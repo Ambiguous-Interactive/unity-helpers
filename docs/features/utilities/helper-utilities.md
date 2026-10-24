@@ -1879,18 +1879,11 @@ preserve its output and use **Clean Build** in Build Profiles. A build script ca
 [Unity's clean-build guide](https://docs.unity3d.com/6000.0/Documentation/Manual/build-clean-build.html).
 Keep the browser console visible when checking the rebuilt player.
 
-In the controlled [#991 investigation](https://github.com/Ambiguous-Interactive/unity-helpers/issues/991),
-a retained `Library` cache omitted `MonoScript` from native registration and produced 30 errors per
-page load. Rebuilding with an empty `Library` restored registration with all 41 authored and
-project-setting files byte-identical. A later incremental build reintroduced the omission with
-current production source; `CleanBuildCache` restored registration and removed the errors.
-The builds retained IL2CPP Release, High managed stripping, native stripping, and the same
-serialized MonoScript resources. Storage checks passed in both failing and error-free players.
-
-The [recorded counterfactual](../../performance/browser-storage-webgl-cache-evidence.json) isolates
-the retained build cache without identifying the individual cache file responsible. If a clean
-build does not help, close Unity and move `Library` aside before rebuilding all imported state.
-This recovery leaves browser storage data intact and does not require weaker stripping settings.
+If a clean build does not help, close Unity and move `Library` aside before rebuilding imported
+state. Keep a copy of the failing output and compare the same source and build settings after
+recovery. This rebuild leaves browser storage data intact and does not require weaker stripping
+settings. A successful storage read does not by itself show that the startup registration error is
+resolved; check the browser console as well.
 
 <a id="environment-detection"></a>
 

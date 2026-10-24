@@ -719,55 +719,13 @@ contract; disabling unsafe blocks alone does not exclude those tools.
 Reference clearing and callback invocation still perform runtime work. Removing disposal-lease work
 does not establish a timing or allocation improvement for a particular workload.
 
-`FromBase64` privately owns its temporary byte array and returns it in `finally`, without issuing
-a disposable lease. The array never leaves the synchronous decoder; only the decoded string escapes.
-This preserves the BCL pool, byte clearing policy, bounded writes and strict UTF-8 failure handling.
-Copyable leases elsewhere still retain runtime generations.
+Choose between a lease and a borrowed callback by the buffer's lifetime. Keep a lease when several
+helpers must share the same rental, or when work continues beyond the callback. Use a borrowed
+callback when all span access ends before the callback returns. For either form, profile the complete
+operation, including input clearing and callback creation, in your target player.
 
-The Base64 comparison in `BorrowedBufferPerformanceTests` measures complete calls against the current
-`FromBase64` implementation. The experimental borrowed-callback candidate uses the same decoder,
-a cached callback and the same BCL pool. A test-side leased decoder preserves the former ownership
-shape as a correctness and lease-generation positive control. Controls cover pool boundaries,
-malformed input and invalid UTF-8; they verify that the shipped private decoder and borrowed candidate
-do not advance lease generations.
-
-Timing cases retain 32 observations per arm and require calibrated, stable timings before checking
-non-inferiority. Diagnostic runs cannot satisfy that acceptance gate. The borrowed-callback candidate
-stays in test code until player timing, allocation and retained-memory evidence supports its adoption.
-Host evidence does not establish Release-player performance or native allocation behavior.
-
-`BorrowedBufferPreflightTests` records runtime identity, all empty clock brackets, and retained-boxing
-allocation controls before reporting an unqualified channel. The IL2CPP thread allocation counter
-is compiled out unless `UNITY_6000_2_OR_NEWER` is defined. Unity documents the
-`GetAllocatedBytesForCurrentThread` crash fix (UUM-100690) in
-[6000.1.4f1](https://unity.com/releases/editor/whats-new/6000.1.4f1) and
-[6000.2.0f1](https://unity.com/releases/editor/whats-new/6000.2.0f1). The conservative Unity 6.2 cutoff
-also excludes fixed Unity 6.1 patches because the minor-version symbol cannot distinguish them from
-earlier Unity 6.1 releases. Before any IL2CPP counter call, a runtime check also requires an exact
-`6000.minor.patch` version with minor at least 2 and a final (`f`) or patch (`p`) release suffix with a
-positive build number. Alpha, beta, malformed, and unknown major versions report an unsupported
-channel with no counter calls. A permitted counter still needs positive calibration in the exact player;
-this guard does not establish native AOT safety or allocation eligibility. These records remain diagnostic:
-binary, corpus and build settings are unverified, and retained-memory accounting is not calibrated.
-Passing clock or managed-byte controls cannot establish campaign eligibility or candidate adoption.
-
-For an executed standalone run, `scripts/unity/run-ci-tests.ps1` accepts an optional
-`-FrozenPlayerDeclarationPath`. The JSON declaration uses `SchemaVersion: 1`, a unique `RunId`, the
-requested `UnityVersion` and `Backend` (`Mono2x` or `IL2CPP`), and nonempty `SourceFiles` and
-`CorpusFiles` arrays. Each file entry contains a repository-relative `Path` and its lowercase SHA256
-in `Sha256`. The runner records declared input hashes and the complete player directory before and
-after launch, rejects changes, and retains a diagnostic report under the run's artifacts directory.
-The report also checks the exact preflight and two Base64 correctness outcomes. To join the compiled
-player to actual test inputs, export `BorrowedBase64Tests.CreateCanonicalCorpusBytes()` and include
-that file in `CorpusFiles`. Set the optional `CanonicalCorpusPath` to its exact declared path. The
-runner compiles the run and declaration hashes into the performance test assembly and checks both
-runtime markers against the frozen corpus. The shared corpus contains 35 correctness rows and 12
-whole-call declarations. The correctness marker reports 70 decoder comparisons; those comparisons
-do not execute the 12 timing cases. Missing or conflicting markers reject the join.
-
-Declared hashes do not prove complete source coverage. Effective build settings, timing-case
-consumption and retained-memory behavior remain unverified; campaign and adoption eligibility stay
-false.
+For examples of safe copies, returned results and interface boxing, see
+[using pooled resources safely](../../performance/ownership-audit.md).
 
 ---
 

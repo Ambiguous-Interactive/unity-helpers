@@ -1,55 +1,32 @@
 # Random Number Generator Performance Benchmarks
 
-State repair for a generator restored from JSON or protobuf happens in its constructor or the shared
-after-deserialization callback. This includes each generator's state, the shared bit/byte reservoirs
-and GUID scratch buffer. Repair is not repeated in a draw method, so malformed/default serialized
-state is repaired before the first draw without adding a guard to every later draw. PhotonSpin's
-one-time warmup priming also happens there, leaving only its block-boundary check in the draw path.
+Use the tables below as historical measurements, then profile the random operations your game
+actually calls. Throughput, statistical quality and replay compatibility answer different questions.
+A fast raw integer draw does not establish the cost or behavior of a bounded or Gaussian sample.
 
 ## How the Speed column is measured
 
-The ops/s columns are each generator measured on its own, one after another. That answers "how fast
-is this generator here" and it is the wrong instrument for "which generator is faster": the roster
-takes minutes to walk, and anything that changed on the machine in between lands on whichever
-generator was being measured at the time.
+The ops/s columns measure generators sequentially on one machine. Machine load can change between
+measurements, so use them as local throughput observations rather than a universal ranking.
 
-The **Speed** column is measured differently. Every generator is compared against `IllusionFlow`
-(the speed baseline, measured in the same `ABBABAAB` batch) so each of the four readings that make
-up a ratio sits next to the reading it is divided by, and both generators occupy the same mean
-position in the batch. A drift that is linear across the batch cancels rather than being attributed
-to one side. The four raw readings per side are kept, and their spread is what decides whether the
-ratio is worth publishing: if the machine moved more than 3% between adjacent cycles, that
-generator falls back to the un-paired number and the run says so.
+The **Speed** column uses paired comparisons against `IllusionFlow`, with alternating measurement
+order and repeated readings. When readings vary by more than 3%, the benchmark falls back to an
+unpaired measurement and reports that limitation. Device, backend and workload differences still
+matter even for a stable paired result.
 
-So a Speed bucket is a claim about the generators; an ops/s figure is a claim about this machine on
-that day.
+<a id="two-batteries-because-they-ask-different-questions"></a>
 
-## Two batteries, because they ask different questions
+## Statistical quality
 
-**PractRand** streams until something fails and reports the depth: a generator is "clean through
-8GB" or it is not. **TestU01 SmallCrush** runs fifteen fixed statistics and reports a p-value for
-each. A generator can be clean at 8GB of PractRand and still land a decisive p-value here, so
-neither stands in for the other.
+**PractRand** tests a byte stream up to a reported depth, such as 8 GB. **TestU01 SmallCrush** runs
+a smaller fixed set of statistical tests. Passing one does not imply passing the other, and neither
+proves suitability for every use. The descriptions distinguish observed outcomes from unmeasured
+claims. In particular, `Sfc64Random` has no recorded PractRand depth at either stream width;
+its deterministic bit-plane checks do not supply that result.
 
-Both run against the same byte stream, from the same host, so a difference between them is a
-difference between the batteries rather than between two ways of producing bytes.
-
-The outcome manifest must match the host's live `--list` inventory; the ordinary stream contract
-checks that equality before the scheduled batteries run. An expected pass with `cleanThrough: null`
-is an unmeasured hypothesis. A clean report remains **INCONCLUSIVE** until its baseline is reviewed
-and recorded, while a definitive failure still fails the report. `Sfc64Random` currently has this
-unmeasured status at both widths; its deterministic bit-plane checks establish no PractRand depth.
-Reports must carry matching battery and stream headers plus complete blocks with positive test
-results. Empty, malformed or truncated output is an error. Clean output must reach the requested byte
-budget; a complete early failure remains conclusive. Control discrimination uses the reported depth,
-and a clean run below a recorded passing baseline remains inconclusive.
-
-Reading a SmallCrush result takes one piece of context: with fifteen statistics, a perfectly good
-generator lands one p-value outside `[0.001, 0.9990]` roughly one run in seven. The threshold that
-separates noise from signal is not close: the recorded weak control reports `eps` (below 1e-300),
-while noise sits around 1e-4. Anything below **1e-10** is treated as a failure; anything above it is
-reported and ignored. `IllusionFlow` produced a single 7.2e-4 at the manifest seed and was clean on
-two other seeds, which is what that rule is for.
+Isolated SmallCrush p-values can occur by chance. The historical comparison used a failure
+threshold below `1e-10`; weaker deviations were recorded separately. Do not interpret a single
+passing statistical run as a cryptographic guarantee.
 
 Whole-inventory SmallCrush, 2026-08-26, seed `00010203-0405-0607-0809-0a0b0c0d0e0f`, 908 MB and
 6.3 s of CPU per generator:
@@ -60,12 +37,6 @@ Whole-inventory SmallCrush, 2026-08-26, seed `00010203-0405-0607-0809-0a0b0c0d0e
 - Three recorded-weak generators passed: `DotNetRandom`, `SquirrelRandom`, `SystemRandom`.
   SmallCrush is the shallower instrument, so that is inconclusive rather than a contradiction of
   their rating.
-
-For statistical batteries, the repository's
-`Generator~/WallstopStudios.UnityHelpers.RandomQuality` host emits a reproducible little-endian byte
-stream from an explicit generator, GUID seed and byte count. Long PractRand/TestU01 runs belong in
-scheduled reporting with pinned tools and expected weak-generator failures; they are not suitable as
-nondeterministic pull-request gates.
 
 > The `NextUlong`, `NextLong` and `NextDouble` columns below predate the one-advance-per-64-bit-draw
 > change to `BlastCircuitRandom`, `RomuDuo`, `SplitMix64`, `WyRandom` and `Xoshiro256StarStar`, which
@@ -152,55 +123,52 @@ nondeterministic pull-request gates.
 </table>
 <!-- RANDOM_BENCHMARKS_END -->
 
-## Generators added since the last benchmark run
+<a id="generators-added-since-the-last-benchmark-run"></a>
 
-The tables above are rewritten only by a benchmark run, so a generator added since the last one is
-absent until the `.github/workflows/unity-benchmarks.yml` workflow next runs.
-Absence here says nothing about quality: statistical standing is measured separately, by the
-bit-plane linearity gate on every pull request and by the scheduled PractRand battery. See
-[Random Generators](../features/utilities/random-generators.md) for the current ratings.
+## Choose a generator for your game
 
-The battery runs **both stream widths**. `NextUlong` is no longer `NextUint` rearranged: five
-generators answer a 64-bit draw from one raw word, so half of it reaches a caller only through
-`NextDouble`, `NextLong` and `NextUlong(max)` and appears in no 32-bit draw. Even the generators
-that do build `NextUlong` from two `NextUint` draws pack them high-word-first and write
-little-endian, so their 64-bit stream is the 32-bit one with each adjacent word pair swapped.
-`SystemRandom` is the proof that this is not a redundant measurement: it fails the 32-bit battery at
-exactly 8GB and is clean through 8GB at 64-bit. Every "clean through 8GB" above is the 32-bit
-figure; the 64-bit outcomes are recorded per generator in
-`scripts/random-quality/expected-outcomes.json`.
+Use the tables to compare the measured operations, then read the
+[random generator guide](../features/utilities/random-generators.md) for the current generator
+choices and APIs. A generator added after the recorded benchmark run may be absent from these
+tables. Absence is not a quality or speed rating.
+
+The `NextUint` column measures raw 32-bit draws. Bounded integers, floating-point transforms,
+weighted selection and Gaussian draws do different work. Compare the operation your game uses,
+and profile it on your target device and scripting backend before changing generators for speed.
+
+Statistical quality is separate from throughput. A clean finite test stream is not a guarantee
+for every seed or workload. The quality descriptions above refer to the tested 32-bit streams;
+a 64-bit draw can use a different part or ordering of a generator's state. These generators are
+not cryptographic random sources.
 
 ## Raw-stream compatibility
 
-`npm run test:random-quality-stream` checks frozen raw-output vectors for all 20 managed
-generators in the standalone host. Each generator has two fixed seeds and both 32-bit and
-64-bit streams: 80 cases, each checking its first 256 bytes and the SHA-256 of 1 MiB.
-The vectors come from main commit `14adde00a4e372a387dd2a3a3a845b47b7078cc6` and are stored in
-`scripts/random-quality/raw-stream-vectors.json`. Preserve them when changing bounded sampling;
-an intentional raw-stream change requires an explicit compatibility decision.
+A raw stream is the sequence returned by unbounded `NextUint()` or `NextUlong()` calls. It is
+separate from bounded sampling, which can consume more than one raw draw when rejecting a value.
+Changing the bounds, operation order or failure policy can therefore change later results even
+when the underlying raw stream stays the same.
 
-`RandomRawStreamCompatibilityTests` runs all 80 one-MiB hashes inside Unity, using direct
-constructors so the cases also reach IL2CPP and WebGL test players. The host gate checks exact
-parity between the Unity cases and the frozen JSON inventory. A host pass does not prove a player
-pass: retain the executed fixture results for each Unity version and backend in the campaign.
+For deterministic gameplay, record the generator type, seed or saved state, package version and
+call order. Save a snapshot when you need to resume partway through a stream: a seed alone does
+not include cached Gaussian, bit or byte state. See
+[saving and restoring random state](../features/utilities/random-generators.md#saving-and-restoring-a-generator)
+for the snapshot APIs.
 
-The two generators outside that host inventory have separate Unity fixtures:
+| Generator family           | Replay consideration                                                                                                   |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Package-managed generators | Keep the generator and saved state format consistent; check retained replays when upgrading.                           |
+| `NativePcgRandom`          | Value copies preserve its state, including partially consumed bit reservoirs; it has no `RandomState` or protobuf API. |
+| `UnityRandom`              | Follows the running Unity engine; do not assume identical engine streams or snapshot payloads across Unity versions.   |
+| `DotNetRandom`             | Wraps `System.Random`; its sequence depends on the runtime.                                                            |
+| `WDoomRandom`              | Deliberately repeats a fixed table; use only when that deterministic behavior is intended.                             |
 
-| Generator             | Raw compatibility check                                                        | Continuation check                                                                                      |
-| --------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| 20 managed generators | 80 frozen hashes, two seeds and both widths                                    | Snapshot, copy, JSON and protobuf fixtures; generated protobuf runs on IL2CPP                           |
-| NativePcgRandom       | Existing integer-seed golden words at both widths                              | Value copies preserve partially consumed bit reservoirs; no RandomState or protobuf API                 |
-| UnityRandom           | Both widths match the current engine's integer draws and final engine position | Mixed snapshot, copy, JSON and generated protobuf continuation with cached Gaussian, bit and byte state |
-
-UnityRandom's adapter check intentionally follows the running engine. It does not promise identical
-Unity engine streams or snapshot payloads across engine versions. JSON and direct protobuf-net
-oracle cases that require unsupported reflection remain separately marked on IL2CPP. Raw hashes
-and continuation checks establish compatibility, not statistical quality, throughput or allocation
-performance; the paired player campaign and WebGL execution remain separate acceptance items.
-WDoomRandom intentionally skips the inherited statistical fixture; its snapshot, copy and protobuf
-and JSON paths have dedicated coverage, including mixed draws with empty and primed caches.
+Raw-stream compatibility does not establish statistical quality, throughput or allocation cost.
+Validate each property that your game depends on, including mixed sampling calls and retained
+saves, on the backends you ship.
 
 ## Refreshing these numbers
 
-Run `RandomPerformanceTests.Benchmark` from Unity's Test Runner, or dispatch the `Unity Benchmarks`
-workflow manually; refreshed results land through the protected-branch perf-results commit. Both rewrite the tables in place.
+The package publishes refreshed tables after its benchmark workflow completes. To measure your
+own project, run `RandomPerformanceTests.Benchmark` in Unity's Test Runner with the package tests
+enabled. Keep the Unity version, backend and device with your results so later comparisons use
+the same environment.

@@ -56,7 +56,6 @@ from surviving when domain reload is disabled. Enable automatic pruning again
 when initializing each play session. Maps that never opt in stay entirely
 manual, including session cleanup.
 
-The logger and serializer use the same public comparer. Run
-`npm run test:stable-assets` for portable comparer and canonicalizer tests. The
-Unity fixtures also check destroyed-key lookup, exact pruning and lifecycle
-cleanup.
+Use the comparer when distinct managed objects must remain distinct keys, including destroyed
+Unity objects retained for diagnostics. Use `UnityObjectMap` when you also need explicit or
+scene-unload cleanup. Neither changes Unity's overloaded null checks elsewhere in your code.
