@@ -22,6 +22,8 @@ not_in_nav: |
   readme.md
   images/documentation-image-manifest.md
   includes/abbreviations.md
+
+exclude_docs: |
   runbooks/unity-runners-after-transfer.md
 site_url: https://ambiguous-interactive.github.io/unity-helpers/
 site_description: >-
@@ -260,7 +262,6 @@ nav:
           - AI Model Backends: guides/ai-model-backends.md
           - MCP Local Setup: guides/mcp-local-setup.md
           - MCP Ecosystem Notes: guides/mcp-ecosystem.md
-      - Runner Administration: runbooks/unity-runners-after-transfer.md
   - Project:
       - License: project/license.md
       - Third-Party Notices: project/third-party-notices.md

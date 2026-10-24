@@ -14,8 +14,6 @@ Choose the setup you need:
 - [MCP local setup](../guides/mcp-local-setup.md) for repository coding-tool connections.
 - [AI model backends](../guides/ai-model-backends.md) for optional development launchers.
 - [MCP ecosystem notes](../guides/mcp-ecosystem.md) for the shared tool catalog's design.
-- [Runner administration](../runbooks/unity-runners-after-transfer.md) for maintainers with
-  organization access who need to restore self-hosted CI routing.
 
 ## Dev Container Setup (Recommended)
 
@@ -302,8 +300,7 @@ https://github.com/wallstop/unity-helpers.git#3.1.5
 Maintainers can dispatch **Unity Benchmarks** to validate the licensed benchmark lifecycle. The
 weekly hosted scheduler dispatches it on protected main. Both workflows must be enabled in the
 repository. Branch dispatches retain diagnostics without updating the canonical performance
-baseline. See the [runner runbook](../runbooks/unity-runners-after-transfer.md#licensed-benchmarks)
-for cleanup, cancellation, and reporting requirements.
+baseline.
 
 Maintainers prepare releases from the default branch with the **Release Prepare** workflow. Choose a `major`, `minor`, or `patch` bump, review the generated release PR, and squash-merge it with the default `release: X.Y.Z` title. **Auto publish** is enabled by default. After the merged commit passes Unity Tests, Local Gates, Repo Lint, and every other triggered push validation workflow, automation starts **Release Publish** with that exact commit. It validates and packs npm, creates the `.unitypackage` without opening Unity, creates the release tag when needed, and publishes npm and GitHub Release assets.
 

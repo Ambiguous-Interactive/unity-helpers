@@ -2,11 +2,6 @@
 
 # Unity Runners After Repository Transfer Runbook
 
-This page is for maintainers who administer this repository's GitHub Actions runners. Package
-users do not need runner access or a Unity CI license to install Unity Helpers. Start with
-[Getting Started](../overview/getting-started.md) for game-project setup, or
-[Contributing](../project/contributing.md) for package development.
-
 This runbook explains how to restore self-hosted Unity runner access after a repository is transferred between GitHub organizations (or when a freshly provisioned runner does not pick up queued Unity jobs). Keep execution notes local. Do not paste secrets, screenshots of organization settings, or other private account metadata into this file or any tracked follow-up.
 
 It is referenced by the `runner-preflight` job in `.github/workflows/unity-tests.yml`, `.github/workflows/unity-benchmarks.yml`, and `.github/workflows/runner-bootstrap.yml`, and by `scripts/unity/ensure-editor.ps1` and `.github/actions/print-self-hosted-runner-diagnostics`.
