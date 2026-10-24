@@ -64,6 +64,10 @@ function Resolve-UnityProjectWorkspace {
           PruneRoot    - the parent holding sibling legs' projects, or '' when
                          not persistent (never prune a developer's .artifacts)
           LeafName     - the per-leg directory name
+          LegacyProjectPath - the original path before generation isolation
+
+        GenerationFingerprint isolates generated compiler inputs while retaining
+        package download caches. Explicit project paths remain authoritative.
 
         Pure apart from path normalization: creates nothing, reads nothing.
     #>
@@ -74,7 +78,8 @@ function Resolve-UnityProjectWorkspace {
         [string]$Scope,
         [switch]$ShareEditorProject,
         [string]$ExplicitProjectPath,
-        [string]$PersistentRoot
+        [string]$PersistentRoot,
+        [string]$GenerationFingerprint
     )
 
     $leaf = Get-UnityProjectLeafName -Version $Version -Mode $Mode -Scope $Scope -ShareEditorProject:$ShareEditorProject
@@ -83,6 +88,7 @@ function Resolve-UnityProjectWorkspace {
 
     if (-not [string]::IsNullOrWhiteSpace($ExplicitProjectPath)) {
         return @{
+            LegacyProjectPath = $ExplicitProjectPath
             ProjectPath = $ExplicitProjectPath
             CacheRoot = Join-Path $repoCaches $Version
             Persistent = $false
@@ -91,10 +97,17 @@ function Resolve-UnityProjectWorkspace {
         }
     }
 
+    $legacyLeaf = $leaf
+    if (-not [string]::IsNullOrWhiteSpace($GenerationFingerprint)) {
+        if ($GenerationFingerprint -cnotmatch '^[a-f0-9]{16}$') { throw 'Project generation fingerprint must contain sixteen lowercase hexadecimal characters.' }
+        $leaf += '-framework-' + $GenerationFingerprint
+    }
+
     if (-not [string]::IsNullOrWhiteSpace($PersistentRoot)) {
         $root = $PersistentRoot.Trim()
         $projectsRoot = Join-Path $root 'projects'
         return @{
+            LegacyProjectPath = Join-Path $projectsRoot $legacyLeaf
             ProjectPath = Join-Path $projectsRoot $leaf
             CacheRoot = Join-Path (Join-Path $root 'cache') $Version
             Persistent = $true
@@ -104,6 +117,7 @@ function Resolve-UnityProjectWorkspace {
     }
 
     return @{
+        LegacyProjectPath = Join-Path $repoProjects $legacyLeaf
         ProjectPath = Join-Path $repoProjects $leaf
         CacheRoot = Join-Path $repoCaches $Version
         Persistent = $false

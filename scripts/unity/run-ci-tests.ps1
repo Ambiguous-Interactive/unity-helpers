@@ -5021,10 +5021,15 @@ $ProjectWorkspace = Resolve-UnityProjectWorkspace `
     -Scope $ProjectScope `
     -ShareEditorProject:$ShareEditorProject `
     -ExplicitProjectPath $ProjectPath `
-    -PersistentRoot $ProjectRoot
+    -PersistentRoot $ProjectRoot `
+    -GenerationFingerprint $(if ($TestMode -ne 'export') { Get-UnityTestFrameworkProjectFingerprint -Root $RepoRoot } else { '' })
 $ProjectPath = Resolve-FullPath -Path $ProjectWorkspace.ProjectPath
 
 Initialize-UnityCacheEnvironment -CacheRoot (Resolve-FullPath -Path $ProjectWorkspace.CacheRoot)
+
+if ($TestMode -ne 'export' -and -not $GenerateOnly -and $ProjectWorkspace.Persistent) {
+    Remove-LegacyUnityTestFrameworkCollector -Project $ProjectWorkspace.LegacyProjectPath -ArtifactsPath $ArtifactsPath
+}
 
 # Reclaim disk BEFORE the project directory is (re)created, so this leg's own
 # project is never a prune candidate on the run that needs it.

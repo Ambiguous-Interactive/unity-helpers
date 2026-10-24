@@ -50,7 +50,15 @@ Unity 6 supplies a core package tied to the editor, so the request alone does no
 what ran. See [Unity's core-package policy](https://docs.unity3d.com/6000.5/Documentation/Manual/com.unity.test-framework.html).
 Keep the separate NUnit 3.5 compiler floor and historical host witnesses unchanged.
 
-Generated test projects include an editor-only collector. CI gives each editor invocation a
+Generated test projects include an editor-only collector. Persistent project paths include a
+fingerprint of its source, assembly definition and framework policy. Revisions with different
+collector inputs use separate project Libraries and retain the shared package-download cache.
+Explicit project-path overrides keep their requested location. The runner retires only the
+exact known collector files left by the initial unpublished implementation in legacy caches.
+It refuses unknown or linked files and active editors, retains original bytes before removal,
+and preserves unrelated assets, parent folders and their metadata.
+
+CI gives each editor invocation a
 fresh `*.log.framework/<capture-id>` directory. It retains the manifest before launch, then
 captures the resolved manifest and lock, framework package metadata and C# source files,
 and the loaded editor runner, runtime runner and NUnit DLLs, plus available PDBs. Each domain snapshot records

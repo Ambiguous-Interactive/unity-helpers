@@ -32,7 +32,7 @@ class FrameworkEvidenceTests(unittest.TestCase):
                     System.Text.Json.JsonSerializer.Serialize(value, value.GetType(), new System.Text.Json.JsonSerializerOptions { IncludeFields = true, WriteIndented = pretty }); }
                 public static class Debug { public static void LogError(string value) { System.Console.WriteLine(value); } }
                 } namespace UnityEngine.TestTools { public class UnityTestAttribute : System.Attribute {} }""",
-            "UnityEditor.TestRunner": """namespace UnityEditor { public class InitializeOnLoadAttribute : System.Attribute {} }
+            "UnityEditor.TestRunner": """namespace UnityEditor { public class InitializeOnLoadAttribute : System.Attribute {} public class PackageInfo {} }
                 namespace UnityEditor.TestTools.TestRunner.Api { public class TestRunnerApi {} }
                 namespace UnityEditor.PackageManager {
                     public class PackageInfo {
