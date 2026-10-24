@@ -48,18 +48,20 @@ string winner = UnityEditor.Compilation.CompilationPipeline
     .GetPrecompiledAssemblyPathFromAssemblyName("System.Text.Encodings.Web.dll");
 ```
 
-Then inspect which compiled assemblies reference that exact path. This Editor snippet lists the
-selected file and its callers in the Console:
+Then inspect which compiled assemblies reference that name. This Editor snippet logs each
+caller's full reference path. It matches filenames after normalizing separators, so a relative
+selected path can be compared with the absolute paths in the compiler's reference list:
 
 <!-- doc-sample: compiles-editor -->
 
 ```csharp
 using System;
+using System.IO;
 using UnityEditor.Compilation;
 using UnityEngine;
 
-string selected = CompilationPipeline.GetPrecompiledAssemblyPathFromAssemblyName(
-    "System.Text.Encodings.Web.dll");
+const string assemblyFileName = "System.Text.Encodings.Web.dll";
+string selected = CompilationPipeline.GetPrecompiledAssemblyPathFromAssemblyName(assemblyFileName);
 Debug.Log($"Selected encodings assembly: {selected}");
 
 foreach (UnityEditor.Compilation.Assembly assembly in
@@ -67,14 +69,18 @@ foreach (UnityEditor.Compilation.Assembly assembly in
 {
     foreach (string reference in assembly.compiledAssemblyReferences)
     {
-        if (string.Equals(reference, selected, StringComparison.OrdinalIgnoreCase))
+        string fileName = Path.GetFileName(reference.Replace('\\', '/'));
+        if (string.Equals(fileName, assemblyFileName, StringComparison.OrdinalIgnoreCase))
         {
-            Debug.Log($"Referenced by: {assembly.name}");
-            break;
+            Debug.Log($"Referenced by {assembly.name}: {reference}");
         }
     }
 }
 ```
+
+Compare the logged paths with the selected file. Registry packages may use a `Library/PackageCache`
+physical path for an asset shown under `Packages` in the Project window. If the selected path is
+empty, Unity did not select a matching assembly in the current compilation context.
 
 Check the assembly that reports the error. If its asmdef enables **Override References**, it must
 explicitly list the precompiled DLLs it uses; an auto-referenced plugin does not override that
