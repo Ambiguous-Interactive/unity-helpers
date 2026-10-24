@@ -274,6 +274,24 @@ class FrameworkEvidenceTests(unittest.TestCase):
         self.assertEqual(len(list(self.output.glob("*/capture-error.txt"))), 1)
         self.assertNotEqual(self.verify(process_id=1).returncode, 0)
 
+    def test_valid_unity_package_source_paths_are_retained(self) -> None:
+        relative = "Samples~/1_RunningTest_Project_Solution/Tests_1s/MyMathTests.cs"
+        source = self.package / relative
+        source.parent.mkdir(parents=True)
+        source.write_text("// Registry sample path control")
+        additional = self.package / "Samples~/Space and plus+/Unicode-λ.cs"
+        additional.parent.mkdir(parents=True)
+        additional.write_text("// Legal relative source path control")
+        self.capture()
+        result = self.verify()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        receipt_path, receipt = self.receipt()
+        self.assertEqual(receipt["SourceCount"], 3)
+        self.assertEqual(
+            (receipt_path.parent / "package" / relative).read_bytes(),
+            source.read_bytes(),
+        )
+
     def test_oversized_source_is_refused_before_copy(self) -> None:
         (self.package / "Editor/Source.cs").write_bytes(b"x" * (16777216 + 1))
         self.capture()
@@ -355,6 +373,10 @@ class FrameworkEvidenceTests(unittest.TestCase):
             "package\\escape",
             "package//escape",
             "package/./escape",
+            "C:/absolute",
+            "package/name:stream",
+            "package/control\ncharacter",
+            "   ",
         ):
             receipt = json.loads(json.dumps(original))
             receipt["Files"][0]["Path"] = relative

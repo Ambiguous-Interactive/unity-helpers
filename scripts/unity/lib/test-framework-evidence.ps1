@@ -19,8 +19,9 @@ function Assert-UnityTestFrameworkEvidence {
         }
         $paths = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
         foreach ($file in $receipt.Files) {
-            if ($file.Path -isnot [string] -or $file.Path -cnotmatch '^[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*$' -or
-                @($file.Path.Split('/') | Where-Object { $_ -in @('.', '..') }).Count -gt 0 -or -not $paths.Add($file.Path)) {
+            if ($file.Path -isnot [string] -or [string]::IsNullOrWhiteSpace($file.Path) -or
+                [IO.Path]::IsPathRooted($file.Path) -or $file.Path.Contains('\') -or $file.Path -match '[\x00-\x1f\x7f:]' -or
+                @($file.Path.Split('/') | Where-Object { $_ -in @('', '.', '..') }).Count -gt 0 -or -not $paths.Add($file.Path)) {
                 throw 'Malformed or duplicate Test Framework evidence path.'
             }
             $path = Join-Path $snapshot.FullName $file.Path
