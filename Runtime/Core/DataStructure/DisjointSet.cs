@@ -155,13 +155,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 int parent = parents[current];
                 if (parent == current)
                 {
-                    representative = current;
                     while (x != current)
                     {
                         int next = parents[x];
                         parents[x] = current;
                         x = next;
                     }
+                    representative = current;
                     return true;
                 }
                 current = parent;

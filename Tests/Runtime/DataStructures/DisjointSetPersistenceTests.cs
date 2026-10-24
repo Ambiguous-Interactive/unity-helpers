@@ -13,6 +13,38 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     [TestFixture]
     public sealed class DisjointSetPersistenceTests
     {
+        private static DisjointSet ReadGraph(
+            int[] parents,
+            int[] ranks,
+            bool legacy,
+            int? setCount = null
+        )
+        {
+            byte[] bytes = new byte[checked((parents.Length + ranks.Length) * 11 + 16)];
+            WProtoWriter writer = new WProtoWriter(bytes);
+            foreach (int parent in parents)
+            {
+                Assert.That(writer.TryWriteTag(1, WProtoWireType.Varint), Is.True);
+                Assert.That(writer.TryWriteInt32(parent), Is.True);
+            }
+            foreach (int rank in ranks)
+            {
+                Assert.That(writer.TryWriteTag(2, WProtoWireType.Varint), Is.True);
+                Assert.That(writer.TryWriteInt32(rank), Is.True);
+            }
+            Assert.That(writer.TryWriteTag(3, WProtoWireType.Varint), Is.True);
+            Assert.That(writer.TryWriteInt32(setCount ?? parents.Length), Is.True);
+            byte[] payload = writer.Written.ToArray();
+#if !WALLSTOP_PROTO_ONLY
+            if (legacy)
+            {
+                using MemoryStream stream = new MemoryStream(payload);
+                return ProtoBuf.Serializer.Deserialize<DisjointSet>(stream);
+            }
+#endif
+            return WProtoFacade.Deserialize<DisjointSet>(payload);
+        }
+
         [TestCase(-1, false)]
         [TestCase(3, false)]
         [TestCase(int.MinValue, false)]
@@ -302,38 +334,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.That(sets.Count, Is.Zero);
             Assert.That(sets.SetCount, Is.Zero);
             Assert.That(sets.TryUnion(0, 0), Is.False);
-        }
-
-        private static DisjointSet ReadGraph(
-            int[] parents,
-            int[] ranks,
-            bool legacy,
-            int? setCount = null
-        )
-        {
-            byte[] bytes = new byte[checked((parents.Length + ranks.Length) * 11 + 16)];
-            WProtoWriter writer = new WProtoWriter(bytes);
-            foreach (int parent in parents)
-            {
-                Assert.That(writer.TryWriteTag(1, WProtoWireType.Varint), Is.True);
-                Assert.That(writer.TryWriteInt32(parent), Is.True);
-            }
-            foreach (int rank in ranks)
-            {
-                Assert.That(writer.TryWriteTag(2, WProtoWireType.Varint), Is.True);
-                Assert.That(writer.TryWriteInt32(rank), Is.True);
-            }
-            Assert.That(writer.TryWriteTag(3, WProtoWireType.Varint), Is.True);
-            Assert.That(writer.TryWriteInt32(setCount ?? parents.Length), Is.True);
-            byte[] payload = writer.Written.ToArray();
-#if !WALLSTOP_PROTO_ONLY
-            if (legacy)
-            {
-                using MemoryStream stream = new MemoryStream(payload);
-                return ProtoBuf.Serializer.Deserialize<DisjointSet>(stream);
-            }
-#endif
-            return WProtoFacade.Deserialize<DisjointSet>(payload);
         }
     }
 }
