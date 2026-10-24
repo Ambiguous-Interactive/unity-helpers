@@ -106,7 +106,10 @@ class FrameworkEvidenceTests(unittest.TestCase):
             $definition = $ast.Find({ param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Invoke-UnityObservedEditor' }, $true)
             Invoke-Expression $definition.Extent.Text
             function Get-UnityNativeEvidence { param($Capture, $LogPath) return @{ State = 'HOST-SHIM-NOT-UNITY' } }
-            function Write-UnityExecutionObservation { param($LogPath, $ProcessObservation, $Label) }
+            function Write-UnityExecutionObservation {
+                param($LogPath, $ProcessObservation, $Label)
+                @{ Process = $ProcessObservation } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath ([IO.Path]::ChangeExtension($LogPath, 'execution-diagnostics.json'))
+            }
             function Invoke-ProcessWithTreeKillTimeout {
                 param($FilePath, $Arguments, $TimeoutSeconds, $LogPath, $Label, $CompletionPattern, $CompletionGraceSeconds, $StallSeconds, $ProcessObservation)
                 $start = [Diagnostics.ProcessStartInfo]::new('dotnet')
@@ -118,6 +121,8 @@ class FrameworkEvidenceTests(unittest.TestCase):
                     if (-not $process.WaitForExit(30000)) { $process.Kill($true); throw 'Host collector control timed out.' }
                     if ($process.ExitCode -ne 0) { throw 'Host collector control failed.' }
                 } finally { $process.Dispose() }
+                $null = New-Item -ItemType Directory -Path (Split-Path -Parent $LogPath) -Force
+                [IO.File]::WriteAllText($LogPath, ('HOST ORIGINAL PID ' + $ProcessObservation.ProcessId))
                 $capture = $Arguments[[Array]::IndexOf($Arguments, '-uhFrameworkEvidenceDirectory') + 1]
                 if ($Control -ceq 'missing') { Get-ChildItem -LiteralPath $capture -Directory | Remove-Item -Recurse -Force }
                 if ($Control -ceq 'wrong-process') { $ProcessObservation.ProcessId = 1 }
@@ -129,6 +134,8 @@ class FrameworkEvidenceTests(unittest.TestCase):
                 $second = Invoke-UnityObservedEditor -EditorPath 'labeled-host-shim' -Arguments @('-projectPath', $Project) -LogPath $LogPath -Label 'HOST CONTROL' -TimeoutSeconds 30
                 if (@(Get-ChildItem -LiteralPath (Join-Path $ArtifactsPath 'framework') -Directory).Count -ne 2) { throw 'Invocations reused evidence directories.' }
             }
+            [IO.File]::WriteAllText($LogPath, 'OVERWRITTEN RETRY LOG')
+            [IO.File]::WriteAllText([IO.Path]::ChangeExtension($LogPath, 'execution-diagnostics.json'), '{"Process":{"ProcessId":1}}')
         """
         )
 
@@ -468,7 +475,11 @@ class FrameworkEvidenceTests(unittest.TestCase):
                     receipt = json.loads(next(capture.glob("*/receipt.json")).read_text())
                     self.assertEqual(invocation["ProcessId"], receipt["ProcessId"])
                     self.assertEqual(invocation["ProjectPath"], receipt["ProjectPath"])
-                    self.assertEqual(invocation["LogRelativePath"], "migration/OdinMigrationDictionaryImportVerificationTests/unity.log" if control == "deep" else "twice.log")
+                    retained_log = self.case / control / invocation["LogRelativePath"]
+                    self.assertEqual(retained_log.read_text(), "HOST ORIGINAL PID " + str(receipt["ProcessId"]))
+                    retained_diagnostics = retained_log.with_suffix(".execution-diagnostics.json")
+                    self.assertEqual(json.loads(retained_diagnostics.read_text())["Process"]["ProcessId"], receipt["ProcessId"])
+                    self.assertEqual(invocation["OriginalLogRelativePath"], "migration/OdinMigrationDictionaryImportVerificationTests/unity.log" if control == "deep" else "twice.log")
             else:
                 self.assertNotEqual(result.returncode, 0, control)
 

@@ -3875,7 +3875,7 @@ function Invoke-UnityObservedEditor {
             $frameworkEvidence = Join-Path $script:ArtifactsPath ('framework/' + [Guid]::NewGuid().ToString('N'))
             $null = New-Item -ItemType Directory -Path $frameworkEvidence -ErrorAction Stop
             Copy-Item -LiteralPath (Join-Path $frameworkProject 'Packages/manifest.json') -Destination (Join-Path $frameworkEvidence 'requested-manifest.json')
-            $frameworkInvocation = @{ SchemaVersion = 1; ProjectPath = $frameworkProject; LogRelativePath = [IO.Path]::GetRelativePath($script:ArtifactsPath, $LogPath).Replace('\', '/') }
+            $frameworkInvocation = @{ SchemaVersion = 1; ProjectPath = $frameworkProject; OriginalLogRelativePath = [IO.Path]::GetRelativePath($script:ArtifactsPath, $LogPath).Replace('\', '/') }
             $frameworkInvocation | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $frameworkEvidence 'invocation.json') -Encoding UTF8
             $Arguments = @($Arguments) + @('-uhFrameworkEvidenceDirectory', $frameworkEvidence)
         }
@@ -3902,6 +3902,10 @@ function Invoke-UnityObservedEditor {
     catch { $ProcessObservation['NativeEvidence'] = @{ State = 'capture-unavailable'; Files = @() } }
     Write-UnityExecutionObservation -LogPath $LogPath -ProcessObservation $ProcessObservation -Label $Label
     if ($null -ne $frameworkEvidence) {
+        $capturedFrameworkLog = Join-Path $frameworkEvidence 'unity.log'
+        Copy-Item -LiteralPath $LogPath -Destination $capturedFrameworkLog -ErrorAction Stop
+        Copy-Item -LiteralPath ([IO.Path]::ChangeExtension($LogPath, 'execution-diagnostics.json')) -Destination (Join-Path $frameworkEvidence 'unity.execution-diagnostics.json') -ErrorAction Stop
+        $frameworkInvocation.LogRelativePath = [IO.Path]::GetRelativePath($script:ArtifactsPath, $capturedFrameworkLog).Replace('\', '/')
         $frameworkInvocation.ProcessId = $ProcessObservation.ProcessId
         $frameworkInvocation | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $frameworkEvidence 'invocation.json') -Encoding UTF8
         Assert-UnityTestFrameworkEvidence -Directory $frameworkEvidence -ProcessId $ProcessObservation.ProcessId -Project $frameworkProject
