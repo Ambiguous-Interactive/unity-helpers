@@ -3872,9 +3872,11 @@ function Invoke-UnityObservedEditor {
     if ($projectArgument -ge 0 -and $projectArgument + 1 -lt $Arguments.Count) {
         $frameworkProject = $Arguments[$projectArgument + 1]
         if (Test-Path -LiteralPath (Join-Path $frameworkProject 'Assets/UhCiTestFrameworkEvidence/Editor/UhCiTestFrameworkEvidence.cs')) {
-            $frameworkEvidence = "$LogPath.framework/$([Guid]::NewGuid().ToString('N'))"
+            $frameworkEvidence = Join-Path $script:ArtifactsPath ('framework/' + [Guid]::NewGuid().ToString('N'))
             $null = New-Item -ItemType Directory -Path $frameworkEvidence -ErrorAction Stop
             Copy-Item -LiteralPath (Join-Path $frameworkProject 'Packages/manifest.json') -Destination (Join-Path $frameworkEvidence 'requested-manifest.json')
+            $frameworkInvocation = @{ SchemaVersion = 1; ProjectPath = $frameworkProject; LogRelativePath = [IO.Path]::GetRelativePath($script:ArtifactsPath, $LogPath).Replace('\', '/') }
+            $frameworkInvocation | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $frameworkEvidence 'invocation.json') -Encoding UTF8
             $Arguments = @($Arguments) + @('-uhFrameworkEvidenceDirectory', $frameworkEvidence)
         }
     }
@@ -3900,6 +3902,8 @@ function Invoke-UnityObservedEditor {
     catch { $ProcessObservation['NativeEvidence'] = @{ State = 'capture-unavailable'; Files = @() } }
     Write-UnityExecutionObservation -LogPath $LogPath -ProcessObservation $ProcessObservation -Label $Label
     if ($null -ne $frameworkEvidence) {
+        $frameworkInvocation.ProcessId = $ProcessObservation.ProcessId
+        $frameworkInvocation | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $frameworkEvidence 'invocation.json') -Encoding UTF8
         Assert-UnityTestFrameworkEvidence -Directory $frameworkEvidence -ProcessId $ProcessObservation.ProcessId -Project $frameworkProject
     }
     return $watch

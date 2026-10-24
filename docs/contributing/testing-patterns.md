@@ -59,7 +59,7 @@ It refuses unknown or linked files and active editors, retains original bytes be
 and preserves unrelated assets, parent folders and their metadata.
 
 CI gives each editor invocation a
-fresh `*.log.framework/<capture-id>` directory. It retains the manifest before launch, then
+fresh `framework/<capture-id>` directory at the leg artifact root, independent of nested log paths. An invocation record binds that capture to its log, project and process. It retains the manifest before launch, then
 captures the resolved manifest and lock, framework package metadata and C# source files,
 and the loaded editor runner, runtime runner and NUnit DLLs, plus available PDBs. Package sources use short numbered filenames; the inventory retains their original package-relative paths. This keeps generated compiler and evidence paths within Windows file API limits. Each domain snapshot records
 its process, project, Unity version, loaded module IDs and file hashes. The readback checks

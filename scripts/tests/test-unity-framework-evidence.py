@@ -95,9 +95,10 @@ class FrameworkEvidenceTests(unittest.TestCase):
 
         cls.invoker = cls.root / "invoke.ps1"
         cls.invoker.write_text(
-            r"""param([string]$Root, [string]$Project, [string]$Driver, [string]$LogPath, [string]$Control)
+            r"""param([string]$Root, [string]$Project, [string]$Driver, [string]$LogPath, [string]$ArtifactsPath, [string]$Control)
             Set-StrictMode -Version Latest
             $ErrorActionPreference = 'Stop'
+            $script:ArtifactsPath = $ArtifactsPath
             . (Join-Path $Root 'scripts/unity/lib/test-framework-evidence.ps1')
             $tokens = $null
             $errors = $null
@@ -126,7 +127,7 @@ class FrameworkEvidenceTests(unittest.TestCase):
             $first = Invoke-UnityObservedEditor -EditorPath 'labeled-host-shim' -Arguments @('-projectPath', $Project) -LogPath $LogPath -Label 'HOST CONTROL' -TimeoutSeconds 30
             if ($Control -ceq 'twice') {
                 $second = Invoke-UnityObservedEditor -EditorPath 'labeled-host-shim' -Arguments @('-projectPath', $Project) -LogPath $LogPath -Label 'HOST CONTROL' -TimeoutSeconds 30
-                if (@(Get-ChildItem -LiteralPath "$LogPath.framework" -Directory).Count -ne 2) { throw 'Invocations reused evidence directories.' }
+                if (@(Get-ChildItem -LiteralPath (Join-Path $ArtifactsPath 'framework') -Directory).Count -ne 2) { throw 'Invocations reused evidence directories.' }
             }
         """
         )
@@ -431,7 +432,7 @@ class FrameworkEvidenceTests(unittest.TestCase):
         source.write_text(
             (ROOT / "scripts/unity/test-framework-evidence.cs.txt").read_text()
         )
-        for control in ("twice", "missing", "wrong-process"):
+        for control in ("twice", "deep", "missing", "wrong-process"):
             result = subprocess.run(
                 [
                     "pwsh",
@@ -445,7 +446,9 @@ class FrameworkEvidenceTests(unittest.TestCase):
                     "-Driver",
                     str(self.root / "bin/Driver.dll"),
                     "-LogPath",
-                    str(self.case / (control + ".log")),
+                    str(self.case / control / ("migration/OdinMigrationDictionaryImportVerificationTests/unity.log" if control == "deep" else control + ".log")),
+                    "-ArtifactsPath",
+                    str(self.case / control),
                     "-Control",
                     control,
                 ],
@@ -454,13 +457,18 @@ class FrameworkEvidenceTests(unittest.TestCase):
                 text=True,
                 timeout=60,
             )
-            if control == "twice":
+            if control in ("twice", "deep"):
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                for capture in (self.case / "twice.log.framework").iterdir():
+                for capture in (self.case / control / "framework").iterdir():
                     self.assertEqual(
                         json.loads((capture / "requested-manifest.json").read_text()),
                         self.manifest,
                     )
+                    invocation = json.loads((capture / "invocation.json").read_text())
+                    receipt = json.loads(next(capture.glob("*/receipt.json")).read_text())
+                    self.assertEqual(invocation["ProcessId"], receipt["ProcessId"])
+                    self.assertEqual(invocation["ProjectPath"], receipt["ProjectPath"])
+                    self.assertEqual(invocation["LogRelativePath"], "migration/OdinMigrationDictionaryImportVerificationTests/unity.log" if control == "deep" else "twice.log")
             else:
                 self.assertNotEqual(result.returncode, 0, control)
 
