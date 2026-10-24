@@ -36,6 +36,24 @@ function New-Legacy {
 try {
     $fingerprint = Get-UnityTestFrameworkProjectFingerprint -Root $root
     Require ($fingerprint -cmatch '^[0-9a-f]{16}$') 'bounded generation fingerprint'
+    $workflow = [IO.File]::ReadAllText((Join-Path $root '.github/workflows/unity-tests.yml'))
+    $step = [regex]::Match($workflow, '(?ms)^      - name: Capture native exit diagnostics\r?\n.*?(?=^      - name:)').Value
+    $run = [regex]::Match($step, '(?ms)^        run: \|\r?\n(?<script>.*)$').Groups['script'].Value
+    $prefix = $run.Substring(0, $run.IndexOf('$captureTimeout =')).Replace('${{ matrix.unity-version }}', '6000.6.0f1')
+    $prefix = [regex]::Replace($prefix, '(?m)^          ', '')
+    $previousWorkspace = $env:GITHUB_WORKSPACE
+    $previousRunnerWorkspace = $env:RUNNER_WORKSPACE
+    try {
+        $env:GITHUB_WORKSPACE = $root
+        $env:RUNNER_WORKSPACE = $temporary
+        Push-Location $root
+        try { Invoke-Expression $prefix } finally { Pop-Location }
+        $expectedDiagnostic = Resolve-UnityProjectWorkspace -RepoRoot $root -Version '6000.6.0f1' -Mode editmode -ShareEditorProject -PersistentRoot (Join-Path $temporary 'unity-workspace') -GenerationFingerprint $fingerprint
+        Require ($workspace.ProjectPath -ceq $expectedDiagnostic.ProjectPath) 'native diagnostics inspect the generated project that ran'
+    } finally {
+        $env:GITHUB_WORKSPACE = $previousWorkspace
+        $env:RUNNER_WORKSPACE = $previousRunnerWorkspace
+    }
     $inputRoot = Join-Path $temporary 'inputs'
     $null = New-Item -ItemType Directory -Path (Join-Path $inputRoot '.github'), (Join-Path $inputRoot 'scripts/unity') -Force
     $inputs = @('.github/unity-test-framework.json', 'scripts/unity/test-framework-evidence.cs.txt', 'scripts/unity/test-framework-evidence.asmdef.txt')

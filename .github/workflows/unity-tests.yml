@@ -753,9 +753,11 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           . ./scripts/unity/lib/project-workspace.ps1
+          . ./scripts/unity/lib/test-framework-evidence.ps1
           $workspace = Resolve-UnityProjectWorkspace -RepoRoot $env:GITHUB_WORKSPACE `
             -Version '${{ matrix.unity-version }}' -Mode editmode -ShareEditorProject `
-            -PersistentRoot (Join-Path $env:RUNNER_WORKSPACE 'unity-workspace')
+            -PersistentRoot (Join-Path $env:RUNNER_WORKSPACE 'unity-workspace') `
+            -GenerationFingerprint (Get-UnityTestFrameworkProjectFingerprint -Root $env:GITHUB_WORKSPACE)
           $captureTimeout = if ($env:UH_COMPARE_LOADER_SNAPS -eq 'true') { 300 } else { 600 }
           ./scripts/unity/capture-native-fault.ps1 -EditorPath $env:UNITY_EDITOR_PATH `
             -ProjectPath $workspace.ProjectPath -AssemblyNames $env:UH_TEST_ASSEMBLIES `
