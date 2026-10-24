@@ -505,9 +505,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <remarks>
         /// <para>Null handling: Throws ArgumentNullException if items is null. Throws NullReferenceException if list is null.</para>
         /// <para>Thread safety: Not thread-safe. Modifies the list in place. No Unity main thread requirement.</para>
-        /// <para>Performance: O(m) where m is the number of items to add. Optimized for List&lt;T&gt; using AddRange.</para>
+        /// <para>Performance: O(m) where m is the number of items to add. List&lt;T&gt; and SerializableList&lt;T&gt; use their bulk AddRange paths.</para>
         /// <para>Allocations: May allocate if list needs to grow capacity.</para>
-        /// <para>Edge cases: Empty items collection adds nothing to the list.</para>
+        /// <para>Edge cases: Empty items collection adds nothing. Appending the list itself duplicates its original elements once.</para>
         /// </remarks>
         /// <exception cref="ArgumentNullException">Thrown when items is null.</exception>
         public static void AddRange<T>(this IList<T> list, IEnumerable<T> items)
@@ -520,6 +520,22 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             if (list is List<T> concreteList)
             {
                 concreteList.AddRange(items);
+                return;
+            }
+
+            if (list is SerializableList<T> serializableList)
+            {
+                serializableList.AddRange(items);
+                return;
+            }
+
+            if (ReferenceEquals(list, items))
+            {
+                int count = list.Count;
+                for (int index = 0; index < count; ++index)
+                {
+                    list.Add(list[index]);
+                }
                 return;
             }
 
@@ -536,15 +552,24 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <param name="list">The list to rotate.</param>
         /// <param name="positions">The number of positions to rotate left. Defaults to 1.</param>
         /// <remarks>
-        /// <para>Null handling: If list is null, returns immediately (delegated to Shift).</para>
+        /// <para>Null handling: If list is null, returns immediately.</para>
         /// <para>Thread safety: Not thread-safe. Modifies the list in place. No Unity main thread requirement.</para>
         /// <para>Performance: O(n) where n is the number of elements. Delegates to Shift.</para>
-        /// <para>Allocations: No allocations.</para>
-        /// <para>Edge cases: See Shift method for edge cases.</para>
+        /// <para>Allocations: See <see cref="Shift{T}(IList{T}, int)"/> for pooled scratch and bulk-copy segment costs.</para>
+        /// <para>Edge cases: Every signed position, including int.MinValue, is normalized before changing direction.</para>
         /// </remarks>
         public static void RotateLeft<T>(this IList<T> list, int positions = 1)
         {
-            list.Shift(-positions);
+            if (list == null)
+            {
+                return;
+            }
+            int count = list.Count;
+            if (count <= 1)
+            {
+                return;
+            }
+            list.Shift(-(positions % count));
         }
 
         /// <summary>
@@ -554,10 +579,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <param name="list">The list to rotate.</param>
         /// <param name="positions">The number of positions to rotate right. Defaults to 1.</param>
         /// <remarks>
-        /// <para>Null handling: If list is null, returns immediately (delegated to Shift).</para>
+        /// <para>Null handling: If list is null, returns immediately.</para>
         /// <para>Thread safety: Not thread-safe. Modifies the list in place. No Unity main thread requirement.</para>
         /// <para>Performance: O(n) where n is the number of elements. Delegates to Shift.</para>
-        /// <para>Allocations: No allocations.</para>
+        /// <para>Allocations: See <see cref="Shift{T}(IList{T}, int)"/> for pooled scratch and bulk-copy segment costs.</para>
         /// <para>Edge cases: See Shift method for edge cases.</para>
         /// </remarks>
         public static void RotateRight<T>(this IList<T> list, int positions = 1)

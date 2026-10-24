@@ -257,10 +257,15 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <typeparam name="T">The type of elements in the span.</typeparam>
         /// <param name="span">The span to rotate.</param>
         /// <param name="positions">Positions to rotate left. Defaults to 1.</param>
-        /// <remarks>Delegates to <see cref="Shift{T}(Span{T}, int)"/>; see it for edge cases.</remarks>
+        /// <remarks>Normalizes every signed position, including int.MinValue, before delegating to <see cref="Shift{T}(Span{T}, int)"/>.</remarks>
         public static void RotateLeft<T>(this Span<T> span, int positions = 1)
         {
-            Shift(span, -positions);
+            int count = span.Length;
+            if (count <= 1)
+            {
+                return;
+            }
+            Shift(span, -(positions % count));
         }
 
         /// <summary>

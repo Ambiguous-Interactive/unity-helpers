@@ -16,11 +16,46 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     public sealed class ValueEnumerationAllocationTests
     {
 #if UNITY_5_3_OR_NEWER
-        private const int ProfilerCalls = 128;
+        internal const int ProfilerCalls = 128;
         private const int ProfilerCapacity = 512;
 #endif
 
         private static int _observedSum;
+
+#if UNITY_5_3_OR_NEWER
+        internal static long MeasureProfilerAllocationCount(Action action)
+        {
+            for (int index = 0; index < 64; ++index)
+            {
+                action();
+            }
+            using ProfilerRecorder recorder = ProfilerRecorder.StartNew(
+                ProfilerCategory.Memory,
+                "GC.Alloc",
+                ProfilerCapacity,
+                ProfilerRecorderOptions.CollectOnlyOnCurrentThread
+            );
+            if (!recorder.Valid)
+            {
+                Assert.Ignore("This runtime does not expose the GC.Alloc marker.");
+            }
+            for (int index = 0; index < ProfilerCalls; ++index)
+            {
+                action();
+            }
+            recorder.Stop();
+            Assert.IsFalse(
+                recorder.WrappedAround,
+                "Allocation samples exceeded recorder capacity."
+            );
+            long count = 0;
+            for (int index = 0; index < recorder.Count; ++index)
+            {
+                count += recorder.GetSample(index).Count;
+            }
+            return count;
+        }
+#endif
 
         private static void Consume(IEnumerable<int> source, bool wrapped)
         {
@@ -62,39 +97,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
 #if UNITY_5_3_OR_NEWER
-        private static long MeasureProfilerAllocationCount(Action action)
-        {
-            for (int index = 0; index < 64; ++index)
-            {
-                action();
-            }
-            using ProfilerRecorder recorder = ProfilerRecorder.StartNew(
-                ProfilerCategory.Memory,
-                "GC.Alloc",
-                ProfilerCapacity,
-                ProfilerRecorderOptions.CollectOnlyOnCurrentThread
-            );
-            if (!recorder.Valid)
-            {
-                Assert.Ignore("This runtime does not expose the GC.Alloc marker.");
-            }
-            for (int index = 0; index < ProfilerCalls; ++index)
-            {
-                action();
-            }
-            recorder.Stop();
-            Assert.IsFalse(
-                recorder.WrappedAround,
-                "Allocation samples exceeded recorder capacity."
-            );
-            long count = 0;
-            for (int index = 0; index < recorder.Count; ++index)
-            {
-                count += recorder.GetSample(index).Count;
-            }
-            return count;
-        }
-
         [TestCase(0, 1)]
         [TestCase(0, 16)]
         [TestCase(0, 4096)]
