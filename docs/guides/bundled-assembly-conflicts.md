@@ -12,7 +12,9 @@ error CS0012: The type 'JavaScriptEncoder' is defined in an assembly that is not
 You must add a reference to assembly 'System.Text.Encodings.Web, Version=9.0.0.0, ...'.
 ```
 
-The error is reported against this package's JSON converters, but the package is not the cause.
+The error can appear in a JSON converter even when the missing reference comes from duplicate
+DLL ownership or the caller's assembly definition. Identify the selected DLL and the failing
+assembly before changing imports.
 
 ## Why it happens
 
@@ -46,17 +48,41 @@ string winner = UnityEditor.Compilation.CompilationPipeline
     .GetPrecompiledAssemblyPathFromAssemblyName("System.Text.Encodings.Web.dll");
 ```
 
-If that path is not the one you expect, count how many assemblies actually reference it:
+Then inspect which compiled assemblies reference that exact path. This Editor snippet lists the
+selected file and its callers in the Console:
 
 <!-- doc-sample: compiles-editor -->
 
 ```csharp
-UnityEditor.Compilation.Assembly[] assemblies = UnityEditor.Compilation.CompilationPipeline
-    .GetAssemblies(UnityEditor.Compilation.AssembliesType.Editor);
+using System;
+using UnityEditor.Compilation;
+using UnityEngine;
+
+string selected = CompilationPipeline.GetPrecompiledAssemblyPathFromAssemblyName(
+    "System.Text.Encodings.Web.dll");
+Debug.Log($"Selected encodings assembly: {selected}");
+
+foreach (UnityEditor.Compilation.Assembly assembly in
+    CompilationPipeline.GetAssemblies(AssembliesType.Editor))
+{
+    foreach (string reference in assembly.compiledAssemblyReferences)
+    {
+        if (string.Equals(reference, selected, StringComparison.OrdinalIgnoreCase))
+        {
+            Debug.Log($"Referenced by: {assembly.name}");
+            break;
+        }
+    }
+}
 ```
 
-A healthy project references the name from nearly every assembly. A broken one references it from
-none.
+Check the assembly that reports the error. If its asmdef enables **Override References**, it must
+explicitly list the precompiled DLLs it uses; an auto-referenced plugin does not override that
+assembly's explicit reference policy. Inspect the selected plugin's platform and define constraints
+as well. Editor references do not establish player references for a different target.
+
+If Unity selects another package's explicitly referenced copy, follow that package's supported
+exclusion policy below. Do not add an extra DLL with the same name to fix a missing reference.
 
 ## Resolving it
 
@@ -103,11 +129,8 @@ and adding another competing source can change assembly resolution. The linter's
 absence rule applies to `Runtime/Binaries/`; it does not inventory the separate protobuf
 dependency directory.
 
-The constraints and absence rules for `Runtime/Binaries/` are enforced
-by `scripts/lint-bundled-assemblies.ps1`. That matters because the fix here is invisible: a NuGet
-refresh that regenerates an importer without its constraint, or drops in a new DLL, would silently
-restore the conflict. The linter fails on an unclassified DLL, so a refresh cannot proceed without a
-conscious decision recorded here.
+When reporting a conflict, include the Unity version, target, failing assembly, selected DLL path
+and the relevant plugin/asmdef settings. Do not include credentials or unrelated project data.
 
 ## Bundled dependency versions
 
@@ -118,21 +141,11 @@ The four BCL assemblies under `Runtime/Binaries/` use official NuGet **10.0.13**
 The existing Unity-version constraints and importer GUIDs remain unchanged.
 Newer Unity versions continue to use their own JSON, encodings and async-interface assemblies.
 
-Protobuf-net **3.4.40** uses the rebased AOT patch, Immutable **10.0.13** and
-Unsafe **6.1.2**. Build and verify it with:
+Protobuf-net **3.4.40** uses the package's AOT patch, Immutable **10.0.13** and
+Unsafe **6.1.2**. These versions identify the bundled files; they do not override Unity's assembly
+selection. On newer editors the selected JSON-related assemblies can come from Unity instead.
 
-```bash
-python3 scripts/build-protobuf-candidate.py --output /tmp/protobuf-candidate
-python3 scripts/verify-protobuf-shipped.py --candidate-root /tmp/protobuf-candidate/assemblies
-```
-
-The builder requires SDK 9.0.319 and produces isolated binaries with a source-bound
-build receipt. The independent current lane uses `ProtobufNetOracle=candidate`
-and `ProtobufNetCandidateRoot=/tmp/protobuf-candidate/assemblies`. Frozen v2/v3 lanes
-retain their original DLLs under `Generator~`; dependency upgrades never refresh them.
-The retained Dox consumer suite exercises both the frozen v3 and current builds.
-
-A .NET Standard target and passing host tests do not establish Unity assembly
-ownership or backend health. Supported-version, stripped IL2CPP, WebGL and native
-process qualification remain tracked in
-[#1052](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1052).
+If you maintain the package's bundled assemblies, use the
+[dependency rebuild instructions](../project/contributing.md#rebuild-bundled-serialization-dependencies).
+Game projects do not need to rebuild the package or run its historical compatibility oracles to
+resolve a duplicate-reference error.

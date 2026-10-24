@@ -1,249 +1,45 @@
 # Unity Helpers
 
-> Unity Helpers is a comprehensive Unity package (2021.3+) providing production-ready utilities that reduce boilerplate and improve runtime performance:
->
-> - Professional inspector tooling, spatial data structures, PRNGs, serialization utilities
-> - Effects systems, relational components, and 30+ editor tools
-> - 17,000+ tests, IL2CPP/WebGL compatible, shipped in commercial games
+> A Unity 2021.3+ package for inspector tools, component wiring, serialization, spatial queries,
+> random generators, pooled collections and gameplay effects.
 
 ## Key Information
 
 - **Package Name**: `com.wallstop-studios.unity-helpers`
-- **Version**: 3.0.4
-- **Unity Version**: 2021.3+ (LTS)
+- **Version**: 3.6.2
 - **License**: MIT
-- **Repository**: https://github.com/wallstop/unity-helpers
 - **Root Namespace**: `WallstopStudios.UnityHelpers`
+- **Repository**: https://github.com/wallstop/unity-helpers
 
-### Important Implementation Notes
+## Using This Index
 
-- Use **explicit types** instead of `var` in all code
-- Use **PascalCase** for all method names (no underscores, even in tests)
-- Never use `#region` directives
-- Never use nullable reference types (`?` annotations like `string?`)
-- Never use `?.`, `??`, `??=` on `UnityEngine.Object` types (use explicit null checks instead)
-- Place `using` directives inside namespace blocks
-- Unity Object null checks: use `thing != null` / `thing == null` directly (Unity's Object equality)
-- For tests: use `[Test]` for synchronous tests, `[UnityTest]` with `IEnumerator` for async (NOT `async Task`)
-- One file per MonoBehaviour/ScriptableObject (production AND tests)
+Use the feature guides below when adding Unity Helpers to a game. Read installation requirements,
+public API examples, failure behavior and backend limits before suggesting code. Use documentation
+for the installed package version; main can describe unreleased features. Check CHANGELOG for changes.
 
-### Assembly Structure
+Repository contribution rules apply when editing this package. They are not setup requirements
+for a game that consumes it. Contributor instructions are linked separately under Optional.
 
-| Assembly                                     | Purpose               |
-| -------------------------------------------- | --------------------- |
-| `WallstopStudios.UnityHelpers`               | Runtime code          |
-| `WallstopStudios.UnityHelpers.Editor`        | Editor code           |
-| `WallstopStudios.UnityHelpers.Tests.Runtime` | Runtime tests         |
-| `WallstopStudios.UnityHelpers.Tests.Editor`  | Editor tests          |
-| `WallstopStudios.UnityHelpers.Tests.Core`    | Shared test utilities |
+## Choose a Feature
 
-## Core Features
+- **Inspector attributes**: group fields, show conditional values and invoke methods in the Editor.
+- **Relational components**: assign sibling, parent and child references during component setup.
+- **Serialization**: choose JSON, Unity inspector collections or generated WallstopProto according
+  to the storage contract. Preserve field numbers and retained saves when migrating binary data.
+- **Spatial queries**: select a 2D or 3D index using its update and query semantics.
+- **Random generators**: choose a seedable generator and retain state for replay. These APIs are
+  not cryptographic random sources; consult the random guide for entropy-failure behavior.
+- **Pooling**: keep each lease until its consumer finishes. Logical length can differ from rented
+  array capacity. Do not retain a pooled collection after returning it.
+- **Effects**: define stat changes and tags as assets, then apply and remove effect handles.
+- **Threading**: dispatch Unity work to the main thread. A thread-safe cache does not make Unity
+  objects safe to access from workers.
+- **Reflection**: reuse delegates for runtime-discovered members. Preserve reflected members in
+  stripped players and measure the fallback on your target backend.
 
-### Inspector Tooling (Odin-like, FREE)
-
-Professional inspector attributes eliminating custom PropertyDrawer code:
-
-- `[WGroup]` / `[WGroupEnd]` - Boxed sections with collapsible headers, color themes, animations
-- `[WButton]` - Method buttons with async support, cancellation, history, groupPriority, groupPlacement
-- `[WShowIf]` - Conditional visibility (9 comparison operators)
-- `[WEnumToggleButtons]` - Flag enums as visual toggle grids
-- `[WReadOnly]` - Read-only inspector display
-- `[WInLineEditor]` - Inline nested editor for object references
-- `[WNotNull]` - Validation for required fields (shows error/warning HelpBox in inspector with customizable MessageType and CustomMessage)
-- `[ValidateAssignment]` - Runtime assignment validation (shows error/warning HelpBox for null, empty string, or empty collections)
-- `[StringInList]` - Dropdown selection from string lists, methods (`nameof(Method)`), or static methods
-- `[WValueDropDown]` - Value dropdown selection
-- `[WSerializableCollectionFoldout]` - Custom foldout behavior for serializable collections
-- `[IntDropDown]` - Integer dropdown selection
-- `[EnumDisplayName]` - Custom display names for enum values
-- `[DetectAssetChanged]` - Monitor asset changes and execute methods when assets are created/deleted
-
-### Relational Components (Auto-Wiring)
-
-Reduce GetComponent boilerplate with hierarchy-aware attributes:
-
-```csharp
-[SiblingComponent] private Animator animator;           // Same GameObject
-[ParentComponent] private Rigidbody2D rb;               // Parent hierarchy
-[ChildComponent] private Collider2D[] colliders;        // Children
-[ChildComponent(MaxDepth = 1)] private Weapon[] weapons; // Direct children only
-```
-
-Call `this.AssignRelationalComponents()` in Awake to wire all references.
-
-### Serializable Collections
-
-Unity-serializable data structures with custom inspector drawers:
-
-- `SerializableDictionary<TKey, TValue>` - Dictionary with full inspector support
-- `SerializableSortedDictionary<TKey, TValue>` - Ordered dictionary
-- `SerializableHashSet<T>` - HashSet with duplicate detection
-- `SerializableSortedSet<T>` - Sorted set for `IComparable<T>` elements
-- `SerializableNullable<T>` - Nullable value types in inspector
-- `SerializableType` - Type references in inspector
-- `WGuid` - Serializable GUID
-
-All collections support pagination, inline nested editors, undo/redo, and confirmation dialogs when clearing.
-
-### Spatial Data Structures
-
-O(log n) spatial queries for 2D and 3D:
-
-**2D Trees**: `QuadTree2D<T>`, `KdTree2D<T>`, `RTree2D<T>`, `SpatialHash2D<T>`
-**3D Trees**: `OctTree3D<T>`, `KdTree3D<T>`, `RTree3D<T>`, `SpatialHash3D<T>`
-
-```csharp
-QuadTree2D<Enemy> tree = new(enemies, e => e.transform.position);
-tree.GetElementsInRange(playerPos, radius: 10f, resultsBuffer);
-tree.GetElementsInBounds(bounds, resultsBuffer);
-tree.GetApproximateNearestNeighbors(position, count: 5, resultsBuffer);
-```
-
-### Random Number Generators
-
-20+ high-quality PRNGs (10-15x faster than Unity.Random in benchmarks):
-
-- `PRNG.Instance` - Thread-local default (Xoshiro256StarStar)
-- `IllusionFlow`, `PcgRandom`, `XorShiftRandom`, `XoroShiroRandom`, `SplitMix64`, `RomuDuo`, `WyRandom`
-- `Xoshiro128StarStar`, `Xoshiro256StarStar` - xoshiro\*\* scramblers; no weak output bit, so safe for `NextBool` and low-bit masks
-- `BlastCircuitRandom`, `WaveSplatRandom`, `FlurryBurstRandom`, `PhotonSpinRandom`, `StormDropRandom`, `SquirrelRandom`
-- `LinearCongruentialGenerator`, `DotNetRandom`, `SystemRandom`, `UnityRandom` (wrappers)
-- `WDoomRandom` - index-into-array generator, period 1024; deterministic replays, not statistical randomness
-- `NativePcgRandom` - Burst/Jobs compatible
-- All implement `IRandom` with extensive API: `NextFloat()`, `NextVector2()`, `NextGaussian()`, `NextWeightedIndex()`, `Shuffle()`, `NextGuid()`
-- `NextIntSkewed()` draws a bounded integer toward a preferred target with a bounded sample count
-- `PerlinNoise` - Coherent noise generation
-
-All generators are seedable for deterministic replay systems. Use `RandomGeneratorMetadata` to inspect generator properties.
-
-### Effects System
-
-Data-driven buffs/debuffs using ScriptableObjects:
-
-- `AttributeEffect` - ScriptableObject defining stat modifications, tags, cosmetics, duration
-- `AttributesComponent` - Base class exposing `Attribute` fields
-- `TagHandler` - Reference-counted tag queries ("Stunned", "Invulnerable")
-- `EffectHandle` - Unique ID for tracking/removing specific effect instances
-
-```csharp
-EffectHandle? handle = player.ApplyEffect(hasteEffect);
-if (player.HasTag("Stunned")) return;
-player.RemoveEffect(handle.Value);
-```
-
-### Serialization
-
-JSON and Protobuf serialization with Unity type support:
-
-```csharp
-// JSON (System.Text.Json with Unity converters)
-byte[] json = Serializer.JsonSerialize(data);
-SaveData loaded = Serializer.JsonDeserialize<SaveData>(jsonText);
-
-// Protobuf (protobuf-net, compact binary)
-byte[] proto = Serializer.ProtoSerialize(message);
-Message decoded = Serializer.ProtoDeserialize<Message>(proto);
-```
-
-Supported Unity types: Vector2/3/4, Color, Quaternion, Rect, Bounds, GameObject references.
-
-### Pooling & Buffering
-
-Zero-allocation patterns for hot paths:
-
-```csharp
-// Collection pooling (List, HashSet, etc.)
-using var lease = Buffers<Enemy>.List.Get(out List<Enemy> buffer);
-tree.GetElementsInRange(position, radius, buffer);
-// buffer automatically returned to pool on dispose
-
-// Variable-size array pooling (preferred for dynamic sizes)
-using PooledArray<float> pooled = SystemArrayPool<float>.Get(size, out float[] arr);
-// IMPORTANT: Use pooled.Length, not arr.Length (arr may be larger than requested)
-
-// Exact-size array pooling (for fixed, known sizes only)
-using var arrayLease = WallstopArrayPool<float>.Get(size, out float[] arr);
-```
-
-### Threading & Main Thread Dispatch
-
-Thread-safe utilities for Unity's main thread requirement:
-
-- `UnityMainThreadDispatcher` - Execute code on Unity's main thread from any thread
-- `UnityMainThreadGuard` (internal) - Ensure operations run on the main thread
-- Thread pool utilities for background work
-
-### Editor Tools
-
-30+ automation tools accessible via `Tools > Wallstop Studios > Unity Helpers`:
-
-- **Sprite Tools**: Cropper, Atlas Generator, Pivot Adjuster
-- **Animation Tools**: Event Editor, Creator, Copier, Sheet Animation Creator
-- **Texture Tools**: Blur, Resize, Settings Applier, Fit Texture Size
-- **Validation**: Prefab Checker with comprehensive validation rules
-- **Analysis**: Unity Method Analyzer for detecting inheritance issues and lifecycle method errors
-- **Utilities**: ScriptableObject Singleton Creator, Request Script Compilation (Ctrl/Cmd+Alt+R)
-- **Project Settings**: Configure coroutine wait buffer defaults under `Project Settings > Wallstop Studios > Unity Helpers`
-
-### Data Structures
-
-Additional high-performance structures:
-
-- `CyclicBuffer<T>` - Ring buffer
-- `Heap<T>` / `PriorityQueue<T>` - Min/max heap
-- `Deque<T>` - Double-ended queue
-- `DisjointSet` - Union-find
-- `Trie` - String prefix tree
-- `SparseSet` - Fast add/remove with iteration
-- `BitSet` / `ImmutableBitSet` - Compact boolean storage
-- `TimedCache<T>` - Auto-expiring cache
-
-### Geometry & Math
-
-Geometric primitives and math utilities:
-
-- `Circle`, `Sphere`, `BoundingBox3D` - Geometric primitives
-- `WallMath` - Math utilities, ballistics, geometry calculations
-- `Geometry` - Hull generation (convex/concave), point operations
-- `LineHelper` - Line intersection, distance calculations
-
-### Extension Methods
-
-200+ extensions for Unity types, collections, strings, math:
-
-- `transform.GetAncestors(buffer)` - Non-allocating hierarchy traversal
-- `Camera.OrthographicBounds()` - Visible world bounds
-- `color.GetAverageColor(ColorAveragingMethod.LAB)` - Perceptual color averaging
-- `(-1).PositiveMod(length)` - Non-negative modulo
-- `gameObject.SmartDestroy()` - Editor/runtime safe destruction
-- `string.LevenshteinDistance()` - Edit distance for fuzzy matching
-
-### Visual Components
-
-UGUI and UI Toolkit visual components:
-
-- `EnhancedImage` (UGUI) - Extended Image with HDR color support, improved material management
-- `LayeredImage` (UI Toolkit) - Multi-layer visual element
-- `AnimatedSpriteLayer` - Sprite animation layers
-
-### Singletons
-
-- `RuntimeSingleton<T>` - Component singleton with cross-scene persistence
-- `ScriptableObjectSingleton<T>` - Settings singleton from Resources
-- `[AutoLoadSingleton]` - Automatic singleton instantiation during Unity start-up phases
-
-### DI Framework Integration
-
-Automatic integration with VContainer, Zenject, and Reflex:
-
-```csharp
-// VContainer
-builder.RegisterRelationalComponents();
-
-// Zenject - add RelationalComponentsInstaller to SceneContext
-
-// Reflex - add RelationalComponentsInstaller to SceneScope
-```
+Performance reports describe their stated runtime and workload. Do not turn an Editor result into
+an IL2CPP or WebGL guarantee. A feature's platform support does not imply identical performance,
+allocation behavior or availability of background threads.
 
 ## Docs
 
@@ -264,7 +60,7 @@ builder.RegisterRelationalComponents();
 - [Effects Tutorial](https://github.com/wallstop/unity-helpers/blob/main/docs/features/effects/effects-system-tutorial.md): 5-minute effects setup walkthrough
 - [Serialization Guide](https://github.com/wallstop/unity-helpers/blob/main/docs/features/serialization/serialization.md): JSON and Protobuf serialization
 - [Serialization Types](https://github.com/wallstop/unity-helpers/blob/main/docs/features/serialization/serialization-types.md): Serializable collections documentation
-- [Editor Tools Guide](https://github.com/wallstop/unity-helpers/blob/main/docs/features/editor-tools/editor-tools-guide.md): 20+ editor automation tools
+- [Editor Tools Guide](https://github.com/wallstop/unity-helpers/blob/main/docs/features/editor-tools/editor-tools-guide.md): Editor automation tools
 - [2D Spatial Trees](https://github.com/wallstop/unity-helpers/blob/main/docs/features/spatial/spatial-trees-2d-guide.md): QuadTree, KDTree, RTree usage
 - [3D Spatial Trees](https://github.com/wallstop/unity-helpers/blob/main/docs/features/spatial/spatial-trees-3d-guide.md): OctTree, KDTree3D, RTree3D, SpatialHash3D
 - [Spatial Tree Semantics](https://github.com/wallstop/unity-helpers/blob/main/docs/features/spatial/spatial-tree-semantics.md): Behavior details and edge cases
@@ -278,10 +74,10 @@ builder.RegisterRelationalComponents();
 
 ## Performance
 
-- [Random Performance](https://github.com/wallstop/unity-helpers/blob/main/docs/performance/random-performance.md): PRNG benchmarks (10-15x faster than Unity.Random)
+- [Random Performance](https://github.com/wallstop/unity-helpers/blob/main/docs/performance/random-performance.md): PRNG measurements and their workload limits
 - [Spatial Tree 2D Performance](https://github.com/wallstop/unity-helpers/blob/main/docs/performance/spatial-tree-2d-performance.md): 2D tree benchmarks
 - [Spatial Tree 3D Performance](https://github.com/wallstop/unity-helpers/blob/main/docs/performance/spatial-tree-3d-performance.md): 3D tree benchmarks
-- [Reflection Performance](https://github.com/wallstop/unity-helpers/blob/main/docs/performance/reflection-performance.md): Cached reflection benchmarks (up to 100x faster in tested scenarios)
+- [Reflection Performance](https://github.com/wallstop/unity-helpers/blob/main/docs/performance/reflection-performance.md): Historical boxed and typed access measurements
 - [Relational Components Performance](https://github.com/wallstop/unity-helpers/blob/main/docs/performance/relational-components-performance.md): Component wiring benchmarks
 - [IList Sorting Performance](https://github.com/wallstop/unity-helpers/blob/main/docs/performance/ilist-sorting-performance.md): Sorting algorithm benchmarks
 
@@ -296,4 +92,3 @@ builder.RegisterRelationalComponents();
 
 - [LLM Instructions](https://github.com/wallstop/unity-helpers/blob/main/.llm/context.md): Comprehensive AI agent guidelines for working with this repository
 - [Third-Party Notices](https://github.com/wallstop/unity-helpers/blob/main/docs/project/third-party-notices.md): Attribution for included libraries
-- [Animation Event Editor](https://github.com/wallstop/unity-helpers/blob/main/docs/project/animation-event-editor.md): Detailed animation event editor documentation

@@ -1,29 +1,56 @@
 # Reflection Helpers
 
-**Reflection you can afford to call every frame.** `ReflectionHelpers` turns a `FieldInfo`,
-`PropertyInfo`, `MethodInfo` or `ConstructorInfo` into a delegate once, caches it, and hands you back
-something you can call in a loop -- instead of paying `GetValue` / `Invoke` (and a boxing allocation)
-on every access.
+`ReflectionHelpers` builds reusable delegates for fields, properties, methods and constructors.
+Use it when an integration discovers a member at runtime and then accesses it repeatedly. If you
+already know the member in your own code, direct access is simpler and avoids reflection entirely.
+
+## Build once, reuse for each item
+
+This adapter lets an importer select an integer field by name during setup. It checks the field
+before building the delegate, then reads each later record through the same delegate. The caller
+handles a rejected field choice before processing records.
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using System;
 using System.Reflection;
 using WallstopStudios.UnityHelpers.Core.Helper;
 
-// Once, when you first see the type.
-FieldInfo scoreField = typeof(Player).GetField(
-    "_score",
-    BindingFlags.NonPublic | BindingFlags.Instance
-);
-Func<Player, int> readScore = ReflectionHelpers.GetFieldGetter<Player, int>(scoreField);
+public sealed class ImportedScore
+{
+    public int Points;
+}
 
-// Then as often as you like: no lookup, no boxing.
-int score = readScore(player);
+public static class ImportedScoreReader
+{
+    public static Func<ImportedScore, int> CreateReader(string fieldName)
+    {
+        if (string.IsNullOrWhiteSpace(fieldName))
+        {
+            return null;
+        }
+
+        FieldInfo field = typeof(ImportedScore).GetField(
+            fieldName, BindingFlags.Public | BindingFlags.Instance);
+        if (field == null || field.FieldType != typeof(int))
+        {
+            return null;
+        }
+
+        return ReflectionHelpers.GetFieldGetter<ImportedScore, int>(field);
+    }
+}
 ```
 
-Everything below is a static member of `ReflectionHelpers`. The later samples omit the `using`
-directives shown above; add `using System.Collections.Generic;` and `using UnityEngine;` where the
-snippet needs them.
+Build it with `CreateReader(nameof(ImportedScore.Points))`, or pass the field name from your import
+settings. If the result is null, report an invalid mapping and stop that import. Otherwise retain
+the result and call it with each nonnull record. In a stripped player, preserve the reflected field
+as described below; a successful Editor lookup does not prove player availability.
+
+The later snippets illustrate individual operations. They assume your own `Enemy`, `Stat` and
+settings types. Import `System`, `System.Reflection` and
+`WallstopStudios.UnityHelpers.Core.Helper`; add collection and Unity namespaces where needed.
 
 ![Reflection scan overview](../../images/utilities/reflection/reflection-scan.svg)
 
@@ -34,15 +61,15 @@ snippet needs them.
 Reach for it when the same member is read, written, or invoked many times: serialization, inspector
 and editor tooling, save systems, attribute-driven wiring. Skip it when the reflection happens once
 (an editor button, a one-shot import step) -- plain `FieldInfo.GetValue` is simpler and the delegate
-never pays for itself. The package uses it in `Runtime/Core/Serialization/Serializer.cs`,
-`Runtime/Core/Attributes/RelationalComponentInitializer.cs` and
-`Runtime/Core/Extension/WallstopStudiosLogger.cs`.
+may not repay its setup cost. Measure setup and repeated calls separately before putting an
+adapter in a frame loop.
 
 ---
 
 ## Fields
 
-Use the typed overloads when you know both types at compile time -- they avoid boxing. Use the boxed
+Use typed overloads when both types are known at compile time. They avoid object-shaped calls,
+but field access may still box values on the reflection fallback. Use the boxed
 overloads when the type is only known at runtime (a serializer walking arbitrary fields).
 
 ```csharp
@@ -55,7 +82,7 @@ Enemy enemy = new();
 setHealth(enemy, 25);
 Debug.Log((int)getHealth(enemy)); // 25
 
-// Typed: no boxing.
+// Typed call shape; fallback costs depend on the player backend.
 Func<Enemy, int> getHealthTyped = ReflectionHelpers.GetFieldGetter<Enemy, int>(health);
 int current = getHealthTyped(enemy);
 
@@ -128,8 +155,9 @@ translate names rather than trim or validate every character of a C# identifier.
 ## Methods
 
 `GetMethodInvoker` and `GetStaticMethodInvoker` take an `object[]` of arguments and work with any
-signature, including private methods. The typed invokers (arities 0-4) skip the array and the boxing
-entirely, and validate the signature when you build them.
+signature, including private methods. Typed invokers (arities 0-4) accept arguments directly
+and validate the signature during setup. Compatible methods can bind directly to delegates;
+a reflection fallback can still allocate an argument array and box values.
 
 ```csharp
 // Boxed: signature only known at runtime.
@@ -137,7 +165,7 @@ MethodInfo takeDamage = typeof(Enemy).GetMethod("TakeDamage");
 Func<object, object[], object> invokeDamage = ReflectionHelpers.GetMethodInvoker(takeDamage);
 invokeDamage(enemy, new object[] { 10 });
 
-// Typed static: no object[], no boxing.
+// Typed static: compatible methods can bind without an argument array.
 MethodInfo concat = typeof(string).GetMethod(
     nameof(string.Concat),
     new[] { typeof(string), typeof(string) }
@@ -228,6 +256,10 @@ List<object> buffered = new List<object> { "a", "b", "c" };
 Array typed = ReflectionHelpers.CreateTypedArray(typeof(string), buffered, 2); // string[] { "a", "b" }
 ```
 
+Runtime-discovered collection types still need usable closed generic implementations in an AOT
+player. Caching does not generate missing AOT code or preserve stripped constructors. Prefer typed
+creators when possible, and exercise the exact element/key/value types in your player build.
+
 `CreateTypedArray<TSource>(elementType, source, count)` copies the first `count` items of a
 `List<TSource>` into a new `elementType[]` -- the shape a serializer needs when it has been buffering
 into a pooled list. `TSource` is constrained to `class`, so the source list must hold reference types
@@ -239,9 +271,10 @@ as null rather than throwing.
 
 ## Types and attributes
 
-Scanning loaded assemblies normally means handling `ReflectionTypeLoadException` yourself. Every
-`*Safe` helper here swallows loader errors and returns an empty result instead of throwing, so a
-single bad assembly cannot take down startup.
+Use discovery helpers when the type is not known until runtime. The `*Safe` attribute helpers
+catch inspection failures and return the method's missing-result value, such as `false`, `null`
+or an empty array. A missing result does not distinguish an absent attribute from failed inspection;
+do not treat it as proof that a required contract is valid.
 
 ```csharp
 // Discovery. In the editor these use UnityEditor.TypeCache automatically.
@@ -309,35 +342,31 @@ back rather than re-requesting it inside a loop.
 
 ## Platform behaviour
 
-The helpers pick the fastest delegate the platform allows, and the API you call never changes:
+The same public API selects an available implementation. The choice depends on the member and
+backend; it is not a promise of the fastest implementation for your workload:
 
-| Platform                                | Strategy used                                         | Cost                                                  |
-| --------------------------------------- | ----------------------------------------------------- | ----------------------------------------------------- |
-| Editor and Mono players (incl. server)  | `DynamicMethod` IL emit, expression compile as backup | Fastest; typed paths avoid boxing entirely            |
-| IL2CPP (iOS, Android, console, desktop) | Cached reflection wrappers                            | No lookup cost; struct setters and boxed invokers box |
-| WebGL                                   | Cached reflection wrappers                            | Same as IL2CPP; runtime codegen is unavailable        |
-| Burst jobs                              | Not supported                                         | Burst forbids managed reflection -- pre-bake the data |
+| Platform                 | Available access paths                                                            | What to budget for                                                                  |
+| ------------------------ | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Editor and Mono players  | Dynamic IL, compiled expressions, direct method delegates and reflection fallback | Setup cost; boxing depends on the overload and selected path.                       |
+| IL2CPP and WebGL players | Direct method delegates where compatible; cached reflection fallback              | Field/constructor reflection, boxed values and fallback argument arrays can remain. |
+| Burst jobs               | These managed reflection APIs are not supported                                   | Discover data outside the job and pass supported data into it.                      |
 
-IL emit is compiled out by `#if !((UNITY_WEBGL && !UNITY_EDITOR) || ENABLE_IL2CPP)`, and expression
-compilation is additionally probed at runtime before use. A `SINGLE_THREADED` build swaps the
-concurrent caches for plain dictionaries.
-
-Cache entries are keyed by member **and** strategy, so an expression-compiled delegate and an
-IL-emitted one never overwrite each other, and a strategy that fails for a member is remembered and
-skipped next time. The hooks that force a strategy (`OverrideReflectionCapabilities`,
-`TryGetDelegateStrategy`, `ClearFieldGetterCache`, `ClearPropertyCache`, `ClearMethodCache`,
-`ClearConstructorCache`) are `internal` test hooks, not public API.
+Dynamic IL and expression compilation are disabled in IL2CPP and player WebGL builds. Do not
+choose an expression or IL strategy yourself; retain the public delegate and let the helper
+select an available path. A `SINGLE_THREADED` build requires single-thread access or your own
+synchronization around the caches.
 
 ### IL2CPP/WebGL notes
 
-Nothing to configure: the same calls work, they just resolve to cached reflection instead of emitted
-IL. Caching still removes the repeated `GetField`/`GetMethod` lookups, which is most of the win.
+Caching avoids repeated delegate construction. Keep member discovery outside the repeated work too:
+calling `typeof(T).GetField(...)` on every item still pays for that lookup. Test the full operation
+on your player backend, including allocations; Editor performance does not establish an IL2CPP win.
 
 ### ⚠️ IL2CPP Code Stripping Considerations
 
 `ReflectionHelpers` is IL2CPP-safe, but Unity's managed code stripping can delete the members you are
-reflecting over. This affects any reflection-based code. Symptoms show up only in non-development
-IL2CPP builds: `FieldInfo` or `MethodInfo` comes back null, `Type.GetType` returns null, or you get a
+reflecting over. This affects any reflection-based code. Symptoms can appear in stripped
+player builds: `FieldInfo` or `MethodInfo` comes back null, `Type.GetType` returns null, or you get a
 `TypeLoadException` for a type that exists in the Editor.
 
 Preserve anything you reach by string name with a `link.xml` in `Assets`:
@@ -353,26 +382,31 @@ Preserve anything you reach by string name with a `link.xml` in `Assets`:
       <property name="ImportantProperty" />
     </type>
 
-    <namespace fullname="MyNamespace.ReflectedTypes" preserve="all"/>
+    <type fullname="MyNamespace.ReflectedTypes.*" preserve="all"/>
   </assembly>
 </linker>
 ```
 
-You do not need `link.xml` when the type is referenced directly in code (`typeof(MyClass)`, a generic
-argument such as `GetFieldGetter<MyClass, int>()`), or for Unity's own built-in types.
+A direct type reference such as `typeof(MyClass)` or a generic type argument does not guarantee
+that every member reached through reflection survives stripping. Preserve the fields, properties,
+methods and constructors you actually discover. Use your real assembly name in `link.xml`, including
+an asmdef name when the type does not live in `Assembly-CSharp`.
+
+Unity documents the available [preservation annotations and linker rules](https://docs.unity3d.com/Manual/managed-code-stripping-preserving.html).
+Verify member lookup and invocation in a build with your shipping backend and stripping level.
 
 ---
 
 ## Thread safety and pitfalls
 
-Caches are concurrent dictionaries, so building and calling delegates from worker threads is safe --
-except under `SINGLE_THREADED`, where those same caches are plain dictionaries and calls must be
-confined to one thread or externally synchronized.
+The default caches support concurrent access. This does not make the target object, invoked method,
+or Unity API thread-safe. Follow the target's threading rules. Under `SINGLE_THREADED`, cache calls
+must also stay on one thread or be externally synchronized.
 
 - Passing an instance `FieldInfo`/`PropertyInfo` to a `GetStatic*` helper throws `ArgumentException`.
 - `GetPropertySetter` on a get-only property throws `ArgumentException`.
 - Writing a struct's instance field needs `GetFieldSetter<TInstance, TValue>` (the `ref` setter); the
-  boxed setter writes to a copy.
+  boxed setter cannot update the original unboxed variable.
 - Typed invokers reject `ref`/`out` parameters with `NotSupportedException`.
 - Prefer the typed overloads in loops, and hoist the delegate out of the loop.
 
@@ -382,16 +416,13 @@ confined to one thread or externally synchronized.
 
 Numbers and methodology live in the
 [Reflection Performance benchmarks](../../performance/reflection-performance.md).
-`Tests/Runtime/Performance/ReflectionPerformanceTests` captures getter, setter, invoker and
-constructor timings, and `Tests/Runtime/Helper/ReflectionHelperCapabilityMatrixTests` runs every
-helper with each strategy forced on and off, so the IL2CPP fallback path is covered on desktop. When
-you refresh timings, record the Unity version, scripting backend and OS alongside them.
+Compare the same operation and overload, and include setup if the adapter is short-lived.
+The historical Windows table contains both wins and regressions. It is not evidence for a different
+backend or a guarantee that any typed call is allocation-free.
 
 ---
 
 ## See also
 
 - [Helper Utilities](./helper-utilities.md)
-- `Runtime/Core/Helper/ReflectionHelpers.cs`, `Runtime/Core/Helper/ReflectionHelpers.Factory.cs` and
-  `Runtime/Core/Helper/ReflectionHelpers.TypeDiscovery.cs` -- the three files of the
-  `ReflectionHelpers` partial class.
+- [Serialization choices](../serialization/serialization.md)
