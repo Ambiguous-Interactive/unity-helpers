@@ -1,12 +1,8 @@
 # Authored Asset Validation
 
-Your code is checked by a compiler, an analyzer and a test suite. Your **assets** are checked by
-nobody. A designer forgets a reference, an artist deletes a sprite, a serializer migration retires a
-field — and the project still compiles, the tests still pass, and the damage shows up as "the thing
-flickers" or "no decal appeared", which nobody files as a bug.
-
-These checks read committed `.unity`, `.prefab` and `.asset` files as text and report what is
-wrong, with the line to open.
+Find missing references, broken serialized dictionaries, empty animation keyframes and stale
+serialized keys before they reach a player. These commands inspect authored `.unity`, `.prefab`
+and `.asset` files and report the file and line to review.
 
 Blank filesystem paths and scope prefixes are ignored. Spaces inside asset names remain valid; the checks do not trim authored names.
 
@@ -43,55 +39,35 @@ read are all in [Asset Validation](./asset-validation.md).
 
 ## What a scan could not read
 
-Every report names the files it could not open, and each command prints that set when it is not
-empty. A read fails for reasons that are not going away: a permissions error, a file another process
-has locked, a file deleted between enumeration and the read, an `.asset` saved in binary
-serialization mode, an I/O error on a network drive. The animation check fails differently — the
-asset database names a path as carrying a clip and then hands back none — and reports it the same
-way.
+Read the unreadable-path list as well as the findings. A scan can report no defects while some
+assets were locked, deleted, inaccessible or saved in an unsupported binary format. The subject
+count alone cannot establish that every input was inspected.
 
-**An unreadable file is not a finding.** It is a hole in the measurement, not a defect in the asset,
-and folding the two together would make a finding mean two things: a caller could no longer read
-"no findings" as "nothing is wrong". So `TryScan` takes a list of unreadable asset paths beside its
-findings, sorted and naming each file once, and a CI caller that asserts the list is empty fails
-when a scan could not see all of its subject.
+The `TryScan` overloads that accept an unreadable-path list return those paths separately, sorted
+and without duplicates. Check the boolean result, findings, unreadable inputs and the number of
+expected subjects when deciding whether a scan meets your project's policy.
 
-The subject counts cannot catch this on their own. They catch a scan that read **nothing** — a moved
-root, a renamed backing field. One locked file in a project of four thousand still reports a large
-count and a clean result, which is the failure these checks exist to prevent turned on themselves.
+<a id="why-the-set-prints-without-turning-the-log-yellow"></a>
 
-### Why the set prints without turning the log yellow
+### Binary assets and log severity
 
-Expect entries here in a project with baked lighting, and expect them permanently. Unity writes
-`LightingData.asset` as binary whatever the serialization mode says — measured on two of two under
-`ForceText` — so the scan opens it, finds no Unity document in it, and correctly reports that it
-could not see inside.
+Unity can write assets such as `LightingData.asset` in binary form even when text serialization is
+enabled. A text scan cannot inspect those contents. The command prints unreadable paths, but they
+do not automatically become defect warnings. Define explicit handling for expected binary assets;
+do not silently treat them as inspected or hide unexpected read failures.
 
-That is worth saying and not worth warning about. A warning claims there is something to fix, and a
-permanently unactionable one is exactly what teaches people to stop reading warnings. So the set
-always prints, and the severity follows the findings. A gate that wants to fail on a coverage hole
-asserts the list, which is what the scan returns it for.
+<a id="why-text-and-why-loading-is-the-wrong-instrument"></a>
 
-## Why text, and why loading is the wrong instrument
+## Inspection side effects
 
-**Opening a scene mutates it.** Every `OnValidate` in it runs — a collider that rebuilds its points
-from the sprite's physics shape is enough — so the act of inspecting dirties the scene, and closing
-it then prompts for a save. A prompt blocks the editor's main loop, which is fatal for anything
-driving the editor over a bridge. A gate must not mutate what it measures.
+Text-based checks read files without opening their scenes or prefabs. Loading an asset can invoke
+your `OnValidate` or other lifecycle code and dirty the asset. Text inspection also exposes stale
+serialized keys that a loaded object's current fields no longer represent.
 
-Text also reaches a baked scene without opening one. And for the stale-key question, loading asks
-the same serializer that dropped the data what the data is, and it answers "there is no such field"
-— indistinguishable from "the field is empty".
-
-The one question text cannot answer is animation: a keyframe's guid can resolve perfectly while the
-object does not, because a sprite sheet re-imported as `Single` still has a `.meta` describing every
-slice the importer no longer produces. That check uses `AnimationUtility`.
-
-`AuthoredAssetYaml.TryResolveObjectReference` reads both external and same-file references. Unity
-omits `guid` when one document points to another document in the same scene, prefab or asset. Pass
-the owning asset GUID and the method supplies it for a nonzero `fileID`; an empty reference keeps a
-null GUID. Invalid inline mappings and local references without an owning GUID return `false` with
-empty outputs.
+Animation-keyframe checks use Unity's animation APIs because a valid GUID alone does not prove
+that a sprite or other referenced sub-object still exists. The stale-key command also creates
+temporary instances to discover Unity's serialized fields. Run that command deliberately when your
+components' construction and lifecycle behavior is safe for inspection; it is not a continuous rule.
 
 ## Script bindings
 
@@ -160,21 +136,18 @@ years ago is still in the YAML today and reads exactly like a live one. Beyond d
 object-reference key keeps another asset **looking referenced** — a guid search answers "this sprite
 is used by the level prefab" about a slot nothing reads.
 
-The declared set is `SerializedObject` over a throwaway instance, never reflection over the type's
-fields: only Unity knows what its serializer accepted. Every `[FormerlySerializedAs]` alias counts
-as a live key, walking the base chain — judging by `SerializedObject` alone was measured reporting
-565 aliases doing their job as orphans. A document whose script does not resolve is counted, not
-reported: that is a missing script, a different defect with its own signal.
+The scan compares authored keys with Unity's current serialized fields and inherited
+`[FormerlySerializedAs]` aliases. Engine-owned headers and managed-reference metadata are not
+reported as retired user fields. Documents with unresolved scripts are counted separately;
+resolve those bindings before treating the stale-key result as complete.
 
-The engine's own header keys are listed rather than discovered, because the probe cannot report
-them: a `ScriptableObject` asset is written with the full `MonoBehaviour` header — `m_GameObject`,
-`m_Enabled`, `m_EditorHideFlags` — while a `SerializedObject` over a `ScriptableObject` reports none
-of it. So is the `references` block a `[SerializeReference]` document ends with.
+Findings are grouped by `Type::Key`, so you can review every asset affected by one retired field.
+Check that the field is intentionally retired before repairing it. A key used by an older package
+or model may still matter to a rollback path.
 
-Findings are grouped by cause (`Type::Key`), because a migration retires a field once and every
-asset of that type inherits it.
+<a id="the-repair-and-why-it-is-a-wrapper"></a>
 
-### The repair, and why it is a wrapper
+### Repair selected assets
 
 There is no "delete this key" API. `AssetDatabase.ForceReserializeAssets` rewrites an asset from
 what it loaded, dropping every dead key. It is not safe unsupervised:
@@ -198,34 +171,43 @@ that lock, and an edit made before the snapshot cannot be distinguished from the
 platforms without `File.Replace`, rollback reports failure and preserves the current asset. Commit
 or stash first.
 
-The rewrite is covered, not just the refusals: a fixture authors a plain asset, an asset whose
-content lives in sub-objects, and a prefab, leaves a key no field claims in each, repairs them, and
-asserts the outcome and the object count. It pins the prefab finding directly — the same prefab
-rewritten with assets only comes back byte-identical, stale key and all.
+After a repair, review the changed files and open representative assets before keeping the result.
+An unchanged object count is one guard against loss; it is not proof that every property or
+reference retained its intended value. Keep the original files until that review is complete.
 
-The completion and recovery phases are exercised directly, without injected production callbacks:
-a fixture deletes a real authored sub-asset before completion, and a real filesystem exception
-exercises recovery after the asset has been changed. These controls check the object-count guard,
-error log, byte restore, and forced re-import. Concurrent edits and unwritable destinations check
-that restoration refuses unsafe or failed writes. This phase composition does not make
-`ForceReserializeAssets` itself lose content or throw, and does not prove the public entry point's
-catch routing. The confirmation dialog remains, and committing first is still the advice.
+<a id="the-reader-underneath"></a>
 
-## The reader underneath
+## Scan assets from Editor code
 
-`AuthoredAssetYaml` parses a committed file into the documents Unity wrote — each with its `!u!`
-class id, anchor, line range, and every key at any depth — and `MonoScriptIndex` resolves a
-document's `m_Script` guid to a type and back. They exist so the checks above share one parser
-rather than four, because four parsers are four chances for one of them to drift into reporting
-clean.
-The reader removes surrounding quotes from mapping keys and skips text inside block scalars, so
-neither quoting nor a key-like line of text changes what a check sees.
+Use the public validators in `WallstopStudios.UnityHelpers.Editor.Validation` for project-specific
+checks. This example accepts an explicit asset list and requires at least one serialized dictionary.
+It refuses unreadable inputs and findings, as well as a scan that inspected no dictionary. Remove
+the nonzero requirement only when an empty dictionary set is valid for your declared inputs.
 
-`MonoScriptIndex`'s forward lookup is name-narrowed first, which is fast and correct _while_ a
-script asset is named after the type it binds — the second script-binding rule above. When it is
-not, the search falls through to a full index rather than to `null`, because a resolver that
-silently answers "no such type" makes every "except its own file" exclusion match nothing, and a
-check can then pass for every type at once.
+<!-- doc-sample: compiles-editor -->
+
+```csharp
+using System.Collections.Generic;
+using WallstopStudios.UnityHelpers.Editor.Validation;
+
+public static class DictionaryAssetCheck
+{
+    public static bool IsValid(IReadOnlyList<string> assetPaths, out int dictionariesInspected)
+    {
+        List<SerializableDictionaryAssetFinding> findings = new();
+        List<string> unreadable = new();
+        bool completed = SerializableDictionaryAssetValidator.TryScan(
+            assetPaths, findings, unreadable, out dictionariesInspected);
+        return completed && unreadable.Count == 0 && findings.Count == 0
+            && dictionariesInspected > 0;
+    }
+}
+```
+
+Use the findings and unreadable-path lists to display details in your own tool rather than returning
+only a boolean when an author needs to fix the result. `AuthoredAssetYaml` can also read individual
+Unity YAML documents for custom text checks. `MonoScriptIndex` resolves script types, GUIDs and
+paths. These helpers support inspection; they do not establish that a file is safe to rewrite.
 
 ## Related
 

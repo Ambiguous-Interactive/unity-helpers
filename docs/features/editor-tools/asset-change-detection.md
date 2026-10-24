@@ -438,34 +438,27 @@ public class UniversalAssetHandler : MonoBehaviour
 
 ---
 
-## Implementation Details
+<a id="implementation-details"></a>
 
-The `DetectAssetChangeProcessor` (Editor assembly) automatically:
+## Callback scheduling
 
-1. Scans for methods decorated with `[DetectAssetChanged]`
-2. Registers callbacks with Unity's `AssetPostprocessor`
-3. Invokes methods when matching assets change
-4. Handles null checks and error cases
-5. Supports both Edit Mode and Play Mode
-
-**Threading:** All callbacks execute on the main thread during asset processing
-
-**Timing:** Methods are called after Unity completes asset import/deletion
+The watcher discovers methods marked `[DetectAssetChanged]` and dispatches matching asset changes
+on the Editor's main thread. Keep callbacks short. Importing or modifying assets from a callback
+can queue another change batch; repeated cycles can activate loop protection.
 
 ### When the Watcher Runs
 
-Step 1 above is an all-types / all-methods reflection scan. Running it inside Unity's import phase
-destabilizes the asset pipeline (a native crash on some Unity versions, multi-minute importer stalls
-on others), so the watcher declines to initialize where it has nothing to do:
+| Context                                 | Default behavior                                      |
+| --------------------------------------- | ----------------------------------------------------- |
+| Interactive Editor                      | The watcher initializes automatically.                |
+| Play mode or a transition into it       | Asset-import notifications are ignored.               |
+| Batch mode (`-batchmode`, CI, headless) | Initialization is disabled unless explicitly enabled. |
 
-| Context                                 | Watcher initializes | Why                                                             |
-| --------------------------------------- | ------------------- | --------------------------------------------------------------- |
-| Interactive editor                      | Yes                 | This is the authoring workflow the feature exists for           |
-| Play mode                               | No                  | Authoring concern; a play-mode import would recurse into a scan |
-| Batch mode (`-batchmode`, CI, headless) | No                  | No author is present to act on a callback                       |
+Choose an initialization policy from an `[InitializeOnLoad]` static constructor, before the
+watcher's deferred initialization. This example disables automatic initialization in an
+interactive Editor:
 
-Override the default from an `[InitializeOnLoad]` static constructor, so it applies before the
-watcher's own deferred initialization:
+<!-- doc-sample: compiles-editor -->
 
 ```csharp
 using UnityEditor;
@@ -476,17 +469,14 @@ internal static class AssetWatcherPolicy
 {
     static AssetWatcherPolicy()
     {
-        // Opt a headless asset pipeline back in...
-        AssetChangeDetectionUtility.Enabled = true;
-
-        // ...or keep the watcher off in an interactive editor.
         AssetChangeDetectionUtility.Enabled = false;
-
-        // Drop the override and restore the defaults in the table above.
-        AssetChangeDetectionUtility.ResetEnabledToDefault();
     }
 }
 ```
+
+Set `Enabled = true` instead when a headless asset pipeline needs the watcher. Call
+`ResetEnabledToDefault()` to remove your override. Set the policy before initialization: it is
+not a switch that removes subscriptions already discovered in the current domain.
 
 Turning the watcher off after it has already initialized stops further initialization but leaves
 already-discovered subscriptions in place.

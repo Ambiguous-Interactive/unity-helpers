@@ -2,23 +2,10 @@
 
 ## Overview
 
-The Test Run Reporter starts a Unity test run from a menu item and writes a machine-readable summary
-file that an outside process can poll. It exists for the case where a script, an agent, or a
-CI-adjacent process is driving an editor it does not own, and cannot use the ordinary batch-mode
-runner.
-
-Three constraints shape it, and together they rule out the obvious approaches:
-
-- `TestRunnerApi.Execute` is asynchronous, so a command that starts a run returns before any result
-  exists.
-- The editor console is not a reliable sink. It can be cleared between the run and the read, and a
-  large run produces more output than a single tool result can carry.
-- Some editor-command bridges refuse to drive `TestRunnerApi` at all, reporting it as requiring user
-  interaction. The entry point therefore has to be a `MenuItem` such a bridge can invoke, not a
-  snippet it compiles.
-
-A file is the only sink that survives all three. The reporter opens one before the run starts and
-finishes it when the run ends, so a poller always sees either a run in flight or a complete summary.
+Start a complete EditMode or PlayMode suite from the menu, then poll a summary file from an
+external script. The menu returns immediately; the file records a running marker and later the
+completed results. Use this when automating an open Editor rather than launching Unity in batch
+mode. You do not need to collect a large test run from the console.
 
 This is complementary to the [Failed Tests Exporter](./failed-tests-exporter.md), which reports
 failures after a run somebody else started.
@@ -45,14 +32,10 @@ opening a file. Paths containing spaces remain valid.
 | EditMode | `<project>/Temp/unity-helpers-test-run-editmode.txt` |
 | PlayMode | `<project>/Temp/unity-helpers-test-run-playmode.txt` |
 
-`<project>` is the Unity project root, the folder containing `Assets/`. `Temp/` is Unity's own
-scratch folder: it is recreated on demand, it is not an asset folder, and it is gitignored by every
-standard Unity `.gitignore` (this repository ignores `/Temp/` explicitly, because a package
-checkout is not a Unity project and nothing else here covered it).
-
-**The two modes never share a path.** That is deliberate: if they did, polling one file after
-running the other mode would read a stale summary that is indistinguishable from a run still in
-flight.
+`<project>` is the Unity project root, containing `Assets/`. The summaries are temporary files;
+exclude `Temp/` from version control and retain a copy elsewhere if you need a durable report.
+Read the file for the mode you started. EditMode and PlayMode use separate paths, and a previous
+summary can remain after a run or Editor shutdown.
 
 ## File format
 
@@ -169,7 +152,7 @@ def parse(line):
     return tokens[0], tokens[1:2] == ["running"], fields
 
 
-deadline = time.time() + 1800
+deadline = time.monotonic() + 1800
 while True:
     with open(PATH, encoding="utf-8") as handle:
         lines = [line for line in handle.read().split("\n") if line]
@@ -177,8 +160,8 @@ while True:
         kind, running, fields = parse(lines[0])
         if not running:
             break
-    if deadline < time.time():
-        raise TimeoutError("the run was lost; delete " + PATH + " and start it again")
+    if deadline < time.monotonic():
+        raise TimeoutError("polling timed out; inspect Unity Test Runner before recovering " + PATH)
     time.sleep(2)
 
 for line in lines:
@@ -187,71 +170,49 @@ for line in lines:
         print(fields["name"], fields["location"], fields["message"])
 ```
 
-## Design decisions
+<a id="design-decisions"></a>
+
+## Run status and recovery
 
 ### A run already in flight is refused
 
-Starting a run takes one shared cross-mode claim, checks both summary files, writes a unique
-`owner=` token into the selected mode's running marker, and then releases the claim. A second
-invocation, of either mode, sees that marker and refuses with a warning in the console naming the
-file that is held. Finishing or discarding a run requires the same owner token, so a late callback
-from an older run cannot replace or delete a newer marker.
+While either mode owns a running summary, another reporter invocation refuses to start and logs
+the held path. The menu stays clickable so automation receives that explanation rather than a
+silent refusal.
 
-Ownership tokens are identifiers: null, empty, and entirely whitespace tokens cannot finish or
-discard a run, even when a malformed marker contains the same value. Reading such a marker returns
-no owner. Nonblank tokens are compared exactly, including any surrounding spaces; the reporter does
-not trim a token or a summary path.
-
-The guards distinguish identifiers from serialized report data. Escaping, unescaping, and field
-value parsing preserve whitespace-only values because test messages and names are literal data.
-Their null/empty checks intentionally remain unchanged. A malformed marker still carries `running`,
-so starting another run refuses it until the reader performs the documented recovery action below.
-
-The menu items are deliberately **not** greyed out while a run is in flight. A validate function
-that disables them would make a bridge's `ExecuteMenuItem` do nothing silently; a clickable item that
-logs why it refused tells the driver something.
+A unique `owner=` token prevents a late callback from an older run from replacing a newer report.
+Treat that token as an identifier, not a process-health signal. A running marker, including a
+malformed one, can remain after cancellation or a lost callback.
 
 ### A cancelled run, or a crashed editor, leaves `running` in the file
 
-There is **no heartbeat, and the reporter does not time itself out.** The decision is that the
-reader owns the timeout:
+The reporter has no heartbeat or automatic timeout. Your poller may stop waiting at its own
+deadline, but **a polling timeout does not mean that Unity stopped executing tests**. Deleting the
+summary file does not cancel the native test run.
 
-1. A poller applies its own wall-clock deadline. The `started` field is on the very line it is
-   already reading, so it can compute the elapsed time without any extra state.
-2. On timeout, the poller **deletes the summary file.** That releases the claim, and the next menu
-   invocation starts a fresh run.
+1. Inspect Unity's Test Runner and the Editor process after a timeout. If the run is still active,
+   keep observing it, or cancel it through Unity and wait until it has stopped.
+2. Preserve the summary and relevant Editor logs if you need to diagnose the lost result.
+3. Only after confirming that the test runner is inactive, or that the owning Editor process has
+   ended, delete the stale summary file. You can then start a new reporter run.
 
-Deleting the file is the single documented recovery action, and it is deliberately something an
-outside process can do without the editor's cooperation. An editor restart does not clear the
-marker on its own, because the file outlives the process; deleting it is what clears it.
+An Editor restart clears its session ownership but may leave the temporary file. Confirm the
+restarted Editor is idle before removing that stale marker. A marker's age alone does not prove
+that recovery is safe.
 
 ### PlayMode domain reloads
 
-Entering play mode reloads the domain, which destroys every managed object including registered
-`ICallbacks`. If nothing re-registered them, `RunFinished` would never arrive and the summary would
-never be finished.
-
-The summary file carries the durable marker while Unity's editor-session state carries the matching
-owner token across domain reloads. An `[InitializeOnLoadMethod]` checks both before re-registering
-the Test Runner callbacks. An editor restart clears the session token, so a stale marker cannot
-consume an unrelated later test run. A second `RunStarted` callback also invalidates ownership after
-a cancelled or lost run. When the owned run finishes, its callback only replaces the marker whose
-token matches. A run this reporter did not start is ignored.
+The reporter restores its callbacks after a PlayMode domain reload using the summary's ownership
+token and the current Editor session. It ignores runs it did not start. An Editor restart does not
+resume the old run's ownership; use the recovery steps above if a running marker remains.
 
 ### Assembly build times are reported, staleness is not judged
 
-Each `ASSEMBLY` line carries `built=`, the write time of the compiled DLL. That is a **fact**, and a
-run against yesterday's DLL is a false green worth being able to see.
-
-**No stale/fresh marker ships.** The obvious discriminator — comparing source file mtime values to the
-assembly's mtime — is wrong on the common case: a formatter rewriting a file to byte-identical
-content moves its mtime, Unity's content-addressed asset database correctly skips the rebuild, and
-the marker fires anyway. That happens on every commit that touches C#, so the marker becomes noise
-and a genuinely stale assembly then looks exactly like the noise. A content hash recorded at build
-time would be a correct discriminator, but it costs every consumer a hash of every source file on
-every compile for a facility only an automated driver uses, so it was not built. A discriminator
-that is wrong on the common case is worse than none; `built=` plus the reader's own judgement is
-what ships instead.
+Each `ASSEMBLY` line carries `built=`, the compiled DLL's write time. Use it as diagnostic context,
+not proof that Unity compiled your latest source. A timestamp alone does not establish source
+identity: files can be rewritten without changing their content, and builds can reuse outputs.
+When freshness matters, confirm compilation completed and compare the source/build identities your
+automation records.
 
 ## What is not covered
 
