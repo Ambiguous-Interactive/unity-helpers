@@ -187,6 +187,14 @@ jobs:
             ${{ runner.temp }}/protobuf-candidate/retained-results
           if-no-files-found: warn
 
+      - name: Retain compiled host test inputs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: wproto-host-test-inputs
+          path: Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/bin
+          if-no-files-found: warn
+
       - name: Retain oracle invocation evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9

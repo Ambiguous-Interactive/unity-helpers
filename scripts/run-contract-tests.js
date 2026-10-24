@@ -29,6 +29,11 @@ const { runChecks, runRegistry } = require("./check-runner");
 /** A check whose `run` is executed with `bash -c` from the repository root. */
 const CHECKS = [
   {
+    id: "watchdog-cancellation",
+    name: "Watchdog cancellation and scheduling controls",
+    run: "npm run test:watchdog-cancellation"
+  },
+  {
     id: "native-build-readback",
     name: "Historical native Build receipt readback",
     run: "npm run validate:tests:native-build-readback"

@@ -536,6 +536,7 @@
     {
       "name": "tech-terms",
       "words": [
+        "KaTeX",
         "SARIF",
         "msbuild",
         "CJK",
@@ -958,7 +959,8 @@
         "ntdll",
         "rcx",
         "dmp",
-        "killpg"
+        "killpg",
+        "PDB"
       ]
     }
   ],

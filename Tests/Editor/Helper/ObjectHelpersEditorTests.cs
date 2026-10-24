@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Tests.Helper
 {
 #if UNITY_EDITOR
+    using System;
     using NUnit.Framework;
     using UnityEditor;
     using UnityEngine;
@@ -15,23 +16,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     [NUnit.Framework.Category("Integration")]
     public sealed class ObjectHelpersEditorTests : BatchedEditorTestBase
     {
-        private const string TempFolder = "Assets/TempObjectHelpersEditorTests";
         private const string AssetName = "TestMaterial.mat";
+        private readonly string _tempFolder =
+            "Assets/TempObjectHelpersEditorTests-" + Guid.NewGuid().ToString("N");
         private string _assetPath;
 
         [OneTimeSetUp]
         public override void CommonOneTimeSetUp()
         {
             base.CommonOneTimeSetUp();
-            EnsureFolder(TempFolder);
-            TrackFolder(TempFolder);
+            ExecuteWithImmediateImport(() =>
+            {
+                EnsureFolder(_tempFolder);
+                TrackFolder(_tempFolder);
+            });
         }
 
         [SetUp]
         public override void BaseSetUp()
         {
             base.BaseSetUp();
-            _assetPath = TempFolder + "/" + AssetName;
+            _assetPath = _tempFolder + "/" + AssetName;
         }
 
         [TearDown]
@@ -43,6 +48,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             {
                 TrackAssetPath(_assetPath);
             }
+        }
+
+        [OneTimeTearDown]
+        public override void OneTimeTearDown()
+        {
+            try
+            {
+                CleanupTrackedFoldersAndAssets();
+            }
+            finally
+            {
+                base.OneTimeTearDown();
+            }
+            EditorAssetFolderAssertions.AssertUniqueRootRemoved(_tempFolder);
         }
 
         [Test]

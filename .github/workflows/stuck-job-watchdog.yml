@@ -29,6 +29,9 @@ name: Stuck Job Watchdog
 #     is hard-excluded by default; additional entries may be added via the
 #     `WATCHDOG_EXCLUDED_WORKFLOWS` repo variable, whitespace-separated).
 #   * The run id is NOT the watchdog's own run id.
+#   * Fresh run/job reads still identify the same queued attempt with no job
+#     assigned or started. Licensed Unity workflows need operator recovery:
+#     assignment can occur after even the last API read (issue #1023).
 #
 # Recovery action for the dispatcher-stuck mode (per cli/cli#9221 and the
 # gh-run-rerun manual, `gh run rerun --failed` cannot be used on a
@@ -116,6 +119,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - name: Checkout cancellation guard
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
       # The runner inventory is the watchdog's whole basis for action, and
       # GITHUB_TOKEN cannot read it: `orgs/{owner}/actions/runners` needs
       # admin:org and 403s, and the repo-scoped fallback does not list
@@ -541,6 +549,9 @@ jobs:
                 .[]
                 | select(.id == $id)
                 | {
+                    id: .id,
+                    run_attempt: .run_attempt,
+                    head_sha: .head_sha,
                     path: (.path // ""),
                     event: (.event // ""),
                     workflow_id: (.workflow_id // 0),
@@ -657,9 +668,15 @@ jobs:
               continue
             fi
 
-            log_summary "run ${run_id} (${run_path_base}, event=${run_event}): dispatcher-stuck; cancelling (attempt $((cancels + 1))/${MAX_CANCELS_PER_DAY})."
-            if ! gh run cancel "${run_id}" --repo "${REPO}" 2>&1 | tee -a "${summary_file}"; then
-              log_summary "run ${run_id}: 'gh run cancel' failed; will try again next cycle."
+            run_snapshot="$(mktemp "${RUNNER_TEMP}/watchdog-run.XXXXXX")"
+            printf '%s\n' "${run_meta}" > "${run_snapshot}"
+            log_summary "run ${run_id} (${run_path_base}, event=${run_event}): revalidating cancellation eligibility (attempt $((cancels + 1))/${MAX_CANCELS_PER_DAY})."
+            if ! python3 "${GITHUB_WORKSPACE}/.github/scripts/cancel-stuck-workflow.py" \
+                --repository "${REPO}" --run-id "${run_id}" --snapshot "${run_snapshot}" \
+                --jobs-snapshot "${jobs_json}" \
+                --minimum-age-seconds "${MIN_QUEUE_AGE_SECONDS}" 2>&1 | tee -a "${summary_file}"; then
+              log_summary "run ${run_id}: no cancellation confirmed; operator action: ${run_html_url}"
+              printf '* run %s (%s, event=%s) -- cancellation refused or unconfirmed, operator action: %s\n' "${run_id}" "${run_path_base}" "${run_event}" "${run_html_url}" >> "${excluded_runs_file}"
               continue
             fi
 

@@ -3230,6 +3230,37 @@ Passing host receipts do not complete partial or missing lane requirements, play
 consumer deployment, allocation, or throughput acceptance. Historical results without a matching
 invocation receipt remain historical evidence.
 
+The generator workflow also retains `wproto-host-test-inputs` after success or failure.
+It contains the compiled test DLL, PDB, dependencies and runtime configuration for each host oracle
+lane that reached a build. Keep it with the same run's TRX, logs and oracle receipts. A later rebuild
+is a separate observation; it cannot recover the binary that failed in CI.
+
+The representative allocation test prints each round's total write bytes, process and managed
+thread IDs, runtime, OS, and test-module identity after all measurement intervals. Its zero-byte
+requirement still uses the maximum round, with clock calls outside the allocation counter interval.
+An unexplained nonzero sample remains a failure even when a later process passes. Retain the failed
+sample and use stack evidence or a distinguishing causal control before attributing it or accepting
+its timings. Module identity and allocation totals alone do not identify an allocation site.
+
+Each of the four representative host measurements reserves a 128 MiB no-GC region before its
+clock and allocation markers. The sample fails if the region cannot start or a collection invalidates
+it. The zero-byte maximum, fixed warmup and allocating-clock control remain in place; real object
+allocations still count. This prevents background collection from changing the counter through
+[allocation-context retirement](https://github.com/dotnet/runtime/blob/v9.0.21/src/coreclr/gc/gc.cpp#L7947):
+CoreCLR computes the thread's count by subtracting its
+[unused allocation space](https://github.com/dotnet/runtime/blob/v9.0.21/src/coreclr/vm/comutilnative.cpp#L920),
+which disappears when the collector clears that context. These host samples use the same region
+policy for both serializers and both directions. They do not qualify Unity's allocation channel or
+explain older failures without matching evidence.
+
+For CoreCLR allocation-stack diagnostics, enable the allocation provider before runtime startup.
+The [.NET 9 runtime snapshots that state](https://github.com/dotnet/runtime/blob/v9.0.21/src/coreclr/vm/eventtrace.cpp#L816)
+when it chooses the allocation helpers; attaching later can miss small allocations. Calibrate the
+collector with a known allocation inside the measured interval and verify the actual test-host
+process, thread and managed stack. Tracing changes execution, so diagnostic captures do not qualify
+throughput. Preserve collector failures and partial traces rather than treating missing events as
+proof of zero allocation.
+
 The generator remains `ISourceGenerator` with the Unity 2021.3 compiler floor. Unity documents
 [Roslyn 3.8 for that editor](https://docs.unity3d.com/2021.3/Documentation/Manual/roslyn-analyzers.html).
 The separate compiler-floor host suite loads the shipped generator through Roslyn 3.8, compiles
