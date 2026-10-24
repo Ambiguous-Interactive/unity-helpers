@@ -283,19 +283,6 @@ if ($ForceFreshCompilationCache -and ($TestMode -ne 'standalone' -or $Standalone
 $PSNativeCommandUseErrorActionPreference = $false
 
 $PackageName = 'com.wallstop-studios.unity-helpers'
-# TODO(unity-helpers): test-framework version reconciliation. DxMessaging pinned
-# com.unity.test-framework 1.4.5; unity-helpers' existing
-# scripts/unity/create-test-project.sh pins 1.1.33. The harness here builds its
-# OWN manifest (New-ManifestJson) independent of create-test-project.sh, so this
-# value is the version Unity resolves for the ephemeral CI project. Kept at 1.4.5
-# (the harness-proven value) -- a maintainer should confirm whether unity-helpers
-# requires 1.1.33 (to match create-test-project.sh) or 1.4.5 before the first
-# self-hosted run. Performance tests intentionally use raw Stopwatch measurements,
-# so the ephemeral project does not need Unity's performance-testing package.
-$TestFrameworkVersion = '1.4.5'
-# (The analyzer-DLL roster that stood here was empty, unreferenced, and carried a premise that
-# stopped being true in session 173. See Write-AnalyzerSetupDiagnostics for what actually ships.)
-
 # Unity Accelerator (cache server) helpers live in a dot-sourceable library so
 # they can be unit-tested with plain pwsh (run-ci-tests.ps1 itself has a
 # mandatory param() block and a main, so it cannot be dot-sourced). This MUST
@@ -310,6 +297,7 @@ $TestFrameworkVersion = '1.4.5'
 . (Join-Path $PSScriptRoot 'lib/catastrophic-patterns.ps1')
 . (Join-Path $PSScriptRoot 'lib/credential-redaction.ps1')
 . (Join-Path $PSScriptRoot 'lib/native-evidence.ps1')
+. (Join-Path $PSScriptRoot 'lib/test-framework-evidence.ps1')
 
 # Resolves WHERE the generated project and its Library live, and prunes the
 # persistent root when a self-hosted runner's disk gets tight. Dot-sourced for
@@ -1569,6 +1557,16 @@ function Get-UnityTestProjectModules {
     return $modules
 }
 
+function Get-UnityTestFrameworkVersion {
+    param([Parameter(Mandatory = $true)][string]$Root)
+    $source = Get-PackageManifestSource -Root $Root -RelativePath '.github/unity-test-framework.json' -Kind 'Unity Test Framework policy'
+    $version = $source.PSObject.Properties['requestedVersion']
+    if ($null -eq $version -or $version.Value -isnot [string] -or $version.Value -cnotmatch '^[0-9]+\.[0-9]+\.[0-9]+$') {
+        throw 'Unity Test Framework policy requires a stable requestedVersion string.'
+    }
+    return $version.Value
+}
+
 function New-ManifestJson {
     param(
         [Parameter(Mandatory = $true)][string]$Root,
@@ -1578,8 +1576,9 @@ function New-ManifestJson {
     )
 
     $packagePath = ConvertTo-UnityFileUriPath -Path $Root
+    $moduleRoot = if ([string]::IsNullOrWhiteSpace($RepoRoot)) { $Root } else { $RepoRoot }
     $dependencies = [ordered]@{
-        'com.unity.test-framework' = $TestFrameworkVersion
+        'com.unity.test-framework' = Get-UnityTestFrameworkVersion -Root $moduleRoot
     }
 
     # UNCONDITIONAL (every leg -- editmode/playmode/standalone, single-threaded,
@@ -1589,7 +1588,6 @@ function New-ManifestJson {
     # create-test-project.sh cannot drift. The package.json deliberately does NOT
     # carry these (dual npm+UPM file; `npm ci` would fail to resolve com.unity.*),
     # so the test-project manifest is their only home.
-    $moduleRoot = if ([string]::IsNullOrWhiteSpace($RepoRoot)) { $Root } else { $RepoRoot }
     foreach ($module in (Get-UnityTestProjectModules -Root $moduleRoot).GetEnumerator()) {
         $dependencies[$module.Key] = $module.Value
     }
@@ -2236,6 +2234,13 @@ EditorSettings:
     Set-EphemeralProjectContent `
         -Path (Join-Path $project 'Assets\Editor\UhCiTestConfigurator.cs') `
         -Content (New-ConfiguratorSource -Backend $Backend -CompilerConfiguration $Il2CppCompilerConfiguration -StrippingLevel $ManagedStrippingLevel -RequireReleaseManagedCodeVariant:$RequireReleaseManagedCodeVariant)
+
+    $frameworkEvidence = Join-Path $project 'Assets/UhCiTestFrameworkEvidence/Editor'
+    $null = New-Item -ItemType Directory -Force -Path $frameworkEvidence
+    foreach ($extension in @('cs', 'asmdef')) {
+        Set-EphemeralProjectContent -Path (Join-Path $frameworkEvidence "UhCiTestFrameworkEvidence.$extension") `
+            -Content ([IO.File]::ReadAllText((Join-Path $RepoRoot "scripts/unity/test-framework-evidence.$extension.txt")))
+    }
 
     # STANDALONE ONLY: generate the split-build helpers that sever the test
     # player's PlayerConnection/TCP result streaming (the 10060 hang on multi-NIC
@@ -3862,6 +3867,18 @@ function Invoke-UnityObservedEditor {
     )
 
     if ($null -eq $ProcessObservation) { $ProcessObservation = @{} }
+    $frameworkEvidence = $null
+    $projectArgument = [Array]::IndexOf($Arguments, '-projectPath')
+    if ($projectArgument -ge 0 -and $projectArgument + 1 -lt $Arguments.Count) {
+        $frameworkProject = $Arguments[$projectArgument + 1]
+        if (Test-Path -LiteralPath (Join-Path $frameworkProject 'Assets/UhCiTestFrameworkEvidence/Editor/UhCiTestFrameworkEvidence.cs')) {
+            $frameworkEvidence = "$LogPath.framework/$([Guid]::NewGuid().ToString('N'))"
+            $null = New-Item -ItemType Directory -Path $frameworkEvidence -ErrorAction Stop
+            Copy-Item -LiteralPath (Join-Path $frameworkProject 'Packages/manifest.json') -Destination (Join-Path $frameworkEvidence 'requested-manifest.json')
+            $Arguments = @($Arguments) + @('-uhFrameworkEvidenceDirectory', $frameworkEvidence)
+        }
+    }
+
     $nativeCapture = $null
     if ($IsWindows) {
         $nativeCapture = New-UnityNativeEvidenceCapture -LogPath $LogPath
@@ -3882,6 +3899,9 @@ function Invoke-UnityObservedEditor {
     try { $ProcessObservation['NativeEvidence'] = Get-UnityNativeEvidence -Capture $nativeCapture -LogPath $LogPath }
     catch { $ProcessObservation['NativeEvidence'] = @{ State = 'capture-unavailable'; Files = @() } }
     Write-UnityExecutionObservation -LogPath $LogPath -ProcessObservation $ProcessObservation -Label $Label
+    if ($null -ne $frameworkEvidence) {
+        Assert-UnityTestFrameworkEvidence -Directory $frameworkEvidence -ProcessId $ProcessObservation.ProcessId -Project $frameworkProject
+    }
     return $watch
 }
 

@@ -29,6 +29,11 @@ const { runChecks, runRegistry } = require("./check-runner");
 /** A check whose `run` is executed with `bash -c` from the repository root. */
 const CHECKS = [
   {
+    id: "unity-framework",
+    name: "Unity Test Framework policy and loaded-source evidence",
+    run: "npm run test:unity-framework"
+  },
+  {
     id: "watchdog-cancellation",
     name: "Watchdog cancellation and scheduling controls",
     run: "npm run test:watchdog-cancellation"

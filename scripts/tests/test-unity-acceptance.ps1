@@ -188,6 +188,13 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
         }, $true)
         Invoke-Expression $definition.Extent.Text
     }
+    foreach ($tooling in @($temporary, (Join-Path $temporary 'different-tooling-root'))) {
+        $templates = Join-Path $tooling 'scripts/unity'
+        $null = New-Item -ItemType Directory -Force -Path $templates
+        foreach ($extension in @('cs', 'asmdef')) {
+            Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../unity/test-framework-evidence.$extension.txt") -Destination $templates
+        }
+    }
     function Resolve-FullPath { param($Path) return [IO.Path]::GetFullPath($Path) }
     function New-ManifestJson { return '{}' }
     $initializeCall = $runner.Find({ param($node)

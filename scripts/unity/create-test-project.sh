@@ -100,7 +100,7 @@ echo "    [4/4] Writing Packages/manifest.json..."
 # devcontainer manifest's MODULE LIST can never drift from the CI generator's.
 # (That drift -- the two generators declaring different/incomplete module sets --
 # is exactly what made every Unity test leg fail to compile.) The test-framework
-# version and the package reference below stay independently pinned per generator.
+# request also comes from a shared policy; Unity 6 resolves its editor core package.
 # These modules cannot live in package.json: it is a dual npm+UPM file and
 # `npm ci` would fail to resolve com.unity.* from the npm registry.
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -121,10 +121,21 @@ if ! jq -e '(.modules | length) >= 1' "${MODULES_SOURCE}" >/dev/null; then
     exit 1
 fi
 
-# dependencies = test-framework + (shared modules, in file order) + the local
-# package. jq object '+' is last-key-wins and preserves insertion order.
-jq '{dependencies: ({"com.unity.test-framework": "1.1.33"} + .modules + {"com.wallstop-studios.unity-helpers": "file:/workspace"})}' \
+FRAMEWORK_POLICY="${REPO_ROOT}/.github/unity-test-framework.json"
+if ! FRAMEWORK_VERSION="$(jq -er '.requestedVersion | select(type == "string" and test("^[0-9]+\\.[0-9]+\\.[0-9]+$"))' "${FRAMEWORK_POLICY}")"; then
+    echo "ERROR: Unity Test Framework policy requires a stable requestedVersion string: ${FRAMEWORK_POLICY}" >&2
+    exit 1
+fi
+
+jq --arg framework "${FRAMEWORK_VERSION}" '{dependencies: ({"com.unity.test-framework": $framework} + .modules + {"com.wallstop-studios.unity-helpers": "file:/workspace"})}' \
     "${MODULES_SOURCE}" > "${UNITY_TEST_PROJECT_DIR}/Packages/manifest.json"
+
+FRAMEWORK_EVIDENCE="${UNITY_TEST_PROJECT_DIR}/Assets/UhCiTestFrameworkEvidence/Editor"
+mkdir -p "${FRAMEWORK_EVIDENCE}"
+for extension in cs asmdef; do
+    cp "${REPO_ROOT}/scripts/unity/test-framework-evidence.${extension}.txt" \
+        "${FRAMEWORK_EVIDENCE}/UhCiTestFrameworkEvidence.${extension}"
+done
 
 # Note: packages-lock.json is intentionally NOT created.
 # Unity generates it on first project open during dependency resolution.

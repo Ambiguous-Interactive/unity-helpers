@@ -1,0 +1,4 @@
+{
+  "requestedVersion": "1.4.6",
+  "_policy": "Request the current compatible registry release for Unity 2021/2022. Unity 6 selects the Test Framework core package that matches the editor; the manifest request does not identify the loaded framework. Retain requested and resolved metadata, loaded assembly identities and package source bytes for each invocation. Keep NUnit compiler-floor and historical host witnesses independent."
+}
