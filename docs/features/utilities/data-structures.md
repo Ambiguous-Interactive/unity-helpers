@@ -340,18 +340,34 @@ map.TrySet(entityId, HealthState.Healthy);   // overwrite in place
 map.Remove(entityId, out _);                 // closes the probe-chain gap without allocating
 ```
 
-Tips and pitfalls
+### When to choose IntMap
 
-- `TryGet` checks each stored key directly and returns its value on a match. It uses the same high-bit hash and wrapping probe sequence as insertion and removal.
-- A fresh Unity 6000.4.6f1 Release Windows Mono player measured 2.34x and 2.90x Dictionary speed for hit-only lookups at 1,000 and 10,000 keys, and 1.53x and 1.83x with 50% misses. All eight comparisons retained 32 samples per arm and met the 3% spread limit with a 600 ms calibration target. These measurements used an Intel Core Ultra 9 285K, CPU 12 affinity, elevated process/thread priority, and explicit High QoS. All four shared-low-bit comparisons stayed within twice the dense lookup time. See [the complete acceptance evidence](https://github.com/Ambiguous-Interactive/unity-helpers/issues/926) for the method and retained failed experiments; measure your own runtime and key distribution.
-- Earlier editor Mono measurements reported 1.97x–2.19x hit-heavy and 1.26x–1.65x at a 50% miss rate using the previous low-bit slot selection. Those margins do not describe the corrected implementation. `IntMapPerformanceTests` retains calibrated counterbalanced comparisons; measurements whose spread exceeds 3% cannot establish acceptance.
-- **Those historical numbers are editor Mono only.** IL2CPP has not been measured, and part of the margin is Mono not devirtualizing `EqualityComparer<int>.Default` — which an AOT compiler may do. See [#578](https://github.com/Ambiguous-Interactive/unity-helpers/issues/578).
-- Removal closes gaps by shifting displaced entries whose probe paths cross the deleted slot, including chains that wrap around the table. It leaves no tombstones and allocates no replacement arrays. Remove-before-add sliding windows can therefore retain one quarter of the table as live entries without growth or cleanup allocations; an eight-entry sliding window stays at the default 64 slots even after one million insertions. The table doubles only when adding another live entry would exceed its 0.25 load factor. The default table remains 64 slots; explicit capacity hints reserve at least four slots per requested live entry, with a minimum of 16 slots. Compared with the previous 0.5 limit, larger tables usually use twice the key and value storage to reduce collisions.
-- Replacing an existing value through `TrySet` or the indexer keeps the current storage, including at the occupancy limit and after removals. Only adding an absent key beyond the live-entry load limit triggers growth.
-- Keys sharing low bits, such as `i * 1024`, use the high bits of the hash product for their starting slots. The performance fixture compares hits and misses against dense keys at 64 and 1,024 entries; stable sparse-key measurements must stay within twice the dense lookup time.
-- Keys below `IntMap<TValue>.MinimumAllowedKey` remain reserved and are refused by `TrySet`; the indexer throws for them.
+Use `IntMap<TValue>` when your keys are integers in its supported range and your API does not
+need `Dictionary<int, TValue>` interoperability. Benchmark the access pattern you use: hit-only
+lookups, misses, replacement and removal can have different costs.
 
-Run `npm run test:intmap` for the same map correctness tests on the host .NET runtime without starting Unity. This gives a fast local edit loop; it does not establish Unity player compatibility or performance.
+A Unity 6000.4.6f1 Release Windows Mono comparison observed 2.34x and 2.90x Dictionary throughput
+for hit-only lookups at 1,000 and 10,000 keys, and 1.53x and 1.83x with 50% misses. Those observations
+used an Intel Core Ultra 9 285K with fixed CPU affinity, elevated priority and High QoS. They do not
+establish the same benefit for ordinary scheduling, IL2CPP or a different device. Earlier Editor
+measurements used a previous hash layout and do not describe the current implementation.
+
+### Capacity and key limits
+
+- Keys below `IntMap<TValue>.MinimumAllowedKey` are reserved. `TrySet` refuses them; the indexer
+  throws. Validate identifiers from external sources before choosing this map.
+- Capacity hints reserve at least four slots per requested live entry, with a minimum of 16 slots.
+  The default table has 64 slots. Growth occurs when adding another live entry would exceed a
+  0.25 load factor. This favors lookup spacing at the cost of more key and value storage.
+- Replacing an existing value does not grow the table, including at the occupancy limit.
+- Removal closes probe-chain gaps without tombstones or replacement arrays. Repeated
+  remove-before-add operations do not require growth while live occupancy stays within the limit.
+- Keys sharing low bits, such as `i * 1024`, use high hash bits to select their initial slots.
+  Profile the actual key distribution your game produces rather than assuming dense keys.
+
+Keep a regular dictionary when its key range, interfaces or integration requirements fit your
+application better. A faster lookup does not by itself offset greater retained storage or a costly
+conversion at an API boundary.
 
 ## String Wrapper (Interned Flyweight)
 

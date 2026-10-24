@@ -1115,8 +1115,8 @@ The same internal helpers centralize existing private cache and serializer array
 changing their lifetimes, clearing flags, or failure behavior. Serializer owner leases still use
 their existing runtime checks; storing an array in its private owner does not issue another lease.
 
-The [ownership audit](./ownership-audit.md) records current producer bindings and private-operation
-candidates, including the reasons to retain shared and extended lifetimes.
+See [using pooled resources safely](./ownership-audit.md) for lease lifetimes, safe returned results
+and the choice between an array lease and a synchronous borrowed buffer.
 
 ## `WUH023`: public struct equality (opt-in)
 

@@ -51,7 +51,7 @@ Unity Helpers reduces repetitive work with utilities tested in commercial releas
         }
       ],
       "dependencies": {
-        "com.wallstop-studios.unity-helpers": "3.0.0"
+        "com.wallstop-studios.unity-helpers": "3.6.2"
       }
     }
     ```

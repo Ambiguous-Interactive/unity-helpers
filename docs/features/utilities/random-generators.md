@@ -64,10 +64,28 @@ float normalValue = random.NextGaussian(mean: 0f, stdDev: 1f);
 
 ### Saving and restoring a generator
 
-Every generator answers `InternalState` with a `RandomState` snapshot, and every generator has a
-constructor that takes one back. Snapshot mid-stream, store the snapshot in your save file, and the
-restored generator resumes the exact sequence, verified for all of them by
-`GeneratorSnapshotRestoreTests`.
+Managed generators expose `InternalState` as a `RandomState` snapshot and accept a snapshot in
+their constructors. Capture that state mid-stream and store it in your save file to resume later.
+Use the same generator type when restoring it. `NativePcgRandom` is a separate value type: copy
+its value to copy its state; it has no `RandomState` API.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using WallstopStudios.UnityHelpers.Core.Random;
+
+public static class RandomReplayExample
+{
+    public static bool RestoredDrawMatches()
+    {
+        PcgRandom original = new(1234);
+        original.NextUint();
+        RandomState saved = original.InternalState;
+        PcgRandom restored = new(saved);
+        return original.NextUint() == restored.NextUint();
+    }
+}
+```
 
 `FlurryBurstRandom`, `PhotonSpinRandom` and `StormDropRandom` copy their logical payload directly
 into an independent saved array. Snapshot creation uses no pooled scratch buffer. Existing payload
@@ -321,24 +339,21 @@ after that failure can start at an earlier stream position. `Next()` and `NextLo
 signed maximum; the earlier correction to those methods intentionally changed the rare draw that
 previously returned that maximum. These generators are not cryptographic random sources.
 
-Arithmetic verification is separate from statistical quality testing. Install the pinned proof
-dependency and run the executable contract with a C++17 compiler exposed as `c++` on `PATH`:
+Choose the failure policy at the call site:
 
-```bash
-python3 -m pip install -r requirements-random-quality.txt
-python3 scripts/random-quality/verify-bounded-sampling.py
-```
+| Your requirement                                                | Use                                                  | Handle failure by                                                 |
+| --------------------------------------------------------------- | ---------------------------------------------------- | ----------------------------------------------------------------- |
+| An exact sample, with no substituted value                      | The corresponding `AbstractRandom.TryNext...` method | Checking `false` and selecting an explicit application policy.    |
+| Existing `IRandom` integration and its legacy fallback behavior | The existing sampling methods                        | Accepting their documented degraded result for a stalled source.  |
+| Reproducible gameplay or saved simulations                      | A seeded generator and saved continuation state      | Keeping the generator, package version and draw order consistent. |
 
-It enumerates every word for every nonzero 8-bit and 16-bit bound, verifies exact results and equal
-accepted bucket counts, and rejects modulo, threshold and high-word model mutants. Z3 proves
-unsigned wrap, product decomposition, the threshold remainder identity, result bounds, and the
-carry reconstruction parsed from the production multiply-high body. Source mutations to a partial
-product, limb extraction and carry shift must each produce a counterexample. Result bounds and limb expansion
-use integer arithmetic; carry reconstruction and unsigned wrap use bit vectors. Unsupported
-production syntax or an inconclusive solver result fails the command. The Unity
-`AbstractRandomBoundedContractTests` fixture independently checks production acceptance and
-outputs against `BigInteger`, including exact retry boundaries and nested rejection failures.
-These checks do not replace raw-stream continuation tests or Mono, IL2CPP and WebGL verification.
+A failed `Try` call has consumed entropy. Retrying it is not a rollback, and immediately retrying
+a stuck custom source can block your game loop. Validate inputs first, then report the failure or
+use a fallback your game explicitly permits. Do not treat the default output as a successful draw.
+
+Statistical quality, exact bounded sampling and replay compatibility are separate properties.
+A fast generator or a passing quality test does not establish the other two. See
+[random performance](../../performance/random-performance.md) for the scope of the published measurements.
 
 ### Ranges a Designer Authored
 
