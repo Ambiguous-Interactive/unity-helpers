@@ -573,6 +573,49 @@ try {
     $lastReceipt = Get-Content -LiteralPath ([IO.Path]::ChangeExtension($nativeLog, 'execution-diagnostics.json')) -Raw | ConvertFrom-Json
     Assert-That 'UPM retry retains distinct first and final child receipts' ($script:executionAttempt -eq 2 -and $firstReceipt.Process.ProcessId -eq 101 -and $lastReceipt.Process.ProcessId -eq 102)
     Assert-That 'retained first receipt refers to its matching first log' ($firstReceipt.NativeReports.NativeReportHeaderCount -eq 0 -and $lastReceipt.NativeReports.NativeReportHeaderCount -eq 1 -and (Get-Content (Join-Path $temporaryRoot 'native.first-attempt.log') -Raw) -match 'IPC stream failed')
+    foreach ($case in @(
+        @{ Name = 'framework-preload-upm'; Log = 'IPCStream (Upm-123): IPC stream failed to read'; HasResults = $false; ExpectedCalls = 2 },
+        @{ Name = 'framework-preload-results'; Log = 'IPCStream (Upm-123): IPC stream failed to read'; HasResults = $true; ExpectedCalls = 1 },
+        @{ Name = 'framework-preload-ordinary'; Log = 'ordinary framework capture failure'; HasResults = $false; ExpectedCalls = 1 },
+        @{ Name = 'framework-preload-mixed'; Log = "IPCStream (Upm-123): IPC stream failed to read`nerror CS0001: compiler failure"; HasResults = $false; ExpectedCalls = 1 }
+    )) {
+        $script:preloadCase = $case
+        $script:preloadCalls = 0
+        $preloadResults = Join-Path $temporaryRoot ($case.Name + '.xml')
+        if ($case.HasResults) { Set-Content -LiteralPath $preloadResults -Value '<test-run />' }
+        function Invoke-UnityEditor {
+            param($EditorPath, $Arguments, $Label, $LogPath, $CompletionPattern, $CompletionGraceSeconds, $TimeoutSeconds, $StallSeconds, $ProcessObservation)
+            ++$script:preloadCalls
+            Set-Content -LiteralPath $LogPath -Value $script:preloadCase.Log
+            if ($script:preloadCalls -eq 1) { throw 'No loaded Test Framework snapshot was captured.' }
+            return 0
+        }
+        $preloadThrew = $false
+        try { $null = Invoke-UnityEditorTestsWithPackageManagerRetry -EditorPath 'owned-editor' -Arguments @('-runTests') -Label $case.Name -LogPath $nativeLog -ResultsPath $preloadResults -Project (Join-Path $temporaryRoot 'retry-project') }
+        catch { $preloadThrew = $true }
+        Assert-That ($case.Name + ' keeps the bounded retry count') ($script:preloadCalls -eq $case.ExpectedCalls)
+        Assert-That ($case.Name + ' preserves failure classification') ($preloadThrew -eq ($case.ExpectedCalls -eq 1))
+        $script:preloadCalls = 0
+        $preloadMarker = Join-Path $temporaryRoot ($case.Name + '.marker')
+        $preloadInvoker = {
+            param($Arguments, $AttemptLog, $AttemptLabel)
+            ++$script:preloadCalls
+            Set-Content -LiteralPath $AttemptLog -Value $script:preloadCase.Log
+            if ($script:preloadCalls -eq 1) {
+                if ($script:preloadCase.HasResults) { Set-Content -LiteralPath $env:UH_CONFIGURE_MARKER_PATH -Value 'fresh' }
+                throw 'No loaded Test Framework snapshot was captured.'
+            }
+            Set-Content -LiteralPath $env:UH_CONFIGURE_MARKER_PATH -Value 'fresh'
+            return 0
+        }
+        $preloadThrew = $false
+        try { Invoke-UnityConfigurePass -EditorPath 'owned-editor' -ProjectPath (Join-Path $temporaryRoot 'retry-project') -MarkerPath $preloadMarker -LogPath $nativeLog -Label $case.Name -ConfigureInvoker $preloadInvoker | Out-Null }
+        catch { $preloadThrew = $true }
+        Assert-That ($case.Name + ' configure keeps the bounded retry count') ($script:preloadCalls -eq $case.ExpectedCalls)
+        Assert-That ($case.Name + ' configure preserves failure classification') ($preloadThrew -eq ($case.ExpectedCalls -eq 1))
+
+    }
+
 
 } finally {
     Remove-Item -LiteralPath $temporaryRoot -Recurse -Force -ErrorAction SilentlyContinue

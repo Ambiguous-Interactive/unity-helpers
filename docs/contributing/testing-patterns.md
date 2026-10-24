@@ -77,6 +77,8 @@ Run `npm run test:unity-framework` for manifest controls and compiled host colle
 The host controls use labeled API shims; native framework qualification still requires the
 supported Unity matrix and controls for timeout, teardown and interrupted PlayMode behavior.
 
+A recognized Package Manager failure before a fresh configure marker or NUnit result retains the existing single retry. The final invocation still requires complete framework evidence.
+
 ## Source validation must find its subjects
 
 Package source scans resolve the owning package from its assembly, then use the source file path

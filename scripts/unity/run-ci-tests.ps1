@@ -1049,15 +1049,21 @@ function Invoke-UnityEditorTestsWithPackageManagerRetry {
     $runTimeout = Get-EditorTestRunTimeoutSeconds
     $runStall = Get-EditorTestStallSeconds
 
-    $runExit = Invoke-UnityEditor `
-        -EditorPath $EditorPath `
-        -Arguments $Arguments `
-        -Label $Label `
-        -LogPath $LogPath `
-        -CompletionPattern $script:EditorTestCompletionSentinel `
-        -CompletionGraceSeconds $completionGrace `
-        -TimeoutSeconds $runTimeout `
-        -StallSeconds $runStall
+    try {
+        $runExit = Invoke-UnityEditor `
+            -EditorPath $EditorPath `
+            -Arguments $Arguments `
+            -Label $Label `
+            -LogPath $LogPath `
+            -CompletionPattern $script:EditorTestCompletionSentinel `
+            -CompletionGraceSeconds $completionGrace `
+            -TimeoutSeconds $runTimeout `
+            -StallSeconds $runStall
+    } catch {
+        if ((Test-Path -LiteralPath $ResultsPath -PathType Leaf) -or
+            -not (Test-UnityConfigurePackageManagerRetryableFailure -LogPath $LogPath)) { throw }
+        $runExit = 1
+    }
 
     if ((Test-Path -LiteralPath $ResultsPath -PathType Leaf) -or
         -not (Test-UnityPackageManagerTransientFailure -LogPath $LogPath)) {
@@ -4814,6 +4820,10 @@ function Invoke-UnityConfigurePass {
     $configureStartedUtc = [DateTime]::UtcNow
     try {
         $configureExit = & $invokeConfigure $Label
+    } catch {
+        if (-not (Test-UnityConfigureMarker -MarkerPath $MarkerPath -StartedUtc $configureStartedUtc) -or
+            -not (Test-UnityConfigurePackageManagerRetryableFailure -LogPath $LogPath)) { throw }
+        $configureExit = 1
     } finally {
         if ($null -ne $FrozenContext) { $FrozenContext.ConfigureOutcomes.Add([pscustomobject]$processObservation.Clone()) }
         # The configurator has run; drop the marker-path env var so it cannot be
