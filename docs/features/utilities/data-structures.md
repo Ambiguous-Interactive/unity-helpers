@@ -195,6 +195,26 @@ Tips
 - Use the generic variant to work with domain objects; internally it maps to indices.
 - No deletions: rebuild if you need dynamic splits.
 
+### Restored graphs and reusable results
+
+`TryFind` follows parent links iteratively and compresses a path only after it reaches a
+valid root. Broken links and cycles return `false` with representative `-1`; deep valid
+trees do not consume one stack frame per link. Queries can still use healthy components
+of a partially malformed graph; set enumeration omits elements whose chains are malformed.
+`TryUnion` also refuses missing or mismatched rank
+storage, negative root ranks, and set counts outside the range needed for a union.
+These operation checks do not validate every component during deserialization.
+
+Call `Reset()` only when you intend to discard the previous grouping. It restores one
+set per delivered element and rebuilds missing rank storage using the parent array's
+length. Existing serialized field numbers and valid saved connectivity are preserved.
+
+Reuse the same `List<List<T>>` with `TryGetAllSets` to retain output capacity between
+queries. Null entries are ignored, and a repeated inner list is reused only once so
+separate sets never share the same output list. Both overloads use pooled scratch;
+the generic overload fills result lists directly. Calls can allocate while pools are
+cold or result capacity grows.
+
 ## Sparse Set
 
 - What it is: Two arrays (sparse and dense) enabling O(1) membership checks and iteration over active items.

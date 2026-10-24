@@ -56,6 +56,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fix extreme signed left rotations and partial self-appends through `IList<T>`, including shared `SerializableList<T>` storage; use its bulk append path ([#1066](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1066)).
+- Fix `DisjointSet` queries so broken or cyclic saved parent links return failure without recursive traversal. Validate union metadata and allow explicit reset of missing ranks ([#1067](https://github.com/wallstop/unity-helpers/issues/1067)).
+- Fix `DisjointSet` set collection so shared result lists preserve every partition and generic calls reuse result storage without temporary index lists ([#1067](https://github.com/wallstop/unity-helpers/issues/1067)).
 - Fix exported protobuf map fields, URI text, and explicit surrogate overrides so other protobuf tools can read the generated schemas ([#1027](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1027)).
 - Fix exported schemas for `uint`, `long`, and `ulong` enums so other protobuf tools preserve their full numeric range ([#1029](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1029)).
 - Fix exported protobuf schemas for concrete subtype roots and members, preserving their inheritance envelopes and field ownership ([#1035](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1035)).
