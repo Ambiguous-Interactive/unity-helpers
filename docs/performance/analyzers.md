@@ -1166,7 +1166,7 @@ string label = permissions.ToCachedName();
 The rule recognizes `Enum.HasFlag` only when both arguments have the same concrete
 enum type. It also recognizes all-bits comparisons such as
 `(permissions & Permissions.ReadWrite) == Permissions.ReadWrite`, including zero masks.
-It leaves any-bit tests, variable-mask comparisons, mixed enum types, boxed `Enum`
+Single-bit checks such as `(permissions & Permissions.Read) != 0` are also covered, including signed high bits. It leaves multi-bit any-match tests, variable-mask comparisons, mixed enum types, boxed `Enum`
 values, constrained generic calls and expression trees unchanged.
 
 Parameterless enum `ToString()` can use `ToCachedName()` for repeated names. Formatted

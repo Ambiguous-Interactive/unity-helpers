@@ -199,7 +199,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     selectedGoodCode =
                         "bool enabled = WallstopStudios.UnityHelpers.Core.Extension.EnumExtensions.HasFlagNoAlloc(System.Reflection.BindingFlags.Public, System.Reflection.BindingFlags.Public);";
                     selectedExplanation =
-                        "Use typed flag checks for the same enum type. ToCachedName can reuse repeated names, but retains cached values. Any-bit tests, formatted strings and expression trees are excluded.";
+                        "Use typed flag checks for the same enum type. ToCachedName can reuse repeated names, but retains cached values. Multi-bit any-match tests, formatted strings and expression trees are excluded.";
                     break;
                 default:
                     badCode = string.Empty;

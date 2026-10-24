@@ -85,15 +85,24 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                     replacement = NameMethodName;
                 }
             }
-            else if (
-                flags
-                && context.Operation is IBinaryOperation comparison
-                && comparison.OperatorKind == BinaryOperatorKind.Equals
-            )
+            else if (flags && context.Operation is IBinaryOperation comparison)
             {
                 if (
-                    IsAllBitsComparison(comparison.LeftOperand, comparison.RightOperand)
-                    || IsAllBitsComparison(comparison.RightOperand, comparison.LeftOperand)
+                    comparison.OperatorKind == BinaryOperatorKind.Equals
+                    && (
+                        IsAllBitsComparison(comparison.LeftOperand, comparison.RightOperand)
+                        || IsAllBitsComparison(comparison.RightOperand, comparison.LeftOperand)
+                    )
+                )
+                {
+                    replacement = FlagMethodName;
+                }
+                else if (
+                    comparison.OperatorKind == BinaryOperatorKind.NotEquals
+                    && (
+                        IsSingleBitComparison(comparison.LeftOperand, comparison.RightOperand)
+                        || IsSingleBitComparison(comparison.RightOperand, comparison.LeftOperand)
+                    )
                 )
                 {
                     replacement = FlagMethodName;
@@ -171,6 +180,76 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             }
             return IsSameConstant(Unwrap(bits.LeftOperand), expected)
                 || IsSameConstant(Unwrap(bits.RightOperand), expected);
+        }
+
+        private static bool IsSingleBitComparison(IOperation candidate, IOperation expected)
+        {
+            candidate = Unwrap(candidate);
+            if (
+                !(candidate is IBinaryOperation bits)
+                || bits.OperatorKind != BinaryOperatorKind.And
+                || !(bits.Type is INamedTypeSymbol type)
+                || type.TypeKind != TypeKind.Enum
+                || !SymbolEqualityComparer.Default.Equals(type, expected.Type)
+                || !expected.ConstantValue.HasValue
+                || !Equals(expected.ConstantValue.Value, 0)
+                    && !Equals(expected.ConstantValue.Value, 0L)
+                    && !Equals(expected.ConstantValue.Value, 0UL)
+                    && !Equals(expected.ConstantValue.Value, (byte)0)
+                    && !Equals(expected.ConstantValue.Value, (sbyte)0)
+                    && !Equals(expected.ConstantValue.Value, (short)0)
+                    && !Equals(expected.ConstantValue.Value, (ushort)0)
+                    && !Equals(expected.ConstantValue.Value, 0U)
+            )
+            {
+                return false;
+            }
+            return IsSingleBitConstant(Unwrap(bits.LeftOperand), type)
+                || IsSingleBitConstant(Unwrap(bits.RightOperand), type);
+        }
+
+        private static bool IsSingleBitConstant(IOperation operation, INamedTypeSymbol type)
+        {
+            if (
+                operation == null
+                || !operation.ConstantValue.HasValue
+                || !SymbolEqualityComparer.Default.Equals(operation.Type, type)
+            )
+            {
+                return false;
+            }
+            object value = operation.ConstantValue.Value;
+            ulong bits =
+                type.EnumUnderlyingType.SpecialType == SpecialType.System_UInt64
+                    ? Convert.ToUInt64(value, System.Globalization.CultureInfo.InvariantCulture)
+                    : unchecked(
+                        (ulong)
+                            Convert.ToInt64(
+                                value,
+                                System.Globalization.CultureInfo.InvariantCulture
+                            )
+                    );
+            switch (type.EnumUnderlyingType.SpecialType)
+            {
+                case SpecialType.System_SByte:
+                case SpecialType.System_Byte:
+                    bits &= byte.MaxValue;
+                    break;
+                case SpecialType.System_Int16:
+                case SpecialType.System_UInt16:
+                    bits &= ushort.MaxValue;
+                    break;
+                case SpecialType.System_Int32:
+                case SpecialType.System_UInt32:
+                    bits &= uint.MaxValue;
+                    break;
+                case SpecialType.System_Int64:
+                case SpecialType.System_UInt64:
+                    break;
+                default:
+                    return false;
+            }
+            return bits != 0 && (bits & (bits - 1)) == 0;
         }
 
         private static bool IsSameConstant(IOperation actual, IOperation expected)

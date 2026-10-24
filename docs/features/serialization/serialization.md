@@ -3,13 +3,13 @@
 Use Unity Helpers to save game state, load configuration and exchange typed messages.
 Choose the format for the data your players and tools need to read:
 
-| Your task                                                         | Start here                                                                                                                                                            |
-| ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Editable settings, mod files or readable save data                | [JSON examples](#json-examples-unity-aware)                                                                                                                           |
-| Compact saves or messages with generated IL2CPP-compatible models | [Adopt WallstopProto](./wallstop-proto-public-survey.md)                                                                                                              |
-| Keep an existing protobuf-net save system working                 | [Protobuf examples](#protobuf-examples-compact--evolvable) and the [migration checklist](./wallstop-proto-public-survey.md#move-an-existing-protobuf-net-save-system) |
-| Show dictionaries, nullable values or IDs in the Unity Inspector  | [Serializable wrappers](./serialization-types.md)                                                                                                                     |
-| Preserve the last good save if a write fails                      | [Durable file writes](#writes-do-not-destroy-the-previous-file)                                                                                                       |
+| Your task                                                         | Start here                                                                                                                                         |
+| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Editable settings, mod files or readable save data                | [JSON examples](#json-examples-unity-aware)                                                                                                        |
+| Compact saves or messages with generated IL2CPP-compatible models | [Adopt WallstopProto](./wallstop-proto-public-survey.md)                                                                                           |
+| Keep an existing protobuf-net save system working                 | [Protobuf examples](#protobuf-examples) and the [migration checklist](./wallstop-proto-public-survey.md#move-an-existing-protobuf-net-save-system) |
+| Show dictionaries, nullable values or IDs in the Unity Inspector  | [Serializable wrappers](./serialization-types.md)                                                                                                  |
+| Preserve the last good save if a write fails                      | [Durable file writes](#writes-do-not-destroy-the-previous-file)                                                                                    |
 
 Start with the examples, then use the sections below as an API reference. Keep a
 copy of released saves when changing a model or serializer. A successful round trip
@@ -470,6 +470,8 @@ int len = Serializer.JsonSerializeFast(data, ref buffer);
 JsonSerializerOptions pocoOpts = Serializer.CreateFastPocoJsonOptions();
 byte[] fastest = Serializer.JsonSerialize(pureCSharpData, pocoOpts);
 ```
+
+<a id="protobuf-examples"></a>
 
 ## Protobuf Examples (Compact + Evolvable)
 

@@ -120,7 +120,7 @@ class FrameworkEvidenceTests(unittest.TestCase):
                 $process = [Diagnostics.Process]::Start($start)
                 try {
                     $ProcessObservation.ProcessId = $process.Id
-                    $ProcessObservation.LaunchUtc = [DateTime]::UtcNow.ToString('o')
+                    $ProcessObservation.LaunchUtc = if ($Control -ceq 'offset-time') { [DateTimeOffset]::UtcNow.ToOffset([TimeSpan]::FromMinutes(330)).ToString('o') } else { [DateTime]::UtcNow.ToString('o') }
                     $ProcessObservation.LogPersistence = if ($Control -ceq 'stale-log') { 'write-failed' } else { 'written' }
                     if (-not $process.WaitForExit(30000)) { $process.Kill($true); throw 'Host collector control timed out.' }
                     if ($process.ExitCode -ne 0) { throw 'Host collector control failed.' }
@@ -443,7 +443,7 @@ class FrameworkEvidenceTests(unittest.TestCase):
         source.write_text(
             (ROOT / "scripts/unity/test-framework-evidence.cs.txt").read_text()
         )
-        for control in ("twice", "deep", "missing", "wrong-process", "stale-log", "stale-diagnostics"):
+        for control in ("twice", "deep", "offset-time", "missing", "wrong-process", "stale-log", "stale-diagnostics"):
             result = subprocess.run(
                 [
                     "pwsh",
@@ -468,7 +468,7 @@ class FrameworkEvidenceTests(unittest.TestCase):
                 text=True,
                 timeout=60,
             )
-            if control in ("twice", "deep"):
+            if control in ("twice", "deep", "offset-time"):
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 for capture in (self.case / control / "framework").iterdir():
                     self.assertEqual(
@@ -483,7 +483,7 @@ class FrameworkEvidenceTests(unittest.TestCase):
                     self.assertEqual(retained_log.read_text(), "HOST ORIGINAL PID " + str(receipt["ProcessId"]))
                     retained_diagnostics = retained_log.with_suffix(".execution-diagnostics.json")
                     self.assertEqual(json.loads(retained_diagnostics.read_text())["Process"]["ProcessId"], receipt["ProcessId"])
-                    self.assertEqual(invocation["OriginalLogRelativePath"], "migration/OdinMigrationDictionaryImportVerificationTests/unity.log" if control == "deep" else "twice.log")
+                    self.assertEqual(invocation["OriginalLogRelativePath"], "migration/OdinMigrationDictionaryImportVerificationTests/unity.log" if control == "deep" else control + ".log")
             else:
                 self.assertNotEqual(result.returncode, 0, control)
 

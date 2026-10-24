@@ -94,6 +94,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension {
         [TestCase("return (value & Flags.Both) == Flags.Both;", "HasFlagNoAlloc")]
         [TestCase("return Flags.Both == (Flags.Both & value);", "HasFlagNoAlloc")]
         [TestCase("return (value & Flags.None) == Flags.None;", "HasFlagNoAlloc")]
+        [TestCase("return (value & Flags.A) != Flags.None;", "HasFlagNoAlloc")]
+        [TestCase("return (value & Flags.High) != 0;", "HasFlagNoAlloc")]
+        [TestCase("return 0 != (Flags.A & value);", "HasFlagNoAlloc")]
         [TestCase("return value.ToString();", "ToCachedName")]
         public void SafeEnumOperationsReport(string body, string replacement)
         {
@@ -105,6 +108,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension {
         }
 
         [TestCase("return (value & Flags.Both) != Flags.None;")]
+        [TestCase("return (value & Flags.None) != Flags.None;")]
+        [TestCase("return (value & Flags.Both) != 0;")]
+        [TestCase("return (value & flag) != 0;")]
         [TestCase("return (value & flag) == flag;")]
         [TestCase("return (value & Flags.A) == Flags.B;")]
         [TestCase("return value.HasFlag(Other.A);")]
@@ -140,6 +146,25 @@ namespace WallstopStudios.UnityHelpers.Core.Extension {
                 + " { High = "
                 + high
                 + " } public static bool CheckWidth(WidthFlags value) { return value.HasFlag(WidthFlags.High); }";
+            Assert.That(Analyze("return true;", extra: members).Length, Is.EqualTo(1));
+        }
+
+        [TestCase("sbyte", "sbyte.MinValue")]
+        [TestCase("byte", "128")]
+        [TestCase("short", "short.MinValue")]
+        [TestCase("ushort", "32768")]
+        [TestCase("int", "int.MinValue")]
+        [TestCase("uint", "2147483648U")]
+        [TestCase("long", "long.MinValue")]
+        [TestCase("ulong", "9223372036854775808UL")]
+        public void SingleBitChecksIncludeSignedHighBits(string underlying, string high)
+        {
+            string members =
+                "public enum WidthFlags : "
+                + underlying
+                + " { High = "
+                + high
+                + " } public static bool CheckWidth(WidthFlags value) { return (value & WidthFlags.High) != 0; }";
             Assert.That(Analyze("return true;", extra: members).Length, Is.EqualTo(1));
         }
 
