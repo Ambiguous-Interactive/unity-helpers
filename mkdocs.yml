@@ -236,8 +236,8 @@ nav:
           - Failed Tests Exporter: features/editor-tools/failed-tests-exporter.md
           - Test Run Reporter: features/editor-tools/test-run-reporter.md
   - Performance:
-      - Enumeration Audit: performance/enumeration-audit.md
-      - Disposal Ownership Audit: performance/ownership-audit.md
+      - Avoid Enumerator Boxing: performance/enumeration-audit.md
+      - Pooled Resource Ownership: performance/ownership-audit.md
       - Random Generators: performance/random-performance.md
       - Spatial Trees 2D: performance/spatial-tree-2d-performance.md
       - Spatial Trees 3D: performance/spatial-tree-3d-performance.md
@@ -245,8 +245,8 @@ nav:
       - Reflection Helpers: performance/reflection-performance.md
       - IList Sorting: performance/ilist-sorting-performance.md
       - Dictionary Key Performance: performance/dictionary-key-performance.md
-      - JSON Codegen Performance: performance/json-codegen-performance.md
-      - Baseline Tests: performance/baseline-tests-performance.md
+      - Custom JSON Converters: performance/json-codegen-performance.md
+      - Reading Performance Measurements: performance/baseline-tests-performance.md
       - "Analyzers (WUH###)": performance/analyzers.md
   - Guides:
       - Odin Migration: guides/odin-migration-guide.md

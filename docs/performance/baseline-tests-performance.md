@@ -1,10 +1,10 @@
 # Performance Baseline Tests
 
-These tests serve as automated CI regression guards. They verify that critical operations complete within acceptable time bounds, detecting performance regressions before they reach production.
+Use these tables as reference measurements for spatial queries, random generation, pooling and serialization. Profile your own workload before choosing an API for speed.
 
 ## Baseline Philosophy
 
-Baselines are set generously (2-3x expected typical performance) to account for CI environment variability while still catching significant regressions. A test failure indicates a performance regression that needs investigation.
+The baseline column is a generous time budget used to flag large changes. A failure needs investigation; device load, runtime changes and workload differences can affect the result. Passing the budget does not establish a speedup or a frame-time guarantee.
 
 ## Test Categories
 
@@ -22,29 +22,22 @@ measurements below are historical and are not results from the current candidate
 
 <!-- CURRENT_BENCHMARK_RESULTS_END -->
 
-## Publishing current measurements
+<a id="publishing-current-measurements"></a>
 
-Every complete successful Unity Benchmarks execution updates the current measurements section
-above and commits the guide alongside its raw NUnit XML and comparison report. A detected
-comparison regression still publishes the measured values and is labeled in the comparison
-report. An unseeded acceptance baseline does not prevent publication. If a seeded baseline
-cannot be compared completely, the current measurements still publish; stale comparison files
-are removed and the workflow reports the comparison contract failure after committing the data. Partial, failed, empty,
-malformed, duplicate, or mismatched result sets preserve the last complete measurement report.
+## Read the measurements
 
-Each publication records its workflow run and attempt, measured candidate commit, Unity version,
-test mode, and UTC publication time. Raw XML links target the same repository and publication
-ref as the run; measurements and evidence are committed together. The candidate SHA identifies
-the measured code, not the later documentation commit. Single Stopwatch aggregates are labeled recorded values;
-reported distributions retain their median and sample count. These current measurements do not
-seed or promote the separate [canonical acceptance baseline](https://github.com/Ambiguous-Interactive/unity-helpers/blob/main/perf-results/baseline.json).
+The current measurements section identifies the measured package commit, Unity version, test
+mode and publication time when a complete run is available. Use those identities when comparing
+results with your project. The historical report below comes from an older run and cannot describe
+the performance of the current package on your device.
 
-Benchmarks run weekly on Wednesday at 10:29 UTC through a separate hosted scheduler, which
-requests an eligible dispatch on protected `main`. The scheduler performs no licensed Unity
-work and holds no Unity credentials. Direct scheduled execution remains excluded from the
-licensed workflow by the enrollment contract; that workflow accepts controlled dispatches.
-Manual dispatch remains available. Every complete successful execution uses the same committed
-measurement publication path.
+The package publishes complete benchmark results together with their raw test output. A partial
+or failed run leaves the last complete report in place. A published result can still show a
+regression: publication records the observation, rather than promising that every measured change
+is faster.
+
+The separate [comparison baseline](https://github.com/Ambiguous-Interactive/unity-helpers/blob/main/perf-results/baseline.json)
+currently contains no accepted metrics. Do not treat the tables as an accepted performance promise.
 
 <!-- BASELINE_PERFORMANCE_START -->
 
@@ -173,137 +166,47 @@ measurements to this guide. To inspect the historical baseline test report local
 
 Run `PerformanceBaselineTests.GeneratePerformanceBaselineReport` from Unity's Test Runner.
 
-## Calibrated paired evidence
+## Compare changes in your project
 
-The generous baseline budgets above detect large regressions. They do not establish that an
-optimization meets the acceptance criteria in [issue #636](https://github.com/Ambiguous-Interactive/unity-helpers/issues/636).
-Unity Benchmarks publishes current measured aggregates in this guide. Comparative aggregate
-reports are not calibrated acceptance evidence. Their renderer never writes the canonical baseline,
-including after a regression, and refuses empty, malformed, duplicate, or incomplete metric sets.
-A positive cost against a zero baseline is a regression. The previous automatic baseline update
-option is rejected.
+A baseline budget is a coarse regression check. It does not show that one implementation is
+faster than another. For that decision, compare both implementations in the same player with the
+same inputs, and check that they produce the same results before measuring them.
 
-`BenchmarkProtocol.MeasureCalibrated` now provides the first part of the stronger protocol:
+1. Choose representative inputs, including small, typical and peak sizes. Measure reads and writes
+   separately when both matter to your game.
+2. Warm each implementation before comparing steady-state work. Measure first use separately if
+   startup latency matters.
+3. Alternate measurement order and keep repeated samples. A single fast sample can reflect
+   scheduling, garbage collection or an idle device rather than a useful improvement.
+4. Include acquisition, clearing, conversions, useful work and cleanup in the measured operation.
+   Measuring only an inner loop can miss the cost your caller actually pays.
+5. Check allocation and retained memory separately from elapsed time. A warm operation can allocate
+   nothing while keeping a large pooled buffer alive.
+6. Repeat on the Unity versions, scripting backends and devices you ship. Editor, host, Mono,
+   IL2CPP and WebGL results are not interchangeable.
 
-- Correctness runs before warmup and again after the retained timing samples.
-- Each arm warms separately for at least 100 ms and three executions. Calibration doubles the
-  common iteration count until both arms reach the selected duration, 20 ms by default.
-  A caller can preregister a finite target from 20 through 2,000 ms; inability to calibrate is
-  inconclusive. The optional observer receives every completed calibration pair after both timed
-  windows close. A longer target leaves the 10 ms sample floor and 3% spread limit unchanged.
-- Eight predeclared `ABBABAAB` batches retain 32 observations per arm. Each slot begins with heap
-  settling, consumes a checksum, and must take at least 10 ms. There are no acceptance retries.
-- Immutable raw milliseconds, paired log ratios, geometric throughput ratio, median, p95, MAD,
-  and within-arm spread accompany a 95% interval from 2,000 deterministic bootstrap repetitions.
-  Bootstrap resamples whole counterbalanced batches to preserve within-batch correlation.
-- Environment metadata records commit/base commit, Unity version, backend, build configuration,
-  OS, CPU, process width, platform, and whether execution is inside the Editor. Unavailable code
-  generation and optimization settings remain `unknown`. Seed, iteration count, and measured
-  warmup durations/executions accompany the samples.
+If repeated samples are unstable, treat the comparison as inconclusive and investigate the
+measurement conditions. Do not report missing or unsupported memory counters as zero allocation.
+Include an operation known to allocate when checking that your allocation measurement works.
 
-Backend labels identify `IL2CPP` from its compilation symbol, `Mono` from the executing core
-library, and `.NET` otherwise. The `.NET` label does not distinguish CoreCLR from NativeAOT or
-other .NET implementations. Reports also preserve the raw runtime framework description; it
-does not prove the compilation mode. Standalone host reports mark Unity fields as unavailable
-and CPU identity as `unknown`, using the host OS and build configuration. The borrowed-buffer
-preflight uses the same backend detector. A host build with the IL2CPP symbol exercises branch
-selection only; player qualification requires actual player execution.
+<a id="calibrated-paired-evidence"></a>
 
-`IntMapPerformanceTests` allows 30 minutes per test case so its grouped dictionary workloads can
-use the maximum calibration target. Its default target remains 20 ms; the timeout does not relax
-any timing or stability gate.
+## Understand paired reports
 
-`IntMapPerformanceTests` emits the full raw record as `INTMAP_PAIRED_SAMPLES` JSON in its NUnit
-output through an explicit JSON writer that needs no runtime serializer generation. Incomplete
-counterbalanced batches cannot claim timing acceptance and report an undefined interval as JSON
-`null`. Existing fixtures that still call `MeasurePaired` retain their older advisory protocol;
-this change does not make their tables calibrated evidence.
+Some package benchmarks report calibrated, paired measurements alongside the simple tables.
+They warm both implementations, select a common iteration count, alternate measurement order and
+retain repeated samples. The reports include a throughput ratio, a confidence interval and sample
+spread.
 
-The protobuf warm serialize and deserialize fixtures use the same calibrated protocol for
-small, medium and large messages, with both contracts using unpacked integer arrays. The generated
-side calls `WProtoFacade` directly. A timed sleep control runs before each fixture measures its
-workloads. Generated and protobuf-net bytes must agree before warmup and after the retained
-samples; generated reads and oracle reads must reproduce the original payload. Each workload
-emits its raw record as `WPROTO_WARM_SAMPLES` JSON. Table timings are median nanoseconds per
-operation, and unstable or insufficient samples report an inconclusive speedup. These editor
-measurements do not establish cold-start, allocation or Release-player acceptance.
+| Report field               | How to use it                                                                                                                                                              |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Throughput ratio           | A ratio above one favors the candidate when the report defines the ratio as reference time divided by candidate time. Check the report's direction before interpreting it. |
+| Confidence interval        | An interval crossing one does not establish which implementation is faster.                                                                                                |
+| Sample spread              | Large variation weakens the comparison even when the median looks favorable.                                                                                               |
+| Inconclusive result        | Calibration, stability or other required measurements were insufficient; it is not a speed claim.                                                                          |
+| Runtime and input metadata | Compare like with like: the same backend, build configuration, workload and input sizes.                                                                                   |
 
-The explicit `CompareFrozenSevenFamilyCorpus` campaign extends that fixture
-with corpus `wproto-seven-families-v1`: scalar-heavy, text-heavy, repeated numeric, maps,
-nested/polymorphic, generic/enum, and binary workloads. Each has empty/default-heavy, small,
-typical, and large cases; numeric reads include packed and unpacked inputs. Scalar cases populate
-zero, one, five, or ten fields. Empty fields use a nonempty envelope so the public facade's
-empty-input contract is preserved. This synthetic corpus has 28 write and 32 read cases; retained
-consumer models remain a required expansion before representative acceptance. The versioned
-input inventory pins every case's encoded length and SHA256 fingerprint and requires each expected
-identity exactly once; changed bytes, duplicate cases, and missing cases fail the normal correctness
-witness before a campaign can qualify.
-
-Memory and stream reads, finite-limit reads, direct codecs, public facade operations, returned
-arrays, and reusable writes are reported separately. The modern protobuf-net v3 buffer/memory
-APIs are the reference for the corresponding operations. Both reusable write arms retain their
-backing storage without clearing payload bytes between calls. Finite reads enable wire, packed-element,
-per-region tag, and total-tag budgets. Every read comparison uses identical
-bytes. Independent semantic checks run before and after sampling, and generated registration is
-required so fallback cannot hide a missing formatter. `WPROTO_CORPUS_SAMPLES` records retain input
-hashes, operation/family/case identities, and the calibrated raw samples. The normal semantic
-witness runs without executing the long timing campaign.
-
-`BenchmarkFamilyMeasurement` averages workload log-ratios within each family and then gives each
-family equal weight. Its 95% interval resamples whole counterbalanced batches within each workload.
-A missing workload, reused measurement, changed sampling plan, unstable arm, or diagnostic run cannot meet the timing
-target. Read and write operations must each reach a lower confidence bound of 2x, and every
-workload must remain within the five-percent runtime non-inferiority margin. A timing predicate
-alone cannot establish release acceptance: floor/latest non-development Mono runs, instrument
-controls, cold startup, allocation/retention, and code-size evidence remain required. IL2CPP and
-WebGL comparisons must use baseline and candidate on the same backend.
-
-For the IntMap player experiment, manually dispatch **Unity Tests** with `acceptance=intmap`
-and a supported `unity-version`. Normal selected tests remain mandatory. The extra test runs in
-a fresh Release IL2CPP player against `Dictionary` compiled in the same candidate, so its commit
-and reference commit metadata are identical. The artifact retains all four workload records.
-The verifier derives ratios, spreads and the bootstrap interval from the raw samples. It reports
-`inconclusive` for unstable arms, `meets-hit-margin` for stable results with at least 1.3× at both
-hit-only sizes and a favorable interval, or `below-hit-margin`. This is the timing decision for
-[#578](https://github.com/Ambiguous-Interactive/unity-helpers/issues/578); it is not full #636
-acceptance or proof of unmeasured allocation and code-size properties. The current corrected-map
-player campaign has rejected unstable workloads; those observations establish no speed claim.
-
-Set `UH_PERF_DIAGNOSTICS=1` only for a predeclared investigation run, or select
-`intmap-diagnostics=true` when manually dispatching `acceptance=intmap`. The workflow enables
-diagnostics only in that additional player step. Calibrated records then
-include `SlotDiagnostics` for every chronological slot, retaining the same clock boundaries,
-sample counts, calibration and stability limit. Windows diagnostics capture native thread identity,
-thread CPU accounting, raw thread cycle counts and the processor observed at each boundary.
-Unavailable APIs remain explicit. The player verifier rejects any record containing diagnostics
-as acceptance evidence, even when its timings appear stable.
-
-Before correctness checks, warmup and calibration, diagnostics query the host's Windows CPU sets
-once using a fixed 64 KiB buffer. `CpuSetTopology` retains the machine name, processor group,
-logical processor index, core index, efficiency class and flags. Unsupported APIs, malformed data
-and insufficient buffer space remain explicit; the query does not retry or change scheduling.
-Endpoint mapping requires one active group, unique logical indices and no unknown record types.
-Efficiency classes are reported OS metadata, not inferred processor labels.
-
-Thread CPU accounting brackets the timed work and includes diagnostic-call overhead and checksum
-publication; its resolution limits comparisons with elapsed time. Processor numbers are relative
-to the current processor group. Endpoints reveal some migrations but cannot exclude movement during
-a slot or between groups. Raw cycle counts are never converted to elapsed time or frequency, as
-[Microsoft's API contract](https://learn.microsoft.com/en-us/windows/win32/api/realtimeapiset/nf-realtimeapiset-querythreadcycletime)
-prohibits that inference. These diagnostics narrow scheduling hypotheses; they do not by themselves
-prove a cause or justify changing affinity, priority, samples or acceptance thresholds.
-
-The encoded timing improvement predicate requires at least 5% less runtime (throughput ratio
-at least `1 / 0.95`), an entirely favorable interval, and stable arms. The allocation-change timing
-predicate requires the entire runtime interval to stay within 5% of the reference. These are timing
-predicates only: they cannot accept a change without green instrument controls, identical semantics,
-and verified allocation, retention, and code-size evidence. Unsupported counters are explicitly
-labeled; an absent measurement never becomes zero.
-
-Issue #636 remains open. Required follow-up includes calibrated allocating/non-allocating and
-fast/slow player canaries, workload-specific retention probes and build-size measurements, the
-full acceptance policy including declared tradeoffs, and explicit post-merge promotion after
-20 clean floor/latest Mono/IL2CPP player calibration repetitions. There is currently no automatic
-promotion command. Analyzer findings, changed-branch coverage, mutation, replay/minimization, and
-touched-group CI tiers also remain separate requirements. Current measured numbers are published only after a complete successful benchmark run; this
-infrastructure change does not claim new measurements or a nonempty acceptance baseline.
+A favorable timing report does not establish source compatibility, allocation cost, retained memory,
+startup cost or build size. Check the properties your application needs before adopting a change.
+See [enumeration](./enumeration-audit.md), [pooled resource ownership](./ownership-audit.md) and
+[random generation](./random-performance.md) for feature-specific choices and limits.

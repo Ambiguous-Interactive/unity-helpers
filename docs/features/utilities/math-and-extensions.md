@@ -904,8 +904,8 @@ image's RGB intact instead of flattening it to black.
 
 ### Value Enumeration
 
-See the [complete enumeration audit](../../performance/enumeration-audit.md) for source coverage,
-retained iterator protocols and allocation limits.
+See [avoiding enumerator boxing](../../performance/enumeration-audit.md) to choose a traversal,
+handle null sources and understand allocation limits.
 
 `AsValueEnumerable` provides a lazy value view over `IEnumerable<T>`, including
 `IReadOnlyList<T>` and `IReadOnlyCollection<T>` sources. Arrays, exact `List<T>` and

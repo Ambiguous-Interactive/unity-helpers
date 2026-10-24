@@ -34,32 +34,27 @@ Unity Helpers is a toolkit used in commercial games that reduces common boilerpl
 
 ### 2. ⚡ Performance Characteristics
 
-**Speed improvements measured in benchmarks:**
+Use the feature guides to choose an API, then profile the complete operation in your target player:
 
-- **10-15x faster in benchmarks** random generation ([benchmark details](../performance/random-performance.md))
-- **10-100x faster in benchmarks** reflection (varies by operation; see [benchmark details](../performance/reflection-performance.md))
-- **O(log n)** spatial queries tested with millions of objects ([benchmark details](../performance/spatial-tree-2d-performance.md))
-- **Zero GC** with buffering pattern
-
-**Benchmark Results:**
-
-- Stable 60 FPS with 1000+ AI agents ([benchmark details](../performance/spatial-tree-2d-performance.md))
-- No allocation spikes from pooled collections
-- Deterministic replays with seedable RNG
+- [Random generators](../features/utilities/random-generators.md) offer explicit seeds, saved state
+  and several sampling operations. The [benchmark tables](../performance/random-performance.md)
+  describe particular workloads and environments.
+- [Spatial queries](../features/spatial/spatial-trees-2d-guide.md) index a fixed data set to reduce
+  repeated full scans. Query cost still depends on the data distribution and number of results.
+- [Pooling](../features/utilities/pooling-guide.md) reuses storage. Cold rents, growth, captured
+  callbacks and returned copies can still allocate.
+- [Reflection helpers](../features/utilities/reflection-helpers.md) cache repeated member access;
+  their available strategies differ between Editor, Mono and AOT players.
 
 ### 3. ✅ Testing & Compatibility
 
-- ✅ **17,000+ automated tests** - Edge cases are handled through test coverage
-- ✅ **Shipped in commercial games** - Used at scale in production
-- ✅ **IL2CPP/WebGL compatible** - Works with aggressive compilers
-- ✅ **Schema evolution** - Player saves maintain compatibility across updates
-- ✅ **SINGLE_THREADED optimized** - Reduced overhead on WebGL
+The package has **17,000+ automated tests** and supports Unity 2021.3 and later. Test the features
+you use in your actual player configuration, especially reflection, stripping, optional integrations
+and platform storage. An Editor pass does not establish every backend's behavior.
 
-**Key capabilities:**
-
-- Edge cases are handled through test coverage
-- Consistent behavior in editor and builds
-- Player data compatibility maintained across updates
+For saved data, follow the [serialization guide](../features/serialization/wallstop-proto-public-survey.md).
+Keep field identities stable and test old saves before adopting a new model or package version.
+Schema evolution provides tools for compatibility; arbitrary model changes can still lose data.
 
 ---
 
@@ -124,7 +119,7 @@ After installation, verify the package appears in **Window → Package Manager**
 
 ### Example 1: Random Generation (Beginner)
 
-**Problem:** Unity's `UnityEngine.Random` is slow and not seedable.
+**Problem:** You need weighted loot selection and a random generator with explicit saved state.
 
 **Solution:**
 
@@ -138,8 +133,7 @@ public class LootDrop : MonoBehaviour
 {
     void Start()
     {
-        // Performance comparison available in benchmarks
-        IRandom rng = PRNG.Instance;
+        IRandom rng = new PcgRandom(1234);
 
         // Basic usage
         int damage = rng.Next(10, 20);
@@ -154,8 +148,9 @@ public class LootDrop : MonoBehaviour
 }
 ```
 
-> ⚠️ **Common Mistake:** Don't use `UnityEngine.Random` and `PRNG.Instance` together in the
-> same class - pick one and stick with it for consistent results.
+`UnityEngine.Random` can also be seeded through `InitState`, but it owns a global stream.
+The example uses a separate `PcgRandom` instance. Keep that instance between draws in your game;
+recreating it with the same seed restarts the sequence. Use a saved snapshot to resume mid-stream.
 
 **Learn More:** [Random Performance](../performance/random-performance.md)
 
@@ -248,7 +243,7 @@ public class EnemyManager : MonoBehaviour
     {
         nearbyBuffer.Clear();
 
-        // Fast query: O(log n) instead of O(n)
+        // Reuse the buffer; cost also depends on the number of results.
         enemyTree.GetElementsInRange(playerPos, radius, nearbyBuffer);
 
         return nearbyBuffer;
