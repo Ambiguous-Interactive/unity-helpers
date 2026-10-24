@@ -283,19 +283,6 @@ if ($ForceFreshCompilationCache -and ($TestMode -ne 'standalone' -or $Standalone
 $PSNativeCommandUseErrorActionPreference = $false
 
 $PackageName = 'com.wallstop-studios.unity-helpers'
-# TODO(unity-helpers): test-framework version reconciliation. DxMessaging pinned
-# com.unity.test-framework 1.4.5; unity-helpers' existing
-# scripts/unity/create-test-project.sh pins 1.1.33. The harness here builds its
-# OWN manifest (New-ManifestJson) independent of create-test-project.sh, so this
-# value is the version Unity resolves for the ephemeral CI project. Kept at 1.4.5
-# (the harness-proven value) -- a maintainer should confirm whether unity-helpers
-# requires 1.1.33 (to match create-test-project.sh) or 1.4.5 before the first
-# self-hosted run. Performance tests intentionally use raw Stopwatch measurements,
-# so the ephemeral project does not need Unity's performance-testing package.
-$TestFrameworkVersion = '1.4.5'
-# (The analyzer-DLL roster that stood here was empty, unreferenced, and carried a premise that
-# stopped being true in session 173. See Write-AnalyzerSetupDiagnostics for what actually ships.)
-
 # Unity Accelerator (cache server) helpers live in a dot-sourceable library so
 # they can be unit-tested with plain pwsh (run-ci-tests.ps1 itself has a
 # mandatory param() block and a main, so it cannot be dot-sourced). This MUST
@@ -310,6 +297,7 @@ $TestFrameworkVersion = '1.4.5'
 . (Join-Path $PSScriptRoot 'lib/catastrophic-patterns.ps1')
 . (Join-Path $PSScriptRoot 'lib/credential-redaction.ps1')
 . (Join-Path $PSScriptRoot 'lib/native-evidence.ps1')
+. (Join-Path $PSScriptRoot 'lib/test-framework-evidence.ps1')
 
 # Resolves WHERE the generated project and its Library live, and prunes the
 # persistent root when a self-hosted runner's disk gets tight. Dot-sourced for
@@ -1061,15 +1049,21 @@ function Invoke-UnityEditorTestsWithPackageManagerRetry {
     $runTimeout = Get-EditorTestRunTimeoutSeconds
     $runStall = Get-EditorTestStallSeconds
 
-    $runExit = Invoke-UnityEditor `
-        -EditorPath $EditorPath `
-        -Arguments $Arguments `
-        -Label $Label `
-        -LogPath $LogPath `
-        -CompletionPattern $script:EditorTestCompletionSentinel `
-        -CompletionGraceSeconds $completionGrace `
-        -TimeoutSeconds $runTimeout `
-        -StallSeconds $runStall
+    try {
+        $runExit = Invoke-UnityEditor `
+            -EditorPath $EditorPath `
+            -Arguments $Arguments `
+            -Label $Label `
+            -LogPath $LogPath `
+            -CompletionPattern $script:EditorTestCompletionSentinel `
+            -CompletionGraceSeconds $completionGrace `
+            -TimeoutSeconds $runTimeout `
+            -StallSeconds $runStall
+    } catch {
+        if ((Test-Path -LiteralPath $ResultsPath -PathType Leaf) -or
+            -not (Test-UnityConfigurePackageManagerRetryableFailure -LogPath $LogPath)) { throw }
+        $runExit = 1
+    }
 
     if ((Test-Path -LiteralPath $ResultsPath -PathType Leaf) -or
         -not (Test-UnityPackageManagerTransientFailure -LogPath $LogPath)) {
@@ -1569,6 +1563,16 @@ function Get-UnityTestProjectModules {
     return $modules
 }
 
+function Get-UnityTestFrameworkVersion {
+    param([Parameter(Mandatory = $true)][string]$Root)
+    $source = Get-PackageManifestSource -Root $Root -RelativePath '.github/unity-test-framework.json' -Kind 'Unity Test Framework policy'
+    $version = $source.PSObject.Properties['requestedVersion']
+    if ($null -eq $version -or $version.Value -isnot [string] -or $version.Value -cnotmatch '^[0-9]+\.[0-9]+\.[0-9]+$') {
+        throw 'Unity Test Framework policy requires a stable requestedVersion string.'
+    }
+    return $version.Value
+}
+
 function New-ManifestJson {
     param(
         [Parameter(Mandatory = $true)][string]$Root,
@@ -1578,8 +1582,9 @@ function New-ManifestJson {
     )
 
     $packagePath = ConvertTo-UnityFileUriPath -Path $Root
+    $moduleRoot = if ([string]::IsNullOrWhiteSpace($RepoRoot)) { $Root } else { $RepoRoot }
     $dependencies = [ordered]@{
-        'com.unity.test-framework' = $TestFrameworkVersion
+        'com.unity.test-framework' = Get-UnityTestFrameworkVersion -Root $moduleRoot
     }
 
     # UNCONDITIONAL (every leg -- editmode/playmode/standalone, single-threaded,
@@ -1589,7 +1594,6 @@ function New-ManifestJson {
     # create-test-project.sh cannot drift. The package.json deliberately does NOT
     # carry these (dual npm+UPM file; `npm ci` would fail to resolve com.unity.*),
     # so the test-project manifest is their only home.
-    $moduleRoot = if ([string]::IsNullOrWhiteSpace($RepoRoot)) { $Root } else { $RepoRoot }
     foreach ($module in (Get-UnityTestProjectModules -Root $moduleRoot).GetEnumerator()) {
         $dependencies[$module.Key] = $module.Value
     }
@@ -2236,6 +2240,13 @@ EditorSettings:
     Set-EphemeralProjectContent `
         -Path (Join-Path $project 'Assets\Editor\UhCiTestConfigurator.cs') `
         -Content (New-ConfiguratorSource -Backend $Backend -CompilerConfiguration $Il2CppCompilerConfiguration -StrippingLevel $ManagedStrippingLevel -RequireReleaseManagedCodeVariant:$RequireReleaseManagedCodeVariant)
+
+    $frameworkEvidence = Join-Path $project 'Assets/UhCiTestFrameworkEvidence/Editor'
+    $null = New-Item -ItemType Directory -Force -Path $frameworkEvidence
+    foreach ($extension in @('cs', 'asmdef')) {
+        Set-EphemeralProjectContent -Path (Join-Path $frameworkEvidence "UhCiTestFrameworkEvidence.$extension") `
+            -Content ([IO.File]::ReadAllText((Join-Path $RepoRoot "scripts/unity/test-framework-evidence.$extension.txt")))
+    }
 
     # STANDALONE ONLY: generate the split-build helpers that sever the test
     # player's PlayerConnection/TCP result streaming (the 10060 hang on multi-NIC
@@ -3862,6 +3873,20 @@ function Invoke-UnityObservedEditor {
     )
 
     if ($null -eq $ProcessObservation) { $ProcessObservation = @{} }
+    $frameworkEvidence = $null
+    $projectArgument = [Array]::IndexOf($Arguments, '-projectPath')
+    if ($projectArgument -ge 0 -and $projectArgument + 1 -lt $Arguments.Count) {
+        $frameworkProject = $Arguments[$projectArgument + 1]
+        if (Test-Path -LiteralPath (Join-Path $frameworkProject 'Assets/UhCiTestFrameworkEvidence/Editor/UhCiTestFrameworkEvidence.cs')) {
+            $frameworkEvidence = Join-Path $script:ArtifactsPath ('framework/' + [Guid]::NewGuid().ToString('N'))
+            $null = New-Item -ItemType Directory -Path $frameworkEvidence -ErrorAction Stop
+            Copy-Item -LiteralPath (Join-Path $frameworkProject 'Packages/manifest.json') -Destination (Join-Path $frameworkEvidence 'requested-manifest.json')
+            $frameworkInvocation = @{ SchemaVersion = 1; ProjectPath = $frameworkProject; OriginalLogRelativePath = [IO.Path]::GetRelativePath($script:ArtifactsPath, $LogPath).Replace('\', '/') }
+            $frameworkInvocation | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $frameworkEvidence 'invocation.json') -Encoding UTF8
+            $Arguments = @($Arguments) + @('-uhFrameworkEvidenceDirectory', $frameworkEvidence)
+        }
+    }
+
     $nativeCapture = $null
     if ($IsWindows) {
         $nativeCapture = New-UnityNativeEvidenceCapture -LogPath $LogPath
@@ -3882,6 +3907,22 @@ function Invoke-UnityObservedEditor {
     try { $ProcessObservation['NativeEvidence'] = Get-UnityNativeEvidence -Capture $nativeCapture -LogPath $LogPath }
     catch { $ProcessObservation['NativeEvidence'] = @{ State = 'capture-unavailable'; Files = @() } }
     Write-UnityExecutionObservation -LogPath $LogPath -ProcessObservation $ProcessObservation -Label $Label
+    if ($null -ne $frameworkEvidence) {
+        if (-not $ProcessObservation.ContainsKey('LogPersistence') -or $ProcessObservation.LogPersistence -cne 'written') { throw 'Current invocation log was not persisted; refusing to bind stale framework evidence.' }
+        $frameworkDiagnosticsPath = [IO.Path]::ChangeExtension($LogPath, 'execution-diagnostics.json')
+        $frameworkDiagnostics = Get-Content -LiteralPath $frameworkDiagnosticsPath -Raw -ErrorAction Stop | ConvertFrom-Json -AsHashtable
+        $recordedFrameworkLaunch = [DateTimeOffset]$frameworkDiagnostics.Process.LaunchUtc
+        $expectedFrameworkLaunch = [DateTimeOffset]$ProcessObservation.LaunchUtc
+        if ($frameworkDiagnostics.Process.ProcessId -ne $ProcessObservation.ProcessId -or
+            $recordedFrameworkLaunch.UtcDateTime.Ticks -ne $expectedFrameworkLaunch.UtcDateTime.Ticks) { throw 'Current invocation diagnostics were not persisted; refusing to bind stale framework evidence.' }
+        $capturedFrameworkLog = Join-Path $frameworkEvidence 'unity.log'
+        Copy-Item -LiteralPath $LogPath -Destination $capturedFrameworkLog -ErrorAction Stop
+        Copy-Item -LiteralPath ([IO.Path]::ChangeExtension($LogPath, 'execution-diagnostics.json')) -Destination (Join-Path $frameworkEvidence 'unity.execution-diagnostics.json') -ErrorAction Stop
+        $frameworkInvocation.LogRelativePath = [IO.Path]::GetRelativePath($script:ArtifactsPath, $capturedFrameworkLog).Replace('\', '/')
+        $frameworkInvocation.ProcessId = $ProcessObservation.ProcessId
+        $frameworkInvocation | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $frameworkEvidence 'invocation.json') -Encoding UTF8
+        Assert-UnityTestFrameworkEvidence -Directory $frameworkEvidence -ProcessId $ProcessObservation.ProcessId -Project $frameworkProject
+    }
     return $watch
 }
 
@@ -4786,6 +4827,10 @@ function Invoke-UnityConfigurePass {
     $configureStartedUtc = [DateTime]::UtcNow
     try {
         $configureExit = & $invokeConfigure $Label
+    } catch {
+        if (-not (Test-UnityConfigureMarker -MarkerPath $MarkerPath -StartedUtc $configureStartedUtc) -or
+            -not (Test-UnityConfigurePackageManagerRetryableFailure -LogPath $LogPath)) { throw }
+        $configureExit = 1
     } finally {
         if ($null -ne $FrozenContext) { $FrozenContext.ConfigureOutcomes.Add([pscustomobject]$processObservation.Clone()) }
         # The configurator has run; drop the marker-path env var so it cannot be
@@ -5001,10 +5046,15 @@ $ProjectWorkspace = Resolve-UnityProjectWorkspace `
     -Scope $ProjectScope `
     -ShareEditorProject:$ShareEditorProject `
     -ExplicitProjectPath $ProjectPath `
-    -PersistentRoot $ProjectRoot
+    -PersistentRoot $ProjectRoot `
+    -GenerationFingerprint $(if ($TestMode -ne 'export') { Get-UnityTestFrameworkProjectFingerprint -Root $RepoRoot } else { '' })
 $ProjectPath = Resolve-FullPath -Path $ProjectWorkspace.ProjectPath
 
 Initialize-UnityCacheEnvironment -CacheRoot (Resolve-FullPath -Path $ProjectWorkspace.CacheRoot)
+
+if ($TestMode -ne 'export' -and -not $GenerateOnly -and $ProjectWorkspace.Persistent) {
+    Remove-LegacyUnityTestFrameworkCollector -Project $ProjectWorkspace.LegacyProjectPath -ArtifactsPath $ArtifactsPath
+}
 
 # Reclaim disk BEFORE the project directory is (re)created, so this leg's own
 # project is never a prune candidate on the run that needs it.

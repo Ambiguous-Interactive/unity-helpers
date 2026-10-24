@@ -59,20 +59,21 @@ command after resolving the failure. Temporary directories are excluded from Uni
 | [`WUH021`](#wuh021-repeated-collection-count-opt-in)                     | Repeated size observations (**off by default**)                       |
 | [`WUH022`](#wuh022-boxing-a-disposable-value-type)                       | A disposable value type converted to a reference type                 |
 | [`WUH023`](#wuh023-public-struct-equality-opt-in)                        | A public struct without typed equality (**off by default**)           |
+| [`WUH024`](#wuh024-typed-enum-helpers-opt-in)                            | Enum operations with typed helpers (**off by default**)               |
 
 These are a different family from the `WPROTO###` serialization diagnostics, and they follow a
 different policy on purpose:
 
-|                     | `WPROTO###`                                                  | `WUH###`                                                                  |
-| ------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------- |
-| Reports             | A serialization contract that cannot be honoured             | An allocation or footgun in correct code                                  |
-| Severity            | Error: the alternative is an exception from a shipped player | Warning by default; project overrides supported                           |
-| Can fail your build | Yes, and it should                                           | Only when explicitly promoted to Error                                    |
-| Default             | On                                                           | On, except `WUH010`, `WUH013`, `WUH018`, `WUH019`, `WUH021`, and `WUH023` |
+|                     | `WPROTO###`                                                  | `WUH###`                                                                            |
+| ------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
+| Reports             | A serialization contract that cannot be honoured             | An allocation or footgun in correct code                                            |
+| Severity            | Error: the alternative is an exception from a shipped player | Warning by default; project overrides supported                                     |
+| Can fail your build | Yes, and it should                                           | Only when explicitly promoted to Error                                              |
+| Default             | On                                                           | On, except `WUH010`, `WUH013`, `WUH018`, `WUH019`, `WUH021`, `WUH023`, and `WUH024` |
 
 **A `WUH###` diagnostic defaults to a warning.** Taking a package upgrade does not promote it to
 a build error; an explicit Error override does. If your project treats warnings as errors, see
-[Turning one off](#turning-one-off). `WUH010`, `WUH013`, `WUH018`, `WUH019`, `WUH021`, and `WUH023` go further and are off until you ask for them, because
+[Turning one off](#turning-one-off). `WUH010`, `WUH013`, `WUH018`, `WUH019`, `WUH021`, `WUH023`, and `WUH024` go further and are off until you ask for them, because
 their shapes are correct code far more often than they are defects.
 
 The compact policy list offers a severity selector beside each diagnostic:
@@ -1146,3 +1147,30 @@ whose own default comparer uses object equality can still box internally. This w
 interface contract; it does not prove allocation counts, equality laws, hash quality, deep collection
 equality, or whether a mutable value is safe to change after use as a dictionary key. Keep hash codes
 within the current process and avoid mutating dictionary keys.
+
+## `WUH024`: typed enum helpers (opt-in)
+
+Enable this rule when you want suggestions for enum checks and repeated enum names:
+
+```xml
+<Rule Id="WUH024" Action="Warning" />
+```
+
+Import `WallstopStudios.UnityHelpers.Core.Extension` to use the helpers:
+
+```csharp
+bool enabled = permissions.HasFlagNoAlloc(Permissions.Read);
+string label = permissions.ToCachedName();
+```
+
+The rule recognizes `Enum.HasFlag` only when both arguments have the same concrete
+enum type. It also recognizes all-bits comparisons such as
+`(permissions & Permissions.ReadWrite) == Permissions.ReadWrite`, including zero masks.
+Single-bit checks such as `(permissions & Permissions.Read) != 0` are also covered, including signed high bits. It leaves multi-bit any-match tests, variable-mask comparisons, mixed enum types, boxed `Enum`
+values, constrained generic calls and expression trees unchanged.
+
+Parameterless enum `ToString()` can use `ToCachedName()` for repeated names. Formatted
+calls such as `ToString("D")` retain their formatting. Name caching retains entries for
+previously unseen values; keep ordinary `ToString()` when values are numerous and rarely
+repeated. The rule does not promise a speedup on every runtime and provides no automatic
+rewrite. Suppress intentional calls with the normal analyzer policy controls.

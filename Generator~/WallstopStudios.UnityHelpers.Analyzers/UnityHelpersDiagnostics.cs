@@ -548,5 +548,16 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 DiagnosticSeverity.Warning,
                 isEnabledByDefault: false
             );
+
+        /// <summary>A typed enum helper is available for this operation.</summary>
+        internal static readonly DiagnosticDescriptor EnumHelperAvailable =
+            new DiagnosticDescriptor(
+                "WUH024",
+                "Use a typed enum helper",
+                "Consider '{0}' from WallstopStudios.UnityHelpers.Core.Extension. Typed flag checks avoid boxing; cached names retain previously seen values. WUH024 is opt-in.",
+                "Performance",
+                DiagnosticSeverity.Warning,
+                isEnabledByDefault: false
+            );
     }
 }

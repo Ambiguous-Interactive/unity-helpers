@@ -1,0 +1,238 @@
+// MIT License - Copyright (c) 2026 wallstop
+namespace WallstopStudios.UnityHelpers.Ci
+{
+    using System;
+    using System.Collections.Generic;
+    using System.Diagnostics;
+    using System.IO;
+    using System.Reflection;
+    using System.Security.Cryptography;
+    using NUnit.Framework;
+    using UnityEditor;
+    using UnityEditor.TestTools.TestRunner.Api;
+    using UnityEngine;
+    using UnityEngine.TestTools;
+    using Debug = UnityEngine.Debug;
+    using PackageInfo = UnityEditor.PackageManager.PackageInfo;
+
+    [InitializeOnLoad]
+    internal static class UhCiTestFrameworkEvidence
+    {
+        static UhCiTestFrameworkEvidence()
+        {
+            string[] arguments = Environment.GetCommandLineArgs();
+            for (int index = 0; index + 1 < arguments.Length; ++index)
+            {
+                if (arguments[index] == "-uhFrameworkEvidenceDirectory")
+                {
+                    Capture(arguments[index + 1]);
+                    return;
+                }
+            }
+        }
+
+        private static void Capture(string destination)
+        {
+            string snapshot = Path.Combine(destination, Guid.NewGuid().ToString("N"));
+            try
+            {
+                Directory.CreateDirectory(snapshot);
+                string project = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+                List<FileRecord> files = new List<FileRecord>();
+                CopyFile(
+                    Path.Combine(project, "Packages/manifest.json"),
+                    snapshot,
+                    "manifest.json",
+                    files
+                );
+                CopyFile(
+                    Path.Combine(project, "Packages/packages-lock.json"),
+                    snapshot,
+                    "packages-lock.json",
+                    files
+                );
+                Assembly[] assemblies =
+                {
+                    typeof(TestRunnerApi).Assembly,
+                    typeof(UnityTestAttribute).Assembly,
+                    typeof(TestAttribute).Assembly,
+                };
+                List<AssemblyRecord> identities = new List<AssemblyRecord>();
+                foreach (Assembly assembly in assemblies)
+                {
+                    string relative = "assemblies/" + assembly.GetName().Name + ".dll";
+                    CopyFile(assembly.Location, snapshot, relative, files);
+                    string symbols = Path.ChangeExtension(assembly.Location, ".pdb");
+                    string savedSymbols = null;
+                    if (File.Exists(symbols))
+                    {
+                        savedSymbols = "assemblies/" + assembly.GetName().Name + ".pdb";
+                        CopyFile(symbols, snapshot, savedSymbols, files);
+                    }
+                    identities.Add(
+                        new AssemblyRecord
+                        {
+                            Name = assembly.GetName().Name,
+                            FullName = assembly.FullName,
+                            ModuleVersionId = assembly.ManifestModule.ModuleVersionId.ToString(),
+                            LoadedPath = assembly.Location,
+                            SavedPath = relative,
+                            SymbolsPath = savedSymbols,
+                        }
+                    );
+                }
+                PackageInfo package = PackageInfo.FindForAssembly(assemblies[0]);
+                if (package == null || package.name != "com.unity.test-framework")
+                {
+                    throw new InvalidOperationException(
+                        "Cannot identify the loaded Test Framework package."
+                    );
+                }
+                int sourceCount = 0;
+                foreach (
+                    string path in Directory.GetFiles(
+                        package.resolvedPath,
+                        "*",
+                        SearchOption.AllDirectories
+                    )
+                )
+                {
+                    string relative = path.Substring(package.resolvedPath.Length)
+                        .TrimStart('/', '\\')
+                        .Replace('\\', '/');
+                    if (
+                        relative == "package.json"
+                        || path.EndsWith(".cs", StringComparison.Ordinal)
+                        || path.EndsWith(".asmdef", StringComparison.Ordinal)
+                    )
+                    {
+                        CopyFile(path, snapshot, "package/" + relative, files);
+                        if (path.EndsWith(".cs", StringComparison.Ordinal))
+                        {
+                            ++sourceCount;
+                        }
+                    }
+                }
+                if (sourceCount == 0)
+                {
+                    throw new InvalidOperationException(
+                        "Loaded Test Framework package has no captured sources."
+                    );
+                }
+                using (Process process = Process.GetCurrentProcess())
+                {
+                    Receipt receipt = new Receipt
+                    {
+                        SchemaVersion = 2,
+                        ProcessId = process.Id,
+                        DomainId = AppDomain.CurrentDomain.Id,
+                        CapturedUtc = DateTime.UtcNow.ToString("o"),
+                        UnityVersion = Application.unityVersion,
+                        ProjectPath = project,
+                        PackageVersion = package.version,
+                        PackageSource = package.source.ToString(),
+                        PackagePath = package.resolvedPath,
+                        SourceCount = sourceCount,
+                        Assemblies = identities.ToArray(),
+                        Files = files.ToArray(),
+                    };
+                    File.WriteAllText(
+                        Path.Combine(snapshot, "receipt.json"),
+                        JsonUtility.ToJson(receipt, true)
+                    );
+                }
+            }
+            catch (Exception exception)
+            {
+                Directory.CreateDirectory(snapshot);
+                File.WriteAllText(
+                    Path.Combine(snapshot, "capture-error.txt"),
+                    exception.ToString()
+                );
+                Debug.LogError("Test Framework evidence capture failed: " + exception.Message);
+            }
+        }
+
+        private static void CopyFile(
+            string source,
+            string snapshot,
+            string relative,
+            List<FileRecord> files
+        )
+        {
+            FileInfo info = new FileInfo(source);
+            if (!info.Exists || info.Length > 16777216 || files.Count >= 4096)
+            {
+                throw new InvalidOperationException(
+                    "Missing or oversized framework evidence input: " + source
+                );
+            }
+            byte[] bytes = File.ReadAllBytes(source);
+            string stored =
+                relative.StartsWith("package/", StringComparison.Ordinal)
+                && relative != "package/package.json"
+                    ? "package/"
+                        + files.Count.ToString(
+                            "D4",
+                            System.Globalization.CultureInfo.InvariantCulture
+                        )
+                        + Path.GetExtension(relative)
+                    : relative;
+            string target = Path.Combine(snapshot, stored);
+            Directory.CreateDirectory(Path.GetDirectoryName(target));
+            File.WriteAllBytes(target, bytes);
+            using (SHA256 algorithm = SHA256.Create())
+            {
+                files.Add(
+                    new FileRecord
+                    {
+                        Path = stored,
+                        OriginalPath = relative,
+                        Length = bytes.Length,
+                        Sha256 = BitConverter
+                            .ToString(algorithm.ComputeHash(bytes))
+                            .Replace("-", "")
+                            .ToLowerInvariant(),
+                    }
+                );
+            }
+        }
+
+        [Serializable]
+        private sealed class Receipt
+        {
+            public int SchemaVersion;
+            public int ProcessId;
+            public int DomainId;
+            public string CapturedUtc;
+            public string UnityVersion;
+            public string ProjectPath;
+            public string PackageVersion;
+            public string PackageSource;
+            public string PackagePath;
+            public int SourceCount;
+            public AssemblyRecord[] Assemblies;
+            public FileRecord[] Files;
+        }
+
+        [Serializable]
+        private sealed class AssemblyRecord
+        {
+            public string Name;
+            public string FullName;
+            public string ModuleVersionId;
+            public string LoadedPath;
+            public string SavedPath;
+            public string SymbolsPath;
+        }
+
+        [Serializable]
+        private sealed class FileRecord
+        {
+            public string Path;
+            public string OriginalPath;
+            public long Length;
+            public string Sha256;
+        }
+    }
+}

@@ -28,11 +28,14 @@ Immutable version-4 GUID wrapper using two longs for efficient Unity serializati
 - **Problem:** Unity doesn't serialize `System.Guid` directly
 - **Solution:** `WGuid` stores as two `long` fields (`_low` and `_high`) for fast Unity serialization
 
-**Performance:**
+**Use it when:**
 
-- 2x faster serialization than string-based GUID storage
-- Smaller memory footprint (16 bytes vs. 36 bytes for string)
-- Immutable design prevents accidental modification
+- You need a stable ID stored in a scene, prefab or ScriptableObject.
+- You want to generate or inspect an ID in the Inspector.
+- You need to convert between Unity-serialized data and `System.Guid` without storing the ID as text.
+
+A `WGuid` is an immutable 128-bit value. Keep an entity's existing ID when editing or
+loading it; generate a new one when creating a distinct entity.
 
 ---
 

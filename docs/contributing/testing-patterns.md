@@ -42,6 +42,43 @@ It preserves unrelated sibling assets. Clear the tool's cached singleton referen
 Inspect full NUnit results as well as leaf counts. A fixture teardown failure can leave all
 individual test cases passing while the run itself fails.
 
+## Identify the Unity Test Framework used by a run
+
+The local test-project builder, CI builder and package exporter read the framework request
+from `.github/unity-test-framework.json`. Unity 2021/2022 use the compatible registry request.
+Unity 6 supplies a core package tied to the editor, so the request alone does not identify
+what ran. See [Unity's core-package policy](https://docs.unity3d.com/6000.5/Documentation/Manual/com.unity.test-framework.html).
+Keep the separate NUnit 3.5 compiler floor and historical host witnesses unchanged.
+
+Generated test projects include an editor-only collector. Persistent project paths include a
+compact fingerprint of the test leg, collector source, assembly definition and framework policy. Revisions with different
+collector inputs use separate project Libraries and retain the shared package-download cache.
+Explicit project-path overrides keep their requested location. The runner retires only the
+exact known collector files left by the initial unpublished implementation in legacy caches.
+It refuses unknown or linked files and active editors, retains original bytes before removal,
+and preserves unrelated assets, parent folders and their metadata.
+
+CI gives each editor invocation a
+fresh `framework/<capture-id>` directory at the leg artifact root, independent of nested log paths. Each invocation retains its own log and process diagnostics before retry paths can overwrite them. Its record binds those copies to the project and process. It retains the manifest before launch, then
+captures the resolved manifest and lock, framework package metadata and C# source files,
+and the loaded editor runner, runtime runner and NUnit DLLs, plus available PDBs. Package sources use short numbered filenames; the inventory retains their original package-relative paths. This keeps generated compiler and evidence paths within Windows file API limits. Each domain snapshot records
+its process, project, Unity version, loaded module IDs and file hashes. The readback checks
+those IDs against the retained DLL bytes and rejects missing or changed evidence. Repeated
+domain reloads produce separate snapshots. A capture error fails the evidence check.
+
+For a manually launched generated project, pass `-uhFrameworkEvidenceDirectory <new-path>`
+to collect the same snapshots. These startup records identify the loaded modules and source
+bytes observed in that domain. They do not prove a clean rebuild, map every framework source
+to compiler inputs, qualify CLI result semantics, or establish native process health. Inspect
+complete NUnit roots and suites, raw process receipts and expected inconclusive outcomes
+separately. A green XML report cannot explain an abnormal native exit.
+
+Run `npm run test:unity-framework` for manifest controls and compiled host collector controls.
+The host controls use labeled API shims; native framework qualification still requires the
+supported Unity matrix and controls for timeout, teardown and interrupted PlayMode behavior.
+
+A recognized Package Manager failure before a fresh configure marker or NUnit result retains the existing single retry. The final invocation still requires complete framework evidence.
+
 ## Source validation must find its subjects
 
 Package source scans resolve the owning package from its assembly, then use the source file path

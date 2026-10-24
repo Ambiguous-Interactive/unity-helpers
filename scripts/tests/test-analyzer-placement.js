@@ -338,8 +338,16 @@ const promotedPolicyIds = [...generatorBuildPolicy.matchAll(/(?:^|;)(WUH\d{3})(?
 );
 check(
   "shared WUH policies are promoted globally and WUH019, WUH021 and WUH023 only in production",
-  JSON.stringify([...promotedPolicyIds].sort()) === JSON.stringify([...descriptorIds].sort()),
+  JSON.stringify([...promotedPolicyIds].sort()) ===
+    JSON.stringify(descriptorIds.filter((id) => id !== "WUH024").sort()),
   `descriptors=${descriptorIds.join(",")} promoted=${promotedPolicyIds.join(",")}`
+);
+
+check(
+  "enum cache advice stays an explicit per-project opt-in",
+  checkRuleset.includes('<Rule Id="WUH024" Action="None" />') &&
+    !promotedPolicyIds.includes("WUH024"),
+  "WUH024 can retain enum names; the package must not turn every naming call into a cache"
 );
 
 process.stdout.write(`Analyzer placement contract passed (${passed} checks).\n`);

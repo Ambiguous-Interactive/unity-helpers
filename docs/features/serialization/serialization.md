@@ -1,22 +1,26 @@
 # Serialization Guide
 
-## TL;DR: What Problem This Solves
+Use Unity Helpers to save game state, load configuration and exchange typed messages.
+Choose the format for the data your players and tools need to read:
 
-- Save/load data and configs reliably with JSON or Protobuf using one unified API.
-- Unity‑aware converters handle common engine types; pooled buffers keep GC low.
-- Pick Pretty/Normal for human‑readable; Fast/FastPOCO for hot paths.
+| Your task                                                         | Start here                                                                                                                                         |
+| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Editable settings, mod files or readable save data                | [JSON examples](#json-examples-unity-aware)                                                                                                        |
+| Compact saves or messages with generated IL2CPP-compatible models | [Adopt WallstopProto](./wallstop-proto-public-survey.md)                                                                                           |
+| Keep an existing protobuf-net save system working                 | [Protobuf examples](#protobuf-examples) and the [migration checklist](./wallstop-proto-public-survey.md#move-an-existing-protobuf-net-save-system) |
+| Show dictionaries, nullable values or IDs in the Unity Inspector  | [Serializable wrappers](./serialization-types.md)                                                                                                  |
+| Preserve the last good save if a write fails                      | [Durable file writes](#writes-do-not-destroy-the-previous-file)                                                                                    |
 
-Visuals
+Start with the examples, then use the sections below as an API reference. Keep a
+copy of released saves when changing a model or serializer. A successful round trip
+of a new object does not prove that old player data can be upgraded or rolled back.
 
 ![Serialization Flow](../../images/serialization/serialization-flow.svg)
 
-This package provides fast, compact serialization for save systems, configuration, and networking with a unified API.
-
-- Json: System.Text.Json with Unity-aware converters
-- Protobuf: protobuf-net for compact, schema-evolvable binary
-- SystemBinary: .NET BinaryFormatter for legacy/trusted-only scenarios
-
-All formats are exposed via `WallstopStudios.UnityHelpers.Core.Serialization.Serializer` and selected with `SerializationType`.
+`WallstopStudios.UnityHelpers.Core.Serialization.Serializer` provides the JSON,
+legacy protobuf-net and format-dispatch APIs. `WProtoFacade` is the generated
+WallstopProto API. Their failure and fallback behavior differs; use the matching
+read and write pair for your chosen format.
 
 ## Formats Provided
 
@@ -54,12 +58,9 @@ and reports `SerializationConfigurationException`. Declare generated roots with
 `WProtoDeclaredRootAttribute` instead. Turning this mode on does not migrate schemas or convert
 existing saves. Verify every retained model and wire contract before removing its legacy backend.
 
-The package's legacy-oracle test assemblies and their dependent assemblies are excluded in this
-mode because they explicitly require protobuf-net. The separate `Tests.ProtoOnly` assembly
-covers generated writes, retained collections, Unity values and RNG continuation. The normal
-mode retains the complete legacy test assemblies; a WProto-only result does not replace that
-validation. `npm run typecheck:unity:proto-only` compiles Runtime and Editor without either
-protobuf-net reference, separately from native editor/player testing.
+Before enabling the define for a release, build and run your save/load flows on each
+supported player target. Include retained saves and any custom formatters. An Editor
+round trip alone does not exercise stripping or player-specific behavior.
 
 `WProtoFacade.Serialize(value, IBufferWriter<byte>)` appends a measured payload to a writer
 without allocating an intermediate payload array. Its `TrySerialize` overload returns a byte
@@ -84,62 +85,15 @@ existing standalone `Compile()` restrictions on private fields and callbacks.
 
 ### Protobuf equality and hashing
 
-Default-mode `ProtoEquals` and `GetProtoComparer<T>()` retain protobuf-net's direct encoding.
-For the two- and three-argument `SerializableDictionary` and `SerializableSortedDictionary`
-types, comparison writes the backing map through a typed protobuf-net map serializer. This
-preserves the bundled protobuf-net 3 encoding, including literal whitespace keys and enumeration
-order, without discovering the adapter's map serializer at runtime. Consumer subclasses retain
-the existing protobuf-net dispatch and their own contract behavior. Stripped-player and nested
-collection compatibility remains tracked in
-[#950](https://github.com/Ambiguous-Interactive/unity-helpers/issues/950).
-The bundled protobuf-net 3.4.40 assemblies retain direct dictionary-entry value checkers
-and source patches for nullable member classification, runtime construction of nested map serializers and
-indexed collection classification. Indexed properties are rejected before speculative tuple
-setter inspection; ordinary tuples and index-free init-only contracts keep their existing
-classification. Init-only setter inspection still uses the original custom-modifier API.
-Nested dictionary fields use the existing typed map serializer and the active model's key/value
-policies without a reflected generic map-decorator constructor. Compiled models retain the
-original typed emitter. Nonnullable map encoding and default omission remain unchanged; nullable map defaults retain explicit presence. Runtime repeated
-providers use typed registrations for intrinsic scalar lists and arrays, while owned generic set,
-deque and cyclic-buffer static constructors register their actual serializers before metadata
-lookup or explicit model registration. The opted-in base collection is initialized without
-running an unrelated consumer subclass initializer. The cache checks the
-original provider identity and directly constructs the original repeated decorator, preserving
-custom-provider precedence and compiled models.
-Registration supplies a direct item-contract serializer factory with separate member state
-for each model. Ordinary unregistered runtime contracts use a nongeneric metadata node and
-typed service bridge, retaining their declared type, callbacks, factories and boxed-value copy
-behavior. This removes a reflected generic contract constructor; it does not supply every
-missing generic map, enum or external serializer method. Item reflection metadata must still be preserved, and inheritance and other
-consumer collection contracts still require their own AOT qualification. [Dependency provenance and rebuild instructions](https://github.com/Ambiguous-Interactive/unity-helpers/blob/main/Runtime/Protobuf-Net/README.md)
-include the exact patch and binary hashes. Qualify each binary change in a fresh Unity 2021.3
-stripped player; success with another binary or a newer editor does not prove compatibility.
-Runtime map slots and surrogate nodes retain the active model's actual services, wire policies,
-merge behavior and conversion failures. Owned plain and sorted dictionary wrappers register
-typed codecs before their first read, validate nullable presence data against parallel arrays before owner construction, and
-retain their existing protobuf fields and nullable presence data. Runtime enum map decorators
-reuse the original serializer by reference identity and resolve services for each operation.
+Use `ProtoEquals` or `GetProtoComparer<T>()` when equality should follow your protobuf
+representation. This can differ from C# field equality: omitted defaults, dictionary
+iteration order, custom serializers and the selected backend can affect the encoding.
 
-The generator emits startup factories for accessible closed external serializer providers,
-including assemblies that declare providers without generated contracts. Existing
-`MetaType.SerializerType` registrations continue to select the same services; a proxy's actual
-nullable service takes precedence. Registration does not construct providers. Access before
-generated startup and inaccessible or runtime-only providers still need separate qualification.
-The managed provider checks do not establish stripped-player support for arbitrary consumer types.
-
-The root save wrappers described below remain a separate path: comparer hashes are not hashes
-of `Serializer.ProtoSerialize` output. WProto-only builds use generated root encoding instead,
-so hashes are not portable between backend modes.
-They are also not portable between protobuf-net majors: version 2 writes zero integer map
-keys and values that version 3 omits. This difference predates the typed map writer.
-
-Built-in dictionary root marshals cover the two-argument types. Cached three-argument types
-require a consumer formatter or marshal in WProto-only builds.
-
-For consumer dictionary subclasses, declare `[ProtoContract]` on the concrete type to avoid
-speculative tuple detection; protobuf-net does not inherit this contract metadata from the base.
-This metadata alone does not establish stripped IL2CPP compatibility.
-Use the existing save API for retained data rather than persisting comparer hashes.
+Keep the same serializer configuration when comparing values. Comparer hashes are not
+hashes of the save-file envelope produced by `Serializer.ProtoSerialize`, and are not
+portable between protobuf-net majors or between default and WProto-only builds. Do not
+store them as permanent save identifiers, cross-version cache keys or network signatures.
+Use an explicit versioned encoding and hash policy for those jobs.
 
 ### Nullable map presence
 
@@ -516,6 +470,8 @@ int len = Serializer.JsonSerializeFast(data, ref buffer);
 JsonSerializerOptions pocoOpts = Serializer.CreateFastPocoJsonOptions();
 byte[] fastest = Serializer.JsonSerialize(pureCSharpData, pocoOpts);
 ```
+
+<a id="protobuf-examples"></a>
 
 ## Protobuf Examples (Compact + Evolvable)
 
@@ -1501,57 +1457,31 @@ A suppression records that decision; it does not prove that the registered types
 
 #### Consumer migration acceptance
 
-Runtime-configured targets can migrate when the build knows their complete shapes. The
-`RuntimeModelConsumerMigrationTests` fixture reconstructs a model without protobuf-net contract
-attributes and compares it with generated declarations on both 2.4.9 and 3.2.56. It covers closed
-`Save<int>` and `Save<string>` targets, a member with an explicitly configured zero default, a member
-with no configured default, nullable zero, repeated polymorphic entries, subtype-side declarations,
-and a foreign struct surrogate. It checks exact bytes and both cross-read directions. Golden bytes
-pin the distinction between an absent string and an empty string; a changed runtime default is a
-negative control that must disagree with the declared shape.
+Before removing your old serializer, record every model your game saves:
 
-The same combined shapes also live in the ordinary Unity assembly
-`WallstopStudios.UnityHelpers.ConsumerMigration`, whose asmdef has no NUnit or protobuf-net
-reference and no test-only define constraint. `WProtoConsumerMigrationTests` references that
-assembly and exercises both closed targets, polymorphic entries, nullable zero, configured
-omission, and the surrogate through generated dispatch. Its retained combined golden payload
-covers all those mechanisms together, and is read and rewritten without an oracle in IL2CPP.
-The host dual-oracle harness compiles these same source files to validate the golden bytes and
-cross-read directions; that flattened host compilation alone does not prove Unity assembly
-registration. Unity runs additionally assert that the declarations and fixture belong to different
-assemblies. The required player acceptance is Release IL2CPP with High managed stripping;
-an ordinary Mono test pass does not establish that acceptance. The focused
-`scripts/unity/run-acceptance.ps1 -Acceptance serialization` gate copies these declarations into
-an ordinary assembly and runs all 12 player-compatible migration scenarios from an ordinary
-consumer driver. Its verifier requires those 12 completed scenarios, the existing four
-cross-assembly scenarios and both replacement-owner orders, exact passing test names, and
-matching source/version markers with effective High stripping and a non-development Release
-IL2CPP player.
+- Closed generic types, including every supported identifier or settings-selected type.
+- Field numbers, subtype numbers, packing and configured defaults.
+- Surrogate pairs, construction behavior and save/load callbacks.
+- Readers that must continue to understand new saves during rollback or mixed-client play.
 
-The full High-stripping test player also runs deliberate legacy reflection fixtures. Its runner
-stages their narrowly scoped test linker declarations under `Assets`, because Unity ignores
-package-contained `link.xml` files. Those declarations preserve named legacy fixture contracts and
-the reflected constructor and protobuf attribute getters their legacy models need. The ordinary
-`ConsumerMigration` assembly
-and its generated contracts have no linker preservation entries. Test fixture preservation does
-not establish that an arbitrary consumer can use the legacy runtime engine under IL2CPP.
+Read real old saves with the new formatter and compare the values that matter to the
+game. Write new saves and read them with the old reader where rollback is required.
+Include null versus empty strings, nullable zero, missing defaults, repeated subtypes
+and custom surrogates. A round trip using only the new writer and reader cannot detect
+a contract that changed in the same way on both sides.
 
-This establishes that these migration mechanisms work together. It does not establish that every
-consumer's configured model has migrated. Before retiring that consumer's fallback, record each
-runtime target, its closed type arguments, field numbers, configured defaults, encoding options,
-subtype tags, surrogate pairs, and construction or callback behavior. Run each recorded shape
-against its original model and retained save payloads, on both oracles. Run the migrated build in
-an IL2CPP player with generated formatters serving those targets. A diagnostic suppression or a
-successful round trip through only the new formatter is insufficient evidence.
+Build a release IL2CPP player with your normal managed stripping settings. Check startup
+registration and save/load flows in the consumer assembly that owns the models. Editor
+success does not establish that your legacy reflection-based registrations survive stripping.
 
-| Model surface                                                                                                 | Migration status                                                                                                                                                                                                                                                          |
-| ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Fixed registrations, closed generic targets, numbered members, subtype tags, static surrogate pairs           | Supported through compile-time declarations; the combined fixture checks exact bytes and cross-reads.                                                                                                                                                                     |
-| A finite list of settings-selected identifier types                                                           | Feasible: declare and reference every supported closure in the consumer build. Test each closure; testing `int` does not establish another identifier's encoding.                                                                                                         |
-| Unset scalar defaults and explicit zero defaults                                                              | Preserve the original distinction with `IsRequired` and ordinary omission, respectively. Required nullable/reference members still cannot invent a null value.                                                                                                            |
-| Custom scalar `ValueMember.DefaultValue` omission policies                                                    | Carry them as `[System.ComponentModel.DefaultValue]` on the matching numbered member. Numeric, boolean, character, string, enum, nullable scalar, decimal, DateTime, TimeSpan, and Guid defaults are supported; conversion and omission are checked against both oracles. |
-| Runtime configuration in a referenced precompiled assembly                                                    | Feasible if its complete model is inventoried and equivalent static declarations or formatters are supplied. `WPROTO048` cannot inspect that assembly's registration code.                                                                                                |
-| Unbounded types discovered only after the player is built, or field/subtype layouts mutated after compilation | Incompatible with static AOT generation unless the application restricts them to a declared build-time set. Keeping reflection-based model discovery does not supply IL2CPP with the missing generated code.                                                              |
+| Model surface                                                                                                 | Migration status                                                                                                                                                                                                                                                                                 |
+| ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Fixed registrations, closed generic targets, numbered members, subtype tags, static surrogate pairs           | Declare these at compile time and verify both required read directions with retained saves.                                                                                                                                                                                                      |
+| A finite list of settings-selected identifier types                                                           | Feasible: declare and reference every supported closure in the consumer build. Test each closure; testing `int` does not establish another identifier's encoding.                                                                                                                                |
+| Unset scalar defaults and explicit zero defaults                                                              | Preserve the original distinction with `IsRequired` and ordinary omission, respectively. Required nullable/reference members still cannot invent a null value.                                                                                                                                   |
+| Custom scalar `ValueMember.DefaultValue` omission policies                                                    | Carry them as `[System.ComponentModel.DefaultValue]` on the matching numbered member. Numeric, boolean, character, string, enum, nullable scalar, decimal, DateTime, TimeSpan, and Guid defaults are supported; verify conversion and omission against your released writer and reader versions. |
+| Runtime configuration in a referenced precompiled assembly                                                    | Feasible if its complete model is inventoried and equivalent static declarations or formatters are supplied. `WPROTO048` cannot inspect that assembly's registration code.                                                                                                                       |
+| Unbounded types discovered only after the player is built, or field/subtype layouts mutated after compilation | Incompatible with static AOT generation unless the application restricts them to a declared build-time set. Keeping reflection-based model discovery does not supply IL2CPP with the missing generated code.                                                                                     |
 
 `[DefaultValue]` configures write omission. A value equal to that explicit default is absent;
 a different value, including zero, is written. Absent fields retain constructor state, so a field
@@ -3166,136 +3096,32 @@ written a tag, reserved prefix or partial payload; discard that output after fai
 
 ### Wire compatibility
 
-Compatibility belongs to a versioned contract: protobuf has
-[no canonical byte representation](https://protobuf.dev/programming-guides/serialization-not-canonical/).
-Freeze tags, defaults, packing, subtype numbers, and root/surrogate encodings before changing a writer.
-WProto writes packed repeated scalars by default; use explicit `IsPacked = false` when preserving a
-legacy unpacked writer. Accepting both forms on read does not make their serialized hashes equal.
-The existing v3 map-write policy and named v2 exceptions below remain part of the contract.
+Protobuf has [no canonical byte representation](https://protobuf.dev/programming-guides/serialization-not-canonical/).
+Two payloads can decode to the same values without having identical bytes. Decide whether
+your game needs value compatibility, byte identity, or both before changing serializers.
 
-The host oracle suite's `CompatibilityInventoryTests` compares package and retained consumer
-metadata against `CompatibilityInventory.v1.json`. Under its frozen `WALLSTOP_PROTO` and
-`UNITY_5_3_OR_NEWER` declarations, it also pins externally visible types and members in the
-WallstopProto namespace, plus selected protobuf/shared `Serializer` operations. This includes
-reader/writer and formatter extension signatures, type and parameter constraints, construction,
-constants, accessors, optional parameters, and source annotation rules. This is a source contract
-snapshot for those declarations, not an ABI or all-configuration guarantee.
+| Requirement                             | What to keep stable                                                                                  |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Read old player saves                   | Field numbers, wire types, defaults, subtype tags and root/surrogate layouts.                        |
+| Let an older client read new data       | Its supported fields and types, unknown-field behavior and required defaults.                        |
+| Compare serialized hashes or signatures | Packing, map ordering, omission rules, backend version and complete root encoding.                   |
+| Move away from reflection in IL2CPP     | Explicit model declarations, supported closed types and startup registration in the stripped player. |
 
-The inventory resolves attribute constants and records effective WProto packing/default policies;
-coordinated edits to both legacy and WProto tags still change the frozen record. Mutation controls
-cover wire metadata and public declaration changes; unresolved API types/defaults cannot pass.
-Review a candidate inventory diff as a wire/API change, preserving historical entries when extending
-coverage; never overwrite the baseline merely to pass a check.
-`CompatibilityEvidence.v1.json` classifies a curated set of executable witnesses as identical
-bytes, readable alternate encodings, known oracle defects, behavior, or unsupported declarations.
-It records the source revision, pinned writers, reader directions, and unqualified backends.
-`CompatibilityEvidenceTests` executes those witnesses in both isolated host oracle lanes.
-This metadata gate and initial evidence ledger complement golden bytes and semantic assertions.
-They do not prove every advertised capability, custom formatter bodies, all consumer deployments,
-or platform performance.
+WallstopProto writes packed repeated scalars by default. Use `IsPacked = false` when
+you need to preserve an older unpacked writer. Accepting both forms on read does not
+make their bytes or hashes equal.
 
-`CompatibilityClaimCatalog.v1.json` maps the documented capabilities to source witnesses,
-compatibility classes, reader directions, lane requirements, and named evidence gaps.
-`CompatibilityCaseBindings.v1.json` freezes the complete discovered case set for each selected
-fixture and lane. Missing discovery and partial coverage remain explicit. The source guard parses
-test declarations without invoking them; ordinary NUnit owns case expansion and lifecycle.
+Pay particular attention to these edge cases when migrating:
 
-The main guide's diagnostic codes have reviewed identifier/severity assertions bound to exact
-ordinary cases in each host lane. Review hashes cover the assertion sources, including their local
-case providers and helpers; edits require renewed review. `WPROTO041` separately pins the player,
-Editor, and preprocessor-symbol controls for explicit subtype declarations. These bindings check
-reviewed metadata and execution identity. Human review establishes what each assertion means;
-the verifier does not prove arbitrary C# semantics or every diagnostic trigger path. Unadvertised
-generator descriptors remain outside this diagnostic inventory.
+- An empty, non-null string or byte array is distinct from null. Test both.
+- Default-value omission can turn floating-point negative zero into positive zero.
+- A writer may emit members in ascending field-number order rather than declaration order.
+- protobuf-net versions differ in omission and reading of some default and nullable map
+  values. Identical bytes do not establish that every reader version preserves those values.
+- Nullable repeated elements remain unsupported; use a contract that explicitly represents
+  the optional element instead of silently dropping it.
 
-From the repository root, validate the catalog with
-`pwsh -NoProfile -File scripts/verify-wproto-evidence.ps1 -Mode catalog`.
-Run either isolated host lane with
-`pwsh -NoProfile -File scripts/run-wproto-evidence.ps1 -Oracle v3` or `-Oracle v2`.
-Each invocation retains a new directory under `progress/.artifacts/wproto-evidence` by default.
-It records a fresh Release build, source and binary inventories, raw process streams, exit status,
-and ordinary TRX results, then verifies their identities and exact fixture case sets.
-Changed, missing, duplicated, skipped, or inconclusive required cases cannot qualify.
-Review case-binding changes against complete runner results; do not regenerate them to conceal
-lost coverage.
-
-Catalog and initial source-census failures retain their primary error without launching the SDK,
-build or tests. Their rejected receipts have no completed before/after source comparison.
-Source drift is checked only after the initial census completes, including when a later build
-or test fails. Missing or incomplete source observations never qualify an invocation.
-
-This verifier accepts CoreCLR host fixture evidence only. Its process observation covers the
-`dotnet` parent exit and captured output; it does not establish Unity native-process stability.
-Passing host receipts do not complete partial or missing lane requirements, player qualification,
-consumer deployment, allocation, or throughput acceptance. Historical results without a matching
-invocation receipt remain historical evidence.
-
-The generator workflow also retains `wproto-host-test-inputs` after success or failure.
-It contains the compiled test DLL, PDB, dependencies and runtime configuration for each host oracle
-lane that reached a build. Keep it with the same run's TRX, logs and oracle receipts. A later rebuild
-is a separate observation; it cannot recover the binary that failed in CI.
-
-The representative allocation test prints each round's total write bytes, process and managed
-thread IDs, runtime, OS, and test-module identity after all measurement intervals. Its zero-byte
-requirement still uses the maximum round, with clock calls outside the allocation counter interval.
-An unexplained nonzero sample remains a failure even when a later process passes. Retain the failed
-sample and use stack evidence or a distinguishing causal control before attributing it or accepting
-its timings. Module identity and allocation totals alone do not identify an allocation site.
-
-Each of the four representative host measurements reserves a 128 MiB no-GC region before its
-clock and allocation markers. The sample fails if the region cannot start or a collection invalidates
-it. The zero-byte maximum, fixed warmup and allocating-clock control remain in place; real object
-allocations still count. This prevents background collection from changing the counter through
-[allocation-context retirement](https://github.com/dotnet/runtime/blob/v9.0.21/src/coreclr/gc/gc.cpp#L7947):
-CoreCLR computes the thread's count by subtracting its
-[unused allocation space](https://github.com/dotnet/runtime/blob/v9.0.21/src/coreclr/vm/comutilnative.cpp#L920),
-which disappears when the collector clears that context. These host samples use the same region
-policy for both serializers and both directions. They do not qualify Unity's allocation channel or
-explain older failures without matching evidence.
-
-For CoreCLR allocation-stack diagnostics, enable the allocation provider before runtime startup.
-The [.NET 9 runtime snapshots that state](https://github.com/dotnet/runtime/blob/v9.0.21/src/coreclr/vm/eventtrace.cpp#L816)
-when it chooses the allocation helpers; attaching later can miss small allocations. Calibrate the
-collector with a known allocation inside the measured interval and verify the actual test-host
-process, thread and managed stack. Tracing changes execution, so diagnostic captures do not qualify
-throughput. Preserve collector failures and partial traces rather than treating missing events as
-proof of zero allocation.
-
-The generator remains `ISourceGenerator` with the Unity 2021.3 compiler floor. Unity documents
-[Roslyn 3.8 for that editor](https://docs.unity3d.com/2021.3/Documentation/Manual/roslyn-analyzers.html).
-The separate compiler-floor host suite loads the shipped generator through Roslyn 3.8, compiles
-C# 9 consumers against .NET Standard 2.1 metadata, and checks the emitted module constructor.
-It covers absent, source, public, inaccessible internal and friend-assembly attribute definitions,
-with controls for removed polyfills and initializer uses. Its retained inputs and ordinary NUnit
-results are separate from strict oracle receipts. It does not compile the complete platform-neutral
-source closure or establish Unity compiler-process or player startup acceptance.
-The hybrid facade and bundled runtime remain supported during migration; dependency retirement
-requires separate release qualification.
-
-The differential suite runs in two isolated processes: one loads protobuf-net 2.4.9 and the other
-loads 3.2.56. Isolation matters because both assemblies have the same name; each run asserts the
-physical version it loaded before testing. The writer is byte-for-byte identical to 3.2.56 across 90
-wire cases covering varints, ZigZag, fixed32/64, strings, byte arrays, nested messages, unpacked
-repeated fields, and the maximum field number, plus 644 whole-message cases across the four contracts
-above. The shared v2/v3 domain is also byte-equal and cross-deserialized in both directions.
-
-The majors themselves diverge at a few edges. protobuf-net 2.4.9 omits empty string map keys/values
-and a default struct map value that 3.2.56 writes, and v2 silently drops a null repeated element that v3
-rejects. WallstopProto follows the safer/current v3 behavior and separately proves it can read the v2
-omissions using protobuf defaults (including `string.Empty`, never `null`) and the v2
-map bytes, so an old save migrates without claiming an impossible three-way byte identity.
-
-Nullable map writes also match both pinned oracle writers. In the .NET 9 host tests, the 2.4.9
-reader loses or changes nullable enum and struct map values even from its own identical bytes.
-Generated readers retain the encoded values. The suite records those older-reader losses
-explicitly; byte equality does not establish full v2 reader compatibility for these shapes.
-Qualify retained data with the actual reader versions before a mixed-version rollout.
-
-Three protobuf-net behaviors are worth knowing because they are easy to trip over:
-
-- An **empty but non-null** `string` or `byte[]` is written as tag plus a zero length. Only `null` is
-  omitted.
-- **Negative zero is not preserved.** Default-value omission tests `value == 0`, and `-0.0 == 0.0`, so a
-  `-0f` member is omitted and reads back as `+0f`.
-- **Members go out in ascending field number.** Declarations with tags 3, 1, 2 are emitted as
-  1, 2, 3.
+Keep a small set of representative released save files as compatibility tests in your
+own project. Include every version and reader direction your release policy promises,
+plus corrupted and truncated files. Run those tests on the actual player targets before
+rolling out a new writer. Preserve the original files when a read or upgrade fails.

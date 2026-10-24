@@ -231,7 +231,9 @@ function stageUnityPackage({ repoRoot, projectPath, unityVersion }) {
     fs.writeFileSync(
       path.join(project, "Packages", "manifest.json"),
       JSON.stringify(
-        { dependencies: { "com.unity.test-framework": "1.1.33", ...modules } },
+        {
+          dependencies: { "com.unity.test-framework": testFrameworkVersion(repoRoot), ...modules }
+        },
         null,
         2
       ) + "\n"
@@ -247,6 +249,19 @@ function stageUnityPackage({ repoRoot, projectPath, unityVersion }) {
   } finally {
     fs.rmSync(scratch, { recursive: true, force: true });
   }
+}
+
+function testFrameworkVersion(repoRoot) {
+  const policy = JSON.parse(
+    fs.readFileSync(path.join(repoRoot, ".github", "unity-test-framework.json"), "utf8")
+  );
+  if (
+    typeof policy.requestedVersion !== "string" ||
+    !/^[0-9]+\.[0-9]+\.[0-9]+$/.test(policy.requestedVersion)
+  ) {
+    throw new Error("Unity Test Framework policy requires a stable requestedVersion string.");
+  }
+  return policy.requestedVersion;
 }
 
 function main(args) {
@@ -274,4 +289,10 @@ if (require.main === module) {
   }
 }
 
-module.exports = { REQUIRED_ENTRIES, EXPORTER_SOURCE, resolveProjectPath, stageUnityPackage };
+module.exports = {
+  REQUIRED_ENTRIES,
+  EXPORTER_SOURCE,
+  resolveProjectPath,
+  stageUnityPackage,
+  testFrameworkVersion
+};
