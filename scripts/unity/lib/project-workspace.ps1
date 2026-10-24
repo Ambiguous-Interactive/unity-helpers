@@ -100,7 +100,8 @@ function Resolve-UnityProjectWorkspace {
     $legacyLeaf = $leaf
     if (-not [string]::IsNullOrWhiteSpace($GenerationFingerprint)) {
         if ($GenerationFingerprint -cnotmatch '^[a-f0-9]{16}$') { throw 'Project generation fingerprint must contain sixteen lowercase hexadecimal characters.' }
-        $leaf += '-framework-' + $GenerationFingerprint
+        $identity = [Text.Encoding]::UTF8.GetBytes($legacyLeaf + "`n" + $GenerationFingerprint)
+        $leaf = 'f-' + [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($identity)).ToLowerInvariant().Substring(0, 16)
     }
 
     if (-not [string]::IsNullOrWhiteSpace($PersistentRoot)) {

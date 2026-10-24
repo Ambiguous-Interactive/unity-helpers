@@ -51,7 +51,7 @@ what ran. See [Unity's core-package policy](https://docs.unity3d.com/6000.5/Docu
 Keep the separate NUnit 3.5 compiler floor and historical host witnesses unchanged.
 
 Generated test projects include an editor-only collector. Persistent project paths include a
-fingerprint of its source, assembly definition and framework policy. Revisions with different
+compact fingerprint of the test leg, collector source, assembly definition and framework policy. Revisions with different
 collector inputs use separate project Libraries and retain the shared package-download cache.
 Explicit project-path overrides keep their requested location. The runner retires only the
 exact known collector files left by the initial unpublished implementation in legacy caches.
@@ -61,7 +61,7 @@ and preserves unrelated assets, parent folders and their metadata.
 CI gives each editor invocation a
 fresh `*.log.framework/<capture-id>` directory. It retains the manifest before launch, then
 captures the resolved manifest and lock, framework package metadata and C# source files,
-and the loaded editor runner, runtime runner and NUnit DLLs, plus available PDBs. Each domain snapshot records
+and the loaded editor runner, runtime runner and NUnit DLLs, plus available PDBs. Package sources use short numbered filenames; the inventory retains their original package-relative paths. This keeps generated compiler and evidence paths within Windows file API limits. Each domain snapshot records
 its process, project, Unity version, loaded module IDs and file hashes. The readback checks
 those IDs against the retained DLL bytes and rejects missing or changed evidence. Repeated
 domain reloads produce separate snapshots. A capture error fails the evidence check.

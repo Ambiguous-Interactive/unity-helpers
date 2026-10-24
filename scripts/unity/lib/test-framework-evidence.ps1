@@ -13,17 +13,27 @@ function Assert-UnityTestFrameworkEvidence {
     foreach ($snapshot in $snapshots) {
         if (Test-Path -LiteralPath (Join-Path $snapshot.FullName 'capture-error.txt')) { throw 'Test Framework source capture was incomplete.' }
         $receipt = Get-Content -LiteralPath (Join-Path $snapshot.FullName 'receipt.json') -Raw | ConvertFrom-Json -AsHashtable
-        if ($receipt.SchemaVersion -ne 1 -or $receipt.ProcessId -ne $ProcessId -or $ProcessId -le 0 -or
+        if ($receipt.SchemaVersion -ne 2 -or $receipt.ProcessId -ne $ProcessId -or $ProcessId -le 0 -or
             -not [string]::Equals([IO.Path]::GetFullPath($receipt.ProjectPath), [IO.Path]::GetFullPath($Project), $pathComparison)) {
             throw 'Test Framework snapshot does not match this Unity process/project.'
         }
         $paths = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+        $originalPaths = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
         foreach ($file in $receipt.Files) {
             if ($file.Path -isnot [string] -or [string]::IsNullOrWhiteSpace($file.Path) -or
                 [IO.Path]::IsPathRooted($file.Path) -or $file.Path.Contains('\') -or $file.Path -match '[\x00-\x1f\x7f:]' -or
                 @($file.Path.Split('/') | Where-Object { $_ -in @('', '.', '..') }).Count -gt 0 -or -not $paths.Add($file.Path)) {
                 throw 'Malformed or duplicate Test Framework evidence path.'
             }
+            if ($file.OriginalPath -isnot [string] -or [string]::IsNullOrWhiteSpace($file.OriginalPath) -or
+                [IO.Path]::IsPathRooted($file.OriginalPath) -or $file.OriginalPath.Contains('\') -or $file.OriginalPath -match '[\x00-\x1f\x7f:]' -or
+                @($file.OriginalPath.Split('/') | Where-Object { $_ -in @('', '.', '..') }).Count -gt 0 -or -not $originalPaths.Add($file.OriginalPath)) {
+                throw 'Malformed or duplicate original Test Framework evidence path.'
+            }
+            if (($file.Path -ceq 'package/package.json' -or -not $file.Path.StartsWith('package/', [StringComparison]::Ordinal)) -and $file.OriginalPath -cne $file.Path) { throw 'Framework metadata/module mapping differs.' }
+            if ($file.Path.StartsWith('package/', [StringComparison]::Ordinal) -and $file.Path -cne 'package/package.json' -and
+                ($file.Path -cnotmatch '^package/[0-9]{4}\.(cs|asmdef)$' -or -not $file.OriginalPath.StartsWith('package/', [StringComparison]::Ordinal) -or
+                [IO.Path]::GetExtension($file.Path) -cne [IO.Path]::GetExtension($file.OriginalPath))) { throw 'Malformed compact framework source mapping.' }
             $path = Join-Path $snapshot.FullName $file.Path
             $item = Get-Item -LiteralPath $path -ErrorAction Stop
             if ($item.Length -ne $file.Length -or (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant() -cne $file.Sha256) {

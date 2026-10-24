@@ -186,6 +186,11 @@ class FrameworkEvidenceTests(unittest.TestCase):
         self.assertEqual(len(paths), 1)
         return paths[0], json.loads(paths[0].read_text())
 
+    def retained(self, original: str) -> Path:
+        receipt_path, receipt = self.receipt()
+        entry = next(e for e in receipt["Files"] if e["OriginalPath"] == original)
+        return receipt_path.parent / entry["Path"]
+
     def verify(
         self, process_id: int | None = None, project: Path | None = None
     ) -> subprocess.CompletedProcess[str]:
@@ -222,7 +227,7 @@ class FrameworkEvidenceTests(unittest.TestCase):
         self.assertEqual(receipt["SourceCount"], 1)
         self.assertEqual(len(receipt["Assemblies"]), 3)
         self.assertEqual(
-            (path.parent / "package/Editor/Source.cs").read_bytes(),
+            self.retained("package/Editor/Source.cs").read_bytes(),
             (self.package / "Editor/Source.cs").read_bytes(),
         )
         for entry in receipt["Files"]:
@@ -288,9 +293,21 @@ class FrameworkEvidenceTests(unittest.TestCase):
         receipt_path, receipt = self.receipt()
         self.assertEqual(receipt["SourceCount"], 3)
         self.assertEqual(
-            (receipt_path.parent / "package" / relative).read_bytes(),
+            self.retained("package/" + relative).read_bytes(),
             source.read_bytes(),
         )
+
+    def test_nested_package_sources_have_short_storage_paths_and_original_names(self) -> None:
+        relative = "Samples~/10_LongRunningTests_Solution/PlayModeTests_10s/PlayModeTests_10s.asmdef"
+        source = self.package / relative
+        source.parent.mkdir(parents=True)
+        source.write_text('{"name":"LongPathControl"}')
+        self.capture()
+        path, receipt = self.receipt()
+        entry = next(e for e in receipt["Files"] if e.get("OriginalPath") == "package/" + relative)
+        self.assertLessEqual(len(entry["Path"]), 19)
+        self.assertEqual((path.parent / entry["Path"]).read_bytes(), source.read_bytes())
+        self.assertEqual(self.verify().returncode, 0)
 
     def test_oversized_source_is_refused_before_copy(self) -> None:
         (self.package / "Editor/Source.cs").write_bytes(b"x" * (16777216 + 1))
@@ -304,10 +321,10 @@ class FrameworkEvidenceTests(unittest.TestCase):
     def test_changed_source_after_capture_does_not_rewrite_retained_bytes(self) -> None:
         self.capture()
         path, _ = self.receipt()
-        before = (path.parent / "package/Editor/Source.cs").read_bytes()
+        before = self.retained("package/Editor/Source.cs").read_bytes()
         (self.package / "Editor/Source.cs").write_text("CHANGED EXTERNAL PACKAGE")
         self.assertEqual(
-            (path.parent / "package/Editor/Source.cs").read_bytes(), before
+            self.retained("package/Editor/Source.cs").read_bytes(), before
         )
         self.assertEqual(self.verify().returncode, 0)
 
@@ -388,6 +405,19 @@ class FrameworkEvidenceTests(unittest.TestCase):
         receipt["Files"] = [
             entry for entry in receipt["Files"] if entry["Path"] != "manifest.json"
         ]
+        path.write_text(json.dumps(receipt))
+        self.assertNotEqual(self.verify().returncode, 0)
+
+    def test_invalid_original_paths_and_duplicate_source_mappings_are_rejected(self) -> None:
+        self.capture()
+        path, original = self.receipt()
+        for value in ("../escape", "/absolute", "package/name:stream", "package//empty", "package/./part", "package/control\nname", "package\\part"):
+            receipt = json.loads(json.dumps(original))
+            receipt["Files"][0]["OriginalPath"] = value
+            path.write_text(json.dumps(receipt))
+            self.assertNotEqual(self.verify().returncode, 0, value)
+        receipt = json.loads(json.dumps(original))
+        receipt["Files"][1]["OriginalPath"] = receipt["Files"][0]["OriginalPath"]
         path.write_text(json.dumps(receipt))
         self.assertNotEqual(self.verify().returncode, 0)
 

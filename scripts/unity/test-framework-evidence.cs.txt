@@ -123,7 +123,7 @@ namespace WallstopStudios.UnityHelpers.Ci
                 {
                     Receipt receipt = new Receipt
                     {
-                        SchemaVersion = 1,
+                        SchemaVersion = 2,
                         ProcessId = process.Id,
                         DomainId = AppDomain.CurrentDomain.Id,
                         CapturedUtc = DateTime.UtcNow.ToString("o"),
@@ -168,7 +168,17 @@ namespace WallstopStudios.UnityHelpers.Ci
                 );
             }
             byte[] bytes = File.ReadAllBytes(source);
-            string target = Path.Combine(snapshot, relative);
+            string stored =
+                relative.StartsWith("package/", StringComparison.Ordinal)
+                && relative != "package/package.json"
+                    ? "package/"
+                        + files.Count.ToString(
+                            "D4",
+                            System.Globalization.CultureInfo.InvariantCulture
+                        )
+                        + Path.GetExtension(relative)
+                    : relative;
+            string target = Path.Combine(snapshot, stored);
             Directory.CreateDirectory(Path.GetDirectoryName(target));
             File.WriteAllBytes(target, bytes);
             using (SHA256 algorithm = SHA256.Create())
@@ -176,7 +186,8 @@ namespace WallstopStudios.UnityHelpers.Ci
                 files.Add(
                     new FileRecord
                     {
-                        Path = relative,
+                        Path = stored,
+                        OriginalPath = relative,
                         Length = bytes.Length,
                         Sha256 = BitConverter
                             .ToString(algorithm.ComputeHash(bytes))
@@ -219,6 +230,7 @@ namespace WallstopStudios.UnityHelpers.Ci
         private sealed class FileRecord
         {
             public string Path;
+            public string OriginalPath;
             public long Length;
             public string Sha256;
         }

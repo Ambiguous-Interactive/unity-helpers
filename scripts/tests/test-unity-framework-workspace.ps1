@@ -71,9 +71,18 @@ try {
         $old = Resolve-UnityProjectWorkspace @arguments
         $current = Resolve-UnityProjectWorkspace @arguments -GenerationFingerprint $fingerprint
         Require ($current.ProjectPath -cne $old.ProjectPath -and $current.LegacyProjectPath -ceq $old.ProjectPath) "legacy isolation $mode"
+        Require ($current.LeafName.Length -le $old.LeafName.Length) "generated path does not lengthen Windows compiler paths $mode"
         Require ($current.CacheRoot -ceq $old.CacheRoot -and $current.Persistent) "shared download cache $mode"
         Require ((Resolve-UnityProjectWorkspace @arguments -GenerationFingerprint $fingerprint).ProjectPath -ceq $current.ProjectPath) "stable project $mode"
     }
+    $distinct = foreach ($version in @('2021.3.45f1', '6000.6.0f1')) {
+        foreach ($mode in @('editmode', 'playmode', 'standalone')) {
+            foreach ($scope in @('', 'single-threaded')) {
+                (Resolve-UnityProjectWorkspace -RepoRoot $root -Version $version -Mode $mode -Scope $scope -GenerationFingerprint $fingerprint).ProjectPath
+            }
+        }
+    }
+    Require (@($distinct | Select-Object -Unique).Count -eq 12) 'version mode and scope remain isolated in compact paths'
     $explicit = Resolve-UnityProjectWorkspace -RepoRoot $root -Version '2021.3.45f1' -Mode editmode -ExplicitProjectPath $temporary -GenerationFingerprint $fingerprint
     Require ($explicit.ProjectPath -ceq $temporary -and -not $explicit.Persistent) 'explicit project override remains authoritative'
     Reject { Resolve-UnityProjectWorkspace -RepoRoot $root -Version '2021.3.45f1' -Mode editmode -GenerationFingerprint '../escape' } 'fingerprint must contain'
