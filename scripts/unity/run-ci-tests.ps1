@@ -3908,6 +3908,11 @@ function Invoke-UnityObservedEditor {
     catch { $ProcessObservation['NativeEvidence'] = @{ State = 'capture-unavailable'; Files = @() } }
     Write-UnityExecutionObservation -LogPath $LogPath -ProcessObservation $ProcessObservation -Label $Label
     if ($null -ne $frameworkEvidence) {
+        if (-not $ProcessObservation.ContainsKey('LogPersistence') -or $ProcessObservation.LogPersistence -cne 'written') { throw 'Current invocation log was not persisted; refusing to bind stale framework evidence.' }
+        $frameworkDiagnosticsPath = [IO.Path]::ChangeExtension($LogPath, 'execution-diagnostics.json')
+        $frameworkDiagnostics = Get-Content -LiteralPath $frameworkDiagnosticsPath -Raw -ErrorAction Stop | ConvertFrom-Json -AsHashtable
+        if ($frameworkDiagnostics.Process.ProcessId -ne $ProcessObservation.ProcessId -or
+            $frameworkDiagnostics.Process.LaunchUtc -cne $ProcessObservation.LaunchUtc) { throw 'Current invocation diagnostics were not persisted; refusing to bind stale framework evidence.' }
         $capturedFrameworkLog = Join-Path $frameworkEvidence 'unity.log'
         Copy-Item -LiteralPath $LogPath -Destination $capturedFrameworkLog -ErrorAction Stop
         Copy-Item -LiteralPath ([IO.Path]::ChangeExtension($LogPath, 'execution-diagnostics.json')) -Destination (Join-Path $frameworkEvidence 'unity.execution-diagnostics.json') -ErrorAction Stop

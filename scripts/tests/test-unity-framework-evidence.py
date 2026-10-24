@@ -108,7 +108,9 @@ class FrameworkEvidenceTests(unittest.TestCase):
             function Get-UnityNativeEvidence { param($Capture, $LogPath) return @{ State = 'HOST-SHIM-NOT-UNITY' } }
             function Write-UnityExecutionObservation {
                 param($LogPath, $ProcessObservation, $Label)
-                @{ Process = $ProcessObservation } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath ([IO.Path]::ChangeExtension($LogPath, 'execution-diagnostics.json'))
+                $savedObservation = $ProcessObservation.Clone()
+                if ($Control -ceq 'stale-diagnostics') { $savedObservation.ProcessId = 1 }
+                @{ Process = $savedObservation } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath ([IO.Path]::ChangeExtension($LogPath, 'execution-diagnostics.json'))
             }
             function Invoke-ProcessWithTreeKillTimeout {
                 param($FilePath, $Arguments, $TimeoutSeconds, $LogPath, $Label, $CompletionPattern, $CompletionGraceSeconds, $StallSeconds, $ProcessObservation)
@@ -118,6 +120,8 @@ class FrameworkEvidenceTests(unittest.TestCase):
                 $process = [Diagnostics.Process]::Start($start)
                 try {
                     $ProcessObservation.ProcessId = $process.Id
+                    $ProcessObservation.LaunchUtc = [DateTime]::UtcNow.ToString('o')
+                    $ProcessObservation.LogPersistence = if ($Control -ceq 'stale-log') { 'write-failed' } else { 'written' }
                     if (-not $process.WaitForExit(30000)) { $process.Kill($true); throw 'Host collector control timed out.' }
                     if ($process.ExitCode -ne 0) { throw 'Host collector control failed.' }
                 } finally { $process.Dispose() }
@@ -439,7 +443,7 @@ class FrameworkEvidenceTests(unittest.TestCase):
         source.write_text(
             (ROOT / "scripts/unity/test-framework-evidence.cs.txt").read_text()
         )
-        for control in ("twice", "deep", "missing", "wrong-process"):
+        for control in ("twice", "deep", "missing", "wrong-process", "stale-log", "stale-diagnostics"):
             result = subprocess.run(
                 [
                     "pwsh",

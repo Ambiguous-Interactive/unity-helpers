@@ -131,6 +131,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 "Public struct equality",
                 "Reports public structs without IEquatable of themselves. This policy is opt-in by default."
             ),
+            new(
+                "WUH024",
+                "Typed enum helpers",
+                "Suggests typed flag checks and cached enum names where available. This policy is opt-in; cached names retain previously seen values."
+            ),
         };
 
         /// <summary>Enables or disables every Unity Helpers analyzer in the default ruleset.</summary>

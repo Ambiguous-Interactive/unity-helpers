@@ -193,6 +193,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     selectedExplanation =
                         "Implement typed equality and matching object equality and hashing. Ref structs are excluded on Unity's C# version. Stored collection references keep reference equality unless the type documents content equality.";
                     break;
+                case "WUH024":
+                    selectedBadCode =
+                        "bool enabled = System.Reflection.BindingFlags.Public.HasFlag(System.Reflection.BindingFlags.Public);";
+                    selectedGoodCode =
+                        "bool enabled = WallstopStudios.UnityHelpers.Core.Extension.EnumExtensions.HasFlagNoAlloc(System.Reflection.BindingFlags.Public, System.Reflection.BindingFlags.Public);";
+                    selectedExplanation =
+                        "Use typed flag checks for the same enum type. ToCachedName can reuse repeated names, but retains cached values. Any-bit tests, formatted strings and expression trees are excluded.";
+                    break;
                 default:
                     badCode = string.Empty;
                     goodCode = string.Empty;

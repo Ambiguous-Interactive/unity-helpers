@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add opt-in `WUH024` suggestions for typed enum flag checks and cached enum names, with semantic guards and Analyzer Policies examples ([guide](./docs/performance/analyzers.md#wuh024-typed-enum-helpers-opt-in), [#917](https://github.com/Ambiguous-Interactive/unity-helpers/issues/917)).
 - Add an opt-in WProto allowance that refuses generated class construction before constructors run. Regenerate codecs to enforce it; custom allocations remain separate ([#1042](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1042)).
 - Add an opt-in WProto element allowance shared by collection reads, nested values, maps and reader copies. Regenerate collection codecs to enforce it ([#1040](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1040)).
 - Add an opt-in WProto decoded payload allowance shared across strings, byte arrays, URIs, nested reads, and reader copies. Regenerate byte-array member codecs to enforce it ([#1038](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1038)).
@@ -47,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Replace the protobuf survey with a save/load and migration guide, and make serialization choices, failure handling and player-data compatibility easier to find ([guide](./docs/features/serialization/wallstop-proto-public-survey.md), [#994](https://github.com/Ambiguous-Interactive/unity-helpers/issues/994)).
 - Update bundled JSON and immutable collections to 10.0.13 and patched protobuf-net to 3.4.40, retaining existing Unity assembly constraints ([#1052](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1052)).
 
 ### Fixed

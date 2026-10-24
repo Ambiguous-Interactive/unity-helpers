@@ -85,7 +85,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random {
 
         private static IEnumerable<TestCaseData> Cases()
         {
-            for (int number = 1; number <= 23; ++number)
+            for (int number = 1; number <= 24; ++number)
             {
                 string id = $"WUH{number:000}";
                 yield return new TestCaseData(id).SetName(id + "ExamplesMatchTheActualDiagnostic");
@@ -140,6 +140,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random {
                     return new DisposableStructBoxingAnalyzer();
                 case "WUH023":
                     return new PublicStructEqualityAnalyzer();
+                case "WUH024":
+                    return new EnumHelperAnalyzer();
                 default:
                     Assert.Fail("Unmapped diagnostic " + id);
                     return null;
@@ -151,6 +153,12 @@ namespace WallstopStudios.UnityHelpers.Core.Random {
             if (string.Equals(id, "WUH023", StringComparison.Ordinal))
             {
                 return "using System;\n" + code;
+            }
+            if (string.Equals(id, "WUH024", StringComparison.Ordinal))
+            {
+                return "using System; namespace WallstopStudios.UnityHelpers.Core.Extension { public static class EnumExtensions { public static bool HasFlagNoAlloc<T>(this T value, T flag) where T : unmanaged, Enum { return value.HasFlag(flag); } } } public class Subject { public void Run() { "
+                    + code
+                    + " } }";
             }
             string fields = string.Empty;
             string members = string.Empty;

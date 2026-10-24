@@ -212,7 +212,7 @@ nav:
       - Serialization:
           - Overview: features/serialization/serialization.md
           - Serializable Types: features/serialization/serialization-types.md
-          - Public protobuf-net Survey: features/serialization/wallstop-proto-public-survey.md
+          - Adopt WallstopProto: features/serialization/wallstop-proto-public-survey.md
       - Utilities:
           - Math & Extensions: features/utilities/math-and-extensions.md
           - Data Structures: features/utilities/data-structures.md
