@@ -505,7 +505,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <remarks>
         /// <para>Null handling: Throws ArgumentNullException if items is null. Throws NullReferenceException if list is null.</para>
         /// <para>Thread safety: Not thread-safe. Modifies the list in place. No Unity main thread requirement.</para>
-        /// <para>Performance: O(m) where m is the number of items to add. List&lt;T&gt; and SerializableList&lt;T&gt; use their bulk AddRange paths.</para>
+        /// <para>Performance: O(m) where m is the number of items to add. List&lt;T&gt; uses AddRange; SerializableList&lt;T&gt; uses bulk append for exact lists and serializable lists.</para>
         /// <para>Allocations: May allocate if list needs to grow capacity.</para>
         /// <para>Edge cases: Empty items collection adds nothing. Appending the list itself duplicates its original elements once.</para>
         /// </remarks>
@@ -523,7 +523,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return;
             }
 
-            if (list is SerializableList<T> serializableList)
+            if (
+                list is SerializableList<T> serializableList
+                && (items is SerializableList<T> || items.GetType() == typeof(List<T>))
+            )
             {
                 serializableList.AddRange(items);
                 return;

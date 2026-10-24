@@ -9,9 +9,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
     using WallstopStudios.UnityHelpers.Core.Extension;
-#if UNITY_5_3_OR_NEWER
     using WallstopStudios.UnityHelpers.Tests.DataStructures;
-#endif
 
     [TestFixture]
     [Category("Fast")]
@@ -203,6 +201,48 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             IList<int> actual = CreateList(shape, new[] { 1, 2 });
             Assert.Throws<ArgumentNullException>(() => IListExtensions.AddRange(actual, null));
             Assert.That(actual, Is.EqualTo(new[] { 1, 2 }));
+        }
+
+        [Test]
+        public void SerializableAppendRetainsDerivedListEnumeration()
+        {
+            EnumerationDerivedList source = new EnumerationDerivedList { 99 };
+            source.Probe.Values[0] = 7;
+            IList<int> target = new SerializableList<int> { 10 };
+            IListExtensions.AddRange(target, source);
+            Assert.That(target, Is.EqualTo(new[] { 10, 7, 2, 3 }));
+            Assert.That(
+                source.Probe.Events,
+                Is.EqualTo(
+                    new[]
+                    {
+                        nameof(EnumerationProbe.GetEnumerator),
+                        nameof(EnumerationProbe.MoveNext),
+                        nameof(EnumerationProbe.Current),
+                        nameof(EnumerationProbe.MoveNext),
+                        nameof(EnumerationProbe.Current),
+                        nameof(EnumerationProbe.MoveNext),
+                        nameof(EnumerationProbe.Current),
+                        nameof(EnumerationProbe.MoveNext),
+                        nameof(EnumerationProbe.Dispose),
+                    }
+                )
+            );
+        }
+
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(3)]
+        [TestCase(4)]
+        public void SerializableAppendRetainsDerivedListEnumeratorFailures(int failure)
+        {
+            EnumerationDerivedList source = new EnumerationDerivedList { 99 };
+            source.Probe.Failure = failure;
+            IList<int> target = new SerializableList<int> { 10 };
+            Assert.Throws<InvalidOperationException>(() =>
+                IListExtensions.AddRange(target, source)
+            );
+            Assert.That(target, Is.EqualTo(failure == 4 ? new[] { 10, 1, 2, 3 } : new[] { 10 }));
         }
 
         [TestCase(false)]

@@ -1070,8 +1070,9 @@ spawnOrder.AddRange(spawnOrder);
 // spawnOrder: [1, 2, 3, 1, 2, 3]
 ```
 
-`SerializableList<T>` uses its bulk append operation, which also supports another wrapper sharing
-the same backing list. The destination can still grow its capacity. Fixed-size or read-only lists
+For exact `List<T>` and `SerializableList<T>` sources, `SerializableList<T>` uses its bulk append
+operation, which also supports another wrapper sharing the same backing list. Other sources retain
+their enumeration and disposal behavior, including derived lists with custom enumerators. The destination can still grow its capacity. Fixed-size or read-only lists
 reject nonempty appends, and a null source throws `ArgumentNullException`. If an iterator throws,
 items yielded before the failure can remain in the destination. Materialize a deferred query over
 the destination before appending it; arbitrary aliased iterators are not snapshots.
