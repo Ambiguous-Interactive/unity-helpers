@@ -55,6 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix string-trie enumeration retaining copied prefixes across visited nodes. Preserve traversal order and make default or disposed trie enumerators safe to advance ([#817](https://github.com/Ambiguous-Interactive/unity-helpers/issues/817)).
 - Fix cyclic buffer membership after removal and draining, including `null` and default values ([#1069](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1069)).
 - Fix trie prefix searches on long keys without changing result order or limits ([#1070](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1070)).
 - Fix extreme signed left rotations and partial self-appends through `IList<T>`, including shared `SerializableList<T>` storage; use its bulk append path ([#1066](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1066)).
