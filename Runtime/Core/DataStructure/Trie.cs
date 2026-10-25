@@ -13,8 +13,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
     /// <summary>
     /// A highly optimized, array-backed trie implementation for fast prefix search and exact word lookup.
-    /// Preallocates storage based on total characters in the input set and uses integer indices for traversal,
-    /// minimizing memory allocations and indirections. Provides allocation-free prefix search aside from returned string allocations.
+    /// Preallocates storage based on total characters in the input set and uses integer indices for traversal.
+    /// Prefix search and enumeration reuse pooled scratch; returned strings allocate.
     /// </summary>
     /// <example>
     /// <code><![CDATA[
@@ -133,7 +133,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <summary>
         /// Collects up to maxResults words that start with the given prefix.
         /// Results are added into the provided list (which is cleared at the start).
-        /// Returns the number of results added.
+        /// Returns the supplied list; traversal does not recurse with key depth.
         /// </summary>
         public List<string> GetWordsWithPrefix(
             string prefix,
@@ -174,7 +174,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         }
 
         /// <summary>
-        /// Returns a value-based enumerator for efficient iteration without heap allocations.
+        /// Returns a value-based enumerator that reuses pooled traversal scratch.
         /// </summary>
         public Enumerator GetEnumerator()
         {
@@ -215,28 +215,43 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         private void Collect(int node, List<string> results, int maxResults, StringBuilder builder)
         {
-            if (maxResults <= results.Count)
+            using PooledResource<Stack<(int node, int length)>> lease = Buffers<(
+                int,
+                int
+            )>.Stack.Get(out Stack<(int node, int length)> pending);
+            int root = node;
+            while (true)
             {
-                return;
-            }
+                if (_isWord[node])
+                {
+                    results.Add(builder.ToString());
+                    if (maxResults <= results.Count)
+                    {
+                        return;
+                    }
+                }
 
-            if (_isWord[node])
-            {
-                results.Add(builder.ToString());
-                if (maxResults <= results.Count)
+                int child = _firstChild[node];
+                if (child != Poison)
                 {
-                    return;
+                    pending.Push((node, builder.Length));
+                    node = child;
+                    builder.Append(_chars[node]);
+                    continue;
                 }
-            }
-            for (int child = _firstChild[node]; child != Poison; child = _nextSibling[child])
-            {
-                builder.Append(_chars[child]);
-                Collect(child, results, maxResults, builder);
-                builder.Length--;
-                if (maxResults <= results.Count)
+
+                while (node == root || _nextSibling[node] == Poison)
                 {
-                    return;
+                    if (!pending.TryPop(out (int node, int length) parent))
+                    {
+                        return;
+                    }
+                    node = parent.node;
+                    builder.Length = parent.length;
                 }
+                node = _nextSibling[node];
+                --builder.Length;
+                builder.Append(_chars[node]);
             }
         }
 
@@ -251,62 +266,52 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         }
 
         /// <summary>
-        /// Value-based enumerator for efficient foreach iteration without heap allocations.
-        /// Implements IDisposable to return pooled StringBuilders, Stack, and List.
+        /// Iterates words using one pooled prefix builder and a pooled traversal stack.
         /// </summary>
         public struct Enumerator : IDisposable, global::System.IEquatable<Enumerator>
         {
+            /// <summary>Gets the last word returned by a successful advance.</summary>
             public string Current => _current;
 
             private readonly Trie _trie;
-            private readonly PooledResource<
-                Stack<(int node, PooledResource<StringBuilder> sbResource, int sbLength)>
-            > _stackResource;
-            private readonly Stack<(
-                int node,
-                PooledResource<StringBuilder> sbResource,
-                int sbLength
-            )> _stack;
-            private readonly PooledResource<List<PooledResource<StringBuilder>>> _listResource;
-            private readonly List<PooledResource<StringBuilder>> _stringBuilderResources;
+            private readonly PooledResource<Stack<(int node, int length)>> _stackResource;
+            private readonly Stack<(int node, int length)> _stack;
+            private readonly PooledResource<StringBuilder> _builderResource;
+            private readonly StringBuilder _builder;
             private string _current;
 
             internal Enumerator(Trie trie)
             {
                 _trie = trie;
-                _stackResource = Buffers<(int, PooledResource<StringBuilder>, int)>.Stack.Get(
-                    out Stack<(int, PooledResource<StringBuilder>, int)> stack
-                );
-                _stack = stack;
-                _listResource = Buffers<PooledResource<StringBuilder>>.List.Get(
-                    out List<PooledResource<StringBuilder>> stringBuilderResources
-                );
-                _stringBuilderResources = stringBuilderResources;
-                _current = null;
-
-                PooledResource<StringBuilder> sbResource = Buffers.StringBuilder.Get();
-                _stringBuilderResources.Add(sbResource);
-                _stack.Push((0, sbResource, 0));
+                _stackResource = Buffers<(int, int)>.Stack.Get(out _stack);
+                try
+                {
+                    _stack.Push((0, 0));
+                    _builderResource = Buffers.StringBuilder.Get(out _builder);
+                    _current = null;
+                }
+                catch
+                {
+                    _stackResource.Dispose();
+                    throw;
+                }
             }
 
+            /// <summary>Advances to the next word in reverse sibling insertion order.</summary>
             public bool MoveNext()
             {
-                while (
-                    _stack.TryPop(
-                        out (int node, PooledResource<StringBuilder> sbResource, int sbLength) item
-                    )
-                )
+                if (!_stackResource.IsHeld || !_builderResource.IsHeld)
                 {
-                    (int node, PooledResource<StringBuilder> sbResource, int sbLength) = item;
-                    StringBuilder sb = sbResource.resource;
-                    sb.Length = sbLength;
+                    return false;
+                }
 
-                    if (_trie._isWord[node])
+                while (_stack.TryPop(out (int node, int length) item))
+                {
+                    int node = item.node;
+                    _builder.Length = item.length;
+                    if (node != 0)
                     {
-                        _current = sb.ToString();
-
-                        PushChildrenAndContinue(node, sbResource, sbLength);
-                        return true;
+                        _builder.Append(_trie._chars[node]);
                     }
 
                     for (
@@ -315,53 +320,43 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                         child = _trie._nextSibling[child]
                     )
                     {
-                        PooledResource<StringBuilder> childResource = Buffers.StringBuilder.Get(
-                            out StringBuilder childSb
-                        );
-                        _stringBuilderResources.Add(childResource);
-                        childSb.Append(sb);
-                        childSb.Append(_trie._chars[child]);
-                        _stack.Push((child, childResource, childSb.Length));
+                        _stack.Push((child, _builder.Length));
+                    }
+
+                    if (_trie._isWord[node])
+                    {
+                        _current = _builder.ToString();
+                        return true;
                     }
                 }
 
                 return false;
             }
 
+            /// <summary>Returns traversal scratch once, including when the enumerator is copied.</summary>
             public void Dispose()
             {
-                foreach (PooledResource<StringBuilder> resource in _stringBuilderResources)
+                try
                 {
-                    resource.Dispose();
+                    _builderResource.Dispose();
                 }
-
-                _stackResource.Dispose();
-                _listResource.Dispose();
+                finally
+                {
+                    _stackResource.Dispose();
+                }
             }
 
             /// <summary>Compares the stored fields with another value.</summary>
             public bool Equals(Enumerator other)
             {
                 return EqualityComparer<Trie>.Default.Equals(_trie, other._trie)
-                    && EqualityComparer<
-                        PooledResource<
-                            Stack<(
-                                int node,
-                                PooledResource<StringBuilder> sbResource,
-                                int sbLength
-                            )>
-                        >
-                    >.Default.Equals(_stackResource, other._stackResource)
-                    && EqualityComparer<
-                        Stack<(int node, PooledResource<StringBuilder> sbResource, int sbLength)>
-                    >.Default.Equals(_stack, other._stack)
-                    && EqualityComparer<
-                        PooledResource<List<PooledResource<StringBuilder>>>
-                    >.Default.Equals(_listResource, other._listResource)
-                    && EqualityComparer<List<PooledResource<StringBuilder>>>.Default.Equals(
-                        _stringBuilderResources,
-                        other._stringBuilderResources
+                    && _stackResource.Equals(other._stackResource)
+                    && EqualityComparer<Stack<(int node, int length)>>.Default.Equals(
+                        _stack,
+                        other._stack
                     )
+                    && _builderResource.Equals(other._builderResource)
+                    && EqualityComparer<StringBuilder>.Default.Equals(_builder, other._builder)
                     && EqualityComparer<string>.Default.Equals(_current, other._current);
             }
 
@@ -378,34 +373,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     _trie,
                     _stackResource,
                     _stack,
-                    _listResource,
-                    _stringBuilderResources,
+                    _builderResource,
+                    _builder,
                     _current
                 );
-            }
-
-            private void PushChildrenAndContinue(
-                int node,
-                PooledResource<StringBuilder> sbResource,
-                int sbLength
-            )
-            {
-                StringBuilder sb = sbResource.resource;
-
-                for (
-                    int child = _trie._firstChild[node];
-                    child != Poison;
-                    child = _trie._nextSibling[child]
-                )
-                {
-                    PooledResource<StringBuilder> childResource = Buffers.StringBuilder.Get(
-                        out StringBuilder childSb
-                    );
-                    _stringBuilderResources.Add(childResource);
-                    childSb.Append(sb);
-                    childSb.Append(_trie._chars[child]);
-                    _stack.Push((child, childResource, childSb.Length));
-                }
             }
         }
 
@@ -529,7 +500,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <summary>
         /// Collects up to maxResults values whose keys start with the given prefix.
         /// Results are added into the provided list (which is cleared at the start).
-        /// Returns the number of results added.
+        /// Returns the supplied list; traversal does not recurse with key depth.
         /// </summary>
         public List<T> GetValuesWithPrefix(
             string prefix,
@@ -564,7 +535,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         }
 
         /// <summary>
-        /// Returns a value-based enumerator for efficient iteration without heap allocations.
+        /// Returns a value-based enumerator that reuses pooled traversal scratch.
         /// </summary>
         public Enumerator GetEnumerator()
         {
@@ -606,26 +577,35 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         private void Collect(int node, List<T> results, int maxResults)
         {
-            if (maxResults <= results.Count)
+            using PooledResource<Stack<int>> lease = Buffers<int>.Stack.Get(out Stack<int> pending);
+            int root = node;
+            while (true)
             {
-                return;
-            }
+                if (_hasValue[node])
+                {
+                    results.Add(_values[node]);
+                    if (maxResults <= results.Count)
+                    {
+                        return;
+                    }
+                }
 
-            if (_hasValue[node])
-            {
-                results.Add(_values[node]);
-                if (maxResults <= results.Count)
+                int child = _firstChild[node];
+                if (child != Poison)
                 {
-                    return;
+                    pending.Push(node);
+                    node = child;
+                    continue;
                 }
-            }
-            for (int child = _firstChild[node]; child != Poison; child = _nextSibling[child])
-            {
-                Collect(child, results, maxResults);
-                if (maxResults <= results.Count)
+
+                while (node == root || _nextSibling[node] == Poison)
                 {
-                    return;
+                    if (!pending.TryPop(out node))
+                    {
+                        return;
+                    }
                 }
+                node = _nextSibling[node];
             }
         }
 
@@ -665,8 +645,14 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 }
             }
 
+            /// <summary>Advances to the next value while traversal scratch remains owned.</summary>
             public bool MoveNext()
             {
+                if (!_stackResource.IsHeld)
+                {
+                    return false;
+                }
+
                 while (_stack.TryPop(out int node))
                 {
                     if (_trie._hasValue[node])
