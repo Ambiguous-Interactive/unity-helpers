@@ -530,7 +530,9 @@ public class LevelManager : MonoBehaviour
 
 #### AreAnyAssignmentsInvalid()
 
-Returns `true` if any `[ValidateAssignment]` field is invalid:
+Returns `true` if any `[ValidateAssignment]` field on a live target is invalid.
+A null or destroyed target returns `false`, matching the no-op behavior of
+`ValidateAssignments()` for a missing target:
 
 ```csharp
 using UnityEngine;

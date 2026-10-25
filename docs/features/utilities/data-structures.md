@@ -301,6 +301,7 @@ trie.GetValuesWithPrefix("ap", values);       // values = [1,2]
 Tips
 
 - Build once with full vocabulary; Tries here are immutable post-construction (no public insert) to stay compact.
+- If an input iterator throws while constructing a `Trie`, the exception propagates and temporary pooled storage is returned.
 - Prefix searches handle long keys without recursive calls. They clear and return your result list, visit a matching key before its descendants, and stop at `maxResults`. Sibling order follows the input, so sort results yourself when you need alphabetical suggestions.
 - `foreach` visits each stored key before its descendants, with siblings in reverse insertion order. This differs from prefix-search order; neither order is alphabetical.
 - String-trie enumeration reuses one pooled prefix builder instead of retaining a copied prefix for every node. Returned words still allocate strings, and scratch pools may grow on first use. Use `foreach` or dispose a manually acquired enumerator, including when stopping early.

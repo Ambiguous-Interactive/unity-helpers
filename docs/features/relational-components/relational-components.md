@@ -318,7 +318,8 @@ Unbounded collections without filters or depth limits use a cached Unity query a
   - If `false`, only assigns enabled components on active-in-hierarchy objects
 
 - `SkipIfAssigned` (default: false)
-  - If `true`, preserves existing non-null value (single) or non-empty collection
+  - If `true`, preserves a live component reference (single) or a non-empty collection.
+  - A destroyed single reference is searched again and cleared to null when no match exists.
 
 - `MaxCount` (default: 0 = unlimited)
   - Applies to arrays, lists, and hash sets; ignored for single fields

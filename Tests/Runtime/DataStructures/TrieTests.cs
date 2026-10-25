@@ -8,11 +8,87 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     using System.Linq;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.DataStructure;
+    using WallstopStudios.UnityHelpers.Utils;
 
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
     public sealed class TrieTests
     {
+        private static IEnumerable<string> ThrowAfterWords(int count, Exception failure)
+        {
+            foreach (string word in EnumerateWords(count))
+            {
+                yield return word;
+            }
+            throw failure;
+        }
+
+        private static IEnumerable<string> EnumerateWords(int count)
+        {
+            for (int index = 0; index < count; ++index)
+            {
+                yield return "word" + index;
+            }
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(16)]
+        public void ConstructorReturnsLeaseWhenEnumerationThrows(int yieldedCount)
+        {
+            InvalidOperationException failure = new(
+                nameof(ConstructorReturnsLeaseWhenEnumerationThrows)
+            );
+            PoolStatistics before = Buffers<string>.List.GetStatistics();
+
+            InvalidOperationException actual = Assert.Throws<InvalidOperationException>(() =>
+                _ = new Trie(ThrowAfterWords(yieldedCount, failure))
+            );
+
+            Assert.AreSame(failure, actual);
+            PoolStatistics after = Buffers<string>.List.GetStatistics();
+            Assert.AreEqual(1, after.RentCount - before.RentCount);
+            Assert.AreEqual(1, after.ReturnCount - before.ReturnCount);
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(16)]
+        public void ConstructorReturnsLeaseForSuccessfulEnumeration(int count)
+        {
+            PoolStatistics before = Buffers<string>.List.GetStatistics();
+            Trie trie = new(EnumerateWords(count));
+            PoolStatistics after = Buffers<string>.List.GetStatistics();
+            Assert.AreEqual(1, after.RentCount - before.RentCount);
+            Assert.AreEqual(1, after.ReturnCount - before.ReturnCount);
+            for (int index = 0; index < count; ++index)
+            {
+                Assert.IsTrue(trie.Contains("word" + index));
+            }
+            Assert.IsFalse(trie.Contains("absent"));
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(16)]
+        public void ConstructorDoesNotRentForReadOnlyList(int count)
+        {
+            string[] words = new string[count];
+            for (int index = 0; index < count; ++index)
+            {
+                words[index] = "word" + index;
+            }
+            PoolStatistics before = Buffers<string>.List.GetStatistics();
+            Trie trie = new(words);
+            PoolStatistics after = Buffers<string>.List.GetStatistics();
+            Assert.AreEqual(0, after.RentCount - before.RentCount);
+            Assert.AreEqual(0, after.ReturnCount - before.ReturnCount);
+            foreach (string word in words)
+            {
+                Assert.IsTrue(trie.Contains(word));
+            }
+        }
+
         [Test]
         public void ConstructorWithEmptyListCreatesValidTrie()
         {
