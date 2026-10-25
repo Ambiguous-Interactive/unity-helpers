@@ -20,6 +20,7 @@ This guide covers several foundational data structures used across the library a
 
 When to use vs. DotNET queues
 
+- `Contains` searches live entries only. Removed slots do not count as stored `default` or `null` values.
 - Prefer `CyclicBuffer<T>` over `Queue<T>` when you want bounded memory with O(1) push/pop at both ends and predictable behavior under backpressure (drop/overwrite oldest, or pop proactively).
 - Use `Queue<T>` when you need unbounded growth without wrap semantics.
 
@@ -300,6 +301,7 @@ trie.GetValuesWithPrefix("ap", values);       // values = [1,2]
 Tips
 
 - Build once with full vocabulary; Tries here are immutable post-construction (no public insert) to stay compact.
+- Prefix searches handle long keys without recursive calls. They clear and return your result list, visit a matching key before its descendants, and stop at `maxResults`. Sibling order follows the input, so sort results yourself when you need alphabetical suggestions.
 - Memory scales with total characters; very large alphabets or long keys benefit from compressed/radix tries (not included here).
 
 ## Bitset

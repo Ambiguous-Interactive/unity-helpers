@@ -55,6 +55,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix cyclic buffer membership after removal and draining, including `null` and default values ([#1069](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1069)).
+- Fix trie prefix searches on long keys without changing result order or limits ([#1070](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1070)).
 - Fix extreme signed left rotations and partial self-appends through `IList<T>`, including shared `SerializableList<T>` storage; use its bulk append path ([#1066](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1066)).
 - Fix `DisjointSet` queries so broken or cyclic saved parent links return failure without recursive traversal. Validate union metadata and allow explicit reset of missing ranks ([#1067](https://github.com/wallstop/unity-helpers/issues/1067)).
 - Fix `DisjointSet` set collection so shared result lists preserve every partition and generic calls reuse result storage without temporary index lists ([#1067](https://github.com/wallstop/unity-helpers/issues/1067)).

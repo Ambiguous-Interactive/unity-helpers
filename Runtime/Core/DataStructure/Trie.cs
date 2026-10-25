@@ -133,7 +133,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <summary>
         /// Collects up to maxResults words that start with the given prefix.
         /// Results are added into the provided list (which is cleared at the start).
-        /// Returns the number of results added.
+        /// Returns the supplied list; traversal does not recurse with key depth.
         /// </summary>
         public List<string> GetWordsWithPrefix(
             string prefix,
@@ -215,28 +215,43 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         private void Collect(int node, List<string> results, int maxResults, StringBuilder builder)
         {
-            if (maxResults <= results.Count)
+            using PooledResource<Stack<(int node, int length)>> lease = Buffers<(
+                int,
+                int
+            )>.Stack.Get(out Stack<(int node, int length)> pending);
+            int root = node;
+            while (true)
             {
-                return;
-            }
+                if (_isWord[node])
+                {
+                    results.Add(builder.ToString());
+                    if (maxResults <= results.Count)
+                    {
+                        return;
+                    }
+                }
 
-            if (_isWord[node])
-            {
-                results.Add(builder.ToString());
-                if (maxResults <= results.Count)
+                int child = _firstChild[node];
+                if (child != Poison)
                 {
-                    return;
+                    pending.Push((node, builder.Length));
+                    node = child;
+                    builder.Append(_chars[node]);
+                    continue;
                 }
-            }
-            for (int child = _firstChild[node]; child != Poison; child = _nextSibling[child])
-            {
-                builder.Append(_chars[child]);
-                Collect(child, results, maxResults, builder);
-                builder.Length--;
-                if (maxResults <= results.Count)
+
+                while (node == root || _nextSibling[node] == Poison)
                 {
-                    return;
+                    if (!pending.TryPop(out (int node, int length) parent))
+                    {
+                        return;
+                    }
+                    node = parent.node;
+                    builder.Length = parent.length;
                 }
+                node = _nextSibling[node];
+                --builder.Length;
+                builder.Append(_chars[node]);
             }
         }
 
@@ -529,7 +544,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <summary>
         /// Collects up to maxResults values whose keys start with the given prefix.
         /// Results are added into the provided list (which is cleared at the start).
-        /// Returns the number of results added.
+        /// Returns the supplied list; traversal does not recurse with key depth.
         /// </summary>
         public List<T> GetValuesWithPrefix(
             string prefix,
@@ -606,26 +621,35 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         private void Collect(int node, List<T> results, int maxResults)
         {
-            if (maxResults <= results.Count)
+            using PooledResource<Stack<int>> lease = Buffers<int>.Stack.Get(out Stack<int> pending);
+            int root = node;
+            while (true)
             {
-                return;
-            }
+                if (_hasValue[node])
+                {
+                    results.Add(_values[node]);
+                    if (maxResults <= results.Count)
+                    {
+                        return;
+                    }
+                }
 
-            if (_hasValue[node])
-            {
-                results.Add(_values[node]);
-                if (maxResults <= results.Count)
+                int child = _firstChild[node];
+                if (child != Poison)
                 {
-                    return;
+                    pending.Push(node);
+                    node = child;
+                    continue;
                 }
-            }
-            for (int child = _firstChild[node]; child != Poison; child = _nextSibling[child])
-            {
-                Collect(child, results, maxResults);
-                if (maxResults <= results.Count)
+
+                while (node == root || _nextSibling[node] == Poison)
                 {
-                    return;
+                    if (!pending.TryPop(out node))
+                    {
+                        return;
+                    }
                 }
+                node = _nextSibling[node];
             }
         }
 

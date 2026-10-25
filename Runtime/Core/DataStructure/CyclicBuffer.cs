@@ -322,9 +322,18 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _position = Count < Capacity ? Count : 0;
         }
 
+        /// <summary>Determines whether a live entry equals the specified item.</summary>
         public bool Contains(T item)
         {
-            return _buffer.Contains(item);
+            EqualityComparer<T> comparer = EqualityComparer<T>.Default;
+            for (int index = 0; index < Count; ++index)
+            {
+                if (comparer.Equals(_buffer[AdjustedIndexFor(index)], item))
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         /// <summary>
