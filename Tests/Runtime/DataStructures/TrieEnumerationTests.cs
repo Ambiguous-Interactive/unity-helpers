@@ -77,6 +77,16 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [TestCase(2)]
         public void EnumerationPreservesReverseSiblingOrderAndExactCharacters(int shape)
         {
+            string embeddedNull = new(new[] { 'c', '\0' });
+            string surrogatePair = new(new[] { 'c', '\ud83d', '\ude00' });
+            string highSurrogate = new(new[] { 'c', '\ud800' });
+            string lowSurrogate = new(new[] { 'c', '\udc00' });
+            Assert.AreEqual(0, (int)embeddedNull[1]);
+            Assert.AreEqual(0xD83D, (int)surrogatePair[1]);
+            Assert.AreEqual(0xDE00, (int)surrogatePair[2]);
+            Assert.AreEqual(0xD800, (int)highSurrogate[1]);
+            Assert.AreEqual(0xDC00, (int)lowSurrogate[1]);
+            Assert.AreNotEqual(highSurrogate, lowSurrogate);
             string[] words =
             {
                 "cat",
@@ -87,10 +97,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 "cape",
                 "z",
                 "",
-                "c\0",
-                "c\ud83d\ude00",
-                "c\ud800",
-                "c\udc00",
+                embeddedNull,
+                surrogatePair,
+                highSurrogate,
+                lowSurrogate,
             };
             string[] expected =
             {
@@ -98,10 +108,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 "z",
                 "do",
                 "dog",
-                "c\udc00",
-                "c\ud800",
-                "c\ud83d\ude00",
-                "c\0",
+                lowSurrogate,
+                highSurrogate,
+                surrogatePair,
+                embeddedNull,
                 "cape",
                 "car",
                 "carbon",
