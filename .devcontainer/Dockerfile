@@ -8,11 +8,11 @@ ARG TARGETARCH=amd64
 ENV DEBIAN_FRONTEND=noninteractive
 
 # The current devcontainer base trails the supported .NET 9 servicing release.
-ENV DOTNET_SDK_VERSION=9.0.319 DOTNET_VERSION=9.0.21 ASPNET_VERSION=9.0.21
-RUN DOTNET_SDK_VERSION="9.0.319" \
+ENV DOTNET_SDK_VERSION=9.0.320 DOTNET_VERSION=9.0.22 ASPNET_VERSION=9.0.22
+RUN DOTNET_SDK_VERSION="9.0.320" \
     && case "${TARGETARCH}" in \
-        amd64) DOTNET_SDK_ARCH="x64" ; DOTNET_SDK_SHA512="ed080b81dd2cca56a453c939468b0061a60a083a87eaf21e035794cd28a14fc00faf52d96a4e4116f3cc1de40e6289cd0f08a8fd478d49e4dc4f28570e2f602c" ;; \
-        arm64) DOTNET_SDK_ARCH="arm64" ; DOTNET_SDK_SHA512="940b056511b078c4ab15318f3a7a6114c57c6c636ab32027e90129e3f8b205236a1c6af794eb35a887d7bf3219ff49522da2cb9f9a6d5d26e390909c25536ed2" ;; \
+        amd64) DOTNET_SDK_ARCH="x64" ; DOTNET_SDK_SHA512="eb371100b5c40641a812b3683bfda1772f0b69e5232091293c715d49eb837f52174b9b9a93375d692bddbfd1d57005f1a9aa774b4b30276665b0c0b1a9b66427" ;; \
+        arm64) DOTNET_SDK_ARCH="arm64" ; DOTNET_SDK_SHA512="88d78bf798432e9b92fe93cbffdad3ff3cc7b3e93b640c75ef46a2caa2d4d0b6dfdca002fcd007d4e95725f2e974ffbd99ae4e3a9d7999a57a667ab5d00ef0e8" ;; \
         *) echo "Unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
     esac \
     && curl -fsSL "https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-${DOTNET_SDK_ARCH}.tar.gz" -o /tmp/dotnet-sdk.tar.gz \
@@ -259,10 +259,10 @@ RUN command -v fd >/dev/null \
 COPY .devcontainer/requirements-tools.txt /tmp/requirements-tools.txt
 
 # Install PowerShell from GitHub releases to support both amd64 and arm64.
-RUN POWERSHELL_VERSION="7.6.7" \
+RUN POWERSHELL_VERSION="7.6.9" \
     && case "${TARGETARCH}" in \
-        amd64) POWERSHELL_ARCH="x64" ; POWERSHELL_SHA256="6896f9e3a6b0a354bf470835a96da76d2f801cd50dcf047ad7c4563bf93bf431" ;; \
-        arm64) POWERSHELL_ARCH="arm64" ; POWERSHELL_SHA256="ba465efdfb0984c1c5dc5ed9eb0b79a7e91a1b52c45f99377058c0659b84d3f1" ;; \
+        amd64) POWERSHELL_ARCH="x64" ; POWERSHELL_SHA256="1da6d6d6035d651f20e70ddee7c4c15ac6ab8b9fb40ee92240d91263f28a884b" ;; \
+        arm64) POWERSHELL_ARCH="arm64" ; POWERSHELL_SHA256="02eb9991af447c7e7fe881acde195961afd397c40b8eb1c2b3856b84ec2d85f2" ;; \
         *) echo "Unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
     esac \
     && curl -fsSL "https://github.com/PowerShell/PowerShell/releases/download/v${POWERSHELL_VERSION}/powershell-${POWERSHELL_VERSION}-linux-${POWERSHELL_ARCH}.tar.gz" -o /tmp/powershell.tar.gz \
@@ -291,12 +291,12 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource_setup.sh
     python3-pip \
     python3-venv \
     && python3 -m venv /opt/python-tools \
-    && /opt/python-tools/bin/pip install --no-cache-dir "uv==0.13.4" \
+    && /opt/python-tools/bin/pip install --no-cache-dir "uv==0.13.5" \
     && /opt/python-tools/bin/uv pip install --python /opt/python-tools/bin/python --no-cache --requirement /tmp/requirements-tools.txt \
     && UV_TOOL_DIR=/opt/mcp-uv-tools UV_TOOL_BIN_DIR=/usr/local/bin UV_PYTHON_PREFERENCE=only-system \
         /opt/python-tools/bin/uv tool install "mcp-server-git==2026.10.19" \
     && UV_TOOL_DIR=/opt/mcp-uv-tools UV_TOOL_BIN_DIR=/usr/local/bin UV_PYTHON_PREFERENCE=only-system \
-        /opt/python-tools/bin/uv tool install "mcp-server-fetch==2026.10.19" \
+        /opt/python-tools/bin/uv tool install "mcp-server-fetch==2026.10.24" \
     && test -x /opt/python-tools/bin/uv \
     && ln -sf /opt/python-tools/bin/uv /usr/local/bin/uv \
     && test -x /usr/local/bin/mcp-server-git \

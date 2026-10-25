@@ -55,6 +55,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
+      - name: Setup retained protobuf compiler SDK
+        id: retained_protobuf_dotnet
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/retained-protobuf-dotnet
+        with:
+          dotnet-version: "9.0.319"
+
+      - name: Require the retained protobuf compiler SDK
+        shell: bash
+        env:
+          EXPECTED_DOTNET_SDK: ${{ steps.retained_protobuf_dotnet.outputs.dotnet-version }}
+        run: |
+          set -euo pipefail
+          selected_sdk="$(dotnet --version)"
+          printf 'Selected retained protobuf SDK: %s\n' "$selected_sdk"
+          test "$selected_sdk" = "${EXPECTED_DOTNET_SDK:?Missing retained SDK version}"
+
       - name: Setup .NET
         id: dotnet
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
@@ -64,7 +82,7 @@ jobs:
           # Pinned to a patch. The byte comparison below is only meaningful against the same
           # compiler, and every SDK patch ships its own Roslyn; 9.0.x floated onto a different one
           # and the gate failed for a reason no developer could reproduce.
-          dotnet-version: "9.0.319"
+          dotnet-version: "9.0.320"
 
       - name: Require the installed .NET SDK
         shell: bash
@@ -145,6 +163,7 @@ jobs:
       - name: Build the pinned current protobuf candidate
         run: >-
           python3 scripts/build-protobuf-candidate.py
+          --dotnet "${{ runner.temp }}/retained-protobuf-dotnet/dotnet"
           --output "${{ runner.temp }}/protobuf-candidate"
 
       - name: Test the generator against the current protobuf candidate

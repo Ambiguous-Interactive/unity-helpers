@@ -77,7 +77,7 @@ jobs:
         env:
           DOTNET_INSTALL_DIR: ${{ runner.temp }}/unity-helpers-dotnet
         with:
-          dotnet-version: "9.0.319"
+          dotnet-version: "9.0.320"
 
       - name: Require the installed .NET SDK
         shell: bash
@@ -256,7 +256,7 @@ jobs:
         env:
           DOTNET_INSTALL_DIR: ${{ runner.temp }}/unity-helpers-dotnet
         with:
-          dotnet-version: "9.0.319"
+          dotnet-version: "9.0.320"
 
       # TestU01 is the second battery, and it answers a different question from PractRand.
       # PractRand streams until something fails and reports the depth; SmallCrush runs 15 fixed
@@ -376,7 +376,7 @@ jobs:
         env:
           DOTNET_INSTALL_DIR: ${{ runner.temp }}/unity-helpers-dotnet
         with:
-          dotnet-version: "9.0.319"
+          dotnet-version: "9.0.320"
 
       - name: Require the installed .NET SDK
         shell: bash
