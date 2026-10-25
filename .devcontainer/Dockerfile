@@ -316,6 +316,21 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource_setup.sh
 #
 # Note: /var/lib/docker is managed by the Docker-in-Docker feature and must
 # remain root-owned. It is NOT pre-created here (the DinD feature handles it).
+RUN mkdir -p /home/vscode/.codex \
+    /home/vscode/.claude \
+    /home/vscode/.claude-zai \
+    /home/vscode/.claude-openrouter \
+    /home/vscode/.config/opencode \
+    /home/vscode/.local/share/opencode \
+    /home/vscode/.local/state/opencode \
+    /home/vscode/.config/nanocoder \
+    /home/vscode/.local/share/nanocoder \
+    /home/vscode/.copilot \
+    /home/vscode/.config/gh \
+    /home/vscode/.mcp-auth \
+    && chown -R vscode:vscode /home/vscode/.codex /home/vscode/.claude /home/vscode/.claude-zai /home/vscode/.claude-openrouter /home/vscode/.config/opencode /home/vscode/.local/share/opencode /home/vscode/.local/state/opencode /home/vscode/.config/nanocoder /home/vscode/.local/share/nanocoder /home/vscode/.copilot /home/vscode/.config/gh /home/vscode/.mcp-auth \
+    && chmod 0700 /home/vscode/.codex /home/vscode/.claude /home/vscode/.claude-zai /home/vscode/.claude-openrouter /home/vscode/.config/opencode /home/vscode/.local/share/opencode /home/vscode/.local/state/opencode /home/vscode/.config/nanocoder /home/vscode/.local/share/nanocoder /home/vscode/.copilot /home/vscode/.config/gh /home/vscode/.mcp-auth
+
 RUN mkdir -p /home/vscode/.npm \
     && mkdir -p /home/vscode/.nuget/packages \
     && mkdir -p /home/vscode/.cache/pip \

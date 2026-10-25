@@ -457,7 +457,7 @@ chmod +x "$sync_fixture/node"
 for failing_command in none configure-shared configure; do
     calls_file="$sync_fixture/calls-$failing_command"
     sync_status=0
-    sync_output="$(PATH="$sync_fixture:$PATH" MCP_SYNC_TEST_CALLS="$calls_file" \
+    sync_output="$(HOME="$sync_fixture/home" PATH="$sync_fixture:$PATH" MCP_SYNC_TEST_CALLS="$calls_file" \
         MCP_SYNC_TEST_FAILURE="$failing_command" bash "$MCP_SYNC" 2>&1)" || sync_status=$?
     calls="$(cat "$calls_file")"
     if [[ "$sync_status" -eq 0 && "$calls" == $'configure-shared\nconfigure' ]] \

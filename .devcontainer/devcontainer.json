@@ -39,6 +39,9 @@
   "containerEnv": {
     "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
     "DOTNET_NOLOGO": "1",
+    "CODEX_HOME": "/home/vscode/.codex",
+    "CLAUDE_CONFIG_DIR": "/home/vscode/.claude",
+    "COPILOT_HOME": "/home/vscode/.copilot",
     // Unity Docker image settings (override via Codespaces secrets or .env)
     // UNITY_VERSION: Unity Editor version for Docker image (e.g., "2021.3.45f1")
     // UNITY_IMAGE_VERSION: GameCI image version tag (e.g., "3")
@@ -61,10 +64,9 @@
     "GH_TOKEN": "${localEnv:GH_TOKEN}",
     "GITHUB_PERSONAL_ACCESS_TOKEN": "${localEnv:GITHUB_PERSONAL_ACCESS_TOKEN}",
     "Z_AI_API_KEY": "${localEnv:Z_AI_API_KEY}",
-    // Point the Copilot CLI and nanocoder at their workspace-local MCP configs (written by
-    // `npm run mcp:configure-shared`). remoteEnv applies to VS Code terminals and tasks; sessions
-    // started via raw `docker exec` must export these themselves.
-    "COPILOT_HOME": "${containerWorkspaceFolder}/.copilot",
+    // Personal Copilot state lives in a volume; lifecycle setup links its MCP file to the
+    // workspace-generated config. Nanocoder reads its generated MCP file directly.
+    "COPILOT_HOME": "/home/vscode/.copilot",
     "NANOCODER_MCPSERVERS_FILE": "${containerWorkspaceFolder}/.nanocoder/mcp.json",
     // Credentials resolve from a 0600 cache; an EMPTY cache used to fall through to the editor's
     // askpass, which raises a dialog on the owner's desktop that no credential helper can suppress
@@ -486,6 +488,18 @@
   },
   // Mount settings
   "mounts": [
+    "source=unity-helpers-${devcontainerId}-codex,target=/home/vscode/.codex,type=volume",
+    "source=unity-helpers-${devcontainerId}-claude,target=/home/vscode/.claude,type=volume",
+    "source=unity-helpers-${devcontainerId}-claude-zai,target=/home/vscode/.claude-zai,type=volume",
+    "source=unity-helpers-${devcontainerId}-claude-openrouter,target=/home/vscode/.claude-openrouter,type=volume",
+    "source=unity-helpers-${devcontainerId}-config-opencode,target=/home/vscode/.config/opencode,type=volume",
+    "source=unity-helpers-${devcontainerId}-local-share-opencode,target=/home/vscode/.local/share/opencode,type=volume",
+    "source=unity-helpers-${devcontainerId}-local-state-opencode,target=/home/vscode/.local/state/opencode,type=volume",
+    "source=unity-helpers-${devcontainerId}-config-nanocoder,target=/home/vscode/.config/nanocoder,type=volume",
+    "source=unity-helpers-${devcontainerId}-local-share-nanocoder,target=/home/vscode/.local/share/nanocoder,type=volume",
+    "source=unity-helpers-${devcontainerId}-copilot,target=/home/vscode/.copilot,type=volume",
+    "source=unity-helpers-${devcontainerId}-config-gh,target=/home/vscode/.config/gh,type=volume",
+    "source=unity-helpers-${devcontainerId}-mcp-auth,target=/home/vscode/.mcp-auth,type=volume",
     "source=${localWorkspaceFolder}/.git,target=${containerWorkspaceFolder}/.git,type=bind,consistency=cached",
     "source=unity-helpers-npm-cache,target=/home/vscode/.npm,type=volume",
     "source=unity-helpers-pip-cache,target=/home/vscode/.cache/pip,type=volume",

@@ -42,6 +42,18 @@ log_warn() {
 log_step "Verifying volume mount ownership"
 
 USER_OWNED_DIRS=(
+    "${HOME}/.codex"
+    "${HOME}/.claude"
+    "${HOME}/.claude-zai"
+    "${HOME}/.claude-openrouter"
+    "${HOME}/.config/opencode"
+    "${HOME}/.local/share/opencode"
+    "${HOME}/.local/state/opencode"
+    "${HOME}/.config/nanocoder"
+    "${HOME}/.local/share/nanocoder"
+    "${HOME}/.copilot"
+    "${HOME}/.config/gh"
+    "${HOME}/.mcp-auth"
     "${HOME}/.npm"
     "${HOME}/.local"
     "${HOME}/.nuget/packages"
@@ -51,7 +63,7 @@ USER_OWNED_DIRS=(
 )
 
 for dir in "${USER_OWNED_DIRS[@]}"; do
-    if [ -d "$dir" ] && [ ! -w "$dir" ]; then
+    if [ -d "$dir" ] && { [ ! -w "$dir" ] || [ "$(stat -c %u "$dir")" != "$(id -u)" ] || [ -n "$(find "$dir" -xdev ! -uid "$(id -u)" -print -quit)" ]; }; then
         if sudo chown -R "$(id -u):$(id -g)" "$dir" 2>/dev/null; then
             log_ok "Repaired ownership: $dir"
         else
@@ -60,6 +72,7 @@ for dir in "${USER_OWNED_DIRS[@]}"; do
     fi
 done
 log_ok "Volume mount ownership verified"
+python3 "$SCRIPT_DIR/agent-state.py" prepare
 
 load_failure_state() {
     failure_count=0

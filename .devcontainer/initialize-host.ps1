@@ -18,13 +18,15 @@
 #     removed.
 #
 #     This script removes containers labeled for this workspace that are
-#     (a) not running, or (b) running but unable to execute a trivial exec
-#     probe. Dev Containers then recreates the container from the cached
-#     image, which is exactly the recoverable path.
+#     (a) dead, or (b) running with a confirmed namespace/init-process
+#     failure. Normal stopped containers and uncertain probe failures are kept.
+#     Dev Containers recreates only the confirmed broken containers.
 #
 #     Best-effort by design: every failure path exits 0 so a missing or
 #     unresponsive docker CLI can never block opening the workspace.
 # #>
+
+param([ValidateRange(1, 120)][int]$ExecProbeTimeoutSeconds = 20)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -32,7 +34,6 @@ $ErrorActionPreference = 'Stop'
 # $PSScriptRoot is the .devcontainer directory; the workspace folder is its parent, which is the
 # exact value Dev Containers stores in each container's devcontainer.local_folder label.
 $workspaceFolder = Split-Path -Parent $PSScriptRoot
-$execProbeTimeoutSeconds = 20
 
 function Write-Info {
     param([string]$Message)
@@ -44,23 +45,42 @@ function Invoke-Docker {
     & docker @DockerArgs 2>$null
 }
 
-# A trivial exec into the container. A healthy running container answers
-# instantly; a zombie fails with an OCI setns/runc error from the daemon.
-# The probe is bounded so a hung docker CLI cannot stall workspace open.
-function Test-ContainerUsable {
+# Only explicit namespace/init failures justify replacing a running container.
+function Test-ContainerZombie {
     param([string]$ContainerId)
+    $probe = [System.Diagnostics.Process]::new()
     try {
-        $probe = Start-Process -FilePath 'docker' `
-            -ArgumentList @('exec', $ContainerId, '/bin/sh', '-c', 'exit 0') `
-            -NoNewWindow -PassThru
-        if (-not $probe.WaitForExit($execProbeTimeoutSeconds * 1000)) {
-            if (-not $probe.HasExited) { $probe.Kill() }
+        $probe.StartInfo.FileName = 'docker'
+        $probe.StartInfo.UseShellExecute = $false
+        $probe.StartInfo.RedirectStandardError = $true
+        $probe.StartInfo.RedirectStandardOutput = $true
+        foreach ($argument in @('exec', $ContainerId, '/bin/sh', '-c', 'exit 0')) {
+            $probe.StartInfo.ArgumentList.Add($argument)
+        }
+        $null = $probe.Start()
+        $stderr = $probe.StandardError.ReadToEndAsync()
+        $stdout = $probe.StandardOutput.ReadToEndAsync()
+        if (-not $probe.WaitForExit($ExecProbeTimeoutSeconds * 1000)) {
+            $probe.Kill($true)
+            $probe.WaitForExit()
+            Write-Info "Container $ContainerId probe timed out; keeping it."
             return $false
         }
-        return $probe.ExitCode -eq 0
+        $errorText = $stderr.GetAwaiter().GetResult()
+        $null = $stdout.GetAwaiter().GetResult()
+        if ($probe.ExitCode -eq 0) { return $false }
+        if ($errorText -match 'failed to open /proc/[0-9]+/ns/[a-z]+[^\r\n]*no such file or directory') {
+            return $true
+        }
+        Write-Info "Container $ContainerId probe failed without confirmed namespace corruption; keeping it."
+        return $false
     }
     catch {
+        Write-Info "Container $ContainerId probe unavailable; keeping it."
         return $false
+    }
+    finally {
+        $probe.Dispose()
     }
 }
 
@@ -105,18 +125,16 @@ try {
         $remove = $false
         $reason = ''
 
-        if ($status -ne 'running') {
+        if ($status -eq 'dead') {
             $remove = $true
             $reason = "status is '$status'"
         }
+        elseif ($status -eq 'running' -and (Test-ContainerZombie -ContainerId $containerId)) {
+            $remove = $true
+            $reason = 'confirmed namespace/init-process failure'
+        }
         else {
-            if (Test-ContainerUsable -ContainerId $containerId) {
-                Write-Info "Container $containerId is running and healthy; keeping it."
-            }
-            else {
-                $remove = $true
-                $reason = 'running but failed the exec health probe (zombie container)'
-            }
+            Write-Info "Container $containerId is '$status'; keeping it."
         }
 
         if ($remove) {
