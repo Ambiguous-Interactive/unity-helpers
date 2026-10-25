@@ -154,75 +154,121 @@ def backup(home, workspace, archive):
     print(f"Backup saved: {archive} ({len(files)} verified files; archive mode 0600)")
 
 
-def restore(home, archive, automatic=False):
+def stage_restore(home, archive, staging, automatic):
     expected = archive.with_suffix(archive.suffix + ".sha256").read_text().strip()
     marker = home / ".codex" / MARKER
     if automatic and marker.is_file() and marker.read_text().strip() == expected:
-        return
+        return None
     actual = digest(archive)
     if actual != expected:
         raise ValueError("Backup checksum mismatch; nothing restored")
+    with tarfile.open(archive, "r:gz") as bundle:
+        for member in bundle.getmembers():
+            path = PurePosixPath(member.name)
+            if path.is_absolute() or ".." in path.parts:
+                raise ValueError("Unsafe archive path; nothing restored")
+            if member.name != MANIFEST and not any(
+                member.name == root or member.name.startswith(root + "/")
+                for root in DIRECTORIES
+            ):
+                raise ValueError("Unexpected archive entry; nothing restored")
+        for member in bundle.getmembers():
+            destination = staging / member.name
+            if member.isdir():
+                destination.mkdir(mode=0o700, parents=True, exist_ok=True)
+            elif member.isfile():
+                destination.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+                with (
+                    bundle.extractfile(member) as source,
+                    destination.open("xb") as target,
+                ):
+                    shutil.copyfileobj(source, target)
+                destination.chmod(member.mode & 0o700)
+            else:
+                raise ValueError("Unsupported archive entry type; nothing restored")
+    manifest = json.loads((staging / MANIFEST).read_text())
+    if not isinstance(manifest, dict) or manifest.get("version") != 1:
+        raise ValueError("Unsupported backup version; nothing restored")
+    if not isinstance(manifest.get("files"), dict) or not isinstance(
+        manifest.get("links", {}), dict
+    ):
+        raise ValueError("Invalid backup manifest; nothing restored")
+    staged_files = {
+        path.relative_to(staging).as_posix()
+        for path in staging.rglob("*")
+        if path.is_file() and path != staging / MANIFEST
+    }
+    if set(manifest["files"]) != staged_files:
+        raise ValueError("Backup file inventory mismatch; nothing restored")
+    for relative, expected_hash in manifest["files"].items():
+        path = staging / relative
+        if (
+            not path.resolve().is_relative_to(staging)
+            or not path.is_file()
+            or path.is_symlink()
+            or digest(path) != expected_hash
+        ):
+            raise ValueError("Backup file verification failed; nothing restored")
+    for relative, link in manifest.get("links", {}).items():
+        if (
+            not isinstance(relative, str)
+            or not isinstance(link, str)
+            or not link
+            or "\0" in link
+        ):
+            raise ValueError("Invalid backup link; nothing restored")
+        path = PurePosixPath(relative)
+        if (
+            path.is_absolute()
+            or ".." in path.parts
+            or not any(relative.startswith(root + "/") for root in DIRECTORIES)
+        ):
+            raise ValueError("Unsafe link path; nothing restored")
+        if (staging / relative).exists() or any(
+            str(parent) in manifest.get("links", {}) for parent in path.parents
+        ):
+            raise ValueError("Conflicting link paths; nothing restored")
+    for relative in DIRECTORIES:
+        target = home / relative
+        if not target.resolve().is_relative_to(home):
+            raise ValueError("Restore destination escapes home; nothing restored")
+        includes_links = any(
+            link.startswith(relative + "/") for link in manifest.get("links", {})
+        )
+        if ((staging / relative).exists() or includes_links) and (
+            target.is_symlink()
+            or (target.exists() and (not target.is_dir() or any(target.iterdir())))
+        ):
+            raise ValueError(
+                f"Restore destination is not empty: {target}; nothing restored"
+            )
+    return manifest, actual
+
+
+def restore(home, archive, automatic=False):
     with tempfile.TemporaryDirectory(prefix="agent-restore-") as directory:
         staging = Path(directory)
-        with tarfile.open(archive, "r:gz") as bundle:
-            for member in bundle.getmembers():
-                path = PurePosixPath(member.name)
-                if path.is_absolute() or ".." in path.parts:
-                    raise ValueError("Unsafe archive path; nothing restored")
-                if member.name != MANIFEST and not any(
-                    member.name == root or member.name.startswith(root + "/")
-                    for root in DIRECTORIES
-                ):
-                    raise ValueError("Unexpected archive entry; nothing restored")
-            for member in bundle.getmembers():
-                destination = staging / member.name
-                if member.isdir():
-                    destination.mkdir(mode=0o700, parents=True, exist_ok=True)
-                elif member.isfile():
-                    destination.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-                    with (
-                        bundle.extractfile(member) as source,
-                        destination.open("xb") as target,
-                    ):
-                        shutil.copyfileobj(source, target)
-                    destination.chmod(member.mode & 0o700)
-                else:
-                    raise ValueError("Unsupported archive entry type; nothing restored")
-        manifest = json.loads((staging / MANIFEST).read_text())
-        if manifest.get("version") != 1:
-            raise ValueError("Unsupported backup version; nothing restored")
-        for relative, expected_hash in manifest["files"].items():
-            path = staging / relative
-            if (
-                not path.resolve().is_relative_to(staging)
-                or not path.is_file()
-                or path.is_symlink()
-                or digest(path) != expected_hash
-            ):
-                raise ValueError("Backup file verification failed; nothing restored")
-        for relative in manifest.get("links", {}):
-            path = PurePosixPath(relative)
-            if (
-                path.is_absolute()
-                or ".." in path.parts
-                or not any(relative.startswith(root + "/") for root in DIRECTORIES)
-            ):
-                raise ValueError("Unsafe link path; nothing restored")
-            if (staging / relative).exists() or any(
-                str(parent) in manifest.get("links", {}) for parent in path.parents
-            ):
-                raise ValueError("Conflicting link paths; nothing restored")
-        for relative in DIRECTORIES:
-            target = home / relative
-            if not target.resolve().is_relative_to(home):
-                raise ValueError("Restore destination escapes home; nothing restored")
-            if (staging / relative).exists() and (
-                target.is_symlink()
-                or (target.exists() and (not target.is_dir() or any(target.iterdir())))
-            ):
-                raise ValueError(
-                    f"Restore destination is not empty: {target}; nothing restored"
-                )
+        try:
+            staged = stage_restore(home, archive, staging, automatic)
+        except (
+            OSError,
+            ValueError,
+            KeyError,
+            TypeError,
+            tarfile.TarError,
+            sqlite3.Error,
+        ) as error:
+            if not automatic:
+                raise
+            print(
+                f"WARNING: Automatic agent state restore skipped: {error}. "
+                "Backup retained; continuing setup. Use explicit restore after resolving the reported issue."
+            )
+            return
+        if staged is None:
+            return
+        manifest, actual = staged
+        marker = home / ".codex" / MARKER
         for relative in DIRECTORIES:
             source = staging / relative
             if source.exists():

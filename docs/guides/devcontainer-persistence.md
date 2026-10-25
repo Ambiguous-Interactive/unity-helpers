@@ -26,6 +26,12 @@ before installing or configuring tools. It checks archive and file checksums and
 into populated destination directories. A marker in the Codex volume prevents the same migration
 from overwriting later changes on subsequent starts. The archive remains available after migration.
 
+If automatic validation finds a missing checksum, damaged archive, invalid manifest, or populated
+destination, setup reports a warning and continues without restoring files or marking the migration
+as applied. The archive and existing state are retained. Resolve the warning before expecting old
+sessions to appear. Explicit restore commands still fail on invalid input; errors while writing a
+validated restore also stop setup.
+
 After rebuilding, verify `codex login status` and resume a previous conversation. Also check the
 other agents you use. Host-injected API keys still need to exist on the host or in your normal secret
 source. Expired or revoked credentials may require signing in again.

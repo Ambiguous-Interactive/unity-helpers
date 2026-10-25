@@ -2,7 +2,9 @@
 """Regression tests for persistent agent state and conservative container recovery."""
 
 import hashlib
+import importlib.util
 import io
+import json
 import os
 import shutil
 import sqlite3
@@ -10,6 +12,7 @@ import subprocess
 import tarfile
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -261,6 +264,112 @@ class StateTests(unittest.TestCase):
         self.run_state("prepare", destination)
         self.assertEqual(changed.read_text(), "new refreshed token")
         self.assertTrue(self.archive.exists())
+
+    def test_prepare_keeps_populated_volumes_when_archive_was_not_applied(self):
+        self.populate()
+        self.run_state("backup")
+        destination = self.root / "restored"
+        current = destination / ".codex/auth.json"
+        current.parent.mkdir(parents=True)
+        current.write_text("keep refreshed credential")
+        original = self.archive.read_bytes()
+
+        result = self.run_state("prepare", destination)
+
+        self.assertIn("WARNING", result.stdout)
+        self.assertEqual(current.read_text(), "keep refreshed credential")
+        self.assertFalse((destination / ".codex/.devcontainer-restored-sha256").exists())
+        self.assertEqual(self.archive.read_bytes(), original)
+        self.run_state("restore", destination, success=False)
+
+    def test_prepare_continues_when_archive_checksum_is_missing(self):
+        self.populate()
+        self.run_state("backup")
+        self.archive.with_suffix(".gz.sha256").unlink()
+        destination = self.root / "restored"
+        original = self.archive.read_bytes()
+
+        result = self.run_state("prepare", destination)
+
+        self.assertIn("WARNING", result.stdout)
+        self.assertFalse((destination / ".codex/auth.json").exists())
+        self.assertTrue((destination / ".codex/config.toml").is_file())
+        self.assertEqual(self.archive.read_bytes(), original)
+        self.run_state("restore", destination, success=False)
+
+    def test_prepare_continues_when_archive_checksum_does_not_match(self):
+        self.populate()
+        self.run_state("backup")
+        with self.archive.open("ab") as stream:
+            stream.write(b"corrupt")
+        destination = self.root / "restored"
+        original = self.archive.read_bytes()
+
+        result = self.run_state("prepare", destination)
+
+        self.assertIn("WARNING", result.stdout)
+        self.assertFalse((destination / ".codex/auth.json").exists())
+        self.assertTrue((destination / ".codex/config.toml").is_file())
+        self.assertEqual(self.archive.read_bytes(), original)
+        self.run_state("restore", destination, success=False)
+
+    def test_prepare_does_not_hide_restore_write_failures(self):
+        self.populate()
+        self.run_state("backup")
+        spec = importlib.util.spec_from_file_location(
+            "agent_state", ROOT / ".devcontainer/agent-state.py"
+        )
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        destination = self.root / "restored"
+        failure = OSError("synthetic restore write failure")
+
+        with mock.patch.object(module.shutil, "copytree", side_effect=failure):
+            with self.assertRaises(OSError) as raised:
+                module.prepare(destination, self.workspace)
+
+        self.assertIs(raised.exception, failure)
+        self.assertFalse((destination / ".codex/.devcontainer-restored-sha256").exists())
+        self.assertTrue(self.archive.exists())
+
+    def test_prepare_rejects_invalid_manifests_before_restoring_files(self):
+        self.populate()
+        self.run_state("backup")
+        original = self.archive.read_bytes()
+        for mode in ("unlisted", "manifest", "link"):
+            with self.subTest(mode=mode):
+                with tarfile.open(fileobj=io.BytesIO(original), mode="r:gz") as bundle:
+                    entries = [
+                        (member, bundle.extractfile(member).read() if member.isfile() else None)
+                        for member in bundle.getmembers()
+                    ]
+                with tarfile.open(self.archive, "w:gz") as bundle:
+                    for member, payload in entries:
+                        if member.name == "agent-state-manifest.json":
+                            manifest = json.loads(payload)
+                            if mode == "manifest":
+                                manifest = []
+                            elif mode == "link":
+                                manifest["links"][".codex/broken-link"] = 42
+                            payload = json.dumps(manifest).encode()
+                            member.size = len(payload)
+                        bundle.addfile(member, io.BytesIO(payload) if payload is not None else None)
+                    if mode == "unlisted":
+                        member = tarfile.TarInfo(".codex/unverified")
+                        member.size = 4
+                        bundle.addfile(member, io.BytesIO(b"nope"))
+                self.archive.with_suffix(".gz.sha256").write_text(
+                    hashlib.sha256(self.archive.read_bytes()).hexdigest()
+                )
+                destination = self.root / ("restored-" + mode)
+
+                result = self.run_state("prepare", destination)
+
+                self.assertIn("WARNING", result.stdout)
+                self.assertFalse((destination / ".codex/auth.json").exists())
+                self.assertFalse((destination / ".codex/unverified").exists())
+                self.assertFalse((destination / ".codex/.devcontainer-restored-sha256").exists())
+                self.run_state("restore", destination, success=False)
 
     def test_prepare_preserves_user_settings_and_links_generated_mcp(self):
         config = self.home / ".codex/config.toml"
