@@ -1,36 +1,36 @@
 # Bundled .NET assemblies
 
 The BCL and Immutable DLLs are the exact `lib/netstandard2.0` assets from official
-NuGet 10.0.13 packages, source commit `4099f83977f4d29604a9aeb971fb0a7bc1d5f699`.
+NuGet 10.0.14 packages, source commit `0427b9abbead3fa64c6655eb4290c537397131fa`.
 Unsafe remains at 6.1.2. Existing plugin importers and GUIDs are preserved.
 The four BCL XML files retain the official package content with byte order marks and trailing whitespace removed.
 
 | DLL                                        | Package version | DLL SHA256                                                         |
 | ------------------------------------------ | --------------- | ------------------------------------------------------------------ |
-| Microsoft.Bcl.AsyncInterfaces.dll          | 10.0.13         | `de8463922b609ff1f5d90a7e78040599c95932e688716c31e981bc160a2f2ee8` |
-| System.IO.Pipelines.dll                    | 10.0.13         | `0c97048fdedc4ccb6f0f41f2545efe307a24cff47324c15fd279a77fe5c2690e` |
-| System.Text.Encodings.Web.dll              | 10.0.13         | `7004c5ce76750196f4024c5bd88935c5d71decedc3eaac9f0a494b39ca6be3a7` |
-| System.Text.Json.dll                       | 10.0.13         | `d6ece4fedda76a70760cc62c57350e32657fe15a2642792a494a5a05e55268cf` |
-| System.Collections.Immutable.dll           | 10.0.13         | `499172bf4ea27ad9928c2df9fddb44b489fb06cbbe80cd3b141192cac6507bfe` |
+| Microsoft.Bcl.AsyncInterfaces.dll          | 10.0.14         | `71ebd816fc62255b8097a6aa813d73299928b64a3bb6cb0a667c1ce53c2b44f3` |
+| System.IO.Pipelines.dll                    | 10.0.14         | `9f5514995fc52aad781a2f7fc8ef999ecc78e8ccacaa15a6491d550de7f55bcf` |
+| System.Text.Encodings.Web.dll              | 10.0.14         | `6630388e3573f1d6500891723b30f21d8545e14370707b4d4328e6f61aaca233` |
+| System.Text.Json.dll                       | 10.0.14         | `136262fc12b3473cf408a4f5a3e604c73019b8baa0d3593205a87df67c7c4228` |
+| System.Collections.Immutable.dll           | 10.0.14         | `08b4fe148bbb6998b8be8cf7db85d2c1265b4e5be302515aa7cdd7085e90d4ff` |
 | System.Runtime.CompilerServices.Unsafe.dll | 6.1.2           | `fd67abc4c4af10affbcd42fd68a2a7bc361b26714afe6965d4d0d139459d8297` |
 
 ## Package provenance
 
 | NuGet package                                                                                                               | Package SHA256                                                     |
 | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| [microsoft.bcl.asyncinterfaces 10.0.13](https://www.nuget.org/packages/microsoft.bcl.asyncinterfaces/10.0.13)               | `6b5580a4250caa42abe7c6938444283d04ea28fe956634648efafc291a935a78` |
-| [system.io.pipelines 10.0.13](https://www.nuget.org/packages/system.io.pipelines/10.0.13)                                   | `5cab29bacbeee21ff054dcca2f40a20530752671aa96dd8514bb695773317220` |
-| [system.text.encodings.web 10.0.13](https://www.nuget.org/packages/system.text.encodings.web/10.0.13)                       | `6ea32156a8c5bd877a6cf109cc5c3482f98df4a0715d4f8dcdb3a50ba1a9a137` |
-| [system.text.json 10.0.13](https://www.nuget.org/packages/system.text.json/10.0.13)                                         | `c36743c19c6e9d3e1f9ea8b38f724487b9fb8a959be53c621c9cc8ae93ba0b93` |
-| [system.collections.immutable 10.0.13](https://www.nuget.org/packages/system.collections.immutable/10.0.13)                 | `74c7c3ab2dcce3385482c7504bacfb0ba051aefaae0be7e09c1297b894f80616` |
+| [microsoft.bcl.asyncinterfaces 10.0.14](https://www.nuget.org/packages/microsoft.bcl.asyncinterfaces/10.0.14)               | `fb9352e6211df8509094861281e627547956e3a81fbba41b6af1d829bae5c80b` |
+| [system.io.pipelines 10.0.14](https://www.nuget.org/packages/system.io.pipelines/10.0.14)                                   | `cc153aae0db94e775e985f907c2bed88bad3d3e8c1660597412ca37905560037` |
+| [system.text.encodings.web 10.0.14](https://www.nuget.org/packages/system.text.encodings.web/10.0.14)                       | `3db3934f595c30618e751c003852dc9b6406781653f9a1936c8df0203e379261` |
+| [system.text.json 10.0.14](https://www.nuget.org/packages/system.text.json/10.0.14)                                         | `efb4116efc788602d167da9bc086c65d97cb32fd4624110eb00e3ff88e57c8c8` |
+| [system.collections.immutable 10.0.14](https://www.nuget.org/packages/system.collections.immutable/10.0.14)                 | `ae295dafa95728eca04110ed7d43ed939ae47693bd09aa85a3671b5eab499207` |
 | [system.runtime.compilerservices.unsafe 6.1.2](https://www.nuget.org/packages/system.runtime.compilerservices.unsafe/6.1.2) | `5f6a7f53af3465f92beb6da873ebe0e496206c313313b98badee4355a6b25937` |
 
 Download packages from NuGet's v3 flat container, verify their package hashes, then
 extract only the named .NET Standard 2.0 members. Keep the matching XML files and
 preserve existing importers. Do not copy another Unsafe DLL into this directory.
 
-For System.Text.Json 10.0.13, the .NET Standard dependency group names companion
-BCL 10.0.13, Buffers 4.6.1, Memory 4.6.3, Unsafe 6.1.2 and Tasks.Extensions 4.6.3.
+For System.Text.Json 10.0.14, the .NET Standard dependency group names companion
+BCL 10.0.14, Buffers 4.6.1, Memory 4.6.3, Unsafe 6.1.2 and Tasks.Extensions 4.6.3.
 Unity supplies the framework assemblies; a NuGet version alone does not establish
 the actual loaded framework identity. Check the binder and supported editor/player
 profiles when refreshing these assets. See the

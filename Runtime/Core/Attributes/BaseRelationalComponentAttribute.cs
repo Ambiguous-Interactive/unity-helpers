@@ -188,28 +188,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                         continue;
                     }
 
-                    if (!cache.TryGetElementType(componentType, field.Name, out Type elementType))
-                    {
-                        continue;
-                    }
-
-                    FieldKind kind = GetFieldKind(field.FieldType, out Type actualElementType);
-
-                    Type resolvedElementType = ChooseElementType(
-                        elementType,
-                        actualElementType,
-                        field.FieldType
-                    );
-
-                    if (
-                        kind == FieldKind.HashSet
-                        && field.FieldType.IsGenericType
-                        && field.FieldType.GetGenericTypeDefinition() == typeof(HashSet<>)
-                        && resolvedElementType == field.FieldType
-                    )
-                    {
-                        resolvedElementType = field.FieldType.GenericTypeArguments[0];
-                    }
+                    FieldKind kind = GetFieldKind(field.FieldType, out Type resolvedElementType);
 
                     Func<int, Array> arrayCreator = null;
                     Func<int, IList> listCreator = null;
@@ -709,33 +688,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 AttributeMetadataCache.FieldKind.HashSet => FieldKind.HashSet,
                 _ => FieldKind.Single,
             };
-        }
-
-        /// <summary>
-        /// Picks between the element type the cache recorded and the one this field's own type
-        /// gives, preferring the cache except where it cannot be describing this field.
-        /// </summary>
-        /// <remarks>
-        /// The cache is keyed by component type and field name, so two same-named fields of
-        /// different types share one slot and the later write wins. A recorded type unrelated to
-        /// the live field's is therefore the other field's, and following it would search for the
-        /// wrong component type.
-        /// </remarks>
-        private static Type ChooseElementType(Type cached, Type live, Type fieldType)
-        {
-            if (cached == null)
-            {
-                return live ?? fieldType;
-            }
-
-            if (live == null)
-            {
-                return cached;
-            }
-
-            bool related =
-                cached == live || cached.IsAssignableFrom(live) || live.IsAssignableFrom(cached);
-            return related ? cached : live;
         }
 
         private static FieldKind GetFieldKind(Type fieldType, out Type elementType)

@@ -27,7 +27,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: "8.0.427"
 
       - name: Restore .NET tools
         run: dotnet tool restore
@@ -64,7 +64,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: "8.0.427"
 
       # The version is read from the tool manifest rather than restated here: a restated pin drifts
       # from .config/dotnet-tools.json silently, and the bot would then format a fork PR with one

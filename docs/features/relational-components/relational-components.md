@@ -160,6 +160,14 @@ public sealed class Enemy : Actor { }
 Where a subclass hides a base field's name with `new`, only the most derived declaration is
 assigned, matching C# name hiding.
 
+Private fields with the same name on different classes remain independent. Each uses its own
+attribute, declared component type, and collection element type. For example, a private
+`Collider` field on a base class can bind a `SphereCollider` while a same-named private
+`BoxCollider` field on its subclass binds a different component. This also applies to arrays,
+`List<T>`, and `HashSet<T>` for sibling, parent, and child searches. A name collision or an
+unresolved element type in the generated metadata cache does not replace either declaration's
+live type.
+
 ### Visual Search Patterns
 
 ```text

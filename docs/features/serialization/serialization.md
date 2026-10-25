@@ -3096,6 +3096,12 @@ written a tag, reserved prefix or partial payload; discard that output after fai
 
 ### Wire compatibility
 
+The frozen protobuf-net v2 oracle has reader defects even when its writer matches generated
+bytes. Its compiled nullable-byte-enum reader loses present-zero values. In the .NET host
+controls, it preserves a nonzero value in Debug and loses it in Release; its interpreted
+reader preserves all three values (null, present zero, and nonzero). These are distinct
+backend observations, not a guarantee that v2 can read every generated map correctly.
+
 Protobuf has [no canonical byte representation](https://protobuf.dev/programming-guides/serialization-not-canonical/).
 Two payloads can decode to the same values without having identical bytes. Decide whether
 your game needs value compatibility, byte identity, or both before changing serializers.

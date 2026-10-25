@@ -46,9 +46,9 @@ test checks the source commit, SDK, target, applied patch hash, loaded assembly
 versions and DLL hashes against the build receipt. It runs the same differential
 and source-linked regression fixtures as v3. Build warnings remain visible.
 
-The candidate needs `System.Collections.Immutable` 10.0.13 and its dependencies.
+The candidate lane references `System.Collections.Immutable` 10.0.14 and its dependencies.
 Its host NuGet references apply only to the candidate lane. The Unity package uses
-the official Immutable 10.0.13 .NET Standard 2.0 asset with the existing importer.
+the official Immutable 10.0.14 .NET Standard 2.0 asset with the existing importer.
 Assembly ownership, retained consumer migration, supported Unity versions, stripped
 IL2CPP and native process health require their own qualification.
 The receipt records `nativeQualificationComplete: false`; host tests cannot change

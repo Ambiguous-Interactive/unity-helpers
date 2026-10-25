@@ -279,7 +279,17 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.IsTrue(legacyRead.Enums.TryGetValue(2, out ZeroMapKeyKind? zero));
             Assert.IsFalse(zero.HasValue);
             Assert.IsTrue(legacyRead.Enums.TryGetValue(3, out ZeroMapKeyKind? nonzero));
+#if DEBUG
+            Assert.AreEqual(ZeroMapKeyKind.Other, nonzero);
+#else
             Assert.AreEqual(default(ZeroMapKeyKind), nonzero);
+#endif
+            ProtoBuf.Meta.RuntimeTypeModel interpreted = ProtoBuf.Meta.RuntimeTypeModel.Create();
+            interpreted.AutoCompile = false;
+            using MemoryStream stream = new MemoryStream(oracle);
+            NullableMapContract interpretedRead = (NullableMapContract)
+                interpreted.Deserialize(stream, null, typeof(NullableMapContract));
+            AssertMaps(original, interpretedRead);
         }
 #endif
 
