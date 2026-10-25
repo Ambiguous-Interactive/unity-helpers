@@ -126,7 +126,7 @@ unconditionally.
 `System.Runtime.CompilerServices.Unsafe` is used across the runtime (`EnumExtensions`,
 `ReflectionHelpers`, `Objects`, `AbstractRandom`, `RuntimeSingleton`). The package already
 contains an overridable Unsafe **6.1.2** assembly under `Runtime/Protobuf-Net/`, alongside
-Immutable **10.0.13**. The Unsafe importer disables the Editor platform; the Immutable importer
+Immutable **10.0.14**. The Unsafe importer disables the Editor platform; the Immutable importer
 enables it. Check the actual winning assembly path and references in the consuming editor.
 Importer settings alone do not identify an assembly already loaded into a running domain.
 
@@ -140,14 +140,14 @@ and the relevant plugin/asmdef settings. Do not include credentials or unrelated
 
 ## Bundled dependency versions
 
-The four BCL assemblies under `Runtime/Binaries/` use official NuGet **10.0.13**
+The four BCL assemblies under `Runtime/Binaries/` use official NuGet **10.0.14**
 .NET Standard 2.0 assets. Their package source commit is
-`4099f83977f4d29604a9aeb971fb0a7bc1d5f699`. DLL/XML provenance is recorded in the
+`0427b9abbead3fa64c6655eb4290c537397131fa`. DLL/XML provenance is recorded in the
 [bundled BCL inventory](https://github.com/Ambiguous-Interactive/unity-helpers/blob/main/Runtime/Binaries/README.md).
 The existing Unity-version constraints and importer GUIDs remain unchanged.
 Newer Unity versions continue to use their own JSON, encodings and async-interface assemblies.
 
-Protobuf-net **3.4.40** uses the package's AOT patch, Immutable **10.0.13** and
+Protobuf-net **3.4.40** uses the package's AOT patch, Immutable **10.0.14** and
 Unsafe **6.1.2**. These versions identify the bundled files; they do not override Unity's assembly
 selection. On newer editors the selected JSON-related assemblies can come from Unity instead.
 

@@ -22,6 +22,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         ///
         /// Fields must be marked with <see cref="ParentComponentAttribute"/>, <see cref="SiblingComponentAttribute"/>, or
         /// <see cref="ChildComponentAttribute"/> for automatic assignment.
+        /// Each field uses its declared element type, including private base and derived fields sharing a name.
         ///
         /// Call from <c>Awake()</c> or <c>OnEnable()</c> so dependent code has references ready.
         ///
@@ -29,7 +30,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         /// pre-initialize all relational component reflection caches using
         /// <see cref="RelationalComponentInitializer.Initialize(System.Collections.Generic.IEnumerable{System.Type}, bool)"/>.
         /// Consider calling it during a loading/bootstrap phase.
-        /// Null handling: If the component is null, this will cause a <see cref="System.NullReferenceException"/>.
+        /// Null handling: Null or destroyed components are ignored.
         /// Thread-safety: Not thread-safe; Unity component access must occur on the main thread.
         /// Performance: O(n*m) where n is the number of attributed fields and m is the search space for each component.
         /// </remarks>

@@ -3179,7 +3179,7 @@
         "NullableMapDifferentialTests.PresentDefaultMessageRetainsEmptyField",
         "NullableMapDifferentialTests.DuplicateNullableMessagesMergeWithinTheEntry"
       ],
-      "limitations": "Named oracle defect; neither silently weaken semantic assertion nor call it full backward-reader support.",
+      "limitations": "The compiled v2 reader loses present-zero enum presence; its nonzero byte-enum result differs between Debug and Release hosts. The interpreted enum reader preserves all values. Default-struct defects remain separate; this is not full backward-reader support.",
       "gapIds": [],
       "status": "supported-with-witness",
       "laneRequirements": [

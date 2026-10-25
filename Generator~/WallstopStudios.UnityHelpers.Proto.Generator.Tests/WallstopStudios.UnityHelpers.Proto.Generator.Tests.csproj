@@ -200,7 +200,7 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(ProtobufNetOracle)' == 'candidate'">
-    <PackageReference Include="System.Collections.Immutable" Version="10.0.13" />
+    <PackageReference Include="System.Collections.Immutable" Version="10.0.14" />
     <None
       Include="$(ProtobufNetCandidateRoot)/candidate-receipt.json"
       CopyToOutputDirectory="Always"

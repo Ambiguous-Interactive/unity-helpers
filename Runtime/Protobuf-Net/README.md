@@ -106,7 +106,7 @@ byte-compares both shipped DLLs and the patch against this recipe.
 | protobuf-net.dll      | `6f75170c678c32eb8dddde13ef697387205a4e6dd52bd0b3240fd5f1cd6de6d2` |
 | protobuf-net.Core.dll | `11a176b195d44b88ae13c3a0687d874eb8b937c88e2d1c6a2978c7f996ce8da4` |
 
-The runtime uses Immutable 10.0.13 and Unsafe 6.1.2 from the official .NET Standard
+The runtime uses Immutable 10.0.14 and Unsafe 6.1.2 from the official .NET Standard
 2.0 NuGet assets. Their existing importers retain assembly ownership rules.
 The [historical v3 oracle](../../Generator~/ProtobufNetV3Oracle/README.md) preserves
 the previous patched 3.2.56 DLLs and original patch. The v2 oracle is unchanged;

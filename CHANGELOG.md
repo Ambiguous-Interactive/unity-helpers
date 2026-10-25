@@ -51,10 +51,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Clarify reflection fallback and stripping limits, dictionary choices and AI-assisted package use; separate contributor setup from game setup ([#994](https://github.com/Ambiguous-Interactive/unity-helpers/issues/994)).
 - Replace internal reports with practical pooling, enumeration, random, JSON and editor guidance, including compiled examples and safe test-run recovery ([#994](https://github.com/Ambiguous-Interactive/unity-helpers/issues/994)).
 - Replace the protobuf survey with a save/load and migration guide, and make serialization choices, failure handling and player-data compatibility easier to find ([guide](./docs/features/serialization/wallstop-proto-public-survey.md), [#994](https://github.com/Ambiguous-Interactive/unity-helpers/issues/994)).
-- Update bundled JSON and immutable collections to 10.0.13 and patched protobuf-net to 3.4.40, retaining existing Unity assembly constraints ([#1052](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1052)).
+- Update bundled JSON and immutable collections to 10.0.14 and patched protobuf-net to 3.4.40, retaining existing Unity assembly constraints ([#1052](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1052)).
 
 ### Fixed
 
+- Fix relational bindings for same-named private base and derived fields so each keeps its declared component and collection element types ([#1074](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1074)).
 - Fix string-trie enumeration retaining copied prefixes across visited nodes. Preserve traversal order and make default or disposed trie enumerators safe to advance ([#817](https://github.com/Ambiguous-Interactive/unity-helpers/issues/817)).
 - Fix cyclic buffer membership after removal and draining, including `null` and default values ([#1069](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1069)).
 - Fix trie prefix searches on long keys without changing result order or limits ([#1070](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1070)).
