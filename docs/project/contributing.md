@@ -2,6 +2,19 @@
 
 Thanks for helping make Unity Helpers better! This project uses a few automated checks and formatters to keep the codebase consistent and easy to review.
 
+This guide is for changing Unity Helpers itself. To add the package to your game, use
+[Getting Started](../overview/getting-started.md). The tools and runner access below are for
+repository development.
+
+## Development and maintainer guides
+
+Choose the setup you need:
+
+- [Unity container licensing](../guides/unity-devcontainer-licensing.md) for local container tests.
+- [MCP local setup](../guides/mcp-local-setup.md) for repository coding-tool connections.
+- [AI model backends](../guides/ai-model-backends.md) for optional development launchers.
+- [MCP ecosystem notes](../guides/mcp-ecosystem.md) for the shared tool catalog's design.
+
 ## Dev Container Setup (Recommended)
 
 The easiest way to contribute is using the included dev container, which has all CI/CD tools pre-installed:
@@ -287,11 +300,35 @@ https://github.com/wallstop/unity-helpers.git#3.1.5
 Maintainers can dispatch **Unity Benchmarks** to validate the licensed benchmark lifecycle. The
 weekly hosted scheduler dispatches it on protected main. Both workflows must be enabled in the
 repository. Branch dispatches retain diagnostics without updating the canonical performance
-baseline. See the [runner runbook](../runbooks/unity-runners-after-transfer.md#licensed-benchmarks)
-for cleanup, cancellation, and reporting requirements.
+baseline.
 
 Maintainers prepare releases from the default branch with the **Release Prepare** workflow. Choose a `major`, `minor`, or `patch` bump, review the generated release PR, and squash-merge it with the default `release: X.Y.Z` title. **Auto publish** is enabled by default. After the merged commit passes Unity Tests, Local Gates, Repo Lint, and every other triggered push validation workflow, automation starts **Release Publish** with that exact commit. It validates and packs npm, creates the `.unitypackage` without opening Unity, creates the release tag when needed, and publishes npm and GitHub Release assets.
 
 Clear **Auto publish** during preparation to publish manually. In **Release Publish**, choose a branch, tag, or commit with **source_ref**; leave **version** blank to read it from that source's `package.json`. **Export only** validates and produces downloadable archives without changing tags or publishing. Automatic publication never moves an existing tag. A failed validation or prior publication attempt requires inspection and manual recovery; duplicate completion events do not dispatch the same release twice. Remove `<!-- unity-helpers:auto-publish -->` from an unmerged release PR to cancel its automatic publication.
 
 Before dispatch, automation atomically creates the internal `release-publish-claims/X.Y.Z` tag at the validated commit. This retained claim prevents duplicate dispatch even before GitHub lists the publication run. A lost response or interrupted publisher leaves the claim in place: inspect the publication history, then use **Release Publish** manually with the claimed source commit. Every main validation workflow uses a separate concurrency group for each pushed commit; newer pull-request revisions still cancel older pull-request runs. Documentation deployment, issue-template synchronization and devcontainer publication have separate recovery paths and do not validate release archives, so their pending or superseded runs do not block publication.
+
+## Rebuild bundled serialization dependencies
+
+These are maintainer steps for changing the shipped assemblies, not package-installation steps.
+The [assembly conflict guide](../guides/bundled-assembly-conflicts.md) explains consumer diagnosis.
+
+```bash
+python3 scripts/build-protobuf-candidate.py --output /tmp/protobuf-candidate
+python3 scripts/verify-protobuf-shipped.py --candidate-root /tmp/protobuf-candidate/assemblies
+```
+
+The builder requires SDK 9.0.319 and produces isolated binaries with a source-bound build receipt.
+The independent current lane uses `ProtobufNetOracle=candidate` and
+`ProtobufNetCandidateRoot=/tmp/protobuf-candidate/assemblies`. Frozen v2/v3 lanes retain their
+original DLLs under `Generator~`; dependency upgrades must not refresh those historical oracles.
+The retained Dox consumer suite exercises the frozen v3 and current builds.
+
+Keep the Unity-version constraints, importer GUIDs and assembly ownership policy when rebuilding.
+`scripts/lint-bundled-assemblies.ps1` checks the `Runtime/Binaries/` constraints and absence rules.
+It does not inventory the separate protobuf dependency directory. Preserve the documented source
+and binary hashes when updating provenance.
+
+A .NET Standard target and passing host tests do not establish Unity assembly ownership or backend
+health. The complete supported-version, stripped IL2CPP, WebGL and native process qualification
+remains tracked in [the dependency qualification issue](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1052).

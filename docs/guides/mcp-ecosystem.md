@@ -1,5 +1,10 @@
 # MCP Ecosystem Notes
 
+This page is for contributors working on Unity Helpers in its development container. It is not
+required to install or use the package in a game. For package setup, see
+[Getting Started](../overview/getting-started.md); for repository setup, see
+[Contributing](../project/contributing.md).
+
 How the repository's shared MCP catalog was chosen, which servers were deliberately left out, and
 the current best practices for keeping one catalog consistent across every agentic harness. The
 shared catalog is regenerated for all seven frontends by `scripts/mcp/unity-mcp.mjs` (see the

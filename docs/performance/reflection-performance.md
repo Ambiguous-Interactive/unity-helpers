@@ -1,8 +1,39 @@
 # Reflection Performance Benchmarks
 
-Unity Helpers replaces ad-hoc reflection with cached delegates that favour expression lambdas on IL2CPP-safe platforms and fall back to dynamic IL emit or plain reflection where available. These benchmarks compare raw `System.Reflection` against the helpers for common access patterns.
+Use this page to compare repeated member access after setup. For choosing an overload and handling
+stripped players, start with the [Reflection Helpers guide](../features/utilities/reflection-helpers.md).
 
-Each run updates the table for the current operating system only. Sections that still show `_No benchmark data generated yet._` simply have not been executed on that platform.
+## Read the results
+
+- **Boxed access** accepts or returns `object`. Value types may box; method calls may need argument arrays.
+- **Typed access** uses known receiver, parameter and return types. Direct delegates can avoid
+  those costs, but reflection fallback paths can still box or allocate.
+- **Speedup vs Reflection** compares the helper with the reflection operation in that row.
+  A ratio below `1x` means the helper was slower.
+- **Speedup vs Delegate** compares typed helpers with an ordinary delegate. It does not compare
+  with direct field access or prove a benefit for a complete game system.
+
+The historical Windows report below was generated on the displayed date. It does not record a
+Unity version, scripting backend, CPU identity, uncertainty interval or allocation result here.
+Treat its values as examples of how costs vary, not as current cross-platform guarantees.
+For example, the default boxed instance property getter reports `0.20x` reflection throughput;
+the default typed instance field getter reports `0.87x` ordinary delegate throughput.
+
+## Choose for your target
+
+Editor and Mono builds can use dynamic IL or compiled expressions. Member-specific strategy order
+varies, and unsupported paths fall back. IL2CPP and player WebGL disable runtime IL emission and
+expression compilation; compatible methods can still bind directly to delegates, while other
+operations use reflection wrappers. A heading such as “Reflection Fallback” does not imply that
+every typed method in that section uses `MethodInfo.Invoke`.
+
+Measure member discovery, delegate setup and warmed invocation separately. Then measure the whole
+consumer operation on your actual backend with your shipping stripping level. Preserve reflected
+members and verify lookup before interpreting timings. See
+[Reading Performance Measurements](./baseline-tests-performance.md) for comparison limits.
+
+Sections with `_No benchmark data generated yet._` provide no measurements for that operating
+system. An operating-system heading alone does not establish Mono or IL2CPP coverage.
 
 ## Windows
 

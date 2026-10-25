@@ -1,50 +1,44 @@
-# llms.txt - LLM-Friendly Documentation
+# Use Unity Helpers with an AI Assistant
 
-Unity Helpers includes an `llms.txt` file following the [llmstxt.org](https://llmstxt.org/) specification. This file provides structured, LLM-optimized documentation that enables AI assistants to quickly understand and work with the package.
+The repository's [llms.txt index](https://github.com/wallstop/unity-helpers/blob/main/llms.txt)
+provides a short feature overview and links to the public guides. Give it to an assistant when you
+want help using Unity Helpers in your game.
 
-## What is llms.txt?
+## Provide your project context
 
-The `llms.txt` specification defines a standard format for providing LLM-friendly content. Unlike full HTML documentation that may be too large for context windows, `llms.txt` offers:
+Include the package version, Unity version, scripting backend and the feature you need. State any
+constraints, such as preserving existing saves or avoiding allocations during a frame update.
 
-- A **concise overview** of the project and its key features
-- **Structured sections** with links to detailed documentation
-- **Machine-readable format** (Markdown) that LLMs can parse efficiently
-- **Curated content** focused on what's most useful for development tasks
+For example:
 
-## Location
+```text
+I use Unity Helpers 3.6.2 in Unity 2022.3 with an IL2CPP player.
+Help me choose a collection for a read-mostly entity lookup.
+Keys include every signed integer value, and callers require IDictionary<int, Health>.
+Use the public collection guide and explain unsupported keys and interfaces.
+```
 
-The file is located at the repository root: [`/llms.txt`](https://github.com/wallstop/unity-helpers/blob/main/llms.txt)
+Ask the assistant to open the linked feature page and check the actual overloads before generating
+code. The index is a starting point, not a complete API reference. Documentation on main can include
+unreleased features; use the release tag matching your installed package when that distinction matters.
 
-## Contents
+## Review the result
 
-The Unity Helpers `llms.txt` includes:
+- Compile the generated example in your Unity project, including its namespace and asmdef references.
+- Check null handling, failure results and ownership of any pooled data.
+- Exercise the shipping player backend and stripping level when reflection or generated code is involved.
+- Read performance results in their stated environment; an Editor measurement is not a device guarantee.
+- Keep retained-save compatibility checks when changing serialization code.
 
-1. **Package Overview** - Name, version, license, repository links
-2. **Implementation Notes** - Coding style requirements and conventions
-3. **Assembly Structure** - Runtime and Editor assembly organization
-4. **Core Features** - Inspector tooling, relational components, serialization, spatial trees, PRNGs, effects system, pooling, editor tools
-5. **Documentation Links** - Organized by category (Docs, Feature Guides, Performance, Project)
-6. **Optional Resources** - LLM instructions, third-party notices
+## Contributing to Unity Helpers itself
 
-## Usage
-
-AI assistants and LLM-powered tools can:
-
-1. **Fetch the file directly** from `https://raw.githubusercontent.com/wallstop/unity-helpers/main/llms.txt`
-2. **Use it as context** when answering questions about Unity Helpers
-3. **Follow links** to detailed documentation for specific features
-4. **Understand coding conventions** before generating code for this project
-
-## For AI Agents
-
-If you're an AI assistant working with this repository, you can also reference:
-
-- [AI Agent Guidelines](https://github.com/wallstop/unity-helpers/blob/main/.llm/context.md) - Comprehensive guidelines for AI agents
-
-This file provides additional context about coding style, testing patterns, and repository-specific conventions.
+Package contributors should also read the [contribution guide](./contributing.md) and
+[repository agent guidelines](https://github.com/wallstop/unity-helpers/blob/main/.llm/context.md).
+Those describe this repository's development checks. You do not need its coding-agent setup,
+runner credentials or test harness to consume Unity Helpers in a game.
 
 ## Related
 
-- [llmstxt.org Specification](https://llmstxt.org/) - The official llms.txt specification
-- [Feature Index](../overview/index.md) - Complete A-Z index of Unity Helpers features
-- [Getting Started Guide](../overview/getting-started.md) - Quick start for new users
+- [Feature Index](../overview/index.md)
+- [Getting Started](../overview/getting-started.md)
+- [Serialization choices](../features/serialization/serialization.md)

@@ -1052,6 +1052,50 @@ enemies.RemoveAtSwapBack(3); // Swaps enemy[3] with last enemy, then removes
 The operation requires a resizable list. On a fixed-size `IList<T>` such as an array or
 `ArraySegment<T>`, it throws `NotSupportedException` without changing the backing storage.
 
+#### Append a range
+
+`IListExtensions.AddRange` appends in source order. Passing the destination itself duplicates its
+original elements once, including when it is a `Collection<T>` or a `SerializableList<T>` held as
+`IList<T>`:
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using WallstopStudios.UnityHelpers.Core.Extension;
+
+IList<int> spawnOrder = new Collection<int> { 1, 2, 3 };
+spawnOrder.AddRange(spawnOrder);
+// spawnOrder: [1, 2, 3, 1, 2, 3]
+```
+
+For exact `List<T>` and `SerializableList<T>` sources, `SerializableList<T>` uses its bulk append
+operation, which also supports another wrapper sharing the same backing list. Other sources retain
+their enumeration and disposal behavior, including derived lists with custom enumerators. The destination can still grow its capacity. Fixed-size or read-only lists
+reject nonempty appends, and a null source throws `ArgumentNullException`. If an iterator throws,
+items yielded before the failure can remain in the destination. Materialize a deferred query over
+the destination before appending it; arbitrary aliased iterators are not snapshots.
+
+#### Rotate by any signed position
+
+Positive `RotateLeft` positions move elements left; negative positions move them right. Both list
+and span overloads normalize the position before changing direction, including `int.MinValue`:
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using System;
+using WallstopStudios.UnityHelpers.Core.Extension;
+
+int[] turnOrder = { 0, 1, 2, 3, 4 };
+turnOrder.AsSpan().RotateLeft(int.MinValue);
+// turnOrder: [2, 3, 4, 0, 1]
+```
+
+Empty and single-element inputs remain unchanged. A null `IList<T>` remains a no-op. Span and
+array rotation work in place; other list shapes use the existing pooled scratch path in `Shift`.
+
 **Partition (split by predicate):**
 
 <!-- doc-sample: compiles -->

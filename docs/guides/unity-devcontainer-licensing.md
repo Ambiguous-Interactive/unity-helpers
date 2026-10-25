@@ -1,5 +1,10 @@
 # Unity Devcontainer Licensing (Codespaces and Local Dev Containers)
 
+This page is for contributors working on Unity Helpers in its development container. It is not
+required to install or use the package in a game. For package setup, see
+[Getting Started](../overview/getting-started.md); for repository setup, see
+[Contributing](../project/contributing.md).
+
 **Unity will not compile without an activated license, and every container rebuild looks like a brand
 new machine to Unity's licensing service.** This guide gets `scripts/unity/compile.sh` and
 `scripts/unity/run-tests.sh` running in a Codespace or a local dev container, and tells you which

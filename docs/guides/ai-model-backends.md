@@ -1,5 +1,10 @@
 # AI Model Backends (Z.ai and OpenRouter launchers)
 
+This page is for contributors working on Unity Helpers in its development container. It is not
+required to install or use the package in a game. For package setup, see
+[Getting Started](../overview/getting-started.md); for repository setup, see
+[Contributing](../project/contributing.md).
+
 The devcontainer ships four process-scoped launchers that point the Codex and Claude Code CLIs at
 alternate model backends without touching the native `codex` and `claude` commands:
 

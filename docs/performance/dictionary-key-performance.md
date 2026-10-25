@@ -1,10 +1,21 @@
 # Dictionary Key Performance
 
-## TL;DR: Do Not Hand-Write an Enum Comparer
+<span id="tldr-do-not-hand-write-an-enum-comparer"></span>
 
-- `Dictionary<TEnum, TValue>` with the **default** comparer is the fastest form on Unity's Mono.
-- Supplying a hand-written struct comparer costs about 11% on every lookup.
-- This contradicts most Unity performance articles; they describe CoreCLR, where the advice was measured.
+## Choose a Key and Collection
+
+Start with `Dictionary<TKey, TValue>` and its default comparer. Choose another collection when
+your key domain or access contract gives you a reason. The measurements below describe one small,
+hit-only workload on Editor Mono; they do not rank every dictionary on every backend.
+
+| Your workload                     | Starting choice                                                               | Check before changing it                                              |
+| --------------------------------- | ----------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Enum keys                         | `Dictionary<TEnum, TValue>` with the default comparer                         | A custom comparer must preserve equality and justify its cost.        |
+| Small, dense integer indices      | Array or list                                                                 | Validate indices and account for unused slots.                        |
+| Sparse integer keys, mostly reads | `Dictionary<int, TValue>`; consider `IntMap<TValue>` after measuring          | Reserved keys, miss rate, capacity, interfaces and enumeration order. |
+| Multiple threads publish entries  | A synchronized collection or explicit locking                                 | `IntMap<TValue>` does not provide concurrent publication.             |
+| Sorted results                    | A sorted collection or an explicit sort                                       | Hash-table enumeration is not a priority or tie-breaking contract.    |
+| Unity-serialized inspector data   | A [serializable collection](../features/serialization/serialization-types.md) | Runtime dictionary speed does not supply Unity serialization.         |
 
 ## The Measurement
 
@@ -19,17 +30,18 @@ with a settled heap per slot, per-cycle spread retained:
 
 Two independent runs agreed (0.8940x, then 0.8902x).
 
-## Why the Folk Advice Fails Here
+<span id="why-the-folk-advice-fails-here"></span>
 
-Unity's Mono BCL already ships a specialized enum comparer for enum keys, so
-there are no boxes to remove: `EqualityComparer<ProbeKey>.Default.GetType().Name` reports
-`EnumEqualityComparer'1`. What a _supplied_ comparer does instead is move hashing and equality onto an
-interface the JIT cannot devirtualize or inline in this runtime: one interface call per probe,
-which is exactly the 11%.
+## Interpreting the Enum Result
 
-The advice exists because on CoreCLR (desktop .NET), generic specialization makes supplied struct
-comparers fully inlined while enums sometimes fall to a slower shared path. Unity's Mono and IL2CPP
-are not that runtime.
+The measured runtime reported `EnumEqualityComparer'1` for
+`EqualityComparer<ProbeKey>.Default.GetType().Name`. It already had an enum-specific default
+comparer. Supplying a custom comparer was slower in this workload; the timings alone do not
+isolate JIT behavior or interface dispatch as the cause.
+
+This result applies to the measured Unity runtime. Different runtimes, comparer implementations,
+key distributions and player backends can produce different results. Measure your actual target
+before applying advice from a different environment.
 
 ## Practical Rules
 
@@ -37,42 +49,37 @@ are not that runtime.
 - **Dense id-like keys (0..N):** consider an array indexed by the key first; an `int[]` was measured
   about 5x faster than any hash table at eight members.
 - **Struct keys other than primitives/enums:** measure before supplying a comparer; on this runtime
-  the default is usually already specialized.
+  implement consistent equality and hashing, then compare the real alternatives.
 - This package's own `IntMap<TValue>` exists for int keys precisely by removing all comparer
   indirection from its probe loop.
 
 ## Caveats
 
-All three numbers above are Editor Mono measurements; IL2CPP shares much of Mono's code-generation
-behavior for constrained calls but has not been re-measured here. If you re-measure on device, use a
+These are historical Editor Mono measurements. This page provides no corresponding IL2CPP result. If you re-measure on device, use a
 counterbalanced protocol so the machine's temperature does not answer instead of the code.
 
 ## Integer Map Migration Constraints
 
-A type replacement needs the caller's key domain, mutation pattern, and API contract. The
-[#905 audit](https://github.com/Ambiguous-Interactive/unity-helpers/issues/905) found these
-constraints in the current production owners:
+Before replacing a dictionary, answer these questions for your own caller:
 
-| Owner                                                                                                         | Constraint to preserve before replacement                                                                                                                                                         |
-| ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CircleLineRenderer._cachedSegments`                                                                          | Segment counts are bounded to 3–4096. Measure this small cache against an indexed table as well as a hash map.                                                                                    |
-| `PoolBucketMap<T>._buckets`                                                                                   | The threaded configuration uses `ConcurrentDictionary` and atomic bucket publication. `IntMap` supplies neither; a type substitution would lose the synchronization contract.                     |
-| `SpriteSheetExtractor` boundary-gap counts                                                                    | The pooled `DictionaryBuffer` lease owns cleanup. Equal-frequency gaps are selected in enumeration order; changing table order can change the inferred sprite grid. Preserve both contracts.      |
-| `UnityLogTagFormatter` decoration leases                                                                      | Caller priorities accept the full signed integer domain. Keep lease cleanup synchronized with the separate sorted decoration map and preserve its priority order.                                 |
-| WGroup foldout state dictionaries                                                                             | `WGroupGUI` accepts concrete `Dictionary<int, bool>` in several shared call paths. Keys are hash products; the full signed integer domain is possible. Preserve parameter interoperability.       |
-| Dropdown display caches                                                                                       | `IntDropDownDrawer`, its Odin counterpart and `DropDownShared` key caches by computed hashes or option indices. Classify those domains separately; a hash may equal either reserved `IntMap` key. |
-| `AnimationCreatorWindow._cachedElementProperties` and `TextureSettingsApplierWindow._replaceSelectionByIndex` | Keys are element indices. Measure realistic cache size, invalidation and miss rates before changing the backing store.                                                                            |
-| Serializable dictionary/set drawer lookup and animation state                                                 | Several related maps share row indices and invalidation paths. Preserve missing-key behavior and coordinated cleanup; measure the complete drawer workload.                                       |
-| WButton label/content caches                                                                                  | Count/index domains can be dense and tiny. Existing `GetOrAdd` helpers require mutable `IDictionary`. Compare indexed storage and include cold-cache misses.                                      |
+1. **Can every key be represented?** `IntMap<TValue>` rejects `int.MinValue` and
+   `int.MinValue + 1`. Computed hashes can produce either value; an integer key is not proof
+   that the domain is safe.
+2. **Which interfaces do callers require?** `IntMap<TValue>` implements a read-only dictionary
+   interface, with its own mutation methods. It does not implement mutable `IDictionary<int, TValue>`.
+   A method that accepts the latter needs a deliberate API change or a different collection.
+3. **Does order affect the result?** A rebuild can change `IntMap` enumeration order. Sort explicitly
+   if iteration resolves equal scores, chooses a winner, or controls display order.
+4. **Who owns cleanup?** Replacing a dictionary rented through `DictionaryBuffer` also changes its
+   lifetime. Keep the lease until every consumer has finished, and return only the rented collection.
+5. **Who can mutate it?** Do not replace `ConcurrentDictionary` with an unsynchronized map. A lock
+   must cover the complete shared operation, including lookup, insertion and dependent state.
+6. **What does the complete operation cost?** Include initialization, growth, misses, churn and
+   retained capacity. Compare an indexed array as well when keys are dense and bounded.
 
-`IntMap<T>` refuses `int.MinValue` and `int.MinValue + 1`, has a read-only dictionary interface
-rather than the mutable `IDictionary` contract, and may change enumeration order when it rebuilds.
-Its integer key alone cannot establish a safe conversion. The new collision and churn regressions
-in [#926](https://github.com/Ambiguous-Interactive/unity-helpers/issues/926) also show why dense-key
-microbenchmarks cannot justify every caller.
+See [IntMap usage and limits](../features/utilities/data-structures.md#intmap-int-keyed-open-addressing-map) before adoption.
+Use the [performance measurement guide](./baseline-tests-performance.md) to interpret a result;
+a dense, hit-only microbenchmark cannot establish a win for a large, miss-heavy cache.
 
-No production dictionary conversion or conversion analyzer is selected by this audit. Corrected-map
-Mono measurements and floor/latest Release IL2CPP timing remain required by
-[#578](https://github.com/Ambiguous-Interactive/unity-helpers/issues/578). Any eventual analyzer must
-be opt-in and advisory, identify unsupported keys and interfaces, and avoid promising a faster
-replacement without evidence for the consumer's workload.
+Keep `Dictionary` when it meets your needs and you have no representative player measurement
+supporting a replacement. This page does not promise a faster replacement or an automatic conversion.

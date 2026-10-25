@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     using System.Collections.Generic;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Extension;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
     using WallstopStudios.UnityHelpers.Utils;
 #if !WALLSTOP_PROTO_ONLY
@@ -36,7 +37,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <summary>
         /// Gets the number of elements in the disjoint set.
         /// </summary>
-        public int Count => _parent.Length;
+        public int Count => _parent == null ? 0 : _parent.Length;
 
         /// <summary>
         /// Gets the number of distinct sets.
@@ -88,28 +89,86 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         private DisjointSet() { }
 
+        internal static void CollectReusableSets<TElement>(
+            List<List<TElement>> results,
+            Stack<List<TElement>> reusable
+        )
+        {
+            if (results.Count == 0)
+            {
+                return;
+            }
+            using PooledResource<HashSet<List<TElement>>> identityLease = SetBuffers<List<TElement>>
+                .GetHashSetPool(ReferenceIdentityComparer<List<TElement>>.Instance)
+                .Get(out HashSet<List<TElement>> identities);
+            foreach (List<TElement> existing in results)
+            {
+                if (existing != null && identities.Add(existing))
+                {
+                    existing.Clear();
+                    reusable.Push(existing);
+                }
+            }
+            results.Clear();
+        }
+
+        internal static List<TElement> GetSetForRoot<TElement>(
+            int root,
+            int[] rootToResult,
+            List<List<TElement>> results,
+            Stack<List<TElement>> reusable
+        )
+        {
+            int slot = rootToResult[root];
+            if (0 < slot)
+            {
+                return results[slot - 1];
+            }
+            if (!reusable.TryPop(out List<TElement> destination))
+            {
+                destination = new List<TElement>();
+            }
+            results.Add(destination);
+            rootToResult[root] = results.Count;
+            return destination;
+        }
+
         /// <summary>
         /// Attempts to find the representative (root) of the set containing element x.
         /// Uses path compression for optimization.
         /// </summary>
         /// <param name="x">The element to find.</param>
         /// <param name="representative">The representative if found.</param>
-        /// <returns>True if x is valid, false otherwise.</returns>
+        /// <returns>True if x reaches a valid root; false for invalid indices, broken links, or cycles.</returns>
         public bool TryFind(int x, out int representative)
         {
-            if (x < 0 || _parent.Length <= x)
+            int[] parents = _parent;
+            int elementCount = parents == null ? 0 : parents.Length;
+            int current = x;
+            for (int visited = 0; visited < elementCount; ++visited)
             {
-                representative = -1;
-                return false;
+                if (current < 0 || elementCount <= current)
+                {
+                    break;
+                }
+
+                int parent = parents[current];
+                if (parent == current)
+                {
+                    while (x != current)
+                    {
+                        int next = parents[x];
+                        parents[x] = current;
+                        x = next;
+                    }
+                    representative = current;
+                    return true;
+                }
+                current = parent;
             }
 
-            // Path compression
-            if (_parent[x] != x)
-            {
-                _parent[x] = TryFindInternal(x);
-            }
-            representative = _parent[x];
-            return true;
+            representative = -1;
+            return false;
         }
 
         /// <summary>
@@ -118,15 +177,19 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// </summary>
         /// <param name="x">First element.</param>
         /// <param name="y">Second element.</param>
-        /// <returns>True if successfully unioned (sets were different), false if invalid indices or already in same set.</returns>
+        /// <returns>True when different sets were joined; false for invalid indices, links, ranks, counts, or an existing connection.</returns>
         public bool TryUnion(int x, int y)
         {
+            if (_rank == null || _rank.Length != Count || _setCount <= 1 || Count < _setCount)
+            {
+                return false;
+            }
             if (!TryFind(x, out int rootX) || !TryFind(y, out int rootY))
             {
                 return false;
             }
 
-            if (rootX == rootY)
+            if (rootX == rootY || _rank[rootX] < 0 || _rank[rootY] < 0)
             {
                 return false;
             }
@@ -143,10 +206,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             else
             {
                 _parent[rootY] = rootX;
-                ++_rank[rootX];
+                if (_rank[rootX] < int.MaxValue)
+                {
+                    ++_rank[rootX];
+                }
             }
 
-            _setCount--;
+            --_setCount;
             return true;
         }
 
@@ -195,7 +261,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <summary>
         /// Populates the provided list with all elements in the same set as element x.
         /// Clears the list before adding. Returns the same list for chaining.
-        /// Returns null if x is invalid.
+        /// Leaves the list empty if x is invalid or its parent chain is malformed.
         /// </summary>
         public List<int> TryGetSet(int x, List<int> results)
         {
@@ -224,8 +290,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         /// <summary>
         /// Populates the provided list with all distinct sets.
-        /// Clears the list before adding. Returns the same list for chaining.
-        /// Uses pooled temporary dictionary to avoid allocations.
+        /// Reuses each nonnull input list at most once and returns distinct output lists for each set.
+        /// Uses pooled temporary storage to avoid steady-state allocations.
         /// </summary>
         public List<List<int>> TryGetAllSets(List<List<int>> results)
         {
@@ -237,18 +303,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             using PooledResource<Stack<List<int>>> reuseStackResource = Buffers<
                 List<int>
             >.Stack.Get(out Stack<List<int>> reuseStack);
-            foreach (List<int> existing in results)
-            {
-                if (existing != null)
-                {
-                    existing.Clear();
-                    reuseStack.Push(existing);
-                }
-            }
+            CollectReusableSets(results, reuseStack);
 
-            results.Clear();
-
-            int elementCount = _parent.Length;
+            int elementCount = Count;
             if (elementCount == 0)
             {
                 return results;
@@ -268,27 +325,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     continue;
                 }
 
-                int slot = rootToResult[root];
-                List<int> destination;
-                if (0 < slot)
-                {
-                    destination = results[slot - 1];
-                }
-                else
-                {
-                    if (reuseStack.TryPop(out destination))
-                    {
-                        destination.Clear();
-                    }
-                    else
-                    {
-                        destination = new List<int>();
-                    }
-
-                    results.Add(destination);
-                    rootToResult[root] = results.Count;
-                }
-
+                List<int> destination = GetSetForRoot(root, rootToResult, results, reuseStack);
                 destination.Add(i);
             }
 
@@ -296,26 +333,25 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         }
 
         /// <summary>
-        /// Resets the disjoint set so each element is in its own set.
+        /// Resets each delivered element to its own set, rebuilding missing rank storage.
         /// </summary>
         public void Reset()
         {
-            int parentLength = _parent.Length;
+            int parentLength = Count;
+            if (_parent == null)
+            {
+                _parent = Array.Empty<int>();
+            }
+            if (_rank == null || _rank.Length != parentLength)
+            {
+                _rank = new int[parentLength];
+            }
             for (int i = 0; i < parentLength; ++i)
             {
                 _parent[i] = i;
                 _rank[i] = 0;
             }
-            _setCount = _parent.Length;
-        }
-
-        private int TryFindInternal(int x)
-        {
-            if (_parent[x] != x)
-            {
-                _parent[x] = TryFindInternal(_parent[x]);
-            }
-            return _parent[x];
+            _setCount = parentLength;
         }
     }
 
@@ -482,8 +518,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         }
 
         /// <summary>
-        /// Populates the provided list with all distinct sets.
-        /// Clears the list before adding. Returns the same list for chaining.
+        /// Populates distinct output lists with all sets, reusing each nonnull input list at most once.
         /// </summary>
         public List<List<T>> TryGetAllSets(List<List<T>> results)
         {
@@ -495,41 +530,25 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             using PooledResource<Stack<List<T>>> stackResource = Buffers<List<T>>.Stack.Get(
                 out Stack<List<T>> stack
             );
-            foreach (List<T> input in results)
-            {
-                if (input != null)
-                {
-                    input.Clear();
-                    stack.Push(input);
-                }
-            }
-
-            results.Clear();
-            using PooledResource<List<List<int>>> listResource = Buffers<List<int>>.List.Get(
-                out List<List<int>> indexSets
+            DisjointSet.CollectReusableSets(results, stack);
+            int elementCount = Count;
+            using PooledArray<int> rootLease = SystemArrayPool<int>.Get(
+                elementCount,
+                clearArray: true,
+                out int[] rootToResult
             );
-
-            foreach (List<int> indexSet in _disjointSet.TryGetAllSets(indexSets))
+            for (int index = 0; index < elementCount; ++index)
             {
-                int indexCount = indexSet.Count;
-                if (!stack.TryPop(out List<T> elementSet))
+                if (_disjointSet.TryFind(index, out int root))
                 {
-                    elementSet = new List<T>(indexCount);
+                    List<T> destination = DisjointSet.GetSetForRoot(
+                        root,
+                        rootToResult,
+                        results,
+                        stack
+                    );
+                    destination.Add(_indexToElement[index]);
                 }
-                else
-                {
-                    elementSet.Clear();
-                    if (elementSet.Capacity < indexCount)
-                    {
-                        elementSet.Capacity = indexCount;
-                    }
-                }
-
-                foreach (int i in indexSet)
-                {
-                    elementSet.Add(_indexToElement[i]);
-                }
-                results.Add(elementSet);
             }
 
             return results;

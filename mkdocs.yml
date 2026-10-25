@@ -22,7 +22,10 @@ not_in_nav: |
   readme.md
   images/documentation-image-manifest.md
   includes/abbreviations.md
+
+exclude_docs: |
   runbooks/unity-runners-after-transfer.md
+  runbooks/unity-runners-after-transfer.md.meta
 site_url: https://ambiguous-interactive.github.io/unity-helpers/
 site_description: >-
   Production-ready Unity utilities: 10-15x faster PRNGs, O(log n) spatial queries,
@@ -250,15 +253,16 @@ nav:
       - "Analyzers (WUH###)": performance/analyzers.md
   - Guides:
       - Odin Migration: guides/odin-migration-guide.md
-      - Unity Devcontainer Licensing: guides/unity-devcontainer-licensing.md
-      - AI Model Backends: guides/ai-model-backends.md
-      - MCP Local Setup: guides/mcp-local-setup.md
-      - MCP Ecosystem Notes: guides/mcp-ecosystem.md
       - Bundled Assembly Conflicts: guides/bundled-assembly-conflicts.md
   - Contributing:
       - Overview: project/contributing.md
       - Testing Patterns: contributing/testing-patterns.md
       - CodeGraph Evaluation: contributing/codegraph-evaluation.md
+      - Development Environment:
+          - Unity Devcontainer Licensing: guides/unity-devcontainer-licensing.md
+          - AI Model Backends: guides/ai-model-backends.md
+          - MCP Local Setup: guides/mcp-local-setup.md
+          - MCP Ecosystem Notes: guides/mcp-ecosystem.md
   - Project:
       - License: project/license.md
       - Third-Party Notices: project/third-party-notices.md

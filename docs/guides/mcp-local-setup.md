@@ -1,5 +1,10 @@
 # MCP Local Setup
 
+This page is for contributors working on Unity Helpers in its development container. It is not
+required to install or use the package in a game. For package setup, see
+[Getting Started](../overview/getting-started.md); for repository setup, see
+[Contributing](../project/contributing.md).
+
 The devcontainer configures the repository's shared MCP servers for Claude Code, Cursor, VS Code
 and GitHub Copilot, Codex, OpenCode, nanocoder, and the Copilot CLI. A full rebuild or fresh clone
 installs the local runtimes and regenerates every machine-local client config automatically; every
