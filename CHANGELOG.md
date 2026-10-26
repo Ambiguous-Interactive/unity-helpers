@@ -55,6 +55,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix relational `SkipIfAssigned` fields retaining destroyed component references when no replacement matches. Live preassigned references remain preserved.
+- Fix `AreAnyAssignmentsInvalid()` throwing for null targets or inspecting destroyed targets; missing targets now return false.
+- Fix `Trie` construction losing pooled storage when an input iterator throws ([#1073](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1073)).
 - Fix relational bindings for same-named private base and derived fields so each keeps its declared component and collection element types ([#1074](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1074)).
 - Fix string-trie enumeration retaining copied prefixes across visited nodes. Preserve traversal order and make default or disposed trie enumerators safe to advance ([#817](https://github.com/Ambiguous-Interactive/unity-helpers/issues/817)).
 - Fix cyclic buffer membership after removal and draining, including `null` and default values ([#1069](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1069)).

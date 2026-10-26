@@ -63,6 +63,18 @@ fi
 log_step "Fixing volume mount permissions"
 
 VOLUME_DIRS=(
+    "/home/vscode/.codex"
+    "/home/vscode/.claude"
+    "/home/vscode/.claude-zai"
+    "/home/vscode/.claude-openrouter"
+    "/home/vscode/.config/opencode"
+    "/home/vscode/.local/share/opencode"
+    "/home/vscode/.local/state/opencode"
+    "/home/vscode/.config/nanocoder"
+    "/home/vscode/.local/share/nanocoder"
+    "/home/vscode/.copilot"
+    "/home/vscode/.config/gh"
+    "/home/vscode/.mcp-auth"
     "/home/vscode/.npm"
     "/home/vscode/.nuget/packages"
     "/home/vscode/.cache/pip"
@@ -90,6 +102,8 @@ for dir in "${VOLUME_DIRS[@]}"; do
         log_ok "Created and fixed ownership: $dir"
     fi
 done
+
+python3 "$SCRIPT_DIR/agent-state.py" prepare
 
 # ── Step 2: Restore .NET tools ───────────────────────────────────────────────
 # Restores tools from .config/dotnet-tools.json (CSharpier, etc.)

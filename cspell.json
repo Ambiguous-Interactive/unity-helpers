@@ -960,7 +960,8 @@
         "rcx",
         "dmp",
         "killpg",
-        "PDB"
+        "PDB",
+        "clis"
       ]
     }
   ],

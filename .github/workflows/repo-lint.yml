@@ -98,7 +98,7 @@ jobs:
         env:
           DOTNET_INSTALL_DIR: ${{ runner.temp }}/unity-helpers-dotnet
         with:
-          dotnet-version: "9.0.319"
+          dotnet-version: "9.0.320"
 
       # The three check groups each record an outcome instead of ending the job, so one failure
       # never hides the other two. The gate at the end is what actually reds the run.

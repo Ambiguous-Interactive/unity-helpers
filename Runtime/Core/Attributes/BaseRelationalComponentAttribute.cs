@@ -73,10 +73,11 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         public bool IncludeInactive { get; set; } = true;
 
         /// <summary>
-        /// When true, skips assignment if the field already has a non-null value (for single components)
-        /// or a non-empty collection (for arrays/lists). Default: false.
-        /// Useful to avoid stomping values set manually or from prior initialization.
+        /// Preserves live single-component values and non-empty collections when true.
         /// </summary>
+        /// <remarks>
+        /// Defaults to false. Destroyed single-component references are rebound or cleared when no match exists.
+        /// </remarks>
         public bool SkipIfAssigned { get; set; } = false;
 
         /// <summary>
@@ -368,11 +369,9 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         /// <param name="component">The component whose field will be assigned.</param>
         /// <param name="metadata">The field metadata containing attribute and accessor information.</param>
         /// <remarks>
-        /// This method only assigns null if:
-        /// <list type="bullet">
-        /// <item><description><see cref="BaseRelationalComponentAttribute.SkipIfAssigned"/> is false</description></item>
-        /// <item><description>The field is a single-component type (not array, list, or hashset)</description></item>
-        /// </list>
+        /// Call only after <see cref="ShouldSkipAssignment{TAttribute}"/> has allowed assignment.
+        /// Live preassigned values are skipped there; destroyed references are cleared here.
+        /// Arrays, lists, and hash sets are unchanged.
         /// Call this after <see cref="LogMissingComponentError{TAttribute}"/> to ensure single fields
         /// are explicitly nulled when no matching component is found.
         /// </remarks>
@@ -382,11 +381,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         )
             where TAttribute : BaseRelationalComponentAttribute
         {
-            if (metadata.attribute.SkipIfAssigned)
-            {
-                return;
-            }
-
             if (metadata.kind != FieldKind.Single)
             {
                 return;

@@ -10,3 +10,7 @@ fi
 if ! node "$MCP_REPO_ROOT/scripts/mcp/unity-mcp.mjs" configure; then
     echo "WARN: Unity MCP configuration failed; run npm run unity:mcp:configure after repairing the bridge." >&2
 fi
+
+if ! python3 "$SCRIPT_DIR/agent-state.py" link-mcp; then
+    echo "WARN: Copilot MCP link repair failed; personal configuration was kept." >&2
+fi

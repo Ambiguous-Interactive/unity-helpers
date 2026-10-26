@@ -125,7 +125,7 @@ refused because they hide member names. Size and reference-identity queries rema
 The positive controls require plain, escaped, formatted and interpolated calls to be found.
 Separate sources exercise format characters without an ordinary spelling that could mask a prefilter regression.
 
-Stack-allocation and memory-access checks use the existing Roslyn policy tool and require .NET SDK 9.0.319.
+Stack-allocation and memory-access checks use the existing Roslyn policy tool and require .NET SDK 9.0.320.
 CI installs that SDK into an isolated runner directory and verifies the selected version.
 A newer SDK preinstalled on the runner cannot override the declared compiler.
 
@@ -154,7 +154,7 @@ write failures fail validation; an execution failure cannot be mistaken for a cl
 
 ## Python Tooling
 
-Use Python 3.11 for the repository's Python checks. The dev container pins `uv==0.13.4` and
+Use Python 3.11 for the repository's Python checks. The dev container pins `uv==0.13.5` and
 exposes it as `uv`. Documentation CI installs that same version with pip, then installs the
 fully pinned `requirements-docs.lock` with uv. `requirements-docs.txt` lists the direct
 constraints; the lock records their transitive versions. Run locally with:
@@ -318,7 +318,7 @@ python3 scripts/build-protobuf-candidate.py --output /tmp/protobuf-candidate
 python3 scripts/verify-protobuf-shipped.py --candidate-root /tmp/protobuf-candidate/assemblies
 ```
 
-The builder requires SDK 9.0.319 and produces isolated binaries with a source-bound build receipt.
+The retained candidate builder requires SDK 9.0.319 and produces isolated binaries with a source-bound build receipt. Repository validation uses SDK 9.0.320; install the older SDK separately when rebuilding that retained candidate.
 The independent current lane uses `ProtobufNetOracle=candidate` and
 `ProtobufNetCandidateRoot=/tmp/protobuf-candidate/assemblies`. Frozen v2/v3 lanes retain their
 original DLLs under `Generator~`; dependency upgrades must not refresh those historical oracles.

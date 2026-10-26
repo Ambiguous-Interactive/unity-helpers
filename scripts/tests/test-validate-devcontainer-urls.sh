@@ -206,7 +206,7 @@ assert_contract_exit_code "$fixture_case_fail" 1 "validator rejects case-variant
 assert_contract_exit_code "$fixture_chain_fail" 1 "validator rejects chained apt powershell install"
 
 if validator_sdk_output="$("$VALIDATOR" --list-tools --dockerfile .devcontainer/Dockerfile 2>&1)" \
-    && grep -Fq 'dotnet_sdk|9.0.319|x64|arm64|https://builds.dotnet.microsoft.com/dotnet/Sdk/{VERSION}/dotnet-sdk-{VERSION}-linux-{ARCH}.tar.gz' <<< "$validator_sdk_output"; then
+    && grep -Fq 'dotnet_sdk|9.0.320|x64|arm64|https://builds.dotnet.microsoft.com/dotnet/Sdk/{VERSION}/dotnet-sdk-{VERSION}-linux-{ARCH}.tar.gz' <<< "$validator_sdk_output"; then
     pass "validator resolves .NET SDK archive URLs for both architectures"
 else
     fail "validator resolves .NET SDK archive URLs for both architectures" "$validator_sdk_output"

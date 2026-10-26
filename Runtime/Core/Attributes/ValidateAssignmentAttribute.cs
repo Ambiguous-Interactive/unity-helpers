@@ -167,8 +167,16 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             }
         }
 
+        /// <summary>
+        /// Returns whether a live target has any unassigned attributed fields; null or destroyed targets return false.
+        /// </summary>
         public static bool AreAnyAssignmentsInvalid(this Object o)
         {
+            if (o == null)
+            {
+                return false;
+            }
+
             Type objectType = o.GetType();
             FieldInfo[] fields = GetOrAdd(objectType);
 

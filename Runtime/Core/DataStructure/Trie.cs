@@ -40,6 +40,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// Constructs the Trie from the provided collection of words.
         /// </summary>
         /// <param name="words">All possible words to insert into the Trie.</param>
+        /// <remarks>Input enumeration failures propagate after temporary pooled storage is returned.</remarks>
         public Trie(IEnumerable<string> words)
         {
             if (words == null)
@@ -55,9 +56,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 if (wordList == null)
                 {
                     pooledListResource = Buffers<string>.List.Get(out List<string> pooledList);
+                    usedPooledList = true;
                     pooledList.AddRange(words);
                     wordList = pooledList;
-                    usedPooledList = true;
                 }
 
                 int maxWordLength;

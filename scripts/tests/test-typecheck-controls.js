@@ -470,8 +470,8 @@ for (const file of sdkWorkflows) {
     }
   }
 }
-runTest("all seven pinned SDK installations have selection controls", () =>
-  assert.equal(pinnedSdkSteps, 7)
+runTest("all eight pinned SDK installations have selection controls", () =>
+  assert.equal(pinnedSdkSteps, 8)
 );
 
 console.log("");

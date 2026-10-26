@@ -96,7 +96,7 @@ jobs:
         env:
           DOTNET_INSTALL_DIR: ${{ runner.temp }}/unity-helpers-dotnet
         with:
-          dotnet-version: "9.0.319"
+          dotnet-version: "9.0.320"
 
       - name: Require the installed .NET SDK
         shell: bash
@@ -168,7 +168,7 @@ jobs:
         env:
           DOTNET_INSTALL_DIR: ${{ runner.temp }}/unity-helpers-dotnet
         with:
-          dotnet-version: "9.0.319"
+          dotnet-version: "9.0.320"
 
       - name: Require the installed .NET SDK
         shell: bash

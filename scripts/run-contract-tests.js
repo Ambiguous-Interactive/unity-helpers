@@ -174,6 +174,11 @@ const CHECKS = [
     run: "npm run test:validate-devcontainer-config"
   },
   {
+    id: "devcontainer-persistence",
+    name: "Persistent agent state and container recovery",
+    run: "npm run test:devcontainer-persistence"
+  },
+  {
     id: "validate-hook-permissions",
     name: "Git hook permission validator self-test",
     run: "npm run test:validate-hook-permissions"

@@ -163,6 +163,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
         }
 
         [Test]
+        public void AreAnyAssignmentsInvalidReturnsFalseForNullTarget()
+        {
+            Assert.IsFalse(ValidateAssignmentExtensions.AreAnyAssignmentsInvalid(null));
+        }
+
+        [Test]
+        public void AreAnyAssignmentsInvalidReturnsFalseForDestroyedTarget()
+        {
+            GameObject target = Track(
+                new GameObject(nameof(AreAnyAssignmentsInvalidReturnsFalseForDestroyedTarget))
+            );
+            AssignmentComponent component = target.AddComponent<AssignmentComponent>();
+            Assert.IsTrue(component != null);
+            UnityEngine.Object.DestroyImmediate(component); // UNH-SUPPRESS: Validate an already destroyed target before teardown.
+            Assert.IsTrue(component == null);
+
+            Assert.IsFalse(component.AreAnyAssignmentsInvalid());
+        }
+
+        [Test]
         public void AreAnyAssignmentsInvalidDetectsEmptyString()
         {
             GameObject go = Track(
