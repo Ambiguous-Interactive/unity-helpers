@@ -114,7 +114,7 @@ jobs:
       # visible to the repository; the benchmarks job depends on this job so an
       # impossible label set fails instead of queueing forever.
       - name: Require an online Unity runner
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/check-unity-runner-availability@e04369db0da0e0106af77091bf95118218ec7c02 # v1.17.0
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/check-unity-runner-availability@20077985093aac0e88f88f931ebedae78c1c9284 # v1.17.1
         with:
           reader-app-id: ${{ secrets.BUILD_LOCK_READER_APP_ID }}
           reader-app-private-key: ${{ secrets.BUILD_LOCK_READER_APP_PRIVATE_KEY }}
@@ -131,7 +131,7 @@ jobs:
       - name: Require manually installed Unity editor
         id: ensure_unity_editor
         timeout-minutes: 10
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/ensure-unity-editor@e04369db0da0e0106af77091bf95118218ec7c02 # v1.17.0
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/ensure-unity-editor@20077985093aac0e88f88f931ebedae78c1c9284 # v1.17.1
         with:
           unity-version: "6000.6.0f1"
           install-root: ${{ runner.tool_cache }}\u6-v3
@@ -172,7 +172,7 @@ jobs:
 
       - name: Acquire organization Unity lock
         id: unity_lock
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@e04369db0da0e0106af77091bf95118218ec7c02 # v1.17.0
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@20077985093aac0e88f88f931ebedae78c1c9284 # v1.17.1
         with:
           lock-name: wallstop-organization-builds
           holder-id-suffix: 6000.6.0f1-playmode
@@ -236,7 +236,7 @@ jobs:
         id: return_unity_license
         if: ${{ always() && steps.unity_lock.outputs.acquired == 'true' }}
         timeout-minutes: 5
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/return-unity-license@e04369db0da0e0106af77091bf95118218ec7c02 # v1.17.0
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/return-unity-license@20077985093aac0e88f88f931ebedae78c1c9284 # v1.17.1
         with:
           unity-version: "6000.6.0f1"
           tool-cache: ${{ runner.tool_cache }}
@@ -247,7 +247,7 @@ jobs:
       - name: Classify Unity cleanup evidence
         id: cleanup_classification
         if: ${{ always() && steps.unity_lock.outputs.acquired == 'true' }}
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/classify-unity-cleanup-evidence@e04369db0da0e0106af77091bf95118218ec7c02 # v1.17.0
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/classify-unity-cleanup-evidence@20077985093aac0e88f88f931ebedae78c1c9284 # v1.17.1
         with:
           return-log-path: ${{ steps.return_unity_license.outputs.return-log-path }}
           return-command-completed: ${{ steps.return_unity_license.outputs.return-command-completed }}
@@ -259,7 +259,7 @@ jobs:
         id: release_unity_lock
         if: always()
         timeout-minutes: 5
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@e04369db0da0e0106af77091bf95118218ec7c02 # v1.17.0
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@20077985093aac0e88f88f931ebedae78c1c9284 # v1.17.1
         with:
           lock-name: wallstop-organization-builds
           holder-id-suffix: 6000.6.0f1-playmode
@@ -358,7 +358,7 @@ jobs:
 
       - name: Require confirmed Unity cleanup
         if: always()
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-confirmed-unity-cleanup@e04369db0da0e0106af77091bf95118218ec7c02 # v1.17.0
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-confirmed-unity-cleanup@20077985093aac0e88f88f931ebedae78c1c9284 # v1.17.1
         with:
           acquired: ${{ steps.unity_lock.outputs.acquired }}
           classification-complete: ${{ steps.cleanup_classification.outputs.classification-complete }}
