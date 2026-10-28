@@ -85,7 +85,7 @@ pillow==13.0.0
     # via
     #   -r requirements-docs.txt
     #   cairosvg
-platformdirs==4.13.7
+platformdirs==4.14.0
     # via mkdocs-get-deps
 pycparser==3.12 ; implementation_name != 'PyPy'
     # via cffi
@@ -115,7 +115,7 @@ tinycss2==1.5.1
     # via
     #   cairosvg
     #   cssselect2
-tzdata==2026.5
+tzdata==2026.6
     # via
     #   mkdocs-git-revision-date-localized-plugin
     #   python-dateutil
