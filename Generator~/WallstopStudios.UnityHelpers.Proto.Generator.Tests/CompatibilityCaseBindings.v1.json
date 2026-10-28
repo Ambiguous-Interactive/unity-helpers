@@ -3,6 +3,27 @@
   "policy": "Selectors bind source declarations to fixtures only. A qualifying lane must execute every exact case of each selected fixture once, using ordinary NUnit discovery/lifecycle and a matching source/build receipt. Display-case names never infer method or argument identity.",
   "discoveryArtifacts": [
     {
+      "id": "small-integer-host-v3",
+      "label": "aligned-boundary-v3.trx",
+      "sha256": "a9a779bb26f6f6586468bc9f987f43f6b0a3cffaf6257aee78a56e7eee3a73d0",
+      "purpose": "case-discovery-only",
+      "qualification": "none"
+    },
+    {
+      "id": "small-integer-host-v2",
+      "label": "final-focused-v2.trx",
+      "sha256": "e4c251e4e28d035f5b79827420deee65f16ccf04f54b0ba2b1aaac32819d4ef7",
+      "purpose": "case-discovery-only",
+      "qualification": "none"
+    },
+    {
+      "id": "small-integer-native",
+      "label": "native-small-integer.xml",
+      "sha256": "cdb7b41f18debd5bae4c5929ddefdaf7e457f643cf79de75348bd937b18e8030",
+      "purpose": "case-discovery-only",
+      "qualification": "none"
+    },
+    {
       "id": "collection-elements-host-focused",
       "label": "collection-final-focused.trx",
       "sha256": "612f2cea9e911aa9094217c9e99cf92c06f419394df9c39046be854f26fdc5d3",
@@ -193,6 +214,111 @@
     }
   ],
   "selectors": [
+    {
+      "id": "WProtoSmallIntegerTests.ByteOverflowIsRefused",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoSmallIntegerTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests"
+    },
+    {
+      "id": "WProtoSmallIntegerTests.SignedByteOverflowIsRefused",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoSmallIntegerTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests"
+    },
+    {
+      "id": "WProtoSmallIntegerTests.ShortOverflowIsRefused",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoSmallIntegerTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests"
+    },
+    {
+      "id": "WProtoSmallIntegerTests.UnsignedShortAndCharOverflowIsRefused",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoSmallIntegerTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests"
+    },
+    {
+      "id": "WProtoSmallIntegerTests.ValidBoundariesRemainReadable",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoSmallIntegerTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests"
+    },
+    {
+      "id": "WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoSmallIntegerTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests"
+    },
+    {
+      "id": "WProtoSmallIntegerTests.PackedMembersRefuseOverflow",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoSmallIntegerTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests"
+    },
+    {
+      "id": "WProtoSmallIntegerTests.MapKeysAndValuesRefuseOverflow",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoSmallIntegerTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests"
+    },
+    {
+      "id": "WProtoSmallIntegerTests.CharacterMessageFormatterRefusesOverflow",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoSmallIntegerTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests"
+    },
+    {
+      "id": "WProtoSmallIntegerTests.GeneratedBoundariesPreserveWireBytes",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoSmallIntegerTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests"
+    },
+    {
+      "id": "WProtoSmallIntegerTests.EmptyAndTruncatedSmallScalarsRefuseAndClearOutput",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoSmallIntegerTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests"
+    },
+    {
+      "id": "WProtoSmallIntegerTests.ZigZagSignedByteChecksItsRange",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoSmallIntegerTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests"
+    },
+    {
+      "id": "WProtoSmallIntegerTests.ZigZagShortChecksItsRange",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoSmallIntegerTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests"
+    },
+    {
+      "id": "WProtoSmallIntegerTests.FailedReaderRefusesEverySmallIntegerReadWithoutConsumption",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoSmallIntegerTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests"
+    },
+    {
+      "id": "SmallIntegerDifferentialTests.ScalarOverflowMatchesBothOracleVersions",
+      "sourcePath": "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/SmallIntegerDifferentialTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests"
+    },
+    {
+      "id": "SmallIntegerDifferentialTests.ScalarBoundariesMatchBothOracleVersions",
+      "sourcePath": "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/SmallIntegerDifferentialTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests"
+    },
+    {
+      "id": "SmallIntegerDifferentialTests.GeneratedOverflowMatchesOracle",
+      "sourcePath": "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/SmallIntegerDifferentialTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests"
+    },
+    {
+      "id": "SmallIntegerDifferentialTests.MapOverflowMatchesOracle",
+      "sourcePath": "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/SmallIntegerDifferentialTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests"
+    },
+    {
+      "id": "SmallIntegerDifferentialTests.PackedOverflowMatchesOracle",
+      "sourcePath": "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/SmallIntegerDifferentialTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests"
+    },
+    {
+      "id": "SmallIntegerDifferentialTests.CharacterRootRefusesAnOverflowBeforeALaterValidOccurrence",
+      "sourcePath": "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/SmallIntegerDifferentialTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests"
+    },
+    {
+      "id": "SmallIntegerDifferentialTests.GeneratedBoundaryBytesAndReadDirectionsMatchOracle",
+      "sourcePath": "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/SmallIntegerDifferentialTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests"
+    },
     {
       "id": "WProtoCollectionElementBudgetTests.ImmutableAllowanceNormalizesNegatives",
       "sourcePath": "Tests/Runtime/Serialization/WProtoCollectionElementBudgetTests.cs",
@@ -3270,6 +3396,335 @@
     }
   ],
   "fixtures": [
+    {
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoSmallIntegerTests.cs",
+      "lanes": [
+        {
+          "lane": "host-v2",
+          "status": "discovered",
+          "caseNames": [
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ByteOverflowIsRefused(-1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ByteOverflowIsRefused(256)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ByteOverflowIsRefused(int.MaxValue)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.CharacterMessageFormatterRefusesOverflow",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.EmptyAndTruncatedSmallScalarsRefuseAndClearOutput(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.EmptyAndTruncatedSmallScalarsRefuseAndClearOutput(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.FailedReaderRefusesEverySmallIntegerReadWithoutConsumption",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedBoundariesPreserveWireBytes",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(1,256)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(10,-32769)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(10,32768)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(11,-129)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(11,128)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(12,32768)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(13,128)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(14,65536)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(15,65536)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(2,-129)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(2,128)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(3,-32769)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(3,32768)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(4,65536)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(5,65536)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(6,32768)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(7,32768)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(8,256)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.MapKeysAndValuesRefuseOverflow(16,1,65536)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.MapKeysAndValuesRefuseOverflow(16,2,65536)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.MapKeysAndValuesRefuseOverflow(17,1,-129)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.MapKeysAndValuesRefuseOverflow(17,1,128)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.MapKeysAndValuesRefuseOverflow(17,2,-32769)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.MapKeysAndValuesRefuseOverflow(17,2,32768)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.MapKeysAndValuesRefuseOverflow(9,1,32768)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.MapKeysAndValuesRefuseOverflow(9,2,256)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.PackedMembersRefuseOverflow(13,-129)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.PackedMembersRefuseOverflow(13,128)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.PackedMembersRefuseOverflow(14,65536)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.PackedMembersRefuseOverflow(7,-32769)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.PackedMembersRefuseOverflow(7,32768)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.PackedMembersRefuseOverflow(8,256)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ShortOverflowIsRefused(-32769)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ShortOverflowIsRefused(32768)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ShortOverflowIsRefused(int.MaxValue)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ShortOverflowIsRefused(int.MinValue)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.SignedByteOverflowIsRefused(-129)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.SignedByteOverflowIsRefused(128)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.SignedByteOverflowIsRefused(int.MaxValue)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.SignedByteOverflowIsRefused(int.MinValue)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.UnsignedShortAndCharOverflowIsRefused(-1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.UnsignedShortAndCharOverflowIsRefused(65536)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.UnsignedShortAndCharOverflowIsRefused(int.MaxValue)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ValidBoundariesRemainReadable",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ZigZagShortChecksItsRange(-32768,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ZigZagShortChecksItsRange(-32769,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ZigZagShortChecksItsRange(32767,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ZigZagShortChecksItsRange(32768,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ZigZagSignedByteChecksItsRange(-128,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ZigZagSignedByteChecksItsRange(-129,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ZigZagSignedByteChecksItsRange(127,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ZigZagSignedByteChecksItsRange(128,False)"
+          ],
+          "discoveryArtifact": "small-integer-host-v2",
+          "reason": "Discovery only; matching source/build receipts and ordinary passing execution remain required."
+        },
+        {
+          "lane": "host-v3",
+          "status": "discovered",
+          "caseNames": [
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ByteOverflowIsRefused(-1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ByteOverflowIsRefused(256)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ByteOverflowIsRefused(int.MaxValue)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.CharacterMessageFormatterRefusesOverflow",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.EmptyAndTruncatedSmallScalarsRefuseAndClearOutput(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.EmptyAndTruncatedSmallScalarsRefuseAndClearOutput(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.FailedReaderRefusesEverySmallIntegerReadWithoutConsumption",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedBoundariesPreserveWireBytes",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(1,256)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(10,-32769)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(10,32768)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(11,-129)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(11,128)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(12,32768)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(13,128)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(14,65536)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(15,65536)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(2,-129)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(2,128)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(3,-32769)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(3,32768)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(4,65536)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(5,65536)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(6,32768)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(7,32768)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(8,256)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.MapKeysAndValuesRefuseOverflow(16,1,65536)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.MapKeysAndValuesRefuseOverflow(16,2,65536)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.MapKeysAndValuesRefuseOverflow(17,1,-129)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.MapKeysAndValuesRefuseOverflow(17,1,128)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.MapKeysAndValuesRefuseOverflow(17,2,-32769)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.MapKeysAndValuesRefuseOverflow(17,2,32768)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.MapKeysAndValuesRefuseOverflow(9,1,32768)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.MapKeysAndValuesRefuseOverflow(9,2,256)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.PackedMembersRefuseOverflow(13,-129)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.PackedMembersRefuseOverflow(13,128)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.PackedMembersRefuseOverflow(14,65536)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.PackedMembersRefuseOverflow(7,-32769)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.PackedMembersRefuseOverflow(7,32768)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.PackedMembersRefuseOverflow(8,256)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ShortOverflowIsRefused(-32769)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ShortOverflowIsRefused(32768)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ShortOverflowIsRefused(int.MaxValue)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ShortOverflowIsRefused(int.MinValue)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.SignedByteOverflowIsRefused(-129)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.SignedByteOverflowIsRefused(128)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.SignedByteOverflowIsRefused(int.MaxValue)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.SignedByteOverflowIsRefused(int.MinValue)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.UnsignedShortAndCharOverflowIsRefused(-1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.UnsignedShortAndCharOverflowIsRefused(65536)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.UnsignedShortAndCharOverflowIsRefused(int.MaxValue)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ValidBoundariesRemainReadable",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ZigZagShortChecksItsRange(-32768,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ZigZagShortChecksItsRange(-32769,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ZigZagShortChecksItsRange(32767,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ZigZagShortChecksItsRange(32768,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ZigZagSignedByteChecksItsRange(-128,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ZigZagSignedByteChecksItsRange(-129,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ZigZagSignedByteChecksItsRange(127,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ZigZagSignedByteChecksItsRange(128,False)"
+          ],
+          "discoveryArtifact": "small-integer-host-v3",
+          "reason": "Discovery only; matching source/build receipts and ordinary passing execution remain required."
+        },
+        {
+          "lane": "unity-editor-playmode",
+          "status": "discovered",
+          "caseNames": [
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ByteOverflowIsRefused(-1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ByteOverflowIsRefused(256)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ByteOverflowIsRefused(int.MaxValue)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.CharacterMessageFormatterRefusesOverflow",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.EmptyAndTruncatedSmallScalarsRefuseAndClearOutput(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.EmptyAndTruncatedSmallScalarsRefuseAndClearOutput(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.FailedReaderRefusesEverySmallIntegerReadWithoutConsumption",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedBoundariesPreserveWireBytes",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(1,256)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(10,-32769)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(10,32768)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(11,-129)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(11,128)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(12,32768)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(13,128)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(14,65536)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(15,65536)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(2,-129)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(2,128)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(3,-32769)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(3,32768)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(4,65536)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(5,65536)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(6,32768)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(7,32768)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.GeneratedMembersRefuseOverflow(8,256)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.MapKeysAndValuesRefuseOverflow(16,1,65536)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.MapKeysAndValuesRefuseOverflow(16,2,65536)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.MapKeysAndValuesRefuseOverflow(17,1,-129)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.MapKeysAndValuesRefuseOverflow(17,1,128)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.MapKeysAndValuesRefuseOverflow(17,2,-32769)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.MapKeysAndValuesRefuseOverflow(17,2,32768)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.MapKeysAndValuesRefuseOverflow(9,1,32768)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.MapKeysAndValuesRefuseOverflow(9,2,256)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.PackedMembersRefuseOverflow(13,-129)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.PackedMembersRefuseOverflow(13,128)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.PackedMembersRefuseOverflow(14,65536)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.PackedMembersRefuseOverflow(7,-32769)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.PackedMembersRefuseOverflow(7,32768)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.PackedMembersRefuseOverflow(8,256)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ShortOverflowIsRefused(-32769)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ShortOverflowIsRefused(32768)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ShortOverflowIsRefused(int.MaxValue)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ShortOverflowIsRefused(int.MinValue)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.SignedByteOverflowIsRefused(-129)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.SignedByteOverflowIsRefused(128)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.SignedByteOverflowIsRefused(int.MaxValue)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.SignedByteOverflowIsRefused(int.MinValue)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.UnsignedShortAndCharOverflowIsRefused(-1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.UnsignedShortAndCharOverflowIsRefused(65536)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.UnsignedShortAndCharOverflowIsRefused(int.MaxValue)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ValidBoundariesRemainReadable",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ZigZagShortChecksItsRange(-32768,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ZigZagShortChecksItsRange(-32769,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ZigZagShortChecksItsRange(32767,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ZigZagShortChecksItsRange(32768,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ZigZagSignedByteChecksItsRange(-128,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ZigZagSignedByteChecksItsRange(-129,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ZigZagSignedByteChecksItsRange(127,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoSmallIntegerTests.ZigZagSignedByteChecksItsRange(128,False)"
+          ],
+          "discoveryArtifact": "small-integer-native",
+          "reason": "Discovery-only full NUnit identities from the ordinary PlayMode runner; source/build evidence remains separate."
+        },
+        {
+          "lane": "unity-editor-editmode",
+          "status": "not-applicable",
+          "caseNames": [],
+          "discoveryArtifact": null,
+          "reason": "This fixture is not bound to this lane."
+        },
+        {
+          "lane": "unity-editor-playmode-wproto-only",
+          "status": "not-applicable",
+          "caseNames": [],
+          "discoveryArtifact": null,
+          "reason": "This fixture is not bound to this lane."
+        }
+      ]
+    },
+    {
+      "fixture": "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests",
+      "sourcePath": "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/SmallIntegerDifferentialTests.cs",
+      "lanes": [
+        {
+          "lane": "host-v2",
+          "status": "discovered",
+          "caseNames": [
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.CharacterRootRefusesAnOverflowBeforeALaterValidOccurrence",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.GeneratedBoundaryBytesAndReadDirectionsMatchOracle(False)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.GeneratedBoundaryBytesAndReadDirectionsMatchOracle(True)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.GeneratedOverflowMatchesOracle(1,256,False)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.GeneratedOverflowMatchesOracle(10,-32769,True)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.GeneratedOverflowMatchesOracle(10,32768,True)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.GeneratedOverflowMatchesOracle(11,-129,True)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.GeneratedOverflowMatchesOracle(11,128,True)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.GeneratedOverflowMatchesOracle(12,32768,True)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.GeneratedOverflowMatchesOracle(13,128,False)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.GeneratedOverflowMatchesOracle(14,65536,False)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.GeneratedOverflowMatchesOracle(15,65536,False)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.GeneratedOverflowMatchesOracle(2,128,False)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.GeneratedOverflowMatchesOracle(3,32768,False)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.GeneratedOverflowMatchesOracle(4,65536,False)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.GeneratedOverflowMatchesOracle(5,65536,False)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.GeneratedOverflowMatchesOracle(6,32768,False)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.GeneratedOverflowMatchesOracle(7,32768,False)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.GeneratedOverflowMatchesOracle(8,256,False)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.MapOverflowMatchesOracle(16,1,65536)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.MapOverflowMatchesOracle(16,2,65536)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.MapOverflowMatchesOracle(17,1,128)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.MapOverflowMatchesOracle(17,2,32768)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.MapOverflowMatchesOracle(9,1,32768)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.MapOverflowMatchesOracle(9,2,256)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.PackedOverflowMatchesOracle(13,128)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.PackedOverflowMatchesOracle(14,65536)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.PackedOverflowMatchesOracle(7,32768)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.PackedOverflowMatchesOracle(8,256)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.ScalarBoundariesMatchBothOracleVersions",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.ScalarOverflowMatchesBothOracleVersions"
+          ],
+          "discoveryArtifact": "small-integer-host-v2",
+          "reason": "Discovery only; matching source/build receipts and ordinary passing execution remain required."
+        },
+        {
+          "lane": "host-v3",
+          "status": "discovered",
+          "caseNames": [
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.CharacterRootRefusesAnOverflowBeforeALaterValidOccurrence",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.GeneratedBoundaryBytesAndReadDirectionsMatchOracle(False)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.GeneratedBoundaryBytesAndReadDirectionsMatchOracle(True)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.GeneratedOverflowMatchesOracle(1,256,False)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.GeneratedOverflowMatchesOracle(10,-32769,True)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.GeneratedOverflowMatchesOracle(10,32768,True)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.GeneratedOverflowMatchesOracle(11,-129,True)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.GeneratedOverflowMatchesOracle(11,128,True)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.GeneratedOverflowMatchesOracle(12,32768,True)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.GeneratedOverflowMatchesOracle(13,128,False)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.GeneratedOverflowMatchesOracle(14,65536,False)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.GeneratedOverflowMatchesOracle(15,65536,False)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.GeneratedOverflowMatchesOracle(2,128,False)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.GeneratedOverflowMatchesOracle(3,32768,False)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.GeneratedOverflowMatchesOracle(4,65536,False)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.GeneratedOverflowMatchesOracle(5,65536,False)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.GeneratedOverflowMatchesOracle(6,32768,False)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.GeneratedOverflowMatchesOracle(7,32768,False)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.GeneratedOverflowMatchesOracle(8,256,False)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.MapOverflowMatchesOracle(16,1,65536)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.MapOverflowMatchesOracle(16,2,65536)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.MapOverflowMatchesOracle(17,1,128)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.MapOverflowMatchesOracle(17,2,32768)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.MapOverflowMatchesOracle(9,1,32768)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.MapOverflowMatchesOracle(9,2,256)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.PackedOverflowMatchesOracle(13,128)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.PackedOverflowMatchesOracle(14,65536)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.PackedOverflowMatchesOracle(7,32768)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.PackedOverflowMatchesOracle(8,256)",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.ScalarBoundariesMatchBothOracleVersions",
+            "WallstopStudios.UnityHelpers.Proto.Generator.Tests.SmallIntegerDifferentialTests.ScalarOverflowMatchesBothOracleVersions"
+          ],
+          "discoveryArtifact": "small-integer-host-v3",
+          "reason": "Discovery only; matching source/build receipts and ordinary passing execution remain required."
+        },
+        {
+          "lane": "unity-editor-playmode",
+          "status": "not-applicable",
+          "caseNames": [],
+          "discoveryArtifact": null,
+          "reason": "This fixture is not bound to this lane."
+        },
+        {
+          "lane": "unity-editor-editmode",
+          "status": "not-applicable",
+          "caseNames": [],
+          "discoveryArtifact": null,
+          "reason": "This fixture is not bound to this lane."
+        },
+        {
+          "lane": "unity-editor-playmode-wproto-only",
+          "status": "not-applicable",
+          "caseNames": [],
+          "discoveryArtifact": null,
+          "reason": "This fixture is not bound to this lane."
+        }
+      ]
+    },
     {
       "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests",
       "sourcePath": "Tests/Runtime/Serialization/WProtoCollectionElementBudgetTests.cs",

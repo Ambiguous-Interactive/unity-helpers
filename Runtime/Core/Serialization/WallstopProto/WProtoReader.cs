@@ -520,6 +520,141 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             return true;
         }
 
+        /// <summary>Reads a signed 8-bit integer, refusing values outside its range.</summary>
+        /// <param name="value">Receives the value, or the type's default on failure.</param>
+        /// <returns>Whether the decoded value fits its destination type.</returns>
+        /// <remarks>Overflow consumes the encoded value and latches <see cref="Malformed"/>.</remarks>
+        public bool TryReadSByte(out sbyte value)
+        {
+            if (
+                !TryReadInt32(out int decoded)
+                || decoded < sbyte.MinValue
+                || sbyte.MaxValue < decoded
+            )
+            {
+                _malformed = true;
+                value = default;
+                return false;
+            }
+
+            value = (sbyte)decoded;
+            return true;
+        }
+
+        /// <summary>Reads an unsigned 8-bit integer, refusing values outside its range.</summary>
+        /// <param name="value">Receives the value, or the type's default on failure.</param>
+        /// <returns>Whether the decoded value fits its destination type.</returns>
+        /// <remarks>Overflow consumes the encoded value and latches <see cref="Malformed"/>.</remarks>
+        public bool TryReadByte(out byte value)
+        {
+            if (!TryReadVarint32(out uint decoded) || byte.MaxValue < decoded)
+            {
+                _malformed = true;
+                value = default;
+                return false;
+            }
+
+            value = (byte)decoded;
+            return true;
+        }
+
+        /// <summary>Reads a signed 16-bit integer, refusing values outside its range.</summary>
+        /// <param name="value">Receives the value, or the type's default on failure.</param>
+        /// <returns>Whether the decoded value fits its destination type.</returns>
+        /// <remarks>Overflow consumes the encoded value and latches <see cref="Malformed"/>.</remarks>
+        public bool TryReadInt16(out short value)
+        {
+            if (
+                !TryReadInt32(out int decoded)
+                || decoded < short.MinValue
+                || short.MaxValue < decoded
+            )
+            {
+                _malformed = true;
+                value = default;
+                return false;
+            }
+
+            value = (short)decoded;
+            return true;
+        }
+
+        /// <summary>Reads an unsigned 16-bit integer, refusing values outside its range.</summary>
+        /// <param name="value">Receives the value, or the type's default on failure.</param>
+        /// <returns>Whether the decoded value fits its destination type.</returns>
+        /// <remarks>Overflow consumes the encoded value and latches <see cref="Malformed"/>.</remarks>
+        public bool TryReadUInt16(out ushort value)
+        {
+            if (!TryReadVarint32(out uint decoded) || ushort.MaxValue < decoded)
+            {
+                _malformed = true;
+                value = default;
+                return false;
+            }
+
+            value = (ushort)decoded;
+            return true;
+        }
+
+        /// <summary>Reads a UTF-16 code unit, refusing values outside its range.</summary>
+        /// <param name="value">Receives the value, or the type's default on failure.</param>
+        /// <returns>Whether the decoded value fits its destination type.</returns>
+        /// <remarks>Overflow consumes the encoded value and latches <see cref="Malformed"/>.</remarks>
+        public bool TryReadChar(out char value)
+        {
+            if (!TryReadVarint32(out uint decoded) || char.MaxValue < decoded)
+            {
+                _malformed = true;
+                value = default;
+                return false;
+            }
+
+            value = (char)decoded;
+            return true;
+        }
+
+        /// <summary>Reads a ZigZag-encoded signed 8-bit integer, refusing values outside its range.</summary>
+        /// <param name="value">Receives the value, or the type's default on failure.</param>
+        /// <returns>Whether the decoded value fits its destination type.</returns>
+        /// <remarks>Overflow consumes the encoded value and latches <see cref="Malformed"/>.</remarks>
+        public bool TryReadZigZagSByte(out sbyte value)
+        {
+            if (
+                !TryReadZigZag32(out int decoded)
+                || decoded < sbyte.MinValue
+                || sbyte.MaxValue < decoded
+            )
+            {
+                _malformed = true;
+                value = default;
+                return false;
+            }
+
+            value = (sbyte)decoded;
+            return true;
+        }
+
+        /// <summary>Reads a ZigZag-encoded signed 16-bit integer, refusing values outside its range.</summary>
+        /// <param name="value">Receives the value, or the type's default on failure.</param>
+        /// <returns>Whether the decoded value fits its destination type.</returns>
+        /// <remarks>Overflow consumes the encoded value and latches <see cref="Malformed"/>.</remarks>
+        public bool TryReadZigZagInt16(out short value)
+        {
+            if (
+                !TryReadZigZag32(out int decoded)
+                || decoded < short.MinValue
+                || short.MaxValue < decoded
+            )
+            {
+                _malformed = true;
+                value = default;
+                return false;
+            }
+
+            value = (short)decoded;
+            return true;
+        }
+
         /// <summary>
         /// Reads a protobuf <c>float</c> (fixed32).
         /// </summary>

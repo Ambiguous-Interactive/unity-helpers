@@ -963,14 +963,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <inheritdoc />
         public bool TryRead(ref WProtoReader reader, out char value)
         {
-            if (!reader.TryReadVarint32(out uint raw))
-            {
-                value = default(char);
-                return false;
-            }
-
-            value = (char)raw;
-            return true;
+            return reader.TryReadChar(out value);
         }
     }
 
@@ -997,12 +990,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
         public bool TryRead(ref WProtoReader reader, out char value)
         {
-            uint raw = 0U;
+            char raw = default;
             while (reader.TryReadTag(out int fieldNumber, out int wireType))
             {
                 if (fieldNumber == 1 && wireType == WProtoWireType.Varint)
                 {
-                    if (!reader.TryReadVarint32(out raw))
+                    if (!reader.TryReadChar(out raw))
                     {
                         value = default(char);
                         return false;
@@ -1021,7 +1014,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
-            value = (char)raw;
+            value = raw;
             return true;
         }
     }

@@ -58,6 +58,8 @@
     <Compile Include="$(RepoRoot)/Runtime/Core/Serialization/SerializationCapacityLimits.cs" />
     <Compile Include="$(RepoRoot)/Runtime/Core/Serialization/SerializationFailureException.cs" />
     <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoEnumFormatterTests.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoSmallIntegerTests.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoSmallIntegerContract.cs" />
     <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoReadLimitsTests.cs" />
     <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoDecodedPayloadBudgetTests.cs" />
     <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoCollectionElementBudgetTests.cs" />
