@@ -155,6 +155,11 @@ spawner._dontDestroyOnLoad = true;
 
 ChildSpawner prevents duplicate instantiation:
 
+A prefab callback that disables and re-enables the same spawner during instantiation
+does not start another spawning pass. Later lifecycle events still recreate destroyed
+children. This guard applies to each spawner; callbacks that enable a different
+spawner retain the existing persistent-prefab tracking policy.
+
 ```csharp
 // Spawns DebugCanvas once
 ChildSpawner spawner1 = obj1.AddComponent<ChildSpawner>();

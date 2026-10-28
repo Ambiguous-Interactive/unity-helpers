@@ -42,7 +42,10 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// Instantiates a curated list of prefabs as children of the current GameObject while ensuring
     /// duplicates across scenes are avoided and optional DontDestroyOnLoad behaviour is applied.
     /// </summary>
-    /// <remarks>Destroyed children can be spawned again by the next configured lifecycle event.</remarks>
+    /// <remarks>
+    /// Destroyed children can be spawned again by the next configured lifecycle event.
+    /// Lifecycle callbacks during instantiation cannot reenter the same spawning pass.
+    /// </remarks>
     [DisallowMultipleComponent]
     public sealed class ChildSpawner : MonoBehaviour
     {
@@ -74,6 +77,8 @@ namespace WallstopStudios.UnityHelpers.Utils
         internal GameObject[] _developmentOnlyPrefabs = Array.Empty<GameObject>();
 
         private readonly Dictionary<GameObject, List<GameObject>> _spawnedPrefabs = new();
+
+        private bool _isSpawning;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         internal static void ClearSpawnedPrefabs()
@@ -200,20 +205,32 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </summary>
         private void Spawn()
         {
-            TrySetDontDestroyOnLoad();
-            CheckForDuplicatePrefabs();
-
-            int count = 0;
-            SpawnGroup(_prefabs, string.Empty, ref count);
-#if UNITY_EDITOR
-            if (Application.isEditor)
+            if (_isSpawning)
             {
-                SpawnGroup(_editorOnlyPrefabs, "EDITOR-ONLY ", ref count);
+                return;
             }
-#endif
-            if (Application.isEditor || Debug.isDebugBuild)
+            _isSpawning = true;
+            try
             {
-                SpawnGroup(_developmentOnlyPrefabs, "DEVELOPMENT-ONLY ", ref count);
+                TrySetDontDestroyOnLoad();
+                CheckForDuplicatePrefabs();
+
+                int count = 0;
+                SpawnGroup(_prefabs, string.Empty, ref count);
+#if UNITY_EDITOR
+                if (Application.isEditor)
+                {
+                    SpawnGroup(_editorOnlyPrefabs, "EDITOR-ONLY ", ref count);
+                }
+#endif
+                if (Application.isEditor || Debug.isDebugBuild)
+                {
+                    SpawnGroup(_developmentOnlyPrefabs, "DEVELOPMENT-ONLY ", ref count);
+                }
+            }
+            finally
+            {
+                _isSpawning = false;
             }
         }
 
