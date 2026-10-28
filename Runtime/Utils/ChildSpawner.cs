@@ -42,10 +42,14 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// Instantiates a curated list of prefabs as children of the current GameObject while ensuring
     /// duplicates across scenes are avoided and optional DontDestroyOnLoad behaviour is applied.
     /// </summary>
+    /// <remarks>
+    /// Destroyed children can be spawned again by the next configured lifecycle event.
+    /// Lifecycle callbacks during instantiation cannot reenter the same spawning pass.
+    /// </remarks>
     [DisallowMultipleComponent]
     public sealed class ChildSpawner : MonoBehaviour
     {
-        private static readonly HashSet<GameObject> SpawnedPrefabs = new();
+        private static readonly Dictionary<GameObject, GameObject> SpawnedPrefabs = new();
 
         [FormerlySerializedAs("dontDestroyOnLoad")]
         [SerializeField]
@@ -72,7 +76,9 @@ namespace WallstopStudios.UnityHelpers.Utils
         [SerializeField]
         internal GameObject[] _developmentOnlyPrefabs = Array.Empty<GameObject>();
 
-        private readonly HashSet<GameObject> _spawnedPrefabs = new();
+        private readonly Dictionary<GameObject, List<GameObject>> _spawnedPrefabs = new();
+
+        private bool _isSpawning;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         internal static void ClearSpawnedPrefabs()
@@ -199,73 +205,88 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </summary>
         private void Spawn()
         {
-            TrySetDontDestroyOnLoad();
-            CheckForDuplicatePrefabs();
-
-            int count = 0;
-            foreach (GameObject prefab in _prefabs)
+            if (_isSpawning)
             {
-                GameObject child = Spawn(prefab);
-                if (child != null)
-                {
-                    child.name = $"{child.name} ({count++:00})";
-                }
+                return;
             }
-
-            foreach (GameObject prefab in _prefabs)
+            _isSpawning = true;
+            try
             {
-                if (prefab != null)
-                {
-                    _spawnedPrefabs.Add(prefab);
-                }
-            }
+                TrySetDontDestroyOnLoad();
+                CheckForDuplicatePrefabs();
 
+                int count = 0;
+                SpawnGroup(_prefabs, string.Empty, ref count);
 #if UNITY_EDITOR
-            if (Application.isEditor)
-            {
-                foreach (GameObject prefab in _editorOnlyPrefabs)
+                if (Application.isEditor)
                 {
-                    GameObject child = Spawn(prefab);
-                    if (child != null)
-                    {
-                        child.name = $"{child.name} (EDITOR-ONLY {count++:00})";
-                    }
+                    SpawnGroup(_editorOnlyPrefabs, "EDITOR-ONLY ", ref count);
                 }
-
-                foreach (GameObject prefab in _editorOnlyPrefabs)
+#endif
+                if (Application.isEditor || Debug.isDebugBuild)
                 {
-                    if (prefab != null)
-                    {
-                        _spawnedPrefabs.Add(prefab);
-                    }
+                    SpawnGroup(_developmentOnlyPrefabs, "DEVELOPMENT-ONLY ", ref count);
                 }
             }
-#endif
-
-            if (Application.isEditor || Debug.isDebugBuild)
+            finally
             {
-                foreach (GameObject prefab in _developmentOnlyPrefabs)
-                {
-                    GameObject child = Spawn(prefab);
-                    if (child != null)
-                    {
-                        child.name = $"{child.name} (DEVELOPMENT-ONLY {count++:00})";
-                    }
-                }
-
-                foreach (GameObject prefab in _developmentOnlyPrefabs)
-                {
-                    if (prefab != null)
-                    {
-                        _spawnedPrefabs.Add(prefab);
-                    }
-                }
+                _isSpawning = false;
             }
         }
 
+        private void SpawnGroup(GameObject[] prefabs, string label, ref int count)
+        {
+            if (prefabs == null || prefabs.Length == 0)
+            {
+                return;
+            }
+
+            using PooledResource<List<(GameObject prefab, GameObject child)>> spawnedLease =
+                Buffers<(GameObject prefab, GameObject child)>.List.Get(
+                    out List<(GameObject prefab, GameObject child)> spawned
+                );
+            foreach (GameObject prefab in prefabs)
+            {
+                GameObject child = Spawn(prefab);
+                if (child == null)
+                {
+                    continue;
+                }
+                child.name = $"{child.name} ({label}{count++:00})";
+                spawned.Add((prefab, child));
+            }
+
+            // Preserve duplicate entries within one nonpersistent group while suppressing later lifecycle calls.
+            foreach ((GameObject prefab, GameObject child) entry in spawned)
+            {
+                if (!_spawnedPrefabs.TryGetValue(entry.prefab, out List<GameObject> instances))
+                {
+                    instances = new List<GameObject>(1);
+                    _spawnedPrefabs.Add(entry.prefab, instances);
+                }
+                instances.Add(entry.child);
+            }
+        }
+
+        private bool HasLiveSpawnedInstance(GameObject prefab)
+        {
+            if (!_spawnedPrefabs.TryGetValue(prefab, out List<GameObject> instances))
+            {
+                return false;
+            }
+            foreach (GameObject instance in instances)
+            {
+                if (instance != null)
+                {
+                    return true;
+                }
+            }
+            instances.Clear();
+            return false;
+        }
+
         /// <summary>
-        /// Instantiates <paramref name="prefab"/> as a child of this component if it has not been
-        /// spawned previously, guarding against duplicate DontDestroyOnLoad instances.
+        /// Instantiates <paramref name="prefab"/> when no tracked instance is still alive.
         /// </summary>
         /// <param name="prefab">Prefab to spawn.</param>
         /// <returns>The instantiated child instance, or <c>null</c> if the spawn is skipped.</returns>
@@ -278,17 +299,25 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return null;
             }
 
-            if (_spawnedPrefabs.Contains(prefab))
+            if (HasLiveSpawnedInstance(prefab))
             {
                 return null;
             }
 
-            if (SpawnedPrefabs.Contains(prefab))
+            if (SpawnedPrefabs.TryGetValue(prefab, out GameObject existing))
             {
-                return null;
+                if (existing != null)
+                {
+                    return null;
+                }
+                SpawnedPrefabs.Remove(prefab);
             }
 
             GameObject child = Instantiate(prefab, transform);
+            if (child == null)
+            {
+                return null;
+            }
             CleanName(child);
             if (
                 child.IsDontDestroyOnLoad()
@@ -296,7 +325,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 || prefab.IsDontDestroyOnLoad()
             )
             {
-                SpawnedPrefabs.Add(prefab);
+                SpawnedPrefabs[prefab] = child;
             }
             return child;
         }

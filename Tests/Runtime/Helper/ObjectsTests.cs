@@ -345,7 +345,102 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             yield return null;
 
             int hashAfter = Objects.EnumerableHashCode(objects);
-            Assert.AreEqual(0, hashAfter, "Destroyed Unity objects should hash as null.");
+            Assert.AreEqual(hashBefore, hashAfter, "Destroyed Unity objects must keep their hash.");
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void HashCodesRemainStableAfterUnityObjectDestruction(bool boxed)
+        {
+            GameObject instance = Track(new GameObject("StableHash"));
+            GameObject[] typedValues = { instance, null };
+            object[] boxedValues = { instance, null };
+            int single = boxed ? Objects.HashCode((object)instance) : Objects.HashCode(instance);
+            int mixed = boxed
+                ? Objects.HashCode(7, (object)instance)
+                : Objects.HashCode(7, instance);
+            int span = boxed
+                ? Objects.SpanHashCode<object>(boxedValues)
+                : Objects.SpanHashCode<GameObject>(typedValues);
+            int enumerable = boxed
+                ? Objects.EnumerableHashCode<object>(boxedValues)
+                : Objects.EnumerableHashCode<GameObject>(typedValues);
+
+            Object.DestroyImmediate(instance); // UNH-SUPPRESS: Verify hashing after native destruction.
+
+            Assert.That(instance == null, Is.True);
+            Assert.That(
+                boxed ? Objects.HashCode((object)instance) : Objects.HashCode(instance),
+                Is.EqualTo(single)
+            );
+            Assert.That(
+                boxed ? Objects.HashCode(7, (object)instance) : Objects.HashCode(7, instance),
+                Is.EqualTo(mixed)
+            );
+            Assert.That(
+                boxed
+                    ? Objects.SpanHashCode<object>(boxedValues)
+                    : Objects.SpanHashCode<GameObject>(typedValues),
+                Is.EqualTo(span)
+            );
+            Assert.That(
+                boxed
+                    ? Objects.EnumerableHashCode<object>(boxedValues)
+                    : Objects.EnumerableHashCode<GameObject>(typedValues),
+                Is.EqualTo(enumerable)
+            );
+        }
+
+        [Test]
+        public void DestroyedUnityObjectKeysRemainReachableInCollections()
+        {
+            GameObject instance = Track(new GameObject("DictionaryKey"));
+            UnityObjectKey key = new(instance, 7);
+            Dictionary<UnityObjectKey, int> dictionary = new() { [key] = 42 };
+            HashSet<UnityObjectKey> set = new() { key };
+            int hash = key.GetHashCode();
+
+            Object.DestroyImmediate(instance); // UNH-SUPPRESS: Verify dictionary removal after native destruction.
+
+            UnityObjectKey lookup = new(instance, 7);
+            Assert.That(lookup.GetHashCode(), Is.EqualTo(hash));
+            Assert.That(dictionary.TryGetValue(lookup, out int value), Is.True);
+            Assert.That(value, Is.EqualTo(42));
+            Assert.That(dictionary.Remove(lookup), Is.True);
+            Assert.That(set.Remove(lookup), Is.True);
+            Assert.That(dictionary.Count, Is.Zero);
+            Assert.That(set.Count, Is.Zero);
+        }
+
+        [Test]
+        public void HashCodeUsesUnityInstanceHashThroughBaseTypes()
+        {
+            GameObject instance = Track(new GameObject("BaseTypeHash"));
+            Component component = instance.transform;
+            Object unityObject = component;
+            int expected = Objects.HashCode(component.GetHashCode());
+            Assert.That(Objects.HashCode(component), Is.EqualTo(expected));
+            Assert.That(Objects.HashCode(unityObject), Is.EqualTo(expected));
+            Assert.That(Objects.HashCode((object)component), Is.EqualTo(expected));
+
+            Object.DestroyImmediate(instance); // UNH-SUPPRESS: Verify base-type hashes after native destruction.
+
+            Assert.That(Objects.HashCode(component), Is.EqualTo(expected));
+            Assert.That(Objects.HashCode(unityObject), Is.EqualTo(expected));
+            Assert.That(Objects.HashCode((object)component), Is.EqualTo(expected));
+        }
+
+        [Test]
+        public void NullUnityObjectHashesRemainZeroThroughAllDeclaredTypes()
+        {
+            Assert.That(Objects.HashCode((GameObject)null), Is.Zero);
+            Assert.That(Objects.HashCode((Component)null), Is.Zero);
+            Assert.That(Objects.HashCode((Object)null), Is.Zero);
+            Assert.That(Objects.HashCode((object)null), Is.Zero);
+            Assert.That(
+                Objects.HashCode(7, (GameObject)null),
+                Is.EqualTo(Objects.HashCode(7, (object)null))
+            );
         }
 
         [Test]
@@ -554,6 +649,34 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             IEnumerator IEnumerable.GetEnumerator()
             {
                 return GetEnumerator();
+            }
+        }
+
+        private readonly struct UnityObjectKey : IEquatable<UnityObjectKey>
+        {
+            private readonly Object _instance;
+            private readonly int _identifier;
+
+            internal UnityObjectKey(Object instance, int identifier)
+            {
+                _instance = instance;
+                _identifier = identifier;
+            }
+
+            public bool Equals(UnityObjectKey other)
+            {
+                return ReferenceEquals(_instance, other._instance)
+                    && _identifier == other._identifier;
+            }
+
+            public override bool Equals(object other)
+            {
+                return other is UnityObjectKey key && Equals(key);
+            }
+
+            public override int GetHashCode()
+            {
+                return Objects.HashCode(_identifier, _instance);
             }
         }
     }

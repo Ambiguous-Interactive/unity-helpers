@@ -86,11 +86,12 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
         /// <summary>
         /// Maximum depth to search up the hierarchy. 0 means unlimited. Default: 0.
-        /// Depth 1 = immediate parent only, depth 2 = parent and grandparent, etc.
+        /// Depth 1 includes the immediate parent, depth 2 includes the grandparent, etc.
         /// </summary>
         /// <remarks>
-        /// Negative values are treated as 0 (unlimited). The search proceeds from closest
-        /// to most distant ancestors.
+        /// Negative values are treated as 0 (unlimited). Depth is measured from the component's
+        /// GameObject at zero, whether or not OnlyAncestors excludes it from the results.
+        /// The search proceeds from closest to most distant ancestors.
         /// </remarks>
         public int MaxDepth
         {
@@ -595,11 +596,11 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             {
                 Transform current = root;
                 int depth = 0;
-                int maxDepth = 0 < attribute.MaxDepth ? attribute.MaxDepth : int.MaxValue;
+                int maxDepth = GetMaximumDepthFromSearchRoot(attribute);
 
                 using PooledResource<List<Component>> parentComponentBuffer =
                     Buffers<Component>.List.Get(out List<Component> components);
-                while (current != null && depth < maxDepth)
+                while (current != null && depth <= maxDepth)
                 {
                     GetComponentsOfType(
                         current,
@@ -624,11 +625,11 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
             if (0 < attribute.MaxDepth)
             {
+                int maxDepth = GetMaximumDepthFromSearchRoot(attribute);
                 foreach (Component comp in allParents)
                 {
                     int depth = GetDepthFromTransform(root, comp.transform);
-                    // Depth is relative to the search root, so MaxDepth excludes that numbered level.
-                    if (depth < attribute.MaxDepth)
+                    if (depth <= maxDepth)
                     {
                         buffer.Add(comp);
                     }
@@ -653,7 +654,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         {
             Transform current = root;
             int depth = 0;
-            int maxDepth = 0 < attribute.MaxDepth ? attribute.MaxDepth : int.MaxValue;
+            int maxDepth = GetMaximumDepthFromSearchRoot(attribute);
 
             bool needsScratch = isInterface || filters.RequiresPostProcessing;
             List<Component> components = null;
@@ -665,7 +666,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
             try
             {
-                while (current != null && depth < maxDepth)
+                while (current != null && depth <= maxDepth)
                 {
                     if (
                         TryResolveSingleComponent(
@@ -698,6 +699,15 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
             result = null;
             return false;
+        }
+
+        private static int GetMaximumDepthFromSearchRoot(ParentComponentAttribute attribute)
+        {
+            if (attribute.MaxDepth == 0)
+            {
+                return int.MaxValue;
+            }
+            return attribute.MaxDepth - (attribute.OnlyAncestors ? 1 : 0);
         }
 
         private static int GetDepthFromTransform(Transform start, Transform target)

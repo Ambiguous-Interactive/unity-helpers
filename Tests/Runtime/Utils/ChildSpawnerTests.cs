@@ -37,6 +37,139 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             base.TearDown();
         }
 
+        [TestCase(false, true)]
+        [TestCase(true, false)]
+        [TestCase(true, true)]
+        [TestCase(false, false)]
+        public void RecreatesDestroyedChildrenOnTheSameSpawner(
+            bool persistentSpawner,
+            bool persistentPrefab
+        )
+        {
+            GameObject prefab = Track(new GameObject("RespawnPrefab"));
+            if (persistentPrefab)
+            {
+                Object.DontDestroyOnLoad(prefab);
+            }
+            ChildSpawner spawner = CreateSpawner(prefab, persistentSpawner);
+            InvokeStartOnce(spawner);
+            Assert.That(spawner.transform.childCount, Is.EqualTo(1));
+            GameObject original = spawner.transform.GetChild(0).gameObject;
+            Object.DestroyImmediate(original); // UNH-SUPPRESS: Verify spawning after destruction.
+
+            spawner._spawnMethod = ChildSpawnMethod.Start;
+            InvokeStartOnce(spawner);
+
+            Assert.That(spawner.transform.childCount, Is.EqualTo(1));
+            Assert.That(
+                ReferenceEquals(original, spawner.transform.GetChild(0).gameObject),
+                Is.False
+            );
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void RecreatesDestroyedPersistentChildrenOnAnotherSpawner(bool persistentPrefab)
+        {
+            GameObject prefab = Track(new GameObject("GlobalPrefab"));
+            if (persistentPrefab)
+            {
+                Object.DontDestroyOnLoad(prefab);
+            }
+            ChildSpawner first = CreateSpawner(prefab, !persistentPrefab);
+            InvokeStartOnce(first);
+            GameObject original = first.transform.GetChild(0).gameObject;
+            ChildSpawner second = CreateSpawner(prefab, !persistentPrefab);
+            InvokeStartOnce(second);
+            Assert.That(
+                second.transform.childCount,
+                Is.Zero,
+                "A live persistent instance must be reused."
+            );
+
+            Object.DestroyImmediate(original); // UNH-SUPPRESS: Verify global spawn tracking after destruction.
+            second._spawnMethod = ChildSpawnMethod.Start;
+            InvokeStartOnce(second);
+
+            Assert.That(second.transform.childCount, Is.EqualTo(1));
+            ChildSpawner third = CreateSpawner(prefab, !persistentPrefab);
+            InvokeStartOnce(third);
+            Assert.That(third.transform.childCount, Is.Zero);
+        }
+
+        [Test]
+        public void PersistentChildRemainsTrackedAfterItsSpawnerIsDestroyed()
+        {
+            GameObject prefab = Track(new GameObject("DetachedPrefab"));
+            ChildSpawner first = CreateSpawner(prefab, true);
+            InvokeStartOnce(first);
+            GameObject original = Track(first.transform.GetChild(0).gameObject);
+            original.transform.SetParent(null);
+            Object.DontDestroyOnLoad(original);
+            Object.DestroyImmediate(first.gameObject); // UNH-SUPPRESS: Verify tracking follows the child rather than its spawner.
+
+            ChildSpawner second = CreateSpawner(prefab, true);
+            InvokeStartOnce(second);
+            Assert.That(second.transform.childCount, Is.Zero);
+            Object.DestroyImmediate(original); // UNH-SUPPRESS: Verify the detached child's destruction allows a replacement.
+            second._spawnMethod = ChildSpawnMethod.Start;
+            InvokeStartOnce(second);
+            Assert.That(second.transform.childCount, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void DestroyingOnePersistentChildPreservesOtherPrefabInstances()
+        {
+            GameObject firstPrefab = Track(new GameObject("FirstPrefab"));
+            GameObject secondPrefab = Track(new GameObject("SecondPrefab"));
+            ChildSpawner first = CreateSpawner(firstPrefab, true);
+            first._prefabs = new[] { firstPrefab, secondPrefab };
+            InvokeStartOnce(first);
+            GameObject survivor = first.transform.GetChild(1).gameObject;
+            Object.DestroyImmediate(first.transform.GetChild(0).gameObject); // UNH-SUPPRESS: Verify per-prefab replacement.
+            ChildSpawner second = CreateSpawner(firstPrefab, true);
+            second._prefabs = new[] { firstPrefab, secondPrefab };
+            InvokeStartOnce(second);
+            Assert.That(second.transform.childCount, Is.EqualTo(1));
+            Assert.That(survivor != null, Is.True);
+            Assert.That(first.transform.childCount, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void RemainingDuplicateChildPreventsRespawnUntilAllInstancesAreDestroyed()
+        {
+            GameObject prefab = Track(new GameObject("DuplicatePrefab"));
+            ChildSpawner spawner = CreateSpawner(prefab, false);
+            spawner._prefabs = new[] { prefab, prefab };
+            ExpectWallstopLog(
+                LogType.Warning,
+                new System.Text.RegularExpressions.Regex("Duplicate child prefab")
+            );
+            InvokeStartOnce(spawner);
+            Assert.That(spawner.transform.childCount, Is.EqualTo(2));
+            Object.DestroyImmediate(spawner.transform.GetChild(1).gameObject); // UNH-SUPPRESS: Keep one duplicate alive.
+            spawner._prefabs = new[] { prefab };
+            spawner._spawnMethod = ChildSpawnMethod.Start;
+            InvokeStartOnce(spawner);
+            Assert.That(spawner.transform.childCount, Is.EqualTo(1));
+            Object.DestroyImmediate(spawner.transform.GetChild(0).gameObject); // UNH-SUPPRESS: Destroy the final duplicate.
+            spawner._spawnMethod = ChildSpawnMethod.Start;
+            InvokeStartOnce(spawner);
+            Assert.That(spawner.transform.childCount, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void NonPersistentChildrenAreIndependentAcrossSpawners()
+        {
+            GameObject prefab = Track(new GameObject("LocalPrefab"));
+            ChildSpawner first = CreateSpawner(prefab, false);
+            ChildSpawner second = CreateSpawner(prefab, false);
+            InvokeStartOnce(first);
+            InvokeStartOnce(second);
+            Assert.That(first.transform.childCount, Is.EqualTo(1));
+            Assert.That(second.transform.childCount, Is.EqualTo(1));
+        }
+
         [UnityTest]
         public IEnumerator SpawnsChildrenOnAwake()
         {
@@ -525,6 +658,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.AreEqual(1, spawnerStart.transform.childCount);
 
             yield return null;
+        }
+
+        private ChildSpawner CreateSpawner(GameObject prefab, bool persistent)
+        {
+            GameObject owner = Track(new GameObject("RespawnOwner", typeof(ChildSpawner)));
+            ChildSpawner spawner = owner.GetComponent<ChildSpawner>();
+            spawner._prefabs = new[] { prefab };
+            spawner._spawnMethod = ChildSpawnMethod.Start;
+            spawner._dontDestroyOnLoad = persistent;
+            return spawner;
         }
     }
 }

@@ -286,13 +286,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 case SpecialType.System_Int16:
                 case SpecialType.System_Int32:
                 {
-                    return Integer(qualified, type.SpecialType == SpecialType.System_Int32);
+                    return Integer(qualified, type.SpecialType);
                 }
                 case SpecialType.System_Byte:
                 case SpecialType.System_UInt16:
                 case SpecialType.System_UInt32:
                 {
-                    return Unsigned32(qualified, type.SpecialType == SpecialType.System_UInt32);
+                    return Unsigned32(qualified, type.SpecialType);
                 }
                 case SpecialType.System_Char:
                 {
@@ -505,9 +505,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     + widened
                     + ")",
                 WriteMethod = wide ? "TryWriteZigZag64" : "TryWriteZigZag32",
-                ReadMethod = wide ? "TryReadZigZag64" : "TryReadZigZag32",
-                ReadLocalType = wide ? "long" : "int",
-                AssignExpression = exact ? Placeholder : "(" + qualified + ")" + Placeholder,
+                ReadMethod =
+                    wide ? "TryReadZigZag64"
+                    : type.SpecialType == SpecialType.System_SByte ? "TryReadZigZagSByte"
+                    : type.SpecialType == SpecialType.System_Int16 ? "TryReadZigZagInt16"
+                    : "TryReadZigZag32",
+                ReadLocalType = qualified,
+                AssignExpression = Placeholder,
                 WriteCast = exact ? string.Empty : cast,
             };
         }
@@ -661,8 +665,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             return null;
         }
 
-        private static Shape Integer(string qualified, bool exact)
+        private static Shape Integer(string qualified, SpecialType type)
         {
+            bool exact = type == SpecialType.System_Int32;
+            string readMethod =
+                type == SpecialType.System_SByte ? "TryReadSByte"
+                : type == SpecialType.System_Int16 ? "TryReadInt16"
+                : "TryReadInt32";
             string widened = exact ? Placeholder : "(int)" + Placeholder;
             return new Shape
             {
@@ -670,9 +679,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 PresenceTest = Placeholder + " != 0",
                 SizeExpression = Proto + ".WProtoSizes.Int32Size(" + widened + ")",
                 WriteMethod = "TryWriteInt32",
-                ReadMethod = "TryReadInt32",
-                ReadLocalType = "int",
-                AssignExpression = exact ? Placeholder : "(" + qualified + ")" + Placeholder,
+                ReadMethod = readMethod,
+                ReadLocalType = qualified,
+                AssignExpression = Placeholder,
                 WriteCast = exact ? string.Empty : "(int)",
             };
         }
@@ -694,16 +703,21 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 PresenceTest = Placeholder + " != '\\0'",
                 SizeExpression = Proto + ".WProtoSizes.Varint32Size((uint)" + Placeholder + ")",
                 WriteMethod = "TryWriteVarint32",
-                ReadMethod = "TryReadVarint32",
-                ReadLocalType = "uint",
-                AssignExpression = "(char)" + Placeholder,
+                ReadMethod = "TryReadChar",
+                ReadLocalType = "char",
+                AssignExpression = Placeholder,
                 WriteCast = "(uint)",
                 NeverPacked = true,
             };
         }
 
-        private static Shape Unsigned32(string qualified, bool exact)
+        private static Shape Unsigned32(string qualified, SpecialType type)
         {
+            bool exact = type == SpecialType.System_UInt32;
+            string readMethod =
+                type == SpecialType.System_Byte ? "TryReadByte"
+                : type == SpecialType.System_UInt16 ? "TryReadUInt16"
+                : "TryReadVarint32";
             string widened = exact ? Placeholder : "(uint)" + Placeholder;
             return new Shape
             {
@@ -711,9 +725,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 PresenceTest = Placeholder + " != 0",
                 SizeExpression = Proto + ".WProtoSizes.Varint32Size(" + widened + ")",
                 WriteMethod = "TryWriteVarint32",
-                ReadMethod = "TryReadVarint32",
-                ReadLocalType = "uint",
-                AssignExpression = exact ? Placeholder : "(" + qualified + ")" + Placeholder,
+                ReadMethod = readMethod,
+                ReadLocalType = qualified,
+                AssignExpression = Placeholder,
                 WriteCast = exact ? string.Empty : "(uint)",
             };
         }

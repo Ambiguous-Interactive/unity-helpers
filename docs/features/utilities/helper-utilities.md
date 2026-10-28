@@ -1409,6 +1409,8 @@ appear to work and then fail.
 
 ### Stable Hashing for Saves and Networking
 
+Unity object hashes remain stable after `Destroy` or `DestroyImmediate`, including values passed as `object`, spans, and sequences. Only a managed null reference hashes as null. This keeps dictionary and set keys reachable after their Unity objects are destroyed. `Objects.Null` and `Objects.NotNull` still use Unity's destroyed-object checks.
+
 `Objects.StableHash32V1` hashes bytes and nothing else, so its answer depends only on its arguments:
 the same bytes and the same seed produce the same value in every process, on every platform, and in
 every later version of this package. The algorithm is frozen -- that is what the `V1` names -- so a

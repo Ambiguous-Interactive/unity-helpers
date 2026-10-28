@@ -407,14 +407,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
             public bool TryReadValue(ref WProtoReader reader, out char value)
             {
-                if (!reader.TryReadVarint32(out uint raw))
-                {
-                    value = default(char);
-                    return false;
-                }
-
-                value = (char)raw;
-                return true;
+                return reader.TryReadChar(out value);
             }
         }
 
@@ -439,14 +432,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
             public bool TryReadValue(ref WProtoReader reader, out short value)
             {
-                if (!reader.TryReadInt32(out int decoded))
-                {
-                    value = 0;
-                    return false;
-                }
-
-                value = (short)decoded;
-                return true;
+                return reader.TryReadInt16(out value);
             }
         }
 
@@ -471,14 +457,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
             public bool TryReadValue(ref WProtoReader reader, out ushort value)
             {
-                if (!reader.TryReadVarint32(out uint decoded))
-                {
-                    value = 0;
-                    return false;
-                }
-
-                value = (ushort)decoded;
-                return true;
+                return reader.TryReadUInt16(out value);
             }
         }
 
@@ -503,14 +482,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
             public bool TryReadValue(ref WProtoReader reader, out sbyte value)
             {
-                if (!reader.TryReadInt32(out int decoded))
-                {
-                    value = 0;
-                    return false;
-                }
-
-                value = (sbyte)decoded;
-                return true;
+                return reader.TryReadSByte(out value);
             }
         }
 
@@ -535,14 +507,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
             public bool TryReadValue(ref WProtoReader reader, out byte value)
             {
-                if (!reader.TryReadVarint32(out uint decoded))
-                {
-                    value = 0;
-                    return false;
-                }
-
-                value = (byte)decoded;
-                return true;
+                return reader.TryReadByte(out value);
             }
         }
 

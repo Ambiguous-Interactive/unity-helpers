@@ -2587,6 +2587,24 @@ Editor actions must perform them after export. File output is Tier C for Unity U
 a directory export may leave paths listed in `WrittenPaths`, and overwritten files cannot be restored
 through Unity Undo.
 
+### Small integer reads
+
+WProto refuses decoded values outside the range of `byte`, `sbyte`, `short`, `ushort`, and
+`char`, matching protobuf-net. For example, a byte field containing 256 fails instead of becoming
+zero. The same checks apply to nullable fields, collection elements, map keys and values, and
+signed small integers using ZigZag encoding. Valid values and their wire bytes are unchanged.
+
+Custom formatters can use `WProtoReader.TryReadByte`, `TryReadSByte`, `TryReadInt16`,
+`TryReadUInt16`, `TryReadChar`, `TryReadZigZagSByte`, and `TryReadZigZagInt16`. Each returns
+`false`, clears its output, and marks the reader malformed on overflow. The encoded value has
+already been consumed; later reads refuse to continue. These checks preserve the existing
+32-bit varint truncation and sign-extension rules before checking the smaller destination.
+Enum reads retain their existing handling of undefined values.
+
+Regenerate precompiled formatters to apply the checks to generated member reads. A served corrupt
+payload still fails through the existing serialization error path; it does not retry with
+protobuf-net.
+
 ### Resolving a formatter
 
 `WProtoFormatterProvider` maps a message type to its `IWProtoFormatter<T>`. The lookup is a static
