@@ -291,7 +291,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource_setup.sh
     python3-pip \
     python3-venv \
     && python3 -m venv /opt/python-tools \
-    && /opt/python-tools/bin/pip install --no-cache-dir "uv==0.13.5" \
+    && /opt/python-tools/bin/pip install --no-cache-dir "uv==0.13.6" \
     && /opt/python-tools/bin/uv pip install --python /opt/python-tools/bin/python --no-cache --requirement /tmp/requirements-tools.txt \
     && UV_TOOL_DIR=/opt/mcp-uv-tools UV_TOOL_BIN_DIR=/usr/local/bin UV_PYTHON_PREFERENCE=only-system \
         /opt/python-tools/bin/uv tool install "mcp-server-git==2026.10.19" \

@@ -65,7 +65,7 @@ mkdocs==1.6.1
     #   mkdocs-minify-plugin
 mkdocs-get-deps==0.2.2
     # via mkdocs
-mkdocs-git-revision-date-localized-plugin==1.6.1
+mkdocs-git-revision-date-localized-plugin==1.6.2
     # via -r requirements-docs.txt
 mkdocs-material==9.8.0
     # via -r requirements-docs.txt
@@ -85,7 +85,7 @@ pillow==13.0.0
     # via
     #   -r requirements-docs.txt
     #   cairosvg
-platformdirs==4.13.5
+platformdirs==4.13.6
     # via mkdocs-get-deps
 pycparser==3.12 ; implementation_name != 'PyPy'
     # via cffi

@@ -154,7 +154,7 @@ write failures fail validation; an execution failure cannot be mistaken for a cl
 
 ## Python Tooling
 
-Use Python 3.11 for the repository's Python checks. The dev container pins `uv==0.13.5` and
+Use Python 3.11 for the repository's Python checks. The dev container pins `uv==0.13.6` and
 exposes it as `uv`. Documentation CI installs that same version with pip, then installs the
 fully pinned `requirements-docs.lock` with uv. `requirements-docs.txt` lists the direct
 constraints; the lock records their transitive versions. Run locally with:
