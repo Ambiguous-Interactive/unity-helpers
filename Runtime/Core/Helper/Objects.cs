@@ -17,8 +17,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     /// The <c>HashCode</c> family mixes its arguments with a fixed FNV-1a step, but each argument
     /// contributes its ordinary <see cref="object.GetHashCode"/> value -- which is randomized per
     /// process for <see cref="string"/>, is a session-local instance id for a
-    /// <see cref="UnityEngine.Object"/>, and is whatever the author wrote for any other type. The
-    /// composed result is therefore a hash code: valid for dictionaries and sets inside one process,
+    /// <see cref="UnityEngine.Object"/>, and is whatever the author wrote for any other type.
+    /// Destroyed Unity objects keep their instance hash; only managed null contributes no value.
+    /// The composed result is therefore a hash code: valid for dictionaries and sets inside one process,
     /// and not a value to persist, compare across processes or put on a wire. For a value that
     /// survives all three, hash bytes you control with <see cref="StableHash32V1"/>.
     /// </remarks>
@@ -1057,7 +1058,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             {
                 UnityEngine.Object unityObject = value as UnityEngine.Object;
 
-                if (unityObject == null)
+                if (ReferenceEquals(unityObject, null))
                 {
                     hasNonNullValue = false;
                     return NullSentinel;
@@ -1071,18 +1072,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             private static uint GetBoxedObjectHash(T value, out bool hasNonNullValue)
             {
                 object boxed = value;
-
-                if (boxed is UnityEngine.Object unityObject)
-                {
-                    if (unityObject == null)
-                    {
-                        hasNonNullValue = false;
-                        return NullSentinel;
-                    }
-
-                    hasNonNullValue = true;
-                    return unchecked((uint)unityObject.GetHashCode());
-                }
 
                 if (boxed is null)
                 {

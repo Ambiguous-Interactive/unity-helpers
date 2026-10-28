@@ -165,7 +165,7 @@ ChildSpawner spawner2 = obj2.AddComponent<ChildSpawner>();
 spawner2._prefabs = new[] { debugCanvasPrefab };
 ```
 
-Deduplication uses prefab asset path matching.
+Deduplication uses the prefab object reference and its live spawned instances. Persistent instances are shared across spawners; ordinary children are tracked by their own spawner. A disabled or reparented child still counts as alive. After every tracked instance of a prefab is destroyed, the next configured spawn event can create it again. Destroying the spawner alone does not forget a surviving persistent child.
 
 ### Spawn Methods
 
