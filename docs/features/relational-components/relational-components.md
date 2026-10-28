@@ -229,6 +229,7 @@ SiblingComponent (searches same GameObject):
 - Limits how far up/down the hierarchy to search
 - `MaxDepth = 1` with `OnlyDescendants = true` → immediate children only
 - `MaxDepth = 2` → children + grandchildren (or parents + grandparents)
+- Parent depth is measured from the owner at zero. `OnlyAncestors = false` includes the owner without reducing the ancestor search limit. `MaxDepth = 1` can therefore return the owner and its immediate parent.
 
 ---
 
