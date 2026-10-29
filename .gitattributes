@@ -23,6 +23,8 @@
 *.yml                  text eol=lf
 *.md                   text eol=lf
 *.sh                   text eol=lf
+*.py                   text eol=lf
+scripts/python~/**     text=auto eol=lf
 .githooks/**           text eol=lf
 .github/**             text=auto eol=lf
 package.json           text eol=lf

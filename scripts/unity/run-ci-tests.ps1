@@ -4924,7 +4924,7 @@ function Assert-UnityRunMode {
             'Assets/WallstopStudios/UnityHelpers/package.json', 'Packages/manifest.json',
             'ProjectSettings/ProjectVersion.txt')) {
         if (-not (Test-Path -LiteralPath (Join-Path $Project $required) -PathType Leaf)) {
-            throw "Export project is not staged: missing $required. Run node scripts/unity/stage-unitypackage.js first."
+            throw "Export project is not staged: missing $required. Run uv run --project scripts/python~ --locked python scripts/unity/stage_unitypackage.py first."
         }
     }
     $projectVersion = Get-Content -LiteralPath (Join-Path $Project 'ProjectSettings/ProjectVersion.txt') -Raw

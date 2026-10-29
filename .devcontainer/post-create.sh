@@ -132,6 +132,10 @@ else
     log_ok "npm install succeeded (no lockfile)"
 fi
 
+log_step "Installing locked Python tooling"
+uv sync --project "$SCRIPT_DIR/../scripts/python~" --locked
+log_ok "Locked Python tooling is available"
+
 # ── Step 4: Install/update AI coding agents and MCP runtimes ─────────────────
 # Ensures OpenAI Codex, OpenCode, nanocoder, Z.AI Vision MCP, and the remote MCP
 # adapter are installed globally and current on first container create. Failures

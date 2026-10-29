@@ -340,39 +340,8 @@ echo "--- B3: Unity package export project stays below an allowed root ---"
 
 run_test
 unity_export_package="$REPO_ROOT/scripts/unity/export-unitypackage.sh"
-unity_stage_package="$REPO_ROOT/scripts/unity/stage-unitypackage.js"
-if node - "$unity_stage_package" "$REPO_ROOT" <<'NODE'
-const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
-const { resolveProjectPath } = require(process.argv[2]);
-const repository = process.argv[3];
-const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'export-path-control-'));
-try {
-    const link = path.join(temporary, 'checkout-link');
-    fs.symlinkSync(repository, link, 'dir');
-    assert.throws(() => resolveProjectPath(repository, link), /Refusing/);
-    assert.throws(() => resolveProjectPath(repository, path.join(link, 'Runtime')), /Refusing/);
-    assert.equal(resolveProjectPath(repository, path.join(temporary, 'safe')), path.join(temporary, 'safe'));
-    const fakeRepository = path.join(temporary, 'repository');
-    const runtime = path.join(fakeRepository, 'Runtime');
-    fs.mkdirSync(runtime, { recursive: true });
-    const artifacts = path.join(fakeRepository, '.artifacts');
-    for (const target of [fakeRepository, runtime, temporary]) {
-        fs.symlinkSync(target, artifacts, 'dir');
-        assert.throws(() => resolveProjectPath(fakeRepository, path.join(runtime, 'Keep')), /Refusing/);
-        assert.throws(() => resolveProjectPath(fakeRepository, fakeRepository), /Refusing/);
-        fs.unlinkSync(artifacts);
-    }
-    const scratch = path.join(temporary, 'external-scratch');
-    fs.mkdirSync(scratch);
-    fs.symlinkSync(scratch, artifacts, 'dir');
-    assert.throws(() => resolveProjectPath(fakeRepository, artifacts), /Refusing/);
-    assert.equal(resolveProjectPath(fakeRepository, path.join(artifacts, 'safe')), path.join(scratch, 'safe'));
-
-} finally { fs.rmSync(temporary, { recursive: true, force: true }); }
-NODE
+unity_stage_package="$REPO_ROOT/scripts/unity/stage_unitypackage.py"
+if uv run --project "$REPO_ROOT/scripts/python~" --locked pytest "$REPO_ROOT/scripts/tests/test_unitypackage.py" -q -k project_boundary_and_symlink_aliases
 then
     pass "Unity package export refuses symlink aliases of the checkout and accepts isolated temp paths"
 else
@@ -397,7 +366,10 @@ done
 guard_fake_root="$(mktemp -d)"
 mkdir -p "$guard_fake_root/scripts/unity" "$guard_fake_root/.github"
 cp "$unity_export_package" "$guard_fake_root/scripts/unity/export-unitypackage.sh"
-cp "$unity_stage_package" "$guard_fake_root/scripts/unity/stage-unitypackage.js"
+cp "$unity_stage_package" "$guard_fake_root/scripts/unity/stage_unitypackage.py"
+mkdir -p "$guard_fake_root/scripts/python~"
+cp "$REPO_ROOT/scripts/python~/pyproject.toml" "$REPO_ROOT/scripts/python~/uv.lock" "$guard_fake_root/scripts/python~/"
+ln -s "$REPO_ROOT/scripts/python~/.venv" "$guard_fake_root/scripts/python~/.venv"
 cp "$REPO_ROOT/package.json" "$guard_fake_root/package.json"
 cp "$REPO_ROOT/.github/unity-versions.json" "$guard_fake_root/.github/unity-versions.json"
 for refused_dir in "$guard_fake_root" "$guard_fake_root/scripts" "$(dirname "$guard_fake_root")"; do
@@ -504,7 +476,10 @@ metadata_fixture="$(mktemp -d)"
 metadata_log="$(mktemp)"
 mkdir -p "$metadata_fixture/scripts/unity" "$metadata_fixture/.github"
 cp "$unity_export_package" "$metadata_fixture/scripts/unity/export-unitypackage.sh"
-cp "$unity_stage_package" "$metadata_fixture/scripts/unity/stage-unitypackage.js"
+cp "$unity_stage_package" "$metadata_fixture/scripts/unity/stage_unitypackage.py"
+mkdir -p "$metadata_fixture/scripts/python~"
+cp "$REPO_ROOT/scripts/python~/pyproject.toml" "$REPO_ROOT/scripts/python~/uv.lock" "$metadata_fixture/scripts/python~/"
+ln -s "$REPO_ROOT/scripts/python~/.venv" "$metadata_fixture/scripts/python~/.venv"
 printf '{ "release": "2022.3.45f1" }\n' > "$metadata_fixture/.github/unity-versions.json"
 printf '{ "name": "fixture-package" }\n' > "$metadata_fixture/package.json"
 if bash "$metadata_fixture/scripts/unity/export-unitypackage.sh" \

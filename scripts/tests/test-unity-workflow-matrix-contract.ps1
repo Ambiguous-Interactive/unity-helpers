@@ -4722,7 +4722,7 @@ if (-not $centralReturnOwnershipContract) {
 function Test-NativeExportFleet {
     param([string]$Job, [string]$Preflight)
 
-    $stageIndex = $Job.IndexOf('node scripts/unity/stage-unitypackage.js', [StringComparison]::Ordinal)
+    $stageIndex = $Job.IndexOf('uv run --project scripts/python~ --locked python scripts/unity/stage_unitypackage.py', [StringComparison]::Ordinal)
     $acquireIndex = $Job.IndexOf('- name: Acquire organization Unity lock', [StringComparison]::Ordinal)
     $exportIndex = $Job.IndexOf("-TestMode 'export'", [StringComparison]::Ordinal)
     $cleanupGate = [regex]::Match($Job, '(?ms)^      - name: Require confirmed Unity cleanup\s*$.*?(?=^      - |\z)')
@@ -4761,7 +4761,7 @@ foreach ($exportContract in @(
     foreach ($mutation in @(
             @{ From = 'runs-on: [self-hosted, Windows, RAM-64GB]'; To = 'runs-on: ubuntu-latest'; Target = 'Job' },
             @{ From = '      - runner-preflight'; To = '      - no-preflight'; Target = 'Job' },
-            @{ From = 'node scripts/unity/stage-unitypackage.js'; To = 'node scripts/unity/create-test-project.js'; Target = 'Job' },
+            @{ From = 'uv run --project scripts/python~ --locked python scripts/unity/stage_unitypackage.py'; To = 'node scripts/unity/create-test-project.js'; Target = 'Job' },
             @{ From = "-TestMode 'export'"; To = "-TestMode 'editmode'"; Target = 'Job' },
             @{ From = 'UH_CENTRAL_LICENSE_RETURN: "true"'; To = 'UH_CENTRAL_LICENSE_RETURN: "false"'; Target = 'Job' },
             @{ From = "uses: $centralReturnUses"; To = 'uses: ./.github/actions/return-unity-license'; Target = 'Job' },
@@ -5020,7 +5020,7 @@ if (-not $jobTexts.ContainsKey('unitypackage-smoke')) {
     $requiredUnitypackageSmokeContracts = $requiredQueuedUnityContracts + @(
         @{
             Name = 'runs the release exporter'
-            Pattern = 'node scripts/unity/stage-unitypackage\.js'
+            Pattern = 'uv run --project scripts/python~ --locked python scripts/unity/stage_unitypackage\.py'
             Message = 'unitypackage-smoke must stage the shared npm payload so Samples~ compile as release assets.'
         },
         @{

@@ -853,7 +853,7 @@ each measured cell distinct. Duplicate identities still prevent publication.
 ## Package exports
 
 Release Publish creates the `.unitypackage` on an `ubuntu-latest` runner without opening Unity or
-using a license. `scripts/unity/create-unitypackage.js` stages the validated npm payload, renames
+using a license. `scripts/unity/create_unitypackage.py` stages the validated npm payload, renames
 `Samples~` to `Samples`, preserves every tracked asset GUID, and writes the Unity archive plus its
 SHA256 sidecar. Generated package-root and renamed-sample folder GUIDs are stable hashes of their
 paths instead of fresh values from each temporary Unity project.

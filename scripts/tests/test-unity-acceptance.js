@@ -212,7 +212,7 @@ try {
         const tools = path.join(directory, `${unityVersion}-${mode}`);
         fs.mkdirSync(tools);
         if (mode !== "missing") {
-          const versionText = mode === "malformed" ? "unusable" : "v22.18.0";
+          const versionText = mode === "malformed" ? "unusable" : "v22.23.4";
           const exitCode = mode === "nonzero" ? 1 : 0;
           const windows = process.platform === "win32";
           fs.writeFileSync(

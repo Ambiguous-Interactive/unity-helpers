@@ -46,6 +46,45 @@ The WProto compatibility inventory checks referenced enum values independently o
 order. Its regression compiles both declaration orders and requires the same inventory, including
 the enum underlying type and constants. Preserve the frozen inventory when fixing its collector.
 
+### Typed Python scripts
+
+Release payload staging, archive creation, and Unity metadata generation run through uv. Install uv 0.13.6, then use:
+
+```bash
+uv sync --project scripts/python~ --locked
+npm run lint:python
+npm run test:create-unitypackage
+npm run test:meta-generation
+npm run meta:generate -- Runtime/Example.cs
+uv run --project scripts/python~ --locked python scripts/unity/create_unitypackage.py --output .artifacts/release/local.unitypackage
+uv run --project scripts/python~ --locked python scripts/unity/stage_unitypackage.py --project-dir .artifacts/unity/local-export
+```
+
+The devcontainer runs the locked sync during creation. Python 3.11.8 or newer
+is required; uv can provision a compatible interpreter. The environment lives under
+`scripts/python~/.venv`, separate from the documentation environment. Unity ignores that tooling
+folder. The release CLI still accepts `--output`; staging still accepts `--project-dir` and
+`UNITY_VERSION`, with the same safe scratch-directory restrictions. Invalid framework and module policies fail
+before an existing export project is removed. Archive checksums support UTF-8 output filenames.
+
+The lockfile pins Ruff, mypy, Pyright, pytest, and their dependencies. `lint:python` checks Ruff
+formatting and correctness rules plus both type checkers in strict mode. Function signatures must
+be fully annotated and explicit `Any` is forbidden. CI runs these checks and the package tests.
+The existing `scripts/generate-meta.sh` entry point delegates to Python and retains `--force`,
+CRLF metadata, and importer defaults. Use `npm run meta:generate -- <path>` or invoke
+`scripts/generate_meta.py` through uv for a shell-independent entry point. Existing metadata is
+refused unless `--force` is explicit; a competing creation also preserves the first file.
+
+New Python files must join the strict `tool.pyright.include` list in
+`scripts/python~/pyproject.toml`; a Git-backed inventory rejects unregistered files. The explicit
+legacy list records existing Python scripts still awaiting migration. Remove an entry when its
+script joins strict validation; do not add new scripts to that backlog.
+
+The package tests check archive headers, GUIDs, checksums, repeated output, failure preservation,
+CLI errors, policy validation, and the real npm payload. They also inject type, lint, and formatting
+defects to prove each gate rejects them. Port remaining scripts incrementally while keeping their
+CLI contracts and executable controls.
+
 ### GitHub Credentials in the Container
 
 The container resolves github.com credentials from a cached token. The Dev Containers credential
@@ -90,6 +129,7 @@ These tools are required and installed via npm/dotnet:
 - **prettier**: Markdown/JSON/YAML formatter (via npm)
 - **cspell**: Spell checker (via npm)
 - **CSharpier**: C# formatter (via .NET tools)
+- **uv**: Locked Python script environment and analysis tools
 
 ## Formatting and Linting
 

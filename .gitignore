@@ -481,3 +481,10 @@ test-results*
 Generator~/WallstopStudios.UnityHelpers.TypeCheck/bin/
 Generator~/WallstopStudios.UnityHelpers.TypeCheck/obj/
 scripts/mcp/PIPELINE_SETUP_HANDOFF.md*
+
+# Locked Python tooling is source; its isolated environment remains local.
+!scripts/python~/
+scripts/python~/*
+!scripts/python~/pyproject.toml
+!scripts/python~/uv.lock
+!scripts/python~/check.py

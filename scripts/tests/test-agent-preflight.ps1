@@ -79,7 +79,6 @@ function New-TestRepo {
     # line rather than the actual test we're trying to run.
     Copy-Item (Join-Path $repoRoot 'scripts/git-push-defaults-helpers.ps1') (Join-Path $scriptsDir 'git-push-defaults-helpers.ps1') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/git-path-helpers.ps1') (Join-Path $scriptsDir 'git-path-helpers.ps1') -Force
-    Copy-Item (Join-Path $repoRoot 'scripts/generate-meta.sh') (Join-Path $scriptsDir 'generate-meta.sh') -Force
     # agent-preflight resolves license years by forking this, its sibling, rather than running a
     # second copy of the walk (#681). A fixture without it makes the license check skip, which the
     # LicenseHeaderDrift_Message assertion below turns red -- so that test is this copy's control.
@@ -1276,7 +1275,7 @@ function Test-JavaScriptLibraryPreflight {
         Write-TestResult 'Jslib_RepairProducesGuidAndCRLF' ($meta -match '(?m)^guid: [a-f0-9]{32}\r?$' -and $meta.Contains("`r`n") -and $meta -notmatch '(?<!\r)\n') 'Expected a Unity GUID and CRLF meta bytes.'
         $controlPath = Join-Path $repoPath 'Runtime/GeneratorControl.jslib'
         [System.IO.File]::WriteAllText($controlPath, $formatted)
-        $generatorOutput = & bash (Join-Path $repoPath 'scripts/generate-meta.sh') $controlPath 2>&1
+        $generatorOutput = & bash (Join-Path $PSScriptRoot '../generate-meta.sh') $controlPath 2>&1
         $generatorExit = $LASTEXITCODE
         $controlMetaPath = "$controlPath.meta"
         $controlMeta = if (Test-Path -LiteralPath $controlMetaPath) { [System.IO.File]::ReadAllText($controlMetaPath) } else { '' }

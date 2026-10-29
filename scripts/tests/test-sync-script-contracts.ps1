@@ -2195,10 +2195,10 @@ function Run-ReleasePublishTagPreparationContractTests {
     $prepareTagBlock.Success -and
     $setupNodePinnedConsistently -and
     $verifyTagBlock.Value.Contains($setupNodeReference) -and
-    $verifyTagBlock.Value.Contains('node-version: "22.18.0"') -and
+    $verifyTagBlock.Value.Contains('node-version: "22.23.4"') -and
     (Test-AppearsBefore -Haystack $verifyTagBlock.Value -First 'Setup Node.js' -Second 'Verify tag matches package metadata') -and
     $prepareTagBlock.Value.Contains($setupNodeReference) -and
-    $prepareTagBlock.Value.Contains('node-version: "22.18.0"') -and
+    $prepareTagBlock.Value.Contains('node-version: "22.23.4"') -and
     (Test-AppearsBefore -Haystack $prepareTagBlock.Value -First 'Setup Node.js' -Second 'Recheck release artifacts before tag mutation')
   )
 
@@ -2421,7 +2421,7 @@ function Run-ReleasePublishWorkflowBudgetContractTests {
   )
   $releaseCreatesPortableUnityPackage = (
     $releaseJob.Contains('runs-on: ubuntu-latest') -and
-    $releaseJob.Contains('run: node scripts/unity/create-unitypackage.js') -and
+    $releaseJob.Contains('run: uv run --project scripts/python~ --locked python scripts/unity/create_unitypackage.py') -and
     $releaseJob.Contains('path: .artifacts/release/*.unitypackage*') -and
     -not ($releaseJob -match 'self-hosted|UNITY_SERIAL|ensure-unity-editor|build-lock|run-ci-tests\.ps1')
   )
@@ -2949,9 +2949,9 @@ function Run-ReleasePackageContentContractTests {
     -Passed $validatorPreservesCaseOnlyPathVariants `
     -Message 'Expected validate-npm-package.ps1 not to collapse case-only path variants with Sort-Object -Unique.'
 
-  $exporterPath = Join-Path $repoRoot 'scripts/unity/stage-unitypackage.js'
+  $exporterPath = Join-Path $repoRoot 'scripts/unity/stage_unitypackage.py'
   $requiredExportEntries = @(
-    node -e 'console.log(JSON.stringify(require(process.argv[1]).REQUIRED_ENTRIES))' $exporterPath |
+    uv run --project (Join-Path $repoRoot 'scripts/python~') --locked python -c 'import json,sys; sys.path.insert(0,sys.argv[1]); from stage_unitypackage import REQUIRED_ENTRIES; print(json.dumps(REQUIRED_ENTRIES))' (Split-Path $exporterPath -Parent) |
       ConvertFrom-Json
   )
   $exporterRegistryLoaded = $LASTEXITCODE -eq 0 -and $requiredExportEntries.Count -gt 0
