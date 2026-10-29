@@ -326,7 +326,7 @@ try {
         [IO.File]::WriteAllText($UnityEditorPath, "#!/bin/sh`nexec pwsh -NoProfile -File `"`$(dirname `"`$0`")/console.ps1`" `"`$@`"`n")
         & chmod +x $UnityEditorPath
         if ($LASTEXITCODE -ne 0) { throw 'Cannot make synthetic console producer executable' }
-        [IO.File]::WriteAllText((Join-Path $fake 'console.ps1'), "[Console]::Out.Write('X' * 131072); [Console]::Error.Write('Y' * 131072); [IO.File]::WriteAllText(`$env:CONSUMER_OUTPUT,'SYNTHETIC PLAYER'); if (`$env:NULLABLE_CONTROL_INHERITEDPIPE -eq '1') { `$child = [Diagnostics.Process]::Start('sleep','120'); [IO.File]::WriteAllText(`$env:NULLABLE_CONTROL_CHILD_PID,`$child.Id.ToString()); `$child.Dispose() }; if (`$env:NULLABLE_CONTROL_NONZERO -eq '1') { exit 7 }; exit 0")
+        [IO.File]::WriteAllText((Join-Path $fake 'console.ps1'), "[Console]::Out.Write('X' * 131072); [Console]::Error.Write('Y' * 131072); [IO.File]::WriteAllText(`$env:CONSUMER_OUTPUT,'SYNTHETIC PLAYER'); if (`$env:NULLABLE_CONTROL_INHERITEDPIPE -eq '1') { `$child = [Diagnostics.Process]::Start('sleep','120'); `$pidTemporary = `$env:NULLABLE_CONTROL_CHILD_PID + '.writing'; [IO.File]::WriteAllText(`$pidTemporary,`$child.Id.ToString()); [IO.File]::Move(`$pidTemporary,`$env:NULLABLE_CONTROL_CHILD_PID); `$child.Dispose() }; if (`$env:NULLABLE_CONTROL_NONZERO -eq '1') { exit 7 }; exit 0")
         $producer = [IO.File]::ReadAllText((Join-Path $PSScriptRoot '../unity/run-nullable-consumer.ps1'))
         $begin = $producer.IndexOf('$oldOutput = $env:CONSUMER_OUTPUT', [StringComparison]::Ordinal)
         $end = $producer.IndexOf('foreach ($entry in $packageHashes.GetEnumerator())', $begin, [StringComparison]::Ordinal)
@@ -363,7 +363,11 @@ try {
                 ++$optionalControls
             } finally {
                 if (Test-Path -LiteralPath $childPath -PathType Leaf) {
-                    $childProcess = [Diagnostics.Process]::GetProcessById([int]([IO.File]::ReadAllText($childPath)))
+                    $childPidValue = 0
+                    if (-not [int]::TryParse([IO.File]::ReadAllText($childPath), [ref]$childPidValue) -or $childPidValue -le 0 -or $childPidValue -eq $PID) {
+                        throw 'Inherited-pipe cleanup refuses an invalid or self PID receipt.'
+                    }
+                    $childProcess = [Diagnostics.Process]::GetProcessById($childPidValue)
                     try { if (-not $childProcess.HasExited) { $childProcess.Kill($true); $childProcess.WaitForExit() } } finally { $childProcess.Dispose() }
                 }
                 $env:NULLABLE_CONTROL_INHERITEDPIPE = $oldInherited
