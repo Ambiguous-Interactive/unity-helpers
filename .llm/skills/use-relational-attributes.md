@@ -58,3 +58,7 @@
 ## Notes
 
 [Read section](../references/use-relational-attributes-part-2.md#notes)
+
+## Compiler validation
+
+[Read section](../references/use-relational-attributes-part-2.md#compiler-validation)

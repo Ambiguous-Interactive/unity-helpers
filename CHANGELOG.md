@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `WUH025` compiler diagnostics for unsupported relational field types, with an Analyzer Policies severity control to reject invalid declarations before runtime. ([#1086](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1086)).
 - Add opt-in `WUH024` suggestions for typed enum flag checks and cached enum names, with semantic guards and Analyzer Policies examples ([guide](./docs/performance/analyzers.md#wuh024-typed-enum-helpers-opt-in), [#917](https://github.com/Ambiguous-Interactive/unity-helpers/issues/917)).
 - Add an opt-in WProto allowance that refuses generated class construction before constructors run. Regenerate codecs to enforce it; custom allocations remain separate ([#1042](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1042)).
 - Add an opt-in WProto element allowance shared by collection reads, nested values, maps and reader copies. Regenerate collection codecs to enforce it ([#1040](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1040)).
@@ -55,10 +56,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix unsupported relational field shapes interrupting valid bindings or clearing authored values; skip those fields with a warning ([#1086](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1086)).
 - Fix WProto small-integer reads silently wrapping out-of-range values. Generated members, collections, maps, and char roots now reject overflow; regenerate precompiled codecs ([#1081](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1081)).
 - Fix `ParentComponent.MaxDepth` excluding the boundary ancestor when the owner is included in the search ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
 - Fix Unity object hashes changing after destruction, keeping dictionary and set entries reachable ([#1078](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1078)).
-- Fix `ChildSpawner` refusing to recreate destroyed children and creating duplicate children during reentrant lifecycle callbacks ([#1079](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1079), [#1082](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1082)).
+- Fix `ChildSpawner` refusing to recreate destroyed children and creating duplicate children during reentrant lifecycle callbacks; retain surviving children across nested spawners ([#1084](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1084), [#1079](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1079), [#1082](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1082)).
 - Fix relational `SkipIfAssigned` fields retaining destroyed component references when no replacement matches. Live preassigned references remain preserved.
 - Fix `AreAnyAssignmentsInvalid()` throwing for null targets or inspecting destroyed targets; missing targets now return false.
 - Fix `Trie` construction losing pooled storage when an input iterator throws ([#1073](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1073)).

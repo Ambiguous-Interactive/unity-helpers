@@ -26,11 +26,46 @@ function Assert-Attach([bool]$Condition, [string]$Message) {
     ++$script:passed
 }
 function Save-NativeCaptureRecord { }
+function Read-AttachControlPid([string]$Path) {
+    $controlPid = 0
+    if (-not [int]::TryParse([IO.File]::ReadAllText($Path), [ref]$controlPid) -or $controlPid -le 0 -or $controlPid -eq $PID) {
+        throw 'Control PID receipt must contain a positive PID other than this test runner.'
+    }
+    return $controlPid
+}
 try {
     $shell = (Get-Process -Id $PID).Path
     $child = Join-Path $root 'child with spaces.ps1'
     $descendantPath = Join-Path $root 'descendant.pid'
-    [IO.File]::WriteAllText($child, 'param($DescendantPath); $info = [Diagnostics.ProcessStartInfo]::new((Get-Process -Id $PID).Path); $info.UseShellExecute = $false; $info.ArgumentList.Add("-NoProfile"); $info.ArgumentList.Add("-Command"); $info.ArgumentList.Add("Start-Sleep -Seconds 30"); $descendant = [Diagnostics.Process]::Start($info); [IO.File]::WriteAllText($DescendantPath, [string]$descendant.Id); [Console]::Write("WORKER_READY|" + [Environment]::CurrentDirectory + "|" + $env:_NT_SYMBOL_PATH); Start-Sleep -Seconds 30')
+    $publishGatePath = Join-Path $root 'publish-pid'
+    $publishStagedPath = Join-Path $root 'pid-staged'
+    [IO.File]::WriteAllText($child, @'
+param($DescendantPath, $PublishGatePath, $PublishStagedPath)
+$info = [Diagnostics.ProcessStartInfo]::new((Get-Process -Id $PID).Path)
+$info.UseShellExecute = $false
+$info.ArgumentList.Add('-NoProfile'); $info.ArgumentList.Add('-Command'); $info.ArgumentList.Add('Start-Sleep -Seconds 30')
+$descendant = [Diagnostics.Process]::Start($info)
+$temporary = $DescendantPath + '.writing'
+$stream = [IO.File]::Open($temporary, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::Read)
+try {
+    [IO.File]::WriteAllText($PublishStagedPath, '')
+    while (-not [IO.File]::Exists($PublishGatePath)) { Start-Sleep -Milliseconds 20 }
+    $bytes = [Text.Encoding]::UTF8.GetBytes([string]$descendant.Id)
+    $stream.Write($bytes, 0, $bytes.Length)
+    $stream.Flush()
+} finally { $stream.Dispose() }
+[IO.File]::Move($temporary, $DescendantPath)
+[Console]::Write('WORKER_READY|' + [Environment]::CurrentDirectory + '|' + $env:_NT_SYMBOL_PATH)
+Start-Sleep -Seconds 30
+'@)
+    $invalidPidPath = Join-Path $root 'invalid.pid'
+    foreach ($text in @('', ' ', '0', '-1', 'not-a-pid', '2147483648', [string]$PID)) {
+        [IO.File]::WriteAllText($invalidPidPath, $text)
+        $rejected = $false
+        try { $null = Read-AttachControlPid -Path $invalidPidPath } catch { $rejected = $true }
+        Assert-Attach $rejected 'Empty, malformed, nonpositive, overflow and self PID receipts are rejected before opening a process.'
+    }
+
     $identityPath = Join-Path $root 'identity.json'
     $cancelPath = Join-Path $root 'cancel'
     $expected = @{
@@ -38,7 +73,7 @@ try {
         ExecutableSha256 = (Get-FileHash -LiteralPath $shell -Algorithm SHA256).Hash; EarliestTicks = [DateTime]::UtcNow.Ticks
     }
     $spec = @{
-        ExecutablePath = $shell; Arguments = @('-NoProfile', '-File', $child, $descendantPath); Directory = $root; Seconds = 30
+        ExecutablePath = $shell; Arguments = @('-NoProfile', '-File', $child, $descendantPath, $publishGatePath, $publishStagedPath); Directory = $root; Seconds = 30
         Coordination = @{ CaptureId = $expected.CaptureId; ControllerPid = $PID; IdentityPath = $identityPath; CancelPath = $cancelPath }
     }
     $symbols = [Environment]::GetEnvironmentVariable('_NT_SYMBOL_PATH', 'Process')
@@ -52,6 +87,7 @@ try {
         Assert-Attach (Test-Path -LiteralPath $identityPath) 'Shipping worker must publish an early identity.'
         $identityText = [IO.File]::ReadAllText($identityPath)
         $identity = $identityText | ConvertFrom-Json -AsHashtable
+        Assert-Attach ($identity.Pid -gt 0 -and $identity.Pid -ne $PID -and $identity.Pid -ne $identity.WorkerPid) 'Held target identity excludes this runner and its worker before opening a process.'
         $held = [Diagnostics.Process]::GetProcessById($identity.Pid)
         $null = $held.Handle
         $creationMatches = if ($IsWindows) { $held.StartTime.ToUniversalTime().Ticks -eq $identity.CreatedTicks }
@@ -59,8 +95,14 @@ try {
         Assert-Attach (-not $held.HasExited -and $job.State -eq 'Running' -and $identity.CaptureId -ceq $expected.CaptureId -and
             $identity.ControllerPid -eq $PID -and $identity.WorkerPid -ne $PID -and $identity.ExecutablePath -ceq $shell -and
             $identity.ExecutableSha256 -ceq $expected.ExecutableSha256 -and $creationMatches) 'Receipt binds a live owned target and a separate worker; exact cross-process creation ticks are required on Windows.'
+        while (-not (Test-Path -LiteralPath $publishStagedPath) -and -not $held.HasExited -and [DateTime]::UtcNow -lt $limit) { Start-Sleep -Milliseconds 50 }
+        Assert-Attach (Test-Path -LiteralPath $publishStagedPath) 'Owned child reaches the paused PID publication boundary.'
+        Assert-Attach (-not (Test-Path -LiteralPath $descendantPath)) 'An incomplete PID receipt is never published to readers.'
+        [IO.File]::WriteAllText($publishGatePath, '')
         while (-not (Test-Path -LiteralPath $descendantPath) -and -not $held.HasExited -and [DateTime]::UtcNow -lt $limit) { Start-Sleep -Milliseconds 50 }
-        $descendant = [Diagnostics.Process]::GetProcessById([int][IO.File]::ReadAllText($descendantPath))
+        $descendantPid = Read-AttachControlPid -Path $descendantPath
+        Assert-Attach ($descendantPid -ne $identity.Pid -and $descendantPid -ne $identity.WorkerPid) 'Descendant receipt identifies a separate process before opening it.'
+        $descendant = [Diagnostics.Process]::GetProcessById($descendantPid)
         $null = $descendant.Handle
         Assert-Attach (-not $descendant.HasExited) 'Direct target owns a live descendant before cancellation.'
         foreach ($mutation in @('nonce', 'host', 'controller', 'worker', 'pid', 'path', 'hash', 'creation', 'worker-creation', 'duplicate', 'missing', 'unknown', 'wrong-type', 'partial', 'oversize')) {

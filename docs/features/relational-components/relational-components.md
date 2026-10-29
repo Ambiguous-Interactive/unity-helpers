@@ -325,6 +325,8 @@ Unbounded collections without filters or depth limits use a cached Unity query a
 - `MaxCount` (default: 0 = unlimited)
   - Applies to arrays, lists, and hash sets; ignored for single fields
 
+Relational fields support components, interfaces, and one-dimensional arrays, `List<T>`, or `HashSet<T>` of those values. Multidimensional arrays, nested collections, and unrelated value types are left unchanged with an authoring warning, so they cannot interrupt other bindings. Prewarming skips those fields too.
+
 - `TagFilter`
   - Exact tag match using `CompareTag`
 
@@ -691,3 +693,11 @@ Common pitfalls and how to avoid them
 - Reflex Integration - See `Samples~/DI - Reflex` folder in the repository
 
 **Need help?** [Open an issue](https://github.com/wallstop/unity-helpers/issues) | [Troubleshooting](#troubleshooting)
+
+### Validate field types during compilation
+
+The `WUH025` analyzer reports unsupported relational field declarations, including multidimensional
+arrays and nested collections. In **Analyzer Policies**, select **Error** for WUH025 to reject them
+during compilation. See [relational analyzer configuration](../../performance/analyzers.md#wuh025-unsupported-relational-field).
+Runtime checks still protect older assemblies and generic fields whose concrete type is unknown
+at declaration time. Interface fields remain single-component contracts, including enumerable interfaces.

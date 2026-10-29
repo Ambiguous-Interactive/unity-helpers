@@ -127,3 +127,13 @@ public void TearDown()
 **Root cause**: `SerializedProperty.stringValue` always converts null strings to `""`. This means any test that sets a backing string field to `null` and then reads it through `SerializedObject.Update()` / `SerializedProperty` will see `""`, not `null`. See [defensive-editor-programming](../skills/defensive-editor-programming.md) for the full serialization behavior documentation.
 
 ---
+
+### File Receipt Publication
+
+File existence does not prove a payload is ready: creating a receipt can expose an empty file
+before its contents are written. Publish process identities through a temporary file, close it,
+then rename it to the final path. Parse PID receipts explicitly and reject empty, malformed,
+nonpositive and self PIDs before opening a process or attempting cleanup. PowerShell casts an
+empty string to zero; this is not a valid identity. Exercise the boundary with a paused writer
+and confirm that direct publication fails the control. Do not use sleeps or passing retries
+as proof that a publication race is fixed.

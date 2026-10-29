@@ -45,11 +45,12 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// <remarks>
     /// Destroyed children can be spawned again by the next configured lifecycle event.
     /// Lifecycle callbacks during instantiation cannot reenter the same spawning pass.
+    /// All persistent instances created by nested callbacks remain tracked until destroyed.
     /// </remarks>
     [DisallowMultipleComponent]
     public sealed class ChildSpawner : MonoBehaviour
     {
-        private static readonly Dictionary<GameObject, GameObject> SpawnedPrefabs = new();
+        private static readonly Dictionary<GameObject, List<GameObject>> SpawnedPrefabs = new();
 
         [FormerlySerializedAs("dontDestroyOnLoad")]
         [SerializeField]
@@ -93,6 +94,26 @@ namespace WallstopStudios.UnityHelpers.Utils
         private static void CleanName(GameObject child)
         {
             child.name = child.name.Replace("(Clone)", string.Empty);
+        }
+
+        private static bool HasLiveSpawnedInstance(
+            Dictionary<GameObject, List<GameObject>> spawnedPrefabs,
+            GameObject prefab
+        )
+        {
+            if (!spawnedPrefabs.TryGetValue(prefab, out List<GameObject> instances))
+            {
+                return false;
+            }
+            foreach (GameObject instance in instances)
+            {
+                if (instance != null)
+                {
+                    return true;
+                }
+            }
+            instances.Clear();
+            return false;
         }
 
         private void Awake()
@@ -268,23 +289,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
         }
 
-        private bool HasLiveSpawnedInstance(GameObject prefab)
-        {
-            if (!_spawnedPrefabs.TryGetValue(prefab, out List<GameObject> instances))
-            {
-                return false;
-            }
-            foreach (GameObject instance in instances)
-            {
-                if (instance != null)
-                {
-                    return true;
-                }
-            }
-            instances.Clear();
-            return false;
-        }
-
         /// <summary>
         /// Instantiates <paramref name="prefab"/> when no tracked instance is still alive.
         /// </summary>
@@ -299,18 +303,12 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return null;
             }
 
-            if (HasLiveSpawnedInstance(prefab))
+            if (
+                HasLiveSpawnedInstance(_spawnedPrefabs, prefab)
+                || HasLiveSpawnedInstance(SpawnedPrefabs, prefab)
+            )
             {
                 return null;
-            }
-
-            if (SpawnedPrefabs.TryGetValue(prefab, out GameObject existing))
-            {
-                if (existing != null)
-                {
-                    return null;
-                }
-                SpawnedPrefabs.Remove(prefab);
             }
 
             GameObject child = Instantiate(prefab, transform);
@@ -325,7 +323,12 @@ namespace WallstopStudios.UnityHelpers.Utils
                 || prefab.IsDontDestroyOnLoad()
             )
             {
-                SpawnedPrefabs[prefab] = child;
+                if (!SpawnedPrefabs.TryGetValue(prefab, out List<GameObject> instances))
+                {
+                    instances = new List<GameObject>(1);
+                    SpawnedPrefabs.Add(prefab, instances);
+                }
+                instances.Add(child);
             }
             return child;
         }

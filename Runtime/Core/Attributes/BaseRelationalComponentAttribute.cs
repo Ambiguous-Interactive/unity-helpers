@@ -20,6 +20,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     /// </summary>
     /// <remarks>
     /// <para>
+    /// Unsupported field types are left unchanged with a warning; other fields continue binding.
     /// Used by <see cref="ParentComponentAttribute"/>, <see cref="SiblingComponentAttribute"/>, and
     /// <see cref="ChildComponentAttribute"/> to control search behavior, filtering, and assignment.
     /// </para>
@@ -189,7 +190,17 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                         continue;
                     }
 
-                    FieldKind kind = GetFieldKind(field.FieldType, out Type resolvedElementType);
+                    if (
+                        !TryGetFieldKind(
+                            field.FieldType,
+                            out FieldKind kind,
+                            out Type resolvedElementType
+                        )
+                    )
+                    {
+                        LogUnsupportedField(field);
+                        continue;
+                    }
 
                     Func<int, Array> arrayCreator = null;
                     Func<int, IList> listCreator = null;
@@ -270,7 +281,11 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 }
 
                 Type fieldType = field.FieldType;
-                FieldKind kind = GetFieldKind(fieldType, out Type elementType);
+                if (!TryGetFieldKind(fieldType, out FieldKind kind, out Type elementType))
+                {
+                    LogUnsupportedField(field);
+                    continue;
+                }
 
                 Func<int, Array> arrayCreator = null;
                 Func<int, IList> listCreator = null;
@@ -326,6 +341,68 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             }
 
             return results.ToArray();
+        }
+
+        internal static bool TryGetFieldKind(
+            Type fieldType,
+            out FieldKind kind,
+            out Type elementType
+        )
+        {
+            if (fieldType == null)
+            {
+                kind = default;
+                elementType = null;
+                return false;
+            }
+
+            FieldKind candidateKind = FieldKind.Single;
+            Type candidateElement = fieldType;
+            if (fieldType.IsArray)
+            {
+                if (fieldType.GetArrayRank() != 1)
+                {
+                    kind = default;
+                    elementType = null;
+                    return false;
+                }
+                candidateElement = fieldType.GetElementType();
+                if (candidateElement == null || fieldType != candidateElement.MakeArrayType())
+                {
+                    kind = default;
+                    elementType = null;
+                    return false;
+                }
+                candidateKind = FieldKind.Array;
+            }
+            else if (fieldType.IsGenericType)
+            {
+                Type genericType = fieldType.GetGenericTypeDefinition();
+                if (genericType == typeof(List<>))
+                {
+                    candidateKind = FieldKind.List;
+                    candidateElement = fieldType.GenericTypeArguments[0];
+                }
+                else if (genericType == typeof(HashSet<>))
+                {
+                    candidateKind = FieldKind.HashSet;
+                    candidateElement = fieldType.GenericTypeArguments[0];
+                }
+            }
+
+            if (
+                !candidateElement.IsInterface
+                && !typeof(Component).IsAssignableFrom(candidateElement)
+                && !candidateElement.IsAssignableFrom(typeof(Component))
+            )
+            {
+                kind = default;
+                elementType = null;
+                return false;
+            }
+            kind = candidateKind;
+            elementType = candidateElement;
+            return true;
         }
 
         internal static bool ShouldSkipAssignment<TAttribute>(
@@ -684,38 +761,11 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             };
         }
 
-        private static FieldKind GetFieldKind(Type fieldType, out Type elementType)
+        private static void LogUnsupportedField(FieldInfo field)
         {
-            if (fieldType == null)
-            {
-                elementType = null;
-                return FieldKind.Single;
-            }
-
-            if (fieldType.IsArray)
-            {
-                elementType = fieldType.GetElementType();
-                return FieldKind.Array;
-            }
-
-            if (fieldType.IsGenericType)
-            {
-                Type genericType = fieldType.GetGenericTypeDefinition();
-                if (genericType == typeof(List<>))
-                {
-                    elementType = fieldType.GenericTypeArguments[0];
-                    return FieldKind.List;
-                }
-
-                if (genericType == typeof(HashSet<>))
-                {
-                    elementType = fieldType.GenericTypeArguments[0];
-                    return FieldKind.HashSet;
-                }
-            }
-
-            elementType = fieldType;
-            return FieldKind.Single;
+            Debug.LogWarning(
+                $"Skipping unsupported relational field '{field.DeclaringType?.FullName}.{field.Name}'. Use a component or interface, or a one-dimensional array, List, or HashSet of those values."
+            );
         }
 
         private static FieldAccessor CreateFieldAccessor(Type componentType, FieldInfo field)

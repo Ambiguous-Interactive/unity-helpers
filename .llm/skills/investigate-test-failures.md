@@ -54,6 +54,8 @@
 
 ### [Serialization Layer Mismatches](../references/investigate-test-failures-part-2.md#serialization-layer-mismatches)
 
+### [File Receipt Publication](../references/investigate-test-failures-part-2.md#file-receipt-publication)
+
 ## Unity-Specific Test Issues
 
 [Read section](../references/investigate-test-failures-part-3.md#unity-specific-test-issues)
