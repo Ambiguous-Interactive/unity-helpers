@@ -349,10 +349,10 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             out Type elementType
         )
         {
-            kind = default;
-            elementType = null;
             if (fieldType == null)
             {
+                kind = default;
+                elementType = null;
                 return false;
             }
 
@@ -362,11 +362,15 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             {
                 if (fieldType.GetArrayRank() != 1)
                 {
+                    kind = default;
+                    elementType = null;
                     return false;
                 }
                 candidateElement = fieldType.GetElementType();
                 if (candidateElement == null || fieldType != candidateElement.MakeArrayType())
                 {
+                    kind = default;
+                    elementType = null;
                     return false;
                 }
                 candidateKind = FieldKind.Array;
@@ -392,6 +396,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 && !candidateElement.IsAssignableFrom(typeof(Component))
             )
             {
+                kind = default;
+                elementType = null;
                 return false;
             }
             kind = candidateKind;
