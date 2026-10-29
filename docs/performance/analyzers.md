@@ -28,6 +28,11 @@ with a diagnostic ID and ruleset action (`Default`, `None`, `Info`, `Warning`, `
 Both support an explicit `.ruleset` asset path for assembly-specific rulesets managed by Unity;
 the window edits the project-wide default ruleset. Writes import the asset immediately.
 
+Ruleset XML must have no namespace. Older policy files with an MSBuild namespace can stop script
+compilation. The window reports these files as needing repair; choose **Enable All** or **Disable
+All** to repair the namespace while keeping other rules and includes. API writes also repair the
+namespace. Reading or refreshing a file does not change it.
+
 For package development, `npm run verify:shipped-analyzers` compares all three shipped compiler-input DLLs with fresh
 Release builds. `npm run verify:shipped-analyzers:fix` stages each replacement in a hidden directory
 before publishing it. A failed copy or replacement leaves that DLL and its importer metadata intact

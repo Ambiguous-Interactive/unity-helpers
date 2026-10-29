@@ -9,7 +9,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
     using UnityEditor;
     using UnityEngine;
 
-    /// <summary>Writes Unity Helpers analyzer policies without opening a window.</summary>
+    /// <summary>Writes compiler-readable Unity Helpers analyzer policies without opening a window.</summary>
+    /// <remarks>Writes repair legacy XML namespaces while preserving other rules and includes.</remarks>
     public static class AnalyzerPolicyAPI
     {
         public const string DefaultRulesetAssetPath = "Assets/Default.ruleset";

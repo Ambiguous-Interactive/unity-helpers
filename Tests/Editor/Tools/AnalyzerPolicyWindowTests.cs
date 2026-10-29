@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
     using System.Collections;
     using System.Collections.Generic;
     using System.IO;
+    using System.Xml.Linq;
     using NUnit.Framework;
     using UnityEditor;
     using UnityEditor.UIElements;
@@ -156,6 +157,85 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             {
                 base.TearDown();
             }
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void LegacyNamespaceRequiresExplicitRepair(bool prefixed)
+        {
+            string path = GetRulesetPath();
+            IReadOnlyList<AnalyzerPolicy> policies = AnalyzerPolicyWindow.GetPolicies();
+            Assert.IsTrue(
+                AnalyzerPolicyRuleset.TryWrite(
+                    path,
+                    AnalyzerPolicyState.Enabled,
+                    policies,
+                    out string writeMessage
+                ),
+                writeMessage
+            );
+            XDocument document = XDocument.Load(path);
+            XNamespace legacy = "http://schemas.microsoft.com/developer/msbuild/2003";
+            foreach (XElement element in document.Root.DescendantsAndSelf())
+            {
+                element.Name = legacy + element.Name.LocalName;
+            }
+            if (prefixed)
+            {
+                document.Root.Add(new XAttribute(XNamespace.Xmlns + "old", legacy.NamespaceName));
+                document.Root.Add(new XAttribute("xmlns", "urn:unused"));
+            }
+            document.Save(path);
+            string invalid = File.ReadAllText(path);
+
+            Assert.IsTrue(
+                AnalyzerPolicyRuleset.TryRead(
+                    path,
+                    policies,
+                    out AnalyzerPolicyState state,
+                    out string readMessage
+                ),
+                readMessage
+            );
+            Assert.AreEqual(AnalyzerPolicyState.Drifted, state);
+            Dictionary<string, string> actions = new();
+            Assert.IsFalse(
+                AnalyzerPolicyRuleset.TryReadActions(
+                    path,
+                    policies,
+                    actions,
+                    out string actionMessage
+                )
+            );
+            StringAssert.Contains("namespace", actionMessage);
+            Assert.AreEqual(invalid, File.ReadAllText(path));
+
+            Assert.IsTrue(
+                AnalyzerPolicyRuleset.TryWriteSeverity(
+                    path,
+                    "WUH010",
+                    "Error",
+                    policies,
+                    out string severityMessage
+                ),
+                severityMessage
+            );
+            document = XDocument.Load(path);
+            foreach (XElement element in document.Root.DescendantsAndSelf())
+            {
+                Assert.AreEqual(XNamespace.None, element.Name.Namespace);
+            }
+            Assert.IsTrue(
+                AnalyzerPolicyRuleset.TryReadActions(
+                    path,
+                    policies,
+                    actions,
+                    out string repairedMessage
+                ),
+                repairedMessage
+            );
+            Assert.That(actions.TryGetValue("WUH010", out string action), Is.True);
+            Assert.AreEqual("Error", action);
         }
 
         [Test]
