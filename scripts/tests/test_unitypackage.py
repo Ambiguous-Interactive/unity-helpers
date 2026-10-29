@@ -43,6 +43,7 @@ from stage_unitypackage import (
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+COMMAND_TIMEOUT_SECONDS = 300
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -258,6 +259,7 @@ def test_cli_rejects_unknown_and_incomplete_arguments(script: str) -> None:
             capture_output=True,
             text=True,
             check=False,
+            timeout=COMMAND_TIMEOUT_SECONDS,
         )
         assert result.returncode != 0
         assert "usage:" in result.stderr
@@ -293,7 +295,11 @@ def test_python_gates_reject_real_defects(
     control = tmp_path / "control.py"
     control.write_text(source, encoding="utf-8")
     result = subprocess.run(
-        [tool, *arguments, str(control)], capture_output=True, text=True, check=False
+        [tool, *arguments, str(control)],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=COMMAND_TIMEOUT_SECONDS,
     )
     assert result.returncode != 0
     assert diagnostic in result.stdout + result.stderr
@@ -302,7 +308,9 @@ def test_python_gates_reject_real_defects(
 def test_python_registry_rejects_missing_new_duplicate_and_empty_scope(tmp_path: Path) -> None:
     git = shutil.which("git")
     assert git is not None
-    subprocess.run([git, "init", "--quiet", str(tmp_path)], check=True)
+    subprocess.run(
+        [git, "init", "--quiet", str(tmp_path)], check=True, timeout=COMMAND_TIMEOUT_SECONDS
+    )
     selected = tmp_path / "selected.py"
     selected.write_text("", encoding="utf-8")
     legacy = tmp_path / "legacy.py"
@@ -418,6 +426,7 @@ def test_runtime_metadata_avoids_dev_installs_and_retains_warm_tools(
                 check=False,
                 capture_output=True,
                 text=True,
+                timeout=COMMAND_TIMEOUT_SECONDS,
             )
             assert installation.returncode == 0, installation.stdout + installation.stderr
             installed_before = {"dev-tool-marker": "0.0.0"}
@@ -430,6 +439,7 @@ def test_runtime_metadata_avoids_dev_installs_and_retains_warm_tools(
             check=False,
             capture_output=True,
             text=True,
+            timeout=COMMAND_TIMEOUT_SECONDS,
         )
         assert result.returncode == 0, result.stdout + result.stderr
         assert Path(f"{asset}.meta").is_file()
@@ -439,6 +449,7 @@ def test_runtime_metadata_avoids_dev_installs_and_retains_warm_tools(
             check=True,
             capture_output=True,
             text=True,
+            timeout=COMMAND_TIMEOUT_SECONDS,
         )
         assert json.loads(after.stdout) == installed_before
 
@@ -448,6 +459,7 @@ def test_runtime_metadata_avoids_dev_installs_and_retains_warm_tools(
         check=True,
         capture_output=True,
         text=True,
+        timeout=COMMAND_TIMEOUT_SECONDS,
     )
     assert retained.stdout.strip() == "retained developer tool"
     removed = subprocess.run(
@@ -467,6 +479,7 @@ def test_runtime_metadata_avoids_dev_installs_and_retains_warm_tools(
         check=True,
         capture_output=True,
         text=True,
+        timeout=COMMAND_TIMEOUT_SECONDS,
     )
     assert json.loads(removed.stdout) == {}
 
@@ -489,6 +502,7 @@ def test_python_bootstrap_uses_native_powershell() -> None:
         capture_output=True,
         text=True,
         check=False,
+        timeout=COMMAND_TIMEOUT_SECONDS,
     )
     assert invocation.returncode == 0, invocation.stdout + invocation.stderr
     assert json.loads(invocation.stdout) == [

@@ -2951,7 +2951,7 @@ function Run-ReleasePackageContentContractTests {
 
   $exporterPath = Join-Path $repoRoot 'scripts/unity/stage_unitypackage.py'
   $requiredExportEntries = @(
-    uv run --project (Join-Path $repoRoot 'scripts/python~') --locked python -c 'import json,sys; sys.path.insert(0,sys.argv[1]); from stage_unitypackage import REQUIRED_ENTRIES; print(json.dumps(REQUIRED_ENTRIES))' (Split-Path $exporterPath -Parent) |
+    uv run --project (Join-Path $repoRoot 'scripts/python~') --locked --no-dev python -c 'import json,sys; sys.path.insert(0,sys.argv[1]); from stage_unitypackage import REQUIRED_ENTRIES; print(json.dumps(REQUIRED_ENTRIES))' (Split-Path $exporterPath -Parent) |
       ConvertFrom-Json
   )
   $exporterRegistryLoaded = $LASTEXITCODE -eq 0 -and $requiredExportEntries.Count -gt 0

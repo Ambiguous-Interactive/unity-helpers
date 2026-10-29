@@ -15,6 +15,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from generate_meta import generate_metadata, render_metadata
 
+COMMAND_TIMEOUT_SECONDS = 300
 ROOT = Path(__file__).resolve().parents[2]
 GOLDENS = cast(
     "dict[str, str]",
@@ -85,6 +86,7 @@ def test_cli_handles_file_and_folder_paths(tmp_path: Path, name: str) -> None:
         capture_output=True,
         text=True,
         check=False,
+        timeout=COMMAND_TIMEOUT_SECONDS,
     )
     assert result.returncode == 0, result.stderr
     assert "Created:" in result.stdout
@@ -119,6 +121,7 @@ def test_no_arguments_and_invalid_paths_fail_clearly(tmp_path: Path) -> None:
             capture_output=True,
             text=True,
             check=False,
+            timeout=COMMAND_TIMEOUT_SECONDS,
         )
         assert result.returncode == 1
         assert message in result.stderr
