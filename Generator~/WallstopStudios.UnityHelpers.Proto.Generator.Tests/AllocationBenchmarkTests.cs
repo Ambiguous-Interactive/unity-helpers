@@ -20,6 +20,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         private const int WarmupIterations = 100;
         private const int MeasuredIterations = 10_000;
         private const int MeasurementRounds = 5;
+        private const int MeasurementWarmupRounds = 64;
         private const int ShapeIterations = 2_000;
 
         private static Measurement Summarize(Measurement[] measurements)
@@ -213,6 +214,17 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 _ = ProtoBuf.Serializer.Deserialize<AllocationContract>(protobufReadBuffer);
             }
 
+            for (int round = 0; round < MeasurementWarmupRounds; ++round)
+            {
+                _ = MeasureWallstopProtoSerialize(original, ref buffer);
+                _ = MeasureProtobufNetSerialize(original, protobufWriteBuffer);
+                _ = MeasureWallstopProtoDeserialize(buffer);
+                _ = MeasureProtobufNetDeserialize(protobufReadBuffer);
+            }
+            TestContext.WriteLine(
+                $"Retained timing begins after {MeasurementWarmupRounds} complete measurement-loop warmup rounds."
+            );
+
             Measurement[] wallstopProtoSerializeRounds = new Measurement[MeasurementRounds];
             Measurement[] protobufNetSerializeRounds = new Measurement[MeasurementRounds];
             Measurement[] wallstopProtoDeserializeRounds = new Measurement[MeasurementRounds];
@@ -259,6 +271,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     writeAllocationRounds.Append(", ");
                 }
                 writeAllocationRounds.Append(wallstopProtoSerializeRounds[round].AllocatedBytes);
+                TestContext.WriteLine(
+                    $"Retained round {round}: WProto write {wallstopProtoSerializeRounds[round].NanosecondsPerOperation:R}, "
+                        + $"oracle write {protobufNetSerializeRounds[round].NanosecondsPerOperation:R}, "
+                        + $"WProto read {wallstopProtoDeserializeRounds[round].NanosecondsPerOperation:R}, "
+                        + $"oracle read {protobufNetDeserializeRounds[round].NanosecondsPerOperation:R} ns/op."
+                );
             }
             TestContext.WriteLine(
                 $"WProto write allocated bytes by round ({MeasuredIterations} calls each): {writeAllocationRounds}"
