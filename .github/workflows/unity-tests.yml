@@ -232,7 +232,7 @@ jobs:
         if: ${{ always() }}
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
-          node-version: "22.18.0"
+          node-version: "22.23.4"
 
       - name: Redact historical readback output
         id: redact_native_readback
@@ -282,7 +282,7 @@ jobs:
       - name: Setup Node.js for assembly discovery
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
-          node-version: "22.18.0"
+          node-version: "22.23.4"
 
       - name: Validate Build readback source selection
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.native-readback-build-receipt-sha256 != '' }}
@@ -876,7 +876,7 @@ jobs:
           && steps.unity_lock.outputs.acquired == 'true' }}
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: "22.18.0"
+          node-version: "22.23.4"
 
       - name: Setup Python for Standalone build diagnostics
         id: native_build_python
@@ -1145,7 +1145,7 @@ jobs:
         timeout-minutes: 2
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
-          node-version: "22.18.0"
+          node-version: "22.23.4"
 
       - name: Redact credentials from EditMode artifacts
         id: redact_editmode
@@ -1786,7 +1786,7 @@ jobs:
         timeout-minutes: 2
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
-          node-version: "22.18.0"
+          node-version: "22.23.4"
 
       # Scope is exactly what this job uploads. A wider scope reaches files the
       # job never publishes, and the redactor fails closed on a file it cannot
@@ -1956,14 +1956,17 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
-          node-version: "22.18.0"
+          node-version: "22.23.4"
+
+      - name: Setup Python tooling
+        uses: ./.github/actions/setup-python-tools
 
       - name: Stage release package payload
         shell: pwsh
         env:
           UNITY_VERSION: ${{ needs.matrix-config.outputs.release-unity-version }}
         run: |
-          node scripts/unity/stage-unitypackage.js --project-dir ".artifacts/unity/unitypackage-smoke-project"
+          uv run --project scripts/python~ --locked --no-dev python scripts/unity/stage_unitypackage.py --project-dir ".artifacts/unity/unitypackage-smoke-project"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Validate Unity license secrets

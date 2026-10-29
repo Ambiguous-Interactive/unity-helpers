@@ -1,0 +1,70 @@
+[project]
+name = "unity-helpers-scripts"
+version = "0.0.0"
+requires-python = ">=3.11.8"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "mypy>=2.4.1",
+    "pyright>=1.1.414",
+    "pytest>=9.2.0",
+    "ruff>=0.17.3",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E4", "E7", "E9", "F", "I", "UP", "B", "A", "C4", "DTZ", "FA", "ISC",
+    "ICN", "PIE", "PYI", "PT", "Q", "RET", "SIM", "TC", "ARG", "PTH", "RUF",
+    "ANN", "S", "PERF",
+]
+ignore = ["ISC001"]
+
+[tool.ruff.lint.per-file-ignores]
+"test_*.py" = ["S101", "S603"]
+
+[tool.mypy]
+strict = true
+disallow_any_explicit = true
+warn_unreachable = true
+
+[tool.pyright]
+pythonVersion = "3.11"
+typeCheckingMode = "strict"
+extraPaths = ["../unity", "..", "."]
+include = ["../unity/create_unitypackage.py", "../unity/stage_unitypackage.py", "../tests/test_unitypackage.py", "check.py", "../generate_meta.py", "../tests/test_meta_generation.py"]
+
+[tool.unity-helpers-python]
+legacy = [
+    ".devcontainer/agent-state.py",
+    ".github/scripts/cancel-stuck-workflow.py",
+    ".github/scripts/check_markdown_links.py",
+    ".github/scripts/check_markdown_url_encoding.py",
+    ".github/scripts/validate_markdown_links.py",
+    "scripts/benchmarks~/generate-jesse-parity.py",
+    "scripts/build-protobuf-candidate.py",
+    "scripts/generate-test-sprites.py",
+    "scripts/generate-test-textures.py",
+    "scripts/random-quality/verify-bounded-sampling.py",
+    "scripts/tests/test-browser-consumer.py",
+    "scripts/tests/test-devcontainer-persistence.py",
+    "scripts/tests/test-native-debugger-download.py",
+    "scripts/tests/test-protobuf-candidate.py",
+    "scripts/tests/test-unity-framework-evidence.py",
+    "scripts/tests/test-watchdog-cancellation.py",
+    "scripts/unity/download-native-debugger.py",
+    "scripts/unity/run-browser-consumer.py",
+    "scripts/verify-protobuf-shipped.py",
+    "scripts/wiki/generate_wiki_footer.py",
+    "scripts/wiki/generate_wiki_sidebar.py",
+    "scripts/wiki/prepare_wiki.py",
+    "scripts/wiki/test_wiki_scripts.py",
+    "scripts/wiki/transform_wiki_links.py",
+]

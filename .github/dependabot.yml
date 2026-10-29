@@ -68,3 +68,17 @@ updates:
       - wallstop
     reviewers:
       - wallstop
+
+  # uv keeps the typed script toolchain and its transitive dependencies locked.
+  - package-ecosystem: "uv"
+    directory: "/scripts/python~"
+    schedule:
+      interval: "weekly"
+    groups:
+      all-dependencies:
+        patterns:
+          - "*"
+    assignees:
+      - wallstop
+    reviewers:
+      - wallstop

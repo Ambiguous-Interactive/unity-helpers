@@ -28,8 +28,8 @@ try {
     $policyPath = Join-Path $fixture '.github/unity-test-framework.json'
     foreach ($version in @('1.4.6', '1.4.99')) {
         @{ requestedVersion = $version } | ConvertTo-Json | Set-Content -LiteralPath $policyPath
-        $exporter = Join-Path $root 'scripts/unity/stage-unitypackage.js'
-        $actual = & node -e 'console.log(require(process.argv[1]).testFrameworkVersion(process.argv[2]))' $exporter $fixture
+        $exporter = Join-Path $root 'scripts/unity/stage_unitypackage.py'
+        $actual = & uv run --project (Join-Path $root 'scripts/python~') --locked --no-dev python -c 'import sys; from pathlib import Path; sys.path.insert(0,sys.argv[1]); from stage_unitypackage import test_framework_version; print(test_framework_version(Path(sys.argv[2])))' (Split-Path $exporter -Parent) $fixture
         if ($LASTEXITCODE -ne 0 -or $actual -cne $version) { throw 'Export builder ignored the shared framework policy.' }
         $checks++
         foreach ($unity in @('2021.3.45f1', '2022.3.45f1', '6000.5.2f1', '6000.6.0f1')) {
@@ -55,7 +55,7 @@ try {
         $env:UNITY_TEST_PROJECT_DIR = Join-Path $temporary ('invalid-' + $checks)
         $output = & bash (Join-Path $fixture 'scripts/unity/create-test-project.sh') 2>&1
         if ($LASTEXITCODE -eq 0 -or (Test-Path -LiteralPath (Join-Path $env:UNITY_TEST_PROJECT_DIR 'Packages/manifest.json'))) { throw "Local builder published invalid framework policy $invalid : $output" }
-        $output = & node -e 'require(process.argv[1]).testFrameworkVersion(process.argv[2])' $exporter $fixture 2>&1
+        $output = & uv run --project (Join-Path $root 'scripts/python~') --locked --no-dev python -c 'import sys; from pathlib import Path; sys.path.insert(0,sys.argv[1]); from stage_unitypackage import test_framework_version; test_framework_version(Path(sys.argv[2]))' (Split-Path $exporter -Parent) $fixture 2>&1
         if ($LASTEXITCODE -eq 0) { throw 'Export builder accepted invalid framework policy.' }
         $checks += 3
     }

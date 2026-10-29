@@ -7,6 +7,13 @@ insert_final_newline = true
 indent_style = space
 indent_size = 4
 
+# Migrated Python uses Ruff's platform-independent LF output.
+[*.py]
+end_of_line = lf
+
+[scripts/python~/**]
+end_of_line = lf
+
 # Shell scripts require Unix line endings
 [*.sh]
 end_of_line = lf

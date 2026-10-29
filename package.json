@@ -241,7 +241,7 @@
     "test:unity-frozen-player-provenance": "pwsh -NoProfile -File scripts/tests/test-unity-frozen-player-provenance.ps1",
     "test:release-export-only": "node scripts/tests/test-release-export-only.js && node scripts/tests/test-require-native-unity-export.js",
     "test:unity-package-export": "pwsh -NoProfile -File scripts/tests/test-unity-package-export.ps1",
-    "test:create-unitypackage": "node scripts/tests/test-create-unitypackage.js",
+    "test:create-unitypackage": "uv run --project scripts/python~ --locked pytest scripts/tests/test_unitypackage.py -q",
     "test:unity-acceptance-runner": "pwsh -NoProfile -File scripts/tests/test-unity-acceptance.ps1",
     "test:unity-acceptance-evidence": "node scripts/tests/test-unity-acceptance.js",
     "test:format-on-demand-workflow": "node scripts/tests/test-format-on-demand-workflow.js",
@@ -396,7 +396,10 @@
     "typecheck:unity:odin-bases-disabled": "dotnet build \"Generator~/WallstopStudios.UnityHelpers.TypeCheck/WallstopStudios.UnityHelpers.TypeCheck.csproj\" --nologo -v minimal -p:WallstopOdin=true -p:WallstopDisableOdinBases=true && dotnet build \"Generator~/WallstopStudios.UnityHelpers.TestCheck/WallstopStudios.UnityHelpers.TestCheck.csproj\" --nologo -v minimal -p:WallstopOdin=true -p:WallstopDisableOdinBases=true && dotnet build \"Generator~/WallstopStudios.UnityHelpers.EditorTestCheck/WallstopStudios.UnityHelpers.EditorTestCheck.csproj\" --nologo -v minimal -p:WallstopOdin=true -p:WallstopDisableOdinBases=true",
     "test:auto-publish-release": "node scripts/tests/test-auto-publish-release.js",
     "test:watchdog-cancellation": "python3 scripts/tests/test-watchdog-cancellation.py",
-    "test:unity-framework": "pwsh -NoProfile -File scripts/tests/test-unity-framework-policy.ps1 && pwsh -NoProfile -File scripts/tests/test-unity-framework-workspace.ps1 && python3 scripts/tests/test-unity-framework-evidence.py"
+    "test:unity-framework": "pwsh -NoProfile -File scripts/tests/test-unity-framework-policy.ps1 && pwsh -NoProfile -File scripts/tests/test-unity-framework-workspace.ps1 && python3 scripts/tests/test-unity-framework-evidence.py",
+    "lint:python": "uv run --project scripts/python~ --locked python scripts/python~/check.py",
+    "test:meta-generation": "uv run --project scripts/python~ --locked pytest scripts/tests/test_meta_generation.py -q",
+    "meta:generate": "uv run --project scripts/python~ --locked --no-dev python scripts/generate_meta.py"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",

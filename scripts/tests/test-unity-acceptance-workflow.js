@@ -98,7 +98,7 @@ const run = identified("run_acceptance");
 const acceptanceNode = identified("acceptance_node");
 assert.ok(steps.indexOf(acceptanceNode) < steps.indexOf(run));
 assert.match(acceptanceNode, /uses: actions\/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1/);
-assert.match(acceptanceNode, /node-version: "22\.18\.0"/);
+assert.match(acceptanceNode, /node-version: "22\.23\.4"/);
 assert.doesNotMatch(acceptanceNode, /continue-on-error: true/);
 assert.match(run, /timeout-minutes: \$\{\{ inputs\.acceptance == 'wproto' && 150 \|\| 120 \}\}/);
 const diagnostics = workflow.match(/^      intmap-diagnostics:\n((?:        [^\n]*\n|\n)+)/m)?.[1];
