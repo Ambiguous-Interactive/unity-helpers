@@ -157,8 +157,10 @@ ChildSpawner prevents duplicate instantiation:
 
 A prefab callback that disables and re-enables the same spawner during instantiation
 does not start another spawning pass. Later lifecycle events still recreate destroyed
-children. This guard applies to each spawner; callbacks that enable a different
-spawner retain the existing persistent-prefab tracking policy.
+children. This guard applies to each spawner. A callback that enables another spawner
+before the first child is registered can still create two persistent children. Both
+remain tracked: destroying either child does not allow another copy while the other
+survives. Once all tracked children are destroyed, a later lifecycle event can respawn.
 
 ```csharp
 // Spawns DebugCanvas once
@@ -170,7 +172,7 @@ ChildSpawner spawner2 = obj2.AddComponent<ChildSpawner>();
 spawner2._prefabs = new[] { debugCanvasPrefab };
 ```
 
-Deduplication uses the prefab object reference and its live spawned instances. Persistent instances are shared across spawners; ordinary children are tracked by their own spawner. A disabled or reparented child still counts as alive. After every tracked instance of a prefab is destroyed, the next configured spawn event can create it again. Destroying the spawner alone does not forget a surviving persistent child.
+Deduplication uses the prefab object reference and its live spawned instances. Persistent instances are shared across spawners; ordinary children are tracked by their own spawner. Repeated prefab entries in one nonpersistent group intentionally create multiple children; later lifecycle events wait until every instance is destroyed. A disabled or reparented child still counts as alive. After every tracked instance of a prefab is destroyed, the next configured spawn event can create it again. Destroying the spawner alone does not forget a surviving persistent child.
 
 ### Spawn Methods
 
