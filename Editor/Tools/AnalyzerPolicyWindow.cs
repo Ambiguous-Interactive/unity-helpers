@@ -1247,9 +1247,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
             if (root.Name.Namespace != XNamespace.None)
             {
-                state = AnalyzerPolicyState.Drifted;
                 message =
                     "The ruleset namespace prevents compilation. Enable or disable all policies to repair it.";
+                state = AnalyzerPolicyState.Drifted;
                 return true;
             }
 
