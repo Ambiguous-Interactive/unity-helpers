@@ -8,5 +8,5 @@ runs:
       with:
         python-version: "3.11"
     - name: Install uv
-      shell: bash
+      shell: pwsh
       run: python -m pip install --disable-pip-version-check uv==0.13.6

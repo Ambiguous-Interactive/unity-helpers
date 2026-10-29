@@ -469,3 +469,32 @@ def test_runtime_metadata_avoids_dev_installs_and_retains_warm_tools(
         text=True,
     )
     assert json.loads(removed.stdout) == {}
+
+
+def test_python_bootstrap_uses_native_powershell() -> None:
+    action = (REPO_ROOT / ".github/actions/setup-python-tools/action.yml").read_text()
+    installation = action.split("    - name: Install uv\n", 1)[1]
+    settings = dict(line.strip().split(": ", 1) for line in installation.splitlines())
+    assert settings["shell"] == "pwsh", "Windows bash can resolve to an unprovisioned WSL launcher."
+    command = settings["run"]
+    powershell = shutil.which("pwsh")
+    assert powershell is not None
+    invocation = subprocess.run(
+        [
+            powershell,
+            "-NoProfile",
+            "-Command",
+            "function python { ConvertTo-Json -Compress -InputObject @($args) }; " + command,
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert invocation.returncode == 0, invocation.stdout + invocation.stderr
+    assert json.loads(invocation.stdout) == [
+        "-m",
+        "pip",
+        "install",
+        "--disable-pip-version-check",
+        "uv==0.13.6",
+    ]
