@@ -22,6 +22,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     /// - Uses <see cref="AttributeMetadataCache"/> when available to avoid heavy reflection.
     /// - Falls back to reflection-based discovery when a type is not present in the cache.
     /// - Logs warnings and continues when individual fields or element types cannot be resolved.
+    /// - Skips unsupported field types without creating their accessors or collection factories.
     /// - Call during a loading screen or bootstrap to eliminate first-use stalls.
     /// </remarks>
     public static class RelationalComponentInitializer
@@ -120,6 +121,12 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                     Debug.LogWarning(
                         $"RelationalComponents.Initialize: Field '{fieldMeta.FieldName}' not found on '{componentType.FullName}'."
                     );
+                    continue;
+                }
+
+                if (!RelationalComponentProcessor.TryGetFieldKind(field.FieldType, out _, out _))
+                {
+                    ++report.Warnings;
                     continue;
                 }
 

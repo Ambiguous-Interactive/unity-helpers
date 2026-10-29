@@ -325,6 +325,8 @@ Unbounded collections without filters or depth limits use a cached Unity query a
 - `MaxCount` (default: 0 = unlimited)
   - Applies to arrays, lists, and hash sets; ignored for single fields
 
+Relational fields support components, interfaces, and one-dimensional arrays, `List<T>`, or `HashSet<T>` of those values. Multidimensional arrays, nested collections, and unrelated value types are left unchanged with an authoring warning, so they cannot interrupt other bindings. Prewarming skips those fields too.
+
 - `TagFilter`
   - Exact tag match using `CompareTag`
 
