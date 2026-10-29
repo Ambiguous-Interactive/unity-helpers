@@ -309,7 +309,8 @@ replaces the lazy loader and rearms metadata lookup. The reset itself does not d
 schedule destruction as `RuntimeSingleton<T>.ClearInstance()` does. `HasInstance`
 becomes false until the next lookup, which can return the same live asset even in the same frame.
 Once Unity has actually destroyed an asset, `HasInstance` excludes it through Unity's native null
-check, and the next main-thread lookup repairs that stale cache. Pending-destruction tracking for runtime GameObjects therefore does
+check, and the next main-thread lookup repairs that stale cache. During shutdown, that lookup
+drops the destroyed cached reference and leaves the replacement loader unevaluated. Pending-destruction tracking for runtime GameObjects therefore does
 not apply to this cache-only reset.
 
 | State when reset starts                | Callback behavior                                 | Result after reset                      |

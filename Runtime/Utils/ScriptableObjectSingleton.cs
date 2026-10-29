@@ -391,9 +391,12 @@ namespace WallstopStudios.UnityHelpers.Utils
         }
 
         /// <summary>
-        /// Gets the global asset instance, loading it from <c>Resources</c> on first access. Returns
-        /// <c>null</c> during cache clearing or shutdown, or when loading is invalidated by a reset or destruction.
+        /// Gets the global asset, preserving cached reads while refusing blocked or invalidated loads.
         /// </summary>
+        /// <remarks>
+        /// Live cached assets remain readable during clearing and shutdown. Uncached reads return null
+        /// until clearing ends and after shutdown begins. A reset or destruction during loading also returns null.
+        /// </remarks>
         /// <example>
         /// <code>
         /// [ScriptableSingletonPath("Settings/Audio")]
@@ -434,11 +437,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
                 UnityMainThreadGuard.EnsureMainThread();
 
-                if (
-                    RuntimeSingletonRegistry.IsApplicationQuitting
-                    || _isClearingInstance
-                    || ScriptableObjectSingletonRegistry.IsClearingInstances
-                )
+                if (_isClearingInstance || ScriptableObjectSingletonRegistry.IsClearingInstances)
                 {
                     return null;
                 }
@@ -448,6 +447,11 @@ namespace WallstopStudios.UnityHelpers.Utils
                     _lazyInstance = CreateLazy();
                     _metadataAsset = null;
                     _metadataLoadAttempted = false;
+                }
+
+                if (RuntimeSingletonRegistry.IsApplicationQuitting)
+                {
+                    return null;
                 }
 
                 Lazy<T> loading = _lazyInstance;

@@ -270,5 +270,33 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 ScriptableObjectSingletonRegistry.Unregister(succeeding);
             }
         }
+
+        [Test]
+        public void ShutdownRepairsDestroyedCacheWithoutLoading()
+        {
+            ClearingScriptableSingleton original = Track(
+                ScriptableObject.CreateInstance<ClearingScriptableSingleton>()
+            );
+            ClearingScriptableSingleton replacement = Track(
+                ScriptableObject.CreateInstance<ClearingScriptableSingleton>()
+            );
+            Lazy<ClearingScriptableSingleton> cached = new(() => original);
+            ClearingScriptableSingleton._lazyInstance = cached;
+            Assert.AreSame(original, ClearingScriptableSingleton.Instance);
+            Object.DestroyImmediate(original); // UNH-SUPPRESS: Verifies cache repair without loading during shutdown.
+            RuntimeStateTestUtilities.SimulateApplicationQuitting();
+            try
+            {
+                Assert.IsTrue(ReferenceEquals(ClearingScriptableSingleton.Instance, null));
+                Assert.AreNotSame(cached, ClearingScriptableSingleton._lazyInstance);
+                Assert.IsFalse(ClearingScriptableSingleton._lazyInstance.IsValueCreated);
+                Assert.IsFalse(ClearingScriptableSingleton.HasInstance);
+            }
+            finally
+            {
+                RuntimeStateTestUtilities.PrepareForSceneLoad();
+            }
+            Assert.AreSame(replacement, ClearingScriptableSingleton.Instance);
+        }
     }
 }
