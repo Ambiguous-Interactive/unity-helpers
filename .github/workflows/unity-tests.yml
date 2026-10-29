@@ -1966,7 +1966,7 @@ jobs:
         env:
           UNITY_VERSION: ${{ needs.matrix-config.outputs.release-unity-version }}
         run: |
-          uv run --project scripts/python~ --locked python scripts/unity/stage_unitypackage.py --project-dir ".artifacts/unity/unitypackage-smoke-project"
+          uv run --project scripts/python~ --locked --no-dev python scripts/unity/stage_unitypackage.py --project-dir ".artifacts/unity/unitypackage-smoke-project"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Validate Unity license secrets

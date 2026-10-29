@@ -41,7 +41,7 @@ if [[ -z "${OUTPUT_PATH}" ]]; then
     OUTPUT_PATH="${REPO_ROOT}/.artifacts/release/${PACKAGE_NAME}-${PACKAGE_VERSION}.unitypackage"
 fi
 
-UNITY_VERSION="${UNITY_VERSION}" uv run --project "${REPO_ROOT}/scripts/python~" --locked python "${SCRIPT_DIR}/stage_unitypackage.py" --project-dir "${PROJECT_DIR}"
+UNITY_VERSION="${UNITY_VERSION}" uv run --project "${REPO_ROOT}/scripts/python~" --locked --no-dev python "${SCRIPT_DIR}/stage_unitypackage.py" --project-dir "${PROJECT_DIR}"
 PROJECT_DIR="$(realpath -m "${PROJECT_DIR}")"
 
 if [[ "${STAGE_ONLY}" -eq 1 ]]; then

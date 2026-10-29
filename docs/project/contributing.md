@@ -51,14 +51,19 @@ the enum underlying type and constants. Preserve the frozen inventory when fixin
 Release payload staging, archive creation, and Unity metadata generation run through uv. Install uv 0.13.6, then use:
 
 ```bash
+python -m pip install --disable-pip-version-check uv==0.13.6
 uv sync --project scripts/python~ --locked
 npm run lint:python
 npm run test:create-unitypackage
 npm run test:meta-generation
 npm run meta:generate -- Runtime/Example.cs
-uv run --project scripts/python~ --locked python scripts/unity/create_unitypackage.py --output .artifacts/release/local.unitypackage
-uv run --project scripts/python~ --locked python scripts/unity/stage_unitypackage.py --project-dir .artifacts/unity/local-export
+uv run --project scripts/python~ --locked --no-dev python scripts/unity/create_unitypackage.py --output .artifacts/release/local.unitypackage
+uv run --project scripts/python~ --locked --no-dev python scripts/unity/stage_unitypackage.py --project-dir .artifacts/unity/local-export
 ```
+
+`validate:local`, `validate:tests:fast`, `validate:tests:hook-regressions`, and
+`test:agent-preflight` require uv, including the metadata parity check. Outside the devcontainer,
+run the bootstrap and locked sync above before these developer entry points.
 
 The devcontainer runs the locked sync during creation. Python 3.11.8 or newer
 is required; uv can provision a compatible interpreter. The environment lives under
@@ -73,7 +78,10 @@ be fully annotated and explicit `Any` is forbidden. CI runs these checks and the
 The existing `scripts/generate-meta.sh` entry point delegates to Python and retains `--force`,
 CRLF metadata, and importer defaults. Use `npm run meta:generate -- <path>` or invoke
 `scripts/generate_meta.py` through uv for a shell-independent entry point. Existing metadata is
-refused unless `--force` is explicit; a competing creation also preserves the first file.
+refused unless `--force` is explicit; a competing creation also preserves the first file. Runtime
+commands use `--no-dev`, so they do not install analysis or test packages into a fresh environment.
+They retain tools already installed in a shared warm environment; compatible Python may still need
+to be provisioned on the first run.
 
 New Python files must join the strict `tool.pyright.include` list in
 `scripts/python~/pyproject.toml`; a Git-backed inventory rejects unregistered files. The explicit

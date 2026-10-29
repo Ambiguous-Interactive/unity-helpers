@@ -871,7 +871,7 @@ The release gate script comes from the workflow commit. Its evidence query remai
 selected source SHA, allowing an older validated source to use the current release controls.
 
 The shell exporter remains available for local Docker comparison and delegates staging to the same
-Node implementation. Compare the portable and native archives by logical path, asset bytes, and
+Python implementation. Compare the portable and native archives by logical path, asset bytes, and
 metadata; Unity may rewrite text assets while importing them, so archive-byte equality is not a
 valid compatibility check.
 

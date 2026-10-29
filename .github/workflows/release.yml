@@ -316,7 +316,7 @@ jobs:
         uses: ./.github/actions/setup-python-tools
 
       - name: Create Unity package
-        run: uv run --project scripts/python~ --locked python scripts/unity/create_unitypackage.py
+        run: uv run --project scripts/python~ --locked --no-dev python scripts/unity/create_unitypackage.py
 
       - name: Upload .unitypackage artifact
         timeout-minutes: 5

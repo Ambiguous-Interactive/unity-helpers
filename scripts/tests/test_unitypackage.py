@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import base64
 import gzip
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import sys
 import tarfile
+import zipfile
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -361,3 +364,108 @@ def test_npm_failure_reports_stderr_and_preserves_project(
     with pytest.raises(ValueError, match=r"npm pack failed \(17\): npm failure diagnostic"):
         stage_unity_package(tmp_path, project, "6000.6.0f1")
     assert marker.read_bytes() == b"retained"
+
+
+@pytest.mark.parametrize("entrypoint", ["shell", "npm"])
+def test_runtime_metadata_avoids_dev_installs_and_retains_warm_tools(
+    tmp_path: Path, entrypoint: str
+) -> None:
+    uv = shutil.which("uv")
+    assert uv is not None
+    environment = dict(os.environ)
+    environment.pop("VIRTUAL_ENV", None)
+    virtual_environment = tmp_path / "isolated-environment"
+    environment.update(
+        {
+            "UV_PROJECT_ENVIRONMENT": str(virtual_environment),
+            "UV_PYTHON": sys.executable,
+            "UV_OFFLINE": "1",
+        }
+    )
+    if entrypoint == "shell":
+        bash = shutil.which("bash")
+        assert bash is not None
+        command = [bash, str(REPO_ROOT / "scripts/generate-meta.sh")]
+    else:
+        command = [*npm_command(), "run", "meta:generate", "--"]
+    python = virtual_environment / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+    inspection = "import importlib.metadata as m,json; print(json.dumps({d.metadata['Name'].lower():d.version for d in m.distributions()}))"
+
+    wheel = tmp_path / "dev_tool_marker-0.0.0-py3-none-any.whl"
+    wheel_metadata = "dev_tool_marker-0.0.0.dist-info"
+    wheel_entries = {
+        "dev_tool_marker.py": b"def main():\n    print('retained developer tool')\n",
+        f"{wheel_metadata}/METADATA": b"Metadata-Version: 2.1\nName: dev-tool-marker\nVersion: 0.0.0\n",
+        f"{wheel_metadata}/WHEEL": b"Wheel-Version: 1.0\nRoot-Is-Purelib: true\nTag: py3-none-any\n",
+    }
+    records: list[str] = []
+    with zipfile.ZipFile(wheel, "w") as archive:
+        for name, content in wheel_entries.items():
+            archive.writestr(name, content)
+            digest = (
+                base64.urlsafe_b64encode(hashlib.sha256(content).digest()).rstrip(b"=").decode()
+            )
+            records.append(f"{name},sha256={digest},{len(content)}")
+        records.append(f"{wheel_metadata}/RECORD,,")
+        archive.writestr(f"{wheel_metadata}/RECORD", "\n".join(records) + "\n")
+
+    for state in ("cold", "warm"):
+        installed_before: dict[str, str] = {}
+        if state == "warm":
+            installation = subprocess.run(
+                [uv, "pip", "install", "--python", str(python), str(wheel)],
+                env=environment,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            assert installation.returncode == 0, installation.stdout + installation.stderr
+            installed_before = {"dev-tool-marker": "0.0.0"}
+        asset = tmp_path / f"{state}.cs"
+        asset.write_bytes(b"")
+        result = subprocess.run(
+            [*command, str(asset)],
+            cwd=REPO_ROOT,
+            env=environment,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert Path(f"{asset}.meta").is_file()
+        after = subprocess.run(
+            [str(python), "-c", inspection],
+            env=environment,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        assert json.loads(after.stdout) == installed_before
+
+    retained = subprocess.run(
+        [str(python), "-c", "import dev_tool_marker; dev_tool_marker.main()"],
+        env=environment,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert retained.stdout.strip() == "retained developer tool"
+    removed = subprocess.run(
+        [
+            uv,
+            "run",
+            "--project",
+            str(REPO_ROOT / "scripts/python~"),
+            "--locked",
+            "--no-dev",
+            "--exact",
+            "python",
+            "-c",
+            inspection,
+        ],
+        env=environment,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert json.loads(removed.stdout) == {}

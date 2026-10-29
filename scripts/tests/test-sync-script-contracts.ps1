@@ -2421,7 +2421,7 @@ function Run-ReleasePublishWorkflowBudgetContractTests {
   )
   $releaseCreatesPortableUnityPackage = (
     $releaseJob.Contains('runs-on: ubuntu-latest') -and
-    $releaseJob.Contains('run: uv run --project scripts/python~ --locked python scripts/unity/create_unitypackage.py') -and
+    $releaseJob.Contains('run: uv run --project scripts/python~ --locked --no-dev python scripts/unity/create_unitypackage.py') -and
     $releaseJob.Contains('path: .artifacts/release/*.unitypackage*') -and
     -not ($releaseJob -match 'self-hosted|UNITY_SERIAL|ensure-unity-editor|build-lock|run-ci-tests\.ps1')
   )

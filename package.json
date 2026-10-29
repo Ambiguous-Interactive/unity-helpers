@@ -399,7 +399,7 @@
     "test:unity-framework": "pwsh -NoProfile -File scripts/tests/test-unity-framework-policy.ps1 && pwsh -NoProfile -File scripts/tests/test-unity-framework-workspace.ps1 && python3 scripts/tests/test-unity-framework-evidence.py",
     "lint:python": "uv run --project scripts/python~ --locked python scripts/python~/check.py",
     "test:meta-generation": "uv run --project scripts/python~ --locked pytest scripts/tests/test_meta_generation.py -q",
-    "meta:generate": "uv run --project scripts/python~ --locked python scripts/generate_meta.py"
+    "meta:generate": "uv run --project scripts/python~ --locked --no-dev python scripts/generate_meta.py"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",
