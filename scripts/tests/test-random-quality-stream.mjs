@@ -40,7 +40,7 @@ assert.match(
 );
 assert.deepEqual(
   pinnedProofRequirements,
-  ["z3-solver==5.3.2.0"],
+  ["z3-solver==5.3.3.0"],
   "The bounded-random proof must keep its validated Z3 version pinned"
 );
 const runtimeAssembly = JSON.parse(

@@ -1,2 +1,2 @@
 # Symbolic proof dependency for scripts/random-quality/verify-bounded-sampling.py.
-z3-solver==5.3.2.0
+z3-solver==5.3.3.0
