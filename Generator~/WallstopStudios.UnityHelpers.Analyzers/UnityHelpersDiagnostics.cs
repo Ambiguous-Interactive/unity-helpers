@@ -559,5 +559,16 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 DiagnosticSeverity.Warning,
                 isEnabledByDefault: false
             );
+
+        /// <summary>An unsupported relational field declaration.</summary>
+        internal static readonly DiagnosticDescriptor UnsupportedRelationalField =
+            new DiagnosticDescriptor(
+                "WUH025",
+                "Relational field type is unsupported",
+                "Relational field '{0}' has unsupported type '{1}'. Use a component, interface, object base type, or a vector array, List<T>, or HashSet<T> of those values. Runtime binding leaves unsupported fields unchanged.",
+                "Correctness",
+                DiagnosticSeverity.Warning,
+                isEnabledByDefault: true
+            );
     }
 }

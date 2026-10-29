@@ -532,9 +532,9 @@
     },
     {
       "name": "use-relational-attributes",
-      "sha256": "33ab4dd858aa846b44c33b14cbfa9d255b2a13a1125336a184eeb4f9268d5170",
+      "sha256": "f3475ea40f38687855ca702551af73bcd846f5d430df57e18fea6bd089c01dba",
       "parts": ["use-relational-attributes-part-1.md", "use-relational-attributes-part-2.md"],
-      "routerSha256": "cd392ef914f8b2554a1e69e50650a4741ad5409cd12384ed223a33983ed2dd19"
+      "routerSha256": "b7b5341a55082e32a74ea30659092fdf742defec2642c27bdeedcb39bf058a1f"
     },
     {
       "name": "use-serializable-types",

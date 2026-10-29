@@ -106,3 +106,14 @@ public class CharacterController : MonoBehaviour
 - Call assignment methods in `Awake()` or `OnEnable()` before dependent code runs
 - Child search is **breadth-first** – closer descendants found before distant ones
 - For performance-critical scenarios, consider using `RelationalComponentInitializer.Initialize()` during loading to pre-cache reflection data
+
+## Compiler validation
+
+Use WUH025 to catch invalid declared field shapes before binding. Select Error in Analyzer Policies
+when compilation must reject them. Keep the runtime guard for older assemblies and unresolved
+generic substitutions. Match the actual component/interface/base-object and vector/List/HashSet
+contract; do not reject an interface merely because it supports enumeration. A component can
+implement that interface. Test all three relation attributes, private fields, field-targeted
+properties, aliases, valid interface controls, severity promotion and suppression when changing
+this rule. Keep the diagnostic, policy catalog/examples, shipped analyzer DLL and documentation
+in sync; rebuild the DLL and verify its bytes after the final source edit.

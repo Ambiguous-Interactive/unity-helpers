@@ -193,6 +193,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     selectedExplanation =
                         "Implement typed equality and matching object equality and hashing. Ref structs are excluded on Unity's C# version. Stored collection references keep reference equality unless the type documents content equality.";
                     break;
+                case "WUH025":
+                    selectedBadCode = "[ChildComponent] private Transform[,] children;";
+                    selectedGoodCode = "[ChildComponent] private Transform[] children;";
+                    selectedExplanation =
+                        "Use a supported component contract or collection shape. Promote WUH025 to Error to stop compilation; runtime guards still protect older binaries and unresolved generic fields.";
+                    break;
                 case "WUH024":
                     selectedBadCode =
                         "bool enabled = System.Reflection.BindingFlags.Public.HasFlag(System.Reflection.BindingFlags.Public);";

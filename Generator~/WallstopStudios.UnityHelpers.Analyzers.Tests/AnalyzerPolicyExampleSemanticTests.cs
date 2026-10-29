@@ -85,7 +85,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random {
 
         private static IEnumerable<TestCaseData> Cases()
         {
-            for (int number = 1; number <= 24; ++number)
+            for (int number = 1; number <= 25; ++number)
             {
                 string id = $"WUH{number:000}";
                 yield return new TestCaseData(id).SetName(id + "ExamplesMatchTheActualDiagnostic");
@@ -140,6 +140,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random {
                     return new DisposableStructBoxingAnalyzer();
                 case "WUH023":
                     return new PublicStructEqualityAnalyzer();
+                case "WUH025":
+                    return new RelationalFieldAnalyzer();
                 case "WUH024":
                     return new EnumHelperAnalyzer();
                 default:
@@ -159,6 +161,12 @@ namespace WallstopStudios.UnityHelpers.Core.Random {
                 return "using System; namespace WallstopStudios.UnityHelpers.Core.Extension { public static class EnumExtensions { public static bool HasFlagNoAlloc<T>(this T value, T flag) where T : unmanaged, Enum { return value.HasFlag(flag); } } } public class Subject { public void Run() { "
                     + code
                     + " } }";
+            }
+            if (string.Equals(id, "WUH025", StringComparison.Ordinal))
+            {
+                return "using UnityEngine; using WallstopStudios.UnityHelpers.Core.Attributes; namespace UnityEngine { public class Object {} public class Component : Object {} public class Transform : Component {} } namespace WallstopStudios.UnityHelpers.Core.Attributes { [System.AttributeUsage(System.AttributeTargets.Field)] public abstract class BaseRelationalComponentAttribute : System.Attribute {} public sealed class ChildComponentAttribute : BaseRelationalComponentAttribute {} } public class Subject { "
+                    + code
+                    + " }";
             }
             string fields = string.Empty;
             string members = string.Empty;

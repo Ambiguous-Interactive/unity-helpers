@@ -136,6 +136,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 "Typed enum helpers",
                 "Suggests typed flag checks and cached enum names where available. This policy is opt-in; cached names retain previously seen values."
             ),
+            new(
+                "WUH025",
+                "Unsupported relational field",
+                "Reports relational fields with unsupported declared types. Select Error to reject these declarations during compilation."
+            ),
         };
 
         /// <summary>Enables or disables every Unity Helpers analyzer in the default ruleset.</summary>

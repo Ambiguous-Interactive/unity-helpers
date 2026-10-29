@@ -1,6 +1,8 @@
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
+#pragma warning disable WUH025 // Deliberately invalid fields exercise runtime rejection for older assemblies.
+
 namespace WallstopStudios.UnityHelpers.Tests.Attributes
 {
     using System;
@@ -52,3 +54,5 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
         public SpriteRenderer valid;
     }
 }
+
+#pragma warning restore WUH025

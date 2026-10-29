@@ -60,6 +60,7 @@ command after resolving the failure. Temporary directories are excluded from Uni
 | [`WUH022`](#wuh022-boxing-a-disposable-value-type)                       | A disposable value type converted to a reference type                 |
 | [`WUH023`](#wuh023-public-struct-equality-opt-in)                        | A public struct without typed equality (**off by default**)           |
 | [`WUH024`](#wuh024-typed-enum-helpers-opt-in)                            | Enum operations with typed helpers (**off by default**)               |
+| [`WUH025`](#wuh025-unsupported-relational-field)                         | A relational field with an unsupported type                           |
 
 These are a different family from the `WPROTO###` serialization diagnostics, and they follow a
 different policy on purpose:
@@ -1174,3 +1175,28 @@ calls such as `ToString("D")` retain their formatting. Name caching retains entr
 previously unseen values; keep ordinary `ToString()` when values are numerous and rarely
 repeated. The rule does not promise a speedup on every runtime and provides no automatic
 rewrite. Suppress intentional calls with the normal analyzer policy controls.
+
+## `WUH025`: unsupported relational field
+
+`ParentComponent`, `SiblingComponent`, and `ChildComponent` fields must use a component,
+interface, component base type, or a vector array, `List<T>`, or `HashSet<T>` of those values.
+The compiler reports multidimensional and nested collections and unrelated scalar or element types,
+including private fields and attributes on auto-property backing fields.
+
+```csharp
+[ChildComponent] private Transform[,] invalid;
+[ChildComponent] private Transform[] children;
+```
+
+Choose **Error** for WUH025 in **Analyzer Policies** to stop compilation, or add this rule
+inside the Unity Helpers analyzer group in `Assets/Default.ruleset`:
+
+```xml
+<Rule Id="WUH025" Action="Error" />
+```
+
+The default is a suppressible warning. Package-owned compiler checks promote it to an error.
+Generic fields whose concrete element type is not yet known still require runtime validation.
+All interface contracts remain supported, including interfaces that also implement enumeration;
+a component can implement these interfaces. The analyzer does not infer collection storage from
+an interface name. Runtime guards remain necessary for older compiled assemblies and reflection.
