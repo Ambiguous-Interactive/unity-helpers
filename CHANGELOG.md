@@ -56,6 +56,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix Analyzer Policies files that prevent script compilation, and repair older namespaced files when saving policies ([#1091](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1091)).
+- Fix child component lists and sets reserving `MaxCount` entries before finding matches; large limits now allocate for actual results ([#1093](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1093)).
 - Fix scriptable singleton cleanup reloading destroyed assets and recursive scene-load resets invoking callbacks repeatedly ([#1088](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1088)).
 - Fix unsupported relational field shapes interrupting valid bindings or clearing authored values; skip those fields with a warning ([#1086](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1086)).
 - Fix WProto small-integer reads silently wrapping out-of-range values. Generated members, collections, maps, and char roots now reject overflow; regenerate precompiled codecs ([#1081](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1081)).

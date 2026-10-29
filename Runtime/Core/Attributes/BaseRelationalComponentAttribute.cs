@@ -87,7 +87,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         /// </summary>
         /// <remarks>
         /// Negative values are treated as 0 (unlimited). For single-field assignments, this property
-        /// has no effect since only one component can be assigned.
+        /// has no effect since only one component can be assigned. New collections allocate for
+        /// matching components rather than reserving this maximum in advance.
         /// </remarks>
         public int MaxCount
         {

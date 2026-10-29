@@ -238,11 +238,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                                 IList list = existing as IList;
                                 if (list == null)
                                 {
-                                    int initialCapacity =
-                                        0 < metadata.attribute.MaxCount
-                                            ? metadata.attribute.MaxCount
-                                            : 0;
-                                    list = metadata.listCreator(initialCapacity);
+                                    list = metadata.listCreator(0);
                                     metadata.SetValue(component, list);
                                 }
                                 else
@@ -274,11 +270,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                                 }
                                 else
                                 {
-                                    int initialCapacity =
-                                        0 < metadata.attribute.MaxCount
-                                            ? metadata.attribute.MaxCount
-                                            : 0;
-                                    instance = metadata.hashSetCreator(initialCapacity);
+                                    instance = metadata.hashSetCreator(0);
                                     metadata.SetValue(component, instance);
                                 }
 

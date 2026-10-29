@@ -814,8 +814,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
     {
         private const string AnalyzerId = "WallstopStudios.UnityHelpers.Analyzers";
         private const string RuleNamespace = "WallstopStudios.UnityHelpers.Analyzers";
-        private const string RulesetNamespace =
-            "http://schemas.microsoft.com/developer/msbuild/2003";
 
         internal static bool TryRead(
             string path,
@@ -879,11 +877,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             }
             else
             {
-                XNamespace rulesetNamespace = RulesetNamespace;
                 document = new XDocument(
                     new XDeclaration("1.0", "utf-8", null),
                     new XElement(
-                        rulesetNamespace + "RuleSet",
+                        "RuleSet",
                         new XAttribute("Name", "Default Rules"),
                         new XAttribute("ToolsVersion", "15.0")
                     )
@@ -900,6 +897,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 return false;
             }
 
+            RemoveRulesetNamespace(root);
             List<XElement> managedGroups = FindManagedGroups(root);
             List<XElement> replacedRules = new();
             foreach (XElement managedGroup in managedGroups)
@@ -962,6 +960,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 || !TryGetRoot(document, out XElement root, out message)
             )
             {
+                return false;
+            }
+            if (root.Name.Namespace != XNamespace.None)
+            {
+                message =
+                    "The ruleset namespace prevents compilation. Enable or disable all policies to repair it.";
                 return false;
             }
             foreach (XElement group in FindManagedGroups(root))
@@ -1058,6 +1062,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             {
                 return false;
             }
+            RemoveRulesetNamespace(root);
             List<XElement> groups = FindManagedGroups(root);
             XElement destination = groups.Count == 0 ? null : groups[0];
             XElement existing = null;
@@ -1103,6 +1108,38 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 );
             }
             return TrySaveAtomically(path, document, out message);
+        }
+
+        private static void RemoveRulesetNamespace(XElement root)
+        {
+            XNamespace previousNamespace = root.Name.Namespace;
+            if (previousNamespace == XNamespace.None)
+            {
+                return;
+            }
+            foreach (XElement element in root.DescendantsAndSelf())
+            {
+                bool unqualify = element.Name.Namespace == previousNamespace;
+                if (unqualify)
+                {
+                    element.Name = element.Name.LocalName;
+                }
+                XAttribute declaration = element.Attribute("xmlns");
+                if (
+                    declaration != null
+                    && (
+                        unqualify
+                        || string.Equals(
+                            declaration.Value,
+                            previousNamespace.NamespaceName,
+                            StringComparison.Ordinal
+                        )
+                    )
+                )
+                {
+                    declaration.Remove();
+                }
+            }
         }
 
         private static bool TryGetRoot(XDocument document, out XElement root, out string message)
@@ -1206,6 +1243,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 state = AnalyzerPolicyState.Drifted;
                 message = "Assets/Default.ruleset has no valid RuleSet root.";
                 return false;
+            }
+
+            if (root.Name.Namespace != XNamespace.None)
+            {
+                message =
+                    "The ruleset namespace prevents compilation. Enable or disable all policies to repair it.";
+                state = AnalyzerPolicyState.Drifted;
+                return true;
             }
 
             List<XElement> groups = FindManagedGroups(root);
