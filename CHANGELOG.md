@@ -56,6 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix scriptable singleton cleanup reloading destroyed assets and recursive scene-load resets invoking callbacks repeatedly ([#1088](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1088)).
 - Fix unsupported relational field shapes interrupting valid bindings or clearing authored values; skip those fields with a warning ([#1086](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1086)).
 - Fix WProto small-integer reads silently wrapping out-of-range values. Generated members, collections, maps, and char roots now reject overflow; regenerate precompiled codecs ([#1081](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1081)).
 - Fix `ParentComponent.MaxDepth` excluding the boundary ancestor when the owner is included in the search ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
