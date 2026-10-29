@@ -327,7 +327,8 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </summary>
         /// <remarks>
         /// Runs on the main thread with the old live instance still available through <see cref="Instance"/>.
-        /// Nested clears of the same type are ignored. Exceptions are logged and the cache reset still completes.
+        /// Nested clears of the same type are ignored. A destroyed instance cannot reload until clearing finishes.
+        /// Exceptions are logged and the cache reset still completes.
         /// This callback does not destroy the asset and is separate from Unity's <c>OnDisable()</c> message.
         /// </remarks>
         protected virtual void OnInstanceCleared() { }
@@ -391,7 +392,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         /// <summary>
         /// Gets the global asset instance, loading it from <c>Resources</c> on first access. Returns
-        /// <c>null</c> rather than starting that load after Unity begins application shutdown.
+        /// <c>null</c> during cache clearing or shutdown, or when loading is invalidated by a reset or destruction.
         /// </summary>
         /// <example>
         /// <code>
@@ -429,26 +430,29 @@ namespace WallstopStudios.UnityHelpers.Utils
                     {
                         return cached;
                     }
-
-                    // A concurrent reset may be overwritten, but both outcomes contain an equivalent fresh Lazy.
-                    if (ReferenceEquals(cachedLazy, _lazyInstance))
-                    {
-                        _lazyInstance = CreateLazy();
-
-                        // Reimport can destroy metadata too; re-arm its lookup to avoid permanent full Resources searches.
-                        _metadataAsset = null;
-                        _metadataLoadAttempted = false;
-                    }
                 }
 
                 UnityMainThreadGuard.EnsureMainThread();
 
-                if (RuntimeSingletonRegistry.IsApplicationQuitting)
+                if (
+                    RuntimeSingletonRegistry.IsApplicationQuitting
+                    || _isClearingInstance
+                    || ScriptableObjectSingletonRegistry.IsClearingInstances
+                )
                 {
                     return null;
                 }
 
-                return _lazyInstance.Value;
+                if (cachedLazy.IsValueCreated && ReferenceEquals(cachedLazy, _lazyInstance))
+                {
+                    _lazyInstance = CreateLazy();
+                    _metadataAsset = null;
+                    _metadataLoadAttempted = false;
+                }
+
+                Lazy<T> loading = _lazyInstance;
+                T loaded = loading.Value;
+                return ReferenceEquals(loading, _lazyInstance) && loaded != null ? loaded : null;
             }
         }
 

@@ -14,6 +14,8 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// </summary>
     internal static class ScriptableObjectSingletonRegistry
     {
+        internal static bool IsClearingInstances { get; private set; }
+
         private static readonly HashSet<Action> _clearActions = new();
 
         /// <summary>
@@ -59,24 +61,36 @@ namespace WallstopStudios.UnityHelpers.Utils
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         internal static void ClearAllInstances()
         {
-            // Snapshot before callbacks can register another singleton and invalidate enumeration.
-            Action[] snapshot;
-            lock (_clearActions)
+            if (IsClearingInstances)
             {
-                snapshot = new Action[_clearActions.Count];
-                _clearActions.CopyTo(snapshot, 0);
+                return;
             }
 
-            foreach (Action clearAction in snapshot)
+            IsClearingInstances = true;
+            try
             {
-                try
+                Action[] snapshot;
+                lock (_clearActions)
                 {
-                    clearAction.Invoke();
+                    snapshot = new Action[_clearActions.Count];
+                    _clearActions.CopyTo(snapshot, 0);
                 }
-                catch (Exception ex)
+
+                foreach (Action clearAction in snapshot)
                 {
-                    Debug.LogException(ex);
+                    try
+                    {
+                        clearAction.Invoke();
+                    }
+                    catch (Exception exception)
+                    {
+                        Debug.LogException(exception);
+                    }
                 }
+            }
+            finally
+            {
+                IsClearingInstances = false;
             }
         }
     }

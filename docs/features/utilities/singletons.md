@@ -298,22 +298,29 @@ Odin note: `ScriptableObjectSingleton<T>` uses Odin's `SerializedScriptableObjec
 
 Cache reset callbacks run on the main thread before the old asset reference is released. Override
 `OnInstanceCleared()` to release derived caches. Reading `Instance` inside that callback still returns
-the live asset being cleared. A nested reset of the same singleton is ignored, including a reset
-reached through another singleton's callback. Callback exceptions are logged once; the reset still
-replaces the lazy loader and rearms metadata lookup. The asset itself remains alive: resetting this
-cache does not schedule destruction as `RuntimeSingleton<T>.ClearInstance()` does. `HasInstance`
+the live asset being cleared. If cleanup destroys that asset, `Instance` returns null until the
+reset finishes. A nested reset of the same singleton is ignored, including a reset reached through
+another singleton's callback. During the global scene-load reset, live cached assets remain
+available, but uncached or destroyed assets cannot load until all callbacks finish. Recursive
+global resets are ignored, so each callback runs at most once per pass. A load invalidated by a
+synchronous reset returns null; a later lookup can load again. A value destroyed during loading
+also returns null. Callback exceptions are logged once; the reset still
+replaces the lazy loader and rearms metadata lookup. The reset itself does not destroy the asset or
+schedule destruction as `RuntimeSingleton<T>.ClearInstance()` does. `HasInstance`
 becomes false until the next lookup, which can return the same live asset even in the same frame.
 Once Unity has actually destroyed an asset, `HasInstance` excludes it through Unity's native null
 check, and the next main-thread lookup repairs that stale cache. Pending-destruction tracking for runtime GameObjects therefore does
 not apply to this cache-only reset.
 
-| State when reset starts               | Callback behavior                                 | Result after reset                      |
-| ------------------------------------- | ------------------------------------------------- | --------------------------------------- |
-| Never loaded, missing, or failed load | No callback                                       | Fresh lazy loader and metadata lookup   |
-| Live cached asset                     | Invoke once with the old instance still available | Cache empty; asset remains alive        |
-| Destroyed cached asset                | No callback                                       | Fresh lazy loader and metadata lookup   |
-| Callback resets the same type         | Ignore nested reset                               | Outer reset completes once              |
-| Callback throws                       | Log the exception                                 | Cache empty; next access may load again |
+| State when reset starts                | Callback behavior                                 | Result after reset                      |
+| -------------------------------------- | ------------------------------------------------- | --------------------------------------- |
+| Never loaded, missing, or failed load  | No callback                                       | Fresh lazy loader and metadata lookup   |
+| Live cached asset                      | Invoke once with the old instance still available | Cache empty; asset remains alive        |
+| Destroyed cached asset                 | No callback                                       | Fresh lazy loader and metadata lookup   |
+| Callback resets the same type          | Ignore nested reset                               | Outer reset completes once              |
+| Callback destroys its asset            | Refuse reload until reset finishes                | Next access can load a surviving asset  |
+| Global callback requests another reset | Ignore recursive global reset                     | Each callback runs once per pass        |
+| Callback throws                        | Log the exception                                 | Cache empty; next access may load again |
 
 Asset management tips:
 
