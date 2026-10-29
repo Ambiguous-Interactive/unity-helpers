@@ -60,7 +60,9 @@ cases; only trim when cases are genuinely redundant.
 Warm the actual timed measurement loops before retaining samples. Warming only the inner
 operation leaves the loop wrapper and its callees eligible for JIT tier promotion during timing.
 Use a bounded, predeclared warmup phase, retain per-round timings, and verify phase ordering in
-diagnostic runs. JIT-disassembly runs establish compilation state, not accepted throughput.
+diagnostic runs with an unbuffered marker. NUnit buffers `TestContext.WriteLine`, so its position
+in JIT output does not prove compilation timing. JIT-disassembly runs establish compilation
+state, not accepted throughput.
 Preserve timing thresholds, measured work and allocation checks while repairing the instrument.
 
 Per-test FIXED overhead is negligible; the slow legs are explained by a few expensive fixtures, so MEASURE,
