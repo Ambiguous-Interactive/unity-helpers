@@ -16,6 +16,8 @@ on:
       - "Tests/**"
       - "docs/features/serialization/serialization.md"
       - "scripts/run-wproto-evidence.ps1"
+      - "scripts/python~/**"
+      - ".github/actions/setup-python-tools/**"
       - "scripts/build-protobuf-candidate.py"
       - "scripts/verify-protobuf-shipped.py"
       - "scripts/tests/test-protobuf-candidate.py"
@@ -32,6 +34,8 @@ on:
       - "Tests/**"
       - "docs/features/serialization/serialization.md"
       - "scripts/run-wproto-evidence.ps1"
+      - "scripts/python~/**"
+      - ".github/actions/setup-python-tools/**"
       - "scripts/build-protobuf-candidate.py"
       - "scripts/verify-protobuf-shipped.py"
       - "scripts/tests/test-protobuf-candidate.py"
@@ -157,12 +161,15 @@ jobs:
         shell: pwsh
         run: ./scripts/run-wproto-evidence.ps1 -Oracle v2 -OutputRoot "$env:RUNNER_TEMP/wproto-evidence"
 
+      - name: Setup Python tooling
+        uses: ./.github/actions/setup-python-tools
+
       - name: Test candidate build controls
-        run: python3 scripts/tests/test-protobuf-candidate.py
+        run: uv run --project scripts/python~ --locked pytest scripts/tests/test-protobuf-candidate.py -q
 
       - name: Build the pinned current protobuf candidate
         run: >-
-          python3 scripts/build-protobuf-candidate.py
+          uv run --project scripts/python~ --locked --no-dev python scripts/build-protobuf-candidate.py
           --dotnet "${{ runner.temp }}/retained-protobuf-dotnet/dotnet"
           --output "${{ runner.temp }}/protobuf-candidate"
 
@@ -179,7 +186,7 @@ jobs:
 
       - name: Verify shipped protobuf matches its source build
         run: >-
-          python3 scripts/verify-protobuf-shipped.py
+          uv run --project scripts/python~ --locked --no-dev python scripts/verify-protobuf-shipped.py
           --candidate-root "${{ runner.temp }}/protobuf-candidate/assemblies"
 
       - name: Admit retained Dox contracts against current protobuf

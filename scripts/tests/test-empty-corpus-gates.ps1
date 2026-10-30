@@ -100,7 +100,15 @@ Write-Host ''
 
 try {
   New-Item -ItemType Directory -Path $scratchRoot -Force | Out-Null
-  Copy-Item -Path (Join-Path $repoRoot 'scripts') -Destination $scratchRoot -Recurse -Force
+  $scratchScripts = Join-Path $scratchRoot 'scripts'
+  New-Item -ItemType Directory -Path $scratchScripts -Force | Out-Null
+  Get-ChildItem -LiteralPath (Join-Path $repoRoot 'scripts') | Where-Object { $_.Name -ne 'python~' } |
+    Copy-Item -Destination $scratchScripts -Recurse -Force
+  $scratchPython = Join-Path $scratchScripts 'python~'
+  New-Item -ItemType Directory -Path $scratchPython -Force | Out-Null
+  foreach ($name in @('pyproject.toml', 'uv.lock')) {
+    Copy-Item -LiteralPath (Join-Path $repoRoot 'scripts/python~' $name) -Destination $scratchPython
+  }
 
   foreach ($gate in $gates) {
     $scriptPath = Join-Path $scratchRoot $gate.Path

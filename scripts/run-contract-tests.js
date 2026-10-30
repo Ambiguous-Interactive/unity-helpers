@@ -33,6 +33,17 @@ const CHECKS = [
     name: "Unity metadata historical importer contracts",
     run: "npm run test:meta-generation"
   },
+  {
+    id: "assembly-launchers",
+    name: "Assembly Python compatibility launchers",
+    run: "npm run test:assembly-launchers"
+  },
+  { id: "asmdef", name: "Assembly definition contracts", run: "npm run test:asmdef" },
+  {
+    id: "protobuf-candidate",
+    name: "Protobuf binary identity controls",
+    run: "npm run test:protobuf-candidate"
+  },
   { id: "python-policy", name: "Strict migrated Python policies", run: "npm run lint:python" },
   {
     id: "unity-framework",

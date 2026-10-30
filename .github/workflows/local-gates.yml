@@ -242,3 +242,18 @@ jobs:
         run: |
           set -euo pipefail
           node -e 'process.exit(process.env.TYPECHECK_PHASE_RESULT === "success" ? 0 : 1)'
+
+  assembly-tools-windows:
+    name: Assembly tools (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Setup Python tooling
+        uses: ./.github/actions/setup-python-tools
+
+      - name: Verify assembly discovery on Windows
+        shell: pwsh
+        run: uv run --project scripts/python~ --locked pytest scripts/tests/test_asmdef.py -q

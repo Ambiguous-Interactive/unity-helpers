@@ -523,8 +523,8 @@ try {
     if ([string]::IsNullOrWhiteSpace($DebuggerDirectory)) {
         $DebuggerDirectory = $layout.Tools
         $record.DownloadProcess = @{}
-        $downloadOutput = Invoke-NativeCaptureProcess -FilePath (Get-Command python.exe -CommandType Application | Select-Object -First 1).Source `
-            -Arguments @((Join-Path $PSScriptRoot 'download-native-debugger.py'), $DebuggerDirectory) `
+        $downloadOutput = Invoke-NativeCaptureProcess -FilePath (Get-Command uv -CommandType Application | Select-Object -First 1).Source `
+            -Arguments @('run', '--project', (Join-Path $PSScriptRoot '../python~'), '--locked', '--no-dev', 'python', (Join-Path $PSScriptRoot 'download-native-debugger.py'), $DebuggerDirectory) `
             -Directory $privateRoot -Seconds 300 -Observation $record.DownloadProcess `
             -ReceiptPath (Join-Path $artifactRoot 'download-process.json')
         [IO.File]::WriteAllText((Join-Path $artifactRoot 'download-console.log'), (ConvertTo-UnitySafeLogText -Text $downloadOutput))

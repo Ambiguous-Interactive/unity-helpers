@@ -1,5 +1,7 @@
 """Build the pinned upstream protobuf candidate without changing shipped assemblies."""
 
+from __future__ import annotations
+
 import argparse
 import hashlib
 import json
@@ -9,6 +11,7 @@ import signal
 import subprocess
 import sys
 from pathlib import Path
+from typing import TypedDict
 
 SOURCE_COMMIT = "3aa672eaaf7763b86d62bec9ed7d7896b0511a8b"
 SDK_VERSION = "9.0.319"
@@ -35,14 +38,27 @@ GIT_LOCAL_VARIABLES = frozenset(
 )
 
 
+class CandidateReceipt(TypedDict):
+    sourceCommit: str
+    sourceUrl: str
+    patchSha256: str
+    buildScriptSha256: str
+    sourceInventorySha256: str
+    sourceInventoryScope: str
+    sdk: str
+    dotnetInfo: str
+    targetFramework: str
+    files: dict[str, str]
+    assetsSha256: str
+    nativeQualificationComplete: bool
+
+
 def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def run(
-    arguments: list[str], directory: Path, log: Path, timeout_seconds: float = 900
-) -> str:
-    process = subprocess.Popen(
+def run(arguments: list[str], directory: Path, log: Path, timeout_seconds: float = 900) -> str:
+    process = subprocess.Popen(  # noqa: S603 - explicit argv, no shell; tools selected by caller.
         arguments,
         cwd=directory,
         stdout=subprocess.PIPE,
@@ -67,8 +83,8 @@ def run(
     except subprocess.TimeoutExpired:
         timed_out = True
         if os.name == "nt":
-            subprocess.run(
-                ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+            subprocess.run(  # noqa: S603 - Windows process-tree termination.
+                ["taskkill", "/PID", str(process.pid), "/T", "/F"],  # noqa: S607 - Windows system utility.
                 check=True,
                 timeout=30,
             )
@@ -143,18 +159,14 @@ def inventory(source: Path, output: Path, phase: str) -> list[dict[str, str]]:
     return records
 
 
-def build(output: Path, dotnet: str, upstream: str) -> dict:
+def build(output: Path, dotnet: str, upstream: str) -> CandidateReceipt:
     output = output.resolve()
     if output.exists():
-        raise ValueError(
-            "Output must be a new directory; prior evidence is never overwritten"
-        )
-    if (
-        output == ROOT
-        or ROOT in output.parents
+        raise ValueError("Output must be a new directory; prior evidence is never overwritten")
+    if output == ROOT or (
+        ROOT in output.parents
         and not any(
-            part.startswith(".") or part.endswith("~")
-            for part in output.relative_to(ROOT).parts
+            part.startswith(".") or part.endswith("~") for part in output.relative_to(ROOT).parts
         )
     ):
         raise ValueError("Build output inside the package must be hidden from Unity")
@@ -212,31 +224,21 @@ def build(output: Path, dotnet: str, upstream: str) -> dict:
         output / "build.log",
     )
     after = inventory(source, output, "after")
-    if (
-        before != after
-        or patch_hash != digest(PATCH)
-        or script_hash != digest(Path(__file__))
-    ):
+    if before != after or patch_hash != digest(PATCH) or script_hash != digest(Path(__file__)):
         raise ValueError("Candidate build inputs changed during the invocation")
     assemblies = output / "assemblies"
     assemblies.mkdir()
-    files = {}
+    files: dict[str, str] = {}
     for name in ("protobuf-net", "protobuf-net.Core"):
         for extension in ("dll", "xml"):
-            path = (
-                source
-                / "src"
-                / name
-                / "bin/Release/netstandard2.1"
-                / f"{name}.{extension}"
-            )
+            path = source / "src" / name / "bin/Release/netstandard2.1" / f"{name}.{extension}"
             destination = assemblies / path.name
             shutil.copyfile(path, destination)
             files[path.name] = digest(destination)
     assets = source / "src/protobuf-net/obj/project.assets.json"
     shutil.copyfile(assets, output / "project.assets.json")
     runtime = run([executable, "--info"], source, output / "dotnet-info.log")
-    receipt = {
+    receipt: CandidateReceipt = {
         "sourceCommit": SOURCE_COMMIT,
         "sourceUrl": source_url,
         "patchSha256": patch_hash,
