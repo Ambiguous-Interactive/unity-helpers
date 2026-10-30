@@ -71,7 +71,8 @@ run the bootstrap and locked sync above before these developer entry points.
 Repository lint and contract execution share `scripts/check_runner.py`. Existing Node entry points
 retain their importable interfaces and delegate process execution, concurrency, selection, and
 reporting to the locked Python environment. Exclusive checks finish before concurrent checks start;
-failed checks do not prevent the remaining checks from running. `npm run test:check-runner`
+failed checks do not prevent the remaining checks from running. Windows uses the Bash executable
+from its Git for Windows installation. `npm run test:check-runner`
 exercises these contracts, including an interrupted child that exits zero.
 
 A check can declare a `completionPattern` when exit status alone is insufficient. The native

@@ -20,6 +20,7 @@ from check_runner import (
     default_jobs,
     main,
     parse_arguments,
+    resolve_bash,
     run_check,
     run_checks,
     run_registry,
@@ -74,12 +75,14 @@ def test_all_results_are_retained_in_registry_order() -> None:
 
 
 def test_exclusive_checks_finish_before_shared_work(tmp_path: Path) -> None:
-    marker = shlex.quote(str(tmp_path / "exclusive"))
+    destination = tmp_path / "exclusive"
+    marker = shlex.quote(str(destination))
     checks = [
         Check("shared", "Shared", f"test -f {marker}"),
         Check("exclusive", "Exclusive", f"touch {marker}", exclusive=True),
     ]
     assert all(result.ok for result in run_checks(checks, 4))
+    assert destination.is_file()
 
 
 @pytest.mark.parametrize(
@@ -228,3 +231,86 @@ def test_protocol_through_real_cli(tmp_path: Path) -> None:
     messages = [json.loads(line) for line in result.stdout.splitlines()]
     assert [message["kind"] for message in messages] == ["output", "result"]
     assert messages[-1]["value"][0]["ok"] is True
+
+
+@pytest.mark.parametrize("reported", ["", ".", "relative"])
+def test_windows_shell_refuses_relative_discovery(
+    reported: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("check_runner.platform.system", lambda: "Windows")
+
+    def find_git(_name: str) -> str:
+        return str(tmp_path / "git.exe")
+
+    monkeypatch.setattr("check_runner.shutil.which", find_git)
+
+    def discover(command: list[str], **_options: object) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(command, 0, stdout=reported, stderr="")
+
+    monkeypatch.setattr("check_runner.subprocess.run", discover)
+    with pytest.raises(OSError, match="invalid executable directory"):
+        resolve_bash()
+
+
+def test_windows_shell_uses_the_git_installation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    git = tmp_path / "git.exe"
+    root = tmp_path / "git-caf\u00e9"
+    executable_directory = root / "mingw64/libexec/git-core"
+    bash = root / "bin/bash.exe"
+    bash.parent.mkdir(parents=True)
+    bash.write_bytes(b"")
+    monkeypatch.setattr("check_runner.platform.system", lambda: "Windows")
+
+    def find_git(_name: str) -> str:
+        return str(git)
+
+    monkeypatch.setattr("check_runner.shutil.which", find_git)
+
+    def discover(command: list[str], **options: object) -> subprocess.CompletedProcess[str]:
+        assert command == [str(git.resolve()), "--exec-path"]
+        assert options["encoding"] == "utf-8"
+        return subprocess.CompletedProcess(
+            command, 0, stdout=str(executable_directory) + "\n", stderr=""
+        )
+
+    monkeypatch.setattr("check_runner.subprocess.run", discover)
+    assert resolve_bash() == str(bash)
+
+
+def test_windows_shell_requires_git_in_path(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("check_runner.platform.system", lambda: "Windows")
+
+    def find_git(_name: str) -> None:
+        return None
+
+    monkeypatch.setattr("check_runner.shutil.which", find_git)
+    with pytest.raises(FileNotFoundError, match="Git for Windows"):
+        resolve_bash()
+
+
+@pytest.mark.parametrize("fault", ["timeout", "exit", "missing_shell"])
+def test_windows_shell_discovery_fails_closed(
+    fault: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("check_runner.platform.system", lambda: "Windows")
+
+    def find_git(_name: str) -> str:
+        return str(tmp_path / "git.exe")
+
+    monkeypatch.setattr("check_runner.shutil.which", find_git)
+
+    def discover(command: list[str], **_options: object) -> subprocess.CompletedProcess[str]:
+        if fault == "timeout":
+            raise subprocess.TimeoutExpired(command, 10)
+        return subprocess.CompletedProcess(
+            command,
+            3 if fault == "exit" else 0,
+            stdout=str(tmp_path / "git/mingw64/libexec/git-core"),
+            stderr="controlled discovery failure",
+        )
+
+    monkeypatch.setattr("check_runner.subprocess.run", discover)
+    with pytest.raises(OSError, match="Git for Windows Bash"):
+        resolve_bash()

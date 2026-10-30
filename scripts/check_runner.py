@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import concurrent.futures
+import errno
 import json
 import math
 import os
+import platform
 import re
+import shutil
 import subprocess
 import sys
 import threading
@@ -100,11 +103,45 @@ def parse_arguments(argv: list[str]) -> dict[str, object]:
     }
 
 
+def resolve_bash() -> str:
+    """Use Git's Windows shell so commands receive native Windows paths correctly."""
+    if platform.system() != "Windows":
+        bash = shutil.which("bash")
+        if bash is None:
+            raise FileNotFoundError(errno.ENOENT, "Bash was not found in PATH", "bash")
+        return str(Path(bash).resolve())
+    git = shutil.which("git")
+    if git is None:
+        raise FileNotFoundError(errno.ENOENT, "Git for Windows was not found in PATH", "git")
+    try:
+        result = subprocess.run(  # noqa: S603 - fixed read-only Git installation discovery.
+            [str(Path(git).resolve()), "--exec-path"],
+            cwd=ROOT,
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=False,
+            timeout=10,
+        )
+    except (subprocess.SubprocessError, UnicodeError) as error:
+        raise OSError("Cannot locate Git for Windows Bash") from error
+    if result.returncode != 0:
+        raise OSError(f"Cannot locate Git for Windows Bash: {result.stderr.strip()}")
+    exec_path = Path(result.stdout.strip())
+    if not exec_path.is_absolute() or len(exec_path.parents) < 3:
+        raise OSError("Git returned an invalid executable directory")
+    bash_path = exec_path.parents[2] / "bin/bash.exe"
+    if not bash_path.is_file():
+        raise FileNotFoundError(errno.ENOENT, "Git for Windows Bash was not found", str(bash_path))
+    return str(bash_path)
+
+
 def run_check(check: Check) -> Result:
     started = time.monotonic()
     try:
         process = subprocess.run(  # noqa: S603 - reviewed repository shell commands are intentional.
-            ["bash", "-c", check.run],  # noqa: S607 - preserve the command's PATH lookup contract.
+            [resolve_bash(), "-c", check.run],
             cwd=ROOT,
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
