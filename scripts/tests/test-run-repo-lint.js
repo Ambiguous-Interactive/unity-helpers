@@ -535,6 +535,7 @@ runTest("no linter in scripts/ has been left unreachable", () => {
     ["scripts/lint-skill-sizes.ps1", "workflow"],
     ["scripts/lint-unity-test-modules.ps1", "workflow"],
     ["scripts/lint-csharp-format.ps1", "preflight"],
+    ["scripts/lint_meta_files.py", "preflight"],
     ["scripts/validate-git-push-config.ps1", "prepush"]
   ]);
 
@@ -656,6 +657,9 @@ runTest("no linter in scripts/ has been left unfalsifiable", () => {
   // A self-test nothing runs is worth exactly as much as one that cannot fail, so reachability is
   // part of the property rather than a separate assertion.
   const reachableTests = new Set([
+    ...[...selfTestSource.keys()].filter(
+      (file) => filesInvoking(".github/workflows", file).length > 0
+    ),
     ...scriptPathsIn(
       leafCommands(require(path.join(repoRoot, "scripts", "run-contract-tests.js")).checksFor(true))
     ),
