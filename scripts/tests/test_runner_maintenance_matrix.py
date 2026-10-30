@@ -7,8 +7,10 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from typing import cast
 
 import pytest
+import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "unity"))
 from runner_maintenance_matrix import PROFILES, ROOT, main, resolve_versions
@@ -119,3 +121,46 @@ def test_bad_profile_cannot_emit_outputs(tmp_path: Path) -> None:
 
 def test_unwritable_output_fails(tmp_path: Path) -> None:
     assert main(["--versions", "6000.6.7f1", "--output", str(tmp_path)]) == 1
+
+
+def workflow_jobs() -> dict[str, dict[str, object]]:
+    document = cast(
+        "dict[object, object]",
+        yaml.safe_load(
+            (ROOT / ".github/workflows/runner-bootstrap.yml").read_text(encoding="utf-8")
+        ),
+    )
+    return cast("dict[str, dict[str, object]]", document["jobs"])
+
+
+def dependency_closure(job: str, jobs: dict[str, dict[str, object]]) -> set[str]:
+    found: set[str] = set()
+    pending = [job]
+    while pending:
+        current = pending.pop()
+        raw = jobs[current].get("needs", [])
+        parents = [raw] if isinstance(raw, str) else cast("list[str]", raw)
+        for parent in parents:
+            if parent not in found:
+                found.add(parent)
+                pending.append(parent)
+    return found
+
+
+def test_matrix_validation_precedes_both_host_jobs() -> None:
+    jobs = workflow_jobs()
+    for job in ("bootstrap-host", "maintain-unity"):
+        assert "matrix-config" in dependency_closure(job, jobs), job
+
+
+def test_removed_validation_edges_are_detected() -> None:
+    jobs = workflow_jobs()
+    mutant = {name: dict(job) for name, job in jobs.items()}
+    for job in mutant.values():
+        raw = job.get("needs", [])
+        parents = [raw] if isinstance(raw, str) else cast("list[str]", raw)
+        job["needs"] = [parent for parent in parents if parent != "matrix-config"]
+    assert not all(
+        "matrix-config" in dependency_closure(job, mutant)
+        for job in ("bootstrap-host", "maintain-unity")
+    )

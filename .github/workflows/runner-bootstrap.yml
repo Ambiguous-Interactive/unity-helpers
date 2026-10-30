@@ -158,6 +158,7 @@ jobs:
     # without expanding the inputs.
     name: ${{ inputs.detect-only && 'Audit' || 'Maintain' }} host on ${{ inputs.runner-label }}
     needs:
+      - matrix-config
       - runner-preflight
     # The selected runner name is a required custom label. GitHub's runner
     # selection is cumulative for `runs-on` arrays, so this queues only on the
