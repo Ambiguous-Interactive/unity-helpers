@@ -19,6 +19,8 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
     [TestFixture]
     public sealed class AnalyzerPolicyExampleSemanticTests
     {
+        private const string BooleanBitwiseDiagnosticId = "WUH026";
+
         private const string Imports =
             @"using System;
 using System.Collections;
@@ -140,7 +142,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random {
                     return new DisposableStructBoxingAnalyzer();
                 case "WUH023":
                     return new PublicStructEqualityAnalyzer();
-                case "WUH026":
+                case BooleanBitwiseDiagnosticId:
                     return new BooleanBitwiseAnalyzer();
                 case "WUH025":
                     return new RelationalFieldAnalyzer();
@@ -170,7 +172,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random {
                     + code
                     + " }";
             }
-            if (string.Equals(id, "WUH026", StringComparison.Ordinal))
+            if (string.Equals(id, BooleanBitwiseDiagnosticId, StringComparison.Ordinal))
             {
                 return "public class Subject { bool Touch() { return true; } public void Run() { "
                     + code
