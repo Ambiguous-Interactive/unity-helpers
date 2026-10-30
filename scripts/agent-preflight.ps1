@@ -2842,7 +2842,7 @@ $csharpMetaShapePaths = @($relativePaths | Where-Object {
 if ($csharpMetaShapePaths.Count -gt 0) {
     Write-Host '[agent-preflight] Checking C# Unity importer metadata...' -ForegroundColor Blue
     $shapePathsJson = ConvertTo-Json -InputObject @($csharpMetaShapePaths) -Compress
-    $shapePathsJson | & uv run --quiet --project (Join-Path $repoRoot 'scripts/python~') --locked --no-dev python (Join-Path $repoRoot 'scripts/lint_meta_files.py') --root $repoRoot --stdin-paths
+    $shapePathsJson | & uv run --quiet --project (Join-Path $repoRoot 'scripts/python~') --locked --no-dev python (Join-Path $repoRoot 'scripts/lint_meta_files.py') --root $repoRoot --stdin-paths --staged
     if ($LASTEXITCODE -ne 0) {
         $failureCount++
     }

@@ -20,7 +20,10 @@ def git(root: Path, *arguments: str) -> bytes:
     executable = shutil.which("git")
     assert executable is not None
     return subprocess.run(
-        [executable, "-C", str(root), *arguments], capture_output=True, check=True, timeout=20
+        [executable, "-C", str(root), *arguments],
+        capture_output=True,
+        check=True,
+        timeout=20,
     ).stdout
 
 
@@ -73,7 +76,10 @@ def test_valid_customized_importers(tmp_path: Path, content: str) -> None:
         (STUB, "MonoImporter"),
         ("", "fileFormatVersion"),
         (VALID.replace("fileFormatVersion: 2\n", ""), "fileFormatVersion"),
-        (VALID.replace("fileFormatVersion: 2", "fileFormatVersion: 3"), "fileFormatVersion"),
+        (
+            VALID.replace("fileFormatVersion: 2", "fileFormatVersion: 3"),
+            "fileFormatVersion",
+        ),
         ("fileFormatVersion: 2\n" + VALID, "fileFormatVersion"),
         ("fileFormatVersion : bad\n" + VALID, "fileFormatVersion"),
         (VALID.replace("guid: 0123456789abcdef0123456789abcdef\n", ""), "guid"),
@@ -88,6 +94,8 @@ def test_valid_customized_importers(tmp_path: Path, content: str) -> None:
         (STUB + "MonoImporter:\n  userData:value\n", "mapping"),
         (STUB + "MonoImporter:\n\tuserData:\n", "mapping"),
         (VALID + "DefaultImporter:\n  userData:\n", "only MonoImporter"),
+        (STUB + "MonoImporter:\n  executionOrder: 0\n  - invalid\n", "YAML"),
+        (VALID + "  icon: [unterminated\n", "YAML"),
     ],
 )
 def test_rejects_malformed_shapes(tmp_path: Path, content: str, field: str) -> None:
@@ -103,6 +111,46 @@ def test_bounded_decoding(tmp_path: Path, payload: bytes) -> None:
     meta = tmp_path / "Example.cs.meta"
     meta.write_bytes(payload)
     assert lint.csharp_meta_error(meta) is not None
+
+
+def test_deep_yaml_returns_validation_failure(tmp_path: Path) -> None:
+    meta = tmp_path / "Example.cs.meta"
+    content = STUB + "MonoImporter:\n  externalObjects: " + "[" * 2000 + "0" + "]" * 2000
+    meta.write_text(content, encoding="utf-8")
+    error = lint.csharp_meta_error(meta)
+    assert error is not None
+    assert "YAML" in error
+
+
+@pytest.mark.parametrize(
+    "staged_content",
+    [
+        pytest.param(STUB, id="stub"),
+        pytest.param(STUB + "MonoImporter:\n  executionOrder: 0\n  - invalid\n", id="later-entry"),
+        pytest.param(VALID + "#" + "x" * lint.MAX_META_BYTES, id="oversized"),
+    ],
+)
+def test_staged_malformed_companion_cannot_hide_behind_worktree_repair(
+    workspace: Path, staged_content: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    asset = add_asset(workspace, meta=staged_content)
+    meta = Path(f"{asset}.meta")
+    meta.write_text(VALID, encoding="utf-8")
+    index = workspace / ".git/index"
+    before_index = index.read_bytes()
+    before_meta = meta.read_bytes()
+    assert lint.check_shapes(workspace, ["Runtime/Example.cs.meta"]) == 0
+    assert lint.check_shapes(workspace, ["Runtime/Example.cs.meta"], staged=True) == 1
+    assert "staged" in capsys.readouterr().out
+    assert index.read_bytes() == before_index
+    assert meta.read_bytes() == before_meta
+
+
+def test_valid_staged_companion_still_checks_worktree(workspace: Path) -> None:
+    asset = add_asset(workspace)
+    assert lint.check_shapes(workspace, ["Runtime/Example.cs.meta"], staged=True) == 0
+    Path(f"{asset}.meta").write_text(STUB, encoding="utf-8")
+    assert lint.check_shapes(workspace, ["Runtime/Example.cs.meta"], staged=True) == 1
 
 
 def test_missing_and_unreadable_meta(tmp_path: Path) -> None:
@@ -140,7 +188,11 @@ def test_file_exclusions(name: str) -> None:
 
 @pytest.mark.parametrize(
     "path",
-    ["scripts/tools~/Example.cs", "Samples~/tools~/Example.cs", "Runtime/Generator~/Example.cs"],
+    [
+        "scripts/tools~/Example.cs",
+        "Samples~/tools~/Example.cs",
+        "Runtime/Generator~/Example.cs",
+    ],
 )
 def test_tilde_tooling_excluded(path: str) -> None:
     assert lint.excluded(path)
@@ -250,7 +302,13 @@ def test_check_mode_preserves_bytes_and_index(workspace: Path) -> None:
 def test_stdin_cli(workspace: Path, input_text: str, expected: int) -> None:
     add_asset(workspace, meta=STUB)
     result = subprocess.run(
-        [sys.executable, str(Path(lint.__file__)), "--root", str(workspace), "--stdin-paths"],
+        [
+            sys.executable,
+            str(Path(lint.__file__)),
+            "--root",
+            str(workspace),
+            "--stdin-paths",
+        ],
         input=input_text,
         text=True,
         capture_output=True,
@@ -269,7 +327,13 @@ def test_annotation_escapes_paths(capsys: pytest.CaptureFixture[str]) -> None:
 def test_full_cli_from_other_directory(workspace: Path, tmp_path: Path) -> None:
     add_asset(workspace)
     result = subprocess.run(
-        [sys.executable, str(Path(lint.__file__)), "--root", str(workspace), "--verbose"],
+        [
+            sys.executable,
+            str(Path(lint.__file__)),
+            "--root",
+            str(workspace),
+            "--verbose",
+        ],
         cwd=tmp_path.parent,
         text=True,
         capture_output=True,
@@ -295,7 +359,13 @@ def test_powershell_launcher(workspace: Path, content: str, expected: int) -> No
     executable = shutil.which("pwsh")
     assert executable is not None
     result = subprocess.run(
-        [executable, "-NoProfile", "-File", str(scripts / "lint-meta-files.ps1"), "-VerboseOutput"],
+        [
+            executable,
+            "-NoProfile",
+            "-File",
+            str(scripts / "lint-meta-files.ps1"),
+            "-VerboseOutput",
+        ],
         cwd=workspace.parent,
         text=True,
         capture_output=True,

@@ -3190,7 +3190,9 @@ foreach ($scenario in @(
     @{ Name = 'Customized'; Content = "fileFormatVersion: 2`nguid: 0123456789abcdef0123456789abcdef`nMonoImporter:`n  executionOrder: -42`n  userData: retained`n"; Expected = 0 },
     @{ Name = 'DuplicateGuid'; Content = "fileFormatVersion: 2`nguid: 0123456789abcdef0123456789abcdef`nguid: 0123456789abcdef0123456789abcdef`nMonoImporter:`n  executionOrder: 0`n"; Expected = 1 },
     @{ Name = 'MissingVersion'; Content = "guid: 0123456789abcdef0123456789abcdef`nMonoImporter:`n  executionOrder: 0`n"; Expected = 1 },
-    @{ Name = 'MalformedGuid'; Content = "fileFormatVersion: 2`nguid: broken`nMonoImporter:`n  executionOrder: 0`n"; Expected = 1 }
+    @{ Name = 'MalformedGuid'; Content = "fileFormatVersion: 2`nguid: broken`nMonoImporter:`n  executionOrder: 0`n"; Expected = 1 },
+    @{ Name = 'MalformedLaterEntry'; Content = "fileFormatVersion: 2`nguid: 0123456789abcdef0123456789abcdef`nMonoImporter:`n  executionOrder: 0`n  - invalid`n"; Expected = 1 },
+    @{ Name = 'StagedStubRepairedWorktree'; Content = "fileFormatVersion: 2`nguid: 0123456789abcdef0123456789abcdef`nMonoImporter:`n  executionOrder: 0`n"; StagedContent = "fileFormatVersion: 2`nguid: 0123456789abcdef0123456789abcdef`n"; Expected = 1 }
 )) {
     $shapeRepo = New-TestRepo -ConfigurePushDefaults
     try {
@@ -3198,6 +3200,11 @@ foreach ($scenario in @(
         New-Item -ItemType Directory -Path $runtimeDirectory -Force | Out-Null
         Set-Content -LiteralPath (Join-Path $runtimeDirectory 'Example.cs') -Value 'class Example {}'
         $companion = Join-Path $runtimeDirectory 'Example.cs.meta'
+        if ($scenario.ContainsKey('StagedContent')) {
+            [System.IO.File]::WriteAllText($companion, $scenario.StagedContent.Replace("`n", "`r`n"), [System.Text.UTF8Encoding]::new($false))
+            & git -C $shapeRepo add -- Runtime/Example.cs.meta
+            if ($LASTEXITCODE -ne 0) { throw 'Could not stage metadata regression fixture' }
+        }
         [System.IO.File]::WriteAllText($companion, $scenario.Content.Replace("`n", "`r`n"), [System.Text.UTF8Encoding]::new($false))
         $beforeBytes = [System.IO.File]::ReadAllBytes($companion)
         $beforeIndex = [System.IO.File]::ReadAllBytes((Join-Path $shapeRepo '.git/index'))

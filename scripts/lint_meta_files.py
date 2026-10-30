@@ -5,12 +5,16 @@ from __future__ import annotations
 import argparse
 import fnmatch
 import json
+import os
 import re
 import shutil
 import subprocess
 import sys
 from pathlib import Path, PurePosixPath
 from typing import cast
+
+import yaml
+from yaml.nodes import MappingNode
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_ROOTS = (
@@ -73,11 +77,18 @@ def csharp_meta_error(meta: Path) -> str | None:
     try:
         with meta.open("rb") as stream:
             raw = stream.read(MAX_META_BYTES + 1)
-        if len(raw) > MAX_META_BYTES:
-            return f"C# metadata exceeds the {MAX_META_BYTES}-byte validation limit"
-        content = raw.decode("utf-8-sig")
-    except (OSError, UnicodeError) as error:
+    except OSError as error:
         return f"Cannot read C# metadata: {error}"
+    return csharp_meta_bytes_error(raw)
+
+
+def csharp_meta_bytes_error(raw: bytes) -> str | None:
+    if len(raw) > MAX_META_BYTES:
+        return f"C# metadata exceeds the {MAX_META_BYTES}-byte validation limit"
+    try:
+        content = raw.decode("utf-8-sig")
+    except UnicodeError as error:
+        return f"Cannot decode C# metadata: {error}"
     lines = content.splitlines()
     required = {
         "fileFormatVersion": r"fileFormatVersion: 2",
@@ -105,7 +116,63 @@ def csharp_meta_error(meta: Path) -> str | None:
     ]
     if other_importers:
         return "C# metadata must use only MonoImporter"
+    try:
+        loader = yaml.SafeLoader(content)
+        try:
+            document = loader.get_single_node()
+        finally:
+            loader.dispose()
+    except (yaml.YAMLError, RecursionError) as error:
+        return f"Invalid C# metadata YAML: {error}"
+    if not isinstance(document, MappingNode):
+        return "C# metadata must contain a YAML mapping"
     return None
+
+
+def indexed_metadata(root: Path) -> dict[str, tuple[str, str]]:
+    result = subprocess.run(  # noqa: S603 - fixed read-only index inventory.
+        [
+            git_executable(),
+            "-C",
+            str(root),
+            "ls-files",
+            "--stage",
+            "-z",
+            "--",
+            ":(icase)*.cs.meta",
+        ],
+        capture_output=True,
+        check=True,
+        timeout=60,
+    )
+    entries: dict[str, tuple[str, str]] = {}
+    for entry in result.stdout.split(b"\0"):
+        if entry:
+            header, path = entry.decode("utf-8").split("\t", 1)
+            _, identity, stage = header.split()
+            entries[os.path.normcase(path)] = (identity, stage)
+    return entries
+
+
+def indexed_meta_error(root: Path, identity: str, stage: str) -> str | None:
+    if stage != "0":
+        return "Unmerged staged C# metadata"
+    git = git_executable()
+    size = subprocess.run(  # noqa: S603 - immutable object from Git's index inventory.
+        [git, "-C", str(root), "cat-file", "-s", identity],
+        capture_output=True,
+        check=True,
+        timeout=60,
+    )
+    if int(size.stdout) > MAX_META_BYTES:
+        return f"C# metadata exceeds the {MAX_META_BYTES}-byte validation limit"
+    blob = subprocess.run(  # noqa: S603 - size-checked immutable Git object, never an index reread.
+        [git, "-C", str(root), "cat-file", "blob", identity],
+        capture_output=True,
+        check=True,
+        timeout=60,
+    )
+    return csharp_meta_bytes_error(blob.stdout)
 
 
 def annotation(path: str, code: str, message: str) -> None:
@@ -120,8 +187,9 @@ def annotation(path: str, code: str, message: str) -> None:
     print(f"::error file={escaped_path}::{code}: {escaped_message}")
 
 
-def check_shapes(root: Path, paths: list[str]) -> int:
+def check_shapes(root: Path, paths: list[str], *, staged: bool = False) -> int:
     failed = False
+    indexed = indexed_metadata(root) if staged else {}
     for relative in sorted(set(paths)):
         source = relative[:-5] if relative.casefold().endswith(".meta") else relative
         parts = PurePosixPath(source).parts
@@ -140,13 +208,24 @@ def check_shapes(root: Path, paths: list[str]) -> int:
         if error is not None:
             annotation(f"{source}.meta", "UNH007", error)
             failed = True
+        entry = indexed.get(os.path.normcase(f"{source}.meta"))
+        if entry is not None:
+            error = indexed_meta_error(root, *entry)
+            if error is not None:
+                annotation(f"{source}.meta", "UNH007", f"Invalid staged companion: {error}")
+                failed = True
     return int(failed)
 
 
-def inventory(root: Path) -> list[str]:
+def git_executable() -> str:
     git = shutil.which("git")
     if git is None:
         raise OSError("Git is required to inventory Unity metadata")
+    return git
+
+
+def inventory(root: Path) -> list[str]:
+    git = git_executable()
     result = subprocess.run(  # noqa: S603 - fixed read-only inventory, anchored to the repository.
         [git, "-C", str(root), "ls-files", "-z", "--", *SOURCE_ROOTS],
         capture_output=True,
@@ -175,7 +254,11 @@ def check(root: Path, *, verbose: bool = False) -> int:
                 not excluded(source, directory=(root / source).is_dir())
                 and not (root / source).exists()
             ):
-                annotation(relative, "UNH006", f"Orphaned .meta file (missing source): {source}")
+                annotation(
+                    relative,
+                    "UNH006",
+                    f"Orphaned .meta file (missing source): {source}",
+                )
                 failed = True
         elif not excluded(relative):
             sources.append(relative)
@@ -199,8 +282,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=ROOT)
     parser.add_argument("--verbose", action="store_true")
+    parser.add_argument("--staged", action="store_true", help="Also validate indexed companions")
     parser.add_argument(
-        "--stdin-paths", action="store_true", help="Check C# shapes for a JSON path list"
+        "--stdin-paths",
+        action="store_true",
+        help="Check C# shapes for a JSON path list",
     )
     arguments = parser.parse_args()
     try:
@@ -212,7 +298,9 @@ def main() -> int:
                 or not all(isinstance(path, str) for path in cast("list[object]", paths))
             ):
                 parser.error("Expected a nonempty JSON list of paths")
-            return check_shapes(arguments.root, cast("list[str]", paths))
+            return check_shapes(arguments.root, cast("list[str]", paths), staged=arguments.staged)
+        if arguments.staged:
+            parser.error("--staged requires --stdin-paths")
         return check(arguments.root, verbose=arguments.verbose)
     except (OSError, UnicodeError, subprocess.SubprocessError, ValueError) as error:
         print(f"::error::Unity metadata validation failed: {error}")
