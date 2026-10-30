@@ -93,6 +93,7 @@ also works directly. Run its offline controls with `--self-test`, or its full re
 suite with `uv run --project scripts/python~ --locked pytest scripts/tests/test_pr_feedback.py`.
 CodeRabbit is trusted only when its exact login belongs to a Bot account. Unknown bots
 and outside people still require issue-specific direction before action.
+HTTP redirects fail closed to keep credentials on the GitHub API origin.
 
 `npm run verify:shipped-analyzers` compares all three committed compiler-input DLLs
 with isolated Release builds through the same locked environment. Add `:fix` to refresh

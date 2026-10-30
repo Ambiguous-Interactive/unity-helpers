@@ -15,7 +15,10 @@ import urllib.request
 from collections.abc import Callable, Mapping
 from email.message import Message
 from pathlib import Path
-from typing import TextIO, cast
+from typing import IO, TYPE_CHECKING, TextIO, cast
+
+if TYPE_CHECKING:
+    from http.client import HTTPMessage
 
 token = ""
 number = "1"
@@ -82,6 +85,24 @@ def read_json(stream: TextIO, url: str) -> object:
         raise FeedbackError(f"invalid JSON from {url}: {safe(error)}") from error
 
 
+class RejectRedirects(urllib.request.HTTPRedirectHandler):
+    def redirect_request(
+        self,
+        req: urllib.request.Request,
+        fp: IO[bytes],
+        code: int,
+        msg: str,
+        headers: HTTPMessage,
+        newurl: str,
+    ) -> None:
+        del msg, headers, newurl
+        fp.close()
+        raise FeedbackError(f"refusing HTTP {code} redirect from {safe(req.full_url)}")
+
+
+OPENER = urllib.request.build_opener(RejectRedirects())
+
+
 def request_json(url: str) -> tuple[object, Mapping[str, str]]:
     if not url.startswith(ROOT_API + "/"):
         raise FeedbackError("refusing request URL outside api.github.com")
@@ -94,7 +115,7 @@ def request_json(url: str) -> tuple[object, Mapping[str, str]]:
         },
     )
     try:
-        with urllib.request.urlopen(request, timeout=60) as response:  # noqa: S310 - fixed HTTPS API origin.
+        with OPENER.open(request, timeout=60) as response:
             return read_json(response, url), response.headers
     except urllib.error.HTTPError as error:
         raise FeedbackError(f"HTTP {error.code} from {safe(url)}") from error
@@ -397,7 +418,7 @@ def run_self_tests() -> None:
     except FeedbackError as error:
         expect(str(error) == f"pagination cycle at {cycle_url}", "pagination cycle")
     http_error = urllib.error.HTTPError(first_url, 503, "fixture", Message(), None)
-    with unittest.mock.patch.object(urllib.request, "urlopen", side_effect=http_error):
+    with unittest.mock.patch.object(OPENER, "open", side_effect=http_error):
         try:
             request_json(first_url)
             expect(False, "HTTP failure")

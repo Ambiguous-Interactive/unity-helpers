@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import http.server
 import io
 import shutil
 import subprocess
 import sys
-import urllib.request
+import threading
 from typing import TYPE_CHECKING, ClassVar
 
 if TYPE_CHECKING:
+    import urllib.request
     from collections.abc import Mapping
 from pathlib import Path
 
@@ -129,7 +131,7 @@ def render(
         calls.append(path)
         return Response(json.dumps(fixtures[path]))
 
-    monkeypatch.setattr(urllib.request, "urlopen", urlopen)
+    monkeypatch.setattr(feedback.OPENER, "open", urlopen)
     monkeypatch.setattr(feedback, "token", "fixture-token")
     monkeypatch.setattr(feedback, "number", "42")
     monkeypatch.setattr(feedback, "root_comments_only", roots_only)
@@ -264,3 +266,41 @@ def test_windows_uses_git_bash_before_the_wsl_stub(
     monkeypatch.setattr(shutil, "which", which)
     assert feedback.bash_command() == str(bash)
     assert calls == ["git"]
+
+
+@pytest.mark.parametrize("status", [301, 302, 303, 307, 308])
+@pytest.mark.parametrize("cross_origin", [False, True])
+def test_real_redirect_never_receives_authorization(
+    status: int, cross_origin: bool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    received: list[tuple[str, str]] = []
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            received.append((self.path, self.headers.get("Authorization", "")))
+            if self.path == "/redirect":
+                self.send_response(status)
+                self.send_header("Location", target)
+            else:
+                self.send_response(200)
+            self.end_headers()
+            if self.path != "/redirect":
+                self.wfile.write(b"{}")
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    origin = f"http://127.0.0.1:{server.server_port}"
+    target = f"http://localhost:{server.server_port}/sink" if cross_origin else origin + "/sink"
+    monkeypatch.setattr(feedback, "ROOT_API", origin)
+    monkeypatch.setattr(feedback, "token", "fixture-token")
+    monkeypatch.setenv("no_proxy", "127.0.0.1,localhost")
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        with pytest.raises(feedback.FeedbackError, match=f"refusing HTTP {status} redirect"):
+            feedback.request_json(origin + "/redirect")
+        assert received == [("/redirect", "Bearer fixture-token")]
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+    assert not thread.is_alive()
