@@ -1979,7 +1979,7 @@ if ($relativePaths.Count -gt 0) {
     $script:PreflightWriteSafety = @{ RepoRoot = $repoRoot; Scope = $safetyScope; WholeRepository = -not $explicitSelection }
 }
 
-$deletedCsharpMetaPaths = @(Invoke-GitPathList -RepoRoot $repoRoot -Arguments @('diff', '--cached', '--name-only', '-z', '--diff-filter=D') | Where-Object {
+$deletedCsharpMetaPaths = @(Invoke-GitPathList -RepoRoot $repoRoot -Arguments @('diff', '--cached', '--no-renames', '--name-only', '-z', '--diff-filter=D') | Where-Object {
         $_ -match '\.cs\.meta$' -and
         (Test-MetaRequiredPath -RelativePath ($_ -replace '\.meta$', '')) -and
         (-not $explicitSelection -or $dedupedPaths.Contains($_) -or $dedupedPaths.Contains(($_ -replace '\.meta$', '')))

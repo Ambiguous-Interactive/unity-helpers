@@ -169,7 +169,7 @@ def test_zero_exit_after_interrupt_cannot_qualify(
     child = tmp_path / "child.py"
     ready = tmp_path / "ready"
     child.write_text(
-        "import os, signal, sys\nfrom pathlib import Path\nsignal.signal(signal.SIGINT, lambda *_: sys.exit(0))\nready = Path(sys.argv[1])\nready.with_suffix('.pending').write_text(str(os.getpid()))\nos.replace(ready.with_suffix('.pending'), ready)\nprint('before interruption', flush=True)\nsignal.pause()\nprint('1 finished.')\n",
+        "import os, signal, sys\nfrom pathlib import Path\nsignal.signal(signal.SIGINT, lambda *_: sys.exit(0))\nready = Path(sys.argv[1])\nprint('before interruption', flush=True)\nready.with_suffix('.pending').write_text(str(os.getpid()))\nos.replace(ready.with_suffix('.pending'), ready)\nsignal.pause()\nprint('1 finished.')\n",
         encoding="utf-8",
     )
     command = (

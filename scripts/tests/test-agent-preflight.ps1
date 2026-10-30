@@ -3184,32 +3184,42 @@ finally {
 }
 
 Write-Host "`nTest group: Staged C# companion deletions" -ForegroundColor Magenta
-foreach ($deleteSource in @($false, $true)) {
-    foreach ($unrelatedChange in @($false, $true)) {
-        $deletionRepo = New-TestRepo -ConfigurePushDefaults
-        try {
-            $runtimeDirectory = Join-Path $deletionRepo 'Runtime'
-            New-Item -ItemType Directory -Path $runtimeDirectory -Force | Out-Null
-            Set-Content -LiteralPath (Join-Path $runtimeDirectory 'Example.cs') -Value 'class Example {}'
-            Set-Content -LiteralPath (Join-Path $runtimeDirectory 'Example.cs.meta') -Value "fileFormatVersion: 2`nguid: 0123456789abcdef0123456789abcdef`nMonoImporter:`n  executionOrder: 0"
-            & git -C $deletionRepo add -- Runtime
-            & git -C $deletionRepo -c user.email=test@example.com -c user.name=test commit -q -m 'Add source and companion'
-            if ($LASTEXITCODE -ne 0) { throw 'Could not commit deletion regression fixture' }
-            & git -C $deletionRepo rm -q -- Runtime/Example.cs.meta
-            if ($deleteSource) { & git -C $deletionRepo rm -q -- Runtime/Example.cs }
-            if ($unrelatedChange) { Set-Content -LiteralPath (Join-Path $deletionRepo 'unrelated.txt') -Value 'changed' }
-            $beforeIndex = [System.IO.File]::ReadAllBytes((Join-Path $deletionRepo '.git/index'))
-            $result = Invoke-Preflight -RepoPath $deletionRepo
-            $label = "MetadataDeletion_SourceDeleted$deleteSource`_OtherChange$unrelatedChange"
-            $expected = if ($deleteSource) { 0 } else { 1 }
-            Write-TestResult "$label`_Exit" ($result.ExitCode -eq $expected) $result.Output
-            if (-not $deleteSource) {
-                Write-TestResult "$label`_Path" ($result.Output -match 'UNH007' -and $result.Output -match 'Example.cs.meta') $result.Output
+foreach ($renameCompanion in @($false, $true)) {
+    foreach ($deleteSource in @($false, $true)) {
+        foreach ($unrelatedChange in @($false, $true)) {
+            $deletionRepo = New-TestRepo -ConfigurePushDefaults
+            try {
+                $runtimeDirectory = Join-Path $deletionRepo 'Runtime'
+                New-Item -ItemType Directory -Path $runtimeDirectory -Force | Out-Null
+                Set-Content -LiteralPath (Join-Path $runtimeDirectory 'Example.cs') -Value 'class Example {}'
+                [System.IO.File]::WriteAllText((Join-Path $runtimeDirectory 'Example.cs.meta'), "fileFormatVersion: 2`r`nguid: 0123456789abcdef0123456789abcdef`r`nMonoImporter:`r`n  executionOrder: 0`r`n")
+                & git -C $deletionRepo add -- Runtime
+                & git -C $deletionRepo -c user.email=test@example.com -c user.name=test commit -q -m 'Add source and companion'
+                if ($LASTEXITCODE -ne 0) { throw 'Could not commit deletion regression fixture' }
+                if ($renameCompanion) {
+                    & git -C $deletionRepo config diff.renames true
+                    & git -C $deletionRepo mv -- Runtime/Example.cs.meta Runtime/Relocated.cs.meta
+                }
+                else { & git -C $deletionRepo rm -q -- Runtime/Example.cs.meta }
+                if ($deleteSource) { & git -C $deletionRepo rm -q -- Runtime/Example.cs }
+                if ($unrelatedChange) { Set-Content -LiteralPath (Join-Path $deletionRepo 'unrelated.txt') -Value 'changed' }
+                if ($renameCompanion) {
+                    $renameStatus = & git -C $deletionRepo diff --cached --name-status
+                    Write-TestResult 'MetadataDeletion_GitDetectsRename' (($renameStatus -join "`n") -match '(?m)^R100\s+Runtime/Example.cs.meta\s+Runtime/Relocated.cs.meta$') ($renameStatus -join "`n")
+                }
+                $beforeIndex = [System.IO.File]::ReadAllBytes((Join-Path $deletionRepo '.git/index'))
+                $result = Invoke-Preflight -RepoPath $deletionRepo
+                $label = "MetadataDeletion_Renamed$renameCompanion`_SourceDeleted$deleteSource`_OtherChange$unrelatedChange"
+                $expected = if ($deleteSource) { 0 } else { 1 }
+                Write-TestResult "$label`_Exit" ($result.ExitCode -eq $expected) $result.Output
+                if (-not $deleteSource) {
+                    Write-TestResult "$label`_Path" ($result.Output -match 'UNH007' -and $result.Output -match 'Example.cs.meta') $result.Output
+                }
+                Write-TestResult "$label`_Index" (Test-ByteArrayEqual -Expected $beforeIndex -Actual ([System.IO.File]::ReadAllBytes((Join-Path $deletionRepo '.git/index')))) 'Check mode must preserve the index'
             }
-            Write-TestResult "$label`_Index" (Test-ByteArrayEqual -Expected $beforeIndex -Actual ([System.IO.File]::ReadAllBytes((Join-Path $deletionRepo '.git/index')))) 'Check mode must preserve the index'
-        }
-        finally {
-            Remove-Item -LiteralPath $deletionRepo -Recurse -Force -ErrorAction SilentlyContinue
+            finally {
+                Remove-Item -LiteralPath $deletionRepo -Recurse -Force -ErrorAction SilentlyContinue
+            }
         }
     }
 }
