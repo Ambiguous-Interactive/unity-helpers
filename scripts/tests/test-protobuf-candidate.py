@@ -8,6 +8,7 @@ import json
 import os
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from typing import Protocol, cast
@@ -58,15 +59,32 @@ CANDIDATE = cast(
 SHIPPED = cast("ShippedModule", load_module("protobuf_shipped", "verify-protobuf-shipped.py"))
 
 
-def assert_descendant_exited(status: Path) -> None:
-    try:
-        status_text = status.read_text()
-    except (FileNotFoundError, ProcessLookupError):
-        return
-    assert "State:\tZ" in status_text, status_text
+def assert_descendant_exited(status: Path, *, timeout_seconds: float = 5) -> None:
+    deadline = time.monotonic() + timeout_seconds
+    while True:
+        try:
+            status_text = status.read_text()
+        except (FileNotFoundError, ProcessLookupError):
+            return
+        if "State:\tZ" in status_text:
+            return
+        assert time.monotonic() < deadline, status_text
+        time.sleep(0.01)
 
 
 class CandidateBuildTests(unittest.TestCase):
+    def test_exit_observation_waits_for_pending_signal_delivery(self) -> None:
+        with (
+            patch.object(
+                Path,
+                "read_text",
+                side_effect=["State:\tR\nShdPnd:\t0000000000000100\n", "State:\tZ\n"],
+            ),
+            patch("time.sleep") as pause,
+        ):
+            assert_descendant_exited(Path("/proc/fixture/status"))
+            pause.assert_called_once_with(0.01)
+
     def test_exit_observation_accepts_process_reaping(self) -> None:
         for error in (FileNotFoundError, ProcessLookupError):
             with (
@@ -85,7 +103,7 @@ class CandidateBuildTests(unittest.TestCase):
                         assert_descendant_exited(status)
                     else:
                         with pytest.raises(AssertionError):
-                            assert_descendant_exited(status)
+                            assert_descendant_exited(status, timeout_seconds=0)
 
     def test_exit_observation_preserves_unrelated_read_errors(self) -> None:
         for error in (PermissionError, IsADirectoryError):
