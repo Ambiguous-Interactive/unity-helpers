@@ -98,7 +98,8 @@ missing source roots, empty assembly scans, invalid references and version expre
 package defines used without a declaration in the owning assembly. File fixtures cover nested
 assemblies, optional package guards, case-insensitive cache exclusions, and hidden files. Unreadable
 C# files report their relative paths without hiding later ownership errors. JSON input is validated
-before using its typed values.
+before using its typed values. CI runs these assembly fixtures on Linux and Windows; the Windows
+job exercises real hidden attributes on both files and directories.
 
 `npm run test:protobuf-candidate` exercises real child-process exit, timeout, descendant cleanup,
 source inventory and shipped-byte checks. `npm run test:native-debugger-download` serves a local

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -282,6 +283,31 @@ def test_unix_hidden_corpus_is_not_scanned(tmp_path: Path, relative: str) -> Non
     root = repository(tmp_path)
     definition(root / relative, [])
     assert check(root) == 0
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Hidden attributes are Windows file semantics")
+def test_windows_hidden_attributes_are_not_scanned(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = repository(tmp_path)
+    hidden_directory = root / "Runtime/Hidden"
+    hidden_file = root / "Runtime/Hidden.asmdef"
+    definition(hidden_directory / "Invalid.asmdef", [])
+    definition(hidden_file, [])
+    attrib = shutil.which("attrib")
+    assert attrib is not None
+    subjects = (hidden_directory, hidden_file)
+    try:
+        for path in subjects:
+            subprocess.run([attrib, "+h", str(path)], check=True, timeout=30)
+        assert check(root) == 0
+        capsys.readouterr()
+        definition(root / "Runtime/VisibleInvalid.asmdef", [])
+        assert check(root) == 1
+        assert "[Runtime/VisibleInvalid.asmdef]" in capsys.readouterr().out
+    finally:
+        for path in subjects:
+            subprocess.run([attrib, "-h", str(path)], check=True, timeout=30)
 
 
 def test_unreadable_source_does_not_hide_later_ownership_errors(
