@@ -63,20 +63,18 @@ bash scripts/tests/test-wiki-generation.sh
 Comprehensive unit and integration tests (50+ test cases):
 
 ```bash
-# Create and activate virtual environment (one time)
-python3.11 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements-wiki.txt
+# Install the locked tooling environment (one time)
+uv sync --project scripts/python~ --locked
 
 # Run all wiki Python tests
-python -m pytest scripts/wiki/test_wiki_scripts.py -v
+uv run --project scripts/python~ --locked pytest scripts/wiki/test_wiki_scripts.py -v
 
 # Test specific module
-python -m pytest \
+uv run --project scripts/python~ --locked pytest \
   scripts/wiki/test_wiki_scripts.py::TestTransformPathToWikiPage -v
 
 # Test on actual repository
-python scripts/wiki/prepare_wiki.py \
+uv run --project scripts/python~ --locked --no-dev python scripts/wiki/prepare_wiki.py \
   --source . --dest /tmp/test-wiki --verbose
 ```
 
@@ -93,7 +91,7 @@ Tests cover:
 ### When Tests Run
 
 - `npm run test:wiki-generation` runs the bash tests only.
-- `python -m pytest scripts/wiki/test_wiki_scripts.py -v` runs the Python
+- `uv run --project scripts/python~ --locked pytest scripts/wiki/test_wiki_scripts.py -v` runs the Python
   tests only.
 - `npm run validate:tests` runs the bash tests only.
 - CI runs both suites for PRs and pushes touching wiki files.
@@ -132,9 +130,14 @@ When refactoring wiki generation scripts (e.g., moving from inline bash to Pytho
 2. **Bash tests validate Python scripts** — The bash tests grep Python
    files for correct patterns
 3. **Run both locally before pushing** — use `npm run test:wiki-generation`
-   for bash coverage and `python -m pytest scripts/wiki/test_wiki_scripts.py -v`
-   for Python coverage. The local pre-push hook does not run wiki regression
-   suites.
+   for bash coverage. Run the Python suite with:
+
+   ```bash
+   uv run --project scripts/python~ --locked pytest \
+     scripts/wiki/test_wiki_scripts.py -v
+   ```
+
+   The local pre-push hook does not run wiki regression suites.
 
 **Example failure scenario (what caused this issue):**
 

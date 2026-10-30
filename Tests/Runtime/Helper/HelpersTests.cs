@@ -1311,6 +1311,94 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.AreEqual(1, bounds.yMax);
         }
 
+        [TestCase(0, false)]
+        [TestCase(1, false)]
+        [TestCase(3, false)]
+        [TestCase(0, true)]
+        [TestCase(1, true)]
+        [TestCase(3, true)]
+        public void WeightedShuffleBagSamplingFailurePreservesTheCycle(
+            int consumed,
+            bool foreignFailure
+        )
+        {
+            WeightedShuffleBag<int> bag = new();
+            int configured = consumed == 1 ? 4 : 3;
+            Assert.IsTrue(bag.TryAdd(10, configured));
+            PcgRandom good = new(123);
+            for (int index = 0; index < consumed; ++index)
+            {
+                Assert.IsTrue(bag.TryNext(good, out _));
+            }
+            List<int> before = new();
+            Assert.IsTrue(bag.TryCopyRemainingTicketsTo(before));
+            IRandom refusing = foreignFailure
+                ? new EdgeCaseRandom()
+                : new DeterministicRandom(Array.Empty<double>());
+
+            Assert.IsFalse(bag.TryNext(refusing, out int item));
+
+            Assert.AreEqual(default(int), item);
+            Assert.AreEqual(before.Count, bag.RemainingCount);
+            Assert.AreEqual(configured, bag.Count);
+            List<int> after = new();
+            Assert.IsTrue(bag.TryCopyRemainingTicketsTo(after));
+            CollectionAssert.AreEqual(before, after);
+            Assert.IsTrue(bag.TryNext(good, out _));
+            Assert.AreEqual(
+                (before.Count == 0 ? configured : before.Count) - 1,
+                bag.RemainingCount
+            );
+        }
+
+        [TestCase(-1)]
+        [TestCase(int.MinValue)]
+        [TestCase(3)]
+        [TestCase(int.MaxValue)]
+        public void WeightedShuffleBagRefusesAnInvalidForeignIndex(int returnedIndex)
+        {
+            WeightedShuffleBag<int> bag = new();
+            Assert.IsTrue(bag.TryAdd(10, 3));
+            int observedBound = -1;
+            EdgeCaseRandom source = new(boundedIntSampler: bound =>
+            {
+                observedBound = bound;
+                return returnedIndex;
+            });
+
+            Assert.IsFalse(bag.TryNext(source, out int item));
+
+            Assert.AreEqual(3, observedBound);
+            Assert.AreEqual(default(int), item);
+            Assert.AreEqual(3, bag.RemainingCount);
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void WeightedShuffleBagRefusesCountChangesDuringSampling(bool clear)
+        {
+            WeightedShuffleBag<int> bag = new();
+            Assert.IsTrue(bag.TryAdd(10, 3));
+            Assert.IsTrue(bag.TryNext(new PcgRandom(123), out _));
+            EdgeCaseRandom source = new(boundedIntSampler: bound =>
+            {
+                if (clear)
+                {
+                    bag.Clear();
+                }
+                else
+                {
+                    bag.Reset();
+                }
+                return 0;
+            });
+
+            Assert.IsFalse(bag.TryNext(source, out int item));
+
+            Assert.AreEqual(default(int), item);
+            Assert.AreEqual(clear ? 0 : 3, bag.RemainingCount);
+        }
+
         private CoroutineHost CreateHost()
         {
             GameObject go = Track(new GameObject("Helpers_CoroutineHost", typeof(CoroutineHost)));

@@ -8,14 +8,15 @@ This script converts links like:
     (./docs/features/inspector/inspector-button.md) → (Features-Inspector-Inspector-Button)
 
 Usage:
-    python transform_wiki_links.py input.md > output.md
-    python transform_wiki_links.py input.md --in-place
+    uv run --project scripts/python~ --locked --no-dev python scripts/wiki/transform_wiki_links.py input.md > output.md
+    uv run --project scripts/python~ --locked --no-dev python scripts/wiki/transform_wiki_links.py input.md --in-place
     echo "content" | python transform_wiki_links.py -
 """
 
 import argparse
 import re
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 
@@ -46,7 +47,7 @@ def transform_path_to_wiki_page(path: str) -> str:
         anchor = "#" + anchor
 
     # Strip ./ and ../ prefixes
-    while path.startswith("./") or path.startswith("../"):
+    while path.startswith(("./", "../")):
         if path.startswith("./"):
             path = path[2:]
         elif path.startswith("../"):
@@ -70,7 +71,7 @@ def transform_path_to_wiki_page(path: str) -> str:
 
     # Replace / with - and capitalize each segment
     parts = path.split("/")
-    wiki_parts = []
+    wiki_parts: list[str] = []
     for part in parts:
         # Split on hyphens to capitalize each word
         words = part.split("-")
@@ -80,7 +81,7 @@ def transform_path_to_wiki_page(path: str) -> str:
     return "-".join(wiki_parts) + anchor
 
 
-def _transform_preserving_code_blocks(content: str, transform_fn) -> str:
+def _transform_preserving_code_blocks(content: str, transform_fn: Callable[[str], str]) -> str:
     """
     Apply a transformation function while preserving code blocks.
 
@@ -107,7 +108,7 @@ def _transform_preserving_code_blocks(content: str, transform_fn) -> str:
     # Split content by fenced code blocks, keeping the delimiters
     fenced_parts = re.split(fenced_pattern, content)
 
-    result_parts = []
+    result_parts: list[str] = []
     for i, part in enumerate(fenced_parts):
         # Odd indices are fenced code blocks (captured groups)
         if i % 2 == 1:
@@ -122,14 +123,12 @@ def _transform_preserving_code_blocks(content: str, transform_fn) -> str:
             # 1. Find and protect standalone inline code (not inside link brackets)
             # 2. Apply transformation (links with backticks in text are transformed)
             # 3. Restore protected inline code
-            result_parts.append(
-                _transform_with_protected_inline_code(part, transform_fn)
-            )
+            result_parts.append(_transform_with_protected_inline_code(part, transform_fn))
 
     return "".join(result_parts)
 
 
-def _transform_with_protected_inline_code(text: str, transform_fn) -> str:
+def _transform_with_protected_inline_code(text: str, transform_fn: Callable[[str], str]) -> str:
     """
     Transform text while protecting standalone inline code.
 
@@ -144,7 +143,7 @@ def _transform_with_protected_inline_code(text: str, transform_fn) -> str:
         Transformed text with standalone inline code preserved
     """
     # Placeholder for protected inline code
-    placeholders = []
+    placeholders: list[str] = []
     placeholder_prefix = "\x00INLINE_CODE_"
 
     # Pattern to find inline code that is NOT inside link brackets
@@ -155,7 +154,7 @@ def _transform_with_protected_inline_code(text: str, transform_fn) -> str:
     #
     # We'll iterate through the text, tracking whether we're inside link brackets
 
-    result = []
+    result: list[str] = []
     pos = 0
     in_link_text = False
     bracket_depth = 0
@@ -205,9 +204,8 @@ def _transform_with_protected_inline_code(text: str, transform_fn) -> str:
                                 pos += 1
                         in_link_text = False
                         continue
-                    else:
-                        # Not a link, just brackets
-                        in_link_text = False
+                    # Not a link, just brackets
+                    in_link_text = False
             # Inside link text - include everything as-is (including backticks)
             result.append(text[pos])
             pos += 1
@@ -267,7 +265,7 @@ def _transform_links_in_text(text: str) -> str:
     # Captures: [link_text](path_with_optional_anchor)
     pattern = r"\[([^\]]+)\]\((\.\.?/[^)]+\.md(?:#[^)]*)?)\)"
 
-    def replace_link(match: re.Match) -> str:
+    def replace_link(match: re.Match[str]) -> str:
         link_text = match.group(1)
         path = match.group(2)
         wiki_page = transform_path_to_wiki_page(path)
@@ -317,7 +315,7 @@ def _transform_images_in_text(text: str) -> str:
     #   ../docs/images/foo.png -> images/foo.png
     #   ../../docs/images/foo.png -> images/foo.png
 
-    def normalize_image_path(match: re.Match) -> str:
+    def normalize_image_path(match: re.Match[str]) -> str:
         alt_text = match.group(1)
         full_path = match.group(2)
 
@@ -372,27 +370,24 @@ def process_file(input_path: str, in_place: bool = False) -> str:
     if input_path == "-":
         content = sys.stdin.read()
     else:
-        with open(input_path, "r", encoding="utf-8") as f:
+        with Path(input_path).open("r", encoding="utf-8") as f:
             content = f.read()
 
     transformed = transform_wiki_links(content)
     transformed = transform_image_paths(transformed)
 
     if in_place and input_path != "-":
-        with open(input_path, "w", encoding="utf-8") as f:
+        with Path(input_path).open("w", encoding="utf-8") as f:
             f.write(transformed)
         return ""
-    else:
-        return transformed
+    return transformed
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Transform relative markdown links to GitHub Wiki page references."
     )
-    parser.add_argument(
-        "input", help="Input markdown file path, or '-' for stdin"
-    )
+    parser.add_argument("input", help="Input markdown file path, or '-' for stdin")
     parser.add_argument(
         "--in-place",
         "-i",

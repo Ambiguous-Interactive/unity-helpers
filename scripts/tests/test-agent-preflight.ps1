@@ -73,6 +73,11 @@ function New-TestRepo {
 
     $repoRoot = Split-Path -Parent $PSScriptRoot | Split-Path -Parent
     Copy-Item (Join-Path $repoRoot 'scripts/agent-preflight.ps1') (Join-Path $scriptsDir 'agent-preflight.ps1') -Force
+    Copy-Item (Join-Path $repoRoot 'scripts/lint_meta_files.py') (Join-Path $scriptsDir 'lint_meta_files.py') -Force
+    $pythonProject = Join-Path $scriptsDir 'python~'
+    New-Item -ItemType Directory -Path $pythonProject -Force | Out-Null
+    Copy-Item (Join-Path $repoRoot 'scripts/python~/pyproject.toml') (Join-Path $pythonProject 'pyproject.toml') -Force
+    Copy-Item (Join-Path $repoRoot 'scripts/python~/uv.lock') (Join-Path $pythonProject 'uv.lock') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/git-staging-helpers.ps1') (Join-Path $scriptsDir 'git-staging-helpers.ps1') -Force
     # agent-preflight.ps1 dot-sources these helpers at startup; omitting the
     # copy would surface as an obscure "path not found" during the dot-source
@@ -3176,6 +3181,37 @@ try {
 finally {
     Remove-Item -Path $repo19 -Recurse -Force -ErrorAction SilentlyContinue
     Remove-Item -Path $nonRepo19 -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+Write-Host "`nTest group: C# importer shapes, including metadata-only changes" -ForegroundColor Magenta
+foreach ($scenario in @(
+    @{ Name = 'Stub'; Content = "fileFormatVersion: 2`nguid: 0123456789abcdef0123456789abcdef`n"; Expected = 1 },
+    @{ Name = 'Valid'; Content = "fileFormatVersion: 2`nguid: 0123456789abcdef0123456789abcdef`nMonoImporter:`n  executionOrder: 0`n"; Expected = 0 },
+    @{ Name = 'Customized'; Content = "fileFormatVersion: 2`nguid: 0123456789abcdef0123456789abcdef`nMonoImporter:`n  executionOrder: -42`n  userData: retained`n"; Expected = 0 },
+    @{ Name = 'DuplicateGuid'; Content = "fileFormatVersion: 2`nguid: 0123456789abcdef0123456789abcdef`nguid: 0123456789abcdef0123456789abcdef`nMonoImporter:`n  executionOrder: 0`n"; Expected = 1 },
+    @{ Name = 'MissingVersion'; Content = "guid: 0123456789abcdef0123456789abcdef`nMonoImporter:`n  executionOrder: 0`n"; Expected = 1 },
+    @{ Name = 'MalformedGuid'; Content = "fileFormatVersion: 2`nguid: broken`nMonoImporter:`n  executionOrder: 0`n"; Expected = 1 }
+)) {
+    $shapeRepo = New-TestRepo -ConfigurePushDefaults
+    try {
+        $runtimeDirectory = Join-Path $shapeRepo 'Runtime'
+        New-Item -ItemType Directory -Path $runtimeDirectory -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $runtimeDirectory 'Example.cs') -Value 'class Example {}'
+        $companion = Join-Path $runtimeDirectory 'Example.cs.meta'
+        [System.IO.File]::WriteAllText($companion, $scenario.Content.Replace("`n", "`r`n"), [System.Text.UTF8Encoding]::new($false))
+        $beforeBytes = [System.IO.File]::ReadAllBytes($companion)
+        $beforeIndex = [System.IO.File]::ReadAllBytes((Join-Path $shapeRepo '.git/index'))
+        $shapeResult = Invoke-Preflight -RepoPath $shapeRepo -Arguments @('-Paths', 'Runtime/Example.cs.meta')
+        Write-TestResult "MetadataShape_$($scenario.Name)_Exit" ($shapeResult.ExitCode -eq $scenario.Expected) $shapeResult.Output
+        if ($scenario.Expected -ne 0) {
+            Write-TestResult "MetadataShape_$($scenario.Name)_Path" ($shapeResult.Output -match 'UNH007' -and $shapeResult.Output -match 'Example.cs.meta') $shapeResult.Output
+        }
+        Write-TestResult "MetadataShape_$($scenario.Name)_Bytes" (Test-ByteArrayEqual -Expected $beforeBytes -Actual ([System.IO.File]::ReadAllBytes($companion))) 'Check mode must preserve metadata bytes'
+        Write-TestResult "MetadataShape_$($scenario.Name)_Index" (Test-ByteArrayEqual -Expected $beforeIndex -Actual ([System.IO.File]::ReadAllBytes((Join-Path $shapeRepo '.git/index')))) 'Check mode must preserve the index'
+    }
+    finally {
+        Remove-Item -LiteralPath $shapeRepo -Recurse -Force -ErrorAction SilentlyContinue
+    }
 }
 
 Write-Host ''

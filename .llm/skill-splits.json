@@ -606,7 +606,7 @@
     },
     {
       "name": "wiki-generation",
-      "sha256": "6fb1f83948fde5fc14af658f276f363960b87f52daf846456a5cfd95d0c65059",
+      "sha256": "472af29c3d02dddf364c7eb5545faa277eb3eb864216c4aec074fe51ce965754",
       "parts": ["wiki-generation-part-1.md", "wiki-generation-part-2.md"],
       "routerSha256": "4e9918fa4d0d112a183e6a063c6f410997fad78e672f1392b657d74df7c7ed72"
     }

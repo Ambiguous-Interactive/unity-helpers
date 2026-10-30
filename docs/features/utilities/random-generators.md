@@ -309,12 +309,11 @@ negative counts still raise argument exceptions.
 
 `AbstractRandom.TryNextUint`, `TryNextUlong`, `TryNextDouble` and `TryNextGaussian` return
 `false` and write `default` for invalid inputs, exhausted rejection sampling, or a floating-point
-result that cannot satisfy the requested contract. Always check the boolean before using the output. Infinite-range `TryNextDouble` also reports failure when its
-bounded integer sampler exhausted its cap, even if that sampler's fallback would produce a finite
-number. It stops on that failure rather than multiplying the nested retry budgets. Legacy infinite-double sampling also stops when exhausted inner sampling yields a nonfinite candidate, returning its existing deterministic fallback. Finite-range
-sampling rejects a result rounded to its exclusive maximum; Gaussian sampling rejects an overflow
-to infinity. Neither case clamps the result or reports a substitute as success. These methods are
-on `AbstractRandom`; `IRandom` remains unchanged.
+result that cannot satisfy the requested contract. Always check the boolean before using the output.
+Infinite-range double sampling stops as soon as its bounded integer sampler fails. Finite-range
+`TryNextDouble` rejects a result rounded to its exclusive maximum; `TryNextGaussian` rejects an
+overflow to infinity. Neither reports a substitute as success. These methods are on
+`AbstractRandom`; `IRandom` remains unchanged.
 
 ```csharp
 AbstractRandom random = new PcgRandom(1234);
@@ -324,28 +323,31 @@ if (random.TryNextDouble(1.0, double.PositiveInfinity, out double sample))
 }
 ```
 
-The existing methods retain their degraded, non-throwing response to a stalled source. They can
-return a modulo reduction, a fixed in-range value, or a Gaussian substitute after their rejection
-caps. Invalid-bound exceptions remain. Use the `Try` methods when a fallback is unacceptable.
-A bounded integer request permits an initial draw followed by 65,536 retries for 32 bits or
-1,048,576 retries for 64 bits. Gaussian sampling permits 1,048,576 candidate pairs before taking
-its fallback path. A failed Gaussian draw does not cache a fallback partner as an exact sample.
+The existing strict sampling methods throw `InvalidOperationException` when a stalled or
+adversarial source exhausts rejection sampling. This includes signed integers, bounded unsigned
+integers, infinite-range floats and doubles, and Gaussian samples. They no longer return modulo
+reductions, fixed values or alternate-distribution substitutes after exhaustion. Existing
+invalid-bound exceptions and successful sampling formulas are unchanged.
 
-Raw `NextUint()` and `NextUlong()` streams, power-of-two reductions, and serialized continuation
-are unaffected by these `Try` guards. A failed `Try` call still consumes its attempted draws;
-a Gaussian transform that overflows retains its finite cached partner for the next request.
-A failed exact request can now stop earlier than the legacy fallback path, so subsequent draws
-after that failure can start at an earlier stream position. `Next()` and `NextLong()` exclude their
-signed maximum; the earlier correction to those methods intentionally changed the rare draw that
-previously returned that maximum. These generators are not cryptographic random sources.
+A bounded integer request permits an initial draw followed by 65,536 retries for 32 bits or
+1,048,576 retries for 64 bits. Signed integer sampling uses the same draw limits when rejecting its
+exclusive maximum. Gaussian sampling accepts up to 1,048,576 candidate pairs; an unsuccessful
+request consumes one final pair to detect exhaustion and returns without drawing a substitute or
+caching a partner. Failed requests consume entropy and cannot be rolled back.
+
+Raw `NextUint()` and `NextUlong()` streams, power-of-two reductions, and saved state formats are
+unchanged. Accepted draws retain their values and draw order. A failed request can consume fewer
+draws than older fallback paths, so later results after that failure can differ. Keep the package
+version and sampling call order with deterministic replays. These generators are not cryptographic
+random sources.
 
 Choose the failure policy at the call site:
 
-| Your requirement                                                | Use                                                  | Handle failure by                                                 |
-| --------------------------------------------------------------- | ---------------------------------------------------- | ----------------------------------------------------------------- |
-| An exact sample, with no substituted value                      | The corresponding `AbstractRandom.TryNext...` method | Checking `false` and selecting an explicit application policy.    |
-| Existing `IRandom` integration and its legacy fallback behavior | The existing sampling methods                        | Accepting their documented degraded result for a stalled source.  |
-| Reproducible gameplay or saved simulations                      | A seeded generator and saved continuation state      | Keeping the generator, package version and draw order consistent. |
+| Your requirement                           | Use                                                  | Handle failure by                                                 |
+| ------------------------------------------ | ---------------------------------------------------- | ----------------------------------------------------------------- |
+| An exact sample, with no substituted value | The corresponding `AbstractRandom.TryNext...` method | Checking `false` and selecting an explicit application policy.    |
+| Existing `IRandom` integration             | The existing strict sampling methods                 | Handling `InvalidOperationException` if a custom source stalls.   |
+| Reproducible gameplay or saved simulations | A seeded generator and saved continuation state      | Keeping the generator, package version and draw order consistent. |
 
 A failed `Try` call has consumed entropy. Retrying it is not a rollback, and immediately retrying
 a stuck custom source can block your game loop. Validate inputs first, then report the failure or
@@ -401,7 +403,7 @@ int moves = random.NextIntSkewed(minMoves, maxMoves, targetMoves);
 
 The float and double siblings also answer the low bound when either bound is `NaN`. The strict
 `NextFloat` and `NextDouble` overloads reject `NaN` bounds with `ArgumentException` before drawing.
-Their existing support for infinite two-bound ranges and bounded-sampling fallbacks is unchanged.
+Infinite two-bound ranges remain supported; exhausted rejection sampling throws `InvalidOperationException`.
 
 #### Weighted span selection
 
@@ -506,8 +508,15 @@ if (BadLuckProtection.TryCreate(0.10f, 0.05f, 10, out BadLuckProtection rareDrop
 WeightedShuffleBag<string> bag = new();
 bag.TryAdd("Common", 2);
 bag.TryAdd("Rare", 1);
-bag.TryNext(random, out string reward);
+if (bag.TryNext(random, out string reward))
+{
+    UnityEngine.Debug.Log(reward);
+}
 ```
+
+`WeightedShuffleBag<T>.TryNext` returns `false` with a default output if sampling fails or a
+custom generator returns an invalid index. A failed draw removes no ticket and does not start a
+new cycle. Retry with a working source; do not use the default output as a reward.
 
 `ExactAveragePrd` intentionally rejects very small non-zero targets below
 `ExactAveragePrd.MinimumPositiveTargetChance`; use `BadLuckProtection` or a

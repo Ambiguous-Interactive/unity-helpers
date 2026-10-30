@@ -8,20 +8,18 @@ This script handles the complete wiki preparation process:
 3. Generate sidebar and footer
 
 Usage:
-    python prepare_wiki.py --source /path/to/repo --dest /path/to/wiki
+    uv run --project scripts/python~ --locked --no-dev python scripts/wiki/prepare_wiki.py --source /path/to/repo --dest /path/to/wiki
 """
 
 import argparse
 import shutil
 import sys
 from pathlib import Path
-from typing import Tuple
 
 # Import sibling modules
-script_dir = Path(__file__).parent
-sys.path.insert(0, str(script_dir))
+sys.path.insert(0, str(Path(__file__).parent))
 
-from transform_wiki_links import transform_wiki_links, transform_image_paths
+from transform_wiki_links import transform_image_paths, transform_wiki_links
 
 
 def path_to_wiki_name(relative_path: str) -> str:
@@ -60,22 +58,18 @@ def copy_and_transform_file(src: Path, dest: Path) -> None:
         src: Source file path
         dest: Destination file path
     """
-    with open(src, "r", encoding="utf-8") as f:
+    with src.open("r", encoding="utf-8") as f:
         content = f.read()
 
     # Transform links
     content = transform_wiki_links(content)
     content = transform_image_paths(content)
 
-    with open(dest, "w", encoding="utf-8") as f:
+    with dest.open("w", encoding="utf-8") as f:
         f.write(content)
 
 
-def prepare_wiki(
-    source_dir: Path,
-    dest_dir: Path,
-    verbose: bool = False
-) -> Tuple[int, int]:
+def prepare_wiki(source_dir: Path, dest_dir: Path, verbose: bool = False) -> tuple[int, int]:
     """
     Prepare wiki content from source repository.
 
@@ -157,7 +151,7 @@ def prepare_wiki(
     return pages_created, images_copied
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Prepare documentation files for GitHub Wiki deployment."
     )
@@ -209,7 +203,7 @@ def main():
     pages, images = prepare_wiki(source_dir, dest_dir, args.verbose)
 
     if args.verbose:
-        print(f"\n✅ Wiki preparation complete")
+        print("\n✅ Wiki preparation complete")
         print(f"   Pages: {pages}")
         print(f"   Images: {images}")
 

@@ -57,6 +57,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix exhausted random sampling returning fabricated values. Strict methods throw `InvalidOperationException`; `Try` methods and weighted shuffle bags return `false` when sampling fails ([guide](./docs/features/utilities/random-generators.md), [#638](https://github.com/Ambiguous-Interactive/unity-helpers/issues/638)).
+- Fix missing C# importer metadata while preserving asset GUIDs and existing settings ([#1083](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1083)).
 - Fix Analyzer Policies files that prevent script compilation, and repair older namespaced files when saving policies ([#1091](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1091)).
 - Fix child component lists and sets reserving `MaxCount` entries before finding matches; large limits now allocate for actual results ([#1093](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1093)).
 - Fix scriptable singleton cleanup reloading destroyed assets and recursive scene-load resets invoking callbacks repeatedly ([#1088](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1088)).
