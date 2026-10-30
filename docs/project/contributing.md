@@ -103,12 +103,13 @@ its importer metadata. The Node entry points remain compatibility launchers.
 `npm run lint:repo -- --only meta-files` checks tracked asset coverage and C# importer shapes through typed Python.
 The PowerShell and shell test commands remain compatibility launchers. C# companions require
 one valid `fileFormatVersion: 2`, one 32-digit hexadecimal GUID, and a nonempty `MonoImporter`
-mapping with valid YAML syntax. Changed-path preflight checks metadata-only edits and validates
+mapping with valid YAML syntax and distinct setting keys. Changed-path preflight checks metadata-only edits and validates
 both the working copy and any indexed companion. Validation reads at most 1 MiB
 per C# companion and never rewrites existing bytes or index entries. Keep customized references,
 execution order, and other importer settings; repair a stub by retaining its headers and adding
 the generated importer block. Samples retain their companions when imported into Assets;
 Unity-ignored tooling folders remain excluded.
+Metadata checks select the `metadata` dependency group; generation uses only Python's standard library.
 
 The three standalone Markdown checkers under `.github/scripts` also join strict validation.
 Invoke them through the locked environment, for example:

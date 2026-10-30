@@ -14,7 +14,7 @@ from pathlib import Path, PurePosixPath
 from typing import cast
 
 import yaml
-from yaml.nodes import MappingNode
+from yaml.nodes import MappingNode, Node, ScalarNode, SequenceNode
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_ROOTS = (
@@ -126,6 +126,32 @@ def csharp_meta_bytes_error(raw: bytes) -> str | None:
         return f"Invalid C# metadata YAML: {error}"
     if not isinstance(document, MappingNode):
         return "C# metadata must contain a YAML mapping"
+    return yaml_duplicate_key_error(document)
+
+
+def yaml_duplicate_key_error(document: Node) -> str | None:
+    """Reject repeated scalar setting keys without expanding aliases."""
+    pending: list[Node] = [document]
+    visited: set[int] = set()
+    while pending:
+        node = pending.pop()
+        identity = id(node)
+        if identity in visited:
+            continue
+        visited.add(identity)
+        if isinstance(node, MappingNode):
+            keys: set[tuple[str, str]] = set()
+            for key, value in cast("list[tuple[Node, Node]]", node.value):
+                if isinstance(key, ScalarNode):
+                    name = cast("str", key.value)
+                    setting = (key.tag, name)
+                    if setting in keys:
+                        return f"Duplicate YAML mapping key: {name}"
+                    keys.add(setting)
+                pending.append(key)
+                pending.append(value)
+        elif isinstance(node, SequenceNode):
+            pending.extend(cast("list[Node]", node.value))
     return None
 
 

@@ -59,6 +59,10 @@ def add_asset(root: Path, name: str = "Runtime/Example.cs", meta: str | None = V
             "defaultReferences: []",
             "defaultReferences:\n  - service: {fileID: 123, guid: 11111111111111111111111111111111, type: 3}",
         ),
+        VALID.replace(
+            "defaultReferences: []",
+            "defaultReferences:\n  - service: {fileID: 1}\n  - service: {fileID: 2}",
+        ),
         "\ufeff" + VALID,
         VALID.replace("\n", "\r\n"),
         VALID.replace("0123456789abcdef0123456789abcdef", "ABCDEF0123456789ABCDEF0123456789"),
@@ -96,6 +100,18 @@ def test_valid_customized_importers(tmp_path: Path, content: str) -> None:
         (VALID + "DefaultImporter:\n  userData:\n", "only MonoImporter"),
         (STUB + "MonoImporter:\n  executionOrder: 0\n  - invalid\n", "YAML"),
         (VALID + "  icon: [unterminated\n", "YAML"),
+        (
+            VALID.replace("executionOrder: 0", "executionOrder: 0\n  executionOrder: 100"),
+            "Duplicate",
+        ),
+        (
+            VALID.replace("executionOrder: 0", 'executionOrder: 0\n  "executionOrder": 100'),
+            "Duplicate",
+        ),
+        (
+            VALID.replace("icon: {instanceID: 0}", "icon: {instanceID: 0, instanceID: 1}"),
+            "Duplicate",
+        ),
     ],
 )
 def test_rejects_malformed_shapes(tmp_path: Path, content: str, field: str) -> None:
@@ -120,6 +136,19 @@ def test_deep_yaml_returns_validation_failure(tmp_path: Path) -> None:
     error = lint.csharp_meta_error(meta)
     assert error is not None
     assert "YAML" in error
+
+
+def test_yaml_alias_cycle_remains_bounded(workspace: Path) -> None:
+    add_asset(workspace, meta=VALID.replace("userData:", "userData: &recursive {self: *recursive}"))
+    result = subprocess.run(
+        [sys.executable, str(Path(lint.__file__)), "--root", str(workspace), "--stdin-paths"],
+        input='["Runtime/Example.cs.meta"]',
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=20,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 @pytest.mark.parametrize(
@@ -205,7 +234,15 @@ def test_samples_children_keep_meta_requirement() -> None:
 
 
 @pytest.mark.parametrize("mode", ["full", "source", "meta"])
-@pytest.mark.parametrize(("content", "expected"), [(VALID, 0), (STUB, 1), (None, 1)])
+@pytest.mark.parametrize(
+    ("content", "expected"),
+    [
+        (VALID, 0),
+        (STUB, 1),
+        (None, 1),
+        (VALID.replace("executionOrder: 0", "executionOrder: 0\n  executionOrder: 100"), 1),
+    ],
+)
 def test_both_gates(
     workspace: Path,
     mode: str,

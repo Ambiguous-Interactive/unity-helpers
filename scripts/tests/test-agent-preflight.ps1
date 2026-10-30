@@ -3192,7 +3192,8 @@ foreach ($scenario in @(
     @{ Name = 'MissingVersion'; Content = "guid: 0123456789abcdef0123456789abcdef`nMonoImporter:`n  executionOrder: 0`n"; Expected = 1 },
     @{ Name = 'MalformedGuid'; Content = "fileFormatVersion: 2`nguid: broken`nMonoImporter:`n  executionOrder: 0`n"; Expected = 1 },
     @{ Name = 'MalformedLaterEntry'; Content = "fileFormatVersion: 2`nguid: 0123456789abcdef0123456789abcdef`nMonoImporter:`n  executionOrder: 0`n  - invalid`n"; Expected = 1 },
-    @{ Name = 'StagedStubRepairedWorktree'; Content = "fileFormatVersion: 2`nguid: 0123456789abcdef0123456789abcdef`nMonoImporter:`n  executionOrder: 0`n"; StagedContent = "fileFormatVersion: 2`nguid: 0123456789abcdef0123456789abcdef`n"; Expected = 1 }
+    @{ Name = 'StagedStubRepairedWorktree'; Content = "fileFormatVersion: 2`nguid: 0123456789abcdef0123456789abcdef`nMonoImporter:`n  executionOrder: 0`n"; StagedContent = "fileFormatVersion: 2`nguid: 0123456789abcdef0123456789abcdef`n"; Expected = 1 },
+    @{ Name = 'DuplicateSetting'; Content = "fileFormatVersion: 2`nguid: 0123456789abcdef0123456789abcdef`nMonoImporter:`n  executionOrder: 0`n  executionOrder: 100`n"; Expected = 1 }
 )) {
     $shapeRepo = New-TestRepo -ConfigurePushDefaults
     try {
