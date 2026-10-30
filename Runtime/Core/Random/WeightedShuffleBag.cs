@@ -161,7 +161,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         /// <param name="random">The random generator to use. When null, <see cref="PRNG.Instance"/> is used.</param>
         /// <param name="item">The drawn item, or default on failure.</param>
         /// <returns>True when an item was drawn; otherwise false.</returns>
-        /// <remarks>Sampling failure applies no draw or automatic cycle reset.</remarks>
+        /// <remarks><see cref="AbstractRandom"/> sources use exact sampling. Failure applies no draw or automatic cycle reset.</remarks>
         public bool TryNext(IRandom random, out T item)
         {
             int entryCount = _entries.Count;
@@ -177,7 +177,19 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             int index;
             try
             {
-                index = generator.Next(sampleCount);
+                if (generator is AbstractRandom exact)
+                {
+                    if (!exact.TryNextUint((uint)sampleCount, out uint sample))
+                    {
+                        item = default;
+                        return false;
+                    }
+                    index = (int)sample;
+                }
+                else
+                {
+                    index = generator.Next(sampleCount);
+                }
             }
             catch (Exception)
             {

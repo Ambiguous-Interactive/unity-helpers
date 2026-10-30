@@ -121,46 +121,76 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
 
         [TestCase(false)]
         [TestCase(true)]
-        public void SignedSamplingFailsClosedOnEntropyExhaustion(bool wide)
+        public void SignedSamplingFallsBackInsideItsRangeOnEntropyExhaustion(bool wide)
         {
             ScriptedRandom random = new();
             random.SetConstant(AllOnes32);
             if (wide)
             {
-                Assert.Throws<InvalidOperationException>(() => random.NextLong());
+                Assert.AreEqual(0L, random.NextLong());
                 Assert.AreEqual(2 * ((1 << 20) + 1), random.UintCalls);
             }
             else
             {
-                Assert.Throws<InvalidOperationException>(() => random.Next());
+                Assert.AreEqual(0, random.Next());
                 Assert.AreEqual((1 << 16) + 1, random.UintCalls);
             }
         }
 
         [TestCase(false)]
         [TestCase(true)]
-        public void BoundedSamplingFailsClosedOnEntropyExhaustion(bool wide)
+        public void BoundedSamplingFallsBackInsideItsRangeOnEntropyExhaustion(bool wide)
         {
             ScriptedRandom random = new();
             random.SetConstant(0u);
             if (wide)
             {
-                Assert.Throws<InvalidOperationException>(() => random.NextUlong(3UL));
+                Assert.AreEqual(0UL, random.NextUlong(3UL));
                 Assert.AreEqual(2 * ((1 << 20) + 1), random.UintCalls);
             }
             else
             {
-                Assert.Throws<InvalidOperationException>(() => random.NextUint(3u));
+                Assert.AreEqual(0u, random.NextUint(3u));
                 Assert.AreEqual((1 << 16) + 1, random.UintCalls);
             }
         }
 
+        [TestCase(false)]
+        [TestCase(true)]
+        public void BoundedFallbackRetainsTheLastProductWithoutClaimingExactness(bool wide)
+        {
+            ScriptedRandom ordinary = new();
+            ordinary.SetConstant(2u);
+            ScriptedRandom exact = new();
+            exact.SetConstant(2u);
+            if (wide)
+            {
+                const ulong bound = 0x8000000000000001UL;
+                const ulong draw = 0x0000000200000002UL;
+                ulong value = ordinary.NextUlong(bound);
+                Assert.AreEqual(ExpectedMultiplyHigh(draw, bound, 64), new BigInteger(value));
+                Assert.IsTrue(value < bound);
+                Assert.IsFalse(exact.TryNextUlong(bound, out ulong refused));
+                Assert.AreEqual(0UL, refused);
+            }
+            else
+            {
+                const uint bound = 0x80000001u;
+                uint value = ordinary.NextUint(bound);
+                Assert.AreEqual(ExpectedMultiplyHigh(2u, bound, 32), new BigInteger(value));
+                Assert.IsTrue(value < bound);
+                Assert.IsFalse(exact.TryNextUint(bound, out uint refused));
+                Assert.AreEqual(0u, refused);
+            }
+            Assert.AreEqual(ordinary.UintCalls, exact.UintCalls);
+        }
+
         [Test]
-        public void GaussianSamplingFailsClosedOnEntropyExhaustion()
+        public void GaussianSamplingFallsBackToItsMeanOnEntropyExhaustion()
         {
             ScriptedRandom random = new();
             random.SetConstant(0u);
-            Assert.Throws<InvalidOperationException>(() => random.NextGaussian());
+            Assert.AreEqual(7d, random.NextGaussian(7d, 3d));
             Assert.AreEqual(4 * ((1 << 20) + 1), random.UintCalls);
         }
 
@@ -229,17 +259,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
 
         [TestCase(false)]
         [TestCase(true)]
-        public void OffsetBoundsPropagateEntropyFailure(bool wide)
+        public void OffsetBoundsRetainTheirMinimumOnEntropyExhaustion(bool wide)
         {
             ScriptedRandom random = new();
             random.SetConstant(0u);
             if (wide)
             {
-                Assert.Throws<InvalidOperationException>(() => random.NextUlong(7UL, 10UL));
+                Assert.AreEqual(7UL, random.NextUlong(7UL, 10UL));
             }
             else
             {
-                Assert.Throws<InvalidOperationException>(() => random.NextUint(7u, 10u));
+                Assert.AreEqual(7u, random.NextUint(7u, 10u));
             }
         }
 
@@ -247,7 +277,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         [TestCase(false, true)]
         [TestCase(true, false)]
         [TestCase(true, true)]
-        public void StrictBoundedSamplingHonoursTheLastPermittedDraw(bool wide, bool exhausted)
+        public void BoundedSamplingHonoursTheLastPermittedDraw(bool wide, bool exhausted)
         {
             int limit = wide ? (1 << 20) + 1 : (1 << 16) + 1;
             ScriptedRandom random = new();
@@ -258,11 +288,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             {
                 if (wide)
                 {
-                    Assert.Throws<InvalidOperationException>(() => random.NextUlong(3UL));
+                    Assert.AreEqual(0UL, random.NextUlong(3UL));
                 }
                 else
                 {
-                    Assert.Throws<InvalidOperationException>(() => random.NextUint(3u));
+                    Assert.AreEqual(0u, random.NextUint(3u));
                 }
             }
             else
@@ -299,7 +329,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             random.MaximumUintCalls = 2 * ((1 << 20) + 1);
             if (exhausted)
             {
-                Assert.Throws<InvalidOperationException>(() => random.SampleFullRange());
+                Assert.AreEqual(-1.9999999999999998d, random.SampleFullRange());
             }
             else
             {
@@ -498,13 +528,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
 
         [TestCase(false)]
         [TestCase(true)]
-        public void InfiniteZeroUpperBoundsFailClosedOnEntropyExhaustion(bool negativeZero)
+        public void InfiniteZeroUpperBoundsFallBackInsideTheirRangeOnEntropyExhaustion(
+            bool negativeZero
+        )
         {
             float floatMaximum = BitConverter.Int32BitsToSingle(negativeZero ? int.MinValue : 0);
             ScriptedRandom floating = new();
             floating.SetConstant(0u);
             floating.MaximumUintCalls = (1 << 16) + 1;
-            Assert.Throws<InvalidOperationException>(() =>
+            Assert.AreEqual(
+                float.MinValue,
                 floating.NextFloat(float.NegativeInfinity, floatMaximum)
             );
             Assert.AreEqual(floating.MaximumUintCalls, floating.UintCalls);
@@ -515,7 +548,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             ScriptedRandom legacy = new();
             legacy.SetConstant(0u);
             legacy.MaximumUintCalls = 2 * ((1 << 20) + 1);
-            Assert.Throws<InvalidOperationException>(() =>
+            Assert.AreEqual(
+                double.MinValue,
                 legacy.NextDouble(double.NegativeInfinity, doubleMaximum)
             );
             Assert.AreEqual(legacy.MaximumUintCalls, legacy.UintCalls);
@@ -544,27 +578,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
 
         [TestCase(0d)]
         [TestCase(double.PositiveInfinity)]
-        public void InfiniteDoubleFailsClosedAfterNestedEntropyExhaustion(double maximum)
+        public void InfiniteDoubleFallsBackAfterNestedEntropyExhaustion(double maximum)
         {
             ScriptedRandom random = new();
             random.SetConstant(0u);
             random.MaximumUintCalls = 2 * ((1 << 20) + 1);
 
-            Assert.Throws<InvalidOperationException>(() =>
-                random.NextDouble(double.NegativeInfinity, maximum)
-            );
+            Assert.AreEqual(double.MinValue, random.NextDouble(double.NegativeInfinity, maximum));
             Assert.AreEqual(random.MaximumUintCalls, random.UintCalls);
         }
 
         [Test]
-        public void InfiniteDoubleFailsClosedOnNestedBoundedRejection()
+        public void InfiniteDoubleFallsBackOnNestedBoundedRejection()
         {
             ScriptedRandom random = new();
             random.SetConstant(0u);
 
-            Assert.Throws<InvalidOperationException>(() =>
-                random.NextDouble(2.0, double.PositiveInfinity)
-            );
+            Assert.AreEqual(2d, random.NextDouble(2.0, double.PositiveInfinity));
             Assert.AreEqual(2 * ((1 << 20) + 1), random.UintCalls);
         }
 

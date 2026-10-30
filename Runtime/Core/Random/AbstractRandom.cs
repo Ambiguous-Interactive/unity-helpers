@@ -480,7 +480,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         }
 
         /// <summary>Samples a non-negative integer below int.MaxValue.</summary>
-        /// <exception cref="InvalidOperationException">The random source exhausted rejection sampling.</exception>
+        /// <remarks>Exhausted rejection returns zero.</remarks>
         public virtual int Next()
         {
             unchecked
@@ -497,9 +497,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
                     if (MaxRejectionAttempts32 < ++attempts)
                     {
-                        throw new InvalidOperationException(
-                            "The random source exhausted signed integer rejection."
-                        );
+                        return 0;
                     }
                 }
             }
@@ -537,7 +535,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         public abstract uint NextUint();
 
         /// <summary>Samples an unsigned integer below the exclusive upper bound.</summary>
-        /// <exception cref="InvalidOperationException">The random source exhausted rejection sampling.</exception>
+        /// <remarks>Exhausted rejection returns a bounded fallback; use the Try overload to detect failure.</remarks>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public uint NextUint(uint max)
         {
@@ -546,17 +544,11 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 throw new ArgumentException("Max cannot be zero");
             }
 
-            if (!TrySampleUintBelow(max, out uint value))
-            {
-                throw new InvalidOperationException(
-                    "The random source exhausted rejection sampling."
-                );
-            }
-            return value;
+            return SampleUintBelow(max, out _);
         }
 
         /// <summary>Samples an unsigned integer in the half-open range.</summary>
-        /// <exception cref="InvalidOperationException">The random source exhausted rejection sampling.</exception>
+        /// <remarks>Exhausted rejection returns a bounded fallback; use the Try overload to detect failure.</remarks>
         public uint NextUint(uint min, uint max)
         {
             if (max <= min)
@@ -586,7 +578,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 return false;
             }
 
-            if (!TrySampleUintBelow(max, out uint sample))
+            uint sample = SampleUintBelow(max, out bool unbiased);
+            if (!unbiased)
             {
                 value = default;
                 return false;
@@ -660,7 +653,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         }
 
         /// <summary>Samples a non-negative integer below long.MaxValue.</summary>
-        /// <exception cref="InvalidOperationException">The random source exhausted rejection sampling.</exception>
+        /// <remarks>Exhausted rejection returns zero.</remarks>
         public long NextLong()
         {
             unchecked
@@ -677,9 +670,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
                     if (MaxRejectionAttempts64 < ++attempts)
                     {
-                        throw new InvalidOperationException(
-                            "The random source exhausted signed integer rejection."
-                        );
+                        return 0;
                     }
                 }
             }
@@ -721,7 +712,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         }
 
         /// <summary>Samples an unsigned long below the exclusive upper bound.</summary>
-        /// <exception cref="InvalidOperationException">The random source exhausted rejection sampling.</exception>
+        /// <remarks>Exhausted rejection returns a bounded fallback; use the Try overload to detect failure.</remarks>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ulong NextUlong(ulong max)
         {
@@ -730,17 +721,11 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 throw new ArgumentException("Max cannot be zero");
             }
 
-            if (!TrySampleUlongBelow(max, out ulong value))
-            {
-                throw new InvalidOperationException(
-                    "The random source exhausted rejection sampling."
-                );
-            }
-            return value;
+            return SampleUlongBelow(max, out _);
         }
 
         /// <summary>Samples an unsigned long in the half-open range.</summary>
-        /// <exception cref="InvalidOperationException">The random source exhausted rejection sampling.</exception>
+        /// <remarks>Exhausted rejection returns a bounded fallback; use the Try overload to detect failure.</remarks>
         public ulong NextUlong(ulong min, ulong max)
         {
             if (max <= min)
@@ -770,7 +755,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 return false;
             }
 
-            if (!TrySampleUlongBelow(max, out ulong sample))
+            ulong sample = SampleUlongBelow(max, out bool unbiased);
+            if (!unbiased)
             {
                 value = default;
                 return false;
@@ -895,8 +881,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         /// <summary>
         /// Draws from a nonempty range, rejecting NaN bounds before drawing.
         /// </summary>
-        /// <remarks>A positive-infinity bound uses the same finite bit-pattern sampling as the two-bound overload.</remarks>
-        /// <exception cref="InvalidOperationException">The random source exhausted finite double rejection.</exception>
+        /// <remarks>
+        /// A positive-infinity bound samples finite bit patterns. Exhausted rejection returns zero.
+        /// </remarks>
         public double NextDouble(double max)
         {
             if (!(0d < max))
@@ -915,8 +902,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         /// <remarks>
         /// When negative infinity is the only representable value below the upper bound, returns it without drawing.
         /// Infinite ranges ending at either sign of zero exclude both zero encodings.
+        /// Exhausted rejection returns the lowest finite value in range.
         /// </remarks>
-        /// <exception cref="InvalidOperationException">The random source exhausted finite double rejection.</exception>
         public double NextDouble(double min, double max)
         {
             if (!(min < max))
@@ -978,7 +965,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         }
 
         /// <summary>Samples a normal deviate with the requested mean and standard deviation.</summary>
-        /// <exception cref="InvalidOperationException">The random source exhausted rejection sampling.</exception>
+        /// <remarks>Exhausted rejection returns the mean without caching a partner; TryNextGaussian reports failure.</remarks>
         public double NextGaussian(double mean = 0, double stdDev = 1)
         {
             return mean + NextGaussianInternal() * stdDev;
@@ -1509,9 +1496,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             }
             if (!TrySampleDoubleWithInfiniteRange(min, max, out double value))
             {
-                throw new InvalidOperationException(
-                    "The random source exhausted finite double rejection."
-                );
+                return double.IsNegativeInfinity(min) ? double.MinValue : min;
             }
             return value;
         }
@@ -1529,9 +1514,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                     && (randomBits & exponentMask) == exponentMask
                 )
                 {
-                    throw new InvalidOperationException(
-                        "The random source exhausted finite double rejection."
-                    );
+                    randomBits &= 0xBFFFFFFFFFFFFFFFUL;
+                    break;
                 }
             } while ((randomBits & exponentMask) == exponentMask);
 
@@ -1629,15 +1613,15 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         /// arithmetic exists once.
         /// </summary>
         /// <param name="max">Exclusive upper bound; must not be zero.</param>
-        /// <param name="value">The exact sample, or default on failure.</param>
-        /// <returns>Whether rejection sampling produced an unbiased value.</returns>
+        /// <param name="unbiased">Whether rejection sampling accepted the returned value.</param>
+        /// <returns>The sample, or the last bounded multiply-high result on exhaustion.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool TrySampleUintBelow(uint max, out uint value)
+        private uint SampleUintBelow(uint max, out bool unbiased)
         {
             if ((max & (max - 1)) == 0)
             {
-                value = NextUint() & (max - 1);
-                return true;
+                unbiased = true;
+                return NextUint() & (max - 1);
             }
 
             // Lemire's method (32-bit): take high 32 bits of r*max
@@ -1652,8 +1636,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 {
                     if (MaxRejectionAttempts32 < ++attempts)
                     {
-                        value = default;
-                        return false;
+                        unbiased = false;
+                        return (uint)(m >> 32);
                     }
                     r = NextUint();
                     m = (ulong)r * max;
@@ -1661,8 +1645,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 }
             }
 
-            value = (uint)(m >> 32);
-            return true;
+            unbiased = true;
+            return (uint)(m >> 32);
         }
 
         /// <summary>
@@ -1671,15 +1655,15 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         /// arithmetic exists once.
         /// </summary>
         /// <param name="max">Exclusive upper bound; must not be zero.</param>
-        /// <param name="value">The exact sample, or default on failure.</param>
-        /// <returns>Whether rejection sampling produced an unbiased value.</returns>
+        /// <param name="unbiased">Whether rejection sampling accepted the returned value.</param>
+        /// <returns>The sample, or the last bounded multiply-high result on exhaustion.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool TrySampleUlongBelow(ulong max, out ulong value)
+        private ulong SampleUlongBelow(ulong max, out bool unbiased)
         {
             if ((max & (max - 1)) == 0)
             {
-                value = NextUlong() & (max - 1);
-                return true;
+                unbiased = true;
+                return NextUlong() & (max - 1);
             }
 
             /*
@@ -1697,8 +1681,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 {
                     if (MaxRejectionAttempts64 < ++attempts)
                     {
-                        value = default;
-                        return false;
+                        unbiased = false;
+                        return MulHi64(sample, max);
                     }
 
                     sample = NextUlong();
@@ -1706,8 +1690,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 }
             }
 
-            value = MulHi64(sample, max);
-            return true;
+            unbiased = true;
+            return MulHi64(sample, max);
         }
 
         /// <summary>
@@ -1740,7 +1724,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             int attempts = 0;
             while (true)
             {
-                bool unbiased = TrySampleUlongBelow(range, out ulong offset);
+                ulong offset = SampleUlongBelow(range, out bool unbiased);
                 if (!unbiased)
                 {
                     value = default;
@@ -1766,9 +1750,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         {
             if (!TrySampleGaussian(out double value))
             {
-                throw new InvalidOperationException(
-                    "The random source exhausted rejection sampling."
-                );
+                return 0d;
             }
             return value;
         }

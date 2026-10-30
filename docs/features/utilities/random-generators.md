@@ -323,17 +323,20 @@ if (random.TryNextDouble(1.0, double.PositiveInfinity, out double sample))
 }
 ```
 
-The existing strict sampling methods throw `InvalidOperationException` when a stalled or
-adversarial source exhausts rejection sampling. This includes signed integers, bounded unsigned
-integers, infinite-range floats and doubles, and Gaussian samples. They no longer return modulo
-reductions, fixed values or alternate-distribution substitutes after exhaustion. Existing
-invalid-bound exceptions and successful sampling formulas are unchanged.
+Ordinary sampling methods complete without throwing when a valid request exhausts rejection.
+Their emergency results are deliberately biased: signed integers return zero; bounded unsigned
+integers use the last multiply-high result; infinite-range doubles return the lowest finite value
+in range; and Gaussian sampling returns the requested mean without caching a partner. Full-range
+doubles clear the high exponent bit of the last non-finite draw. Infinite-range floats retain the
+bounded integer fallback. These results preserve the requested range, but cannot restore entropy
+to a stuck source. Use `Try...` when a substituted value is unacceptable. Existing invalid-bound
+exceptions and successful sampling formulas are unchanged.
 
 A bounded integer request permits an initial draw followed by 65,536 retries for 32 bits or
 1,048,576 retries for 64 bits. Signed integer sampling uses the same draw limits when rejecting its
 exclusive maximum. Gaussian sampling accepts up to 1,048,576 candidate pairs; an unsuccessful
-request consumes one final pair to detect exhaustion and returns without drawing a substitute or
-caching a partner. Failed requests consume entropy and cannot be rolled back.
+request consumes one final pair to detect exhaustion. Neither surface draws extra entropy or
+caches a partner after exhaustion. Failed requests consume entropy and cannot be rolled back.
 
 Raw `NextUint()` and `NextUlong()` streams, power-of-two reductions, and saved state formats are
 unchanged. Accepted draws retain their values and draw order. A failed request can consume fewer
@@ -346,7 +349,7 @@ Choose the failure policy at the call site:
 | Your requirement                           | Use                                                  | Handle failure by                                                 |
 | ------------------------------------------ | ---------------------------------------------------- | ----------------------------------------------------------------- |
 | An exact sample, with no substituted value | The corresponding `AbstractRandom.TryNext...` method | Checking `false` and selecting an explicit application policy.    |
-| Existing `IRandom` integration             | The existing strict sampling methods                 | Handling `InvalidOperationException` if a custom source stalls.   |
+| Existing `IRandom` integration             | Ordinary sampling methods                            | Accepting the documented biased fallback if a source stalls.      |
 | Reproducible gameplay or saved simulations | A seeded generator and saved continuation state      | Keeping the generator, package version and draw order consistent. |
 
 A failed `Try` call has consumed entropy. Retrying it is not a rollback, and immediately retrying
@@ -403,7 +406,7 @@ int moves = random.NextIntSkewed(minMoves, maxMoves, targetMoves);
 
 The float and double siblings also answer the low bound when either bound is `NaN`. The strict
 `NextFloat` and `NextDouble` overloads reject `NaN` bounds with `ArgumentException` before drawing.
-Infinite two-bound ranges remain supported; exhausted rejection sampling throws `InvalidOperationException`.
+Infinite two-bound ranges remain supported; exhausted rejection sampling returns the documented biased fallback.
 
 #### Weighted span selection
 
@@ -514,7 +517,8 @@ if (bag.TryNext(random, out string reward))
 }
 ```
 
-`WeightedShuffleBag<T>.TryNext` returns `false` with a default output if sampling fails or a
+`WeightedShuffleBag<T>.TryNext` uses exact sampling for `AbstractRandom` sources, so an ordinary
+sampling fallback never consumes a ticket. It returns `false` with a default output if sampling fails or a
 custom generator returns an invalid index. A failed draw removes no ticket and does not start a
 new cycle. Retry with a working source; do not use the default output as a reward.
 
