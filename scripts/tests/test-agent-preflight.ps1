@@ -3183,6 +3183,37 @@ finally {
     Remove-Item -Path $nonRepo19 -Recurse -Force -ErrorAction SilentlyContinue
 }
 
+Write-Host "`nTest group: Staged C# companion deletions" -ForegroundColor Magenta
+foreach ($deleteSource in @($false, $true)) {
+    foreach ($unrelatedChange in @($false, $true)) {
+        $deletionRepo = New-TestRepo -ConfigurePushDefaults
+        try {
+            $runtimeDirectory = Join-Path $deletionRepo 'Runtime'
+            New-Item -ItemType Directory -Path $runtimeDirectory -Force | Out-Null
+            Set-Content -LiteralPath (Join-Path $runtimeDirectory 'Example.cs') -Value 'class Example {}'
+            Set-Content -LiteralPath (Join-Path $runtimeDirectory 'Example.cs.meta') -Value "fileFormatVersion: 2`nguid: 0123456789abcdef0123456789abcdef`nMonoImporter:`n  executionOrder: 0"
+            & git -C $deletionRepo add -- Runtime
+            & git -C $deletionRepo -c user.email=test@example.com -c user.name=test commit -q -m 'Add source and companion'
+            if ($LASTEXITCODE -ne 0) { throw 'Could not commit deletion regression fixture' }
+            & git -C $deletionRepo rm -q -- Runtime/Example.cs.meta
+            if ($deleteSource) { & git -C $deletionRepo rm -q -- Runtime/Example.cs }
+            if ($unrelatedChange) { Set-Content -LiteralPath (Join-Path $deletionRepo 'unrelated.txt') -Value 'changed' }
+            $beforeIndex = [System.IO.File]::ReadAllBytes((Join-Path $deletionRepo '.git/index'))
+            $result = Invoke-Preflight -RepoPath $deletionRepo
+            $label = "MetadataDeletion_SourceDeleted$deleteSource`_OtherChange$unrelatedChange"
+            $expected = if ($deleteSource) { 0 } else { 1 }
+            Write-TestResult "$label`_Exit" ($result.ExitCode -eq $expected) $result.Output
+            if (-not $deleteSource) {
+                Write-TestResult "$label`_Path" ($result.Output -match 'UNH007' -and $result.Output -match 'Example.cs.meta') $result.Output
+            }
+            Write-TestResult "$label`_Index" (Test-ByteArrayEqual -Expected $beforeIndex -Actual ([System.IO.File]::ReadAllBytes((Join-Path $deletionRepo '.git/index')))) 'Check mode must preserve the index'
+        }
+        finally {
+            Remove-Item -LiteralPath $deletionRepo -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 Write-Host "`nTest group: C# importer shapes, including metadata-only changes" -ForegroundColor Magenta
 foreach ($scenario in @(
     @{ Name = 'Stub'; Content = "fileFormatVersion: 2`nguid: 0123456789abcdef0123456789abcdef`n"; Expected = 1 },

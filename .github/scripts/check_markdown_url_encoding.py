@@ -69,20 +69,29 @@ def main(root: str) -> int:
         return 1
     issues = 0
     checked = 0
-    for dirpath, dirnames, filenames in os.walk(root):
+    walk_errors: list[OSError] = []
+    for dirpath, dirnames, filenames in os.walk(root, onerror=walk_errors.append):
         dirnames[:] = [d for d in dirnames if d not in EXCLUDE_DIRS]
         for filename in filenames:
             if filename.lower().endswith(".md"):
                 checked += 1
                 issues += scan_file(os.path.join(dirpath, filename))  # noqa: PTH118 - preserve diagnostic path spelling.
+    for error in walk_errors:
+        print(f"Cannot read markdown source {error.filename}: {error}", file=sys.stderr)
+    if walk_errors:
+        return 1
     if checked == 0:
         print(f"No markdown sources found: {root}", file=sys.stderr)
         return 1
     if issues:
         print(
-            f"Found {issues} markdown link(s) with unencoded spaces or plus signs.", file=sys.stderr
+            f"Found {issues} markdown link(s) with unencoded spaces or plus signs.",
+            file=sys.stderr,
         )
-        print("Please URL-encode spaces as %20 and '+' as %2B in relative links.", file=sys.stderr)
+        print(
+            "Please URL-encode spaces as %20 and '+' as %2B in relative links.",
+            file=sys.stderr,
+        )
         return 1
     return 0
 

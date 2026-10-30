@@ -9,7 +9,11 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-CHECKS = ("check_markdown_links.py", "check_markdown_url_encoding.py", "validate_markdown_links.py")
+CHECKS = (
+    "check_markdown_links.py",
+    "check_markdown_url_encoding.py",
+    "validate_markdown_links.py",
+)
 
 
 def run(name: str, root: Path) -> subprocess.CompletedProcess[str]:
@@ -84,8 +88,16 @@ def test_prunes_excluded_directories(name: str, directory: str, tmp_path: Path) 
         ("check_markdown_links.py", "[some/target](./target.md)", "human-readable"),
         ("check_markdown_url_encoding.py", "[A readable title](./a+b.md)", "Unencoded"),
         ("check_markdown_url_encoding.py", "[image]: ./a+b.png", "link definition"),
-        ("validate_markdown_links.py", "[A readable title](./missing.md)", "target file not found"),
-        ("validate_markdown_links.py", "[A readable title](#missing)", "dangling anchor"),
+        (
+            "validate_markdown_links.py",
+            "[A readable title](./missing.md)",
+            "target file not found",
+        ),
+        (
+            "validate_markdown_links.py",
+            "[A readable title](#missing)",
+            "dangling anchor",
+        ),
         (
             "validate_markdown_links.py",
             "[A readable title](./target.md#missing)",
@@ -109,7 +121,8 @@ def test_encoded_unicode_paths_and_titles(name: str, tmp_path: Path) -> None:
     (tmp_path / "two caf\u00e9 words.md").write_text("# Target\n", encoding="utf-8")
     source = tmp_path / "source.md"
     source.write_text(
-        '[Read this guide](./two%20caf%C3%A9%20words.md#target "a title")\n', encoding="utf-8"
+        '[Read this guide](./two%20caf%C3%A9%20words.md#target "a title")\n',
+        encoding="utf-8",
     )
     before = source.read_bytes()
     result = run(name, tmp_path)
@@ -122,3 +135,47 @@ def test_validator_accepts_explicit_files_and_setext_anchors(tmp_path: Path) -> 
     source.write_text("Title\n=====\n\n[Jump](#title)\n", encoding="utf-8")
     result = run("validate_markdown_links.py", source)
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+@pytest.mark.parametrize("name", CHECKS)
+@pytest.mark.parametrize("directory", ["blocked", ".git", "node_modules", ".vs"])
+def test_directory_listing_errors_fail_unless_pruned(
+    name: str, directory: str, tmp_path: Path
+) -> None:
+    (tmp_path / "visible.md").write_text("# Visible\n", encoding="utf-8")
+    denied = tmp_path / directory
+    denied.mkdir()
+    (denied / "hidden.md").write_text("# Hidden\n", encoding="utf-8")
+    code = """
+import os
+from pathlib import Path
+import runpy
+import sys
+original = os.scandir
+denied = Path(sys.argv.pop()).resolve()
+def scandir(path):
+    if Path(path).resolve() == denied:
+        raise PermissionError(13, 'controlled listing failure', str(path))
+    return original(path)
+os.scandir = scandir
+sys.argv = sys.argv[1:]
+runpy.run_path(sys.argv[0], run_name='__main__')
+"""
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            code,
+            str(ROOT / ".github/scripts" / name),
+            str(tmp_path),
+            str(denied),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=20,
+    )
+    assert result.returncode == (1 if directory == "blocked" else 0), result.stdout + result.stderr
+    if directory == "blocked":
+        assert "controlled listing failure" in result.stderr
+        assert "blocked" in result.stderr

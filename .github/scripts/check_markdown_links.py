@@ -38,7 +38,8 @@ def main(root: str) -> int:
         return 1
     issues = 0
     checked = 0
-    for dirpath, dirnames, filenames in os.walk(root):
+    walk_errors: list[OSError] = []
+    for dirpath, dirnames, filenames in os.walk(root, onerror=walk_errors.append):
         # prune excluded directories
         dirnames[:] = [d for d in dirnames if d not in EXCLUDE_DIRS]
         for filename in filenames:
@@ -73,6 +74,13 @@ def main(root: str) -> int:
                         msg = f"{path}:{idx}: Link text '{text}' should be human-readable, not a raw file name or path (target: {target_raw})"
                         print(msg)
 
+    for walk_error in walk_errors:
+        print(
+            f"Cannot read markdown source {walk_error.filename}: {walk_error}",
+            file=sys.stderr,
+        )
+    if walk_errors:
+        return 1
     if checked == 0:
         print(f"No markdown sources found: {root}", file=sys.stderr)
         return 1

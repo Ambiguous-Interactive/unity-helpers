@@ -147,11 +147,14 @@ def check_internal_link(src_file: str, target_raw: str) -> tuple[bool, str]:
 def main(paths: list[str]) -> int:
     issues = 0
 
+    def raise_walk_error(error: OSError) -> None:
+        raise error
+
     def iter_markdown_files() -> list[str]:
         files: list[str] = []
         for p in paths:
             if Path(p).is_dir():
-                for dirpath, dirnames, filenames in os.walk(p):
+                for dirpath, dirnames, filenames in os.walk(p, onerror=raise_walk_error):
                     dirnames[:] = [d for d in dirnames if d not in EXCLUDE_DIRS]
                     files.extend(
                         os.path.join(dirpath, filename)  # noqa: PTH118 - preserve diagnostic path spelling.
@@ -167,7 +170,11 @@ def main(paths: list[str]) -> int:
     if missing:
         print(f"Markdown scan inputs not found: {missing}", file=sys.stderr)
         return 1
-    files = iter_markdown_files()
+    try:
+        files = iter_markdown_files()
+    except OSError as error:
+        print(f"Cannot read markdown source {error.filename}: {error}", file=sys.stderr)
+        return 1
     if not files:
         print("No markdown sources found", file=sys.stderr)
         return 1

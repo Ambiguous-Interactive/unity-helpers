@@ -1979,10 +1979,16 @@ if ($relativePaths.Count -gt 0) {
     $script:PreflightWriteSafety = @{ RepoRoot = $repoRoot; Scope = $safetyScope; WholeRepository = -not $explicitSelection }
 }
 
+$deletedCsharpMetaPaths = @(Invoke-GitPathList -RepoRoot $repoRoot -Arguments @('diff', '--cached', '--name-only', '-z', '--diff-filter=D') | Where-Object {
+        $_ -match '\.cs\.meta$' -and
+        (Test-MetaRequiredPath -RelativePath ($_ -replace '\.meta$', '')) -and
+        (-not $explicitSelection -or $dedupedPaths.Contains($_) -or $dedupedPaths.Contains(($_ -replace '\.meta$', '')))
+    })
+
 Test-GitPushConfig -RepoRoot $repoRoot -FailureCount ([ref]$failureCount) -Fix:$Fix
 Test-StrayArtifactFiles -RepoRoot $repoRoot -FailureCount ([ref]$failureCount) -Fix:$Fix
 
-if ($relativePaths.Count -eq 0) {
+if ($relativePaths.Count -eq 0 -and $deletedCsharpMetaPaths.Count -eq 0) {
     if ($failureCount -gt 0) {
         Write-Host "[agent-preflight] Failed with $failureCount check group(s) reporting issues." -ForegroundColor Red
         exit 1
@@ -2835,7 +2841,7 @@ if ($metaRelevantPaths.Count -gt 0) {
     }
 }
 
-$csharpMetaShapePaths = @($relativePaths | Where-Object {
+$csharpMetaShapePaths = @(@($relativePaths) + @($deletedCsharpMetaPaths) | Where-Object {
         $_ -match '\.cs(\.meta)?$' -and
         (Test-MetaRequiredPath -RelativePath ($_ -replace '\.meta$', ''))
     })
