@@ -60,7 +60,7 @@ const CHECKS = [
   {
     id: "asmdef",
     name: "Assembly definitions",
-    run: "pwsh -NoProfile -File scripts/lint-asmdef.ps1 -VerboseOutput"
+    run: "uv run --project scripts/python~ --locked --no-dev python scripts/lint_asmdef.py --verbose"
   },
   {
     id: "conditional-call-chains",
@@ -372,7 +372,7 @@ const CHECKS = [
   {
     id: "native-debugger-download",
     name: "Bounded native debugger download",
-    run: "python3 scripts/tests/test-native-debugger-download.py"
+    run: "npm run test:native-debugger-download"
   },
   {
     id: "native-fault-capture",

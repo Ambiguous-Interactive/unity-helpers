@@ -1,10 +1,13 @@
 """Verify shipped protobuf assemblies and patch against a fresh candidate build."""
 
+from __future__ import annotations
+
 import argparse
 import hashlib
 import json
 import sys
 from pathlib import Path
+from typing import cast
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -14,11 +17,14 @@ def digest(path: Path) -> str:
 
 
 def verify(candidate: Path, shipped: Path, patch: Path) -> None:
-    receipt = json.loads(
-        (candidate / "candidate-receipt.json").read_text(encoding="utf-8")
-    )
-    if not isinstance(receipt, dict):
+    raw: object = json.loads((candidate / "candidate-receipt.json").read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
         raise ValueError("Candidate receipt must be an object")
+    receipt = cast("dict[str, object]", raw)
+    files = receipt.get("files")
+    if not isinstance(files, dict):
+        raise ValueError("Candidate files must be an object")
+    hashes = cast("dict[str, object]", files)
     expected = {
         "sourceCommit": "3aa672eaaf7763b86d62bec9ed7d7896b0511a8b",
         "sourceUrl": "https://github.com/protobuf-net/protobuf-net.git",
@@ -29,11 +35,10 @@ def verify(candidate: Path, shipped: Path, patch: Path) -> None:
         if receipt.get(name) != value:
             raise ValueError(f"Candidate {name} does not match the pinned build")
     for name in ("protobuf-net.dll", "protobuf-net.Core.dll"):
-        expected_hash = receipt["files"][name]
-        if (
-            digest(candidate / name) != expected_hash
-            or digest(shipped / name) != expected_hash
-        ):
+        expected_hash = hashes.get(name)
+        if not isinstance(expected_hash, str):
+            raise ValueError(f"Candidate {name} hash must be a string")
+        if digest(candidate / name) != expected_hash or digest(shipped / name) != expected_hash:
             raise ValueError(f"Shipped {name} differs from the source build")
     if (
         digest(shipped / "il2cpp-aot.patch") != digest(patch)
@@ -55,9 +60,7 @@ def main() -> int:
     except (OSError, ValueError, KeyError, TypeError) as error:
         print(str(error), file=sys.stderr)
         return 1
-    print(
-        "Both shipped protobuf DLLs and their AOT patch match the pinned source build."
-    )
+    print("Both shipped protobuf DLLs and their AOT patch match the pinned source build.")
     return 0
 
 

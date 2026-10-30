@@ -732,9 +732,7 @@ jobs:
           ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.native-diagnostics
           && matrix.unity-version == '6000.6.0f1' && steps.unity_lock.outputs.acquired == 'true'
           && steps.run_editmode.outcome == 'success' }}
-        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
-        with:
-          python-version: "3.11"
+        uses: ./.github/actions/setup-python-tools
 
       - name: Capture native exit diagnostics
         id: native_capture
@@ -885,9 +883,7 @@ jobs:
           && inputs.test-mode == 'standalone' && inputs.acceptance == 'none'
           && matrix.unity-version == '6000.6.0f1' && steps.unity_lock.outputs.acquired == 'true'
           && steps.run_standalone.outcome == 'success' }}
-        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
-        with:
-          python-version: "3.11"
+        uses: ./.github/actions/setup-python-tools
 
       - name: Capture Standalone build diagnostics
         id: native_build_capture

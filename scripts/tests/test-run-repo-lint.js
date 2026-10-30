@@ -561,7 +561,7 @@ runTest("no linter in scripts/ has been left unreachable", () => {
 
   const linters = fs
     .readdirSync(path.join(repoRoot, "scripts"))
-    .filter((name) => /^(?:lint|validate)-.*\.(?:ps1|sh|js|mjs)$/.test(name))
+    .filter((name) => /^(?:lint|validate)[-_].*\.(?:ps1|sh|js|mjs|py)$/.test(name))
     .map((name) => `scripts/${name}`)
     .sort();
 
@@ -694,7 +694,7 @@ runTest("no linter in scripts/ has been left unfalsifiable", () => {
 
   const linters = fs
     .readdirSync(path.join(repoRoot, "scripts"))
-    .filter((name) => /^(?:lint|validate|check)-.*\.(?:ps1|sh|js|mjs)$/.test(name))
+    .filter((name) => /^(?:lint|validate|check)[-_].*\.(?:ps1|sh|js|mjs|py)$/.test(name))
     .filter((name) => !notGates.has(name))
     .sort();
 

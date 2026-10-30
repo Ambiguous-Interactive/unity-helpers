@@ -55,6 +55,9 @@ python -m pip install --disable-pip-version-check uv==0.13.6
 uv sync --project scripts/python~ --locked
 npm run lint:python
 npm run test:create-unitypackage
+npm run test:asmdef
+npm run test:protobuf-candidate
+npm run test:native-debugger-download
 npm run test:meta-generation
 npm run meta:generate -- Runtime/Example.cs
 uv run --project scripts/python~ --locked --no-dev python scripts/unity/create_unitypackage.py --output .artifacts/release/local.unitypackage
@@ -87,6 +90,20 @@ New Python files must join the strict `tool.pyright.include` list in
 `scripts/python~/pyproject.toml`; a Git-backed inventory rejects unregistered files. The explicit
 legacy list records existing Python scripts still awaiting migration. Remove an entry when its
 script joins strict validation; do not add new scripts to that backlog.
+
+Assembly-definition and bundled-BCL validation, the protobuf candidate builder and verifier, and
+the native-debugger downloader also use this locked environment. The PowerShell assembly-check
+entry points remain compatibility launchers; npm calls Python directly. The assembly check rejects
+missing source roots, empty assembly scans, invalid references and version expressions, and
+package defines used without a declaration in the owning assembly. File fixtures cover nested
+assemblies and optional package guards. JSON input is validated before using its typed values.
+
+`npm run test:protobuf-candidate` exercises real child-process exit, timeout, descendant cleanup,
+source inventory and shipped-byte checks. `npm run test:native-debugger-download` serves a local
+nested archive to check bounded range requests, hashes, sizes and destination paths. These tests
+do not download or execute a debugger, rebuild shipped binaries, or qualify Unity player behavior.
+Native fault capture requires `uv` on the Windows host for its locked downloader command; it keeps
+the existing process watchdog and retained download receipt.
 
 The package tests check archive headers, GUIDs, checksums, repeated output, failure preservation,
 CLI errors, policy validation, and the real npm payload. They also inject type, lint, and formatting
@@ -362,8 +379,8 @@ These are maintainer steps for changing the shipped assemblies, not package-inst
 The [assembly conflict guide](../guides/bundled-assembly-conflicts.md) explains consumer diagnosis.
 
 ```bash
-python3 scripts/build-protobuf-candidate.py --output /tmp/protobuf-candidate
-python3 scripts/verify-protobuf-shipped.py --candidate-root /tmp/protobuf-candidate/assemblies
+uv run --project scripts/python~ --locked --no-dev python scripts/build-protobuf-candidate.py --output /tmp/protobuf-candidate
+uv run --project scripts/python~ --locked --no-dev python scripts/verify-protobuf-shipped.py --candidate-root /tmp/protobuf-candidate/assemblies
 ```
 
 The retained candidate builder requires SDK 9.0.319 and produces isolated binaries with a source-bound build receipt. Repository validation uses SDK 9.0.320; install the older SDK separately when rebuilding that retained candidate.
@@ -373,7 +390,7 @@ original DLLs under `Generator~`; dependency upgrades must not refresh those his
 The retained Dox consumer suite exercises the frozen v3 and current builds.
 
 Keep the Unity-version constraints, importer GUIDs and assembly ownership policy when rebuilding.
-`scripts/lint-bundled-assemblies.ps1` checks the `Runtime/Binaries/` constraints and absence rules.
+`npm run lint:bundled-assemblies` checks the `Runtime/Binaries/` constraints and absence rules.
 It does not inventory the separate protobuf dependency directory. Preserve the documented source
 and binary hashes when updating provenance.
 

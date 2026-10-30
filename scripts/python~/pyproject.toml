@@ -29,6 +29,7 @@ ignore = ["ISC001"]
 
 [tool.ruff.lint.per-file-ignores]
 "test_*.py" = ["S101", "S603"]
+"test-*.py" = ["S101", "S603"]
 
 [tool.mypy]
 strict = true
@@ -39,7 +40,7 @@ warn_unreachable = true
 pythonVersion = "3.11"
 typeCheckingMode = "strict"
 extraPaths = ["../unity", "..", "."]
-include = ["../unity/create_unitypackage.py", "../unity/stage_unitypackage.py", "../tests/test_unitypackage.py", "check.py", "../generate_meta.py", "../tests/test_meta_generation.py"]
+include = ["../unity/create_unitypackage.py", "../unity/stage_unitypackage.py", "../tests/test_unitypackage.py", "check.py", "../generate_meta.py", "../tests/test_meta_generation.py", "../build-protobuf-candidate.py", "../verify-protobuf-shipped.py", "../tests/test-protobuf-candidate.py", "../unity/download-native-debugger.py", "../tests/test-native-debugger-download.py", "../lint_bundled_assemblies.py", "../tests/test_bundled_assemblies.py", "../lint_asmdef.py", "../tests/test_asmdef.py"]
 
 [tool.unity-helpers-python]
 legacy = [
@@ -49,19 +50,14 @@ legacy = [
     ".github/scripts/check_markdown_url_encoding.py",
     ".github/scripts/validate_markdown_links.py",
     "scripts/benchmarks~/generate-jesse-parity.py",
-    "scripts/build-protobuf-candidate.py",
     "scripts/generate-test-sprites.py",
     "scripts/generate-test-textures.py",
     "scripts/random-quality/verify-bounded-sampling.py",
     "scripts/tests/test-browser-consumer.py",
     "scripts/tests/test-devcontainer-persistence.py",
-    "scripts/tests/test-native-debugger-download.py",
-    "scripts/tests/test-protobuf-candidate.py",
     "scripts/tests/test-unity-framework-evidence.py",
     "scripts/tests/test-watchdog-cancellation.py",
-    "scripts/unity/download-native-debugger.py",
     "scripts/unity/run-browser-consumer.py",
-    "scripts/verify-protobuf-shipped.py",
     "scripts/wiki/generate_wiki_footer.py",
     "scripts/wiki/generate_wiki_sidebar.py",
     "scripts/wiki/prepare_wiki.py",

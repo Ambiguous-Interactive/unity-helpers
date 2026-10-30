@@ -356,7 +356,7 @@ runTest("no contract test in scripts/tests/ has been left unreachable", () => {
 
   const suites = fs
     .readdirSync(path.join(repoRoot, "scripts", "tests"))
-    .filter((name) => /^test-.*\.(?:ps1|sh|js|mjs|py)$/.test(name))
+    .filter((name) => /^test[-_].*\.(?:ps1|sh|js|mjs|py)$/.test(name))
     .map((name) => `scripts/tests/${name}`)
     .sort();
 
