@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 import re
+import stat
 import sys
 import unicodedata
 from dataclasses import dataclass
@@ -14,7 +15,7 @@ from typing import cast
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_ROOTS = ("Runtime", "Editor", "Tests", "Samples~", "Styles", "URP", "Shaders")
-EXCLUDED = frozenset(("node_modules", ".git", "obj", "bin", "Library", "Temp"))
+EXCLUDED = frozenset(("node_modules", ".git", "obj", "bin", "library", "temp"))
 EXTERNAL_ASSEMBLIES = frozenset(
     name.casefold()
     for name in (
@@ -122,6 +123,7 @@ class ExpressionResult:
 
 
 def is_blank(value: str) -> bool:
+    """Match .NET whitespace, excluding Python's four extra control separators."""
     return all(
         character in "\t\n\v\f\r\u0085" or unicodedata.category(character) in {"Zs", "Zl", "Zp"}
         for character in value
@@ -129,6 +131,7 @@ def is_blank(value: str) -> bool:
 
 
 def version_expression(expression: str | None) -> ExpressionResult:
+    """Match Unity's structural expression grammar without parsing version numbers."""
     if expression is None or is_blank(expression):
         return ExpressionResult(True)
     begin, end = 0, len(expression) - 1
@@ -222,7 +225,15 @@ def raise_walk_error(error: OSError) -> None:
     raise error
 
 
+def is_hidden(path: Path) -> bool:
+    """Match PowerShell's default hidden-file filtering on each platform."""
+    if sys.platform == "win32":
+        return bool(path.stat().st_file_attributes & stat.FILE_ATTRIBUTE_HIDDEN)
+    return path.name.startswith(".")
+
+
 def discover(repository: Path) -> dict[str, list[Path]]:
+    """Collect source files once while pruning hidden and excluded directories."""
     files: dict[str, list[Path]] = {".asmdef": [], ".asmref": [], ".cs": []}
     for name in SOURCE_ROOTS:
         root = repository / name
@@ -231,11 +242,15 @@ def discover(repository: Path) -> dict[str, list[Path]]:
                 f"Source root not found: {name}. If it moved, update SOURCE_ROOTS in the same commit."
             )
         for directory, children, names in os.walk(root, onerror=raise_walk_error):
-            children[:] = sorted(child for child in children if child not in EXCLUDED)
+            children[:] = sorted(
+                child
+                for child in children
+                if child.casefold() not in EXCLUDED and not is_hidden(Path(directory) / child)
+            )
             for filename in sorted(names):
                 suffix = Path(filename).suffix.lower()
-                if suffix in files:
-                    files[suffix].append(Path(directory) / filename)
+                if suffix in files and not is_hidden(path := Path(directory) / filename):
+                    files[suffix].append(path)
     return {suffix: sorted(paths) for suffix, paths in files.items()}
 
 
@@ -341,30 +356,29 @@ def check(repository: Path, *, verbose: bool = False) -> int:
         except ValueError as error:
             errors.append(f"[{relative}] {error}")
     if symbol_packages:
-        try:
-            for path in sources[".cs"]:
-                owner = next(
-                    (declared[parent] for parent in path.parents if parent in declared), None
-                )
-                if owner is None:
-                    continue
+        for path in sources[".cs"]:
+            owner = next((declared[parent] for parent in path.parents if parent in declared), None)
+            if owner is None:
+                continue
+            try:
                 text = path.read_text(encoding="utf-8-sig")
-                text = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
-                text = re.sub(r"//.*$", "", text, flags=re.MULTILINE)
-                used: set[str] = set()
-                for expression in re.findall(r"^\s*#\s*(?:el)?if\b(.*)$", text, re.MULTILINE):
-                    used.update(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", expression))
-                assembly_path, symbols, packages = owner
-                for symbol in sorted(used.difference(symbols).intersection(symbol_packages)):
-                    opened = packages.intersection(symbol_packages[symbol])
-                    if opened:
-                        package = sorted(opened)[0]
-                        relative = assembly_path.relative_to(repository).as_posix()
-                        message = f'[{relative}] code uses \'#if {symbol}\' but this asmdef declares other versionDefines for package \'{package}\' WITHOUT declaring \'{symbol}\'. Unity versionDefines are per-assembly, so \'{symbol}\' never fires here and the wrong #if branch compiles. Add: {{ "name": "{package}", "expression": "<min-version>", "define": "{symbol}" }}'
-                        if message not in errors:
-                            errors.append(message)
-        except (OSError, UnicodeError) as error:
-            errors.append(str(error))
+            except (OSError, UnicodeError) as error:
+                errors.append(f"[{path.relative_to(repository).as_posix()}] {error}")
+                continue
+            text = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
+            text = re.sub(r"//.*$", "", text, flags=re.MULTILINE)
+            used: set[str] = set()
+            for expression in re.findall(r"^\s*#\s*(?:el)?if\b(.*)$", text, re.MULTILINE):
+                used.update(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", expression))
+            assembly_path, symbols, packages = owner
+            for symbol in sorted(used.difference(symbols).intersection(symbol_packages)):
+                opened = packages.intersection(symbol_packages[symbol])
+                if opened:
+                    package = sorted(opened)[0]
+                    relative = assembly_path.relative_to(repository).as_posix()
+                    message = f'[{relative}] code uses \'#if {symbol}\' but this asmdef declares other versionDefines for package \'{package}\' WITHOUT declaring \'{symbol}\'. Unity versionDefines are per-assembly, so \'{symbol}\' never fires here and the wrong #if branch compiles. Add: {{ "name": "{package}", "expression": "<min-version>", "define": "{symbol}" }}'
+                    if message not in errors:
+                        errors.append(message)
     if verbose:
         print(
             f"[lint-asmdef] Files checked: {len(definitions) + len(references)}; Errors: {len(errors)}; Warnings: {len(warnings)}"

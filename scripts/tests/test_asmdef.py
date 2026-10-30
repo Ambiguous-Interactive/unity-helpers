@@ -245,11 +245,62 @@ def test_nested_assembly_and_similar_directory_names_do_not_inherit_defines(tmp_
     assert check(root) == 1
 
 
-def test_excluded_directories_do_not_supply_definitions(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "excluded",
+    [
+        "obj",
+        "OBJ",
+        "bin",
+        "BIN",
+        "Library",
+        "library",
+        "Temp",
+        "TEMP",
+        "node_modules",
+        "NODE_MODULES",
+        ".git",
+        ".GIT",
+    ],
+)
+def test_excluded_directories_do_not_supply_definitions(tmp_path: Path, excluded: str) -> None:
     root = repository(tmp_path)
-    definition(root / "Runtime/obj/Invalid.asmdef", [])
-    definition(root / "Runtime/Library/Invalid.asmref", [])
+    definition(root / "Runtime" / excluded / "Invalid.asmdef", [])
+    definition(root / "Runtime" / excluded / "Invalid.asmref", [])
     assert check(root) == 0
+
+
+@pytest.mark.parametrize("included", ["binary", "LibraryAssets", "TempData", "objects"])
+def test_exclusions_match_entire_directory_names(tmp_path: Path, included: str) -> None:
+    root = repository(tmp_path)
+    definition(root / "Runtime" / included / "Invalid.asmdef", [])
+    assert check(root) == 1
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Dot names are Unix hidden-file semantics")
+@pytest.mark.parametrize("relative", ["Runtime/.probe/Invalid.asmdef", "Runtime/.Invalid.asmdef"])
+def test_unix_hidden_corpus_is_not_scanned(tmp_path: Path, relative: str) -> None:
+    root = repository(tmp_path)
+    definition(root / relative, [])
+    assert check(root) == 0
+
+
+def test_unreadable_source_does_not_hide_later_ownership_errors(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = repository(tmp_path)
+    definition(
+        root / "Editor/Editor.asmdef",
+        {"name": "Editor", "versionDefines": [version(symbol="NEW_API")]},
+    )
+    definition(root / "Runtime/Runtime.asmdef", {"name": "Runtime", "versionDefines": [version()]})
+    (root / "Runtime/AUnreadable.cs").write_bytes(b"\xff")
+    (root / "Runtime/BUnreadable.cs").write_bytes(b"\xfe")
+    (root / "Runtime/ZViolation.cs").write_text("#if NEW_API\n#endif", encoding="utf-8")
+    assert check(root) == 1
+    output = capsys.readouterr().out
+    assert "[Runtime/AUnreadable.cs]" in output
+    assert "[Runtime/BUnreadable.cs]" in output
+    assert "code uses '#if NEW_API'" in output
 
 
 def test_cli_reports_failure_from_another_directory(tmp_path: Path) -> None:

@@ -96,7 +96,9 @@ the native-debugger downloader also use this locked environment. The PowerShell 
 entry points remain compatibility launchers; npm calls Python directly. The assembly check rejects
 missing source roots, empty assembly scans, invalid references and version expressions, and
 package defines used without a declaration in the owning assembly. File fixtures cover nested
-assemblies and optional package guards. JSON input is validated before using its typed values.
+assemblies, optional package guards, case-insensitive cache exclusions, and hidden files. Unreadable
+C# files report their relative paths without hiding later ownership errors. JSON input is validated
+before using its typed values.
 
 `npm run test:protobuf-candidate` exercises real child-process exit, timeout, descendant cleanup,
 source inventory and shipped-byte checks. `npm run test:native-debugger-download` serves a local
