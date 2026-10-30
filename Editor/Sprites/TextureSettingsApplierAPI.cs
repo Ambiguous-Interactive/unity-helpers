@@ -143,27 +143,34 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             if (config.applyReadWriteEnabled)
             {
-                changed |= ti.isReadable != config.readWriteEnabled;
+                bool isReadableChanged = ti.isReadable != config.readWriteEnabled;
+                changed = changed || isReadableChanged;
             }
             if (config.applyMipMaps)
             {
-                changed |= ti.mipmapEnabled != config.generateMipMaps;
+                bool mipmapEnabledChanged = ti.mipmapEnabled != config.generateMipMaps;
+                changed = changed || mipmapEnabledChanged;
             }
             if (config.applyWrapMode)
             {
-                changed |= ti.wrapMode != config.wrapMode;
+                bool wrapModeChanged = ti.wrapMode != config.wrapMode;
+                changed = changed || wrapModeChanged;
             }
             if (config.applyFilterMode)
             {
-                changed |= ti.filterMode != config.filterMode;
+                bool filterModeChanged = ti.filterMode != config.filterMode;
+                changed = changed || filterModeChanged;
             }
             if (config.applyCompression)
             {
-                changed |= ti.textureCompression != config.compression;
+                bool textureCompressionChanged = ti.textureCompression != config.compression;
+                changed = changed || textureCompressionChanged;
             }
             if (config.applyCrunchCompression)
             {
-                changed |= ti.crunchedCompression != config.useCrunchCompression;
+                bool crunchedCompressionChanged =
+                    ti.crunchedCompression != config.useCrunchCompression;
+                changed = changed || crunchedCompressionChanged;
             }
 
             buffer ??= new TextureImporterSettings();
@@ -172,23 +179,30 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             TextureImporterPlatformSettings ps = ti.GetDefaultPlatformTextureSettings();
             if (config.applyPlatformResizeAlgorithm)
             {
-                changed |= ps.resizeAlgorithm != config.platformResizeAlgorithm;
+                bool resizeAlgorithmChanged = ps.resizeAlgorithm != config.platformResizeAlgorithm;
+                changed = changed || resizeAlgorithmChanged;
             }
             if (config.applyPlatformMaxTextureSize)
             {
-                changed |= ps.maxTextureSize != config.platformMaxTextureSize;
+                bool maxTextureSizeChanged = ps.maxTextureSize != config.platformMaxTextureSize;
+                changed = changed || maxTextureSizeChanged;
             }
             if (config.applyPlatformFormat)
             {
-                changed |= ps.format != config.platformFormat;
+                bool formatChanged = ps.format != config.platformFormat;
+                changed = changed || formatChanged;
             }
             if (config.applyPlatformCompression)
             {
-                changed |= ps.textureCompression != config.platformCompression;
+                bool textureCompressionChanged =
+                    ps.textureCompression != config.platformCompression;
+                changed = changed || textureCompressionChanged;
             }
             if (config.applyPlatformCrunchCompression)
             {
-                changed |= ps.crunchedCompression != config.platformUseCrunchCompression;
+                bool crunchedCompressionChanged =
+                    ps.crunchedCompression != config.platformUseCrunchCompression;
+                changed = changed || crunchedCompressionChanged;
             }
 
             if (config.platformOverrides != null)
@@ -209,27 +223,33 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         : ti.GetPlatformTextureSettings(po.name);
                     if (po.applyResizeAlgorithm)
                     {
-                        changed |= ops.resizeAlgorithm != po.resizeAlgorithm;
+                        bool resizeAlgorithmChanged = ops.resizeAlgorithm != po.resizeAlgorithm;
+                        changed = changed || resizeAlgorithmChanged;
                     }
 
                     if (po.applyMaxTextureSize)
                     {
-                        changed |= ops.maxTextureSize != po.maxTextureSize;
+                        bool maxTextureSizeChanged = ops.maxTextureSize != po.maxTextureSize;
+                        changed = changed || maxTextureSizeChanged;
                     }
 
                     if (po.applyFormat)
                     {
-                        changed |= ops.format != po.format;
+                        bool formatChanged = ops.format != po.format;
+                        changed = changed || formatChanged;
                     }
 
                     if (po.applyCompression)
                     {
-                        changed |= ops.textureCompression != po.compression;
+                        bool textureCompressionChanged = ops.textureCompression != po.compression;
+                        changed = changed || textureCompressionChanged;
                     }
 
                     if (po.applyCrunchCompression)
                     {
-                        changed |= ops.crunchedCompression != po.useCrunchCompression;
+                        bool crunchedCompressionChanged =
+                            ops.crunchedCompression != po.useCrunchCompression;
+                        changed = changed || crunchedCompressionChanged;
                     }
                 }
             }

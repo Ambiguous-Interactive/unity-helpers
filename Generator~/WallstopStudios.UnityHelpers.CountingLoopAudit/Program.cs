@@ -105,7 +105,7 @@ namespace WallstopStudios.UnityHelpers.CountingLoopAudit
                 */
                 trees.Add(
                     CSharpSyntaxTree.ParseText(
-                        "internal static class CountingLoopAuditControl { static int Sum(int[] values) { int total = 0; for (int index = 0; index < values.Length; index++) { total += values[index]; } return total; } static int Snapshot(System.Collections.Generic.ICollection<int> values) { if (values.Count > 0) { return values.Count; } return 0; } static void MissingApi() { DeliberatelyUnavailableModernUnityApi(); } } public struct EqualityAuditControl { }",
+                        "internal static class CountingLoopAuditControl { static int Sum(int[] values) { int total = 0; for (int index = 0; index < values.Length; index++) { total += values[index]; } return total; } static int Snapshot(System.Collections.Generic.ICollection<int> values) { if (values.Count > 0) { return values.Count; } return 0; } static bool Logic(bool left, bool right) { return left | right; } static void MissingApi() { DeliberatelyUnavailableModernUnityApi(); } } public struct EqualityAuditControl { }",
                         parseOptions,
                         ControlPath
                     )
@@ -122,6 +122,7 @@ namespace WallstopStudios.UnityHelpers.CountingLoopAudit
                                 .Add("WUH019", ReportDiagnostic.Warn)
                                 .Add("WUH021", ReportDiagnostic.Warn)
                                 .Add("WUH023", ReportDiagnostic.Warn)
+                                .Add("WUH026", ReportDiagnostic.Warn)
                         )
                 );
                 ImmutableArray<Diagnostic> diagnostics = compilation
@@ -130,13 +131,23 @@ namespace WallstopStudios.UnityHelpers.CountingLoopAudit
                             new CountingLoopAnalyzer(),
                             new LoopBoundAnalyzer(),
                             new RepeatedCollectionCountAnalyzer(),
-                            new PublicStructEqualityAnalyzer()
+                            new PublicStructEqualityAnalyzer(),
+                            new BooleanBitwiseAnalyzer()
                         )
                     )
                     .GetAnalyzerDiagnosticsAsync()
                     .GetAwaiter()
                     .GetResult();
-                foreach (string diagnosticId in new[] { "WUH013", "WUH019", "WUH021", "WUH023" })
+                foreach (
+                    string diagnosticId in new[]
+                    {
+                        "WUH013",
+                        "WUH019",
+                        "WUH021",
+                        "WUH023",
+                        "WUH026",
+                    }
+                )
                 {
                     if (
                         diagnostics.Count(diagnostic =>
@@ -174,6 +185,7 @@ namespace WallstopStudios.UnityHelpers.CountingLoopAudit
                             && !string.Equals(diagnostic.Id, "WUH019", StringComparison.Ordinal)
                             && !string.Equals(diagnostic.Id, "WUH021", StringComparison.Ordinal)
                             && !string.Equals(diagnostic.Id, "WUH023", StringComparison.Ordinal)
+                            && !string.Equals(diagnostic.Id, "WUH026", StringComparison.Ordinal)
                         )
                         || !subjectPaths.Contains(
                             diagnostic.Location.SourceTree?.FilePath ?? string.Empty

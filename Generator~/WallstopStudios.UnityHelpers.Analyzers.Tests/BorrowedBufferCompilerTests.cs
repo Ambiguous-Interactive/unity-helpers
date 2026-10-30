@@ -152,7 +152,9 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
                 bool expectedFound = false;
                 foreach (string expected in expectedDiagnosticIds)
                 {
-                    expectedFound |= string.Equals(error.Id, expected, StringComparison.Ordinal);
+                    expectedFound =
+                        expectedFound
+                        || string.Equals(error.Id, expected, StringComparison.Ordinal);
                 }
                 Assert.That(expectedFound, Is.True, error.ToString());
             }

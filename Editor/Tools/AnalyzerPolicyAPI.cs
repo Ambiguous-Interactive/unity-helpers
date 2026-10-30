@@ -142,6 +142,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 "Unsupported relational field",
                 "Reports relational fields with unsupported declared types. Select Error to reject these declarations during compilation."
             ),
+            new(
+                "WUH026",
+                "Boolean bitwise operators",
+                "Reports bitwise operators on bool and bool? operands. Preserve required evaluations and nullable truth tables when replacing them."
+            ),
         };
 
         /// <summary>Enables or disables every Unity Helpers analyzer in the default ruleset.</summary>

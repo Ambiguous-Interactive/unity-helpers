@@ -283,7 +283,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 if (_retainedBoxes[index] is int value)
                 {
                     checksum += value;
-                    verified &= value == unchecked(seed + index);
+                    verified = verified && (value == unchecked(seed + index));
                 }
                 else
                 {
@@ -310,11 +310,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             long checksum = 0;
             foreach (object value in _retainedBoxes)
             {
-                verified &= ReferenceEquals(value, _preboxedValue);
+                verified = verified && (ReferenceEquals(value, _preboxedValue));
                 if (value is int observed)
                 {
                     checksum += observed;
-                    verified &= observed == seed;
+                    verified = verified && (observed == seed);
                 }
                 else
                 {
@@ -839,13 +839,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 string expectedNativeSourceSha256 = Environment.GetEnvironmentVariable(
                     "UH_NATIVE_PROBE_SOURCE_SHA256"
                 );
-                nativeAllocationsPassed &=
-                    nativeSourceSha256 != null
-                    && nativeSourceSha256.Length == 64
-                    && string.Equals(
-                        nativeSourceSha256,
-                        expectedNativeSourceSha256,
-                        StringComparison.Ordinal
+                nativeAllocationsPassed =
+                    nativeAllocationsPassed
+                    && (
+                        nativeSourceSha256 != null
+                        && nativeSourceSha256.Length == 64
+                        && string.Equals(
+                            nativeSourceSha256,
+                            expectedNativeSourceSha256,
+                            StringComparison.Ordinal
+                        )
                     );
                 if (nativeAllocationsPassed)
                 {

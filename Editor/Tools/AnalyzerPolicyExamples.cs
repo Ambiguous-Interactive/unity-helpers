@@ -193,6 +193,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     selectedExplanation =
                         "Implement typed equality and matching object equality and hashing. Ref structs are excluded on Unity's C# version. Stored collection references keep reference equality unless the type documents content equality.";
                     break;
+                case "WUH026":
+                    selectedBadCode = "bool changed = false;\nchanged |= Touch();";
+                    selectedGoodCode =
+                        "bool changed = false;\nbool touched = Touch();\nchanged = changed || touched;";
+                    selectedExplanation =
+                        "Use logical operators for boolean values. Evaluate required calls into named locals first. Nullable bool operands need explicit handling to preserve null results.";
+                    break;
                 case "WUH025":
                     selectedBadCode = "[ChildComponent] private Transform[,] children;";
                     selectedGoodCode = "[ChildComponent] private Transform[] children;";

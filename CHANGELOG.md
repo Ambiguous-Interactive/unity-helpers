@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `WUH026` to report bitwise boolean operators, with guidance for preserving required calls and nullable results ([#1092](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1092)).
 - Add `WUH025` compiler diagnostics for unsupported relational field types, with an Analyzer Policies severity control to reject invalid declarations before runtime. ([#1086](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1086)).
 - Add opt-in `WUH024` suggestions for typed enum flag checks and cached enum names, with semantic guards and Analyzer Policies examples ([guide](./docs/performance/analyzers.md#wuh024-typed-enum-helpers-opt-in), [#917](https://github.com/Ambiguous-Interactive/unity-helpers/issues/917)).
 - Add an opt-in WProto allowance that refuses generated class construction before constructors run. Regenerate codecs to enforce it; custom allocations remain separate ([#1042](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1042)).

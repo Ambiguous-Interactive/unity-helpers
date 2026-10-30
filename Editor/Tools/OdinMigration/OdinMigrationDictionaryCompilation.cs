@@ -342,8 +342,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 {
                     _diagnostics.Add(message);
                 }
-                failed |=
-                    message.Contains("CS8032")
+                failed =
+                    failed
+                    || message.Contains("CS8032")
                     || message.Contains("CS8784")
                     || message.Contains("CS8785");
             }

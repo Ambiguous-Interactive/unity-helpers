@@ -341,7 +341,8 @@ namespace WallstopStudios.UnityHelpers.SyntaxPolicy
             bool asynchronous = false;
             foreach (SyntaxToken modifier in modifiers)
             {
-                asynchronous |= modifier.IsKind(SyntaxKind.AsyncKeyword);
+                bool isAsyncModifier = modifier.IsKind(SyntaxKind.AsyncKeyword);
+                asynchronous = asynchronous || isAsyncModifier;
             }
             if (!asynchronous)
             {

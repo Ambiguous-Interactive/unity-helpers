@@ -688,11 +688,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                     UnityEditor.Compilation.Assembly assembly in UnityEditor.Compilation.CompilationPipeline.GetAssemblies()
                 )
                 {
-                    packageAssemblyPresent |= string.Equals(
+                    bool isPackageAssembly = string.Equals(
                         assembly.name,
                         packageAssemblyName,
                         StringComparison.Ordinal
                     );
+                    packageAssemblyPresent = packageAssemblyPresent || isPackageAssembly;
                     Assert.AreNotEqual(
                         assemblyName,
                         assembly.name,

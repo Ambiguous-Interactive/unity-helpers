@@ -68,7 +68,7 @@ runTest("a build that reports exactly the expected diagnostics is a pass", () =>
     classify(
       project,
       analyzers,
-      attempt(["WPROTO001", "WUH003", "WUH013", "WUH020", "WUH019", "WUH021", "WUH023"])
+      attempt(["WPROTO001", "WUH003", "WUH013", "WUH020", "WUH026", "WUH019", "WUH021", "WUH023"])
     ),
     null,
     "the analyzers control fired and nothing else did"
@@ -83,7 +83,7 @@ runTest("a build that reports exactly the expected diagnostics is a pass", () =>
 runTest("production opt-in diagnostics apply to production and stay disabled in test gates", () => {
   for (const checkProject of CHECK_PROJECTS) {
     const production = ["runtime", "editor", "integrations"].includes(checkProject.id);
-    const expected = ["WPROTO001", "WUH003", "WUH013", "WUH020"].concat(
+    const expected = ["WPROTO001", "WUH003", "WUH013", "WUH020", "WUH026"].concat(
       production ? ["WUH019", "WUH021", "WUH023"] : []
     );
     assert.equal(classify(checkProject, analyzers, attempt(expected)), null);
@@ -99,7 +99,7 @@ runTest("production opt-in diagnostics apply to production and stay disabled in 
 runTest("the excluded-source audit independently requires every enabled diagnostic", () => {
   const excluded = CONTROLS.find((control) => control.id === "excluded-loops");
   const editor = CHECK_PROJECTS.find((entry) => entry.id === "editor");
-  const ids = ["WUH013", "WUH019", "WUH021", "WUH023"];
+  const ids = ["WUH013", "WUH019", "WUH021", "WUH023", "WUH026"];
   assert.deepEqual(excluded.expected, ids);
   assert.equal(classify(editor, excluded, attempt(ids)), null);
   for (const id of ids) {
@@ -147,7 +147,17 @@ runTest("an extra diagnostic is reported as a tree that does not type-check", ()
   const verdict = classify(
     project,
     analyzers,
-    attempt(["WPROTO001", "WUH003", "WUH013", "WUH020", "WUH019", "WUH021", "WUH023", "CS0234"])
+    attempt([
+      "WPROTO001",
+      "WUH003",
+      "WUH013",
+      "WUH020",
+      "WUH026",
+      "WUH019",
+      "WUH021",
+      "WUH023",
+      "CS0234"
+    ])
   );
   assert.match(verdict ?? "", /also reported CS0234/, "the unexpected id must be named");
   assert.match(
@@ -196,7 +206,7 @@ async function build(project, controlPath) {
   calls++;
   if (calls === 1) return ${JSON.stringify(race)};
   const ids = controlPath.includes("Analyzers")
-    ? ["WPROTO001", "WUH003", "WUH013", "WUH020", "WUH019", "WUH021", "WUH023"]
+    ? ["WPROTO001", "WUH003", "WUH013", "WUH020", "WUH026", "WUH019", "WUH021", "WUH023"]
     : ["CS0246"];
   return { exitCode: 1, output: ids.map((id) => "error " + id).join("\\n") };
 }

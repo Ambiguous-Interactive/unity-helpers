@@ -19,6 +19,8 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
     [TestFixture]
     public sealed class AnalyzerPolicyExampleSemanticTests
     {
+        private const string BooleanBitwiseDiagnosticId = "WUH026";
+
         private const string Imports =
             @"using System;
 using System.Collections;
@@ -85,7 +87,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random {
 
         private static IEnumerable<TestCaseData> Cases()
         {
-            for (int number = 1; number <= 25; ++number)
+            for (int number = 1; number <= 26; ++number)
             {
                 string id = $"WUH{number:000}";
                 yield return new TestCaseData(id).SetName(id + "ExamplesMatchTheActualDiagnostic");
@@ -140,6 +142,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random {
                     return new DisposableStructBoxingAnalyzer();
                 case "WUH023":
                     return new PublicStructEqualityAnalyzer();
+                case BooleanBitwiseDiagnosticId:
+                    return new BooleanBitwiseAnalyzer();
                 case "WUH025":
                     return new RelationalFieldAnalyzer();
                 case "WUH024":
@@ -167,6 +171,12 @@ namespace WallstopStudios.UnityHelpers.Core.Random {
                 return "using UnityEngine; using WallstopStudios.UnityHelpers.Core.Attributes; namespace UnityEngine { public class Object {} public class Component : Object {} public class Transform : Component {} } namespace WallstopStudios.UnityHelpers.Core.Attributes { [System.AttributeUsage(System.AttributeTargets.Field)] public abstract class BaseRelationalComponentAttribute : System.Attribute {} public sealed class ChildComponentAttribute : BaseRelationalComponentAttribute {} } public class Subject { "
                     + code
                     + " }";
+            }
+            if (string.Equals(id, BooleanBitwiseDiagnosticId, StringComparison.Ordinal))
+            {
+                return "public class Subject { bool Touch() { return true; } public void Run() { "
+                    + code
+                    + " } }";
             }
             string fields = string.Empty;
             string members = string.Empty;

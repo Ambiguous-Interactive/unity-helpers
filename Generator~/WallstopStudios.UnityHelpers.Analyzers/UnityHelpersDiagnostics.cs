@@ -570,5 +570,16 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 DiagnosticSeverity.Warning,
                 isEnabledByDefault: true
             );
+
+        /// <summary>A bitwise operator on boolean operands.</summary>
+        internal static readonly DiagnosticDescriptor BooleanBitwiseOperation =
+            new DiagnosticDescriptor(
+                "WUH026",
+                "Use explicit boolean logic",
+                "Use '{0}' for boolean logic. Preserve both operand evaluations and their order with named locals when either may have side effects; do not short-circuit a required call. Nullable booleans require explicit null handling to preserve their three-valued truth table.",
+                "Correctness",
+                DiagnosticSeverity.Warning,
+                isEnabledByDefault: true
+            );
     }
 }

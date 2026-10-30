@@ -605,11 +605,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             bool flags = false;
             foreach (AttributeData attribute in type.GetAttributes())
             {
-                flags |= string.Equals(
+                bool isFlagsAttribute = string.Equals(
                     attribute.AttributeClass?.ToDisplayString(),
                     "System.FlagsAttribute",
                     StringComparison.Ordinal
                 );
+                flags = flags || isFlagsAttribute;
             }
             if (flags && bits != 0)
             {

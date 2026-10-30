@@ -294,7 +294,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 float value = random.NextFloat();
                 byte rounded = ColorQuantization.ToByte(value);
                 byte truncated = (byte)(Mathf.Clamp01(value) * 255f);
-                sawMaxChannel |= rounded == byte.MaxValue;
+                sawMaxChannel = sawMaxChannel || (rounded == byte.MaxValue);
                 roundedError += Mathf.Abs(ColorQuantization.ToNormalized(rounded) - value);
                 truncatedError += Mathf.Abs(ColorQuantization.ToNormalized(truncated) - value);
             }

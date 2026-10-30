@@ -134,7 +134,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 }
             }
 
-            _pruneDeleted |= anyDeleted;
+            _pruneDeleted = _pruneDeleted || anyDeleted;
             if (Pending.Count == 0 && !_pruneDeleted)
             {
                 return;

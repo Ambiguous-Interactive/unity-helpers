@@ -1719,7 +1719,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                     value = default;
                     return false;
                 }
-                allDrawsUnbiased &= unbiased;
+                allDrawsUnbiased = allDrawsUnbiased && unbiased;
                 ulong sample = orderedMin + offset;
                 double candidate = FromOrderedDouble(sample);
 

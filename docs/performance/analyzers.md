@@ -66,6 +66,7 @@ command after resolving the failure. Temporary directories are excluded from Uni
 | [`WUH023`](#wuh023-public-struct-equality-opt-in)                        | A public struct without typed equality (**off by default**)           |
 | [`WUH024`](#wuh024-typed-enum-helpers-opt-in)                            | Enum operations with typed helpers (**off by default**)               |
 | [`WUH025`](#wuh025-unsupported-relational-field)                         | A relational field with an unsupported type                           |
+| [`WUH026`](#wuh026-boolean-bitwise-operators)                            | Bitwise operators on boolean operands                                 |
 
 These are a different family from the `WPROTO###` serialization diagnostics, and they follow a
 different policy on purpose:
@@ -1205,3 +1206,31 @@ Generic fields whose concrete element type is not yet known still require runtim
 All interface contracts remain supported, including interfaces that also implement enumeration;
 a component can implement these interfaces. The analyzer does not infer collection storage from
 an interface name. Runtime guards remain necessary for older compiled assemblies and reflection.
+
+## `WUH026`: boolean bitwise operators
+
+Use `&&` and `||` to combine boolean values. `WUH026` reports `&`, `|`, `^`,
+`&=`, `|=`, and `^=` when both operands resolve to `bool` or `bool?`, including
+members declared in another file. Integer masks, enum flags, and user-defined
+operators on other types are excluded. The warning is on by default and can be
+suppressed like the other `WUH` rules.
+
+Keep required calls in their original order. For example, this must visit every
+atlas even after one changes:
+
+```csharp
+bool atlasChanged = GenerateAtlas(atlas);
+changed = changed || atlasChanged;
+```
+
+When a call can also change the accumulator, save the old accumulator before
+calling it. A direct `changed = changed || GenerateAtlas(atlas)` would skip the
+call once `changed` becomes true. Compound assignments to properties or indexers
+also require preserving receiver evaluation, getter order, and the original value.
+
+For non-nullable booleans, use `left != right` for exclusive-or, or use an explicit
+conditional toggle when accumulating a change. Nullable booleans need separate
+null handling: `false & null` is `false`, `true | null` is `true`, and `null ^ false`
+is `null`. `left != right` does not preserve nullable exclusive-or semantics.
+There is no automatic fix because the analyzer cannot choose which evaluations
+and null states the application needs.

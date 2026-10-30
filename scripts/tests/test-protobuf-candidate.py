@@ -58,7 +58,44 @@ CANDIDATE = cast(
 SHIPPED = cast("ShippedModule", load_module("protobuf_shipped", "verify-protobuf-shipped.py"))
 
 
+def assert_descendant_exited(status: Path) -> None:
+    try:
+        status_text = status.read_text()
+    except (FileNotFoundError, ProcessLookupError):
+        return
+    assert "State:\tZ" in status_text, status_text
+
+
 class CandidateBuildTests(unittest.TestCase):
+    def test_exit_observation_accepts_process_reaping(self) -> None:
+        for error in (FileNotFoundError, ProcessLookupError):
+            with (
+                self.subTest(error=error.__name__),
+                patch.object(Path, "read_text", side_effect=error("reaped")),
+            ):
+                assert_descendant_exited(Path("/proc/fixture/status"))
+
+    def test_exit_observation_rejects_live_processes(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            status = Path(temporary) / "status"
+            for state in ("Z", "R", "S"):
+                with self.subTest(state=state):
+                    status.write_text(f"State:\t{state}\n")
+                    if state == "Z":
+                        assert_descendant_exited(status)
+                    else:
+                        with pytest.raises(AssertionError):
+                            assert_descendant_exited(status)
+
+    def test_exit_observation_preserves_unrelated_read_errors(self) -> None:
+        for error in (PermissionError, IsADirectoryError):
+            with (
+                self.subTest(error=error.__name__),
+                patch.object(Path, "read_text", side_effect=error("cannot inspect")),
+                pytest.raises(error),
+            ):
+                assert_descendant_exited(Path("/proc/fixture/status"))
+
     def test_digest_measures_exact_bytes(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "input"
@@ -199,8 +236,7 @@ class CandidateBuildTests(unittest.TestCase):
                 )
             child_pid = int(log.read_text().strip())
             status = Path(f"/proc/{child_pid}/status")
-            if status.exists():
-                assert "State:\tZ" in status.read_text()
+            assert_descendant_exited(status)
 
     def test_missing_executable_fails_without_a_success_receipt(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

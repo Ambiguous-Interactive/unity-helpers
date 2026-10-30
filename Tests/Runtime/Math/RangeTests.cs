@@ -261,7 +261,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
                                         point < secondMax
                                         || (secondEndInclusive && point == secondMax)
                                     );
-                                expected |= inFirst && inSecond;
+                                expected = expected || (inFirst && inSecond);
                             }
                             Assert.That(
                                 first.Overlaps(second),

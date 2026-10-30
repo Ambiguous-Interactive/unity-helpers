@@ -295,10 +295,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int destinationLength = baselineDestination.Length;
             for (int index = 0; index < destinationLength; ++index)
             {
-                detectsBulkCopy |= !ReferenceEquals(
-                    baselineDestination[index],
-                    bulkDestination[index]
-                );
+                detectsBulkCopy =
+                    detectsBulkCopy
+                    || (!ReferenceEquals(baselineDestination[index], bulkDestination[index]));
             }
             TestContext.WriteLine(
                 $"Elementwise baseline: {baseline?.GetType().FullName ?? "none"}; unguarded bulk: {bulk?.GetType().FullName ?? "none"}; wrapped: {wrapped}"

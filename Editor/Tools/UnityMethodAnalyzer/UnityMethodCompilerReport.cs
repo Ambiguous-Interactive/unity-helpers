@@ -54,7 +54,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                         continue;
                     }
                     ++captured;
-                    errors |= report.hasErrors;
+                    errors = errors || report.hasErrors;
                     foreach (MessageData message in report.messages)
                     {
                         messages.Add(
@@ -155,7 +155,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             foreach (CompilerMessage message in messages)
             {
                 bool error = message.type == CompilerMessageType.Error;
-                current.hasErrors |= error;
+                current.hasErrors = current.hasErrors || error;
                 if (MethodAnalyzer.TryCreateIssue(message, out _))
                 {
                     current.messages.Add(
@@ -210,7 +210,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                     }
                     message.file ??= string.Empty;
                     message.message ??= string.Empty;
-                    assembly.hasErrors |= message.error;
+                    assembly.hasErrors = assembly.hasErrors || message.error;
                 }
             }
             return true;

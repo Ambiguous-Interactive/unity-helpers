@@ -9,6 +9,9 @@ on:
       - ".agents/**"
       - ".claude/**"
       - "scripts/pr-feedback.sh"
+      - "scripts/pr_feedback.py"
+      - "scripts/tests/test_pr_feedback.py"
+      - "scripts/python~/**"
       - "scripts/lint-llm-instructions.ps1"
       - "scripts/generate-skills-index.ps1"
       - "scripts/generate-agent-skill-stubs.mjs"
@@ -24,6 +27,9 @@ on:
       - ".agents/**"
       - ".claude/**"
       - "scripts/pr-feedback.sh"
+      - "scripts/pr_feedback.py"
+      - "scripts/tests/test_pr_feedback.py"
+      - "scripts/python~/**"
       - "scripts/lint-llm-instructions.ps1"
       - "scripts/generate-skills-index.ps1"
       - "scripts/generate-agent-skill-stubs.mjs"
@@ -81,6 +87,12 @@ jobs:
           else
             npm i --no-audit --no-fund
           fi
+
+      - name: Setup Python tooling
+        uses: ./.github/actions/setup-python-tools
+
+      - name: Test feedback report
+        run: uv run --project scripts/python~ --locked pytest scripts/tests/test_pr_feedback.py -q
 
       - name: Test LLM instructions lint
         shell: pwsh

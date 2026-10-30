@@ -226,7 +226,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                 bool savedSetup = true;
                 foreach (SceneSetup setup in previous)
                 {
-                    savedSetup &= !string.IsNullOrWhiteSpace(setup.path);
+                    savedSetup = savedSetup && !string.IsNullOrWhiteSpace(setup.path);
                 }
                 if (savedSetup && previous.Length != 0)
                 {

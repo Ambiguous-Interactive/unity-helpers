@@ -314,7 +314,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             $"Processing: {config.name}",
                             progress
                         );
-                        changed |= ScriptableSpriteAtlasGenerator.GenerateWithoutRefresh(config);
+                        bool atlasChanged = ScriptableSpriteAtlasGenerator.GenerateWithoutRefresh(
+                            config
+                        );
+                        changed = changed || atlasChanged;
                     }
                 }
             }

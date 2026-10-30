@@ -139,11 +139,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             {
                 double reference = referenceMilliseconds[index];
                 double subject = subjectMilliseconds[index];
-                sufficient &=
-                    BenchmarkProtocol.MinimumSampleMilliseconds <= reference
-                    && BenchmarkProtocol.MinimumSampleMilliseconds <= subject
-                    && !double.IsInfinity(reference)
-                    && !double.IsInfinity(subject);
+                sufficient =
+                    sufficient
+                    && (
+                        BenchmarkProtocol.MinimumSampleMilliseconds <= reference
+                        && BenchmarkProtocol.MinimumSampleMilliseconds <= subject
+                        && !double.IsInfinity(reference)
+                        && !double.IsInfinity(subject)
+                    );
                 referenceThroughputs[index] = 1000.0 * iterations / reference;
                 subjectThroughputs[index] = 1000.0 * iterations / subject;
                 logs[index] = Math.Log(reference) - Math.Log(subject);
