@@ -159,12 +159,15 @@ def test_yaml_alias_cycle_remains_bounded(workspace: Path) -> None:
         pytest.param(VALID + "#" + "x" * lint.MAX_META_BYTES, id="oversized"),
     ],
 )
+@pytest.mark.parametrize("source_present", [True, False])
 def test_staged_malformed_companion_cannot_hide_behind_worktree_repair(
-    workspace: Path, staged_content: str, capsys: pytest.CaptureFixture[str]
+    workspace: Path, staged_content: str, source_present: bool, capsys: pytest.CaptureFixture[str]
 ) -> None:
     asset = add_asset(workspace, meta=staged_content)
     meta = Path(f"{asset}.meta")
     meta.write_text(VALID, encoding="utf-8")
+    if not source_present:
+        asset.unlink()
     index = workspace / ".git/index"
     before_index = index.read_bytes()
     before_meta = meta.read_bytes()
@@ -173,6 +176,23 @@ def test_staged_malformed_companion_cannot_hide_behind_worktree_repair(
     assert "staged" in capsys.readouterr().out
     assert index.read_bytes() == before_index
     assert meta.read_bytes() == before_meta
+
+
+@pytest.mark.parametrize("source_present", [True, False])
+def test_indexed_source_requires_indexed_companion(workspace: Path, source_present: bool) -> None:
+    asset = add_asset(workspace)
+    git(workspace, "rm", "--cached", "--", "Runtime/Example.cs.meta")
+    if not source_present:
+        asset.unlink()
+    before = (workspace / ".git/index").read_bytes()
+    assert lint.check_shapes(workspace, ["Runtime/Example.cs.meta"], staged=True) == 1
+    assert (workspace / ".git/index").read_bytes() == before
+
+
+def test_genuine_staged_source_deletion_is_preserved(workspace: Path) -> None:
+    add_asset(workspace)
+    git(workspace, "rm", "-f", "--", "Runtime/Example.cs", "Runtime/Example.cs.meta")
+    assert lint.check_shapes(workspace, ["Runtime/Example.cs.meta"], staged=True) == 0
 
 
 def test_valid_staged_companion_still_checks_worktree(workspace: Path) -> None:

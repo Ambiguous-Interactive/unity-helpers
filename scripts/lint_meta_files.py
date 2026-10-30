@@ -155,7 +155,7 @@ def yaml_duplicate_key_error(document: Node) -> str | None:
     return None
 
 
-def indexed_metadata(root: Path) -> dict[str, tuple[str, str]]:
+def indexed_assets(root: Path) -> dict[str, tuple[str, str]]:
     result = subprocess.run(  # noqa: S603 - fixed read-only index inventory.
         [
             git_executable(),
@@ -165,6 +165,7 @@ def indexed_metadata(root: Path) -> dict[str, tuple[str, str]]:
             "--stage",
             "-z",
             "--",
+            ":(icase)*.cs",
             ":(icase)*.cs.meta",
         ],
         capture_output=True,
@@ -215,7 +216,7 @@ def annotation(path: str, code: str, message: str) -> None:
 
 def check_shapes(root: Path, paths: list[str], *, staged: bool = False) -> int:
     failed = False
-    indexed = indexed_metadata(root) if staged else {}
+    indexed = indexed_assets(root) if staged else {}
     for relative in sorted(set(paths)):
         source = relative[:-5] if relative.casefold().endswith(".meta") else relative
         parts = PurePosixPath(source).parts
@@ -227,15 +228,23 @@ def check_shapes(root: Path, paths: list[str], *, staged: bool = False) -> int:
         ):
             continue
         asset = root / source
-        if asset.suffix.casefold() != ".cs" or not asset.is_file():
+        if asset.suffix.casefold() != ".cs":
+            continue
+        source_present = asset.is_file()
+        source_indexed = os.path.normcase(source) in indexed
+        if not source_present and not source_indexed:
             continue
         meta = Path(f"{asset}.meta")
-        error = csharp_meta_error(meta)
-        if error is not None:
-            annotation(f"{source}.meta", "UNH007", error)
-            failed = True
+        if source_present:
+            error = csharp_meta_error(meta)
+            if error is not None:
+                annotation(f"{source}.meta", "UNH007", error)
+                failed = True
         entry = indexed.get(os.path.normcase(f"{source}.meta"))
-        if entry is not None:
+        if source_indexed and entry is None:
+            annotation(f"{source}.meta", "UNH007", "Missing staged C# companion")
+            failed = True
+        elif entry is not None:
             error = indexed_meta_error(root, *entry)
             if error is not None:
                 annotation(f"{source}.meta", "UNH007", f"Invalid staged companion: {error}")
