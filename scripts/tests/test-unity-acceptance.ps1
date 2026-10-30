@@ -1015,7 +1015,6 @@ if (mode === "invalid-records") {
         }
         $checks++
     }
-    Write-Host "$checks orchestration, exact XML and raw evidence integration controls passed."
 } finally {
     foreach ($key in $environmentKeys) {
         if ($null -eq $originalEnvironment[$key]) {
@@ -1026,3 +1025,5 @@ if (mode === "invalid-records") {
     }
     Remove-Item -LiteralPath $temporary -Recurse -Force
 }
+
+Write-Host "$checks orchestration, exact XML and raw evidence integration controls passed."

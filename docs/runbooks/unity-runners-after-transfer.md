@@ -147,6 +147,23 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\unity\install-wind
 
 Once the agent reports online, dispatch **Runner Bootstrap (Windows)** in maintenance mode. That installs the host prerequisites and every Unity editor from `.github/unity-versions.json`, including all supported build-target components. Host preparation runs once, then each editor runs in its own serialized six-hour job. A slow editor therefore cannot consume the timeout for later versions, and GitHub can rerun only the failed version leg.
 
+### Maintain a project editor before changing its pin
+
+To install an editor used by a downstream project without changing this package's test matrix,
+dispatch **Runner Bootstrap (Windows)** once for each target machine with `unity-versions` set
+to the exact version and `provisioning-profile` set to the project's required build support.
+The default empty version selection still maintains every editor in `.github/unity-versions.json`
+with the `Full` profile. Explicit versions are validated before any host job starts.
+
+For DoxReloaded's 6000.6.7f1 upgrade, select `6000.6.7f1` and `EditorOnly` on both `ELI-MACHINE`
+and `DAD-MACHINE`. The editor is installed under the same `runner.tool_cache\u6-v3` root as
+licensed CI. Keep `detect-only` disabled for installation, then repeat with it enabled to audit
+health. Retain each runner's Unity maintenance transcript. A successful dispatch request or an
+installed directory alone does not prove editor health.
+
+After both runners pass, update DoxReloaded's editor and license-return pins together with its
+cleanup validators. Confirm a licensed DoxReloaded run succeeds before closing the upgrade.
+
 ## Run maintenance directly on a Windows runner
 
 When you are already on the runner host, you do not need to run YAML. From a checkout of this repository, run the same maintenance backend directly:

@@ -64,9 +64,20 @@ uv run --project scripts/python~ --locked --no-dev python scripts/unity/create_u
 uv run --project scripts/python~ --locked --no-dev python scripts/unity/stage_unitypackage.py --project-dir .artifacts/unity/local-export
 ```
 
-`validate:local`, `validate:tests:fast`, `validate:tests:hook-regressions`, and
+`lint:repo`, `validate:local`, `validate:tests:fast`, `validate:tests:hook-regressions`, and
 `test:agent-preflight` require uv, including the metadata parity check. Outside the devcontainer,
 run the bootstrap and locked sync above before these developer entry points.
+
+Repository lint and contract execution share `scripts/check_runner.py`. Existing Node entry points
+retain their importable interfaces and delegate process execution, concurrency, selection, and
+reporting to the locked Python environment. Exclusive checks finish before concurrent checks start;
+failed checks do not prevent the remaining checks from running. `npm run test:check-runner`
+exercises these contracts, including an interrupted child that exits zero.
+
+A check can declare a `completionPattern` when exit status alone is insufficient. The native
+acceptance self-test requires its final completion line after cleanup as well as exit zero.
+Missing completion evidence fails the aggregate and preserves the captured output; it cannot count
+as a passing suite. This requirement does not imply that other checks have completion receipts.
 
 The devcontainer runs the locked sync during creation. Python 3.11.8 or newer
 is required; uv can provision a compatible interpreter. The environment lives under

@@ -1164,7 +1164,8 @@ if ([string]::IsNullOrWhiteSpace($reflexVersionText)) {
 
 $runnerUsesUnityVersionsConfig = (
     $runnerBootstrapContent.Contains('.github/unity-versions.json') -and
-    $runnerBootstrapContent.Contains('jq -c ''{"unity-version": .all}''') -and
+    $runnerBootstrapContent.Contains('scripts/unity/runner_maintenance_matrix.py --output') -and
+    $runnerBootstrapContent.Contains('UH_MAINTENANCE_VERSIONS: ${{ inputs.unity-versions }}') -and
     $runnerBootstrapContent.Contains('fromJSON(needs.matrix-config.outputs.matrix)') -and
     $runnerBootstrapContent.Contains('matrix.unity-version')
 )
@@ -1282,7 +1283,9 @@ $runnerBootstrapInvokesMaintenanceFunction = (
     $runnerBootstrapContent.Contains('. $script') -and
     $runnerBootstrapContent.Contains('$maintenanceArgs = @{') -and
     $runnerBootstrapContent.Contains('UnityVersions = @($env:UH_MAINTENANCE_UNITY_VERSION)') -and
-    $runnerBootstrapContent.Contains("ProvisioningProfile = 'Full'") -and
+    $runnerBootstrapContent.Contains('ProvisioningProfile = $env:UH_MAINTENANCE_PROFILE') -and
+    $runnerBootstrapContent.Contains('UH_MAINTENANCE_PROFILE: ${{ needs.matrix-config.outputs.profile }}') -and
+    $runnerBootstrapContent.Contains('default: Full') -and
     $runnerBootstrapContent.Contains('HostOnly = $true') -and
     $runnerBootstrapContent.Contains('SkipHostBootstrap = $true') -and
     $runnerBootstrapContent.Contains('$maintenanceArgs.DetectOnly = $true') -and

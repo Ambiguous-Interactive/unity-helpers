@@ -312,6 +312,7 @@
     "test:validate-lint-error-codes": "pwsh -NoProfile -File scripts/tests/test-validate-lint-error-codes.ps1 -VerboseOutput",
     "lint:repo": "node scripts/run-repo-lint.js",
     "test:run-repo-lint": "node scripts/tests/test-run-repo-lint.js",
+    "test:check-runner": "uv run --project scripts/python~ --locked pytest scripts/tests/test_check_runner.py -q",
     "test:browser-storage": "node --test scripts/tests/test-browser-storage.js",
     "test:browser-consumer": "python3 scripts/tests/test-browser-consumer.py",
     "test:run-contract-tests": "node scripts/tests/test-run-contract-tests.js",

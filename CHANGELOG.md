@@ -57,7 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fix stalled random sources interrupting gameplay or returning exclusive maxima. Ordinary methods use bounded fallbacks; `Try` methods and weighted shuffle bags report sampling failure ([guide](./docs/features/utilities/random-generators.md), [#638](https://github.com/Ambiguous-Interactive/unity-helpers/issues/638)).
+- Fix signed random samples reaching excluded maxima. Keep ordinary rejection fallbacks bounded and report exact-sampling failure through `Try` methods and weighted shuffle bags ([guide](./docs/features/utilities/random-generators.md), [#638](https://github.com/Ambiguous-Interactive/unity-helpers/issues/638)).
 - Fix missing C# importer metadata while preserving asset GUIDs and existing settings ([#1083](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1083)).
 - Fix Analyzer Policies files that prevent script compilation, and repair older namespaced files when saving policies ([#1091](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1091)).
 - Fix child component lists and sets reserving `MaxCount` entries before finding matches; large limits now allocate for actual results ([#1093](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1093)).

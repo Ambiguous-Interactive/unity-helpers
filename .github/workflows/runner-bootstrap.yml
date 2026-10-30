@@ -73,6 +73,23 @@ on:
         required: false
         type: boolean
         default: false
+      unity-versions:
+        description: >-
+          Optional comma-separated editor versions to maintain (for example 6000.6.7f1).
+          Empty selects all versions from .github/unity-versions.json.
+        required: false
+        type: string
+        default: ""
+      provisioning-profile:
+        description: Build support to install and verify for each selected editor.
+        required: false
+        type: choice
+        default: Full
+        options:
+          - Full
+          - EditorOnly
+          - StandaloneWindowsIl2Cpp
+          - Android
 
 # Forbid concurrent bootstraps OF THIS REPO across BOTH runners. The group
 # is intentionally NOT parameterized by `inputs.runner-label` so that two
@@ -98,22 +115,23 @@ jobs:
     timeout-minutes: 3
     outputs:
       matrix: ${{ steps.matrix.outputs.matrix }}
+      profile: ${{ steps.matrix.outputs.profile }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+      - name: Setup Python tooling
+        uses: ./.github/actions/setup-python-tools
       - name: Read Unity versions
         id: matrix
         shell: bash
-        run: |
-          set -euo pipefail
-          matrix="$(jq -c '{"unity-version": .all}' .github/unity-versions.json)"
-          if [[ "$(jq '."unity-version" | length' <<<"$matrix")" -lt 1 ]]; then
-            echo '::error::.github/unity-versions.json must define at least one Unity version in all[].'
-            exit 1
-          fi
-          echo "matrix=$matrix" >>"$GITHUB_OUTPUT"
+        env:
+          UH_MAINTENANCE_VERSIONS: ${{ inputs.unity-versions }}
+          UH_MAINTENANCE_PROFILE: ${{ inputs.provisioning-profile }}
+        run: >-
+          uv run --project scripts/python~ --locked --no-dev python
+          scripts/unity/runner_maintenance_matrix.py --output "$GITHUB_OUTPUT"
 
   # Preflight convention: every job whose runs-on declares `self-hosted`
   # must `needs:` a runner-access preflight (see
@@ -360,6 +378,7 @@ jobs:
         env:
           UH_BOOTSTRAP_DETECT_ONLY: ${{ inputs.detect-only }}
           UH_MAINTENANCE_UNITY_VERSION: ${{ matrix.unity-version }}
+          UH_MAINTENANCE_PROFILE: ${{ needs.matrix-config.outputs.profile }}
           UNITY_EDITOR_INSTALL_ROOT: ${{ runner.tool_cache }}\u6-v3
         run: |
           Set-StrictMode -Version Latest
@@ -382,7 +401,7 @@ jobs:
               Start-Transcript -Path $logPath -Force | Out-Null
               $maintenanceArgs = @{
                   UnityVersions = @($env:UH_MAINTENANCE_UNITY_VERSION)
-                  ProvisioningProfile = 'Full'
+                  ProvisioningProfile = $env:UH_MAINTENANCE_PROFILE
                   InstallRoot = $env:UNITY_EDITOR_INSTALL_ROOT
                   DiagnosticsRoot = $artifactDir
                   SkipHostBootstrap = $true

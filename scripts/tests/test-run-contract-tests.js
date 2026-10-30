@@ -332,6 +332,30 @@ runTest("nested PowerShell suites require a reachable executable owner", () => {
   assert.deepStrictEqual([...reachablePowerShellSuites([owner], removed)], [owner, child]);
 });
 
+runTest("native acceptance requires its completion receipt in both invocation modes", () => {
+  for (const checks of [CHECKS, directChecksFor(false), directChecksFor(true)]) {
+    const check = checks.find((entry) => entry.id === "unity-acceptance-runner");
+    assert.ok(check && typeof check.completionPattern === "string");
+    const receipt = new RegExp(check.completionPattern, "m");
+    assert.ok(
+      receipt.test("184 orchestration, exact XML and raw evidence integration controls passed.\r")
+    );
+    assert.ok(
+      !receipt.test("0 orchestration, exact XML and raw evidence integration controls passed.")
+    );
+    assert.ok(!receipt.test("unexpected early return"));
+  }
+  const source = fs.readFileSync(
+    path.join(repoRoot, "scripts/tests/test-unity-acceptance.ps1"),
+    "utf8"
+  );
+  const completion = source.indexOf(
+    'Write-Host "$checks orchestration, exact XML and raw evidence integration controls passed."'
+  );
+  const cleanup = source.lastIndexOf("Remove-Item -LiteralPath $temporary -Recurse -Force");
+  assert.ok(0 <= cleanup && cleanup < completion, "the completion receipt must follow cleanup");
+});
+
 runTest("no contract test in scripts/tests/ has been left unreachable", () => {
   // The same shape as the linter-orphan assertion in test-run-repo-lint.js, for the same reason:
   // consolidation trades a loud failure (a chain that visibly lost an entry) for a quiet one (a
@@ -343,6 +367,7 @@ runTest("no contract test in scripts/tests/ has been left unreachable", () => {
     ["scripts/tests/test_pr_feedback.py", "workflow"],
     ["scripts/tests/test_meta_lint.py", "workflow"],
     ["scripts/tests/test_markdown_checks.py", "workflow"],
+    ["scripts/tests/test_runner_maintenance_matrix.py", "workflow"],
     ["scripts/tests/test_verify_shipped_analyzers.py", "workflow"],
     ["scripts/tests/test-sync-issue-template-versions.ps1", "workflow"]
   ]);
