@@ -908,7 +908,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             bool constructAtEnd = false;
             foreach (Member member in members)
             {
-                constructAtEnd |= member.RequiresConstruction;
+                bool requiresConstruction = member.RequiresConstruction;
+                constructAtEnd = constructAtEnd || requiresConstruction;
             }
 
             if (constructAtEnd && 0 < includes.Count)

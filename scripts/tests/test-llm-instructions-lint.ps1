@@ -65,7 +65,7 @@ $indexFile = Join-Path $skillsDir 'index.md'
 $githubOperationsSkill = Join-Path $skillsDir 'github-operations.md'
 $shipChangesSkill = Join-Path $skillsDir 'ship-changes.md'
 $shipChangesPartTwo = Join-Path $repoRoot '.llm' 'references' 'ship-changes-part-2.md'
-$prFeedbackFile = Join-Path $repoRoot 'scripts' 'pr-feedback.sh'
+$prFeedbackModule = Join-Path $repoRoot 'scripts' 'pr_feedback.py'
 
 Write-Host "Testing generate-skills-index.ps1 and lint-llm-instructions.ps1..." -ForegroundColor White
 
@@ -439,21 +439,21 @@ try {
       "GitHub operations must permit action on wallstop, Cursor Bugbot, and GitHub Copilot input"
   }
 
-  $prFeedbackRaw = Get-Content -LiteralPath $prFeedbackFile -Raw
+  $prFeedbackRaw = Get-Content -LiteralPath $prFeedbackModule -Raw
   Write-TestResult "PrFeedback.ResolvesAuthenticatedLogin" `
     ($prFeedbackRaw -match 'get_root\("/user"\)') `
     "pr-feedback must resolve the authenticated GitHub login"
   Write-TestResult "PrFeedback.AuditsPaginatedCommitsAndCoauthors" `
-    (($prFeedbackRaw -match '(?s)def get_all\(path, key=None, requester=.*?\):.*?rel="next"') -and `
-      ($prFeedbackRaw -match 'get_all\("/pulls/%s/commits\?per_page=100"') -and `
+    (($prFeedbackRaw -match '(?s)def get_all\(.*?requester: Requester.*?rel="next"') -and `
+      ($prFeedbackRaw -match 'get_all\(f"/pulls/\{number\}/commits\?per_page=100"') -and `
       ($prFeedbackRaw -match 'audit\("commit committer"') -and `
       ($prFeedbackRaw -match 'Co-authored-by') -and `
-      ($prFeedbackRaw -match 'get_all\("/commits/%s/check-runs\?per_page=100".*?"check_runs"')) `
+      ($prFeedbackRaw -match 'get_all\(f"/commits/\{head_sha\}/check-runs\?per_page=100".*?"check_runs"')) `
     "pr-feedback must paginate and inspect commit authors and co-authors"
   Write-TestResult "PrFeedback.WarnsBeforeOutsideAction" `
     ($prFeedbackRaw -match 'USER INPUT REQUIRED BEFORE ACTION OR REPLY') `
     "pr-feedback must foreground outside or unknown authors"
-  $prFeedbackSelfTestOutput = & bash $prFeedbackFile --self-test 2>&1
+  $prFeedbackSelfTestOutput = & uv run --project (Join-Path $repoRoot 'scripts/python~') --locked --no-dev python $prFeedbackModule --self-test 2>&1
   Write-TestResult "PrFeedback.OfflineBehaviorFixtures" `
     (($LASTEXITCODE -eq 0) -and ($prFeedbackSelfTestOutput -match 'self-tests passed: 22')) `
     "pr-feedback offline fixtures must cover pagination, identities, provenance, failures, and sanitization: $prFeedbackSelfTestOutput"
@@ -571,7 +571,7 @@ try {
     @{ Name = 'Context'; Path = $contextPolicyFile; From = 'DISCLOSURE: LLM-GENERATED TEXT'; To = 'REMOVED DISCLOSURE' }
     @{ Name = 'GitHubOperations'; Path = $githubOperationsSkill; From = 'DISCLOSURE: LLM-GENERATED TEXT'; To = 'REMOVED DISCLOSURE' }
     @{ Name = 'ShipChanges'; Path = $shipChangesPartTwo; From = 'DISCLOSURE: LLM-GENERATED TEXT'; To = 'REMOVED DISCLOSURE' }
-    @{ Name = 'PrFeedback'; Path = $prFeedbackFile; From = 'OUTSIDE OR UNKNOWN -- USER INPUT REQUIRED'; To = 'AUTOMATIC ACTION ALLOWED' }
+    @{ Name = 'PrFeedback'; Path = $prFeedbackModule; From = 'OUTSIDE OR UNKNOWN -- USER INPUT REQUIRED'; To = 'AUTOMATIC ACTION ALLOWED' }
   )
   foreach ($mutation in $authorshipMutations) {
     $authorshipBackup = [System.IO.File]::ReadAllBytes($mutation.Path)

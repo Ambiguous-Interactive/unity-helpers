@@ -215,7 +215,8 @@ namespace WallstopStudios.UnityHelpers.SyntaxPolicy
                                     + "', which no compiler-bound constant bounds. Use a direct ternary with a constant bound and rent above it; see issue #637.";
                             }
                         }
-                        expanded |= priorSymbols != relevant.Count;
+                        bool symbolsExpanded = priorSymbols != relevant.Count;
+                        expanded = expanded || symbolsExpanded;
                     }
                 } while (expanded);
             }

@@ -51,11 +51,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 double familyMean = 0;
                 foreach (CalibratedBenchmarkMeasurement workload in family)
                 {
-                    conclusive &=
+                    bool workloadConclusive =
                         workload.SlotDiagnostics == null
                         && workload.HasSufficientTiming
                         && workload.Comparison.IsStable(BenchmarkProtocol.DefaultSpreadLimit);
-                    nonInferior &= workload.HasTimingNonInferiority;
+                    conclusive = conclusive && workloadConclusive;
+                    bool workloadNonInferior = workload.HasTimingNonInferiority;
+                    nonInferior = nonInferior && workloadNonInferior;
                     double logSum = 0;
                     foreach (double log in workload.PairedLogRatios)
                     {

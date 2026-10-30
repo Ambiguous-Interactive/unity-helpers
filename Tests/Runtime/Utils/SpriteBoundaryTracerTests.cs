@@ -159,7 +159,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                     bool inside = false;
                     foreach (Vector2[] path in paths)
                     {
-                        inside ^= Contains(path, point);
+                        if (Contains(path, point))
+                        {
+                            inside = !inside;
+                        }
                     }
                     Assert.AreEqual(pixels[index], inside, $"Pattern {pattern}, pixel {index}");
                 }

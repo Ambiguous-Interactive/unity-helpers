@@ -140,6 +140,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random {
                     return new DisposableStructBoxingAnalyzer();
                 case "WUH023":
                     return new PublicStructEqualityAnalyzer();
+                case "WUH026":
+                    return new BooleanBitwiseAnalyzer();
                 case "WUH025":
                     return new RelationalFieldAnalyzer();
                 case "WUH024":
@@ -167,6 +169,12 @@ namespace WallstopStudios.UnityHelpers.Core.Random {
                 return "using UnityEngine; using WallstopStudios.UnityHelpers.Core.Attributes; namespace UnityEngine { public class Object {} public class Component : Object {} public class Transform : Component {} } namespace WallstopStudios.UnityHelpers.Core.Attributes { [System.AttributeUsage(System.AttributeTargets.Field)] public abstract class BaseRelationalComponentAttribute : System.Attribute {} public sealed class ChildComponentAttribute : BaseRelationalComponentAttribute {} } public class Subject { "
                     + code
                     + " }";
+            }
+            if (string.Equals(id, "WUH026", StringComparison.Ordinal))
+            {
+                return "public class Subject { bool Touch() { return true; } public void Run() { "
+                    + code
+                    + " } }";
             }
             string fields = string.Empty;
             string members = string.Empty;

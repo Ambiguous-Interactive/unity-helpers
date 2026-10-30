@@ -134,9 +134,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             bool verified = true;
             for (int index = 0; index < count; ++index)
             {
-                verified &= preboxed
+                bool valueVerified = preboxed
                     ? ReferenceEquals(_retainedBoxes[index], _preboxedValue)
                     : _retainedBoxes[index] is int value && value == unchecked(seed + index);
+                verified = verified && valueVerified;
             }
             GC.KeepAlive(_retainedBoxes);
             return new NativeAllocationObservation(

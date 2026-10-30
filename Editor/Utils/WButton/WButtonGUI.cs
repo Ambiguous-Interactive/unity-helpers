@@ -379,7 +379,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                     )
                     {
                         ++running;
-                        anyCancellable |= handle.SupportsCancellation;
+                        bool supportsCancellation = handle.SupportsCancellation;
+                        anyCancellable = anyCancellable || supportsCancellation;
                     }
                 }
             }

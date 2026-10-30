@@ -86,6 +86,19 @@ commands use `--no-dev`, so they do not install analysis or test packages into a
 They retain tools already installed in a shared warm environment; compatible Python may still need
 to be provisioned on the first run.
 
+`npm run pr:feedback -- <number>` uses the locked Python environment to read all four
+PR feedback surfaces and audit author identities. The shell entry point remains available;
+`uv run --project scripts/python~ --locked --no-dev python scripts/pr_feedback.py <number>`
+also works directly. Run its offline controls with `--self-test`, or its full regression
+suite with `uv run --project scripts/python~ --locked pytest scripts/tests/test_pr_feedback.py`.
+CodeRabbit is trusted only when its exact login belongs to a Bot account. Unknown bots
+and outside people still require issue-specific direction before action.
+
+`npm run verify:shipped-analyzers` compares all three committed compiler-input DLLs
+with isolated Release builds through the same locked environment. Add `:fix` to refresh
+stale or missing payloads. A failed copy or replacement preserves the previous DLL and
+its importer metadata. The Node entry points remain compatibility launchers.
+
 New Python files must join the strict `tool.pyright.include` list in
 `scripts/python~/pyproject.toml`; a Git-backed inventory rejects unregistered files. The explicit
 legacy list records existing Python scripts still awaiting migration. Remove an entry when its

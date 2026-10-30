@@ -257,3 +257,10 @@ jobs:
       - name: Verify assembly discovery on Windows
         shell: pwsh
         run: uv run --project scripts/python~ --locked pytest scripts/tests/test_asmdef.py -q
+
+      - name: Verify compiler payload publication on Windows
+        shell: pwsh
+        run: >-
+          uv run --project scripts/python~ --locked pytest
+          scripts/tests/test_verify_shipped_analyzers.py -q
+          -k "not project_copy_configuration and not debug_payload_copy"

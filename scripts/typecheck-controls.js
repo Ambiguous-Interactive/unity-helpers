@@ -142,6 +142,11 @@ function analyzerControl(anchor) {
             return 0;
         }
 
+        internal static bool Logic(bool left, bool right)
+        {
+            return left | right;
+        }
+
         internal static int Sum(int[] values)
         {
             int total = 0;
@@ -171,6 +176,11 @@ function excludedLoopControl(anchor) {
                 return values.Count;
             }
             return 0;
+        }
+
+        internal static bool Logic(bool left, bool right)
+        {
+            return left | right;
         }
 
         internal static int Sum(int[] values)
@@ -220,7 +230,7 @@ const CONTROLS = Object.freeze([
     id: "analyzers",
     fileName: "WallstopCheckControlAnalyzers.cs",
     render: analyzerControl,
-    expected: ["WPROTO001", "WUH003", "WUH013", "WUH020"],
+    expected: ["WPROTO001", "WUH003", "WUH013", "WUH020", "WUH026"],
     productionExpected: ["WUH019", "WUH021", "WUH023"],
     meaning:
       "the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins"
@@ -236,7 +246,7 @@ const CONTROLS = Object.freeze([
     id: "excluded-loops",
     fileName: "WallstopCheckControlExcludedLoops.cs",
     render: excludedLoopControl,
-    expected: ["WUH013", "WUH019", "WUH021", "WUH023"],
+    expected: ["WUH013", "WUH019", "WUH021", "WUH023", "WUH026"],
     projectIds: ["editor"],
     property: "WallstopCountingLoopAuditControl",
     meaning:

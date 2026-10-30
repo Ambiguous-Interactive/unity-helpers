@@ -38,7 +38,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 bool allEmitted = true;
                 foreach (Include declaration in subtypes.For(contract))
                 {
-                    allEmitted &= emittedContracts.Contains(declaration.SubType);
+                    bool subtypeEmitted = emittedContracts.Contains(declaration.SubType);
+                    allEmitted = allEmitted && subtypeEmitted;
                 }
                 if (!allEmitted || !SubtypeMap.SupportsReplacement(contract))
                 {

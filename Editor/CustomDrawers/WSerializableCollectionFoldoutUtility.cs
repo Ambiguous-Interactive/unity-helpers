@@ -50,29 +50,32 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             bool added = false;
             if (serializedObject == null)
             {
-                added |= InitializedKeys.Add(
+                bool keyAdded = InitializedKeys.Add(
                     new FoldoutInitializationKey(null, property.propertyPath)
                 );
+                added = added || keyAdded;
                 return added;
             }
 
             UnityEngine.Object[] targets = serializedObject.targetObjects;
             if (targets == null || targets.Length == 0)
             {
-                added |= InitializedKeys.Add(
+                bool keyAdded = InitializedKeys.Add(
                     new FoldoutInitializationKey(
                         serializedObject.targetObject,
                         property.propertyPath
                     )
                 );
+                added = added || keyAdded;
                 return added;
             }
 
             foreach (UnityEngine.Object targetsElement in targets)
             {
-                added |= InitializedKeys.Add(
+                bool keyAdded = InitializedKeys.Add(
                     new FoldoutInitializationKey(targetsElement, property.propertyPath)
                 );
+                added = added || keyAdded;
             }
 
             return added;

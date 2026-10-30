@@ -578,11 +578,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             bool reported = false;
             foreach (ValidationFinding finding in run.Findings.AsValueEnumerableRequired())
             {
-                reported |= string.Equals(
+                bool findingMatches = string.Equals(
                     finding.RuleId,
                     ValidationRuleIds.RequiredFieldEmpty,
                     StringComparison.Ordinal
                 );
+                reported = reported || findingMatches;
             }
 
             Assert.IsTrue(reported, Describe(new List<ValidationFinding>(run.Findings)));

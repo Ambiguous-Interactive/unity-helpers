@@ -222,8 +222,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             for (int index = start + 1; index < probeEnd; ++index)
             {
                 int comparison = comparer.Compare(array[index - 1], array[index]);
-                ascending &= comparison <= 0;
-                descending &= 0 <= comparison;
+                ascending = ascending && comparison <= 0;
+                descending = descending && 0 <= comparison;
             }
             if (ascending && (4 <= length || descending))
             {
@@ -922,9 +922,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             bool prefix =
                 1024 <= leftLength
                 && comparer.Compare(source[offset + begin + 1023], source[offset + middle]) <= 0;
-            prefix |=
+            bool rightPrefix =
                 1024 <= rightLength
                 && comparer.Compare(source[offset + middle + 1023], source[offset + begin]) < 0;
+            prefix = prefix || rightPrefix;
             if (!prefix)
             {
                 return false;
@@ -1072,12 +1073,13 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 int runCount = runs.Count;
                 if (2 <= runCount && runCount <= 3)
                 {
-                    firstTwoOverlap &= JesseRunsOverlap(
+                    bool runsOverlap = JesseRunsOverlap(
                         array,
                         runs[runCount - 2],
                         runs[runCount - 1],
                         comparer
                     );
+                    firstTwoOverlap = firstTwoOverlap && runsOverlap;
                     if (runCount == 3 && firstTwoOverlap && position <= 8192)
                     {
                         return false;

@@ -106,6 +106,9 @@ jobs:
             nuget-v1-${{ runner.os }}-${{ runner.arch }}-generator-${{
             hashFiles('Generator~/**/*.csproj', 'Generator~/**/*.props', 'Generator~/**/*.targets', '**/NuGet.Config', '**/nuget.config') }}
 
+      - name: Setup Python tooling
+        uses: ./.github/actions/setup-python-tools
+
       - name: Verify every shipped compiler input against its sources
         run: node scripts/verify-shipped-analyzers.js
 
@@ -160,9 +163,6 @@ jobs:
         # isolation boundary; side-by-side aliases can silently bind both references to v3.
         shell: pwsh
         run: ./scripts/run-wproto-evidence.ps1 -Oracle v2 -OutputRoot "$env:RUNNER_TEMP/wproto-evidence"
-
-      - name: Setup Python tooling
-        uses: ./.github/actions/setup-python-tools
 
       - name: Test candidate build controls
         run: uv run --project scripts/python~ --locked pytest scripts/tests/test-protobuf-candidate.py -q

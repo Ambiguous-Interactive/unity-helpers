@@ -599,9 +599,12 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                             float maximum = boxTree
                                 ? storedBounds[index].max[dimension]
                                 : positions[index][dimension];
-                            matches &=
-                                minimum <= bounds.max[dimension]
-                                && bounds.min[dimension] <= maximum;
+                            matches =
+                                matches
+                                && (
+                                    minimum <= bounds.max[dimension]
+                                    && bounds.min[dimension] <= maximum
+                                );
                         }
                         if (matches)
                         {

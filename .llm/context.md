@@ -76,7 +76,7 @@ See [create-csharp-file](./skills/create-csharp-file.md) for detailed C# rules.
     because their correct shapes are ubiquitous. **The package opts into WUH010, WUH013, and WUH018
     in its shared check-project ruleset; WUH019, WUH021 and WUH023 are enabled by the production-only ruleset for
     Runtime, Editor, and integration checks. The excluded-source audit covers WUH013,
-    WUH019, WUH021 and WUH023 with reporting controls.** Every owned `Generator~` project self-hosts all shipped compiler inputs and promotes shared `WUH###` policies; WUH019, WUH021 and WUH023 promotion is limited to production checks; the five Unity source gates cover Runtime, Editor, integrations, and both test trees without changing consumer defaults.
+    WUH019, WUH021, WUH023 and WUH026 with reporting controls.** Every owned `Generator~` project self-hosts all shipped compiler inputs and promotes shared `WUH###` policies; WUH019, WUH021 and WUH023 promotion is limited to production checks; the five Unity source gates cover Runtime, Editor, integrations, and both test trees without changing consumer defaults.
     Retain indexed loops when the index is needed or enumeration changes behavior.
     The independent Odin migration generator emits editor bindings without depending on the protobuf generator DLL.
     All three DLLs are committed under `Runtime/Analyzers`, byte-compared in CI, and **an edit to

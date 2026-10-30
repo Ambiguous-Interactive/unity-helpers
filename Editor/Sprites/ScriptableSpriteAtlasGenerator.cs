@@ -221,7 +221,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         succeeded = false;
                         continue;
                     }
-                    normalized |= RemoveNullSprites(config);
+                    bool nullSpritesRemoved = RemoveNullSprites(config);
+                    normalized = normalized || nullSpritesRemoved;
                     (bool coreChanged, bool coreSucceeded) = GenerateCore(config);
                     if (!coreSucceeded)
                     {

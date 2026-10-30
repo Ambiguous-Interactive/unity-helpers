@@ -293,8 +293,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                     {
                         for (int to = 0; to < count; ++to)
                         {
-                            reachable[from, to] |=
-                                reachable[from, intermediate] && reachable[intermediate, to];
+                            reachable[from, to] =
+                                reachable[from, to]
+                                || (reachable[from, intermediate] && reachable[intermediate, to]);
                         }
                     }
                 }

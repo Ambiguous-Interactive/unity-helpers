@@ -585,7 +585,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                     continue;
                 }
 
-                everyIndexWasInRange &= 0 <= index && index <= 1;
+                everyIndexWasInRange = everyIndexWasInRange && 0 <= index && index <= 1;
                 if (index == 0)
                 {
                     ++firstCount;
@@ -620,27 +620,31 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
             for (int draw = 0; draw < DrawCount; ++draw)
             {
-                everySelectionSucceeded &= cumulativeOriginal.TryNextWeightedIndex(
+                bool originalSelectionSucceeded = cumulativeOriginal.TryNextWeightedIndex(
                     original,
                     out int oldIndex
                 );
-                everySelectionSucceeded &= cumulativeChanged.TryNextWeightedIndex(
+                everySelectionSucceeded = everySelectionSucceeded && originalSelectionSucceeded;
+                bool changedSelectionSucceeded = cumulativeChanged.TryNextWeightedIndex(
                     changed,
                     out int newIndex
                 );
+                everySelectionSucceeded = everySelectionSucceeded && changedSelectionSucceeded;
                 if (oldIndex != newIndex)
                 {
                     ++cumulativeChanges;
                 }
 
-                everySelectionSucceeded &= raceOriginal.TryNextWeightedIndexByRace(
+                bool originalRaceSucceeded = raceOriginal.TryNextWeightedIndexByRace(
                     original,
                     out oldIndex
                 );
-                everySelectionSucceeded &= raceChanged.TryNextWeightedIndexByRace(
+                everySelectionSucceeded = everySelectionSucceeded && originalRaceSucceeded;
+                bool changedRaceSucceeded = raceChanged.TryNextWeightedIndexByRace(
                     changed,
                     out newIndex
                 );
+                everySelectionSucceeded = everySelectionSucceeded && changedRaceSucceeded;
                 if (oldIndex != newIndex)
                 {
                     ++raceChanges;
@@ -765,7 +769,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             bool ordered = true;
             for (int index = 0; index < winners.Length; ++index)
             {
-                ordered &= winners[index] == index;
+                ordered = ordered && winners[index] == index;
             }
             Assert.IsTrue(ordered);
         }

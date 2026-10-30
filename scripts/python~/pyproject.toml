@@ -40,7 +40,7 @@ warn_unreachable = true
 pythonVersion = "3.11"
 typeCheckingMode = "strict"
 extraPaths = ["../unity", "..", "."]
-include = ["../unity/create_unitypackage.py", "../unity/stage_unitypackage.py", "../tests/test_unitypackage.py", "check.py", "../generate_meta.py", "../tests/test_meta_generation.py", "../build-protobuf-candidate.py", "../verify-protobuf-shipped.py", "../tests/test-protobuf-candidate.py", "../unity/download-native-debugger.py", "../tests/test-native-debugger-download.py", "../lint_bundled_assemblies.py", "../tests/test_bundled_assemblies.py", "../lint_asmdef.py", "../tests/test_asmdef.py"]
+include = ["../unity/create_unitypackage.py", "../unity/stage_unitypackage.py", "../tests/test_unitypackage.py", "check.py", "../generate_meta.py", "../tests/test_meta_generation.py", "../build-protobuf-candidate.py", "../verify-protobuf-shipped.py", "../tests/test-protobuf-candidate.py", "../unity/download-native-debugger.py", "../tests/test-native-debugger-download.py", "../lint_bundled_assemblies.py", "../tests/test_bundled_assemblies.py", "../lint_asmdef.py", "../tests/test_asmdef.py", "../pr_feedback.py", "../tests/test_pr_feedback.py", "../verify_shipped_analyzers.py", "../tests/test_verify_shipped_analyzers.py"]
 
 [tool.unity-helpers-python]
 legacy = [

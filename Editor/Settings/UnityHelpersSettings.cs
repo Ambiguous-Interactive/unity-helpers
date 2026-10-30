@@ -2494,7 +2494,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     property,
                                     patternsInitializedProperty
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -2513,7 +2513,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     MaxPageSize,
                                     value => settings._stringInListPageSize = value
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -2532,7 +2532,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     MaxPageSize,
                                     value => settings._serializableSetPageSize = value
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -2549,7 +2549,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     settings._serializableSetStartCollapsed,
                                     value => settings._serializableSetStartCollapsed = value
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -2568,7 +2568,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     MaxSerializableDictionaryPageSize,
                                     value => settings._serializableDictionaryPageSize = value
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -2585,7 +2585,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     settings._serializableDictionaryStartCollapsed,
                                     value => settings._serializableDictionaryStartCollapsed = value
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -2604,7 +2604,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     MaxPageSize,
                                     value => settings._enumToggleButtonsPageSize = value
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -2623,7 +2623,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     MaxPageSize,
                                     value => settings._wbuttonPageSize = value
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -2642,7 +2642,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     MaxWButtonHistorySize,
                                     value => settings._wbuttonHistorySize = value
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -2659,7 +2659,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     settings._wbuttonActionsPlacement,
                                     value => settings._wbuttonActionsPlacement = value
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -2676,7 +2676,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     settings._wbuttonFoldoutBehavior,
                                     value => settings._wbuttonFoldoutBehavior = value
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -2693,7 +2693,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     settings._inlineEditorFoldoutBehavior,
                                     value => settings._inlineEditorFoldoutBehavior = value
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -2710,7 +2710,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     settings._inlineEditorFoldoutTweenEnabled,
                                     value => settings._inlineEditorFoldoutTweenEnabled = value
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -2735,7 +2735,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     value => settings._inlineEditorFoldoutSpeed = value,
                                     true
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -2752,7 +2752,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     settings._wbuttonFoldoutTweenEnabled,
                                     value => settings._wbuttonFoldoutTweenEnabled = value
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -2777,7 +2777,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     value => settings._wbuttonFoldoutSpeed = value,
                                     true
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -2794,7 +2794,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     settings._wbuttonCancelButtonColor,
                                     value => settings._wbuttonCancelButtonColor = value
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -2811,7 +2811,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     settings._wbuttonCancelButtonTextColor,
                                     value => settings._wbuttonCancelButtonTextColor = value
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -2828,7 +2828,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     settings._wbuttonClearHistoryButtonColor,
                                     value => settings._wbuttonClearHistoryButtonColor = value
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -2845,7 +2845,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     settings._wbuttonClearHistoryButtonTextColor,
                                     value => settings._wbuttonClearHistoryButtonTextColor = value
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -2916,7 +2916,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                         settings._waitInstructionBufferApplyOnLoad,
                                         value => settings._waitInstructionBufferApplyOnLoad = value
                                     );
-                                    dataChanged |= changed;
+                                    dataChanged = dataChanged || changed;
                                 }
                                 return true;
                             }
@@ -2942,7 +2942,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                             settings._waitInstructionBufferQuantizationStepSeconds =
                                                 Mathf.Max(0f, value)
                                     );
-                                    dataChanged |= changed;
+                                    dataChanged = dataChanged || changed;
                                 }
                                 return true;
                             }
@@ -2968,7 +2968,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                             settings._waitInstructionBufferMaxDistinctEntries =
                                                 Mathf.Max(0, value)
                                     );
-                                    dataChanged |= changed;
+                                    dataChanged = dataChanged || changed;
                                 }
                                 return true;
                             }
@@ -2993,7 +2993,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                         value =>
                                             settings._waitInstructionBufferUseLruEviction = value
                                     );
-                                    dataChanged |= changed;
+                                    dataChanged = dataChanged || changed;
                                     DrawWaitInstructionBufferButtons(settings);
                                 }
                                 return true;
@@ -3013,7 +3013,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     value =>
                                         settings._serializableDictionaryFoldoutTweenEnabled = value
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -3038,7 +3038,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     value => settings._serializableDictionaryFoldoutSpeed = value,
                                     true
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -3057,7 +3057,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                         settings._serializableSortedDictionaryFoldoutTweenEnabled =
                                             value
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -3083,7 +3083,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                         settings._serializableSortedDictionaryFoldoutSpeed = value,
                                     true
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -3100,7 +3100,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     settings._serializableSetFoldoutTweenEnabled,
                                     value => settings._serializableSetFoldoutTweenEnabled = value
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -3125,7 +3125,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     value => settings._serializableSetFoldoutSpeed = value,
                                     true
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -3143,7 +3143,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     value =>
                                         settings._serializableSortedSetFoldoutTweenEnabled = value
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -3168,7 +3168,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     value => settings._serializableSortedSetFoldoutSpeed = value,
                                     true
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -3185,7 +3185,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     settings._duplicateRowAnimationMode,
                                     value => settings._duplicateRowAnimationMode = value
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -3210,7 +3210,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     settings._duplicateRowTweenCycles,
                                     value => settings._duplicateRowTweenCycles = value
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -3230,7 +3230,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     value => settings._detectAssetChangeLoopWindowSeconds = value,
                                     true
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -3247,7 +3247,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     settings._deferAssetPostprocessorCallbacks,
                                     value => settings._deferAssetPostprocessorCallbacks = value
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -3264,7 +3264,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     settings._serializableSetDuplicateTweenEnabled,
                                     value => settings._serializableSetDuplicateTweenEnabled = value
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -3286,7 +3286,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     settings._serializableSetDuplicateTweenCycles,
                                     value => settings._serializableSetDuplicateTweenCycles = value
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -3303,7 +3303,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     settings._wgroupAutoIncludeMode,
                                     value => settings._wgroupAutoIncludeMode = value
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -3327,7 +3327,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     MaxWGroupAutoIncludeRowCount,
                                     value => settings._wgroupAutoIncludeRowCount = value
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -3344,7 +3344,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     settings._wgroupFoldoutsStartCollapsed,
                                     value => settings._wgroupFoldoutsStartCollapsed = value
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -3361,7 +3361,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     settings._wgroupFoldoutTweenEnabled,
                                     value => settings._wgroupFoldoutTweenEnabled = value
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -3386,7 +3386,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     value => settings._wgroupFoldoutSpeed = value,
                                     true
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -3404,7 +3404,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     settings._poolPurgingEnabled,
                                     value => settings._poolPurgingEnabled = value
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -3430,7 +3430,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                         FailedTestsExporter.Reinitialize();
                                     }
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
 #else
                                 EditorGUILayout.HelpBox(
                                     "Failed test export requires Unity Test Framework.",
@@ -3454,7 +3454,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                 }
 
                                 bool changed = DrawFailedTestsOutputDirectoryField(settings);
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -3471,7 +3471,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     settings._poolIdleTimeoutSeconds,
                                     value => settings._poolIdleTimeoutSeconds = Mathf.Max(0f, value)
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -3488,7 +3488,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     settings._poolMinRetainCount,
                                     value => settings._poolMinRetainCount = Mathf.Max(0, value)
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -3505,7 +3505,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     settings._poolWarmRetainCount,
                                     value => settings._poolWarmRetainCount = Mathf.Max(0, value)
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -3522,7 +3522,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     settings._poolMaxSize,
                                     value => settings._poolMaxSize = Mathf.Max(0, value)
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -3539,7 +3539,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     settings._poolBufferMultiplier,
                                     value => settings._poolBufferMultiplier = Mathf.Max(1f, value)
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -3557,7 +3557,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     value =>
                                         settings._poolRollingWindowSeconds = Mathf.Max(1f, value)
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -3574,7 +3574,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                     settings._poolHysteresisSeconds,
                                     value => settings._poolHysteresisSeconds = Mathf.Max(0f, value)
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
                                 return true;
                             }
 
@@ -3595,7 +3595,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                             value
                                         )
                                 );
-                                dataChanged |= changed;
+                                dataChanged = dataChanged || changed;
 
                                 EditorGUILayout.Space(4f);
                                 if (

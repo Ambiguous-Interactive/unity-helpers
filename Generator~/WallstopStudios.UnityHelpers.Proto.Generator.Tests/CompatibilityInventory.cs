@@ -596,11 +596,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                             )
                         );
                 }
-                isAttribute |= string.Equals(
+                bool matchesAttribute = string.Equals(
                     current.ToDisplayString(),
                     typeof(Attribute).FullName,
                     StringComparison.Ordinal
                 );
+                isAttribute = isAttribute || matchesAttribute;
             }
             if (isAttribute)
             {

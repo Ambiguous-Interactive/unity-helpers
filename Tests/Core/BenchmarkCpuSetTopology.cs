@@ -292,7 +292,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                         );
                     }
                     ulong bit = 1UL << logicalIndex;
-                    uniqueLogicalIndices &= (logicalIndices & bit) == 0;
+                    uniqueLogicalIndices = uniqueLogicalIndices && ((logicalIndices & bit) == 0);
                     logicalIndices |= bit;
                     records.Add(
                         new BenchmarkCpuSetRecord(

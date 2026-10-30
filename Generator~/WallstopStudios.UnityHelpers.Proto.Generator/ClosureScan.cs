@@ -495,21 +495,23 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                             : (IEnumerable<ITypeParameterSymbol>)required.Types;
                         foreach (ITypeParameterSymbol parameter in requiredTypes)
                         {
-                            changed |= AddTypeRequirements(
+                            bool parameterRequirementsAdded = AddTypeRequirements(
                                 ResolveParameter(call.Method, parameter),
                                 caller,
                                 propagated
                             );
+                            changed = changed || parameterRequirementsAdded;
                         }
                         foreach (ArgumentUse argument in call.Arguments)
                         {
                             if (required.TypeValues.Contains(argument.Ordinal))
                             {
-                                changed |= AddTypeRequirements(
+                                bool argumentTypeRequirementsAdded = AddTypeRequirements(
                                     argument.TypeOperand,
                                     caller,
                                     propagated
                                 );
+                                changed = changed || argumentTypeRequirementsAdded;
                                 if (
                                     argument.Parameter != null
                                     && SymbolEqualityComparer.Default.Equals(
@@ -518,16 +520,22 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                                     )
                                 )
                                 {
-                                    changed |= propagated.TypeValues.Add(
+                                    bool typeValueAdded = propagated.TypeValues.Add(
                                         argument.Parameter.Ordinal
                                     );
+                                    changed = changed || typeValueAdded;
                                 }
                             }
                             if (!required.Values.Contains(argument.Ordinal))
                             {
                                 continue;
                             }
-                            changed |= AddTypeRequirements(argument.Type, caller, propagated);
+                            bool argumentRequirementsAdded = AddTypeRequirements(
+                                argument.Type,
+                                caller,
+                                propagated
+                            );
+                            changed = changed || argumentRequirementsAdded;
                             if (
                                 argument.Parameter != null
                                 && SymbolEqualityComparer.Default.Equals(
@@ -536,7 +544,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                                 )
                             )
                             {
-                                changed |= propagated.Values.Add(argument.Parameter.Ordinal);
+                                bool valueAdded = propagated.Values.Add(argument.Parameter.Ordinal);
+                                changed = changed || valueAdded;
                             }
                         }
                     }
@@ -651,7 +660,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             bool changed = AddTypeRequirements(named.ContainingType, caller, requirements);
             foreach (ITypeSymbol argument in named.TypeArguments)
             {
-                changed |= AddTypeRequirements(argument, caller, requirements);
+                bool argumentRequirementsAdded = AddTypeRequirements(
+                    argument,
+                    caller,
+                    requirements
+                );
+                changed = changed || argumentRequirementsAdded;
             }
             return changed;
         }

@@ -83,11 +83,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                     }
                     string text = ReadCompiledSource(source);
                     texts[source.Path] = text;
-                    scriptCaptured |= string.Equals(
+                    bool checksumMatches = string.Equals(
                         scriptChecksum,
                         source.Checksum,
                         StringComparison.Ordinal
                     );
+                    scriptCaptured = scriptCaptured || checksumMatches;
                 }
                 if (!scriptCaptured)
                 {

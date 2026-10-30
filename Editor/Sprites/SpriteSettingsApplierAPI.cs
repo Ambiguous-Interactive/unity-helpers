@@ -617,57 +617,76 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             bool changed = false;
             if (spriteData.applyPixelsPerUnit)
             {
-                changed |= current.SpritePixelsPerUnit != spriteData.pixelsPerUnit;
+                bool spritePixelsPerUnitChanged =
+                    current.SpritePixelsPerUnit != spriteData.pixelsPerUnit;
+                changed = changed || spritePixelsPerUnitChanged;
             }
             if (spriteData.applyPivot)
             {
-                changed |= current.SpritePivot != spriteData.pivot;
+                bool spritePivotChanged = current.SpritePivot != spriteData.pivot;
+                changed = changed || spritePivotChanged;
             }
             if (spriteData.applyGenerateMipMaps)
             {
-                changed |= current.MipmapEnabled != spriteData.generateMipMaps;
+                bool mipmapEnabledChanged = current.MipmapEnabled != spriteData.generateMipMaps;
+                changed = changed || mipmapEnabledChanged;
             }
             if (spriteData.applyCrunchCompression)
             {
-                changed |= current.CrunchedCompression != spriteData.useCrunchCompression;
+                bool crunchedCompressionChanged =
+                    current.CrunchedCompression != spriteData.useCrunchCompression;
+                changed = changed || crunchedCompressionChanged;
             }
             if (spriteData.applyCompression)
             {
-                changed |= current.TextureCompression != spriteData.compressionLevel;
+                bool textureCompressionChanged =
+                    current.TextureCompression != spriteData.compressionLevel;
+                changed = changed || textureCompressionChanged;
             }
 
             if (spriteData.applyTextureType)
             {
-                changed |= current.TextureType != spriteData.textureType;
+                bool textureTypeChanged = current.TextureType != spriteData.textureType;
+                changed = changed || textureTypeChanged;
             }
             if (spriteData.applyPivot)
             {
-                changed |= current.SpriteAlignment != (int)SpriteAlignment.Custom;
+                bool spriteAlignmentChanged =
+                    current.SpriteAlignment != (int)SpriteAlignment.Custom;
+                changed = changed || spriteAlignmentChanged;
             }
             if (spriteData.applyAlphaIsTransparency)
             {
-                changed |= current.AlphaIsTransparency != spriteData.alphaIsTransparency;
+                bool alphaIsTransparencyChanged =
+                    current.AlphaIsTransparency != spriteData.alphaIsTransparency;
+                changed = changed || alphaIsTransparencyChanged;
             }
             if (spriteData.applyReadWriteEnabled)
             {
-                changed |= current.Readable != spriteData.readWriteEnabled;
+                bool readableChanged = current.Readable != spriteData.readWriteEnabled;
+                changed = changed || readableChanged;
             }
             if (spriteData.applySpriteMode)
             {
-                changed |= current.SpriteImportMode != spriteData.spriteMode;
-                changed |= current.SpriteMode != (int)spriteData.spriteMode;
+                bool spriteImportModeChanged = current.SpriteImportMode != spriteData.spriteMode;
+                changed = changed || spriteImportModeChanged;
+                bool spriteModeChanged = current.SpriteMode != (int)spriteData.spriteMode;
+                changed = changed || spriteModeChanged;
             }
             if (spriteData.applyExtrudeEdges)
             {
-                changed |= current.SpriteExtrude != spriteData.extrudeEdges;
+                bool spriteExtrudeChanged = current.SpriteExtrude != spriteData.extrudeEdges;
+                changed = changed || spriteExtrudeChanged;
             }
             if (spriteData.applyWrapMode)
             {
-                changed |= current.WrapMode != spriteData.wrapMode;
+                bool wrapModeChanged = current.WrapMode != spriteData.wrapMode;
+                changed = changed || wrapModeChanged;
             }
             if (spriteData.applyFilterMode)
             {
-                changed |= current.FilterMode != spriteData.filterMode;
+                bool filterModeChanged = current.FilterMode != spriteData.filterMode;
+                changed = changed || filterModeChanged;
             }
             return changed;
         }

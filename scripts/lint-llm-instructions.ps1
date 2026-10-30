@@ -76,7 +76,7 @@ $indexFileName = 'index.md'
 $indexFile = Join-Path -Path $skillsDir -ChildPath $indexFileName
 $githubOperationsFile = Join-Path -Path $skillsDir -ChildPath 'github-operations.md'
 $shipChangesFile = Join-Path -Path $skillsDir -ChildPath 'ship-changes.md'
-$prFeedbackFile = Join-Path -Path $repoRoot -ChildPath 'scripts/pr-feedback.sh'
+$prFeedbackFile = Join-Path -Path $repoRoot -ChildPath 'scripts/pr_feedback.py'
 $agentEntrypoints = @(
     @{ Path = (Join-Path $repoRoot 'AGENTS.md'); Link = '](./.llm/context.md)'; Label = 'Codex, OpenCode, and nanocoder entrypoint' }
     @{ Path = (Join-Path $repoRoot 'CLAUDE.md'); Link = '](./.llm/context.md)'; Label = 'Claude Code entrypoint' }
@@ -437,22 +437,22 @@ $prFeedbackRequirements = @(
     @{ Pattern = 'get_root\("/user"\)'; Label = 'authenticated viewer lookup' }
     @{ Pattern = '(?is)OUTSIDE OR UNKNOWN -- USER INPUT REQUIRED'; Label = 'outside-author warning' }
     @{ Pattern = '(?is)author_association is not identity'; Label = 'association distrust' }
-    @{ Pattern = 'get_all\("/pulls/%s/commits\?per_page=100"'; Label = 'paginated commit audit' }
+    @{ Pattern = 'get_all\(f"/pulls/\{number\}/commits\?per_page=100"'; Label = 'paginated commit audit' }
     @{ Pattern = 'audit\("commit committer"'; Label = 'commit committer audit' }
     @{ Pattern = '(?is)Co-authored-by'; Label = 'co-author audit' }
-    @{ Pattern = '(?s)def get_all\(path, key=None, requester=.*?\):.*?rel="next"'; Label = 'REST pagination' }
-    @{ Pattern = 'get_all\("/commits/%s/check-runs\?per_page=100".*?"check_runs"'; Label = 'paginated check-run audit' }
-    @{ Pattern = '(?is)(?=.*raise FeedbackError\("HTTP)(?=.*raise FeedbackError\("invalid JSON)'; Label = 'fail-closed HTTP and JSON handling' }
-    @{ Pattern = '(?is)incomplete GitHub data.*?SystemExit\(4\)'; Label = 'nonzero incomplete-data exit' }
+    @{ Pattern = '(?s)def get_all\(.*?requester: Requester.*?rel="next"'; Label = 'REST pagination' }
+    @{ Pattern = 'get_all\(f"/commits/\{head_sha\}/check-runs\?per_page=100".*?"check_runs"'; Label = 'paginated check-run audit' }
+    @{ Pattern = '(?is)(?=.*raise FeedbackError\(f?"HTTP)(?=.*raise FeedbackError\(f?"invalid JSON)'; Label = 'fail-closed HTTP and JSON handling' }
+    @{ Pattern = '(?is)incomplete GitHub data.*?return 4'; Label = 'nonzero incomplete-data exit' }
     @{ Pattern = '(?is)TRUSTED_AUTOMATION.*?third-party bot'; Label = 'trusted and third-party bot fixtures' }
     @{ Pattern = '(?is)TRUSTED_AUTHORS.*?wallstop.*?TRUSTED_AUTOMATION.*?cursor\[bot\].*?copilot-pull-request-reviewer\[bot\].*?copilot-swe-agent\[bot\]'; Label = 'trusted owner and review bot identities' }
-    @{ Pattern = '(?is)def safe\(value\).*?terminal sanitization'; Label = 'terminal control sanitization fixture' }
+    @{ Pattern = '(?is)def safe\(value: object\).*?terminal sanitization'; Label = 'terminal control sanitization fixture' }
     @{ Pattern = '(?is)--root-comments-only.*?REST comments do not expose thread resolution'; Label = 'truthful root-comment filter' }
     @{ Pattern = '(?is)run_self_tests.*?page failure.*?JSON failure'; Label = 'offline failure fixtures' }
 )
 foreach ($requirement in $prFeedbackRequirements) {
     if ($prFeedbackContent -notmatch $requirement.Pattern) {
-        Write-ErrorMsg "pr-feedback.sh is missing required authorship coverage: $($requirement.Label)."
+        Write-ErrorMsg "pr_feedback.py is missing required authorship coverage: $($requirement.Label)."
         $exitCode = 1
     }
 }
