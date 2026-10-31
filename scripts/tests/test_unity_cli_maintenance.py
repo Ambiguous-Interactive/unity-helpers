@@ -294,3 +294,108 @@ ConvertTo-Json -InputObject $script:arguments -Compress
     )
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout) == ["uninstall", "6000.6.7f1", "--yes"]
+
+
+@pytest.mark.parametrize("visible", [False, True])
+@pytest.mark.parametrize("interruption", ["stall", "wall"])
+@pytest.mark.parametrize("cleanup_stage", ["uninstall", "quarantine"])
+@pytest.mark.parametrize("failures", [0, 1, 2])
+def test_interrupted_base_install_requires_cleanup_before_another_cli_attempt(
+    visible: bool, interruption: str, cleanup_stage: str, failures: int, tmp_path: Path
+) -> None:
+    result = probe(
+        tmp_path,
+        r"""
+Import-Definition 'Invoke-WithRetry'
+function Write-Host { param([Parameter(ValueFromRemainingArguments = $true)][object[]]$Message) }
+function Write-CiNotice { param($Message) }
+function Write-UnityCliInstallFailureAnnotation { param($Version, $Output, $ExitCode, $Arguments) }
+function Write-ModuleInstallFailureDiagnostics {
+    param($Version, $Output, $ExitCode, $Arguments, $Root, $TimedOut, $StallKilled, $TimedOutWallClock, $TimeoutSeconds, $StallSeconds)
+}
+function Write-InstalledEditorDiagnostics { param($Version, $Root, $Reason) }
+function Get-CollapsedCliOutputTail { param($Output, $MaxLines) return 'control' }
+function Get-EnsureEditorInstallTimeoutSeconds { return 2700 }
+function Get-EnsureEditorProgressStallSeconds { return 0 }
+$script:installs = 0
+$script:cleanups = 0
+$script:resolutions = 0
+$script:sequence = [Collections.Generic.List[string]]::new()
+$InstallRoot = Join-Path $PSScriptRoot 'editor'
+$UnityVersion = '6000.6.7f1'
+$CiManagedOnly = $true
+$installArgs = @('install', $UnityVersion, '--yes')
+$installRetryAttempts = 3
+$retryDelaySeconds = 0
+$interruptedInstallCleanupPending = [ref] $false
+function Invoke-UnityCliCapture {
+    param($Arguments)
+    $script:sequence.Add('install')
+    ++$script:installs
+    $null = New-Item -ItemType Directory -Force -Path $InstallRoot
+    if ($script:installs -eq 1) {
+        Set-Content -LiteralPath (Join-Path $InstallRoot 'partial') -Value 'incomplete payload'
+        Set-Content -LiteralPath (Join-Path $InstallRoot 'Unity.exe') -Value 'visible executable'
+        return @{ Success = $false; ExitCode = 124; Output = @('Installing');
+            StallKilled = ($Stall -eq 'true'); TimedOutWallClock = ($Wall -eq 'true') }
+    }
+    if (Test-Path -LiteralPath (Join-Path $InstallRoot 'partial')) {
+        return @{ Success = $false; ExitCode = 6; Output = @('Editor already installed');
+            StallKilled = $false; TimedOutWallClock = $false }
+    }
+    Set-Content -LiteralPath (Join-Path $InstallRoot 'complete') -Value 'complete payload'
+    return @{ Success = $true; ExitCode = 0; Output = @(); StallKilled = $false; TimedOutWallClock = $false }
+}
+function Resolve-InstalledEditor {
+    param($Version, $Root, [switch]$ManagedOnly)
+    ++$script:resolutions
+    if ($script:resolutions -eq 1 -and $Initial -ne 'true') { return $null }
+    return (Join-Path $Root 'Unity.exe')
+}
+function Stop-StaleUnityProvisioningProcesses { param($InstallRoot, $Version, $Reason) }
+function Invoke-UnityVersionUninstallForRepair {
+    param($Version, $Reason, $InstallRoot)
+    $script:sequence.Add('uninstall')
+    ++$script:cleanups
+    return @{ Success = -not ($Hold -eq 'uninstall' -and $script:cleanups -le $ExitCode) }
+}
+function Move-UnityVersionInstallToQuarantine {
+    param($Version, $InstallRoot)
+    $script:sequence.Add('quarantine')
+    if ($Hold -eq 'quarantine' -and $script:cleanups -le $ExitCode) { throw 'Locked partial tree' }
+    Move-Item -LiteralPath $InstallRoot -Destination ($InstallRoot + '-quarantine')
+}
+$call = $ast.Find({ param($candidate)
+    $candidate -is [Management.Automation.Language.CommandAst] -and
+    $candidate.GetCommandName() -eq 'Invoke-WithUnityInstallLock' -and
+    $candidate.Extent.Text.Contains('Invoke-WithRetry -MaxAttempts $installRetryAttempts')
+}, $true)
+if ($null -eq $call) { throw 'Missing actual base-install retry action' }
+$action = @($call.CommandElements | Where-Object { $_ -is [Management.Automation.Language.ScriptBlockExpressionAst] })[0].ScriptBlock.GetScriptBlock()
+$success = $true
+try { $null = & $action } catch { $success = $false }
+@{ success = $success; installs = $script:installs; cleanups = $script:cleanups;
+   partial = (Test-Path -LiteralPath (Join-Path $InstallRoot 'partial'));
+   complete = (Test-Path -LiteralPath (Join-Path $InstallRoot 'complete'));
+   sequence = $script:sequence.ToArray() } | ConvertTo-Json -Compress
+""",
+        [
+            "-Initial",
+            str(visible).lower(),
+            "-Hold",
+            cleanup_stage,
+            "-ExitCode",
+            str(failures),
+            "-Stall",
+            str(interruption == "stall").lower(),
+            "-Wall",
+            str(interruption == "wall").lower(),
+        ],
+    )
+    assert result.returncode == 0, result.stderr
+    observed = json.loads(result.stdout)
+    assert observed["success"] is (failures < 2), observed
+    assert observed["installs"] == (2 if failures < 2 else 1), observed
+    assert observed["cleanups"] == min(failures + 1, 2), observed
+    assert observed["partial"] is (failures == 2), observed
+    assert observed["complete"] is (failures < 2), observed

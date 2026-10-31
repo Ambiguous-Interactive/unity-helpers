@@ -170,7 +170,9 @@ A reported root outside the managed installation directory still fails before ed
 Maintenance replaces pre-1.0 CLI installations through Unity's current standalone installer.
 Editor and module installs, plus stale-install cleanup, pass explicit `--yes` confirmation as
 described in [Unity's installation reference](https://github.com/Unity-Technologies/skills/blob/main/skills/unity-cli/references/editors-install.md).
-An interrupted installer fails maintenance even when an editor executable is already visible.
+An interrupted command cannot recover from an executable left behind. Before another CLI attempt
+in the same run, maintenance must stop scoped stale processes, clear the interrupted registration,
+and quarantine the partial tree. Failed cleanup stays pending and prevents another CLI attempt.
 Editor-only unpacking uses the 45-minute absolute deadline because native unpacking can be quiet;
 `UH_ENSURE_EDITOR_PROGRESS_STALL_SECONDS` still selects an earlier quiet-time cutoff when needed.
 Require the later detect-only audit to pass before changing a downstream editor pin.

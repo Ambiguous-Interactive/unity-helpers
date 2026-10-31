@@ -5138,10 +5138,23 @@ if (-not $editor) {
     # line is echoed the instant it arrives), never silently buffered.
     $retryDelaySeconds = Get-EnsureEditorRetryDelaySeconds
     $installRetryAttempts = Get-EnsureEditorInstallRetryAttempts
+    $interruptedInstallCleanupPending = [ref] $false
 
     $recoveredEditor = Invoke-WithUnityInstallLock -Version $UnityVersion -InstallRoot $InstallRoot -Action {
         Invoke-WithRetry -MaxAttempts $installRetryAttempts -DelaySeconds $retryDelaySeconds -Action {
+            if ($interruptedInstallCleanupPending.Value) {
+                Stop-StaleUnityProvisioningProcesses -InstallRoot $InstallRoot -Version $UnityVersion -Reason 'cleaning an interrupted base install before retry'
+                $cleanupResult = Invoke-UnityVersionUninstallForRepair -Version $UnityVersion -Reason 'cleaning an interrupted base install before retry' -InstallRoot $InstallRoot
+                if (-not $cleanupResult.Success) {
+                    throw "Unity $UnityVersion interrupted-install metadata cleanup failed; refusing another install attempt against the partial tree."
+                }
+                Move-UnityVersionInstallToQuarantine -Version $UnityVersion -InstallRoot $InstallRoot
+                $interruptedInstallCleanupPending.Value = $false
+            }
             $installResult = Invoke-UnityCliCapture -Arguments $installArgs
+            if ($installResult.StallKilled -or $installResult.TimedOutWallClock) {
+                $interruptedInstallCleanupPending.Value = $true
+            }
             if (-not $installResult.Success) {
                 $installLines = @($installResult.Output)
                 $installText = ($installLines -join "`n")
@@ -5156,7 +5169,7 @@ if (-not $editor) {
                     return $resolvedAfterFailure
                 }
 
-                if ($installText -match '(?i)already installed|editor already installed|is already installed') {
+                if (-not $interruptedInstallCleanupPending.Value -and $installText -match '(?i)already installed|editor already installed|is already installed') {
                     Write-InstalledEditorDiagnostics -Version $UnityVersion -Root $InstallRoot -Reason "Unity CLI reported the editor is already installed, but Unity.exe could not be resolved afterward."
                     Invoke-UnityVersionUninstallForRepair -Version $UnityVersion -Reason "Unity CLI reported an already-installed editor, but Unity.exe could not be resolved." -InstallRoot $InstallRoot | Out-Null
                     # Stop stale provisioning processes ONLY when the wrapper
@@ -5176,8 +5189,8 @@ if (-not $editor) {
                 Write-UnityCliInstallFailureAnnotation -Version $UnityVersion -Output $installResult.Output -ExitCode $installResult.ExitCode -Arguments $installArgs
                 # Phrase from wrapper-driven kill state so a NATIVE 124/125 from
                 # the Unity CLI is not misread as a stall or wall-clock kill.
-                # The retry classifier is unchanged -- both sentinels remain
-                # retryable via the existing throw flow.
+                # Wrapper interruptions retain cleanup state across retries.
+                # The next attempt must clear it before invoking the CLI again.
                 $baseInstallStallKilled = [bool]$installResult.StallKilled
                 $baseInstallWallTimedOut = [bool]$installResult.TimedOutWallClock
                 $baseInstallTimedOut = ($baseInstallStallKilled -or $baseInstallWallTimedOut)
