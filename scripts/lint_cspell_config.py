@@ -31,13 +31,14 @@ def check(path: Path, *, fix: bool = False) -> int:
         if config.get("caseSensitive") is False:
             for group in groups:
                 words = group.words()
-                for canonical, repeated_words in case_redundant(words):
+                redundant = case_redundant(words)
+                for canonical, repeated_words in redundant:
                     issues += 1
                     print(
                         f"  [{group.name}] Case-redundant: {', '.join([canonical, *repeated_words])} "
                         "(caseSensitive is false)"
                     )
-                if fix:
+                if fix and redundant:
                     group.replace(deduplicate(words))
         duplicates = cross_duplicates(groups)
         for word, locations in duplicates:

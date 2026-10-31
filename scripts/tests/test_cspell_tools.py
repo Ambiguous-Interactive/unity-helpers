@@ -39,6 +39,39 @@ def base() -> dict[str, object]:
     }
 
 
+@pytest.mark.parametrize("root_words", [False, True])
+def test_fix_preserves_buckets_without_inline_words(root_words: bool, tmp_path: Path) -> None:
+    external = {"name": "external", "path": "./terms.txt"}
+    value: dict[str, object] = {
+        "caseSensitive": False,
+        "dictionaryDefinitions": [external, {"name": "inline", "words": ["Word", "WORD"]}],
+        "unrelated": {"retain": True},
+    }
+    if root_words:
+        value["words"] = ["Root"]
+    expected = {
+        **value,
+        "dictionaryDefinitions": [external, {"name": "inline", "words": ["Word"]}],
+    }
+    path = config(tmp_path, value)
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(model.ROOT / "scripts/lint_cspell_config.py"),
+            "--config",
+            str(path),
+            "--fix",
+        ],
+        cwd=tmp_path,
+        capture_output=True,
+        encoding="utf-8",
+        check=False,
+        timeout=20,
+    )
+    assert result.returncode == 0, result.stderr
+    assert model.read_config(path)[1] == expected
+
+
 @pytest.fixture(autouse=True)
 def isolate_formatter(monkeypatch: pytest.MonkeyPatch) -> None:
     def omit_format(_path: Path) -> None:

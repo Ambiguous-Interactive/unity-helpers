@@ -104,7 +104,8 @@ the locked Python environment. Their npm commands invoke Python directly; the ol
 PowerShell paths remain compatibility launchers. The preservation gate includes generic reflection
 calls such as `GetCustomAttribute<PoolPurgePolicyAttribute>()`. Spelling fixes retain the first
 spelling of each word and the file's line endings; word insertion refuses cross-bucket duplicates
-before writing. Use `--config <path>` when checking or updating a separate spelling configuration.
+before writing. Fixes leave path-only dictionaries and absent word lists unchanged.
+Use `--config <path>` when checking or updating a separate spelling configuration.
 Set `PRESERVE_ATTRIBUTES_ROOT` to check a separate runtime source tree. Diagnostics use absolute
 paths when that tree is on a different Windows drive from the repository.
 These command-line tools write UTF-8 diagnostics even when Windows pipes use a legacy encoding.
