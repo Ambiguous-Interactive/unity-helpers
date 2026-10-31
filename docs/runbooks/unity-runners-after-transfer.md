@@ -161,6 +161,9 @@ licensed CI. Keep `detect-only` disabled for installation, then repeat with it e
 health. Retain each runner's Unity maintenance transcript. A successful dispatch request or an
 installed directory alone does not prove editor health.
 
+Managed-root verification accepts both legacy bare paths and the Unity CLI's TSV path rows.
+A reported root outside the managed installation directory still fails before editor changes.
+
 After both runners pass, update DoxReloaded's editor and license-return pins together with its
 cleanup validators. Confirm a licensed DoxReloaded run succeeds before closing the upgrade.
 

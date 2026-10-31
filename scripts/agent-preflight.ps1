@@ -66,6 +66,7 @@ function Invoke-GitPathList {
     foreach ($argument in $Arguments) {
         [void]$startInfo.ArgumentList.Add($argument)
     }
+    $startInfo.StandardOutputEncoding = [System.Text.Encoding]::UTF8
     $startInfo.RedirectStandardOutput = $true
     $startInfo.RedirectStandardError = $true
     $startInfo.UseShellExecute = $false
@@ -1979,10 +1980,25 @@ if ($relativePaths.Count -gt 0) {
     $script:PreflightWriteSafety = @{ RepoRoot = $repoRoot; Scope = $safetyScope; WholeRepository = -not $explicitSelection }
 }
 
+$selectedRenameMetadataSources = [System.Collections.Generic.HashSet[string]]::new($dedupedPaths.Comparer)
+if ($explicitSelection -and $dedupedPaths.Count -gt 0) {
+    $renameFields = @(Invoke-GitPathList -RepoRoot $repoRoot -Arguments @('diff', '--cached', '--name-status', '-z', '--find-renames', '--diff-filter=R'))
+    if ($renameFields.Count % 3 -ne 0) { throw 'Git returned an incomplete staged rename record.' }
+    for ($renameIndex = 0; $renameIndex -lt $renameFields.Count; $renameIndex += 3) {
+        if ($renameFields[$renameIndex] -notmatch '^R[0-9]{1,3}$') { throw 'Git returned an invalid staged rename status.' }
+        $renameSource = $renameFields[$renameIndex + 1]
+        $renameDestination = $renameFields[$renameIndex + 2]
+        $selectedDestination = $dedupedPaths.Contains($renameDestination) -or
+            ($renameDestination -match '\.meta$' -and $dedupedPaths.Contains(($renameDestination -replace '\.meta$', '')))
+        if (-not $selectedDestination) { continue }
+        if ($renameSource -match '\.cs\.meta$') { [void]$selectedRenameMetadataSources.Add($renameSource) }
+    }
+}
+
 $deletedCsharpMetaPaths = @(Invoke-GitPathList -RepoRoot $repoRoot -Arguments @('diff', '--cached', '--no-renames', '--name-only', '-z', '--diff-filter=D') | Where-Object {
         $_ -match '\.cs\.meta$' -and
         (Test-MetaRequiredPath -RelativePath ($_ -replace '\.meta$', '')) -and
-        (-not $explicitSelection -or $dedupedPaths.Contains($_) -or $dedupedPaths.Contains(($_ -replace '\.meta$', '')))
+        (-not $explicitSelection -or $dedupedPaths.Contains($_) -or $dedupedPaths.Contains(($_ -replace '\.meta$', '')) -or $selectedRenameMetadataSources.Contains($_))
     })
 
 Test-GitPushConfig -RepoRoot $repoRoot -FailureCount ([ref]$failureCount) -Fix:$Fix
@@ -2847,11 +2863,38 @@ $csharpMetaShapePaths = @(@($relativePaths) + @($deletedCsharpMetaPaths) | Where
     })
 if ($csharpMetaShapePaths.Count -gt 0) {
     Write-Host '[agent-preflight] Checking C# Unity importer metadata...' -ForegroundColor Blue
-    $shapePathsJson = ConvertTo-Json -InputObject @($csharpMetaShapePaths) -Compress
-    $shapePathsJson | & uv run --quiet --project (Join-Path $repoRoot 'scripts/python~') --locked --no-dev --group metadata python (Join-Path $repoRoot 'scripts/lint_meta_files.py') --root $repoRoot --stdin-paths --staged
-    if ($LASTEXITCODE -ne 0) {
-        $failureCount++
+    $shapePathsJson = ConvertTo-Json -InputObject @($csharpMetaShapePaths) -Compress -EscapeHandling EscapeNonAscii
+    $shapeStartInfo = [System.Diagnostics.ProcessStartInfo]::new()
+    $shapeStartInfo.FileName = 'uv'
+    $shapeStartInfo.UseShellExecute = $false
+    $shapeStartInfo.WorkingDirectory = $repoRoot
+    $shapeStartInfo.RedirectStandardInput = $true
+    $shapeStartInfo.RedirectStandardOutput = $true
+    $shapeStartInfo.RedirectStandardError = $true
+    $shapeStartInfo.StandardInputEncoding = [System.Text.UTF8Encoding]::new($false)
+    $shapeStartInfo.StandardOutputEncoding = [System.Text.UTF8Encoding]::new($false)
+    $shapeStartInfo.StandardErrorEncoding = [System.Text.UTF8Encoding]::new($false)
+    $shapeStartInfo.Environment['PYTHONIOENCODING'] = 'utf-8'
+    foreach ($shapeArgument in @('run', '--quiet', '--project', (Join-Path $repoRoot 'scripts/python~'), '--locked', '--no-dev', '--group', 'metadata', 'python', (Join-Path $repoRoot 'scripts/lint_meta_files.py'), '--root', $repoRoot, '--stdin-paths', '--staged')) {
+        [void]$shapeStartInfo.ArgumentList.Add($shapeArgument)
     }
+    $shapeProcess = [System.Diagnostics.Process]::new()
+    $shapeProcess.StartInfo = $shapeStartInfo
+    try {
+        [void]$shapeProcess.Start()
+        $shapeOutputTask = $shapeProcess.StandardOutput.ReadToEndAsync()
+        $shapeErrorTask = $shapeProcess.StandardError.ReadToEndAsync()
+        $shapeProcess.StandardInput.WriteLine($shapePathsJson)
+        $shapeProcess.StandardInput.Close()
+        $shapeOutput = $shapeOutputTask.GetAwaiter().GetResult()
+        $shapeError = $shapeErrorTask.GetAwaiter().GetResult()
+        $shapeProcess.WaitForExit()
+        if ($shapeOutput) { Write-Host -NoNewline $shapeOutput }
+        if ($shapeError) { Write-Host -NoNewline $shapeError }
+        $global:LASTEXITCODE = $shapeProcess.ExitCode
+        if ($shapeProcess.ExitCode -ne 0) { $failureCount++ }
+    }
+    finally { $shapeProcess.Dispose() }
 }
 
 

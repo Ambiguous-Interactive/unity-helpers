@@ -498,6 +498,9 @@ function Import-EnsureEditorWatchdogFunctions {
         'Invoke-UnityCliCaptureWithTimeout',
         'Invoke-UnityCliSafe',
         'Get-UnityCliOutput',
+        'Test-LooksLikeAbsolutePath',
+        'Get-UnityCliInstallRoot',
+        'Confirm-UnityCliManagedInstallRoot',
         'Move-UnityInstallDirectoryToQuarantine',
         'Get-UnityProvisioningProfile',
         'Assert-UnityProvisioningProfile',
@@ -3538,6 +3541,34 @@ if ($ensureEditorWatchdogImported) {
             $ensureEditorContent -notmatch 'Invoke-UnityCliSafe[^\r\n]+-AcceptCapturedOutputPattern'
         ) {
             Write-Host "::error file=scripts/unity/ensure-editor.ps1::Install-path getter and setter wiring must opt into exact output recovery after a wrapper timeout."
+            $failed = $true
+        }
+        foreach ($rootCase in @(
+            @{ Name = 'Plain'; Output = @('D:\managed editors'); Expected = 'D:\managed editors' },
+            @{ Name = 'Tsv'; Output = @("key`tvalue", "path`tD:\managed editors"); Expected = 'D:\managed editors' },
+            @{ Name = 'UnixTsv'; Output = @("path`t/tmp/managed editors"); Expected = '/tmp/managed editors' },
+            @{ Name = 'UncTsv'; Output = @("path`t\\server\editors"); Expected = '\\server\editors' },
+            @{ Name = 'HeaderOnly'; Output = @("key`tvalue"); Expected = $null },
+            @{ Name = 'RelativeTsv'; Output = @("path`trelative/editors"); Expected = $null },
+            @{ Name = 'WrongKey'; Output = @("other`tD:\managed editors"); Expected = $null }
+        )) {
+            $script:unityCliCaptureResult = @{ Success = $true; ExitCode = 0; Output = $rootCase.Output; StallKilled = $false; TimedOutWallClock = $false }
+            $observedRoot = Get-UnityCliInstallRoot
+            if ($observedRoot -cne $rootCase.Expected) {
+                Write-Host "::error file=scripts/unity/ensure-editor.ps1::CLI install-root case $($rootCase.Name) returned '$observedRoot' instead of '$($rootCase.Expected)'."
+                $failed = $true
+            }
+        }
+        $managedProbeRoot = Join-Path ([IO.Path]::GetTempPath()) 'managed-cli-root-probe'
+        $outsideProbeRoot = Join-Path ([IO.Path]::GetTempPath()) 'outside-cli-root-probe'
+        $script:unityCliCaptureResult.Output = @("path`t$outsideProbeRoot")
+        $outsideRejected = $false
+        try { $null = Confirm-UnityCliManagedInstallRoot -Root $managedProbeRoot 6>$null }
+        catch { $outsideRejected = $_.Exception.Message.Contains('outside the managed root') }
+        $script:unityCliCaptureResult.Output = @("path`t$managedProbeRoot")
+        $confirmedRoot = Confirm-UnityCliManagedInstallRoot -Root $managedProbeRoot
+        if (-not $outsideRejected -or $confirmedRoot -cne $managedProbeRoot) {
+            Write-Host '::error file=scripts/unity/ensure-editor.ps1::TSV root readback must confirm the managed root and reject an outside root.'
             $failed = $true
         }
     } catch {
