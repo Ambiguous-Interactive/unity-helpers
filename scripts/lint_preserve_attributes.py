@@ -8,6 +8,8 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from cli_encoding import configure_output
+
 ROOT = Path(__file__).resolve().parents[1]
 NOT_OURS = {
     "ObsoleteAttribute": "System.ObsoleteAttribute",
@@ -177,4 +179,5 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    configure_output()
     sys.exit(main())

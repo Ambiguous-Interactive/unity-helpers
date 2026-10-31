@@ -104,6 +104,7 @@ function New-TestRepo {
     Copy-Item (Join-Path $repoRoot 'scripts/lint-cspell-config.js') (Join-Path $scriptsDir 'lint-cspell-config.js') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/lint_cspell_config.py') (Join-Path $scriptsDir 'lint_cspell_config.py') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/cspell_config.py') (Join-Path $scriptsDir 'cspell_config.py') -Force
+    Copy-Item (Join-Path $repoRoot 'scripts/cli_encoding.py') (Join-Path $scriptsDir 'cli_encoding.py') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/validate-lint-error-codes.ps1') (Join-Path $scriptsDir 'validate-lint-error-codes.ps1') -Force
     # configure-git-defaults.ps1 is preserved as a CLI entry point; it also
     # depends on git-push-defaults-helpers.ps1 (already copied above).

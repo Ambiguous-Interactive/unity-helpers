@@ -107,6 +107,7 @@ spelling of each word and the file's line endings; word insertion refuses cross-
 before writing. Use `--config <path>` when checking or updating a separate spelling configuration.
 Set `PRESERVE_ATTRIBUTES_ROOT` to check a separate runtime source tree. Diagnostics use absolute
 paths when that tree is on a different Windows drive from the repository.
+These command-line tools write UTF-8 diagnostics even when Windows pipes use a legacy encoding.
 
 ```bash
 npm run lint:doc-identifiers

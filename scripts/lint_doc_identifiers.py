@@ -9,6 +9,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from cli_encoding import configure_output
 from lint_asmdef import read_object
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -130,4 +131,5 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    configure_output()
     sys.exit(main())

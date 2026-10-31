@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -210,6 +212,38 @@ def test_cli_runs_from_another_directory(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stderr
     assert "Would add" in result.stdout
     assert model.read_config(path)[1]["words"] == []
+
+
+@pytest.mark.parametrize("legacy", [False, True])
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_cli_keeps_unicode_output_under_legacy_windows_encoding(
+    legacy: bool, dry_run: bool, tmp_path: Path
+) -> None:
+    if legacy:
+        node = shutil.which("node")
+        if node is None:
+            pytest.skip("Node is required for its compatibility entry point")
+        command = [node, str(model.ROOT / "scripts/add-cspell-word.js")]
+    else:
+        command = [sys.executable, str(model.ROOT / "scripts/add_cspell_word.py")]
+    path = config(tmp_path, base())
+    original = path.read_bytes()
+    arguments = ["--config", str(path), *(["--dry-run"] if dry_run else []), "words", "λ"]
+    result = subprocess.run(
+        [*command, *arguments],
+        cwd=tmp_path,
+        env=dict(os.environ, PYTHONUTF8="0", PYTHONIOENCODING="cp1252"),
+        capture_output=True,
+        encoding="utf-8",
+        timeout=30,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "λ" in result.stdout
+    if dry_run:
+        assert path.read_bytes() == original
+    else:
+        assert model.read_config(path)[1]["words"] == ["λ"]
 
 
 @pytest.mark.parametrize("arguments", [[], ["unknown", "Word"], ["words"]])

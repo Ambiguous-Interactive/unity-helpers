@@ -9,6 +9,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from cli_encoding import configure_output
 from cspell_config import ROOT, buckets, read_config, write_config
 from lint_cspell_config import check
 
@@ -111,4 +112,5 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
+    configure_output()
     sys.exit(main())
