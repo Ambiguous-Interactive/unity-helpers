@@ -119,28 +119,79 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             Assert.AreEqual(4, random.UintCalls, "The out-of-contract draw must be rejected.");
         }
 
-        [Test]
-        public void NextStaysBelowIntMaxValueWhenTheSourceNeverYields()
+        [TestCase(false)]
+        [TestCase(true)]
+        public void SignedSamplingFallsBackInsideItsRangeOnEntropyExhaustion(bool wide)
         {
             ScriptedRandom random = new();
             random.SetConstant(AllOnes32);
+            if (wide)
+            {
+                Assert.AreEqual(0L, random.NextLong());
+                Assert.AreEqual(2 * ((1 << 20) + 1), random.UintCalls);
+            }
+            else
+            {
+                Assert.AreEqual(0, random.Next());
+                Assert.AreEqual((1 << 16) + 1, random.UintCalls);
+            }
+        }
 
-            int value = random.Next();
+        [TestCase(false)]
+        [TestCase(true)]
+        public void BoundedSamplingFallsBackInsideItsRangeOnEntropyExhaustion(bool wide)
+        {
+            ScriptedRandom random = new();
+            random.SetConstant(0u);
+            if (wide)
+            {
+                Assert.AreEqual(0UL, random.NextUlong(3UL));
+                Assert.AreEqual(2 * ((1 << 20) + 1), random.UintCalls);
+            }
+            else
+            {
+                Assert.AreEqual(0u, random.NextUint(3u));
+                Assert.AreEqual((1 << 16) + 1, random.UintCalls);
+            }
+        }
 
-            Assert.IsTrue(0 <= value, "A degraded answer is still non-negative.");
-            Assert.IsTrue(value < int.MaxValue, "A degraded answer still honours the contract.");
+        [TestCase(false)]
+        [TestCase(true)]
+        public void BoundedFallbackRetainsTheLastProductWithoutClaimingExactness(bool wide)
+        {
+            ScriptedRandom ordinary = new();
+            ordinary.SetConstant(2u);
+            ScriptedRandom exact = new();
+            exact.SetConstant(2u);
+            if (wide)
+            {
+                const ulong bound = 0x8000000000000001UL;
+                const ulong draw = 0x0000000200000002UL;
+                ulong value = ordinary.NextUlong(bound);
+                Assert.AreEqual(ExpectedMultiplyHigh(draw, bound, 64), new BigInteger(value));
+                Assert.IsTrue(value < bound);
+                Assert.IsFalse(exact.TryNextUlong(bound, out ulong refused));
+                Assert.AreEqual(0UL, refused);
+            }
+            else
+            {
+                const uint bound = 0x80000001u;
+                uint value = ordinary.NextUint(bound);
+                Assert.AreEqual(ExpectedMultiplyHigh(2u, bound, 32), new BigInteger(value));
+                Assert.IsTrue(value < bound);
+                Assert.IsFalse(exact.TryNextUint(bound, out uint refused));
+                Assert.AreEqual(0u, refused);
+            }
+            Assert.AreEqual(ordinary.UintCalls, exact.UintCalls);
         }
 
         [Test]
-        public void NextLongStaysBelowLongMaxValueWhenTheSourceNeverYields()
+        public void GaussianSamplingFallsBackToItsMeanOnEntropyExhaustion()
         {
             ScriptedRandom random = new();
-            random.SetConstant(AllOnes32);
-
-            long value = random.NextLong();
-
-            Assert.IsTrue(0 <= value, "A degraded answer is still non-negative.");
-            Assert.IsTrue(value < long.MaxValue, "A degraded answer still honours the contract.");
+            random.SetConstant(0u);
+            Assert.AreEqual(7d, random.NextGaussian(7d, 3d));
+            Assert.AreEqual(4 * ((1 << 20) + 1), random.UintCalls);
         }
 
         [Test]
@@ -206,15 +257,85 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             }
         }
 
-        [Test]
-        public void AnExhaustedSourceDegradesRatherThanThrowing()
+        [TestCase(false)]
+        [TestCase(true)]
+        public void OffsetBoundsRetainTheirMinimumOnEntropyExhaustion(bool wide)
         {
             ScriptedRandom random = new();
             random.SetConstant(0u);
+            if (wide)
+            {
+                Assert.AreEqual(7UL, random.NextUlong(7UL, 10UL));
+            }
+            else
+            {
+                Assert.AreEqual(7u, random.NextUint(7u, 10u));
+            }
+        }
 
-            uint value = random.NextUint(3u);
+        [TestCase(false, false)]
+        [TestCase(false, true)]
+        [TestCase(true, false)]
+        [TestCase(true, true)]
+        public void BoundedSamplingHonoursTheLastPermittedDraw(bool wide, bool exhausted)
+        {
+            int limit = wide ? (1 << 20) + 1 : (1 << 16) + 1;
+            ScriptedRandom random = new();
+            random.SetPrefix(0u, (limit - (exhausted ? 0 : 1)) * (wide ? 2 : 1));
+            random.SetConstant(uint.MaxValue);
+            random.MaximumUintCalls = limit * (wide ? 2 : 1);
+            if (exhausted)
+            {
+                if (wide)
+                {
+                    Assert.AreEqual(0UL, random.NextUlong(3UL));
+                }
+                else
+                {
+                    Assert.AreEqual(0u, random.NextUint(3u));
+                }
+            }
+            else
+            {
+                Assert.AreEqual(2UL, wide ? random.NextUlong(3UL) : random.NextUint(3u));
+            }
+            Assert.AreEqual(random.MaximumUintCalls, random.UintCalls);
+        }
 
-            Assert.IsTrue(value < 3u);
+        [TestCase(false)]
+        [TestCase(true)]
+        public void SignedSamplingAcceptsItsLastPermittedDraw(bool wide)
+        {
+            int limit = wide ? (1 << 20) + 1 : (1 << 16) + 1;
+            ScriptedRandom random = new();
+            random.SetPrefix(AllOnes32, (limit - 1) * (wide ? 2 : 1));
+            random.SetConstant(0u);
+            random.MaximumUintCalls = limit * (wide ? 2 : 1);
+            Assert.AreEqual(0L, wide ? random.NextLong() : random.Next());
+            Assert.AreEqual(random.MaximumUintCalls, random.UintCalls);
+        }
+
+        [TestCase(0, false)]
+        [TestCase(1048576, false)]
+        [TestCase(1048577, true)]
+        public void FullRangeDoubleRejectsNonFiniteDrawsWithinItsBudget(
+            int rejectedDraws,
+            bool exhausted
+        )
+        {
+            ScriptedRandom random = new();
+            random.SetPrefix(AllOnes32, rejectedDraws * 2);
+            random.SetConstant(0u);
+            random.MaximumUintCalls = 2 * ((1 << 20) + 1);
+            if (exhausted)
+            {
+                Assert.AreEqual(-1.9999999999999998d, random.SampleFullRange());
+            }
+            else
+            {
+                Assert.AreEqual(0d, random.SampleFullRange());
+            }
+            Assert.AreEqual(2 * (rejectedDraws + (exhausted ? 0 : 1)), random.UintCalls);
         }
 
         [Test]
@@ -407,15 +528,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
 
         [TestCase(false)]
         [TestCase(true)]
-        public void InfiniteZeroUpperBoundsKeepFallbacksInsideTheNumericRange(bool negativeZero)
+        public void InfiniteZeroUpperBoundsFallBackInsideTheirRangeOnEntropyExhaustion(
+            bool negativeZero
+        )
         {
             float floatMaximum = BitConverter.Int32BitsToSingle(negativeZero ? int.MinValue : 0);
             ScriptedRandom floating = new();
             floating.SetConstant(0u);
             floating.MaximumUintCalls = (1 << 16) + 1;
-            float floatValue = floating.NextFloat(float.NegativeInfinity, floatMaximum);
-            Assert.IsTrue(floatValue < floatMaximum);
-            Assert.AreEqual(float.MinValue, floatValue);
+            Assert.AreEqual(
+                float.MinValue,
+                floating.NextFloat(float.NegativeInfinity, floatMaximum)
+            );
             Assert.AreEqual(floating.MaximumUintCalls, floating.UintCalls);
 
             double doubleMaximum = BitConverter.Int64BitsToDouble(
@@ -424,9 +548,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             ScriptedRandom legacy = new();
             legacy.SetConstant(0u);
             legacy.MaximumUintCalls = 2 * ((1 << 20) + 1);
-            double doubleValue = legacy.NextDouble(double.NegativeInfinity, doubleMaximum);
-            Assert.IsTrue(doubleValue < doubleMaximum);
-            Assert.AreEqual(double.MinValue, doubleValue);
+            Assert.AreEqual(
+                double.MinValue,
+                legacy.NextDouble(double.NegativeInfinity, doubleMaximum)
+            );
             Assert.AreEqual(legacy.MaximumUintCalls, legacy.UintCalls);
 
             ScriptedRandom exact = new();
@@ -451,28 +576,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             Assert.AreEqual(random.MaximumUintCalls, random.UintCalls);
         }
 
-        [TestCase(0d, -double.MaxValue)]
-        [TestCase(double.PositiveInfinity, double.MaxValue)]
-        public void LegacyInfiniteDoubleStopsAfterNestedEntropyExhaustion(
-            double maximum,
-            double expected
-        )
+        [TestCase(0d)]
+        [TestCase(double.PositiveInfinity)]
+        public void InfiniteDoubleFallsBackAfterNestedEntropyExhaustion(double maximum)
         {
             ScriptedRandom random = new();
             random.SetConstant(0u);
             random.MaximumUintCalls = 2 * ((1 << 20) + 1);
 
-            Assert.AreEqual(expected, random.NextDouble(double.NegativeInfinity, maximum));
+            Assert.AreEqual(double.MinValue, random.NextDouble(double.NegativeInfinity, maximum));
             Assert.AreEqual(random.MaximumUintCalls, random.UintCalls);
         }
 
         [Test]
-        public void LegacyDoubleRetainsItsNestedBoundedFallback()
+        public void InfiniteDoubleFallsBackOnNestedBoundedRejection()
         {
             ScriptedRandom random = new();
             random.SetConstant(0u);
 
-            Assert.AreEqual(2.0, random.NextDouble(2.0, double.PositiveInfinity));
+            Assert.AreEqual(2d, random.NextDouble(2.0, double.PositiveInfinity));
             Assert.AreEqual(2 * ((1 << 20) + 1), random.UintCalls);
         }
 
@@ -536,7 +658,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         }
 
         [TestCase(1048575, true, 1048576)]
-        [TestCase(1048576, false, 1048578)]
+        [TestCase(1048576, false, 1048577)]
         public void TryNextGaussianHonoursTheLastPermittedPair(
             int rejectedPairs,
             bool expectedSuccess,
@@ -556,7 +678,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         }
 
         [Test]
-        public void FailedGaussianDoesNotCacheItsDegradedPartner()
+        public void FailedGaussianDoesNotDrawOrCacheAnAlternatePartner()
         {
             ScriptedRandom random = new();
             random.SetPrefix(0u, 4 * ((1 << 20) + 1));
@@ -699,6 +821,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             private uint _constant;
             private uint _prefix;
             private int _prefixRemaining;
+
+            public double SampleFullRange()
+            {
+                return NextDoubleFullRange();
+            }
 
             public void EnqueueUint(uint value)
             {

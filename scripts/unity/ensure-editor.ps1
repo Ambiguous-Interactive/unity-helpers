@@ -2239,6 +2239,9 @@ function Get-UnityCliInstallRoot {
         if ($trimmed.Length -eq 0) {
             continue
         }
+        if ($trimmed.StartsWith("path`t", [StringComparison]::Ordinal)) {
+            $trimmed = $trimmed.Substring(5).Trim()
+        }
         if (Test-LooksLikeAbsolutePath $trimmed) {
             $candidate = $trimmed
         }

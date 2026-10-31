@@ -320,6 +320,11 @@ const CHECKS = [
     name: "Gitignore-docs linter self-test",
     run: "npm run test:gitignore-docs"
   },
+  {
+    id: "check-runner",
+    name: "Python check execution and completion",
+    run: "npm run test:check-runner"
+  },
   { id: "run-repo-lint", name: "Repo Lint runner contracts", run: "npm run test:run-repo-lint" },
   {
     id: "run-contract-tests",
@@ -419,7 +424,9 @@ const CHECKS = [
   {
     id: "unity-acceptance-runner",
     name: "Unity native acceptance orchestration",
-    run: "npm run test:unity-acceptance-runner"
+    run: "npm run test:unity-acceptance-runner",
+    completionPattern:
+      "^[1-9][0-9]* orchestration, exact XML and raw evidence integration controls passed\\.\\r?$"
   },
   {
     id: "unity-acceptance-evidence",

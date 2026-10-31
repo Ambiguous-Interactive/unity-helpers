@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
+"""Validate documentation links while preserving the standalone command contract."""
+
+from __future__ import annotations
+
 import os
 import re
 import sys
 import urllib.parse
-
+from pathlib import Path
 
 EXCLUDE_DIRS = {".git", "node_modules", ".vs"}
 
@@ -24,27 +28,31 @@ def should_check_target(target: str) -> bool:
         return False
     # only check links that end in .md (ignoring anchors/query)
     core = re.sub(r"[?#].*$", "", target)
-    try:
-        core = urllib.parse.unquote(core)
-    except Exception:
-        pass
+    core = urllib.parse.unquote(core)
     return core.lower().endswith(".md")
 
 
 def main(root: str) -> int:
+    if not Path(root).is_dir():
+        print(f"Markdown scan directory not found: {root}", file=sys.stderr)
+        return 1
     issues = 0
-    for dirpath, dirnames, filenames in os.walk(root):
+    checked = 0
+    walk_errors: list[OSError] = []
+    for dirpath, dirnames, filenames in os.walk(root, onerror=walk_errors.append):
         # prune excluded directories
         dirnames[:] = [d for d in dirnames if d not in EXCLUDE_DIRS]
         for filename in filenames:
             if not filename.lower().endswith(".md"):
                 continue
-            path = os.path.join(dirpath, filename)
+            checked += 1
+            path = os.path.join(dirpath, filename)  # noqa: PTH118 - preserve diagnostic path spelling.
             try:
-                with open(path, "r", encoding="utf-8") as f:
+                with Path(path).open("r", encoding="utf-8") as f:
                     lines = f.readlines()
-            except Exception:
-                continue
+            except (OSError, UnicodeError) as error:
+                print(f"Cannot read markdown source {path}: {error}", file=sys.stderr)
+                return 1
             for idx, line in enumerate(lines, start=1):
                 for m in LINK_RE.finditer(line):
                     text = m.group("text").strip()
@@ -52,34 +60,36 @@ def main(root: str) -> int:
                     if not should_check_target(target_raw):
                         continue
                     target_core = re.sub(r"[?#].*$", "", target_raw)
-                    try:
-                        target_core = urllib.parse.unquote(target_core)
-                    except Exception:
-                        pass
-                    file_name = os.path.basename(target_core)
-                    base_name, _ = os.path.splitext(file_name)
+                    target_core = urllib.parse.unquote(target_core)
+                    file_name = Path(target_core).name
 
                     is_exact_file_name = text.lower() == file_name.lower()
-                    looks_like_path = (("/" in text) or ("\\" in text)) and not re.search(r"\s", text)
+                    looks_like_path = (("/" in text) or ("\\" in text)) and not re.search(
+                        r"\s", text
+                    )
                     looks_like_markdown = text.strip().lower().endswith(".md")
 
-                    if (
-                        is_exact_file_name
-                        or looks_like_path
-                        or looks_like_markdown
-                    ):
+                    if is_exact_file_name or looks_like_path or looks_like_markdown:
                         issues += 1
                         msg = f"{path}:{idx}: Link text '{text}' should be human-readable, not a raw file name or path (target: {target_raw})"
                         print(msg)
 
+    for walk_error in walk_errors:
+        print(
+            f"Cannot read markdown source {walk_error.filename}: {walk_error}",
+            file=sys.stderr,
+        )
+    if walk_errors:
+        return 1
+    if checked == 0:
+        print(f"No markdown sources found: {root}", file=sys.stderr)
+        return 1
     if issues:
         print(
             f"Found {issues} documentation link(s) with non-human-readable text.",
             file=sys.stderr,
         )
-        print(
-            "Use a descriptive phrase instead of the raw file name.", file=sys.stderr
-        )
+        print("Use a descriptive phrase instead of the raw file name.", file=sys.stderr)
         return 1
     return 0
 

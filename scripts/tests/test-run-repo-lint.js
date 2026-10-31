@@ -298,20 +298,32 @@ runTest("the aggregation contract survives concurrency", async () => {
 });
 
 runTest("concurrent checks actually overlap", async () => {
-  // Without this the pool could be a serial loop wearing a Promise, and every wall-clock claim made
-  // for `--jobs` would be false while all the correctness assertions above still passed.
-  const checks = Array.from({ length: 4 }, (unused, index) => ({
-    id: `sleeper-${index}`,
-    name: `sleeper ${index}`,
-    run: "sleep 1"
-  }));
-  const startedAt = Date.now();
-  await runQuietly(checks, 4);
-  const elapsed = (Date.now() - startedAt) / 1000;
-  assert.ok(
-    elapsed < 2.5,
-    `four one-second checks at --jobs 4 took ${elapsed.toFixed(2)}s; they did not overlap`
-  );
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "check-overlap-"));
+  try {
+    const markers = Array.from({ length: 4 }, (unused, index) => path.join(directory, `${index}`));
+    const checks = markers.map((marker, index) => {
+      const code = `const fs = require("fs");
+        const markers = ${JSON.stringify(markers)};
+        fs.writeFileSync(${JSON.stringify(marker)}, "ready");
+        const deadline = Date.now() + 10000;
+        function observe() {
+          if (markers.every((file) => fs.existsSync(file))) process.exit(0);
+          if (Date.now() > deadline) process.exit(3);
+          setTimeout(observe, 10);
+        }
+        observe();`;
+      const quoted = "'" + code.replace(/'/g, "'\\''") + "'";
+      return { id: `barrier-${index}`, name: `barrier ${index}`, run: `node -e ${quoted}` };
+    });
+    const { results } = await runQuietly(checks, 4);
+    assert.deepStrictEqual(
+      results.map((result) => result.ok),
+      [true, true, true, true],
+      "every child must observe all four live arrivals; a serial worker cannot satisfy the barrier"
+    );
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 runTest("a command bash itself cannot be launched for settles exactly once", async () => {
@@ -535,6 +547,7 @@ runTest("no linter in scripts/ has been left unreachable", () => {
     ["scripts/lint-skill-sizes.ps1", "workflow"],
     ["scripts/lint-unity-test-modules.ps1", "workflow"],
     ["scripts/lint-csharp-format.ps1", "preflight"],
+    ["scripts/lint_meta_files.py", "preflight"],
     ["scripts/validate-git-push-config.ps1", "prepush"]
   ]);
 
@@ -656,6 +669,9 @@ runTest("no linter in scripts/ has been left unfalsifiable", () => {
   // A self-test nothing runs is worth exactly as much as one that cannot fail, so reachability is
   // part of the property rather than a separate assertion.
   const reachableTests = new Set([
+    ...[...selfTestSource.keys()].filter(
+      (file) => filesInvoking(".github/workflows", file).length > 0
+    ),
     ...scriptPathsIn(
       leafCommands(require(path.join(repoRoot, "scripts", "run-contract-tests.js")).checksFor(true))
     ),
@@ -673,7 +689,7 @@ runTest("no linter in scripts/ has been left unfalsifiable", () => {
   // spawns others, scans no corpus and has no report to make, so "a green run of it is not evidence
   // it still fires" does not parse for it. The assertion under it is that exclusion's red half:
   // an entry that starts being spawned as a gate, or that disappears, must leave the set.
-  const notGates = new Set(["check-runner.js"]);
+  const notGates = new Set(["check-runner.js", "check_runner.py"]);
 
   const spawnedAsAGate = new Set([
     ...scriptPathsIn(

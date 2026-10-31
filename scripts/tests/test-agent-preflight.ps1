@@ -73,6 +73,11 @@ function New-TestRepo {
 
     $repoRoot = Split-Path -Parent $PSScriptRoot | Split-Path -Parent
     Copy-Item (Join-Path $repoRoot 'scripts/agent-preflight.ps1') (Join-Path $scriptsDir 'agent-preflight.ps1') -Force
+    Copy-Item (Join-Path $repoRoot 'scripts/lint_meta_files.py') (Join-Path $scriptsDir 'lint_meta_files.py') -Force
+    $pythonProject = Join-Path $scriptsDir 'python~'
+    New-Item -ItemType Directory -Path $pythonProject -Force | Out-Null
+    Copy-Item (Join-Path $repoRoot 'scripts/python~/pyproject.toml') (Join-Path $pythonProject 'pyproject.toml') -Force
+    Copy-Item (Join-Path $repoRoot 'scripts/python~/uv.lock') (Join-Path $pythonProject 'uv.lock') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/git-staging-helpers.ps1') (Join-Path $scriptsDir 'git-staging-helpers.ps1') -Force
     # agent-preflight.ps1 dot-sources these helpers at startup; omitting the
     # copy would surface as an obscure "path not found" during the dot-source
@@ -3176,6 +3181,155 @@ try {
 finally {
     Remove-Item -Path $repo19 -Recurse -Force -ErrorAction SilentlyContinue
     Remove-Item -Path $nonRepo19 -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+Write-Host "`nTest group: Staged C# companion deletions" -ForegroundColor Magenta
+foreach ($renameCompanion in @($false, $true)) {
+    foreach ($deleteSource in @($false, $true)) {
+        foreach ($unrelatedChange in @($false, $true)) {
+            $deletionRepo = New-TestRepo -ConfigurePushDefaults
+            try {
+                $runtimeDirectory = Join-Path $deletionRepo 'Runtime'
+                New-Item -ItemType Directory -Path $runtimeDirectory -Force | Out-Null
+                Set-Content -LiteralPath (Join-Path $runtimeDirectory 'Example.cs') -Value 'class Example {}'
+                [System.IO.File]::WriteAllText((Join-Path $runtimeDirectory 'Example.cs.meta'), "fileFormatVersion: 2`r`nguid: 0123456789abcdef0123456789abcdef`r`nMonoImporter:`r`n  executionOrder: 0`r`n")
+                & git -C $deletionRepo add -- Runtime
+                & git -C $deletionRepo -c user.email=test@example.com -c user.name=test commit -q -m 'Add source and companion'
+                if ($LASTEXITCODE -ne 0) { throw 'Could not commit deletion regression fixture' }
+                if ($renameCompanion) {
+                    & git -C $deletionRepo config diff.renames true
+                    & git -C $deletionRepo mv -- Runtime/Example.cs.meta Runtime/Relocated.cs.meta
+                }
+                else { & git -C $deletionRepo rm -q -- Runtime/Example.cs.meta }
+                if ($deleteSource) { & git -C $deletionRepo rm -q -- Runtime/Example.cs }
+                if ($unrelatedChange) { Set-Content -LiteralPath (Join-Path $deletionRepo 'unrelated.txt') -Value 'changed' }
+                if ($renameCompanion) {
+                    $renameStatus = & git -C $deletionRepo diff --cached --name-status
+                    Write-TestResult 'MetadataDeletion_GitDetectsRename' (($renameStatus -join "`n") -match '(?m)^R100\s+Runtime/Example.cs.meta\s+Runtime/Relocated.cs.meta$') ($renameStatus -join "`n")
+                }
+                $beforeIndex = [System.IO.File]::ReadAllBytes((Join-Path $deletionRepo '.git/index'))
+                $result = Invoke-Preflight -RepoPath $deletionRepo
+                $label = "MetadataDeletion_Renamed$renameCompanion`_SourceDeleted$deleteSource`_OtherChange$unrelatedChange"
+                $expected = if ($deleteSource) { 0 } else { 1 }
+                Write-TestResult "$label`_Exit" ($result.ExitCode -eq $expected) $result.Output
+                if (-not $deleteSource) {
+                    Write-TestResult "$label`_Path" ($result.Output -match 'UNH007' -and $result.Output -match 'Example.cs.meta') $result.Output
+                }
+                Write-TestResult "$label`_Index" (Test-ByteArrayEqual -Expected $beforeIndex -Actual ([System.IO.File]::ReadAllBytes((Join-Path $deletionRepo '.git/index')))) 'Check mode must preserve the index'
+            }
+            finally {
+                Remove-Item -LiteralPath $deletionRepo -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+}
+
+Write-Host "`nTest group: Explicit selections follow metadata renames" -ForegroundColor Magenta
+$renameSelections = @(
+    @{ Name = 'Destination'; Selection = 'Metadata'; DeleteSource = $false; Suffix = '' },
+    @{ Name = 'SourceDeleted'; Selection = 'Metadata'; DeleteSource = $true; Suffix = '' },
+    @{ Name = 'Owner'; Selection = 'Owner'; DeleteSource = $false; Suffix = '' },
+    @{ Name = 'OwnerSourceDeleted'; Selection = 'Owner'; DeleteSource = $true; Suffix = '' },
+    @{ Name = 'Unrelated'; Selection = 'Unrelated'; DeleteSource = $false; Suffix = '' },
+    @{ Name = 'SpacesUnicode'; Selection = 'Metadata'; DeleteSource = $false; Suffix = ' café with spaces' },
+    @{ Name = 'RenameConfigDisabled'; Selection = 'Metadata'; DeleteSource = $false; Suffix = ''; DisableRenameDetection = $true },
+    @{ Name = 'ModifiedDestination'; Selection = 'Metadata'; DeleteSource = $false; Suffix = ''; ModifyDestination = $true }
+)
+if (-not $IsWindows) { $renameSelections += @{ Name = 'NewlineTab'; Selection = 'Metadata'; DeleteSource = $false; Suffix = " line`nwith`ttab" } }
+foreach ($scenario in $renameSelections) {
+    $renameRepo = New-TestRepo -ConfigurePushDefaults
+    try {
+        $runtimeDirectory = Join-Path $renameRepo 'Runtime'
+        New-Item -ItemType Directory -Path $runtimeDirectory -Force | Out-Null
+        $source = 'Runtime/Example' + $scenario.Suffix + '.cs'
+        $destination = 'Runtime/Relocated' + $scenario.Suffix + '.cs.meta'
+        [IO.File]::WriteAllText((Join-Path $renameRepo $source), "class Example {}`r`n")
+        [IO.File]::WriteAllText((Join-Path $renameRepo "$source.meta"), "fileFormatVersion: 2`r`nguid: 0123456789abcdef0123456789abcdef`r`nMonoImporter:`r`n  executionOrder: 0`r`n")
+        [IO.File]::WriteAllText((Join-Path $renameRepo 'Runtime.meta'), "fileFormatVersion: 2`r`nguid: fedcba9876543210fedcba9876543210`r`nfolderAsset: yes`r`nDefaultImporter:`r`n  externalObjects: {}`r`n  userData:`r`n  assetBundleName:`r`n  assetBundleVariant:`r`n")
+        [IO.File]::WriteAllText((Join-Path $renameRepo 'selection.txt'), "unrelated`r`n")
+        & git -C $renameRepo add -- Runtime Runtime.meta selection.txt
+        & git -C $renameRepo -c user.email=test@example.com -c user.name=test commit -q -m 'Create scoped rename fixture'
+        if ($LASTEXITCODE -ne 0) { throw 'Could not commit scoped rename fixture' }
+        $renameSetting = if ($scenario.ContainsKey('DisableRenameDetection')) { 'false' } else { 'true' }
+        & git -C $renameRepo config diff.renames $renameSetting
+        & git -C $renameRepo mv -- "$source.meta" $destination
+        if ($LASTEXITCODE -ne 0) { throw 'Could not stage metadata rename' }
+        if ($scenario.ContainsKey('ModifyDestination')) {
+            $destinationPath = Join-Path $renameRepo $destination
+            [IO.File]::WriteAllText($destinationPath, [IO.File]::ReadAllText($destinationPath).Replace('executionOrder: 0', 'executionOrder: 42'))
+            & git -C $renameRepo add -- $destination
+        }
+        if ($scenario.DeleteSource) { & git -C $renameRepo rm -q -- $source }
+        $selection = $destination
+        if ($scenario.Selection -eq 'Owner') {
+            $selection = $destination -replace '\.meta$', ''
+            $year = (Get-Date).Year
+            [IO.File]::WriteAllText((Join-Path $renameRepo $selection), "// MIT License - Copyright (c) $year wallstop`r`n// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE`r`n`r`nnamespace WallstopStudios.UnityHelpers.Probes`r`n{`r`n    internal sealed class Relocated {}`r`n}`r`n")
+            & git -C $renameRepo add -- $selection
+        }
+        elseif ($scenario.Selection -eq 'Unrelated') { $selection = 'selection.txt' }
+        $sourceBefore = if ($scenario.DeleteSource) { $null } else { [IO.File]::ReadAllBytes((Join-Path $renameRepo $source)) }
+        $destinationBefore = [IO.File]::ReadAllBytes((Join-Path $renameRepo $destination))
+        $unrelatedBefore = [IO.File]::ReadAllBytes((Join-Path $renameRepo 'selection.txt'))
+        $indexBefore = [IO.File]::ReadAllBytes((Join-Path $renameRepo '.git/index'))
+        $result = Invoke-Preflight -RepoPath $renameRepo -Arguments @('-Paths', $selection)
+        $expected = if ($scenario.DeleteSource -or $scenario.Selection -eq 'Unrelated') { 0 } else { 1 }
+        $label = "MetadataScopedRename_$($scenario.Name)"
+        Write-TestResult "$label`_Exit" ($result.ExitCode -eq $expected) $result.Output
+        $reportedCompanion = "$source.meta".Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A').Replace(',', '%2C').Replace(':', '%3A')
+        if ($expected -eq 1) { Write-TestResult "$label`_Path" ($result.Output.Contains('UNH007') -and $result.Output.Contains($reportedCompanion)) $result.Output }
+        Write-TestResult "$label`_Index" (Test-ByteArrayEqual $indexBefore ([IO.File]::ReadAllBytes((Join-Path $renameRepo '.git/index')))) 'Read-only rename validation changed the index'
+        Write-TestResult "$label`_Destination" (Test-ByteArrayEqual $destinationBefore ([IO.File]::ReadAllBytes((Join-Path $renameRepo $destination)))) 'Read-only rename validation changed the destination'
+        Write-TestResult "$label`_Unrelated" (Test-ByteArrayEqual $unrelatedBefore ([IO.File]::ReadAllBytes((Join-Path $renameRepo 'selection.txt')))) 'Read-only rename validation changed unrelated input'
+        if (-not $scenario.DeleteSource) { Write-TestResult "$label`_Source" (Test-ByteArrayEqual $sourceBefore ([IO.File]::ReadAllBytes((Join-Path $renameRepo $source)))) 'Read-only rename validation changed the unselected source' }
+        if ($scenario.Name -eq 'Destination') {
+            $fixed = Invoke-Preflight -RepoPath $renameRepo -Arguments @('-Fix', '-Paths', $selection)
+            Write-TestResult "$label`_FixExit" ($fixed.ExitCode -eq 1 -and $fixed.Output.Contains('UNH007')) $fixed.Output
+            Write-TestResult "$label`_FixSource" (Test-ByteArrayEqual $sourceBefore ([IO.File]::ReadAllBytes((Join-Path $renameRepo $source)))) 'Rename validation widened formatter or write scope'
+            Write-TestResult "$label`_FixCompanionAbsent" (-not (Test-Path -LiteralPath (Join-Path $renameRepo "$source.meta"))) 'Rename validation created an unselected companion'
+            Write-TestResult "$label`_FixUnrelated" (Test-ByteArrayEqual $unrelatedBefore ([IO.File]::ReadAllBytes((Join-Path $renameRepo 'selection.txt')))) 'Rename validation wrote unrelated input'
+        }
+    }
+    finally { Remove-Item -LiteralPath $renameRepo -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+Write-Host "`nTest group: C# importer shapes, including metadata-only changes" -ForegroundColor Magenta
+foreach ($scenario in @(
+    @{ Name = 'Stub'; Content = "fileFormatVersion: 2`nguid: 0123456789abcdef0123456789abcdef`n"; Expected = 1 },
+    @{ Name = 'Valid'; Content = "fileFormatVersion: 2`nguid: 0123456789abcdef0123456789abcdef`nMonoImporter:`n  executionOrder: 0`n"; Expected = 0 },
+    @{ Name = 'Customized'; Content = "fileFormatVersion: 2`nguid: 0123456789abcdef0123456789abcdef`nMonoImporter:`n  executionOrder: -42`n  userData: retained`n"; Expected = 0 },
+    @{ Name = 'DuplicateGuid'; Content = "fileFormatVersion: 2`nguid: 0123456789abcdef0123456789abcdef`nguid: 0123456789abcdef0123456789abcdef`nMonoImporter:`n  executionOrder: 0`n"; Expected = 1 },
+    @{ Name = 'MissingVersion'; Content = "guid: 0123456789abcdef0123456789abcdef`nMonoImporter:`n  executionOrder: 0`n"; Expected = 1 },
+    @{ Name = 'MalformedGuid'; Content = "fileFormatVersion: 2`nguid: broken`nMonoImporter:`n  executionOrder: 0`n"; Expected = 1 },
+    @{ Name = 'MalformedLaterEntry'; Content = "fileFormatVersion: 2`nguid: 0123456789abcdef0123456789abcdef`nMonoImporter:`n  executionOrder: 0`n  - invalid`n"; Expected = 1 },
+    @{ Name = 'StagedStubRepairedWorktree'; Content = "fileFormatVersion: 2`nguid: 0123456789abcdef0123456789abcdef`nMonoImporter:`n  executionOrder: 0`n"; StagedContent = "fileFormatVersion: 2`nguid: 0123456789abcdef0123456789abcdef`n"; Expected = 1 },
+    @{ Name = 'DuplicateSetting'; Content = "fileFormatVersion: 2`nguid: 0123456789abcdef0123456789abcdef`nMonoImporter:`n  executionOrder: 0`n  executionOrder: 100`n"; Expected = 1 }
+)) {
+    $shapeRepo = New-TestRepo -ConfigurePushDefaults
+    try {
+        $runtimeDirectory = Join-Path $shapeRepo 'Runtime'
+        New-Item -ItemType Directory -Path $runtimeDirectory -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $runtimeDirectory 'Example.cs') -Value 'class Example {}'
+        $companion = Join-Path $runtimeDirectory 'Example.cs.meta'
+        if ($scenario.ContainsKey('StagedContent')) {
+            [System.IO.File]::WriteAllText($companion, $scenario.StagedContent.Replace("`n", "`r`n"), [System.Text.UTF8Encoding]::new($false))
+            & git -C $shapeRepo add -- Runtime/Example.cs.meta
+            if ($LASTEXITCODE -ne 0) { throw 'Could not stage metadata regression fixture' }
+        }
+        [System.IO.File]::WriteAllText($companion, $scenario.Content.Replace("`n", "`r`n"), [System.Text.UTF8Encoding]::new($false))
+        $beforeBytes = [System.IO.File]::ReadAllBytes($companion)
+        $beforeIndex = [System.IO.File]::ReadAllBytes((Join-Path $shapeRepo '.git/index'))
+        $shapeResult = Invoke-Preflight -RepoPath $shapeRepo -Arguments @('-Paths', 'Runtime/Example.cs.meta')
+        Write-TestResult "MetadataShape_$($scenario.Name)_Exit" ($shapeResult.ExitCode -eq $scenario.Expected) $shapeResult.Output
+        if ($scenario.Expected -ne 0) {
+            Write-TestResult "MetadataShape_$($scenario.Name)_Path" ($shapeResult.Output -match 'UNH007' -and $shapeResult.Output -match 'Example.cs.meta') $shapeResult.Output
+        }
+        Write-TestResult "MetadataShape_$($scenario.Name)_Bytes" (Test-ByteArrayEqual -Expected $beforeBytes -Actual ([System.IO.File]::ReadAllBytes($companion))) 'Check mode must preserve metadata bytes'
+        Write-TestResult "MetadataShape_$($scenario.Name)_Index" (Test-ByteArrayEqual -Expected $beforeIndex -Actual ([System.IO.File]::ReadAllBytes((Join-Path $shapeRepo '.git/index')))) 'Check mode must preserve the index'
+    }
+    finally {
+        Remove-Item -LiteralPath $shapeRepo -Recurse -Force -ErrorAction SilentlyContinue
+    }
 }
 
 Write-Host ''

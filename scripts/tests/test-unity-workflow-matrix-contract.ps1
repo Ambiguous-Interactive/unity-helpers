@@ -498,6 +498,9 @@ function Import-EnsureEditorWatchdogFunctions {
         'Invoke-UnityCliCaptureWithTimeout',
         'Invoke-UnityCliSafe',
         'Get-UnityCliOutput',
+        'Test-LooksLikeAbsolutePath',
+        'Get-UnityCliInstallRoot',
+        'Confirm-UnityCliManagedInstallRoot',
         'Move-UnityInstallDirectoryToQuarantine',
         'Get-UnityProvisioningProfile',
         'Assert-UnityProvisioningProfile',
@@ -1164,7 +1167,8 @@ if ([string]::IsNullOrWhiteSpace($reflexVersionText)) {
 
 $runnerUsesUnityVersionsConfig = (
     $runnerBootstrapContent.Contains('.github/unity-versions.json') -and
-    $runnerBootstrapContent.Contains('jq -c ''{"unity-version": .all}''') -and
+    $runnerBootstrapContent.Contains('scripts/unity/runner_maintenance_matrix.py --output') -and
+    $runnerBootstrapContent.Contains('UH_MAINTENANCE_VERSIONS: ${{ inputs.unity-versions }}') -and
     $runnerBootstrapContent.Contains('fromJSON(needs.matrix-config.outputs.matrix)') -and
     $runnerBootstrapContent.Contains('matrix.unity-version')
 )
@@ -1282,7 +1286,9 @@ $runnerBootstrapInvokesMaintenanceFunction = (
     $runnerBootstrapContent.Contains('. $script') -and
     $runnerBootstrapContent.Contains('$maintenanceArgs = @{') -and
     $runnerBootstrapContent.Contains('UnityVersions = @($env:UH_MAINTENANCE_UNITY_VERSION)') -and
-    $runnerBootstrapContent.Contains("ProvisioningProfile = 'Full'") -and
+    $runnerBootstrapContent.Contains('ProvisioningProfile = $env:UH_MAINTENANCE_PROFILE') -and
+    $runnerBootstrapContent.Contains('UH_MAINTENANCE_PROFILE: ${{ needs.matrix-config.outputs.profile }}') -and
+    $runnerBootstrapContent.Contains('default: Full') -and
     $runnerBootstrapContent.Contains('HostOnly = $true') -and
     $runnerBootstrapContent.Contains('SkipHostBootstrap = $true') -and
     $runnerBootstrapContent.Contains('$maintenanceArgs.DetectOnly = $true') -and
@@ -3535,6 +3541,34 @@ if ($ensureEditorWatchdogImported) {
             $ensureEditorContent -notmatch 'Invoke-UnityCliSafe[^\r\n]+-AcceptCapturedOutputPattern'
         ) {
             Write-Host "::error file=scripts/unity/ensure-editor.ps1::Install-path getter and setter wiring must opt into exact output recovery after a wrapper timeout."
+            $failed = $true
+        }
+        foreach ($rootCase in @(
+            @{ Name = 'Plain'; Output = @('D:\managed editors'); Expected = 'D:\managed editors' },
+            @{ Name = 'Tsv'; Output = @("key`tvalue", "path`tD:\managed editors"); Expected = 'D:\managed editors' },
+            @{ Name = 'UnixTsv'; Output = @("path`t/tmp/managed editors"); Expected = '/tmp/managed editors' },
+            @{ Name = 'UncTsv'; Output = @("path`t\\server\editors"); Expected = '\\server\editors' },
+            @{ Name = 'HeaderOnly'; Output = @("key`tvalue"); Expected = $null },
+            @{ Name = 'RelativeTsv'; Output = @("path`trelative/editors"); Expected = $null },
+            @{ Name = 'WrongKey'; Output = @("other`tD:\managed editors"); Expected = $null }
+        )) {
+            $script:unityCliCaptureResult = @{ Success = $true; ExitCode = 0; Output = $rootCase.Output; StallKilled = $false; TimedOutWallClock = $false }
+            $observedRoot = Get-UnityCliInstallRoot
+            if ($observedRoot -cne $rootCase.Expected) {
+                Write-Host "::error file=scripts/unity/ensure-editor.ps1::CLI install-root case $($rootCase.Name) returned '$observedRoot' instead of '$($rootCase.Expected)'."
+                $failed = $true
+            }
+        }
+        $managedProbeRoot = Join-Path ([IO.Path]::GetTempPath()) 'managed-cli-root-probe'
+        $outsideProbeRoot = Join-Path ([IO.Path]::GetTempPath()) 'outside-cli-root-probe'
+        $script:unityCliCaptureResult.Output = @("path`t$outsideProbeRoot")
+        $outsideRejected = $false
+        try { $null = Confirm-UnityCliManagedInstallRoot -Root $managedProbeRoot 6>$null }
+        catch { $outsideRejected = $_.Exception.Message.Contains('outside the managed root') }
+        $script:unityCliCaptureResult.Output = @("path`t$managedProbeRoot")
+        $confirmedRoot = Confirm-UnityCliManagedInstallRoot -Root $managedProbeRoot
+        if (-not $outsideRejected -or $confirmedRoot -cne $managedProbeRoot) {
+            Write-Host '::error file=scripts/unity/ensure-editor.ps1::TSV root readback must confirm the managed root and reject an outside root.'
             $failed = $true
         }
     } catch {

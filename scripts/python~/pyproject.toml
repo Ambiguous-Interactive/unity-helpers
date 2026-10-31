@@ -6,11 +6,14 @@ dependencies = []
 
 [dependency-groups]
 dev = [
+    { include-group = "metadata" },
     "mypy>=2.4.1",
     "pyright>=1.1.414",
     "pytest>=9.2.0",
     "ruff>=0.17.3",
+    "types-pyyaml>=6.0.12.20261030",
 ]
+metadata = ["pyyaml>=6.0.3"]
 
 [tool.uv]
 package = false
@@ -39,16 +42,13 @@ warn_unreachable = true
 [tool.pyright]
 pythonVersion = "3.11"
 typeCheckingMode = "strict"
-extraPaths = ["../unity", "..", "."]
-include = ["../unity/create_unitypackage.py", "../unity/stage_unitypackage.py", "../tests/test_unitypackage.py", "check.py", "../generate_meta.py", "../tests/test_meta_generation.py", "../build-protobuf-candidate.py", "../verify-protobuf-shipped.py", "../tests/test-protobuf-candidate.py", "../unity/download-native-debugger.py", "../tests/test-native-debugger-download.py", "../lint_bundled_assemblies.py", "../tests/test_bundled_assemblies.py", "../lint_asmdef.py", "../tests/test_asmdef.py", "../pr_feedback.py", "../tests/test_pr_feedback.py", "../verify_shipped_analyzers.py", "../tests/test_verify_shipped_analyzers.py"]
+extraPaths = ["../unity", "../wiki", "..", "."]
+include = ["../check_runner.py", "../tests/test_check_runner.py", "../unity/runner_maintenance_matrix.py", "../tests/test_runner_maintenance_matrix.py", "../unity/create_unitypackage.py", "../unity/stage_unitypackage.py", "../tests/test_unitypackage.py", "check.py", "../generate_meta.py", "../tests/test_meta_generation.py", "../build-protobuf-candidate.py", "../verify-protobuf-shipped.py", "../tests/test-protobuf-candidate.py", "../unity/download-native-debugger.py", "../tests/test-native-debugger-download.py", "../lint_bundled_assemblies.py", "../tests/test_bundled_assemblies.py", "../lint_asmdef.py", "../tests/test_asmdef.py", "../pr_feedback.py", "../tests/test_pr_feedback.py", "../verify_shipped_analyzers.py", "../tests/test_verify_shipped_analyzers.py", "../lint_meta_files.py", "../tests/test_meta_lint.py", "../../.github/scripts/check_markdown_links.py", "../../.github/scripts/check_markdown_url_encoding.py", "../../.github/scripts/validate_markdown_links.py", "../tests/test_markdown_checks.py", "../wiki/generate_wiki_footer.py", "../wiki/generate_wiki_sidebar.py", "../wiki/prepare_wiki.py", "../wiki/transform_wiki_links.py", "../wiki/test_wiki_scripts.py"]
 
 [tool.unity-helpers-python]
 legacy = [
     ".devcontainer/agent-state.py",
     ".github/scripts/cancel-stuck-workflow.py",
-    ".github/scripts/check_markdown_links.py",
-    ".github/scripts/check_markdown_url_encoding.py",
-    ".github/scripts/validate_markdown_links.py",
     "scripts/benchmarks~/generate-jesse-parity.py",
     "scripts/generate-test-sprites.py",
     "scripts/generate-test-textures.py",
@@ -58,9 +58,4 @@ legacy = [
     "scripts/tests/test-unity-framework-evidence.py",
     "scripts/tests/test-watchdog-cancellation.py",
     "scripts/unity/run-browser-consumer.py",
-    "scripts/wiki/generate_wiki_footer.py",
-    "scripts/wiki/generate_wiki_sidebar.py",
-    "scripts/wiki/prepare_wiki.py",
-    "scripts/wiki/test_wiki_scripts.py",
-    "scripts/wiki/transform_wiki_links.py",
 ]

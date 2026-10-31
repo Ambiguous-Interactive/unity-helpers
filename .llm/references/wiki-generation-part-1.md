@@ -28,14 +28,14 @@ Located in `scripts/wiki/`:
 # Run bash wiki generation tests (fast, validates syntax patterns)
 bash scripts/tests/test-wiki-generation.sh
 
-# Activate virtual environment for Python tests
-source .venv/bin/activate
+# Install the locked environment for Python tests
+uv sync --project scripts/python~ --locked
 
 # Run all wiki Python tests (comprehensive, 50+ test cases)
-python -m pytest scripts/wiki/test_wiki_scripts.py -v
+uv run --project scripts/python~ --locked pytest scripts/wiki/test_wiki_scripts.py -v
 
 # Test on actual repository
-python scripts/wiki/prepare_wiki.py \
+uv run --project scripts/python~ --locked --no-dev python scripts/wiki/prepare_wiki.py \
   --source . --dest /tmp/test-wiki --verbose
 ```
 

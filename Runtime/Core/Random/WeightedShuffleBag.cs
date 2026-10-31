@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Core.Random
 {
+    using System;
     using System.Collections.Generic;
 
     /// <summary>
@@ -147,7 +148,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         /// <summary>
         /// Draws the next item using <see cref="PRNG.Instance"/>.
         /// </summary>
-        /// <param name="item">The drawn item when one is available.</param>
+        /// <param name="item">The drawn item, or default on failure.</param>
         /// <returns>True when an item was drawn; otherwise false.</returns>
         public bool TryNext(out T item)
         {
@@ -158,23 +159,60 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         /// Draws the next item, removing that ticket from the current cycle.
         /// </summary>
         /// <param name="random">The random generator to use. When null, <see cref="PRNG.Instance"/> is used.</param>
-        /// <param name="item">The drawn item when one is available.</param>
+        /// <param name="item">The drawn item, or default on failure.</param>
         /// <returns>True when an item was drawn; otherwise false.</returns>
+        /// <remarks><see cref="AbstractRandom"/> sources use exact sampling. Failure applies no draw or automatic cycle reset.</remarks>
         public bool TryNext(IRandom random, out T item)
         {
-            if (_entries.Count == 0)
+            int entryCount = _entries.Count;
+            if (entryCount == 0)
             {
                 item = default;
                 return false;
             }
 
-            if (_remaining.Count == 0)
+            int remainingCount = _remaining.Count;
+            int sampleCount = remainingCount == 0 ? entryCount : remainingCount;
+            IRandom generator = random ?? PRNG.Instance;
+            int index;
+            try
+            {
+                if (generator is AbstractRandom exact)
+                {
+                    if (!exact.TryNextUint((uint)sampleCount, out uint sample))
+                    {
+                        item = default;
+                        return false;
+                    }
+                    index = (int)sample;
+                }
+                else
+                {
+                    index = generator.Next(sampleCount);
+                }
+            }
+            catch (Exception)
+            {
+                item = default;
+                return false;
+            }
+
+            if (
+                index < 0
+                || sampleCount <= index
+                || _entries.Count != entryCount
+                || _remaining.Count != remainingCount
+            )
+            {
+                item = default;
+                return false;
+            }
+
+            if (remainingCount == 0)
             {
                 Reset();
             }
 
-            IRandom generator = random ?? PRNG.Instance;
-            int index = generator.Next(_remaining.Count);
             T drawn = _remaining[index];
 
             int lastIndex = _remaining.Count - 1;

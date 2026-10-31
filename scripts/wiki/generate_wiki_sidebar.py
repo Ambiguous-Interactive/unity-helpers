@@ -14,7 +14,6 @@ Usage:
 import argparse
 import sys
 from pathlib import Path
-from typing import List, Tuple
 
 
 def get_display_name(wiki_name: str) -> str:
@@ -38,7 +37,7 @@ def get_display_name(wiki_name: str) -> str:
     top_level_prefixes = ["Features-", "Overview-", "Performance-", "Guides-", "Project-"]
     for prefix in top_level_prefixes:
         if display.startswith(prefix):
-            display = display[len(prefix):]
+            display = display[len(prefix) :]
             break
 
     # Remove subcategory prefix if matches known subcategories
@@ -54,16 +53,14 @@ def get_display_name(wiki_name: str) -> str:
     ]
     for prefix in subcategory_prefixes:
         if display.startswith(prefix):
-            display = display[len(prefix):]
+            display = display[len(prefix) :]
             break
 
     # Convert dashes to spaces
-    display = display.replace("-", " ")
-
-    return display
+    return display.replace("-", " ")
 
 
-def get_wiki_files(wiki_dir: Path, pattern: str) -> List[str]:
+def get_wiki_files(wiki_dir: Path, pattern: str) -> list[str]:
     """
     Get sorted list of wiki files matching a pattern.
 
@@ -74,14 +71,10 @@ def get_wiki_files(wiki_dir: Path, pattern: str) -> List[str]:
     Returns:
         Sorted list of filenames (without .md extension)
     """
-    files = []
-    for f in sorted(wiki_dir.glob(pattern)):
-        if f.is_file():
-            files.append(f.stem)  # filename without extension
-    return files
+    return [path.stem for path in sorted(wiki_dir.glob(pattern)) if path.is_file()]
 
 
-def generate_section(title: str, files: List[str]) -> List[str]:
+def generate_section(title: str, files: list[str]) -> list[str]:
     """
     Generate a sidebar section with links to files.
 
@@ -171,7 +164,7 @@ def generate_sidebar(wiki_dir: Path) -> str:
     return "\n".join(lines) + "\n"
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Generate GitHub Wiki sidebar from documentation files."
     )
@@ -195,7 +188,7 @@ def main():
     sidebar = generate_sidebar(wiki_dir)
 
     if args.output:
-        with open(args.output, "w", encoding="utf-8") as f:
+        with Path(args.output).open("w", encoding="utf-8") as f:
             f.write(sidebar)
     else:
         print(sidebar, end="")

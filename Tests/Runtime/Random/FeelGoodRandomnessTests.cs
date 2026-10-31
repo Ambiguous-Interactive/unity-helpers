@@ -216,7 +216,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             Assert.True(bag.TryAdd(10, 1));
             Assert.True(bag.TryAdd(20, 2));
 
-            Assert.True(bag.TryNext(new SequenceRandom(0), out _));
+            Assert.True(bag.TryNext(new SequenceRandom(uint.MaxValue), out _));
             Assert.AreEqual(2, bag.RemainingCount);
 
             bag.Reset();
@@ -257,7 +257,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             WeightedShuffleBag<string> bag = new();
             Assert.True(bag.TryAdd("common", 2));
             Assert.True(bag.TryAdd("rare", 1));
-            Assert.True(bag.TryNext(new SequenceRandom(0), out _));
+            Assert.True(bag.TryNext(new SequenceRandom(uint.MaxValue), out _));
             List<string> remaining = new();
 
             Assert.True(bag.TryCopyRemainingTicketsTo(remaining));

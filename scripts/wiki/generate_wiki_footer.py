@@ -11,7 +11,7 @@ Usage:
 """
 
 import argparse
-import sys
+from pathlib import Path
 
 
 def generate_footer(repo_owner: str = "wallstop", repo_name: str = "unity-helpers") -> str:
@@ -40,10 +40,8 @@ def generate_footer(repo_owner: str = "wallstop", repo_name: str = "unity-helper
     return "\n".join(lines) + "\n"
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Generate GitHub Wiki footer content."
-    )
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Generate GitHub Wiki footer content.")
     parser.add_argument(
         "--output",
         "-o",
@@ -65,7 +63,7 @@ def main():
     footer = generate_footer(args.repo_owner, args.repo_name)
 
     if args.output:
-        with open(args.output, "w", encoding="utf-8") as f:
+        with Path(args.output).open("w", encoding="utf-8") as f:
             f.write(footer)
     else:
         print(footer, end="")

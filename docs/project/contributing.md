@@ -64,9 +64,21 @@ uv run --project scripts/python~ --locked --no-dev python scripts/unity/create_u
 uv run --project scripts/python~ --locked --no-dev python scripts/unity/stage_unitypackage.py --project-dir .artifacts/unity/local-export
 ```
 
-`validate:local`, `validate:tests:fast`, `validate:tests:hook-regressions`, and
+`lint:repo`, `validate:local`, `validate:tests:fast`, `validate:tests:hook-regressions`, and
 `test:agent-preflight` require uv, including the metadata parity check. Outside the devcontainer,
 run the bootstrap and locked sync above before these developer entry points.
+
+Repository lint and contract execution share `scripts/check_runner.py`. Existing Node entry points
+retain their importable interfaces and delegate process execution, concurrency, selection, and
+reporting to the locked Python environment. Exclusive checks finish before concurrent checks start;
+failed checks do not prevent the remaining checks from running. Windows uses the Bash executable
+from its Git for Windows installation. `npm run test:check-runner`
+exercises these contracts, including an interrupted child that exits zero.
+
+A check can declare a `completionPattern` when exit status alone is insufficient. The native
+acceptance self-test requires its final completion line after cleanup as well as exit zero.
+Missing completion evidence fails the aggregate and preserves the captured output; it cannot count
+as a passing suite. This requirement does not imply that other checks have completion receipts.
 
 The devcontainer runs the locked sync during creation. Python 3.11.8 or newer
 is required; uv can provision a compatible interpreter. The environment lives under
@@ -99,6 +111,39 @@ HTTP redirects fail closed to keep credentials on the GitHub API origin.
 with isolated Release builds through the same locked environment. Add `:fix` to refresh
 stale or missing payloads. A failed copy or replacement preserves the previous DLL and
 its importer metadata. The Node entry points remain compatibility launchers.
+
+`npm run lint:repo -- --only meta-files` checks tracked asset coverage and C# importer shapes through typed Python.
+The PowerShell and shell test commands remain compatibility launchers. C# companions require
+one valid `fileFormatVersion: 2`, one 32-digit hexadecimal GUID, and a nonempty `MonoImporter`
+mapping with valid YAML syntax and distinct setting keys. Changed-path preflight checks metadata-only edits and validates
+both the working copy and any indexed companion. Validation reads at most 1 MiB
+per C# companion and never rewrites existing bytes or index entries. Keep customized references,
+execution order, and other importer settings; repair a stub by retaining its headers and adding
+the generated importer block. Samples retain their companions when imported into Assets;
+Unity-ignored tooling folders remain excluded.
+Metadata checks select the `metadata` dependency group; generation uses only Python's standard library.
+
+The three standalone Markdown checkers under `.github/scripts` also join strict validation.
+Invoke them through the locked environment, for example:
+
+```bash
+uv run --project scripts/python~ --locked --no-dev python .github/scripts/validate_markdown_links.py docs
+uv run --project scripts/python~ --locked pytest scripts/tests/test_meta_lint.py scripts/tests/test_markdown_checks.py
+```
+
+They retain their link policies and diagnostics. Missing inputs, empty source scans, and
+unreadable Markdown now fail rather than reporting an unchecked pass. These standalone checks
+remain separate from the repository's normal documentation lint commands.
+
+Wiki generation and its test suite use the same locked Python project. The deployment and
+validation workflows provision uv before running these commands. Link text, code blocks, page
+names, sidebars, and footer output retain their existing contracts.
+
+```bash
+uv run --project scripts/python~ --locked pytest scripts/wiki/test_wiki_scripts.py -v
+uv run --project scripts/python~ --locked --no-dev python scripts/wiki/prepare_wiki.py --source . --dest /tmp/test-wiki --verbose
+npm run test:wiki-generation
+```
 
 New Python files must join the strict `tool.pyright.include` list in
 `scripts/python~/pyproject.toml`; a Git-backed inventory rejects unregistered files. The explicit
@@ -247,32 +292,32 @@ uv pip install --python .venv/bin/python -r requirements-docs.lock
 .venv/bin/mkdocs build --strict
 ```
 
-| Python path                                   | Dependency source                                     | Installer and cache                                                 | Invocation                                                                                                |
-| --------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Documentation validation and Pages deployment | `requirements-docs.lock` from `requirements-docs.txt` | Pinned uv; `setup-python` caches the pip bootstrap wheel            | `mkdocs build --strict`                                                                                   |
-| Wiki link validation                          | `requirements-wiki.txt` from `requirements-wiki.in`   | pip, without a persisted cache                                      | `python -m pytest scripts/wiki/test_wiki_scripts.py -v`; wiki generation scripts use the standard library |
-| Local Gates bounded-random proof              | `requirements-random-quality.txt`                     | pip cache from `setup-python`                                       | `python3 scripts/random-quality/verify-bounded-sampling.py`                                               |
-| Dev container image                           | `.devcontainer/requirements-tools.txt`                | Pinned uv installs yamllint and pinned MCP tools; pip bootstraps uv | Tools run from the image, not during hooks                                                                |
-| Optional local hooks and Unity/result helpers | No Python packages installed by hooks                 | Existing interpreter or optional yamllint tool                      | Hooks call `yamllint` when available; helper scripts call `python3`                                       |
+| Python path                                   | Dependency source                                     | Installer and cache                                                 | Invocation                                                                                                          |
+| --------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Documentation validation and Pages deployment | `requirements-docs.lock` from `requirements-docs.txt` | Pinned uv; `setup-python` caches the pip bootstrap wheel            | `mkdocs build --strict`                                                                                             |
+| Wiki validation and generation                | `scripts/python~/uv.lock`                             | Pinned uv; the shared project installs test tools only for tests    | `uv run --project scripts/python~ --locked pytest scripts/wiki/test_wiki_scripts.py -v`; generation uses `--no-dev` |
+| Local Gates bounded-random proof              | `requirements-random-quality.txt`                     | pip cache from `setup-python`                                       | `python3 scripts/random-quality/verify-bounded-sampling.py`                                                         |
+| Dev container image                           | `.devcontainer/requirements-tools.txt`                | Pinned uv installs yamllint and pinned MCP tools; pip bootstraps uv | Tools run from the image, not during hooks                                                                          |
+| Optional local hooks and Unity/result helpers | No Python packages installed by hooks                 | Existing interpreter or optional yamllint tool                      | Hooks call `yamllint` when available; helper scripts call `python3`                                                 |
 
-The other Python entry points use the interpreter and standard library without installing
-packages: `scripts/wiki/*.py` outside the pytest suite, `scripts/generate-test-*.py`,
-`scripts/pr-feedback.sh`, and `scripts/unity/lib/nunit-results.sh`. The wiki deployment
-workflow runs the wiki scripts directly. The local wiki guide installs from the same locked
-requirements file as CI.
+Release, metadata, binary-check, feedback, and wiki commands use the shared locked uv project.
+The asset fixture generators and some inline Unity/result helpers remain legacy entry points;
+see the explicit migration inventory in `scripts/python~/pyproject.toml`. The old
+`requirements-wiki.in` and `requirements-wiki.txt` remain compatibility inputs for existing
+standalone environments; current wiki CI uses the shared uv lock.
 
-The pip exceptions are measured. On Python 3.11, fresh environments with separate cold and
+Earlier installer comparisons measured the bootstrap costs. On Python 3.11, fresh environments with separate cold and
 warm caches gave documentation installs of 8.66/5.90 seconds with pip and 5.42/0.15 seconds
 with uv. Pytest took 1.26/0.85 seconds with pip and 0.35/0.04 seconds with uv; Z3 took
 2.94/0.76 seconds with pip and 2.20/0.04 seconds with uv. Bootstrapping pinned uv itself
-with pip took another 3.57/0.99 seconds. Thus the two small CI installs stay on pip; adding
-uv there would increase their cold and warm runtime. These are local install measurements,
-not full GitHub runner timings.
+with pip took another 3.57/0.99 seconds. The bounded-random proof still uses pip. Wiki CI now uses the shared uv project; these
+historical install measurements do not describe its current end-to-end runtime.
 
 To update Python dependencies, edit the direct constraints, then regenerate the locks with
 the pinned uv version:
 
 ```bash
+uv lock --project scripts/python~
 uv pip compile --universal --python-version 3.11 requirements-docs.txt --output-file requirements-docs.lock
 uv pip compile --universal --python-version 3.11 requirements-wiki.in --output-file requirements-wiki.txt
 ```
@@ -350,7 +395,8 @@ matrix or provide performance measurements.
   A failed required Git query stops preflight with Git's status and diagnostic. Initial index
   queries run before any fixes.
   Explicit selections use literal Git path scopes for their safety checks and known generated
-  outputs. Fixes must resolve inside the repository; linked targets keep partial-staging
+  outputs. Read-only C# metadata validation also follows selected staged rename destinations
+  to their former companion paths; formatter targets and write scope remain unchanged. Fixes must resolve inside the repository; linked targets keep partial-staging
   protection. A linked destination that resolves to the repository root is refused before tools start. Changed destinations outside the checked scope and hard links with unknown
   destinations fail before writing. Metadata recovery checks every staged source and its parent/file companions,
   including sources outside the selected validation list. With no explicit selection, discovery

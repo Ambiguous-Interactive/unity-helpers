@@ -258,6 +258,13 @@ jobs:
         shell: pwsh
         run: uv run --project scripts/python~ --locked pytest scripts/tests/test_asmdef.py -q
 
+      - name: Verify metadata validation on Windows
+        shell: pwsh
+        run: >-
+          uv run --project scripts/python~ --locked pytest
+          scripts/tests/test_meta_lint.py scripts/tests/test_markdown_checks.py
+          scripts/tests/test_runner_maintenance_matrix.py scripts/tests/test_check_runner.py -q
+
       - name: Verify compiler payload publication on Windows
         shell: pwsh
         run: >-

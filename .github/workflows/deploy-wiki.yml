@@ -69,10 +69,8 @@ jobs:
           path: main
           fetch-depth: 1
 
-      - name: Set up Python
-        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
-        with:
-          python-version: "3.11"
+      - name: Setup locked Python tooling
+        uses: ./main/.github/actions/setup-python-tools
 
       - name: Clone wiki repository
         id: clone-wiki
@@ -107,7 +105,7 @@ jobs:
 
           # Run Python script to prepare wiki content
           echo "Preparing wiki content with Python scripts..."
-          python main/scripts/wiki/prepare_wiki.py \
+          uv run --project main/scripts/python~ --locked --no-dev python main/scripts/wiki/prepare_wiki.py \
             --source main \
             --dest wiki \
             --verbose
@@ -128,7 +126,7 @@ jobs:
           set -euo pipefail
 
           echo "Generating _Sidebar.md with Python script..."
-          python main/scripts/wiki/generate_wiki_sidebar.py wiki --output wiki/_Sidebar.md
+          uv run --project main/scripts/python~ --locked --no-dev python main/scripts/wiki/generate_wiki_sidebar.py wiki --output wiki/_Sidebar.md
 
           echo "Generated sidebar content:"
           cat wiki/_Sidebar.md
@@ -140,7 +138,7 @@ jobs:
           set -euo pipefail
 
           echo "Generating _Footer.md with Python script..."
-          python main/scripts/wiki/generate_wiki_footer.py --output wiki/_Footer.md
+          uv run --project main/scripts/python~ --locked --no-dev python main/scripts/wiki/generate_wiki_footer.py --output wiki/_Footer.md
 
           echo "✅ Footer generated"
 

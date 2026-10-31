@@ -23,6 +23,7 @@ namespace WallstopStudios.UnityHelpers.Tests.TestDoubles
         private readonly double _doubleFallback;
         private readonly int _maxFloatCalls;
         private readonly int _maxDoubleCalls;
+        private readonly Func<int, int> _boundedIntSampler;
         private int _floatCalls;
         private int _doubleCalls;
 
@@ -32,7 +33,8 @@ namespace WallstopStudios.UnityHelpers.Tests.TestDoubles
             float floatFallback = 0f,
             double doubleFallback = 0d,
             int maxFloatCalls = int.MaxValue,
-            int maxDoubleCalls = int.MaxValue
+            int maxDoubleCalls = int.MaxValue,
+            Func<int, int> boundedIntSampler = null
         )
         {
             _floatSequence = floatSequence != null ? new Queue<float>(floatSequence) : null;
@@ -41,6 +43,7 @@ namespace WallstopStudios.UnityHelpers.Tests.TestDoubles
             _doubleFallback = doubleFallback;
             _maxFloatCalls = maxFloatCalls;
             _maxDoubleCalls = maxDoubleCalls;
+            _boundedIntSampler = boundedIntSampler;
         }
 
         public int Next()
@@ -50,6 +53,10 @@ namespace WallstopStudios.UnityHelpers.Tests.TestDoubles
 
         public int Next(int max)
         {
+            if (_boundedIntSampler != null)
+            {
+                return _boundedIntSampler(max);
+            }
             throw new NotSupportedException();
         }
 

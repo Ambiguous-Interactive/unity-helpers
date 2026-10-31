@@ -407,6 +407,56 @@ else
     fi
 fi
 
+wiki_has_command() {
+    local workflow_path="$1"
+    local expected_command="$2"
+    awk -v expected="$expected_command" '
+        {
+            line = $0
+            sub(/^[ \t]+/, "", line)
+            if (index(line, expected) == 1 &&
+                (length(line) == length(expected) ||
+                 substr(line, length(expected) + 1, 1) ~ /[ \t]/)) {
+                found = 1
+            }
+        }
+        END { exit !found }
+    ' "$workflow_path"
+}
+
+wiki_command_specs=(
+    '.github/workflows/deploy-wiki.yml|uses: ./main/.github/actions/setup-python-tools'
+    '.github/workflows/deploy-wiki.yml|uv run --project main/scripts/python~ --locked --no-dev python main/scripts/wiki/prepare_wiki.py'
+    '.github/workflows/deploy-wiki.yml|uv run --project main/scripts/python~ --locked --no-dev python main/scripts/wiki/generate_wiki_sidebar.py'
+    '.github/workflows/deploy-wiki.yml|uv run --project main/scripts/python~ --locked --no-dev python main/scripts/wiki/generate_wiki_footer.py'
+    '.github/workflows/validate-wiki-links.yml|uses: ./.github/actions/setup-python-tools'
+    '.github/workflows/validate-wiki-links.yml|uv run --project scripts/python~ --locked pytest scripts/wiki/test_wiki_scripts.py'
+)
+for wiki_spec in "${wiki_command_specs[@]}"; do
+    IFS='|' read -r wiki_workflow wiki_expected <<< "$wiki_spec"
+    run_test
+    if wiki_has_command "$wiki_workflow" "$wiki_expected"; then
+        pass "Locked wiki command: $wiki_expected"
+    else
+        fail "Locked wiki command in $wiki_workflow" "$wiki_expected" '(not found)'
+    fi
+done
+
+run_test
+if printf '  uv run --project scripts/python~ --locked pytest suite.py\n' |
+    wiki_has_command - 'uv run --project scripts/python~ --locked pytest'; then
+    pass 'Command detector accepts an executable line'
+else
+    fail 'Command detector accepts an executable line' 'accepted' 'rejected'
+fi
+run_test
+if printf '  # uv run --project scripts/python~ --locked pytest\n  echo "uv run --project scripts/python~ --locked pytest"\n' |
+    wiki_has_command - 'uv run --project scripts/python~ --locked pytest'; then
+    fail 'Command detector rejects comments and printed commands' 'rejected' 'accepted'
+else
+    pass 'Command detector rejects comments and printed commands'
+fi
+
 # =============================================================================
 # Summary
 # =============================================================================
