@@ -98,6 +98,21 @@ commands use `--no-dev`, so they do not install analysis or test packages into a
 They retain tools already installed in a shared warm environment; compatible Python may still need
 to be provisioned on the first run.
 
+The documentation identifier, runtime attribute-preservation, and spelling-bucket tools also use
+the locked Python environment. Their npm commands invoke Python directly; the old Node and
+PowerShell paths remain compatibility launchers. The preservation gate includes generic reflection
+calls such as `GetCustomAttribute<PoolPurgePolicyAttribute>()`. Spelling fixes retain the first
+spelling of each word and the file's line endings; word insertion refuses cross-bucket duplicates
+before writing. Use `--config <path>` when checking or updating a separate spelling configuration.
+
+```bash
+npm run lint:doc-identifiers
+npm run lint:preserve-attributes
+npm run lint:spelling:config
+npm run lint:spelling:add -- tech-terms ExampleWord
+uv run --project scripts/python~ --locked pytest scripts/tests/test_doc_identifiers.py scripts/tests/test_preserve_attributes.py scripts/tests/test_cspell_tools.py
+```
+
 `npm run pr:feedback -- <number>` uses the locked Python environment to read all four
 PR feedback surfaces and audit author identities. The shell entry point remains available;
 `uv run --project scripts/python~ --locked --no-dev python scripts/pr_feedback.py <number>`

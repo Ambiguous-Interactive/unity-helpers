@@ -70,6 +70,38 @@ foreach ($fixture in @(
     if ($accepted -ne $fixture.Pass) { throw 'Required native-test positive/negative control mismatch.' }
 }
 
+$identityStart = $verifier.IndexOf('function Assert-SingletonMetadataIdentities {')
+if ($identityStart -lt 0) { throw 'Missing singleton metadata identity gate.' }
+$identityAst = [System.Management.Automation.Language.Parser]::ParseInput(
+    $verifier.Substring($identityStart), [ref]$tokens, [ref]$parseErrors)
+$identityFunction = $identityAst.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq 'Assert-SingletonMetadataIdentities'
+    }, $true)
+if ($null -eq $identityFunction) { throw 'The singleton identity gate must parse.' }
+Invoke-Expression $identityFunction.Extent.Text
+$identityPrefix = 'WallstopStudios.UnityHelpers.Tests.Utils.ScriptableObjectSingletonTests.MetadataAssetTracksSingletonEntries('
+foreach ($fixture in @(
+        @{ Names = @(); Pass = $true },
+        @{ Names = @('Other.Test', 'Other.Test'); Pass = $true },
+        @{ Names = @(($identityPrefix + 'Default)'), ($identityPrefix + 'Custom)')); Pass = $true },
+        @{ Names = @(($identityPrefix + 'Default)'), ($identityPrefix + 'Default)')); Pass = $false },
+        @{ Names = @(($identityPrefix + 'A)'), ($identityPrefix + 'B)'), ($identityPrefix + 'A)')); Pass = $false }
+    )) {
+    [xml]$identityXml = '<test-run>' + (($fixture.Names | ForEach-Object {
+                '<test-case fullname="' + $_ + '" result="Passed" />'
+            }) -join '') + '</test-run>'
+    $accepted = $true
+    try { Assert-SingletonMetadataIdentities -Doc $identityXml }
+    catch { $accepted = $false }
+    if ($accepted -ne $fixture.Pass) { throw 'Singleton identity positive/negative control mismatch.' }
+}
+if (-not $verifier.Contains('Assert-SingletonMetadataIdentities -Doc $doc')) {
+    throw 'Singleton identity validation must run on the actual NUnit document.'
+}
+Write-Host '[test-unity-test-filter] Five singleton identity controls passed.'
+
 # Diagnostics are not the subject; the actual XML gate and invocation sites are.
 function Write-CiError { param([string]$Message) }
 function Write-CiNotice { param([string]$Message) }

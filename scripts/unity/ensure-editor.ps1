@@ -394,45 +394,9 @@ function Get-EnsureEditorInstallTimeoutSeconds {
 }
 
 function Get-EnsureEditorProgressStallSeconds {
-    # Single source of truth for the HEARTBEAT-STALL threshold applied to a captured
-    # CLI invocation (see Invoke-UnityCliCaptureWithTimeout's poll loop). This is
-    # COMPLEMENTARY to Get-EnsureEditorInstallTimeoutSeconds (the total wall-clock
-    # fallback): the heartbeat detector fires when no stdout/stderr line has arrived
-    # for >= this many seconds. Unity module installs can legitimately emit repeated
-    # byte-identical progress triples for a long on-disk install phase, so triple
-    # advance is diagnostic only; output-line silence is the stall signal. Killing
-    # on stall classifies as retryable (sentinel exit 125, distinct from the
-    # wall-clock 124 so callers and tests can tell the two apart) and lets the
-    # existing retry + classification flow run on a quiet hang.
-    #
-    # Honors UH_ENSURE_EDITOR_PROGRESS_STALL_SECONDS following the EXACT
-    # convention of Get-EnsureEditorInstallTimeoutSeconds: tests set it small
-    # (e.g. 2) to force the stall path; CI leaves it unset for the production
-    # default. A non-integer or NEGATIVE override is ignored with a ::warning::
-    # and the default is used. A value of 0 is the explicit OPT-OUT (no heartbeat
-    # detection): the wall-clock fallback alone gates the run.
-    #
-    # Default rationale (PROFILE-AWARE; inherited from the triple-stall detector):
-    # Unity installs have emitted a SINGLE monolithic
-    # `{"...,"pct":50,"phase":"install","msg":"Installing Unity (6000.3.16f1)..."}`
-    # triple that does NOT advance for the WHOLE on-disk unpack, including healthy
-    # installs that keep emitting live output. The heartbeat clock therefore tracks
-    # output silence, not triple changes, while the wall-clock timeout bounds a
-    # chatty no-advance install. The profile-aware values remain deliberately
-    # conservative while this detector changes semantics; lowering them should be
-    # driven by measured max quiet gaps on the self-hosted runners. The
-    # il2cpp/standalone (and Android/Full) profiles unpack MORE payload than
-    # EditorOnly and can spend longer in sparse-output phases, so:
-    #   * EditorOnly                       -> 900s  (15 min; base-editor unpack only)
-    #   * StandaloneWindowsIl2Cpp/Android/Full -> 1800s (30 min; heavier payload, and
-    #                                          a false kill here cascades into the
-    #                                          module step, the real-world failure)
-    # Both stay well under the install wall-clock fallback for their profile, so
-    # a GENUINE quiet hang is still surfaced before the job is cancelled, while a
-    # slow-but-real unpack with live output is no longer killed mid-flight. The
-    # env override remains authoritative and is honored verbatim (tests set it
-    # small to force the stall path; 0 opts out).
-    # StrictMode-safe: no collection reads.
+    # Native editor unpack can remain silent while files are still incomplete.
+    # EditorOnly uses the absolute install deadline; an explicit quiet-time override
+    # remains authoritative. Heavy module profiles keep their 30-minute quiet limit.
     param([int]$Default = -1)
 
     if ($env:UH_ENSURE_EDITOR_PROGRESS_STALL_SECONDS) {
@@ -460,7 +424,7 @@ function Get-EnsureEditorProgressStallSeconds {
         $profile = Get-UnityProvisioningProfile
     }
     if ($profile -eq 'EditorOnly') {
-        return 900
+        return 0
     }
     return 1800
 }
@@ -1146,6 +1110,18 @@ function Update-UnityCliStandalone {
         $script:UnityCliUpdateCompleted = $true
         Write-CiNotice 'Keeping Unity CLI 1.0.0-beta.8 for this maintenance run because beta.9 previously hit its confirmed writer_kind database regression. The compatibility hold expires automatically within 12 hours.'
         return
+    }
+
+    if ((Get-UnityCliVersionText) -match '(?:^|\s)0\.[0-9]+\.[0-9]+') {
+        Write-CiNotice 'Replacing the legacy Unity CLI through the current standalone installer.'
+        Install-UnityCliStandalone
+        Update-SessionPathFromRegistry
+        $installedCommand = Get-Command unity -ErrorAction Stop
+        $script:UnityCliPath = $installedCommand.Source
+        $script:UnityCliVersionText = ''
+        if ((Get-UnityCliVersionText) -match '(?:^|\s)0\.[0-9]+\.[0-9]+') {
+            throw 'The standalone installer left a legacy Unity CLI active. Refusing to report it as current.'
+        }
     }
 
     $timeout = Get-UnityCliUpdateTimeoutSeconds
@@ -2742,8 +2718,8 @@ function Get-UnityCliModuleInstallArguments {
     # message too, so the flag is valid for BOTH verbs handled here.
     #
     # Verb handling (preserving the resilient beta-CLI arg shapes already in use):
-    #   install          -> @('install', <version>, '--accept-eula', [--childModules], '-m', <ids...>)
-    #   install-modules  -> @('install-modules', '-e', <version>, '--accept-eula', [--childModules], '-m', <ids...>)
+    #   install          -> @('install', <version>, '--yes', '--accept-eula', [--childModules], '-m', <ids...>)
+    #   install-modules  -> @('install-modules', '-e', <version>, '--yes', '--accept-eula', [--childModules], '-m', <ids...>)
     # --childModules is included whenever the requested ids include Android so the
     # CLI resolves SDK/NDK/OpenJDK dependencies under AndroidPlayer atomically.
     # NOTE: this builder is for the EULA-bearing module INSTALL only. The `-l`
@@ -2780,7 +2756,7 @@ function Get-UnityCliModuleInstallArguments {
 
     if ($moduleIds.Count -eq 0) {
         if ($Verb -eq 'install') {
-            return @('install', $Version)
+            return @('install', $Version, '--yes')
         }
         throw "Cannot build a Unity install-modules command for profile '$(Get-UnityProvisioningProfile)' because no module ids are selected."
     }
@@ -2790,16 +2766,16 @@ function Get-UnityCliModuleInstallArguments {
     if ($Verb -eq 'install-modules') {
         # `install-modules` targets an EXISTING editor, so it needs `-e <version>`.
         if ($includeChildModules) {
-            return @('install-modules', '-e', $Version, '--accept-eula', '--childModules', '-m') + $moduleIds
+            return @('install-modules', '-e', $Version, '--yes', '--accept-eula', '--childModules', '-m') + $moduleIds
         }
-        return @('install-modules', '-e', $Version, '--accept-eula', '-m') + $moduleIds
+        return @('install-modules', '-e', $Version, '--yes', '--accept-eula', '-m') + $moduleIds
     }
 
     # `install` provisions a fresh editor; the version is positional (no `-e`).
     if ($includeChildModules) {
-        return @('install', $Version, '--accept-eula', '--childModules', '-m') + $moduleIds
+        return @('install', $Version, '--yes', '--accept-eula', '--childModules', '-m') + $moduleIds
     }
-    return @('install', $Version, '--accept-eula', '-m') + $moduleIds
+    return @('install', $Version, '--yes', '--accept-eula', '-m') + $moduleIds
 }
 
 function Test-UnityCiModuleGroupPresent {
@@ -3318,7 +3294,7 @@ function Invoke-UnityVersionUninstallForRepair {
         [string]$InstallRoot
     )
 
-    $uninstallResult = Invoke-UnityCliCapture -Arguments @('uninstall', $Version)
+    $uninstallResult = Invoke-UnityCliCapture -Arguments @('uninstall', $Version, '--yes')
     if (-not $uninstallResult.Success) {
         $uninstallLines = @($uninstallResult.Output)
         $tailCount = [Math]::Min(12, $uninstallLines.Count)
@@ -3380,7 +3356,7 @@ function Install-UnityEditorWithCiModules {
         }
 
         $resolvedAfterFailure = Resolve-InstalledEditor -Version $Version -Root $InstallRoot -ManagedOnly:$ManagedOnly
-        if ($resolvedAfterFailure) {
+        if ($resolvedAfterFailure -and -not $installResult.StallKilled -and -not $installResult.TimedOutWallClock) {
             Write-CiNotice "Unity repair install for $Version failed with exit code $($installResult.ExitCode), but Unity.exe is resolvable afterward; verifying modules against disk."
             $resolved = $resolvedAfterFailure
             $script:ProvisioningEditorPath = $resolved
@@ -4427,10 +4403,10 @@ function Install-UnityAndroidModules {
         }
 
         # Disk is the source of truth: re-verify the android tier groups. If none
-        # are missing, the install succeeded regardless of the CLI exit code (an
-        # exit 6 with everything present is the idempotent no-op).
+        # are missing after natural process completion, a nonzero CLI exit can be
+        # an idempotent no-op. Interrupted native installers remain failures.
         $missingAndroid = @(Get-MissingUnityCiModuleGroups -EditorPath $EditorPath -Profile $Profile | Where-Object { (Get-UnityCiModuleTier $_) -eq 'android' })
-        if ($missingAndroid.Count -eq 0) {
+        if ($missingAndroid.Count -eq 0 -and -not $result.StallKilled -and -not $result.TimedOutWallClock) {
             Write-CiNotice "Android CI module tier for Unity $Version present on disk after attempt $attempt (CLI exit code $($result.ExitCode))."
             return $EditorPath
         }
@@ -4829,7 +4805,7 @@ function Ensure-UnityCiModules {
         # Re-verify the core tier on disk (disk is the source of truth; an exit 6
         # with everything present is the idempotent no-op).
         $missingCoreAfter = @(Get-MissingUnityCiModuleGroups -EditorPath $EditorPath -Profile $Profile | Where-Object { (Get-UnityCiModuleTier $_) -eq 'core' })
-        if ($missingCoreAfter.Count -gt 0) {
+        if ($missingCoreAfter.Count -gt 0 -or $result.StallKilled -or $result.TimedOutWallClock) {
             # Tail of the captured output for diagnostics (collapsed first so the
             # Android NDK progress spam does not bury the tail).
             $tail = Get-CollapsedCliOutputTail -Output $result.Output -MaxLines 20
@@ -5174,7 +5150,7 @@ if (-not $editor) {
                 $installTail = Get-CollapsedCliOutputTail -Output $installResult.Output -MaxLines 40
 
                 $resolvedAfterFailure = Resolve-InstalledEditor -Version $UnityVersion -Root $InstallRoot -ManagedOnly:$CiManagedOnly
-                if ($resolvedAfterFailure) {
+                if ($resolvedAfterFailure -and -not $installResult.StallKilled -and -not $installResult.TimedOutWallClock) {
                     Write-CiNotice "Unity CLI '$($installArgs -join ' ')' failed with exit code $($installResult.ExitCode), but Unity.exe is resolvable afterward; treating the install as already present."
                     Write-CiNotice "Verifying required CI modules after recovered editor install."
                     return $resolvedAfterFailure

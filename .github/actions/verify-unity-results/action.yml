@@ -692,7 +692,20 @@ runs:
           }
         }
 
+        function Assert-SingletonMetadataIdentities {
+          param([xml]$Doc)
+          $prefix = 'WallstopStudios.UnityHelpers.Tests.Utils.ScriptableObjectSingletonTests.MetadataAssetTracksSingletonEntries('
+          $identities = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
+          foreach ($case in @($Doc.SelectNodes("//test-case[starts-with(@fullname, '$prefix')]"))) {
+            $identity = $case.GetAttribute('fullname')
+            if (-not $identities.Add($identity)) {
+              throw "Duplicate singleton metadata scenario identity: $identity"
+            }
+          }
+        }
+
         [xml]$doc = Get-Content -LiteralPath $xml.FullName
+        Assert-SingletonMetadataIdentities -Doc $doc
         $run = $doc.SelectSingleNode('//test-run')
         $total = [int]($run.total)
         $passed = [int]($run.passed)

@@ -4,12 +4,12 @@ Param(
 
 <#
 .SYNOPSIS
-    Regression tests for sync script newline safety and cspell linter contract drift.
+    Regression tests for sync script newline safety and workflow contracts.
 
 .DESCRIPTION
     Validates:
     1. Production scripts that write with Set-Content -NoNewline normalize content to a final LF.
-    2. lint-cspell-config.js header-declared checks match implemented "Check N" sections.
+    2. Workflow and validation entry points retain their declared contracts.
 
 .PARAMETER VerboseOutput
     Show detailed output during test execution.
@@ -174,70 +174,6 @@ function Run-SyncScriptContractTests {
     -ScriptPath (Join-Path $repoRoot 'scripts/sync-banner-version.ps1') `
     -ValueVariable 'updatedContextContent' `
     -TestName 'sync-banner-version.ps1 normalizes context content before -NoNewline write'
-}
-
-function Run-CspellContractTests {
-  Write-Host ""
-  Write-Host "cspell config linter header/implementation contracts:" -ForegroundColor Magenta
-  Write-Host ""
-
-  $repoRoot = Get-RepoRoot
-  $linterPath = Join-Path $repoRoot 'scripts/lint-cspell-config.js'
-
-  if (-not (Test-Path $linterPath)) {
-    Write-TestResult -TestName 'lint-cspell-config.js exists' -Passed $false -Message "Missing file: $linterPath"
-    return
-  }
-
-  $lines = @(Get-Content -Path $linterPath)
-
-  $headerCheckNumbers = @()
-  $checkSectionNumbers = @()
-  $mentionsRemovedCheck = $false
-
-  $inHeader = $false
-  foreach ($line in $lines) {
-    $trimmed = $line.Trim()
-    if ($trimmed -match '^//\s+Lints\s+cspell\.json\s+for\s+common\s+configuration\s+issues:') {
-      $inHeader = $true
-      continue
-    }
-
-    if ($inHeader -and $trimmed -match '^//\s+([0-9]+)\.\s+') {
-      $headerCheckNumbers += [int]$Matches[1]
-    }
-
-    if ($inHeader -and -not $trimmed.StartsWith('//')) {
-      $inHeader = $false
-    }
-
-    if ($trimmed -match '^//\s+[^\n]*?Check\s+([0-9]+):') {
-      $checkSectionNumbers += [int]$Matches[1]
-    }
-
-    if ($trimmed -match 'Root words that belong in a categorized dictionary') {
-      $mentionsRemovedCheck = $true
-    }
-  }
-
-  $headerUnique = @($headerCheckNumbers | Sort-Object -Unique)
-  $sectionsUnique = @($checkSectionNumbers | Sort-Object -Unique)
-
-  Write-Info "Header checks: $($headerUnique -join ', ')"
-  Write-Info "Section checks: $($sectionsUnique -join ', ')"
-
-  $headerMatchesSections = ($headerUnique.Count -eq $sectionsUnique.Count) -and
-    (@($headerUnique) -join ',') -ceq (@($sectionsUnique) -join ',')
-
-  Write-TestResult `
-    -TestName 'lint-cspell-config.js header check list matches implemented Check sections' `
-    -Passed $headerMatchesSections `
-    -Message "Header: [$($headerUnique -join ', ')], Sections: [$($sectionsUnique -join ', ')]"
-
-  Write-TestResult `
-    -TestName 'lint-cspell-config.js does not claim removed check 3 in header' `
-    -Passed (-not $mentionsRemovedCheck) `
-    -Message 'Found stale header text: "Root words that belong in a categorized dictionary"'
 }
 
 function Run-AgentValidationContractTests {
@@ -3126,7 +3062,6 @@ function Print-SummaryAndExit {
 }
 
 Run-SyncScriptContractTests
-Run-CspellContractTests
 Run-AgentValidationContractTests
 Run-PowerShellPathBindingContractTests
 Run-UnityCiScriptContractTests

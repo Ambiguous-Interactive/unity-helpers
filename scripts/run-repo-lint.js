@@ -160,7 +160,7 @@ const CHECKS = [
   {
     id: "preserve-attributes",
     name: "IL2CPP-preserved runtime attributes",
-    run: "node scripts/lint-preserve-attributes.js"
+    run: "npm run lint:preserve-attributes"
   },
   {
     id: "comparison-direction",

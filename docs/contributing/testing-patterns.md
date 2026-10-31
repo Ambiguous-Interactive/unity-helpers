@@ -2,6 +2,14 @@
 
 This guide documents patterns for testing states that "should never happen" but could occur in production. These tests catch edge cases that defensive programming must handle gracefully.
 
+## Give each parameterized case a stable identity
+
+For a `ValueSource` that supplies objects or structs, provide a deterministic display value, such
+as a `ToString()` override returning the scenario description. Check that the registered scenarios
+have distinct values. Read the resulting NUnit XML to verify the actual fullnames; counting test
+leaves alone cannot distinguish scenarios whose display values collide. The Unity result verifier
+rejects duplicate fullnames for singleton metadata scenarios.
+
 ## Access real implementation internals
 
 Production code contains no test-only methods, callbacks, state capture, timing latches, or conditional execution paths. Names such as `ForTest`, `ForTesting`, `ForTests`, and `TestHooks` are prohibited in shipped implementation code and generated production source. Tests use existing operations and state through `internal` visibility and friend assemblies.

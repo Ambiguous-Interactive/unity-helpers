@@ -1393,17 +1393,24 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 List<MemberEntry> into
             )
             {
-                IEnumerable<MemberEntry> fields = declaredType
-                    .GetFields(MemberSearchFlags)
-                    .Select(member => BuildMember(member, messageName))
-                    .Where(entry => entry != null);
-                IEnumerable<MemberEntry> properties = declaredType
-                    .GetProperties(MemberSearchFlags)
-                    .Select(member => BuildMember(member, messageName))
-                    .Where(entry => entry != null);
-
-                into.AddRange(fields);
-                into.AddRange(properties);
+                FieldInfo[] fields = declaredType.GetFields(MemberSearchFlags);
+                PropertyInfo[] properties = declaredType.GetProperties(MemberSearchFlags);
+                foreach (FieldInfo field in fields)
+                {
+                    MemberEntry entry = BuildMember(field, messageName);
+                    if (entry != null)
+                    {
+                        into.Add(entry);
+                    }
+                }
+                foreach (PropertyInfo property in properties)
+                {
+                    MemberEntry entry = BuildMember(property, messageName);
+                    if (entry != null)
+                    {
+                        into.Add(entry);
+                    }
+                }
             }
 
             private MemberEntry BuildMember(MemberInfo member, string messageName)

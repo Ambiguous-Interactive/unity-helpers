@@ -395,6 +395,9 @@ public class EnemySpawner : MonoBehaviour
 - Works with Unity `Object` types, strings, collections, and any reference type
 - Inspector validation runs **only in the Unity Editor** (stripped in builds for performance)
 
+The validation attribute is preserved during managed stripping so explicit runtime checks can
+discover it in player builds.
+
 > **Visual Reference**
 >
 > ![ValidateAssignment fields in inspector with invalid values highlighted](../../images/inspector/validation/validateassignment-inspector.png)

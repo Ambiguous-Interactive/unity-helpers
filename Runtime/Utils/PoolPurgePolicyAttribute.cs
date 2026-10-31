@@ -4,6 +4,9 @@
 namespace WallstopStudios.UnityHelpers.Utils
 {
     using System;
+#if UNITY_5_3_OR_NEWER
+    using UnityEngine.Scripting;
+#endif
 
     /// <summary>
     /// Attribute to control intelligent pool purging behavior for a specific type.
@@ -12,6 +15,7 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// <para>
     /// Apply this attribute to types that should opt-out of or customize intelligent pool purging.
     /// This attribute is checked when determining the effective purge configuration for a type.
+    /// The attribute is preserved for policy lookup in stripped players.
     /// </para>
     /// <para>
     /// The attribute takes precedence over global settings but can be overridden by explicit
@@ -37,6 +41,9 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// </example>
     /// </remarks>
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct, Inherited = false)]
+#if UNITY_5_3_OR_NEWER
+    [Preserve]
+#endif
     public sealed class PoolPurgePolicyAttribute : Attribute
     {
         /// <summary>

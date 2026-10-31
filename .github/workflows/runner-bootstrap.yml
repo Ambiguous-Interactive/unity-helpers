@@ -76,7 +76,7 @@ on:
       unity-versions:
         description: >-
           Optional comma-separated editor versions to maintain (for example 6000.6.7f1).
-          Empty selects all versions from .github/unity-versions.json.
+          Empty selects CI and downstream maintenance versions from .github/unity-versions.json.
         required: false
         type: string
         default: ""
