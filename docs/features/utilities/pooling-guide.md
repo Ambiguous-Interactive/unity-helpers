@@ -140,6 +140,10 @@ PoolPurgeSettings.DisableGlobally();
 
 ### Per-Type Configuration
 
+Apply `[PoolPurgePolicy]` to a type for a default policy, or use the configuration methods below
+for an explicit override. The package preserves the policy attribute for runtime lookup in stripped
+players. Your own pooled type must also remain available to the player.
+
 <!-- doc-sample: compiles -->
 
 ```csharp

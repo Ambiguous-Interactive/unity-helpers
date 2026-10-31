@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     using Extension;
     using Helper;
     using UnityEngine;
+    using UnityEngine.Scripting;
     using WallstopStudios.UnityHelpers.Utils;
     using Object = UnityEngine.Object;
 #if !SINGLE_THREADED
@@ -34,12 +35,10 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     }
 
     /// <summary>
-    /// Validates that a field is properly assigned at edit time. Displays a warning or error in the inspector
-    /// when the field is null, empty (for strings), or has no elements (for collections).
-    /// Use <see cref="ValidateAssignmentExtensions.ValidateAssignments"/> to log warnings for all invalid fields,
-    /// or <see cref="ValidateAssignmentExtensions.AreAnyAssignmentsInvalid"/> to check validity programmatically.
+    /// Validates field assignments for inspector feedback and explicit runtime checks.
     /// </summary>
     /// <remarks>
+    /// The attribute is preserved for runtime validation in stripped players.
     /// Unlike <see cref="WNotNullAttribute"/>, this attribute validates:
     /// <list type="bullet">
     /// <item>Object references (null check)</item>
@@ -66,6 +65,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     /// </code>
     /// </example>
     [AttributeUsage(AttributeTargets.Field)]
+    [Preserve]
     public sealed class ValidateAssignmentAttribute : PropertyAttribute
     {
         /// <summary>

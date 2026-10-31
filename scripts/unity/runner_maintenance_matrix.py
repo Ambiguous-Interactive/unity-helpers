@@ -26,12 +26,22 @@ def resolve_versions(config: Path, requested: str) -> list[str]:
         raw: object = json.loads(config.read_text(encoding="utf-8"))
         if not isinstance(raw, dict):
             raise ValueError("Unity version configuration must be an object")
-        values = cast("dict[str, object]", raw).get("all")
+        document = cast("dict[str, object]", raw)
+        values = document.get("all")
         if not isinstance(values, list) or not all(
             isinstance(item, str) for item in cast("list[object]", values)
         ):
             raise ValueError("Unity version configuration must define an all[] string array")
-        versions = cast("list[str]", values)
+        if not values:
+            raise ValueError("Unity version configuration must define a nonempty all[] array")
+        maintenance = document.get("maintenance", [])
+        if not isinstance(maintenance, list) or not all(
+            isinstance(item, str) for item in cast("list[object]", maintenance)
+        ):
+            raise ValueError(
+                "Unity maintenance configuration must define a maintenance[] string array"
+            )
+        versions = [*cast("list[str]", values), *cast("list[str]", maintenance)]
     if not 1 <= len(versions) <= MAX_VERSIONS:
         raise ValueError(f"Select between 1 and {MAX_VERSIONS} Unity versions")
     for version in versions:

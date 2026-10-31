@@ -2988,7 +2988,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-if ($UnityVersion -notin @('2021.3.45f1', '6000.5.2f1')) {
+if ($UnityVersion -notin @('2021.3.45f1', '6000.5.2f1', '6000.6.7f1')) {
     throw "Bad UnityVersion: $UnityVersion"
 }
 if ($InstallRoot -ne 'D:\actions-runner\_tool\u6-v3') {
@@ -3014,7 +3014,8 @@ Write-Output "fake ensure-editor ok: $UnityVersion diagnostics=$DiagnosticsPath"
   "all": [
     "2021.3.45f1",
     "6000.5.2f1"
-  ]
+  ],
+  "maintenance": ["6000.6.7f1"]
 }
 '@ | Set-Content -LiteralPath (Join-Path $manualGithubRoot 'unity-versions.json') -Encoding UTF8
 
@@ -3046,7 +3047,8 @@ if (
     $manualDefaultsText -notmatch 'Unity versions from \.github[\\/]unity-versions\.json: 2021\.3\.45f1, 6000\.5\.2f1' -or
     $manualDefaultsText -notmatch 'fake bootstrap ok: detect=True' -or
     $manualDefaultsText -notmatch 'fake ensure-editor ok: 2021\.3\.45f1' -or
-    $manualDefaultsText -notmatch 'fake ensure-editor ok: 6000\.5\.2f1'
+    $manualDefaultsText -notmatch 'fake ensure-editor ok: 6000\.5\.2f1' -or
+    $manualDefaultsText -notmatch 'fake ensure-editor ok: 6000\.6\.7f1'
 ) {
     Write-Host "::error file=scripts/unity/maintain-windows-runner.ps1::Direct manual maintenance must load .github/unity-versions.json by default, reuse the Actions runner tool cache, use a repo-local diagnostics root, and honor UH_RUNNER_DISABLE_AUTO_BOOTSTRAP=1 without requiring YAML-supplied arguments. Exit $manualDefaultsExitCode. Output: $manualDefaultsText"
     $failed = $true
@@ -3400,7 +3402,7 @@ if ($ensureEditorWatchdogImported) {
                 ExitCode = 124
                 Output = @('Progress: 50%')
                 StallKilled = $false
-                TimedOutWallClock = $true
+                TimedOutWallClock = $false
             }
         }
         function script:Resolve-InstalledEditor { param([string]$Version, [string]$Root, [switch]$ManagedOnly) return 'D:\Unity\6000.5.2f1\Editor\Unity.exe' }
@@ -3411,7 +3413,7 @@ if ($ensureEditorWatchdogImported) {
         $resolvedRepairEditor = Install-UnityEditorWithCiModules `
             -Version '6000.5.2f1' `
             -InstallRoot 'D:\Unity' `
-            -Reason 'live timeout regression' `
+            -Reason 'native exit regression' `
             -Profile 'StandaloneWindowsIl2Cpp' `
             -ManagedOnly
         $repairRecoveryNoticeText = @($script:repairRecoveryNotices.ToArray()) -join ' '
@@ -3421,7 +3423,7 @@ if ($ensureEditorWatchdogImported) {
             Install-UnityEditorWithCiModules `
                 -Version '6000.5.2f1' `
                 -InstallRoot 'D:\Unity' `
-                -Reason 'live timeout regression' `
+                -Reason 'native exit regression' `
                 -Profile 'StandaloneWindowsIl2Cpp' `
                 -ManagedOnly | Out-Null
         } catch {
@@ -3433,13 +3435,13 @@ if ($ensureEditorWatchdogImported) {
             $repairRecoveryNoticeText -notmatch 'verifying modules against disk' -or
             $missingModuleFailure -notmatch 'required CI module groups.+still missing.+windows-mono'
         ) {
-            Write-Host "::error file=scripts/unity/ensure-editor.ps1::A timed-out repair install must continue to disk module verification when Unity.exe is resolvable afterward and fail closed if required modules are absent. Resolved='$resolvedRepairEditor' Notices='$repairRecoveryNoticeText' MissingModuleFailure='$missingModuleFailure'."
+            Write-Host "::error file=scripts/unity/ensure-editor.ps1::A naturally exited repair install may continue to disk module verification when Unity.exe is resolvable afterward and fail closed if required modules are absent. Resolved='$resolvedRepairEditor' Notices='$repairRecoveryNoticeText' MissingModuleFailure='$missingModuleFailure'."
             $failed = $true
         } elseif ($VerboseOutput) {
-            Write-Info 'Checked repair installs recover a resolvable editor after a Unity CLI timeout and still verify modules on disk.'
+            Write-Info 'Checked repair installs recover a resolvable editor after a native Unity CLI failure and still verify modules on disk.'
         }
     } catch {
-        Write-Host "::error file=scripts/unity/ensure-editor.ps1::Repair-install timeout recovery regression failed: $($_.Exception.Message)"
+        Write-Host "::error file=scripts/unity/ensure-editor.ps1::Repair-install natural-exit recovery regression failed: $($_.Exception.Message)"
         $failed = $true
     } finally {
         foreach ($functionName in $repairRecoveryFunctionNames) {

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -24,7 +25,24 @@ def config(root: Path, value: object) -> Path:
 
 def test_default_matches_canonical_versions() -> None:
     path = ROOT / ".github/unity-versions.json"
-    assert resolve_versions(path, "") == json.loads(path.read_text(encoding="utf-8"))["all"]
+    document = json.loads(path.read_text(encoding="utf-8"))
+    assert resolve_versions(path, "") == list(
+        dict.fromkeys(document["all"] + document["maintenance"])
+    )
+    assert "6000.6.7f1" in resolve_versions(path, "")
+    assert "6000.6.7f1" not in document["all"]
+
+
+def test_default_includes_downstream_editors_without_duplicates(tmp_path: Path) -> None:
+    path = config(tmp_path, {"all": ["2021.3.45f1"], "maintenance": ["6000.6.7f1", "2021.3.45f1"]})
+    assert resolve_versions(path, "") == ["2021.3.45f1", "6000.6.7f1"]
+    assert resolve_versions(path, "2022.3.45f1") == ["2022.3.45f1"]
+
+
+@pytest.mark.parametrize("value", [None, False, "6000.6.7f1", [False], ["bad"]])
+def test_invalid_maintenance_configuration_is_rejected(value: object, tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match=r"Unity"):
+        resolve_versions(config(tmp_path, {"all": ["2021.3.45f1"], "maintenance": value}), "")
 
 
 @pytest.mark.parametrize("selection", ["6000.6.7f1", " 6000.6.7f1 ", "6000.6.7f1,6000.6.7f1"])
@@ -164,3 +182,82 @@ def test_removed_validation_edges_are_detected() -> None:
         "matrix-config" in dependency_closure(job, mutant)
         for job in ("bootstrap-host", "maintain-unity")
     )
+
+
+@pytest.mark.parametrize(
+    ("document", "requested", "expected"),
+    [
+        (
+            {"all": ["2021.3.45f1"], "maintenance": ["6000.6.7f1"]},
+            "",
+            ["2021.3.45f1", "6000.6.7f1"],
+        ),
+        ({"all": ["2021.3.45f1"]}, "", ["2021.3.45f1"]),
+        ({"all": ["2021.3.45f1"], "maintenance": []}, "", ["2021.3.45f1"]),
+        ({"all": ["2021.3.45f1"], "maintenance": ["2021.3.45f1"]}, "", ["2021.3.45f1"]),
+        ({"all": ["2021.3.45f1"]}, "6000.6.7f1,2022.3.45f1", ["6000.6.7f1", "2022.3.45f1"]),
+        ({"all": ["2021.3.45f1"], "maintenance": ["bad"]}, "6000.6.7f1", ["6000.6.7f1"]),
+        ({"all": ["2021.3.45f1"], "maintenance": ["bad"]}, "", None),
+        ({"all": [], "maintenance": ["6000.6.7f1"]}, "", None),
+        ({"all": ["2021.3.45f1"], "maintenance": None}, "", None),
+        ({"all": ["2021.3.45f1"], "maintenance": "6000.6.7f1"}, "", None),
+        ({"all": ["2021.3.45f1"], "maintenance": [False]}, "", None),
+        ({"all": ["2021.3.45f1"], "maintenance": ["6000.6.7f1"] * 16}, "", None),
+        ({"all": "2021.3.45f1"}, "", None),
+        ({"all": ["2021.3.45f1"]}, "bad", None),
+        ({"all": ["2021.3.45f1"]}, "6000.6.7f1,", None),
+    ],
+)
+def test_manual_and_workflow_version_selection_agree(
+    document: dict[str, object], requested: str, expected: list[str] | None, tmp_path: Path
+) -> None:
+    shell = shutil.which("pwsh")
+    if shell is None:
+        pytest.skip("PowerShell is required to exercise the Windows compatibility entry point")
+    github = tmp_path / ".github"
+    github.mkdir()
+    path = github / "unity-versions.json"
+    path.write_text(json.dumps(document), encoding="utf-8")
+    probe = tmp_path / "resolve.ps1"
+    probe.write_text(
+        "param([string]$MaintenanceScript, [string]$Root, [string]$Requested)\n"
+        "$ErrorActionPreference = 'Stop'\n"
+        ". $MaintenanceScript\n"
+        "try {\n"
+        "  $values = @(Resolve-RunnerMaintenanceUnityVersions -UnityVersions @($Requested) -RepoRoot $Root)\n"
+        "  Write-Output ('RESULT:' + (ConvertTo-Json -InputObject $values -Compress))\n"
+        "} catch { [Console]::Error.WriteLine($_.Exception.Message); exit 1 }\n",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [
+            shell,
+            "-NoProfile",
+            "-NonInteractive",
+            "-File",
+            str(probe),
+            "-MaintenanceScript",
+            str(ROOT / "scripts/unity/maintain-windows-runner.ps1"),
+            "-Root",
+            str(tmp_path),
+            "-Requested",
+            requested,
+        ],
+        capture_output=True,
+        encoding="utf-8",
+        check=False,
+        timeout=30,
+    )
+    if expected is None:
+        assert result.returncode != 0, result.stdout
+        with pytest.raises(ValueError, match=r"Unity|Select"):
+            resolve_versions(path, requested)
+    else:
+        assert result.returncode == 0, result.stderr
+        output = next(
+            line.removeprefix("RESULT:")
+            for line in result.stdout.splitlines()
+            if line.startswith("RESULT:")
+        )
+        assert json.loads(output) == expected
+        assert resolve_versions(path, requested) == expected

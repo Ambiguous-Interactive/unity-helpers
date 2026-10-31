@@ -276,6 +276,13 @@ catch inspection failures and return the method's missing-result value, such as 
 or an empty array. A missing result does not distinguish an absent attribute from failed inspection;
 do not treat it as proof that a required contract is valid.
 
+Discovery captures the available assemblies when you call it and inspects their types as you
+enumerate. Enumerating the same result again uses that assembly snapshot; call the helper again
+after loading another assembly. Partial type-load failures retain the types that loaded, in their
+original order. Discovery uses direct iterators, and member signature construction reuses a pooled
+buffer. The returned sequence and reflection results can still allocate, so keep discovery outside
+frame loops and retain the delegates you need.
+
 ```csharp
 // Discovery. In the editor these use UnityEditor.TypeCache automatically.
 IEnumerable<Type> enemies = ReflectionHelpers.GetTypesDerivedFrom<Enemy>();

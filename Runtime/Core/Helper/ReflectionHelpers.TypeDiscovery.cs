@@ -10,10 +10,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 {
     using System;
     using System.Collections.Generic;
-    using System.Linq;
     using System.Reflection;
     using System.Runtime.CompilerServices;
     using System.Text;
+    using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Utils;
 #if UNITY_EDITOR
     using UnityEditor;
@@ -45,33 +45,31 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <summary>
         /// Returns all loaded types across accessible assemblies, swallowing reflection errors.
         /// </summary>
+        /// <remarks>Captures the assembly selection when called and reads each assembly's types during enumeration.</remarks>
         public static IEnumerable<Type> GetAllLoadedTypes()
         {
-            return GetAllLoadedAssemblies()
-                .SelectMany(assembly => GetTypesFromAssembly(assembly))
-                .Where(type => type != null);
+            return EnumerateLoadedTypes(GetAllLoadedAssemblies());
         }
 
         /// <summary>
         /// Returns all loaded assemblies discoverable by the current AppDomain.
         /// </summary>
+        /// <remarks>Repeated enumeration retains the captured assembly snapshot and excludes dynamic assemblies.</remarks>
         public static IEnumerable<Assembly> GetAllLoadedAssemblies()
         {
             try
             {
 #if UNITY_6000_6_OR_NEWER
-                return UnityEngine
-                    .Assemblies.CurrentAssemblies.GetLoadedAssemblies()
-                    .Where(assembly => assembly != null && !assembly.IsDynamic);
+                return FilterLoadedAssemblies(
+                    UnityEngine.Assemblies.CurrentAssemblies.GetLoadedAssemblies()
+                );
 #else
-                return AppDomain
-                    .CurrentDomain.GetAssemblies()
-                    .Where(assembly => assembly != null && !assembly.IsDynamic);
+                return FilterLoadedAssemblies(AppDomain.CurrentDomain.GetAssemblies());
 #endif
             }
             catch
             {
-                return Enumerable.Empty<Assembly>();
+                return Array.Empty<Assembly>();
             }
         }
 
@@ -91,7 +89,33 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
             catch (ReflectionTypeLoadException e)
             {
-                return e.Types.Where(t => t != null).ToArray();
+                Type[] types = e.Types;
+                if (types == null || types.Length == 0)
+                {
+                    return Type.EmptyTypes;
+                }
+                int count = 0;
+                foreach (Type type in types)
+                {
+                    if (type != null)
+                    {
+                        ++count;
+                    }
+                }
+                if (count == 0)
+                {
+                    return Type.EmptyTypes;
+                }
+                Type[] loaded = new Type[count];
+                int index = 0;
+                foreach (Type type in types)
+                {
+                    if (type != null)
+                    {
+                        loaded[index++] = type;
+                    }
+                }
+                return loaded;
             }
             catch
             {
@@ -159,19 +183,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             try
             {
                 TypeCache.TypeCollection list = TypeCache.GetTypesDerivedFrom<T>();
-                return list.Where(t =>
-                    t != null && (includeAbstract || (t.IsClass && !t.IsAbstract))
-                );
+                return FilterCachedTypes(list, includeAbstract);
             }
             catch { }
 #endif
             Type baseType = typeof(T);
-            return GetAllLoadedTypes()
-                .Where(t =>
-                    t != null
-                    && baseType.IsAssignableFrom(t)
-                    && (includeAbstract || (t.IsClass && !t.IsAbstract))
-                );
+            return FilterDerivedTypes(GetAllLoadedTypes(), baseType, includeAbstract);
         }
 
         /// <summary>
@@ -190,18 +207,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             try
             {
                 TypeCache.TypeCollection list = TypeCache.GetTypesDerivedFrom(baseType);
-                return list.Where(t =>
-                    t != null && (includeAbstract || (t.IsClass && !t.IsAbstract))
-                );
+                return FilterCachedTypes(list, includeAbstract);
             }
             catch { }
 #endif
-            return GetAllLoadedTypes()
-                .Where(t =>
-                    t != null
-                    && baseType.IsAssignableFrom(t)
-                    && (includeAbstract || (t.IsClass && !t.IsAbstract))
-                );
+            return FilterDerivedTypes(GetAllLoadedTypes(), baseType, includeAbstract);
         }
 
         /// <summary>
@@ -226,7 +236,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         public static IEnumerable<Type> GetTypesWithAttribute<TAttribute>()
             where TAttribute : Attribute
         {
-            return GetAllLoadedTypes().Where(type => HasAttributeSafe<TAttribute>(type));
+            return FilterAttributedTypes(
+                GetAllLoadedTypes(),
+                typeof(TAttribute),
+                restrictKinds: false,
+                includeAbstract: true
+            );
         }
 
         /// <summary>
@@ -239,18 +254,16 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             try
             {
                 TypeCache.TypeCollection types = TypeCache.GetTypesWithAttribute<TAttribute>();
-                return types.Where(t =>
-                    t != null && (includeAbstract || (t.IsClass && !t.IsAbstract))
-                );
+                return FilterCachedTypes(types, includeAbstract);
             }
             catch { }
 #endif
-            return GetAllLoadedTypes()
-                .Where(t =>
-                    t != null
-                    && (includeAbstract || (t.IsClass && !t.IsAbstract))
-                    && HasAttributeSafe<TAttribute>(t)
-                );
+            return FilterAttributedTypes(
+                GetAllLoadedTypes(),
+                typeof(TAttribute),
+                restrictKinds: true,
+                includeAbstract
+            );
         }
 
         /// <summary>
@@ -260,10 +273,15 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         {
             if (attributeType == null || !typeof(Attribute).IsAssignableFrom(attributeType))
             {
-                return Enumerable.Empty<Type>();
+                return Type.EmptyTypes;
             }
 
-            return GetAllLoadedTypes().Where(type => HasAttributeSafe(type, attributeType));
+            return FilterAttributedTypes(
+                GetAllLoadedTypes(),
+                attributeType,
+                restrictKinds: false,
+                includeAbstract: true
+            );
         }
 
         /// <summary>
@@ -300,23 +318,15 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             {
                 TypeCache.MethodCollection methods =
                     TypeCache.GetMethodsWithAttribute<TAttribute>();
-                IEnumerable<MethodInfo> filtered = methods;
-                if (within != null)
-                {
-                    filtered = filtered.Where(m => m?.DeclaringType == within);
-                }
-                return filtered.Where(m => m != null);
+                return FilterCachedMethods(methods, within);
             }
             catch { }
 #endif
             if (within != null)
             {
-                return SafeGetMethods(within, flags)
-                    .Where(m => m != null && HasAttributeSafe<TAttribute>(m));
+                return FilterAttributedMembers(SafeGetMethods(within, flags), typeof(TAttribute));
             }
-            return GetAllLoadedTypes()
-                .SelectMany(t => SafeGetMethods(t, flags))
-                .Where(m => m != null && HasAttributeSafe<TAttribute>(m));
+            return EnumerateAttributedMethods(GetAllLoadedTypes(), typeof(TAttribute), flags);
         }
 
         /// <summary>
@@ -347,25 +357,18 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             {
                 TypeCache.FieldInfoCollection fields =
                     TypeCache.GetFieldsWithAttribute<TAttribute>();
-                IEnumerable<FieldInfo> filtered = fields;
-                if (within != null)
-                {
-                    filtered = filtered.Where(f =>
-                        f?.DeclaringType != null && f.DeclaringType.IsAssignableFrom(within)
-                    );
-                }
-                return filtered.Where(f => f != null);
+                return FilterCachedFields(fields, within);
             }
             catch { }
 #endif
             if (within != null)
             {
-                return EnumerateDeclaredAndInheritedFields(within, flags)
-                    .Where(f => f != null && HasAttributeSafe<TAttribute>(f));
+                return FilterAttributedMembers(
+                    EnumerateDeclaredAndInheritedFields(within, flags),
+                    typeof(TAttribute)
+                );
             }
-            return GetAllLoadedTypes()
-                .SelectMany(t => SafeGetFields(t, flags))
-                .Where(f => f != null && HasAttributeSafe<TAttribute>(f));
+            return EnumerateAttributedFields(GetAllLoadedTypes(), typeof(TAttribute), flags);
         }
 
         /// <summary>
@@ -383,12 +386,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         {
             if (within != null)
             {
-                return SafeGetProperties(within, flags)
-                    .Where(p => p != null && HasAttributeSafe<TAttribute>(p));
+                return FilterAttributedMembers(
+                    SafeGetProperties(within, flags),
+                    typeof(TAttribute)
+                );
             }
-            return GetAllLoadedTypes()
-                .SelectMany(t => SafeGetProperties(t, flags))
-                .Where(p => p != null && HasAttributeSafe<TAttribute>(p));
+            return EnumerateAttributedProperties(GetAllLoadedTypes(), typeof(TAttribute), flags);
         }
 
         /// <summary>
@@ -729,13 +732,218 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 
+        private static IEnumerable<Assembly> FilterLoadedAssemblies(
+            IEnumerable<Assembly> assemblies
+        )
+        {
+            foreach (Assembly assembly in new ValueEnumerable<Assembly>(assemblies))
+            {
+                if (assembly != null && !assembly.IsDynamic)
+                {
+                    yield return assembly;
+                }
+            }
+        }
+
+        private static IEnumerable<Type> EnumerateLoadedTypes(IEnumerable<Assembly> assemblies)
+        {
+            foreach (Assembly assembly in assemblies)
+            {
+                foreach (Type type in GetTypesFromAssembly(assembly))
+                {
+                    if (type != null)
+                    {
+                        yield return type;
+                    }
+                }
+            }
+        }
+
+        private static bool IsDiscoverableType(Type type, bool includeAbstract)
+        {
+            return type != null && (includeAbstract || (type.IsClass && !type.IsAbstract));
+        }
+
+        private static IEnumerable<Type> FilterDerivedTypes(
+            IEnumerable<Type> types,
+            Type baseType,
+            bool includeAbstract
+        )
+        {
+            foreach (Type type in types)
+            {
+                if (
+                    type != null
+                    && baseType.IsAssignableFrom(type)
+                    && IsDiscoverableType(type, includeAbstract)
+                )
+                {
+                    yield return type;
+                }
+            }
+        }
+
+        private static IEnumerable<Type> FilterAttributedTypes(
+            IEnumerable<Type> types,
+            Type attributeType,
+            bool restrictKinds,
+            bool includeAbstract
+        )
+        {
+            foreach (Type type in types)
+            {
+                if (
+                    (!restrictKinds || IsDiscoverableType(type, includeAbstract))
+                    && HasAttributeSafe(type, attributeType)
+                )
+                {
+                    yield return type;
+                }
+            }
+        }
+
+        private static IEnumerable<TMember> FilterAttributedMembers<TMember>(
+            IEnumerable<TMember> members,
+            Type attributeType
+        )
+            where TMember : MemberInfo
+        {
+            foreach (TMember member in new ValueEnumerable<TMember>(members))
+            {
+                if (member != null && HasAttributeSafe(member, attributeType))
+                {
+                    yield return member;
+                }
+            }
+        }
+
+        private static IEnumerable<MethodInfo> EnumerateAttributedMethods(
+            IEnumerable<Type> types,
+            Type attributeType,
+            BindingFlags flags
+        )
+        {
+            foreach (Type type in types)
+            {
+                foreach (MethodInfo method in SafeGetMethods(type, flags))
+                {
+                    if (method != null && HasAttributeSafe(method, attributeType))
+                    {
+                        yield return method;
+                    }
+                }
+            }
+        }
+
+        private static IEnumerable<FieldInfo> EnumerateAttributedFields(
+            IEnumerable<Type> types,
+            Type attributeType,
+            BindingFlags flags
+        )
+        {
+            foreach (Type type in types)
+            {
+                foreach (FieldInfo field in SafeGetFields(type, flags))
+                {
+                    if (field != null && HasAttributeSafe(field, attributeType))
+                    {
+                        yield return field;
+                    }
+                }
+            }
+        }
+
+        private static IEnumerable<PropertyInfo> EnumerateAttributedProperties(
+            IEnumerable<Type> types,
+            Type attributeType,
+            BindingFlags flags
+        )
+        {
+            foreach (Type type in types)
+            {
+                foreach (PropertyInfo property in SafeGetProperties(type, flags))
+                {
+                    if (property != null && HasAttributeSafe(property, attributeType))
+                    {
+                        yield return property;
+                    }
+                }
+            }
+        }
+
+        private static void AppendParameterSignature(StringBuilder builder, Type[] parameterTypes)
+        {
+            int count = parameterTypes.Length;
+            for (int index = 0; index < count; ++index)
+            {
+                if (0 < index)
+                {
+                    builder.Append(',');
+                }
+                builder.Append(parameterTypes[index]?.FullName ?? "null");
+            }
+        }
+
+#if UNITY_EDITOR
+        private static IEnumerable<Type> FilterCachedTypes(
+            TypeCache.TypeCollection types,
+            bool includeAbstract
+        )
+        {
+            foreach (Type type in types)
+            {
+                if (IsDiscoverableType(type, includeAbstract))
+                {
+                    yield return type;
+                }
+            }
+        }
+
+        private static IEnumerable<MethodInfo> FilterCachedMethods(
+            TypeCache.MethodCollection methods,
+            Type within
+        )
+        {
+            foreach (MethodInfo method in methods)
+            {
+                if (method != null && (within == null || method.DeclaringType == within))
+                {
+                    yield return method;
+                }
+            }
+        }
+
+        private static IEnumerable<FieldInfo> FilterCachedFields(
+            TypeCache.FieldInfoCollection fields,
+            Type within
+        )
+        {
+            foreach (FieldInfo field in fields)
+            {
+                if (
+                    field != null
+                    && (
+                        within == null
+                        || (
+                            field.DeclaringType != null
+                            && field.DeclaringType.IsAssignableFrom(within)
+                        )
+                    )
+                )
+                {
+                    yield return field;
+                }
+            }
+        }
+#endif
+
         private static Assembly ResolvePlaceholderAssembly(AssemblyName requestedAssembly)
         {
             return typeof(object).Assembly;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static IEnumerable<MethodInfo> SafeGetMethods(Type t, BindingFlags flags)
+        private static MethodInfo[] SafeGetMethods(Type t, BindingFlags flags)
         {
             try
             {
@@ -795,7 +1003,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static IEnumerable<PropertyInfo> SafeGetProperties(Type t, BindingFlags flags)
+        private static PropertyInfo[] SafeGetProperties(Type t, BindingFlags flags)
         {
             try
             {
@@ -848,7 +1056,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return "[]";
             }
 
-            return "[" + string.Join(",", paramTypes.Select(t => t?.FullName ?? "null")) + "]";
+            using PooledResource<StringBuilder> lease = Buffers.StringBuilder.Get(
+                out StringBuilder builder
+            );
+            builder.Append('[');
+            AppendParameterSignature(builder, paramTypes);
+            return builder.Append(']').ToString();
         }
 
         private static string BuildMethodSignatureKey(string name, Type[] paramTypes)
@@ -858,10 +1071,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return name + "()";
             }
 
-            return name
-                + "("
-                + string.Join(",", paramTypes.Select(t => t?.FullName ?? "null"))
-                + ")";
+            using PooledResource<StringBuilder> lease = Buffers.StringBuilder.Get(
+                out StringBuilder builder
+            );
+            builder.Append(name).Append('(');
+            AppendParameterSignature(builder, paramTypes);
+            return builder.Append(')').ToString();
         }
     }
 }

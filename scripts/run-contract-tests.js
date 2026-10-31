@@ -321,6 +321,16 @@ const CHECKS = [
     run: "npm run test:gitignore-docs"
   },
   {
+    id: "runner-maintenance",
+    name: "Runner maintenance selection and CLI",
+    run: "npm run test:runner-maintenance"
+  },
+  {
+    id: "python-compatibility",
+    name: "Python migration compatibility entry points",
+    run: "npm run test:python-compatibility"
+  },
+  {
     id: "check-runner",
     name: "Python check execution and completion",
     run: "npm run test:check-runner"

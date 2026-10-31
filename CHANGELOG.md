@@ -50,6 +50,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Reduce temporary iterators and closures in type discovery, member lookup and WProto schema export while retaining discovery order ([#847](https://github.com/Ambiguous-Interactive/unity-helpers/issues/847)).
+- Preserve pool purge policy and assignment validation attributes explicitly for runtime lookup in stripped players ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
 - Clarify reflection fallback and stripping limits, dictionary choices and AI-assisted package use; separate contributor setup from game setup ([#994](https://github.com/Ambiguous-Interactive/unity-helpers/issues/994)).
 - Replace internal reports with practical pooling, enumeration, random, JSON and editor guidance, including compiled examples and safe test-run recovery ([#994](https://github.com/Ambiguous-Interactive/unity-helpers/issues/994)).
 - Replace the protobuf survey with a save/load and migration guide, and make serialization choices, failure handling and player-data compatibility easier to find ([guide](./docs/features/serialization/wallstop-proto-public-survey.md), [#994](https://github.com/Ambiguous-Interactive/unity-helpers/issues/994)).
@@ -57,6 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix type discovery throwing when a partial assembly load supplies no available-type array ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
 - Fix signed random samples reaching excluded maxima. Keep ordinary rejection fallbacks bounded and report exact-sampling failure through `Try` methods and weighted shuffle bags ([guide](./docs/features/utilities/random-generators.md), [#638](https://github.com/Ambiguous-Interactive/unity-helpers/issues/638)).
 - Fix missing C# importer metadata while preserving asset GUIDs and existing settings ([#1083](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1083)).
 - Fix Analyzer Policies files that prevent script compilation, and repair older namespaced files when saving policies ([#1091](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1091)).

@@ -76,7 +76,7 @@ on:
       unity-versions:
         description: >-
           Optional comma-separated editor versions to maintain (for example 6000.6.7f1).
-          Empty selects all versions from .github/unity-versions.json.
+          Empty selects CI and downstream maintenance versions from .github/unity-versions.json.
         required: false
         type: string
         default: ""
@@ -146,7 +146,7 @@ jobs:
       cancel-in-progress: true
     steps:
       - name: Require the selected Unity runner online
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/check-unity-runner-availability@20077985093aac0e88f88f931ebedae78c1c9284 # v1.17.1
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/check-unity-runner-availability@45fa5e36c4371b2fa006582a8df8f49a3c1ec3a8 # v1.17.1
         with:
           reader-app-id: ${{ secrets.BUILD_LOCK_READER_APP_ID }}
           reader-app-private-key: ${{ secrets.BUILD_LOCK_READER_APP_PRIVATE_KEY }}

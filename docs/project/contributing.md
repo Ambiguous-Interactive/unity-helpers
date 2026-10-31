@@ -89,7 +89,8 @@ before an existing export project is removed. Archive checksums support UTF-8 ou
 
 The lockfile pins Ruff, mypy, Pyright, pytest, and their dependencies. `lint:python` checks Ruff
 formatting and correctness rules plus both type checkers in strict mode. Function signatures must
-be fully annotated and explicit `Any` is forbidden. CI runs these checks and the package tests.
+be fully annotated and explicit `Any` is forbidden. CI runs these checks on Linux and Windows,
+along with the package tests.
 The existing `scripts/generate-meta.sh` entry point delegates to Python and retains `--force`,
 CRLF metadata, and importer defaults. Use `npm run meta:generate -- <path>` or invoke
 `scripts/generate_meta.py` through uv for a shell-independent entry point. Existing metadata is
@@ -97,6 +98,25 @@ refused unless `--force` is explicit; a competing creation also preserves the fi
 commands use `--no-dev`, so they do not install analysis or test packages into a fresh environment.
 They retain tools already installed in a shared warm environment; compatible Python may still need
 to be provisioned on the first run.
+
+The documentation identifier, runtime attribute-preservation, and spelling-bucket tools also use
+the locked Python environment. Their npm commands invoke Python directly; the old Node and
+PowerShell paths remain compatibility launchers. The preservation gate includes generic reflection
+calls such as `GetCustomAttribute<PoolPurgePolicyAttribute>()`. Spelling fixes retain the first
+spelling of each word and the file's line endings; word insertion refuses cross-bucket duplicates
+before writing. Fixes leave path-only dictionaries and absent word lists unchanged.
+Use `--config <path>` when checking or updating a separate spelling configuration.
+Set `PRESERVE_ATTRIBUTES_ROOT` to check a separate runtime source tree. Diagnostics use absolute
+paths when that tree is on a different Windows drive from the repository.
+These command-line tools write UTF-8 diagnostics even when Windows pipes use a legacy encoding.
+
+```bash
+npm run lint:doc-identifiers
+npm run lint:preserve-attributes
+npm run lint:spelling:config
+npm run lint:spelling:add -- tech-terms ExampleWord
+uv run --project scripts/python~ --locked pytest scripts/tests/test_doc_identifiers.py scripts/tests/test_preserve_attributes.py scripts/tests/test_cspell_tools.py
+```
 
 `npm run pr:feedback -- <number>` uses the locked Python environment to read all four
 PR feedback surfaces and audit author identities. The shell entry point remains available;

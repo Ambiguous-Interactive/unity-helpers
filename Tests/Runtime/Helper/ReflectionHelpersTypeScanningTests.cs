@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     using System;
     using System.Collections.Generic;
     using System.Linq;
+    using System.Reflection;
     using NUnit.Framework;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
@@ -184,6 +185,86 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 "GetTypesFromAssembly should return non-null array for null input"
             );
             Assert.AreEqual(0, types.Length, "Expected empty array for null assembly.");
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(16)]
+        [TestCase(10000)]
+        public void PartialTypeLoadPreservesEveryAvailableTypeInOrder(int count)
+        {
+            Type[] available = new Type[count];
+            List<Type> expected = new();
+            for (int index = 0; index < count; ++index)
+            {
+                if (index % 3 == 0)
+                {
+                    continue;
+                }
+                Type type = index % 2 == 0 ? typeof(string) : typeof(int);
+                available[index] = type;
+                expected.Add(type);
+            }
+            ReflectionTypeLoadException failure = new(available, Array.Empty<Exception>());
+            TypeDiscoveryAssembly assembly = new(available, failure);
+
+            Type[] result = ReflectionHelpers.GetTypesFromAssembly(assembly);
+
+            CollectionAssert.AreEqual(expected, result);
+            Assert.AreNotSame(available, result);
+        }
+
+        [Test]
+        public void CompleteAssemblyTypeLoadRetainsItsArrayAndOrder()
+        {
+            Type[] types = { typeof(string), null, typeof(int), typeof(string) };
+            TypeDiscoveryAssembly assembly = new(types);
+
+            Assert.AreSame(types, ReflectionHelpers.GetTypesFromAssembly(assembly));
+        }
+
+        [Test]
+        public void FailedAssemblyTypeLoadReturnsEmpty()
+        {
+            TypeDiscoveryAssembly assembly = new(null, new NotSupportedException());
+
+            Assert.IsEmpty(ReflectionHelpers.GetTypesFromAssembly(assembly));
+        }
+
+        [Test]
+        public void PartialTypeLoadWithoutATypeArrayReturnsEmpty()
+        {
+            ReflectionTypeLoadException failure = new(null, Array.Empty<Exception>());
+            TypeDiscoveryAssembly assembly = new(null, failure);
+
+            Assert.IsEmpty(ReflectionHelpers.GetTypesFromAssembly(assembly));
+        }
+
+        [Test]
+        public void AssemblyDiscoveryRetainsItsSnapshotAcrossEnumerations()
+        {
+            IEnumerable<Assembly> discovered = ReflectionHelpers.GetAllLoadedAssemblies();
+            Assembly[] first = discovered.ToArray();
+
+            Assert.IsNotEmpty(first);
+            Assert.IsTrue(first.All(assembly => assembly != null && !assembly.IsDynamic));
+            CollectionAssert.AreEqual(first, discovered.ToArray());
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void DerivedTypeDiscoveryRetainsItsRequestedShape(bool includeAbstract)
+        {
+            Type[] derived = ReflectionHelpers
+                .GetTypesDerivedFrom<Component>(includeAbstract)
+                .ToArray();
+
+            Assert.Contains(typeof(PrewarmTesterComponent), derived);
+            Assert.IsTrue(
+                derived.All(type => type != null && typeof(Component).IsAssignableFrom(type))
+            );
+            Assert.IsTrue(includeAbstract || derived.All(type => type.IsClass && !type.IsAbstract));
+            Assert.IsEmpty(ReflectionHelpers.GetTypesDerivedFrom(null, includeAbstract));
         }
     }
 }

@@ -946,6 +946,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             yield break;
         }
 
+        [Test]
+        public void MetadataScenariosHaveDistinctStableDisplayNames()
+        {
+            System.Collections.Generic.HashSet<string> identities = new(StringComparer.Ordinal);
+            foreach (MetadataScenario scenario in MetadataEntryScenarios())
+            {
+                string identity = scenario.ToString();
+                Assert.AreEqual(scenario.Description, identity);
+                Assert.IsTrue(identities.Add(identity), "Duplicate scenario identity: " + identity);
+            }
+            Assert.AreEqual(5, identities.Count);
+        }
+
         [UnityTest]
         public IEnumerator MetadataAssetTracksSingletonEntries(
             [ValueSource(nameof(MetadataEntryScenarios))] MetadataScenario scenario
@@ -1406,6 +1419,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             public void CreateAsset()
             {
                 _createAsset();
+            }
+
+            /// <inheritdoc />
+            public override string ToString()
+            {
+                return Description;
             }
         }
 

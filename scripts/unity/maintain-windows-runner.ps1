@@ -157,10 +157,11 @@ function Resolve-RunnerMaintenanceUnityVersions {
     $versions = @(
         $UnityVersions |
             ForEach-Object { [string]$_ } |
-            Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            ForEach-Object { $_.Trim() -split '[,\s]+' }
     )
     if ($versions.Count -gt 0) {
-        return $versions
+        return @(Confirm-RunnerMaintenanceUnityVersions -UnityVersions $versions)
     }
 
     $unityVersionsPath = Join-Path $RepoRoot '.github/unity-versions.json'
@@ -169,17 +170,35 @@ function Resolve-RunnerMaintenanceUnityVersions {
     }
 
     $unityVersionsConfig = Get-Content -LiteralPath $unityVersionsPath -Raw | ConvertFrom-Json
-    $versions = @(
-        @($unityVersionsConfig.all) |
-            ForEach-Object { [string]$_ } |
-            Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
-    )
-    if ($versions.Count -lt 1) {
-        throw '.github/unity-versions.json must define at least one Unity version in all[].'
+    if ($unityVersionsConfig.all -isnot [array] -or @($unityVersionsConfig.all).Count -lt 1) {
+        throw '.github/unity-versions.json must define a nonempty all[] string array.'
     }
+    $versions = @($unityVersionsConfig.all)
+    $maintenance = $unityVersionsConfig.PSObject.Properties['maintenance']
+    if ($null -ne $maintenance) {
+        if ($maintenance.Value -isnot [array]) {
+            throw '.github/unity-versions.json maintenance must be a string array.'
+        }
+        $versions += @($maintenance.Value)
+    }
+    $versions = @(Confirm-RunnerMaintenanceUnityVersions -UnityVersions $versions)
 
     Write-RunnerMaintenanceInfo "Unity versions from .github/unity-versions.json: $($versions -join ', ')"
     return $versions
+}
+
+function Confirm-RunnerMaintenanceUnityVersions {
+    param([AllowNull()][object[]]$UnityVersions)
+
+    if ($null -eq $UnityVersions -or $UnityVersions.Count -lt 1 -or 16 -lt $UnityVersions.Count) {
+        throw 'Select between 1 and 16 Unity versions.'
+    }
+    foreach ($version in $UnityVersions) {
+        if ($version -isnot [string] -or $version -cnotmatch '^[1-9][0-9]{3}\.[0-9]{1,2}\.[0-9]{1,3}[abfp][1-9][0-9]{0,2}\z') {
+            throw "Invalid Unity editor version: '$version'."
+        }
+    }
+    return @($UnityVersions | Select-Object -Unique)
 }
 
 function Resolve-RunnerMaintenanceDetectOnly {

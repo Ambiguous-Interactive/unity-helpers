@@ -154,8 +154,12 @@ def test_fix_repairs_stale_and_missing_payloads_preserving_importers(shipped: Pa
 def test_failed_publication_preserves_payload_and_allows_retry(
     shipped: Path, operation: str, real_denial: bool, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    if real_denial and (os.name == "nt" or os.getuid() == 0):
-        pytest.skip("Real chmod denial requires a non-root Unix account.")
+    def require_unprivileged_unix() -> None:
+        if sys.platform == "win32" or os.getuid() == 0:
+            pytest.skip("Real chmod denial requires a non-root Unix account.")
+
+    if real_denial:
+        require_unprivileged_unix()
     name = ASSEMBLIES[0]
     target = shipped / name
     target.write_bytes(b"retained payload")

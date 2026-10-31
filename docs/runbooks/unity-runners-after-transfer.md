@@ -152,8 +152,11 @@ Once the agent reports online, dispatch **Runner Bootstrap (Windows)** in mainte
 To install an editor used by a downstream project without changing this package's test matrix,
 dispatch **Runner Bootstrap (Windows)** once for each target machine with `unity-versions` set
 to the exact version and `provisioning-profile` set to the project's required build support.
-The default empty version selection still maintains every editor in `.github/unity-versions.json`
-with the `Full` profile. Explicit versions are validated before any host job starts.
+The default empty version selection combines the `all` and `maintenance` arrays in
+`.github/unity-versions.json` with the `Full` profile. `all` controls this package's test matrix;
+`maintenance` adds editor versions required by downstream projects, including `6000.6.7f1`.
+Both remote and direct maintenance read this combined list and remove duplicates in order.
+Explicit selections replace the default list and are validated before any host work starts.
 
 For DoxReloaded's 6000.6.7f1 upgrade, select `6000.6.7f1` and `EditorOnly` on both `ELI-MACHINE`
 and `DAD-MACHINE`. The editor is installed under the same `runner.tool_cache\u6-v3` root as
@@ -163,6 +166,16 @@ installed directory alone does not prove editor health.
 
 Managed-root verification accepts both legacy bare paths and the Unity CLI's TSV path rows.
 A reported root outside the managed installation directory still fails before editor changes.
+
+Maintenance replaces pre-1.0 CLI installations through Unity's current standalone installer.
+Editor and module installs, plus stale-install cleanup, pass explicit `--yes` confirmation as
+described in [Unity's installation reference](https://github.com/Unity-Technologies/skills/blob/main/skills/unity-cli/references/editors-install.md).
+An interrupted command cannot recover from an executable left behind. Before another CLI attempt
+in the same run, maintenance must stop scoped stale processes, clear the interrupted registration,
+and quarantine the partial tree. Failed cleanup stays pending and prevents another CLI attempt.
+Editor-only unpacking uses the 45-minute absolute deadline because native unpacking can be quiet;
+`UH_ENSURE_EDITOR_PROGRESS_STALL_SECONDS` still selects an earlier quiet-time cutoff when needed.
+Require the later detect-only audit to pass before changing a downstream editor pin.
 
 After both runners pass, update DoxReloaded's editor and license-return pins together with its
 cleanup validators. Confirm a licensed DoxReloaded run succeeds before closing the upgrade.
