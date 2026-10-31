@@ -183,6 +183,28 @@ def test_repository_attributes_remain_preserved() -> None:
     assert failures == []
 
 
+def test_foreign_drive_diagnostics_keep_the_source_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    file = source(
+        tmp_path,
+        "Fixture.cs",
+        "type.GetCustomAttribute<FixtureAttribute>();\n"
+        "public class FixtureAttribute : Attribute {}",
+    )
+
+    def different_drive(_path: Path, _root: Path) -> str:
+        raise ValueError("Paths are on different Windows drives")
+
+    with monkeypatch.context() as context:
+        context.setattr(os.path, "relpath", different_drive)
+        checked, failures = gate.analyze(tmp_path)
+    assert checked == ["FixtureAttribute"]
+    assert len(failures) == 1
+    assert str(file) in failures[0]
+    assert "not marked [Preserve]" in failures[0]
+
+
 @pytest.mark.parametrize("preserved", [False, True])
 def test_node_compatibility_launcher_preserves_reports(preserved: bool, tmp_path: Path) -> None:
     node = shutil.which("node")
@@ -201,3 +223,8 @@ def test_node_compatibility_launcher_preserves_reports(preserved: bool, tmp_path
         timeout=30,
     )
     assert result.returncode == (0 if preserved else 1), result.stderr
+    if preserved:
+        assert "1 runtime-reflected attribute(s) are preserved" in result.stdout
+    else:
+        assert "FixtureAttribute" in result.stderr
+        assert "not marked [Preserve]" in result.stderr

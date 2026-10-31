@@ -89,7 +89,10 @@ def inspect_sources(files: list[Path]) -> tuple[dict[str, str], dict[str, Declar
     declarations: dict[str, Declaration] = {}
     for file in files:
         text = file.read_text(encoding="utf-8")
-        relative = os.path.relpath(file, ROOT)
+        try:
+            relative = os.path.relpath(file, ROOT)
+        except ValueError:
+            relative = str(file)
         for pattern in (REFLECTED, GENERIC_READ):
             for read in pattern.finditer(text):
                 for name in read.groups():

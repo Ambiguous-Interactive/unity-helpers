@@ -254,6 +254,10 @@ jobs:
       - name: Setup Python tooling
         uses: ./.github/actions/setup-python-tools
 
+      - name: Check strict Python policies on Windows
+        shell: pwsh
+        run: uv run --project scripts/python~ --locked python scripts/python~/check.py
+
       - name: Verify assembly discovery on Windows
         shell: pwsh
         run: uv run --project scripts/python~ --locked pytest scripts/tests/test_asmdef.py -q

@@ -50,9 +50,14 @@ def write(text: str) -> None:
 
 def default_jobs(environment: dict[str, str] | None = None) -> int:
     resolved_environment = os.environ if environment is None else environment
-    cores = (
-        len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else os.cpu_count() or 1
-    )
+    if sys.platform == "win32":
+        cores = os.cpu_count() or 1
+    else:
+        cores = (
+            len(os.sched_getaffinity(0))
+            if hasattr(os, "sched_getaffinity")
+            else os.cpu_count() or 1
+        )
     try:
         quota, period = Path("/sys/fs/cgroup/cpu.max").read_text(encoding="ascii").split()
         if quota != "max" and int(quota) > 0 and int(period) > 0:

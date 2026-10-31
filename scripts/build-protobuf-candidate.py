@@ -82,7 +82,7 @@ def run(arguments: list[str], directory: Path, log: Path, timeout_seconds: float
         output, _ = process.communicate(timeout=timeout_seconds)
     except subprocess.TimeoutExpired:
         timed_out = True
-        if os.name == "nt":
+        if sys.platform == "win32":
             subprocess.run(  # noqa: S603 - Windows process-tree termination.
                 ["taskkill", "/PID", str(process.pid), "/T", "/F"],  # noqa: S607 - Windows system utility.
                 check=True,

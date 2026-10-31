@@ -89,7 +89,8 @@ before an existing export project is removed. Archive checksums support UTF-8 ou
 
 The lockfile pins Ruff, mypy, Pyright, pytest, and their dependencies. `lint:python` checks Ruff
 formatting and correctness rules plus both type checkers in strict mode. Function signatures must
-be fully annotated and explicit `Any` is forbidden. CI runs these checks and the package tests.
+be fully annotated and explicit `Any` is forbidden. CI runs these checks on Linux and Windows,
+along with the package tests.
 The existing `scripts/generate-meta.sh` entry point delegates to Python and retains `--force`,
 CRLF metadata, and importer defaults. Use `npm run meta:generate -- <path>` or invoke
 `scripts/generate_meta.py` through uv for a shell-independent entry point. Existing metadata is
@@ -104,6 +105,8 @@ PowerShell paths remain compatibility launchers. The preservation gate includes 
 calls such as `GetCustomAttribute<PoolPurgePolicyAttribute>()`. Spelling fixes retain the first
 spelling of each word and the file's line endings; word insertion refuses cross-bucket duplicates
 before writing. Use `--config <path>` when checking or updating a separate spelling configuration.
+Set `PRESERVE_ATTRIBUTES_ROOT` to check a separate runtime source tree. Diagnostics use absolute
+paths when that tree is on a different Windows drive from the repository.
 
 ```bash
 npm run lint:doc-identifiers

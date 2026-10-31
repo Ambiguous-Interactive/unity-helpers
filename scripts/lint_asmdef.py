@@ -228,8 +228,10 @@ def raise_walk_error(error: OSError) -> None:
 def is_hidden(path: Path) -> bool:
     """Match PowerShell's default hidden-file filtering on each platform."""
     if sys.platform == "win32":
-        return bool(path.stat().st_file_attributes & stat.FILE_ATTRIBUTE_HIDDEN)
-    return path.name.startswith(".")
+        hidden = bool(path.stat().st_file_attributes & stat.FILE_ATTRIBUTE_HIDDEN)
+    else:
+        hidden = path.name.startswith(".")
+    return hidden
 
 
 def discover(repository: Path) -> dict[str, list[Path]]:

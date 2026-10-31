@@ -190,8 +190,9 @@ def test_zero_exit_after_interrupt_cannot_qualify(
             assert "before interruption" in output
             assert "exit 0 without required completion evidence" in output
         finally:
-            if not pending.done() and ready.exists():
-                os.kill(int(ready.read_text()), signal.SIGKILL)
+            if sys.platform != "win32":
+                if not pending.done() and ready.exists():
+                    os.kill(int(ready.read_text()), signal.SIGKILL)
 
 
 @pytest.mark.parametrize(
