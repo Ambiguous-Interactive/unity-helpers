@@ -81,6 +81,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestTypes
         [ParentComponent(Optional = true, OnlyAncestors = true, NameFilter = "", MaxCount = 2)]
         public HashSet<Component> parentFilteredBoundedSet;
 
+        [ParentComponent(Optional = true, OnlyAncestors = true, MaxDepth = 1)]
+        public Component[] parentDepthLimitedArray;
+
+        [ParentComponent(Optional = true, OnlyAncestors = true, MaxDepth = 1)]
+        public List<Component> parentDepthLimitedList;
+
+        [ParentComponent(Optional = true, OnlyAncestors = true, MaxDepth = 1)]
+        public HashSet<Component> parentDepthLimitedSet;
+
         [ChildComponent(Optional = true, OnlyDescendants = true)]
         public Component[] childAllArray;
 

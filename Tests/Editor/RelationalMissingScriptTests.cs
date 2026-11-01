@@ -75,7 +75,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                 {
                     EnsureFolder(Root);
                     GameObject root = CreateNode("Root", null);
-                    GameObject owner = CreateNode("Owner", root.transform);
+                    GameObject parent = CreateNode("Parent", root.transform);
+                    GameObject owner = CreateNode("Owner", parent.transform);
                     owner.AddComponent<RelationalMissingScriptTarget>();
                     CreateNode("Child", owner.transform);
                     string guid = AssetDatabase.AssetPathToGUID(
@@ -102,6 +103,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                     Assert.IsTrue(prefab != null);
                     RelationalMissingScriptTarget target = prefab
                         .transform.GetChild(0)
+                        .GetChild(0)
                         .GetComponent<RelationalMissingScriptTarget>();
                     Assert.IsTrue(target != null);
                     Component[] raw = target.GetComponents<Component>();
@@ -174,6 +176,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                         target.parentFilteredBoundedList,
                         target.parentFilteredBoundedSet,
                         "parentFilteredBounded"
+                    );
+                    AssertShapes(
+                        LiveComponents(target.transform.parent.GetComponents<Component>(), null),
+                        target.parentDepthLimitedArray,
+                        target.parentDepthLimitedList,
+                        target.parentDepthLimitedSet,
+                        "parentDepthLimited"
                     );
                     AssertShapes(
                         children,

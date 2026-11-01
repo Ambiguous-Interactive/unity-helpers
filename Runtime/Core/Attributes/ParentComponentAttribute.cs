@@ -592,6 +592,10 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 int maxDepth = GetMaximumDepthFromSearchRoot(attribute);
                 foreach (Component comp in allParents)
                 {
+                    if (comp == null)
+                    {
+                        continue;
+                    }
                     int depth = GetDepthFromTransform(root, comp.transform);
                     if (depth <= maxDepth)
                     {
