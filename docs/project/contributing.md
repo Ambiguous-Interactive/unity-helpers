@@ -320,7 +320,7 @@ uv pip install --python .venv/bin/python -r requirements-docs.lock
 | Dev container image                           | `.devcontainer/requirements-tools.txt`                | Pinned uv installs yamllint and pinned MCP tools; pip bootstraps uv | Tools run from the image, not during hooks                                                                          |
 | Optional local hooks and Unity/result helpers | No Python packages installed by hooks                 | Existing interpreter or optional yamllint tool                      | Hooks call `yamllint` when available; helper scripts call `python3`                                                 |
 
-Release, metadata, binary-check, feedback, and wiki commands use the shared locked uv project.
+Release, metadata, binary-check, feedback, wiki, changelog, and XML-summary commands use the shared locked uv project.
 The asset fixture generators and some inline Unity/result helpers remain legacy entry points;
 see the explicit migration inventory in `scripts/python~/pyproject.toml`. The old
 `requirements-wiki.in` and `requirements-wiki.txt` remain compatibility inputs for existing
@@ -384,9 +384,17 @@ For browser correctness checks, `scripts/unity/run-browser-consumer.py` builds a
 WebGL consumer and runs retained-map, enum, RNG, and spatial-query cases in Chromium. It requires
 an installed Unity Editor with WebGL support and Playwright. The runner uses Release IL2CPP,
 High stripping, and `SINGLE_THREADED`; it checks exact golden bytes and rejects corrupt-byte and
-stale-source controls. Run `uv run scripts/unity/run-browser-consumer.py --help` for the editor,
-browser, and artifact path options. This manual check does not replace the supported Unity CI
-matrix or provide performance measurements.
+stale-source controls. Install its matching Chromium and view the editor, browser, and artifact
+path options with:
+
+```bash
+uv run --project scripts/python~ --locked --group browser playwright install chromium
+uv run --project scripts/python~ --locked --group browser python scripts/unity/browser_consumer.py --help
+```
+
+Use `--browser-executable` to select an existing browser instead. This manual check does not replace
+the supported Unity CI matrix or provide performance measurements. The browser runner and its tests
+use the shared locked Python toolchain; the former hyphenated entry point remains a compatibility launcher.
 
 - Install tools once:
   - `npm install --no-audit --no-fund` (the generated root lockfile stays ignored)

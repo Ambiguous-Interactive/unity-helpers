@@ -194,8 +194,8 @@ function Confirm-RunnerMaintenanceUnityVersions {
         throw 'Select between 1 and 16 Unity versions.'
     }
     foreach ($version in $UnityVersions) {
-        if ($version -isnot [string] -or $version -cnotmatch '^[1-9][0-9]{3}\.[0-9]{1,2}\.[0-9]{1,3}[abfp][1-9][0-9]{0,2}\z') {
-            throw "Invalid Unity editor version: '$version'."
+        if ($version -isnot [string] -or $version -cnotmatch '^[1-9][0-9]{3}\.[0-9]{1,2}\.[0-9]{1,3}f[1-9][0-9]{0,2}\z') {
+            throw "Invalid Unity editor version: '$version'. Maintenance supports final releases (f) only."
         }
     }
     return @($UnityVersions | Select-Object -Unique)

@@ -362,6 +362,12 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             );
             try
             {
+                FilterComponentsInPlace(
+                    matches,
+                    metadata.attribute,
+                    metadata.elementType,
+                    metadata.isInterface
+                );
                 return AssignComponentsFromList(component, metadata, matches);
             }
             finally

@@ -85,7 +85,7 @@ pillow==13.0.0
     # via
     #   -r requirements-docs.txt
     #   cairosvg
-platformdirs==4.14.0
+platformdirs==4.14.2
     # via mkdocs-get-deps
 pycparser==3.12 ; implementation_name != 'PyPy'
     # via cffi
@@ -121,7 +121,7 @@ tzdata==2026.6
     #   python-dateutil
 urllib3==2.8.0
     # via requests
-watchdog==6.0.0
+watchdog==7.0.0
     # via mkdocs
 webencodings==0.6.1
     # via
