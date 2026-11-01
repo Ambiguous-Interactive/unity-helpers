@@ -448,7 +448,14 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 );
                 try
                 {
-                    int count = FilterParents(metadata, parents);
+                    int count = FilterComponentsInPlace(
+                        parents,
+                        filters,
+                        attribute,
+                        metadata.elementType,
+                        metadata.isInterface,
+                        filterDisabledComponents: false
+                    );
                     assignedAny = AssignParentComponentsFromList(
                         component,
                         metadata,
@@ -462,49 +469,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                     ParentComponentFastInvoker.Release(parents);
                 }
             }
-        }
-
-        /// <summary>
-        /// Applies <see cref="BaseRelationalComponentAttribute.MaxCount"/> in place and reports how
-        /// many leading entries of <paramref name="source"/> survive.
-        /// </summary>
-        /// <remarks>
-        /// Compaction only runs when a count limit is set, which is what the array-building version
-        /// of this filter did: without a limit it returned its input untouched, destroyed entries
-        /// included.
-        /// </remarks>
-        private static int FilterParents(
-            FieldMetadata<ParentComponentAttribute> metadata,
-            List<Component> source
-        )
-        {
-            if (source == null || source.Count == 0)
-            {
-                return 0;
-            }
-
-            int maxCount = metadata.attribute.MaxCount;
-            if (maxCount <= 0)
-            {
-                return source.Count;
-            }
-
-            int limit = Math.Min(maxCount, source.Count);
-            int writeIndex = 0;
-
-            int sourceCount = source.Count;
-            for (int i = 0; i < sourceCount && writeIndex < limit; ++i)
-            {
-                Component candidate = source[i];
-                if (candidate == null)
-                {
-                    continue;
-                }
-
-                source[writeIndex++] = candidate;
-            }
-
-            return writeIndex;
         }
 
         private static bool AssignParentComponentsFromList(

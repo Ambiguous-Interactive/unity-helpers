@@ -21,6 +21,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     /// <remarks>
     /// <para>
     /// Unsupported field types are left unchanged with a warning; other fields continue binding.
+    /// Field access shares cached object delegates with the initializer and falls back to reflection
+    /// when dynamic code is unavailable, without closing generic accessors for consumer field types.
     /// Used by <see cref="ParentComponentAttribute"/>, <see cref="SiblingComponentAttribute"/>, and
     /// <see cref="ChildComponentAttribute"/> to control search behavior, filtering, and assignment.
     /// </para>
@@ -88,7 +90,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         /// <remarks>
         /// Negative values are treated as 0 (unlimited). For single-field assignments, this property
         /// has no effect since only one component can be assigned. New collections allocate for
-        /// matching components rather than reserving this maximum in advance.
+        /// matching components rather than reserving this maximum in advance. Missing-script and
+        /// destroyed entries are excluded before applying the limit.
         /// </remarks>
         public int MaxCount
         {
@@ -128,12 +131,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         /// leave its backing array parked for the lifetime of the process.
         /// </remarks>
         internal const int MaximumRetainedScratchCapacity = 4_096;
-
-        private static readonly MethodInfo CreateFieldAccessorGenericMethod =
-            typeof(RelationalComponentProcessor).GetMethod(
-                nameof(CreateFieldAccessorGeneric),
-                BindingFlags.NonPublic | BindingFlags.Static
-            );
 
         /// <summary>
         /// Builds the typed array a collection field of <paramref name="elementType"/> holds, taking
@@ -610,18 +607,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return 0;
             }
 
-            if (!filters.RequiresPostProcessing)
-            {
-                int maxCount = 0 < attribute.MaxCount ? attribute.MaxCount : int.MaxValue;
-                if (maxCount < componentCount)
-                {
-                    components.RemoveRange(maxCount, componentCount - maxCount);
-                    return maxCount;
-                }
-
-                return componentCount;
-            }
-
             int writeIndex = 0;
             int maxAssignments = 0 < attribute.MaxCount ? attribute.MaxCount : int.MaxValue;
 
@@ -776,24 +761,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return FieldAccessor.Null;
             }
 
-            // Use the field declaration type so inherited fields share a compiled accessor.
-            Type declaringType = field.DeclaringType;
-            Type accessorComponentType =
-                declaringType != null && typeof(Component).IsAssignableFrom(declaringType)
-                    ? declaringType
-                    : componentType;
-
-            MethodInfo generic = CreateFieldAccessorGenericMethod.MakeGenericMethod(
-                accessorComponentType,
-                field.FieldType
-            );
-            return (FieldAccessor)generic.Invoke(null, new object[] { field });
-        }
-
-        private static FieldAccessor CreateFieldAccessorGeneric<TComponent, TValue>(FieldInfo field)
-            where TComponent : Component
-        {
-            return new FieldAccessor<TComponent, TValue>(field);
+            return new RelationalFieldAccessor(field);
         }
 
         private static AttributeMetadataCache.RelationalAttributeKind GetRelationalKind<TAttribute>()
@@ -948,42 +916,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 }
 
                 public override void Set(Component component, object value) { }
-            }
-        }
-
-        private sealed class FieldAccessor<TComponent, TValue> : FieldAccessor
-            where TComponent : Component
-        {
-            private readonly FieldSetter<TComponent, TValue> _setter;
-            private readonly Func<TComponent, TValue> _getter;
-
-            public FieldAccessor(FieldInfo field)
-            {
-                _setter = ReflectionHelpers.GetFieldSetter<TComponent, TValue>(field);
-                _getter = ReflectionHelpers.GetFieldGetter<TComponent, TValue>(field);
-            }
-
-            public override object Get(Component component)
-            {
-                if (component == null)
-                {
-                    return null;
-                }
-
-                TComponent typedComponent = (TComponent)component;
-                return _getter(typedComponent);
-            }
-
-            public override void Set(Component component, object value)
-            {
-                if (component == null)
-                {
-                    return;
-                }
-
-                TComponent typedComponent = (TComponent)component;
-                TValue typedValue = value != null ? (TValue)value : default;
-                _setter(ref typedComponent, typedValue);
             }
         }
     }

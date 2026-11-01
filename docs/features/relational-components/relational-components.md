@@ -412,7 +412,7 @@ Relational fields support components, interfaces, and one-dimensional arrays, `L
 - Call in `Awake()` or `OnEnable()` so references exist early
 - Prefer selective calls (`AssignSibling/Parent/Child`) when you only use one category
 - Use `MaxDepth` to cap traversal cost in deep trees
-- Use `MaxCount` to reduce allocations when you only need a subset
+- Use `MaxCount` to reduce allocations when you only need a subset. Assignment excludes missing-script and destroyed query entries before this limit in every collection shape, including searches without other filters.
 - Mark non-critical references `Optional = true` to avoid noise
 
 ## Explicit Initialization (Prewarm)
@@ -434,6 +434,7 @@ void Start()
 Notes:
 
 - Uses AttributeMetadataCache when available, with reflection fallback per type if not cached.
+- Field access shares the initializer's cached delegates. On AOT platforms it uses reflection without creating a closed generic accessor for every consumer field type; private and inherited fields retain their declared types.
 - Logs warnings for missing fields/types and logs errors for unexpected exceptions; processing continues.
 - Scope the work by providing specific types: `RelationalComponentInitializer.Initialize(new[]{ typeof(MyComponent) });`
 - To auto‑prewarm on app load, enable the toggle on the AttributeMetadataCache asset: “Prewarm Relational On Load”.

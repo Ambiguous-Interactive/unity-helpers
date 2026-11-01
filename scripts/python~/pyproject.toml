@@ -5,8 +5,12 @@ requires-python = ">=3.11.8"
 dependencies = []
 
 [dependency-groups]
+browser = [
+    "playwright>=1.64.1",
+]
 dev = [
     { include-group = "metadata" },
+    { include-group = "browser" },
     "mypy>=2.4.1",
     "pyright>=1.1.414",
     "pytest>=9.2.0",
@@ -43,7 +47,7 @@ warn_unreachable = true
 pythonVersion = "3.11"
 typeCheckingMode = "strict"
 extraPaths = ["../unity", "../wiki", "..", "."]
-include = ["../cli_encoding.py", "../tests/test_unity_cli_maintenance.py", "../cspell_config.py", "../lint_cspell_config.py", "../add_cspell_word.py", "../tests/test_cspell_tools.py", "../lint_doc_identifiers.py", "../tests/test_doc_identifiers.py", "../lint_preserve_attributes.py", "../tests/test_preserve_attributes.py", "../check_runner.py", "../tests/test_check_runner.py", "../unity/runner_maintenance_matrix.py", "../tests/test_runner_maintenance_matrix.py", "../unity/create_unitypackage.py", "../unity/stage_unitypackage.py", "../tests/test_unitypackage.py", "check.py", "../generate_meta.py", "../tests/test_meta_generation.py", "../build-protobuf-candidate.py", "../verify-protobuf-shipped.py", "../tests/test-protobuf-candidate.py", "../unity/download-native-debugger.py", "../tests/test-native-debugger-download.py", "../lint_bundled_assemblies.py", "../tests/test_bundled_assemblies.py", "../lint_asmdef.py", "../tests/test_asmdef.py", "../pr_feedback.py", "../tests/test_pr_feedback.py", "../verify_shipped_analyzers.py", "../tests/test_verify_shipped_analyzers.py", "../lint_meta_files.py", "../tests/test_meta_lint.py", "../../.github/scripts/check_markdown_links.py", "../../.github/scripts/check_markdown_url_encoding.py", "../../.github/scripts/validate_markdown_links.py", "../tests/test_markdown_checks.py", "../wiki/generate_wiki_footer.py", "../wiki/generate_wiki_sidebar.py", "../wiki/prepare_wiki.py", "../wiki/transform_wiki_links.py", "../wiki/test_wiki_scripts.py"]
+include = ["../unity/browser_consumer.py", "../unity/run-browser-consumer.py", "../tests/test_browser_consumer.py", "../lint_changelog.py", "../tests/test_changelog.py", "../lint_xml_doc_summaries.py", "../tests/test_xml_doc_summaries.py", "../cli_encoding.py", "../tests/test_unity_cli_maintenance.py", "../cspell_config.py", "../lint_cspell_config.py", "../add_cspell_word.py", "../tests/test_cspell_tools.py", "../lint_doc_identifiers.py", "../tests/test_doc_identifiers.py", "../lint_preserve_attributes.py", "../tests/test_preserve_attributes.py", "../check_runner.py", "../tests/test_check_runner.py", "../unity/runner_maintenance_matrix.py", "../tests/test_runner_maintenance_matrix.py", "../unity/create_unitypackage.py", "../unity/stage_unitypackage.py", "../tests/test_unitypackage.py", "check.py", "../generate_meta.py", "../tests/test_meta_generation.py", "../build-protobuf-candidate.py", "../verify-protobuf-shipped.py", "../tests/test-protobuf-candidate.py", "../unity/download-native-debugger.py", "../tests/test-native-debugger-download.py", "../lint_bundled_assemblies.py", "../tests/test_bundled_assemblies.py", "../lint_asmdef.py", "../tests/test_asmdef.py", "../pr_feedback.py", "../tests/test_pr_feedback.py", "../verify_shipped_analyzers.py", "../tests/test_verify_shipped_analyzers.py", "../lint_meta_files.py", "../tests/test_meta_lint.py", "../../.github/scripts/check_markdown_links.py", "../../.github/scripts/check_markdown_url_encoding.py", "../../.github/scripts/validate_markdown_links.py", "../tests/test_markdown_checks.py", "../wiki/generate_wiki_footer.py", "../wiki/generate_wiki_sidebar.py", "../wiki/prepare_wiki.py", "../wiki/transform_wiki_links.py", "../wiki/test_wiki_scripts.py"]
 
 [tool.unity-helpers-python]
 legacy = [
@@ -53,9 +57,7 @@ legacy = [
     "scripts/generate-test-sprites.py",
     "scripts/generate-test-textures.py",
     "scripts/random-quality/verify-bounded-sampling.py",
-    "scripts/tests/test-browser-consumer.py",
     "scripts/tests/test-devcontainer-persistence.py",
     "scripts/tests/test-unity-framework-evidence.py",
     "scripts/tests/test-watchdog-cancellation.py",
-    "scripts/unity/run-browser-consumer.py",
 ]

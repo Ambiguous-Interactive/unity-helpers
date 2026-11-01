@@ -205,6 +205,9 @@ def test_removed_validation_edges_are_detected() -> None:
         ({"all": ["2021.3.45f1"], "maintenance": ["6000.6.7f1"] * 16}, "", None),
         ({"all": "2021.3.45f1"}, "", None),
         ({"all": ["2021.3.45f1"]}, "bad", None),
+        ({"all": ["2021.3.45f1"]}, "6000.6.0a1", None),
+        ({"all": ["2021.3.45f1"]}, "6000.6.0b1", None),
+        ({"all": ["2021.3.45f1"]}, "6000.6.0p1", None),
         ({"all": ["2021.3.45f1"]}, "6000.6.7f1,", None),
     ],
 )
@@ -261,3 +264,73 @@ def test_manual_and_workflow_version_selection_agree(
         )
         assert json.loads(output) == expected
         assert resolve_versions(path, requested) == expected
+
+
+@pytest.mark.parametrize("version", ["6000.6.0a1", "6000.6.0b1", "6000.6.0p1"])
+def test_nonfinal_releases_fail_before_workflow_output(version: str, tmp_path: Path) -> None:
+    output = tmp_path / "github-output"
+    output.write_text("existing=value\n", encoding="utf-8")
+    assert main(["--versions", version, "--output", str(output)]) == 1
+    assert output.read_text(encoding="utf-8") == "existing=value\n"
+
+
+@pytest.mark.parametrize(
+    "version",
+    [
+        "2021.3.45f1",
+        "2022.3.62f1",
+        "6000.6.7f1",
+        "1000.0.0f1",
+        "9999.99.999f999",
+        "6000.6.0a1",
+        "6000.6.0b1",
+        "6000.6.0p1",
+    ],
+)
+def test_selector_acceptance_reaches_actual_installer_parameter_binding(
+    version: str, tmp_path: Path
+) -> None:
+    accepted = "f" in version
+    if accepted:
+        assert resolve_versions(tmp_path / "absent.json", version) == [version]
+    else:
+        with pytest.raises(ValueError, match="final releases"):
+            resolve_versions(tmp_path / "absent.json", version)
+    shell = shutil.which("pwsh")
+    assert shell is not None
+    probe = tmp_path / "bind.ps1"
+    probe.write_text(
+        "param([string]$Installer, [string]$Version)\n"
+        "$ErrorActionPreference = 'Stop'\n"
+        "$tokens = $null; $parseErrors = $null\n"
+        "$ast = [System.Management.Automation.Language.Parser]::ParseFile($Installer, [ref]$tokens, [ref]$parseErrors)\n"
+        "if ($parseErrors.Count -ne 0 -or $null -eq $ast.ParamBlock) { throw 'Actual installer parameter block is missing or invalid.' }\n"
+        "$binding = [scriptblock]::Create($ast.ParamBlock.Extent.Text + '\nWrite-Output (\"BOUND:\" + $UnityVersion)'.Replace('\\n', [Environment]::NewLine))\n"
+        "& $binding -UnityVersion $Version\n",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [
+            shell,
+            "-NoProfile",
+            "-NonInteractive",
+            "-File",
+            str(probe),
+            "-Installer",
+            str(ROOT / "scripts/unity/ensure-editor.ps1"),
+            "-Version",
+            version,
+        ],
+        text=True,
+        encoding="utf-8",
+        capture_output=True,
+        check=False,
+        timeout=30,
+    )
+    if accepted:
+        assert result.returncode == 0, result.stderr
+        assert f"BOUND:{version}" in result.stdout
+    else:
+        assert result.returncode != 0
+        assert "validate" in result.stderr.lower()
+        assert "BOUND:" not in result.stdout

@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import cast
 
 ROOT = Path(__file__).resolve().parents[2]
-VERSION = re.compile(r"[1-9][0-9]{3}\.[0-9]{1,2}\.[0-9]{1,3}[abfp][1-9][0-9]{0,2}\Z")
+VERSION = re.compile(r"[1-9][0-9]{3}\.[0-9]{1,2}\.[0-9]{1,3}f[1-9][0-9]{0,2}\Z")
 PROFILES = ("EditorOnly", "StandaloneWindowsIl2Cpp", "Android", "Full")
 MAX_VERSIONS = 16
 
@@ -46,7 +46,9 @@ def resolve_versions(config: Path, requested: str) -> list[str]:
         raise ValueError(f"Select between 1 and {MAX_VERSIONS} Unity versions")
     for version in versions:
         if VERSION.fullmatch(version) is None:
-            raise ValueError(f"Invalid Unity editor version: {version!r}")
+            raise ValueError(
+                f"Invalid Unity editor version: {version!r}. Maintenance supports final releases (f) only."
+            )
     return list(dict.fromkeys(versions))
 
 

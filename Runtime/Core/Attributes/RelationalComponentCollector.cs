@@ -44,9 +44,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     /// entry point once against a real component, because an AOT runtime that never generated an
     /// instantiation refuses it when it is called rather than when the generic over it is closed. A
     /// refusal caches null and the non-generic path serves that element type for the rest of the
-    /// process. Note that <see cref="FieldAccessor"/> in this same family already closes a generic
-    /// over the field type at run time on every relational assignment, unguarded, and ships through
-    /// the IL2CPP standalone legs.
+    /// process. Field access uses cached object delegates with a reflection fallback and does not
+    /// require a closed generic accessor for each consumer field type.
     /// </remarks>
     internal abstract class RelationalComponentCollector
     {

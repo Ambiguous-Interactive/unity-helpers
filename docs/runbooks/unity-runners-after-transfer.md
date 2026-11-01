@@ -158,6 +158,8 @@ The default empty version selection combines the `all` and `maintenance` arrays 
 Both remote and direct maintenance read this combined list and remove duplicates in order.
 Explicit selections replace the default list and are validated before any host work starts.
 
+Maintenance accepts final Unity release versions with an `f` suffix, such as `2021.3.45f1` and `6000.6.7f1`. Alpha (`a`), beta (`b`), and patch (`p`) suffixes are rejected before workflow jobs are created because the installer does not support those selectors. A valid version format does not guarantee that its release or requested modules are available.
+
 For DoxReloaded's 6000.6.7f1 upgrade, select `6000.6.7f1` and `EditorOnly` on both `ELI-MACHINE`
 and `DAD-MACHINE`. The editor is installed under the same `runner.tool_cache\u6-v3` root as
 licensed CI. Keep `detect-only` disabled for installation, then repeat with it enabled to audit

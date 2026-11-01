@@ -101,6 +101,7 @@ function New-TestRepo {
     Copy-Item (Join-Path $repoRoot 'scripts/check-eol.ps1') (Join-Path $scriptsDir 'check-eol.ps1') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/normalize-eol.ps1') (Join-Path $scriptsDir 'normalize-eol.ps1') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/lint-changelog.ps1') (Join-Path $scriptsDir 'lint-changelog.ps1') -Force
+    Copy-Item (Join-Path $repoRoot 'scripts/lint_changelog.py') (Join-Path $scriptsDir 'lint_changelog.py') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/lint-cspell-config.js') (Join-Path $scriptsDir 'lint-cspell-config.js') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/lint_cspell_config.py') (Join-Path $scriptsDir 'lint_cspell_config.py') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/cspell_config.py') (Join-Path $scriptsDir 'cspell_config.py') -Force

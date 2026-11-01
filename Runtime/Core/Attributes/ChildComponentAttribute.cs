@@ -432,9 +432,13 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             int length
         )
         {
-            if (source == null || length <= 1)
+            if (source == null || length <= 0)
             {
-                return length < 0 ? 0 : length;
+                return 0;
+            }
+            if (length == 1)
+            {
+                return source[0] == null ? 0 : 1;
             }
 
             ChildComponentAttribute attribute = metadata.attribute;

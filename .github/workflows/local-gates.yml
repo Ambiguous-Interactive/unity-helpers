@@ -269,7 +269,9 @@ jobs:
           scripts/tests/test_meta_lint.py scripts/tests/test_markdown_checks.py
           scripts/tests/test_runner_maintenance_matrix.py scripts/tests/test_check_runner.py
           scripts/tests/test_preserve_attributes.py scripts/tests/test_doc_identifiers.py
-          scripts/tests/test_cspell_tools.py scripts/tests/test_unity_cli_maintenance.py -q
+          scripts/tests/test_cspell_tools.py scripts/tests/test_unity_cli_maintenance.py
+          scripts/tests/test_xml_doc_summaries.py scripts/tests/test_changelog.py
+          scripts/tests/test_browser_consumer.py -q
 
       - name: Verify compiler payload publication on Windows
         shell: pwsh

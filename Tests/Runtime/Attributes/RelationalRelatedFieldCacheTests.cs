@@ -41,6 +41,31 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             ReflectionHelpers.ClearFieldSetterCache();
         }
 
+        private static void AssertSharedAccessors<TAttribute>(
+            RelationalComponentProcessor.FieldMetadata<TAttribute>[] fields
+        )
+            where TAttribute : BaseRelationalComponentAttribute
+        {
+            Assert.AreEqual(
+                8,
+                fields.Length,
+                "Both private declarations and all four shapes must be present."
+            );
+            foreach (RelationalComponentProcessor.FieldMetadata<TAttribute> field in fields)
+            {
+                Assert.IsTrue(
+                    ReflectionHelpers.IsFieldGetterCached(field.field),
+                    field.field.ToString()
+                );
+                Assert.IsTrue(
+                    ReflectionHelpers.IsFieldSetterCached(field.field),
+                    field.field.ToString()
+                );
+                Assert.IsTrue(field.GetValue(null) == null);
+                Assert.DoesNotThrow(() => field.SetValue(null, null));
+            }
+        }
+
         private static void AssertShapes<T>(
             T[] expected,
             T single,
@@ -119,6 +144,29 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                         target.DerivedChildSet
                     );
                     break;
+            }
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        public void MetadataUsesSharedAotSafeFieldDelegates(int capability)
+        {
+            using IDisposable scope = new ReflectionCapabilityScope(
+                capability == 0,
+                capability == 1
+            );
+            ClearBindingCaches();
+            try
+            {
+                Type type = typeof(RelationalRelatedNameDerived);
+                AssertSharedAccessors(SiblingComponentExtensions.GetOrCreateFields(type));
+                AssertSharedAccessors(ParentComponentExtensions.GetOrCreateFields(type));
+                AssertSharedAccessors(ChildComponentExtensions.GetOrCreateFields(type));
+            }
+            finally
+            {
+                ClearBindingCaches();
             }
         }
 
