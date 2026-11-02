@@ -220,6 +220,31 @@ def read_mapping(value: object) -> dict[str, object]:
     return cast("dict[str, object]", value)
 
 
+def read_guid(metadata: str) -> str:
+    """Read the literal GUID because YAML can coerce numeric-looking values."""
+    match = re.search(r"^guid: ([0-9a-f]{32})\r?$", metadata, re.MULTILINE)
+    assert match is not None
+    return match[1]
+
+
+@pytest.mark.parametrize(
+    "guid",
+    [
+        "11111111111141118111111111111111",
+        "00000000000040008000000000000000",
+        "abcdefabcdef4abc8abcabcdefabcdef",
+    ],
+)
+def test_guid_reader_preserves_numeric_and_leading_zero_identifiers(guid: str) -> None:
+    assert read_guid(f"fileFormatVersion: 2\r\nguid: {guid}\r\n") == guid
+
+
+@pytest.mark.parametrize("guid", ["123", "x" * 32, "1" * 33])
+def test_guid_reader_rejects_invalid_literal_identifiers(guid: str) -> None:
+    with pytest.raises(AssertionError):
+        read_guid(f"guid: {guid}\r\n")
+
+
 @pytest.mark.parametrize(
     ("kind", "extended", "count"),
     [("sprites", False, 13), ("textures", False, 6), ("textures", True, 21)],
@@ -242,10 +267,9 @@ def test_fixture_pixels_and_metadata_survive_regeneration(
             assert hashlib.sha256(image.tobytes()).hexdigest() == digest
         metadata_bytes = path.with_suffix(".png.meta").read_bytes()
         assert b"\n" not in metadata_bytes.replace(b"\r\n", b"")
-        metadata = read_mapping(yaml.safe_load(metadata_bytes.decode("utf-8")))
-        guid = metadata["guid"]
-        assert isinstance(guid, str)
-        assert re.fullmatch("[0-9a-f]{32}", guid)
+        metadata_text = metadata_bytes.decode("utf-8")
+        metadata = read_mapping(yaml.safe_load(metadata_text))
+        guid = read_guid(metadata_text)
         assert guid not in identities
         identities.add(guid)
         importer = read_mapping(metadata["TextureImporter"])
