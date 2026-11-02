@@ -620,6 +620,9 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Setup Python tooling
+        uses: ./.github/actions/setup-python-tools
+
       - name: Print runner diagnostics
         # Composite action runs PowerShell internally; `shell: bash` on a
         # self-hosted Windows runner can resolve to the WSL stub at
@@ -726,13 +729,6 @@ jobs:
             -ReleaseCodeOptimization `
             -ReleasePlayerBuild `
             -Il2CppCompilerConfiguration 'Release'
-
-      - name: Setup Python for native diagnostics
-        if: >-
-          ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.native-diagnostics
-          && matrix.unity-version == '6000.6.0f1' && steps.unity_lock.outputs.acquired == 'true'
-          && steps.run_editmode.outcome == 'success' }}
-        uses: ./.github/actions/setup-python-tools
 
       - name: Capture native exit diagnostics
         id: native_capture
@@ -1464,6 +1460,9 @@ jobs:
           GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
         with:
           persist-credentials: false
+
+      - name: Setup Python tooling
+        uses: ./.github/actions/setup-python-tools
 
       - name: Print runner diagnostics
         # Composite action runs PowerShell internally; `shell: bash` on a

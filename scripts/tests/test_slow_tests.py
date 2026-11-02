@@ -7,8 +7,10 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import cast
 
 import pytest
+import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "unity"))
 import report_slow_tests as slow
@@ -217,3 +219,23 @@ def test_invalid_options_are_rejected(results: Path, option: str, value: str) ->
     with pytest.raises(SystemExit) as failure:
         slow.main(["--results-path", str(results), option, value])
     assert failure.value.code == 2
+
+
+@pytest.mark.parametrize("job_name", ["unity-tests", "unity-tests-single-threaded"])
+def test_ci_reporter_tools_are_provisioned_before_unity_lock(job_name: str) -> None:
+    workflow = cast(
+        "dict[str, dict[str, dict[str, object]]]",
+        yaml.safe_load((ROOT / ".github/workflows/unity-tests.yml").read_text(encoding="utf-8")),
+    )
+    steps = cast("list[dict[str, object]]", workflow["jobs"][job_name]["steps"])
+    setup_indices = [
+        index
+        for index, step in enumerate(steps)
+        if step.get("uses") == "./.github/actions/setup-python-tools"
+    ]
+    assert setup_indices, f"{job_name} needs Python and uv for failure-path timing reports"
+    setup_index = setup_indices[0]
+    assert "if" not in steps[setup_index], "Reporter tooling must not depend on test success"
+    checkout_index = next(i for i, step in enumerate(steps) if step.get("id") == "checkout")
+    lock_index = next(i for i, step in enumerate(steps) if step.get("id") == "unity_lock")
+    assert checkout_index < setup_index < lock_index
