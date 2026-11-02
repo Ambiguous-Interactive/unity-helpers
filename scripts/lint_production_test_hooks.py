@@ -32,6 +32,7 @@ TRIM = re.compile(r"^" + SPACE + r"+|" + SPACE + r"+$")
 ESCAPE = re.compile(r"\\(?:u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}|x[0-9a-fA-F]{1,4}|[^\r\n\u2028\u2029])")
 IDENTIFIER_ESCAPE = re.compile(r"\\(?:u([0-9a-fA-F]{4})|U([0-9a-fA-F]{8}))")
 IDENTIFIER = re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*\b", re.ASCII)
+LINE_BREAK = re.compile(r"[\r\n]")
 TOKEN_START = re.compile(r"//|/\*|[\"']")
 WIDE_CHARACTER = re.compile(r"[\U00010000-\U0010ffff]")
 MASKED_CHARACTER = re.compile(r"[^\r\n]")
@@ -100,8 +101,8 @@ def tokenize(source: str) -> Tokens:
                 end = source.find("*/", index + 2)
                 index = len(source) if end < 0 else end + 2
             else:
-                match = re.search(r"[\r\n]", source[index:])
-                index = len(source) if match is None else index + match.start()
+                match = LINE_BREAK.search(source, index)
+                index = len(source) if match is None else match.start()
             comments.append(source[start:index])
         elif source[index] in "\"'":
             quote = source[index]
