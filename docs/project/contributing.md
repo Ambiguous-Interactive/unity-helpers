@@ -46,6 +46,20 @@ The WProto compatibility inventory checks referenced enum values independently o
 order. Its regression compiles both declaration orders and requires the same inventory, including
 the enum underlying type and constants. Preserve the frozen inventory when fixing its collector.
 
+### Test runtime reports
+
+Use the typed NUnit timing reporter to rank slow fixtures and cases:
+
+```bash
+uv run --project scripts/python~ --locked --no-dev python scripts/unity/report_slow_tests.py --results-path results.xml --top 30 --fixture-budget-seconds 120 --step-summary
+```
+
+Add `--fail-over-budget` to enforce the fixture budget; otherwise overruns produce warnings.
+The budget covers every fixture, including those outside `--top`. Names use ordinal tie ordering.
+Malformed, negative or nonfinite durations and results without fixtures or cases fail the command;
+missing durations on skipped tests count as zero. A step summary appends UTF-8 Markdown when
+`GITHUB_STEP_SUMMARY` is set. The existing PowerShell command retains its parameter names.
+
 ### Typed Python scripts
 
 Release payload staging, archive creation, and Unity metadata generation run through uv. Install uv 0.13.6, then use:
@@ -106,6 +120,12 @@ also covers Python stubs. The bounded-random proof uses the locked `proof` group
 stub for the public Z3 API it uses. Z3 comparisons return symbolic formulas; their stub return
 types state that behavior explicitly. Production arithmetic is parsed with a closed Python AST
 grammar rather than evaluated as Python code.
+
+The production test-hook naming gate also runs in Python. It checks identifiers and explicit
+markers in production source, plus literal and concatenated C# emitted by generators. It is a
+naming check, not a semantic C# parser: references inside interpolation expressions remain outside
+its scope. Existing Node commands and imports remain compatibility entry points; import the Python
+helpers for content tests that make many calls.
 
 The lockfile pins Ruff, mypy, Pyright, pytest, and their dependencies. `lint:python` checks Ruff
 formatting and correctness rules plus both type checkers in strict mode. Function signatures must
