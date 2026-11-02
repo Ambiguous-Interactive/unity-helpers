@@ -263,10 +263,10 @@ def assert_image_metadata(path: Path, kind: str) -> str:
         else 2
     )
     assert importer["spriteMode"] == expected_mode
+    assert importer["textureType"] == (0 if kind == "textures" else 8)
     sheet = read_mapping(importer["spriteSheet"])
     if kind == "textures":
         assert importer["spriteMode"] == 0
-        assert importer["textureType"] == 0
     elif importer["spriteMode"] == 1:
         assert sheet["sprites"] == []
         assert sheet["nameFileIdTable"] == {}
@@ -350,7 +350,12 @@ def test_fixture_pixels_and_metadata_survive_regeneration(
     assert third.returncode == 0, third.stdout + third.stderr
     assert survivor.read_bytes() == b"existing authored metadata\r\n"
     assert missing.is_file()
-    assert_image_metadata(images[1], kind)
+    regenerated_guid = assert_image_metadata(images[1], kind)
+    # The authored survivor deliberately has no GUID.
+    other_guids = {
+        read_guid(path.with_suffix(".png.meta").read_text(encoding="utf-8")) for path in images[2:]
+    }
+    assert regenerated_guid not in other_guids
     if folder_metadata is not None:
         assert folder_metadata.read_bytes() == b"existing authored folder metadata\r\n"
         folder_metadata.unlink()
