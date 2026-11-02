@@ -1,72 +1,41 @@
 #!/usr/bin/env python3
-"""
-Generate static PNG test fixtures for sprite test suite.
+"""Generate PNG test fixtures through the locked uv fixtures group."""
 
-This script creates PNG files that match what SharedSpriteTestFixtures.CreateSpriteSheet
-would create at runtime, allowing tests to use pre-committed static assets instead.
+from __future__ import annotations
 
-Usage:
-    python scripts/generate-test-sprites.py
-
-Output:
-    Tests/Editor/TestAssets/Sprites/
-        test_2x2_grid.png
-        test_4x4_grid.png
-        test_8x8_grid.png
-        test_single.png
-        test_wide.png
-        test_tall.png
-        test_odd.png
-        test_large_512.png
-        test_npot_100x200.png
-        test_npot_150x75.png
-        test_prime_127.png
-        test_small_16x16.png
-        test_boundary_256.png
-"""
-
-import os
+import argparse
 import colorsys
-import random
-import string
+import uuid
 from pathlib import Path
 
-try:
-    from PIL import Image
-except ImportError:
-    print("PIL/Pillow not found. Installing...")
-    import subprocess
-    subprocess.check_call(["pip", "install", "Pillow"])
-    from PIL import Image
+from cli_encoding import configure_output
+from fixture_assets import Color, write_metadata
+from PIL import Image
 
 
 def generate_guid() -> str:
     """Generate a 32-character lowercase hex GUID for Unity meta files."""
-    return ''.join(random.choices('0123456789abcdef', k=32))
+    return uuid.uuid4().hex
 
 
 def generate_sprite_id() -> str:
     """Generate a 32-character sprite ID for Unity sprite metadata."""
-    return ''.join(random.choices('0123456789abcdef', k=32))
+    return uuid.uuid4().hex
 
 
 def generate_internal_id() -> int:
     """Generate a random internal ID for Unity sprite metadata."""
-    return random.randint(-9223372036854775808, 9223372036854775807)
+    return uuid.uuid4().int % (1 << 64) - (1 << 63)
 
 
-def hsv_to_rgb_255(hue: float, saturation: float, value: float) -> tuple:
+def hsv_to_rgb_255(hue: float, saturation: float, value: float) -> Color:
     """Convert HSV (0-1 range) to RGB (0-255 range)."""
     r, g, b = colorsys.hsv_to_rgb(hue, saturation, value)
     return (int(r * 255), int(g * 255), int(b * 255), 255)
 
 
 def create_grid_sprite_sheet(
-    width: int,
-    height: int,
-    grid_columns: int,
-    grid_rows: int,
-    output_path: str
+    width: int, height: int, grid_columns: int, grid_rows: int, output_path: str
 ) -> None:
     """
     Create a sprite sheet with a grid of cells, each filled with a distinct HSV color.
@@ -91,33 +60,20 @@ def create_grid_sprite_sheet(
             start_x = col * cell_width
             start_y = row * cell_height
 
-            for y in range(start_y, start_y + cell_height):
-                for x in range(start_x, start_x + cell_width):
-                    image.putpixel((x, y), color)
+            image.paste(color, (start_x, start_y, start_x + cell_width, start_y + cell_height))
 
     image.save(output_path, "PNG")
     print(f"Created: {output_path}")
 
 
-def create_single_color_sprite(
-    width: int,
-    height: int,
-    color: tuple,
-    output_path: str
-) -> None:
+def create_single_color_sprite(width: int, height: int, color: Color, output_path: str) -> None:
     """Create a single-color sprite."""
     image = Image.new("RGBA", (width, height), color)
     image.save(output_path, "PNG")
     print(f"Created: {output_path}")
 
 
-def generate_sprite_meta_entry(
-    name: str,
-    x: int,
-    y: int,
-    width: int,
-    height: int
-) -> str:
+def generate_sprite_meta_entry(name: str, x: int, y: int, width: int, height: int) -> str:
     """Generate a single sprite entry for the spriteSheet."""
     sprite_id = generate_sprite_id()
     internal_id = generate_internal_id()
@@ -151,7 +107,7 @@ def generate_meta_file(
     height: int,
     grid_columns: int,
     grid_rows: int,
-    is_single_mode: bool = False
+    is_single_mode: bool = False,
 ) -> None:
     """Generate a Unity meta file for a sprite sheet texture."""
     guid = generate_guid()
@@ -164,8 +120,8 @@ def generate_meta_file(
     name_file_id_table = ""
 
     if not is_single_mode and grid_columns > 0 and grid_rows > 0:
-        sprite_entries = []
-        name_entries = []
+        sprite_entries: list[str] = []
+        name_entries: list[str] = []
 
         for row in range(grid_rows):
             for col in range(grid_columns):
@@ -184,14 +140,20 @@ def generate_meta_file(
                 sprite_entries.append(entry)
 
                 # Get the internal_id from the last generated entry
-                lines = entry.split('\n')
-                internal_id_line = [l for l in lines if 'internalID:' in l][0]
-                internal_id = internal_id_line.split(':')[1].strip()
+                lines = entry.split("\n")
+                internal_id_line = next(line for line in lines if "internalID:" in line)
+                internal_id = internal_id_line.split(":")[1].strip()
                 name_entries.append(f"      {sprite_name}: {internal_id}")
 
         sprites_yaml = "\n".join(sprite_entries)
         name_file_id_table = "\n".join(name_entries)
 
+    sprites_field = "    sprites:\n" + sprites_yaml if sprites_yaml else "    sprites: []"
+    names_field = (
+        "    nameFileIdTable:\n" + name_file_id_table
+        if name_file_id_table
+        else "    nameFileIdTable: {}"
+    )
     meta_content = f"""fileFormatVersion: 2
 guid: {guid}
 TextureImporter:
@@ -302,8 +264,7 @@ TextureImporter:
     forceMaximumCompressionQuality_BC6H_BC7: 0
   spriteSheet:
     serializedVersion: 2
-    sprites:
-{sprites_yaml if sprites_yaml else "    []"}
+{sprites_field}
     outline: []
     physicsShape: []
     bones: []
@@ -314,8 +275,7 @@ TextureImporter:
     edges: []
     weights: []
     secondaryTextures: []
-    nameFileIdTable:
-{name_file_id_table if name_file_id_table else "      {{}}"}
+{names_field}
   mipmapLimitGroupName:
   pSDRemoveMatte: 0
   userData:
@@ -323,16 +283,21 @@ TextureImporter:
   assetBundleVariant:
 """
 
-    with open(output_path, 'w') as f:
-        f.write(meta_content)
-    print(f"Created: {output_path}")
+    write_metadata(Path(output_path), meta_content)
 
 
-def main():
-    script_dir = Path(__file__).parent.parent
-    output_dir = script_dir / "Tests" / "Editor" / "TestAssets" / "Sprites"
+def main() -> None:
+    configure_output()
+    parser = argparse.ArgumentParser(description="Generate sprite test fixtures.")
+    parser.add_argument("--output-dir", type=Path)
+    args = parser.parse_args()
+    output_dir = (
+        Path(args.output_dir)
+        if args.output_dir is not None
+        else Path(__file__).resolve().parents[1] / "Tests/Editor/TestAssets/Sprites"
+    )
 
-    os.makedirs(output_dir, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
     print(f"Output directory: {output_dir}")
 
     # Define all fixtures: (name, width, height, grid_columns, grid_rows, is_single)
@@ -363,10 +328,7 @@ def main():
         else:
             create_grid_sprite_sheet(width, height, grid_cols, grid_rows, png_path)
 
-        # Generate meta file
-        generate_meta_file(
-            meta_path, name, width, height, grid_cols, grid_rows, is_single
-        )
+        generate_meta_file(meta_path, name, width, height, grid_cols, grid_rows, is_single)
 
     print("\nAll PNG files created successfully!")
     print(f"\nFiles in {output_dir}:")

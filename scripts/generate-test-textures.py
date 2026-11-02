@@ -1,67 +1,23 @@
 #!/usr/bin/env python3
-"""
-Generate static PNG test fixtures for texture test suite.
+"""Generate PNG test fixtures through the locked uv fixtures group."""
 
-This script creates solid color PNG files that are used by SharedTextureTestFixtures
-and FitTextureSizeWindowTests.
-
-Usage:
-    python scripts/generate-test-textures.py           # Generate base textures only
-    python scripts/generate-test-textures.py --extended  # Generate base + extended textures
-
-Output:
-    Tests/Editor/TestAssets/Textures/
-        Base textures:
-            solid_300x100_magenta.png
-            solid_128x128_white.png
-            solid_256x256_cyan.png
-            solid_64x64_red.png
-            solid_384x10_blue.png
-            solid_512x512_gray.png
-
-        Extended textures (with --extended flag):
-            solid_1x1_black.png
-            solid_2x2_black.png
-            solid_32x32_black.png
-            solid_1024x1024_black.png
-            solid_2048x2048_black.png
-            solid_4096x4096_black.png
-            solid_257x64_gray.png
-            solid_255x255_gray.png
-            solid_513x400_gray.png
-            solid_511x511_gray.png
-            solid_1x512_yellow.png
-            solid_512x1_yellow.png
-            solid_100x200_green.png
-            solid_400x240_blue.png
-            solid_450x254_blue.png
-"""
+from __future__ import annotations
 
 import argparse
-import os
-import random
+import uuid
 from pathlib import Path
 
-try:
-    from PIL import Image
-except ImportError:
-    print("PIL/Pillow not found. Installing...")
-    import subprocess
-    subprocess.check_call(["pip", "install", "Pillow"])
-    from PIL import Image
+from cli_encoding import configure_output
+from fixture_assets import Color, write_metadata
+from PIL import Image
 
 
 def generate_guid() -> str:
     """Generate a 32-character lowercase hex GUID for Unity meta files."""
-    return ''.join(random.choices('0123456789abcdef', k=32))
+    return uuid.uuid4().hex
 
 
-def create_solid_texture(
-    width: int,
-    height: int,
-    color: tuple,
-    output_path: str
-) -> None:
+def create_solid_texture(width: int, height: int, color: Color, output_path: str) -> None:
     """Create a solid color texture."""
     image = Image.new("RGBA", (width, height), color)
     image.save(output_path, "PNG")
@@ -201,9 +157,7 @@ TextureImporter:
   assetBundleVariant:
 """
 
-    with open(output_path, 'w') as f:
-        f.write(meta_content)
-    print(f"Created: {output_path}")
+    write_metadata(Path(output_path), meta_content)
 
 
 def generate_folder_meta_file(output_path: str) -> None:
@@ -220,55 +174,58 @@ DefaultImporter:
   assetBundleVariant:
 """
 
-    with open(output_path, 'w') as f:
-        f.write(meta_content)
-    print(f"Created: {output_path}")
+    write_metadata(Path(output_path), meta_content)
 
 
-def main():
+def main() -> None:
+    configure_output()
     parser = argparse.ArgumentParser(
-        description='Generate static PNG test fixtures for texture test suite.'
+        description="Generate static PNG test fixtures for texture test suite."
     )
     parser.add_argument(
-        '--extended',
-        action='store_true',
-        help='Generate extended texture set (15 additional textures)'
+        "--extended",
+        action="store_true",
+        help="Generate extended texture set (15 additional textures)",
     )
+    parser.add_argument("--output-dir", type=Path)
     args = parser.parse_args()
 
-    script_dir = Path(__file__).parent.parent
-    output_dir = script_dir / "Tests" / "Editor" / "TestAssets" / "Textures"
+    output_dir = (
+        Path(args.output_dir)
+        if args.output_dir is not None
+        else Path(__file__).resolve().parents[1] / "Tests/Editor/TestAssets/Textures"
+    )
 
-    os.makedirs(output_dir, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
     print(f"Output directory: {output_dir}")
 
     # Define base textures: (name, width, height, color_rgba)
     textures = [
-        ("solid_300x100_magenta", 300, 100, (255, 0, 255, 255)),   # Magenta
-        ("solid_128x128_white", 128, 128, (255, 255, 255, 255)),   # White
-        ("solid_256x256_cyan", 256, 256, (0, 255, 255, 255)),      # Cyan
-        ("solid_64x64_red", 64, 64, (255, 0, 0, 255)),             # Red
-        ("solid_384x10_blue", 384, 10, (0, 0, 255, 255)),          # Blue
-        ("solid_512x512_gray", 512, 512, (128, 128, 128, 255)),    # Gray
+        ("solid_300x100_magenta", 300, 100, (255, 0, 255, 255)),  # Magenta
+        ("solid_128x128_white", 128, 128, (255, 255, 255, 255)),  # White
+        ("solid_256x256_cyan", 256, 256, (0, 255, 255, 255)),  # Cyan
+        ("solid_64x64_red", 64, 64, (255, 0, 0, 255)),  # Red
+        ("solid_384x10_blue", 384, 10, (0, 0, 255, 255)),  # Blue
+        ("solid_512x512_gray", 512, 512, (128, 128, 128, 255)),  # Gray
     ]
 
     # Extended textures for comprehensive dimension coverage
     extended_textures = [
-        ("solid_1x1_black", 1, 1, (0, 0, 0, 255)),                 # Minimum edge case
-        ("solid_2x2_black", 2, 2, (0, 0, 0, 255)),                 # Very small POT
-        ("solid_32x32_black", 32, 32, (0, 0, 0, 255)),             # Min clamp default
-        ("solid_1024x1024_black", 1024, 1024, (0, 0, 0, 255)),     # Large POT
-        ("solid_2048x2048_black", 2048, 2048, (0, 0, 0, 255)),     # Very large POT
-        ("solid_4096x4096_black", 4096, 4096, (0, 0, 0, 255)),     # Maximum POT
-        ("solid_257x64_gray", 257, 64, (128, 128, 128, 255)),      # Just over 256 boundary
-        ("solid_255x255_gray", 255, 255, (128, 128, 128, 255)),    # Just under 256
-        ("solid_513x400_gray", 513, 400, (128, 128, 128, 255)),    # Just over 512
-        ("solid_511x511_gray", 511, 511, (128, 128, 128, 255)),    # Just under 512
-        ("solid_1x512_yellow", 1, 512, (255, 255, 0, 255)),        # Tall strip
-        ("solid_512x1_yellow", 512, 1, (255, 255, 0, 255)),        # Wide strip
-        ("solid_100x200_green", 100, 200, (0, 255, 0, 255)),       # Portrait NPOT
-        ("solid_400x240_blue", 400, 240, (0, 0, 255, 255)),        # Bug case dimension
-        ("solid_450x254_blue", 450, 254, (0, 0, 255, 255)),        # Reported bug case
+        ("solid_1x1_black", 1, 1, (0, 0, 0, 255)),  # Minimum edge case
+        ("solid_2x2_black", 2, 2, (0, 0, 0, 255)),  # Very small POT
+        ("solid_32x32_black", 32, 32, (0, 0, 0, 255)),  # Min clamp default
+        ("solid_1024x1024_black", 1024, 1024, (0, 0, 0, 255)),  # Large POT
+        ("solid_2048x2048_black", 2048, 2048, (0, 0, 0, 255)),  # Very large POT
+        ("solid_4096x4096_black", 4096, 4096, (0, 0, 0, 255)),  # Maximum POT
+        ("solid_257x64_gray", 257, 64, (128, 128, 128, 255)),  # Just over 256 boundary
+        ("solid_255x255_gray", 255, 255, (128, 128, 128, 255)),  # Just under 256
+        ("solid_513x400_gray", 513, 400, (128, 128, 128, 255)),  # Just over 512
+        ("solid_511x511_gray", 511, 511, (128, 128, 128, 255)),  # Just under 512
+        ("solid_1x512_yellow", 1, 512, (255, 255, 0, 255)),  # Tall strip
+        ("solid_512x1_yellow", 512, 1, (255, 255, 0, 255)),  # Wide strip
+        ("solid_100x200_green", 100, 200, (0, 255, 0, 255)),  # Portrait NPOT
+        ("solid_400x240_blue", 400, 240, (0, 0, 255, 255)),  # Bug case dimension
+        ("solid_450x254_blue", 450, 254, (0, 0, 255, 255)),  # Reported bug case
     ]
 
     if args.extended:
@@ -277,7 +234,7 @@ def main():
 
     # Generate folder meta file if it doesn't exist
     folder_meta_path = str(output_dir) + ".meta"
-    if not os.path.exists(folder_meta_path):
+    if not Path(folder_meta_path).exists():
         generate_folder_meta_file(folder_meta_path)
 
     for name, width, height, color in textures:

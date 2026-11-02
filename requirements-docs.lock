@@ -85,7 +85,7 @@ pillow==13.0.0
     # via
     #   -r requirements-docs.txt
     #   cairosvg
-platformdirs==4.14.2
+platformdirs==4.14.3
     # via mkdocs-get-deps
 pycparser==3.12 ; implementation_name != 'PyPy'
     # via cffi
@@ -95,7 +95,7 @@ pymdown-extensions==12.3
     # via
     #   -r requirements-docs.txt
     #   mkdocs-material
-python-dateutil==3.0.0
+python-dateutil==4.0.0
     # via ghp-import
 pyyaml==6.0.3
     # via
@@ -107,8 +107,6 @@ pyyaml-env-tag==1.1
     # via mkdocs
 requests==2.34.2
     # via mkdocs-material
-six==1.17.0
-    # via python-dateutil
 smmap==5.0.3
     # via gitdb
 tinycss2==1.5.1

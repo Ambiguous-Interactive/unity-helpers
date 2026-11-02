@@ -1,8 +1,11 @@
 # MIT License - Copyright (c) 2026 wallstop
 # Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
+from __future__ import annotations
+
 import argparse
 import hashlib
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -15,13 +18,16 @@ def generate_probe(
     output: Path,
 ) -> Path:
     root: Path = Path(__file__).resolve().parents[2]
+    git = shutil.which("git")
+    if git is None:
+        raise RuntimeError("Git is required for source-bound parity generation")
     source_path: str = "Runtime/Core/Extension/Sorting/IListSortJesse.cs"
-    baseline_bytes: bytes = subprocess.check_output(
-        ["git", "show", f"{baseline}:{source_path}"], cwd=root
+    baseline_bytes: bytes = subprocess.check_output(  # noqa: S603 - read-only Git object argument.
+        [git, "show", f"{baseline}:{source_path}"], cwd=root, timeout=30
     )
     candidate_bytes: bytes = (
-        subprocess.check_output(
-            ["git", "show", f"{candidate_ref}:{source_path}"], cwd=root
+        subprocess.check_output(  # noqa: S603 - read-only Git object argument.
+            [git, "show", f"{candidate_ref}:{source_path}"], cwd=root, timeout=30
         )
         if candidate_ref
         else (root / source_path).read_bytes()
@@ -96,9 +102,15 @@ def main() -> None:
         description="Generate a paired JesseSort Unity probe without modifying production sources."
     )
     parser.add_argument("--baseline", default="99f0520c", help="Previous implementation commit.")
-    parser.add_argument("--candidate-ref", help="Candidate Git commit; defaults to the working tree.")
-    parser.add_argument("--wide", action="store_true", help="Use 40-byte records instead of integers.")
-    parser.add_argument("--struct-comparer", action="store_true", help="Use a concrete struct comparer with --wide.")
+    parser.add_argument(
+        "--candidate-ref", help="Candidate Git commit; defaults to the working tree."
+    )
+    parser.add_argument(
+        "--wide", action="store_true", help="Use 40-byte records instead of integers."
+    )
+    parser.add_argument(
+        "--struct-comparer", action="store_true", help="Use a concrete struct comparer with --wide."
+    )
     parser.add_argument("--output", default="progress/.jesse-benchmark/JessePairedNative.cs")
     options: argparse.Namespace = parser.parse_args()
     if options.struct_comparer and not options.wide:

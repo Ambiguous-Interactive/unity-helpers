@@ -10,6 +10,8 @@ browser = [
 ]
 dev = [
     { include-group = "metadata" },
+    { include-group = "fixtures" },
+    { include-group = "proof" },
     { include-group = "browser" },
     "mypy>=2.4.1",
     "pyright>=1.1.414",
@@ -17,7 +19,13 @@ dev = [
     "ruff>=0.17.3",
     "types-pyyaml>=6.0.12.20261030",
 ]
+fixtures = [
+    "pillow>=13.0.0",
+]
 metadata = ["pyyaml>=6.0.3"]
+proof = [
+    "z3-solver==5.3.3.0",
+]
 
 [tool.uv]
 package = false
@@ -39,25 +47,17 @@ ignore = ["ISC001"]
 "test-*.py" = ["S101", "S603"]
 
 [tool.mypy]
+mypy_path = "$MYPY_CONFIG_FILE_DIR/../typings"
 strict = true
 disallow_any_explicit = true
 warn_unreachable = true
 
 [tool.pyright]
+stubPath = "../typings"
 pythonVersion = "3.11"
 typeCheckingMode = "strict"
 extraPaths = ["../unity", "../wiki", "..", "."]
-include = ["../unity/browser_consumer.py", "../unity/run-browser-consumer.py", "../tests/test_browser_consumer.py", "../lint_changelog.py", "../tests/test_changelog.py", "../lint_xml_doc_summaries.py", "../tests/test_xml_doc_summaries.py", "../cli_encoding.py", "../tests/test_unity_cli_maintenance.py", "../cspell_config.py", "../lint_cspell_config.py", "../add_cspell_word.py", "../tests/test_cspell_tools.py", "../lint_doc_identifiers.py", "../tests/test_doc_identifiers.py", "../lint_preserve_attributes.py", "../tests/test_preserve_attributes.py", "../check_runner.py", "../tests/test_check_runner.py", "../unity/runner_maintenance_matrix.py", "../tests/test_runner_maintenance_matrix.py", "../unity/create_unitypackage.py", "../unity/stage_unitypackage.py", "../tests/test_unitypackage.py", "check.py", "../generate_meta.py", "../tests/test_meta_generation.py", "../build-protobuf-candidate.py", "../verify-protobuf-shipped.py", "../tests/test-protobuf-candidate.py", "../unity/download-native-debugger.py", "../tests/test-native-debugger-download.py", "../lint_bundled_assemblies.py", "../tests/test_bundled_assemblies.py", "../lint_asmdef.py", "../tests/test_asmdef.py", "../pr_feedback.py", "../tests/test_pr_feedback.py", "../verify_shipped_analyzers.py", "../tests/test_verify_shipped_analyzers.py", "../lint_meta_files.py", "../tests/test_meta_lint.py", "../../.github/scripts/check_markdown_links.py", "../../.github/scripts/check_markdown_url_encoding.py", "../../.github/scripts/validate_markdown_links.py", "../tests/test_markdown_checks.py", "../wiki/generate_wiki_footer.py", "../wiki/generate_wiki_sidebar.py", "../wiki/prepare_wiki.py", "../wiki/transform_wiki_links.py", "../wiki/test_wiki_scripts.py"]
+include = ["../tests/test_random_quality_stream.py", "../tests/test_bounded_sampling.py", "../typings/z3/__init__.pyi", "../random-quality/verify-bounded-sampling.py", "../tests/test-unity-framework-evidence.py", "../../.devcontainer/agent-state.py", "../tests/test-devcontainer-persistence.py", "../benchmarks~/generate-jesse-parity.py", "../../.github/scripts/cancel-stuck-workflow.py", "../tests/test-watchdog-cancellation.py", "../tests/test_fixture_assets.py", "../fixture_assets.py", "../generate-test-sprites.py", "../generate-test-textures.py", "../unity/browser_consumer.py", "../unity/run-browser-consumer.py", "../tests/test_browser_consumer.py", "../lint_changelog.py", "../tests/test_changelog.py", "../lint_xml_doc_summaries.py", "../tests/test_xml_doc_summaries.py", "../cli_encoding.py", "../tests/test_unity_cli_maintenance.py", "../cspell_config.py", "../lint_cspell_config.py", "../add_cspell_word.py", "../tests/test_cspell_tools.py", "../lint_doc_identifiers.py", "../tests/test_doc_identifiers.py", "../lint_preserve_attributes.py", "../tests/test_preserve_attributes.py", "../check_runner.py", "../tests/test_check_runner.py", "../unity/runner_maintenance_matrix.py", "../tests/test_runner_maintenance_matrix.py", "../unity/create_unitypackage.py", "../unity/stage_unitypackage.py", "../tests/test_unitypackage.py", "check.py", "../generate_meta.py", "../tests/test_meta_generation.py", "../build-protobuf-candidate.py", "../verify-protobuf-shipped.py", "../tests/test-protobuf-candidate.py", "../unity/download-native-debugger.py", "../tests/test-native-debugger-download.py", "../lint_bundled_assemblies.py", "../tests/test_bundled_assemblies.py", "../lint_asmdef.py", "../tests/test_asmdef.py", "../pr_feedback.py", "../tests/test_pr_feedback.py", "../verify_shipped_analyzers.py", "../tests/test_verify_shipped_analyzers.py", "../lint_meta_files.py", "../tests/test_meta_lint.py", "../../.github/scripts/check_markdown_links.py", "../../.github/scripts/check_markdown_url_encoding.py", "../../.github/scripts/validate_markdown_links.py", "../tests/test_markdown_checks.py", "../wiki/generate_wiki_footer.py", "../wiki/generate_wiki_sidebar.py", "../wiki/prepare_wiki.py", "../wiki/transform_wiki_links.py", "../wiki/test_wiki_scripts.py"]
 
 [tool.unity-helpers-python]
-legacy = [
-    ".devcontainer/agent-state.py",
-    ".github/scripts/cancel-stuck-workflow.py",
-    "scripts/benchmarks~/generate-jesse-parity.py",
-    "scripts/generate-test-sprites.py",
-    "scripts/generate-test-textures.py",
-    "scripts/random-quality/verify-bounded-sampling.py",
-    "scripts/tests/test-devcontainer-persistence.py",
-    "scripts/tests/test-unity-framework-evidence.py",
-    "scripts/tests/test-watchdog-cancellation.py",
-]
+legacy = []

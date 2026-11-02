@@ -6,20 +6,60 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import unittest
+from pathlib import Path
+from typing import TypedDict, cast
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
+class EvidenceFile(TypedDict):
+    OriginalPath: str
+    Path: str
+    Sha256: str
+
+
+class AssemblyIdentity(TypedDict):
+    FullName: str
+    ModuleVersionId: str
+
+
+class EvidenceReceipt(TypedDict):
+    UnityVersion: str
+    SourceCount: int
+    ProcessId: int
+    ProjectPath: str
+    PackageVersion: str
+    Files: list[EvidenceFile]
+    Assemblies: list[AssemblyIdentity]
+
+
+class Invocation(TypedDict):
+    ProcessId: int
+    ProjectPath: str
+    LogRelativePath: str
+    OriginalLogRelativePath: str
+
+
+def require_tool(name: str) -> str:
+    executable = shutil.which(name)
+    if executable is None:
+        raise RuntimeError(f"Missing framework-evidence test tool: {name}")
+    return executable
+
+
 class FrameworkEvidenceTests(unittest.TestCase):
+    workspace: tempfile.TemporaryDirectory[str]
+    root: Path
+    verifier: Path
+    invoker: Path
+
     @classmethod
     def setUpClass(cls) -> None:
-        cls.workspace = tempfile.TemporaryDirectory(
-            prefix="framework-evidence-controls-"
-        )
+        cls.workspace = tempfile.TemporaryDirectory(prefix="framework-evidence-controls-")
         cls.root = Path(cls.workspace.name)
         sources = {
             "nunit.framework": "namespace NUnit.Framework { public class TestAttribute : System.Attribute {} }",
@@ -64,12 +104,12 @@ class FrameworkEvidenceTests(unittest.TestCase):
             (folder / f"{name}.csproj").write_text(
                 '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup>'
                 "<TargetFramework>net9.0</TargetFramework><LangVersion>9.0</LangVersion>"
-                f'<OutputType>{"Exe" if name == "Driver" else "Library"}</OutputType>'
+                f"<OutputType>{'Exe' if name == 'Driver' else 'Library'}</OutputType>"
                 "</PropertyGroup><ItemGroup>" + references + "</ItemGroup></Project>"
             )
         build = subprocess.run(
             [
-                "dotnet",
+                require_tool("dotnet"),
                 "build",
                 str(cls.root / "Driver/Driver.csproj"),
                 "--nologo",
@@ -79,6 +119,7 @@ class FrameworkEvidenceTests(unittest.TestCase):
             ],
             capture_output=True,
             text=True,
+            check=False,
             timeout=120,
         )
         if build.returncode:
@@ -172,9 +213,7 @@ class FrameworkEvidenceTests(unittest.TestCase):
         (self.package / "package.json").write_text(
             '{"name":"com.unity.test-framework","version":"1.4.6"}'
         )
-        (self.package / "Editor/Source.cs").write_bytes(
-            b"// HOST SHIM package source\r\n"
-        )
+        (self.package / "Editor/Source.cs").write_bytes(b"// HOST SHIM package source\r\n")
         (self.package / "Editor/Source.asmdef").write_text('{"name":"HostControl"}')
         self.environment = {
             **os.environ,
@@ -183,20 +222,18 @@ class FrameworkEvidenceTests(unittest.TestCase):
             "CONTROL_VERSION": "1.4.6",
         }
 
-    def capture(
-        self, *, with_argument: bool = True
-    ) -> subprocess.CompletedProcess[str]:
-        args = ["dotnet", str(self.root / "bin/Driver.dll")]
+    def capture(self, *, with_argument: bool = True) -> subprocess.CompletedProcess[str]:
+        args = [require_tool("dotnet"), str(self.root / "bin/Driver.dll")]
         if with_argument:
             args += ["-uhFrameworkEvidenceDirectory", str(self.output)]
         return subprocess.run(
             args, env=self.environment, capture_output=True, text=True, timeout=30
         )
 
-    def receipt(self) -> tuple[Path, dict]:
+    def receipt(self) -> tuple[Path, EvidenceReceipt]:
         paths = list(self.output.glob("*/receipt.json"))
-        self.assertEqual(len(paths), 1)
-        return paths[0], json.loads(paths[0].read_text())
+        assert len(paths) == 1
+        return paths[0], cast("EvidenceReceipt", json.loads(paths[0].read_text()))
 
     def retained(self, original: str) -> Path:
         receipt_path, receipt = self.receipt()
@@ -211,7 +248,7 @@ class FrameworkEvidenceTests(unittest.TestCase):
             process_id = receipt["ProcessId"]
         return subprocess.run(
             [
-                "pwsh",
+                require_tool("pwsh"),
                 "-NoProfile",
                 "-File",
                 str(self.verifier),
@@ -226,6 +263,7 @@ class FrameworkEvidenceTests(unittest.TestCase):
             ],
             capture_output=True,
             text=True,
+            check=False,
             timeout=30,
         )
 
@@ -233,20 +271,20 @@ class FrameworkEvidenceTests(unittest.TestCase):
         self,
     ) -> None:
         result = self.capture()
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        assert result.returncode == 0, result.stdout + result.stderr
         path, receipt = self.receipt()
-        self.assertEqual(receipt["UnityVersion"], "HOST-SHIM-NOT-UNITY")
-        self.assertEqual(receipt["SourceCount"], 1)
-        self.assertEqual(len(receipt["Assemblies"]), 3)
-        self.assertEqual(
-            self.retained("package/Editor/Source.cs").read_bytes(),
-            (self.package / "Editor/Source.cs").read_bytes(),
+        assert receipt["UnityVersion"] == "HOST-SHIM-NOT-UNITY"
+        assert receipt["SourceCount"] == 1
+        assert len(receipt["Assemblies"]) == 3
+        assert (
+            self.retained("package/Editor/Source.cs").read_bytes()
+            == (self.package / "Editor/Source.cs").read_bytes()
         )
         for entry in receipt["Files"]:
             payload = (path.parent / entry["Path"]).read_bytes()
-            self.assertEqual(hashlib.sha256(payload).hexdigest(), entry["Sha256"])
+            assert hashlib.sha256(payload).hexdigest() == entry["Sha256"]
         verified = self.verify()
-        self.assertEqual(verified.returncode, 0, verified.stdout + verified.stderr)
+        assert verified.returncode == 0, verified.stdout + verified.stderr
 
     def test_core_resolution_is_reported_separately_from_manifest_request(self) -> None:
         self.environment["CONTROL_VERSION"] = "1.8.0"
@@ -268,28 +306,28 @@ class FrameworkEvidenceTests(unittest.TestCase):
         self.capture()
         path, receipt = self.receipt()
         requested = json.loads((path.parent / "manifest.json").read_text())
-        self.assertEqual(requested["dependencies"]["com.unity.test-framework"], "1.4.6")
-        self.assertEqual(receipt["PackageVersion"], "1.8.0")
+        assert requested["dependencies"]["com.unity.test-framework"] == "1.4.6"
+        assert receipt["PackageVersion"] == "1.8.0"
         result = self.verify()
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        assert result.returncode == 0, result.stdout + result.stderr
 
     def test_collector_is_inactive_without_capture_argument(self) -> None:
-        self.assertEqual(self.capture(with_argument=False).returncode, 0)
-        self.assertFalse(self.output.exists())
+        assert self.capture(with_argument=False).returncode == 0
+        assert not self.output.exists()
 
     def test_missing_lock_retains_error_and_is_rejected(self) -> None:
         (self.project / "Packages/packages-lock.json").unlink()
         self.capture()
-        self.assertEqual(len(list(self.output.glob("*/capture-error.txt"))), 1)
+        assert len(list(self.output.glob("*/capture-error.txt"))) == 1
         result = self.verify(process_id=1)
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("capture was incomplete", result.stderr)
+        assert result.returncode != 0
+        assert "capture was incomplete" in result.stderr
 
     def test_empty_source_scope_is_rejected(self) -> None:
         (self.package / "Editor/Source.cs").unlink()
         self.capture()
-        self.assertEqual(len(list(self.output.glob("*/capture-error.txt"))), 1)
-        self.assertNotEqual(self.verify(process_id=1).returncode, 0)
+        assert len(list(self.output.glob("*/capture-error.txt"))) == 1
+        assert self.verify(process_id=1).returncode != 0
 
     def test_valid_unity_package_source_paths_are_retained(self) -> None:
         relative = "Samples~/1_RunningTest_Project_Solution/Tests_1s/MyMathTests.cs"
@@ -301,51 +339,46 @@ class FrameworkEvidenceTests(unittest.TestCase):
         additional.write_text("// Legal relative source path control")
         self.capture()
         result = self.verify()
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        receipt_path, receipt = self.receipt()
-        self.assertEqual(receipt["SourceCount"], 3)
-        self.assertEqual(
-            self.retained("package/" + relative).read_bytes(),
-            source.read_bytes(),
-        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        _, receipt = self.receipt()
+        assert receipt["SourceCount"] == 3
+        assert self.retained("package/" + relative).read_bytes() == source.read_bytes()
 
     def test_nested_package_sources_have_short_storage_paths_and_original_names(self) -> None:
-        relative = "Samples~/10_LongRunningTests_Solution/PlayModeTests_10s/PlayModeTests_10s.asmdef"
+        relative = (
+            "Samples~/10_LongRunningTests_Solution/PlayModeTests_10s/PlayModeTests_10s.asmdef"
+        )
         source = self.package / relative
         source.parent.mkdir(parents=True)
         source.write_text('{"name":"LongPathControl"}')
         self.capture()
         path, receipt = self.receipt()
         entry = next(e for e in receipt["Files"] if e.get("OriginalPath") == "package/" + relative)
-        self.assertLessEqual(len(entry["Path"]), 19)
-        self.assertEqual((path.parent / entry["Path"]).read_bytes(), source.read_bytes())
-        self.assertEqual(self.verify().returncode, 0)
+        assert len(entry["Path"]) <= 19
+        assert (path.parent / entry["Path"]).read_bytes() == source.read_bytes()
+        assert self.verify().returncode == 0
 
     def test_oversized_source_is_refused_before_copy(self) -> None:
         (self.package / "Editor/Source.cs").write_bytes(b"x" * (16777216 + 1))
         self.capture()
         errors = list(self.output.glob("*/capture-error.txt"))
-        self.assertEqual(len(errors), 1)
-        self.assertIn("oversized", errors[0].read_text())
-        self.assertFalse((errors[0].parent / "package/Editor/Source.cs").exists())
-        self.assertNotEqual(self.verify(process_id=1).returncode, 0)
+        assert len(errors) == 1
+        assert "oversized" in errors[0].read_text()
+        assert not (errors[0].parent / "package/Editor/Source.cs").exists()
+        assert self.verify(process_id=1).returncode != 0
 
     def test_changed_source_after_capture_does_not_rewrite_retained_bytes(self) -> None:
         self.capture()
-        path, _ = self.receipt()
+        _path, _ = self.receipt()
         before = self.retained("package/Editor/Source.cs").read_bytes()
         (self.package / "Editor/Source.cs").write_text("CHANGED EXTERNAL PACKAGE")
-        self.assertEqual(
-            self.retained("package/Editor/Source.cs").read_bytes(), before
-        )
-        self.assertEqual(self.verify().returncode, 0)
+        assert self.retained("package/Editor/Source.cs").read_bytes() == before
+        assert self.verify().returncode == 0
 
     def test_stale_process_or_project_is_rejected(self) -> None:
         self.capture()
-        self.assertNotEqual(self.verify(process_id=1).returncode, 0)
-        self.assertNotEqual(
-            self.verify(project=self.case / "other project").returncode, 0
-        )
+        assert self.verify(process_id=1).returncode != 0
+        assert self.verify(project=self.case / "other project").returncode != 0
 
     def test_tampered_metadata_source_and_module_bytes_are_rejected(self) -> None:
         self.capture()
@@ -355,8 +388,8 @@ class FrameworkEvidenceTests(unittest.TestCase):
             original = target.read_bytes()
             target.write_bytes(original + b"tampered")
             result = self.verify()
-            self.assertNotEqual(result.returncode, 0, entry["Path"])
-            self.assertIn("evidence bytes differ", result.stderr)
+            assert result.returncode != 0, entry["Path"]
+            assert "evidence bytes differ" in result.stderr
             target.write_bytes(original)
 
     def test_removed_module_duplicate_identity_and_wrong_mvid_are_rejected(
@@ -372,15 +405,13 @@ class FrameworkEvidenceTests(unittest.TestCase):
             "source-count",
             "package-version",
         ):
-            receipt = json.loads(json.dumps(original))
+            receipt = cast("EvidenceReceipt", json.loads(json.dumps(original)))
             if mutation == "removed":
                 receipt["Assemblies"].pop()
             elif mutation == "duplicate":
                 receipt["Assemblies"][1] = receipt["Assemblies"][0]
             elif mutation == "mvid":
-                receipt["Assemblies"][0][
-                    "ModuleVersionId"
-                ] = "00000000-0000-0000-0000-000000000000"
+                receipt["Assemblies"][0]["ModuleVersionId"] = "00000000-0000-0000-0000-000000000000"
             elif mutation == "fullname":
                 receipt["Assemblies"][0]["FullName"] = "Wrong, Version=0.0.0.0"
             elif mutation == "source-count":
@@ -388,9 +419,9 @@ class FrameworkEvidenceTests(unittest.TestCase):
             else:
                 receipt["PackageVersion"] = "1.4.99"
             path.write_text(json.dumps(receipt))
-            self.assertNotEqual(self.verify().returncode, 0, mutation)
+            assert self.verify().returncode != 0, mutation
         path.write_text(json.dumps(original))
-        self.assertEqual(self.verify().returncode, 0)
+        assert self.verify().returncode == 0
 
     def test_missing_metadata_and_unsafe_paths_are_rejected(self) -> None:
         self.capture()
@@ -407,46 +438,57 @@ class FrameworkEvidenceTests(unittest.TestCase):
             "package/control\ncharacter",
             "   ",
         ):
-            receipt = json.loads(json.dumps(original))
+            receipt = cast("EvidenceReceipt", json.loads(json.dumps(original)))
             receipt["Files"][0]["Path"] = relative
             path.write_text(json.dumps(receipt))
             result = self.verify()
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("Malformed or duplicate", result.stderr)
-        receipt = json.loads(json.dumps(original))
-        receipt["Files"] = [
-            entry for entry in receipt["Files"] if entry["Path"] != "manifest.json"
-        ]
+            assert result.returncode != 0
+            assert "Malformed or duplicate" in result.stderr
+        receipt = cast("EvidenceReceipt", json.loads(json.dumps(original)))
+        receipt["Files"] = [entry for entry in receipt["Files"] if entry["Path"] != "manifest.json"]
         path.write_text(json.dumps(receipt))
-        self.assertNotEqual(self.verify().returncode, 0)
+        assert self.verify().returncode != 0
 
     def test_invalid_original_paths_and_duplicate_source_mappings_are_rejected(self) -> None:
         self.capture()
         path, original = self.receipt()
-        for value in ("../escape", "/absolute", "package/name:stream", "package//empty", "package/./part", "package/control\nname", "package\\part"):
-            receipt = json.loads(json.dumps(original))
+        for value in (
+            "../escape",
+            "/absolute",
+            "package/name:stream",
+            "package//empty",
+            "package/./part",
+            "package/control\nname",
+            "package\\part",
+        ):
+            receipt = cast("EvidenceReceipt", json.loads(json.dumps(original)))
             receipt["Files"][0]["OriginalPath"] = value
             path.write_text(json.dumps(receipt))
-            self.assertNotEqual(self.verify().returncode, 0, value)
-        receipt = json.loads(json.dumps(original))
+            assert self.verify().returncode != 0, value
+        receipt = cast("EvidenceReceipt", json.loads(json.dumps(original)))
         receipt["Files"][1]["OriginalPath"] = receipt["Files"][0]["OriginalPath"]
         path.write_text(json.dumps(receipt))
-        self.assertNotEqual(self.verify().returncode, 0)
+        assert self.verify().returncode != 0
 
     @unittest.skipIf(os.name == "nt", "Linux host orchestration control")
     def test_real_invocation_path_binds_pid_and_never_reuses_capture(self) -> None:
         source = (
-            self.project
-            / "Assets/UhCiTestFrameworkEvidence/Editor/UhCiTestFrameworkEvidence.cs"
+            self.project / "Assets/UhCiTestFrameworkEvidence/Editor/UhCiTestFrameworkEvidence.cs"
         )
         source.parent.mkdir(parents=True)
-        source.write_text(
-            (ROOT / "scripts/unity/test-framework-evidence.cs.txt").read_text()
-        )
-        for control in ("twice", "deep", "offset-time", "missing", "wrong-process", "stale-log", "stale-diagnostics"):
+        source.write_text((ROOT / "scripts/unity/test-framework-evidence.cs.txt").read_text())
+        for control in (
+            "twice",
+            "deep",
+            "offset-time",
+            "missing",
+            "wrong-process",
+            "stale-log",
+            "stale-diagnostics",
+        ):
             result = subprocess.run(
                 [
-                    "pwsh",
+                    require_tool("pwsh"),
                     "-NoProfile",
                     "-File",
                     str(self.invoker),
@@ -457,7 +499,15 @@ class FrameworkEvidenceTests(unittest.TestCase):
                     "-Driver",
                     str(self.root / "bin/Driver.dll"),
                     "-LogPath",
-                    str(self.case / control / ("migration/OdinMigrationDictionaryImportVerificationTests/unity.log" if control == "deep" else control + ".log")),
+                    str(
+                        self.case
+                        / control
+                        / (
+                            "migration/OdinMigrationDictionaryImportVerificationTests/unity.log"
+                            if control == "deep"
+                            else control + ".log"
+                        )
+                    ),
                     "-ArtifactsPath",
                     str(self.case / control),
                     "-Control",
@@ -469,27 +519,41 @@ class FrameworkEvidenceTests(unittest.TestCase):
                 timeout=60,
             )
             if control in ("twice", "deep", "offset-time"):
-                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                assert result.returncode == 0, result.stdout + result.stderr
                 for capture in (self.case / control / "framework").iterdir():
-                    self.assertEqual(
-                        json.loads((capture / "requested-manifest.json").read_text()),
-                        self.manifest,
+                    assert (
+                        json.loads((capture / "requested-manifest.json").read_text())
+                        == self.manifest
                     )
-                    invocation = json.loads((capture / "invocation.json").read_text())
-                    receipt = json.loads(next(capture.glob("*/receipt.json")).read_text())
-                    self.assertEqual(invocation["ProcessId"], receipt["ProcessId"])
-                    self.assertEqual(invocation["ProjectPath"], receipt["ProjectPath"])
+                    invocation = cast(
+                        "Invocation", json.loads((capture / "invocation.json").read_text())
+                    )
+                    receipt = cast(
+                        "EvidenceReceipt",
+                        json.loads(next(capture.glob("*/receipt.json")).read_text()),
+                    )
+                    assert invocation["ProcessId"] == receipt["ProcessId"]
+                    assert invocation["ProjectPath"] == receipt["ProjectPath"]
                     retained_log = self.case / control / invocation["LogRelativePath"]
-                    self.assertEqual(retained_log.read_text(), "HOST ORIGINAL PID " + str(receipt["ProcessId"]))
+                    assert retained_log.read_text() == "HOST ORIGINAL PID " + str(
+                        receipt["ProcessId"]
+                    )
                     retained_diagnostics = retained_log.with_suffix(".execution-diagnostics.json")
-                    self.assertEqual(json.loads(retained_diagnostics.read_text())["Process"]["ProcessId"], receipt["ProcessId"])
-                    self.assertEqual(invocation["OriginalLogRelativePath"], "migration/OdinMigrationDictionaryImportVerificationTests/unity.log" if control == "deep" else control + ".log")
+                    assert (
+                        json.loads(retained_diagnostics.read_text())["Process"]["ProcessId"]
+                        == receipt["ProcessId"]
+                    )
+                    assert invocation["OriginalLogRelativePath"] == (
+                        "migration/OdinMigrationDictionaryImportVerificationTests/unity.log"
+                        if control == "deep"
+                        else control + ".log"
+                    )
             else:
-                self.assertNotEqual(result.returncode, 0, control)
+                assert result.returncode != 0, control
 
     def test_no_snapshot_is_not_success(self) -> None:
         self.output.mkdir()
-        self.assertNotEqual(self.verify(process_id=1).returncode, 0)
+        assert self.verify(process_id=1).returncode != 0
 
 
 if __name__ == "__main__":

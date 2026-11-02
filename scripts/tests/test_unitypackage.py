@@ -324,6 +324,11 @@ def test_python_registry_rejects_missing_new_duplicate_and_empty_scope(tmp_path:
     extra.write_text("def missing(value): return value", encoding="utf-8")
     assert not verify_registry(tmp_path, [str(selected)], ["legacy.py"])
     extra.unlink()
+    stub = tmp_path / "extra.pyi"
+    stub.write_text("def unsupported(value): ...\n", encoding="utf-8")
+    assert not verify_registry(tmp_path, [str(selected)], ["legacy.py"])
+    assert verify_registry(tmp_path, [str(selected), str(stub)], ["legacy.py"])
+    stub.unlink()
     legacy.unlink()
     assert not verify_registry(tmp_path, [str(selected)], ["legacy.py"])
 

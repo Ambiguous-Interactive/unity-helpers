@@ -1,19 +1,36 @@
 #!/usr/bin/env python3
 """Regression tests for persistent agent state and conservative container recovery."""
 
+from __future__ import annotations
+
 import hashlib
 import importlib.util
 import io
 import json
 import os
+import re
 import shutil
 import sqlite3
 import subprocess
+import sys
 import tarfile
 import tempfile
 import unittest
-from unittest import mock
 from pathlib import Path
+from typing import TYPE_CHECKING, Protocol, cast
+from unittest import mock
+
+import pytest
+
+if TYPE_CHECKING:
+    from types import ModuleType
+
+
+class AgentState(Protocol):
+    shutil: ModuleType
+
+    def prepare(self, home: Path, workspace: Path) -> None: ...
+
 
 ROOT = Path(__file__).resolve().parents[2]
 TARGETS = (
@@ -32,21 +49,37 @@ TARGETS = (
 )
 
 
+def require_tool(name: str) -> str:
+    executable = shutil.which(name)
+    if executable is None:
+        raise RuntimeError(f"Missing required test tool: {name}")
+    return executable
+
+
+def payload_bytes(bundle: tarfile.TarFile, member: tarfile.TarInfo) -> bytes:
+    source = bundle.extractfile(member)
+    assert source is not None
+    with source:
+        return source.read()
+
+
 class MountTests(unittest.TestCase):
-    def test_all_personal_state_has_workspace_scoped_volumes(self):
+    def test_all_personal_state_has_workspace_scoped_volumes(self) -> None:
         config = (ROOT / ".devcontainer/devcontainer.json").read_text()
         for relative in TARGETS:
             with self.subTest(relative=relative):
-                self.assertRegex(
-                    config,
+                assert re.search(
                     r"source=unity-helpers-\$\{devcontainerId\}-[^,]+,target=/home/vscode/"
                     + relative.replace(".", r"\.")
                     + r",type=volume",
+                    config,
                 )
 
 
 class RecoveryTests(unittest.TestCase):
-    def run_case(self, status, probe="", foreign=False, inspect_failure=False):
+    def run_case(
+        self, status: str, probe: str = "", foreign: bool = False, inspect_failure: bool = False
+    ) -> bool:
         with tempfile.TemporaryDirectory(prefix="container-recovery-") as directory:
             temporary = Path(directory)
             fake = temporary / "docker"
@@ -78,7 +111,7 @@ else: sys.exit(2)
             )
             result = subprocess.run(
                 [
-                    "pwsh",
+                    require_tool("pwsh"),
                     "-NoProfile",
                     "-File",
                     str(ROOT / ".devcontainer/initialize-host.ps1"),
@@ -91,15 +124,15 @@ else: sys.exit(2)
                 text=True,
                 timeout=15,
             )
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            assert result.returncode == 0, result.stdout + result.stderr
             return removed.exists()
 
-    def test_normal_states_are_preserved(self):
+    def test_normal_states_are_preserved(self) -> None:
         for state in ("created", "exited", "paused", "restarting", "running"):
             with self.subTest(state=state):
-                self.assertFalse(self.run_case(state))
+                assert not self.run_case(state)
 
-    def test_unknown_probe_failures_are_preserved(self):
+    def test_unknown_probe_failures_are_preserved(self) -> None:
         for failure in (
             "permission denied",
             "OCI runtime exec failed: error executing setns process: operation not permitted",
@@ -107,23 +140,22 @@ else: sys.exit(2)
             "timeout",
         ):
             with self.subTest(failure=failure):
-                self.assertFalse(self.run_case("running", failure))
+                assert not self.run_case("running", failure)
 
-    def test_dead_and_confirmed_zombies_are_removed(self):
-        self.assertTrue(self.run_case("dead"))
-        self.assertTrue(
-            self.run_case(
-                "running",
-                "OCI runtime exec failed: error executing setns process: failed to open /proc/42/ns/ipc: no such file or directory",
-            )
+    def test_dead_and_confirmed_zombies_are_removed(self) -> None:
+        assert self.run_case("dead")
+        assert self.run_case(
+            "running",
+            "OCI runtime exec failed: error executing setns process: failed to open /proc/42/ns/ipc: no such file or directory",
         )
 
-    def test_foreign_and_uninspectable_containers_are_preserved(self):
-        self.assertFalse(self.run_case("dead", foreign=True))
-        self.assertFalse(self.run_case("dead", inspect_failure=True))
+    def test_foreign_and_uninspectable_containers_are_preserved(self) -> None:
+        assert not self.run_case("dead", foreign=True)
+        assert not self.run_case("dead", inspect_failure=True)
 
-    def test_missing_docker_does_not_block_opening(self):
+    def test_missing_docker_does_not_block_opening(self) -> None:
         pwsh = shutil.which("pwsh")
+        assert pwsh is not None
         with tempfile.TemporaryDirectory(prefix="missing-docker-") as directory:
             result = subprocess.run(
                 [
@@ -138,12 +170,12 @@ else: sys.exit(2)
                 text=True,
                 timeout=10,
             )
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("docker CLI not found", result.stdout)
+            assert result.returncode == 0, result.stderr
+            assert "docker CLI not found" in result.stdout
 
 
 class StateTests(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory(prefix="agent-state-test-")
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
@@ -153,10 +185,12 @@ class StateTests(unittest.TestCase):
         self.workspace.mkdir()
         self.archive = self.workspace / "progress/devcontainer-state/migration.tar.gz"
 
-    def run_state(self, command, home=None, success=True):
+    def run_state(
+        self, command: str, home: Path | None = None, success: bool = True
+    ) -> subprocess.CompletedProcess[str]:
         result = subprocess.run(
             [
-                "python3",
+                sys.executable,
                 str(ROOT / ".devcontainer/agent-state.py"),
                 command,
                 "--home",
@@ -170,12 +204,12 @@ class StateTests(unittest.TestCase):
             timeout=30,
         )
         if success:
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            assert result.returncode == 0, result.stdout + result.stderr
         else:
-            self.assertNotEqual(result.returncode, 0)
+            assert result.returncode != 0
         return result
 
-    def populate(self):
+    def populate(self) -> None:
         for relative in TARGETS:
             directory = self.home / relative
             directory.mkdir(parents=True)
@@ -187,7 +221,7 @@ class StateTests(unittest.TestCase):
         )
         (self.home / ".claude.json").write_text('{"theme":"dark"}')
 
-    def test_round_trip_all_tools_and_sqlite_snapshot(self):
+    def test_round_trip_all_tools_and_sqlite_snapshot(self) -> None:
         self.populate()
         database = self.home / ".codex/state.sqlite"
         with sqlite3.connect(database) as connection:
@@ -196,46 +230,39 @@ class StateTests(unittest.TestCase):
             connection.execute("INSERT INTO state VALUES ('synthetic conversation')")
             connection.commit()
             self.run_state("backup")
-        self.assertEqual(self.archive.stat().st_mode & 0o777, 0o600)
+        assert self.archive.stat().st_mode & 511 == 384
         destination = self.root / "restored"
         self.run_state("restore", destination)
         for relative in TARGETS:
-            self.assertEqual(
-                (destination / relative / "synthetic-data").read_text(),
-                "preserve " + relative,
-            )
-        self.assertEqual(
-            (destination / ".claude/.claude.json").read_text(), '{"theme":"dark"}'
-        )
+            assert (destination / relative / "synthetic-data").read_text() == "preserve " + relative
+        assert (destination / ".claude/.claude.json").read_text() == '{"theme":"dark"}'
         with sqlite3.connect(destination / ".codex/state.sqlite") as connection:
-            self.assertEqual(
-                connection.execute("PRAGMA integrity_check").fetchone()[0], "ok"
-            )
-            self.assertEqual(
-                connection.execute("SELECT value FROM state").fetchone()[0],
-                "synthetic conversation",
+            assert connection.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+            assert (
+                connection.execute("SELECT value FROM state").fetchone()[0]
+                == "synthetic conversation"
             )
 
-    def test_restore_conflict_does_not_modify_any_destination(self):
+    def test_restore_conflict_does_not_modify_any_destination(self) -> None:
         self.populate()
         self.run_state("backup")
         destination = self.root / "restored"
         (destination / ".mcp-auth").mkdir(parents=True)
         (destination / ".mcp-auth/keep").write_text("keep")
         self.run_state("restore", destination, success=False)
-        self.assertFalse((destination / ".codex").exists())
-        self.assertEqual((destination / ".mcp-auth/keep").read_text(), "keep")
+        assert not (destination / ".codex").exists()
+        assert (destination / ".mcp-auth/keep").read_text() == "keep"
 
-    def test_corrupted_archive_is_rejected(self):
+    def test_corrupted_archive_is_rejected(self) -> None:
         self.populate()
         self.run_state("backup")
         with self.archive.open("ab") as stream:
             stream.write(b"corrupt")
         destination = self.root / "restored"
         self.run_state("restore", destination, success=False)
-        self.assertFalse(destination.exists())
+        assert not destination.exists()
 
-    def test_restore_rejects_existing_parent_symlink(self):
+    def test_restore_rejects_existing_parent_symlink(self) -> None:
         self.populate()
         self.run_state("backup")
         destination = self.root / "restored"
@@ -244,17 +271,17 @@ class StateTests(unittest.TestCase):
         external.mkdir()
         (destination / ".config").symlink_to(external)
         self.run_state("restore", destination, success=False)
-        self.assertFalse((destination / ".codex").exists())
-        self.assertEqual(list(external.iterdir()), [])
+        assert not (destination / ".codex").exists()
+        assert list(external.iterdir()) == []
 
-    def test_backup_refuses_overwrite(self):
+    def test_backup_refuses_overwrite(self) -> None:
         self.populate()
         self.run_state("backup")
         original = self.archive.read_bytes()
         self.run_state("backup", success=False)
-        self.assertEqual(self.archive.read_bytes(), original)
+        assert self.archive.read_bytes() == original
 
-    def test_prepare_restores_once_and_preserves_later_changes(self):
+    def test_prepare_restores_once_and_preserves_later_changes(self) -> None:
         self.populate()
         self.run_state("backup")
         destination = self.root / "restored"
@@ -262,10 +289,10 @@ class StateTests(unittest.TestCase):
         changed = destination / ".codex/auth.json"
         changed.write_text("new refreshed token")
         self.run_state("prepare", destination)
-        self.assertEqual(changed.read_text(), "new refreshed token")
-        self.assertTrue(self.archive.exists())
+        assert changed.read_text() == "new refreshed token"
+        assert self.archive.exists()
 
-    def test_prepare_keeps_populated_volumes_when_archive_was_not_applied(self):
+    def test_prepare_keeps_populated_volumes_when_archive_was_not_applied(self) -> None:
         self.populate()
         self.run_state("backup")
         destination = self.root / "restored"
@@ -276,13 +303,13 @@ class StateTests(unittest.TestCase):
 
         result = self.run_state("prepare", destination)
 
-        self.assertIn("WARNING", result.stdout)
-        self.assertEqual(current.read_text(), "keep refreshed credential")
-        self.assertFalse((destination / ".codex/.devcontainer-restored-sha256").exists())
-        self.assertEqual(self.archive.read_bytes(), original)
+        assert "WARNING" in result.stdout
+        assert current.read_text() == "keep refreshed credential"
+        assert not (destination / ".codex/.devcontainer-restored-sha256").exists()
+        assert self.archive.read_bytes() == original
         self.run_state("restore", destination, success=False)
 
-    def test_prepare_continues_when_archive_checksum_is_missing(self):
+    def test_prepare_continues_when_archive_checksum_is_missing(self) -> None:
         self.populate()
         self.run_state("backup")
         self.archive.with_suffix(".gz.sha256").unlink()
@@ -291,13 +318,13 @@ class StateTests(unittest.TestCase):
 
         result = self.run_state("prepare", destination)
 
-        self.assertIn("WARNING", result.stdout)
-        self.assertFalse((destination / ".codex/auth.json").exists())
-        self.assertTrue((destination / ".codex/config.toml").is_file())
-        self.assertEqual(self.archive.read_bytes(), original)
+        assert "WARNING" in result.stdout
+        assert not (destination / ".codex/auth.json").exists()
+        assert (destination / ".codex/config.toml").is_file()
+        assert self.archive.read_bytes() == original
         self.run_state("restore", destination, success=False)
 
-    def test_prepare_continues_when_archive_checksum_does_not_match(self):
+    def test_prepare_continues_when_archive_checksum_does_not_match(self) -> None:
         self.populate()
         self.run_state("backup")
         with self.archive.open("ab") as stream:
@@ -307,50 +334,65 @@ class StateTests(unittest.TestCase):
 
         result = self.run_state("prepare", destination)
 
-        self.assertIn("WARNING", result.stdout)
-        self.assertFalse((destination / ".codex/auth.json").exists())
-        self.assertTrue((destination / ".codex/config.toml").is_file())
-        self.assertEqual(self.archive.read_bytes(), original)
+        assert "WARNING" in result.stdout
+        assert not (destination / ".codex/auth.json").exists()
+        assert (destination / ".codex/config.toml").is_file()
+        assert self.archive.read_bytes() == original
         self.run_state("restore", destination, success=False)
 
-    def test_prepare_does_not_hide_restore_write_failures(self):
+    def test_prepare_does_not_hide_restore_write_failures(self) -> None:
         self.populate()
         self.run_state("backup")
         spec = importlib.util.spec_from_file_location(
             "agent_state", ROOT / ".devcontainer/agent-state.py"
         )
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
+        assert spec is not None
+        assert spec.loader is not None
+        loaded = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(loaded)
+        module = cast("AgentState", loaded)
         destination = self.root / "restored"
         failure = OSError("synthetic restore write failure")
 
-        with mock.patch.object(module.shutil, "copytree", side_effect=failure):
-            with self.assertRaises(OSError) as raised:
-                module.prepare(destination, self.workspace)
+        with (
+            mock.patch.object(module.shutil, "copytree", side_effect=failure),
+            pytest.raises(OSError, match="synthetic restore write failure") as raised,
+        ):
+            module.prepare(destination, self.workspace)
 
-        self.assertIs(raised.exception, failure)
-        self.assertFalse((destination / ".codex/.devcontainer-restored-sha256").exists())
-        self.assertTrue(self.archive.exists())
+        assert raised.value is failure
+        assert not (destination / ".codex/.devcontainer-restored-sha256").exists()
+        assert self.archive.exists()
 
-    def test_prepare_rejects_invalid_manifests_before_restoring_files(self):
+    def test_prepare_rejects_invalid_manifests_before_restoring_files(self) -> None:
         self.populate()
         self.run_state("backup")
         original = self.archive.read_bytes()
-        for mode in ("unlisted", "manifest", "link"):
+        for mode in ("unlisted", "manifest", "link", "files-map", "file-hash", "links-map"):
             with self.subTest(mode=mode):
                 with tarfile.open(fileobj=io.BytesIO(original), mode="r:gz") as bundle:
                     entries = [
-                        (member, bundle.extractfile(member).read() if member.isfile() else None)
+                        (member, payload_bytes(bundle, member) if member.isfile() else None)
                         for member in bundle.getmembers()
                     ]
                 with tarfile.open(self.archive, "w:gz") as bundle:
                     for member, payload in entries:
                         if member.name == "agent-state-manifest.json":
-                            manifest = json.loads(payload)
+                            assert payload is not None
+                            manifest: object = json.loads(payload)
+                            record = cast("dict[str, object]", manifest)
                             if mode == "manifest":
-                                manifest = []
+                                manifest = list[object]()
                             elif mode == "link":
-                                manifest["links"][".codex/broken-link"] = 42
+                                cast("dict[str, object]", record["links"])[".codex/broken-link"] = (
+                                    42
+                                )
+                            elif mode == "files-map":
+                                record["files"] = list[object]()
+                            elif mode == "file-hash":
+                                cast("dict[str, object]", record["files"])[".codex/auth.json"] = 42
+                            elif mode == "links-map":
+                                record["links"] = list[object]()
                             payload = json.dumps(manifest).encode()
                             member.size = len(payload)
                         bundle.addfile(member, io.BytesIO(payload) if payload is not None else None)
@@ -365,41 +407,37 @@ class StateTests(unittest.TestCase):
 
                 result = self.run_state("prepare", destination)
 
-                self.assertIn("WARNING", result.stdout)
-                self.assertFalse((destination / ".codex/auth.json").exists())
-                self.assertFalse((destination / ".codex/unverified").exists())
-                self.assertFalse((destination / ".codex/.devcontainer-restored-sha256").exists())
+                assert "WARNING" in result.stdout
+                assert not (destination / ".codex/auth.json").exists()
+                assert not (destination / ".codex/unverified").exists()
+                assert not (destination / ".codex/.devcontainer-restored-sha256").exists()
                 self.run_state("restore", destination, success=False)
 
-    def test_prepare_preserves_user_settings_and_links_generated_mcp(self):
+    def test_prepare_preserves_user_settings_and_links_generated_mcp(self) -> None:
         config = self.home / ".codex/config.toml"
         config.parent.mkdir()
-        original = (
-            'model = "personal-model"\ncli_auth_credentials_store = "ephemeral"\n'
-        )
+        original = 'model = "personal-model"\ncli_auth_credentials_store = "ephemeral"\n'
         config.write_text(original)
         generated = self.workspace / ".copilot/mcp-config.json"
         generated.parent.mkdir()
         generated.write_text('{"mcpServers":{}}')
         result = self.run_state("prepare")
-        self.assertIn("WARNING", result.stdout)
-        self.assertEqual(config.read_text(), original)
-        self.assertEqual(
-            (self.home / ".copilot/mcp-config.json").resolve(), generated.resolve()
-        )
+        assert "WARNING" in result.stdout
+        assert config.read_text() == original
+        assert (self.home / ".copilot/mcp-config.json").resolve() == generated.resolve()
         self.run_state("prepare")
         for relative in TARGETS:
-            self.assertEqual((self.home / relative).stat().st_mode & 0o777, 0o700)
+            assert (self.home / relative).stat().st_mode & 511 == 448
 
-    def test_prepare_defaults_file_auth_without_changing_existing_config(self):
+    def test_prepare_defaults_file_auth_without_changing_existing_config(self) -> None:
         self.run_state("prepare")
         config = self.home / ".codex/config.toml"
-        self.assertIn('cli_auth_credentials_store = "file"', config.read_text())
+        assert 'cli_auth_credentials_store = "file"' in config.read_text()
         config.write_text('model = "keep"\n')
         self.run_state("prepare")
-        self.assertEqual(config.read_text(), 'model = "keep"\n')
+        assert config.read_text() == 'model = "keep"\n'
 
-    def test_legacy_copilot_and_external_links_survive(self):
+    def test_legacy_copilot_and_external_links_survive(self) -> None:
         (self.workspace / ".copilot").mkdir()
         (self.workspace / ".copilot/config.json").write_text("synthetic auth")
         (self.home / ".codex").mkdir()
@@ -407,14 +445,10 @@ class StateTests(unittest.TestCase):
         self.run_state("backup")
         destination = self.root / "restored"
         self.run_state("restore", destination)
-        self.assertEqual(
-            (destination / ".copilot/config.json").read_text(), "synthetic auth"
-        )
-        self.assertEqual(
-            os.readlink(destination / ".codex/skills"), "/opt/image-skills"
-        )
+        assert (destination / ".copilot/config.json").read_text() == "synthetic auth"
+        assert str((destination / ".codex/skills").readlink()) == "/opt/image-skills"
 
-    def test_future_backup_uses_migrated_copilot_state(self):
+    def test_future_backup_uses_migrated_copilot_state(self) -> None:
         (self.workspace / ".copilot").mkdir()
         (self.workspace / ".copilot/config.json").write_text("old token")
         self.run_state("backup")
@@ -424,7 +458,7 @@ class StateTests(unittest.TestCase):
         later = self.workspace / "later.tar.gz"
         result = subprocess.run(
             [
-                "python3",
+                sys.executable,
                 str(ROOT / ".devcontainer/agent-state.py"),
                 "backup",
                 str(later),
@@ -438,13 +472,14 @@ class StateTests(unittest.TestCase):
             text=True,
             timeout=30,
         )
-        self.assertEqual(result.returncode, 0, result.stderr)
+        assert result.returncode == 0, result.stderr
         with tarfile.open(later) as archive:
-            self.assertEqual(
-                archive.extractfile(".copilot/config.json").read(), b"refreshed token"
+            assert (
+                payload_bytes(archive, archive.getmember(".copilot/config.json"))
+                == b"refreshed token"
             )
 
-    def test_path_traversal_archive_is_rejected_before_writing(self):
+    def test_path_traversal_archive_is_rejected_before_writing(self) -> None:
         self.archive.parent.mkdir(parents=True)
         with tarfile.open(self.archive, "w:gz") as bundle:
             member = tarfile.TarInfo("../escaped")
@@ -454,11 +489,11 @@ class StateTests(unittest.TestCase):
             hashlib.sha256(self.archive.read_bytes()).hexdigest()
         )
         self.run_state("restore", success=False)
-        self.assertFalse((self.root / "escaped").exists())
+        assert not (self.root / "escaped").exists()
 
 
 class InstallerTests(unittest.TestCase):
-    def test_update_and_offline_fallback_preserve_personal_state(self):
+    def test_update_and_offline_fallback_preserve_personal_state(self) -> None:
         with tempfile.TemporaryDirectory(prefix="agent-update-") as directory:
             home = Path(directory)
             prefix = home / ".local"
@@ -490,10 +525,7 @@ else: sys.exit(2)
             codex = binaries / "codex"
             codex.write_text("#!/bin/sh\necho 1.0.0\n")
             codex.chmod(0o755)
-            self.assertEqual(
-                subprocess.check_output([str(codex), "--version"], text=True).strip(),
-                "1.0.0",
-            )
+            assert subprocess.check_output([str(codex), "--version"], text=True).strip() == "1.0.0"
             state = home / ".codex/auth.json"
             state.parent.mkdir()
             state.write_text("synthetic refreshed credential")
@@ -505,36 +537,34 @@ else: sys.exit(2)
             )
             installer = str(ROOT / ".devcontainer/install-agent-clis.sh")
             result = subprocess.run(
-                ["bash", installer],
+                [require_tool("bash"), installer],
                 env=environment,
                 check=False,
                 capture_output=True,
                 text=True,
                 timeout=20,
             )
-            self.assertEqual(result.returncode, 0, result.stderr)
+            assert result.returncode == 0, result.stderr
             version = subprocess.check_output(
-                [str(binaries / "codex"), "--version"], text=True
+                [str(binaries / "codex"), "--version"], text=True, timeout=30
             ).strip()
-            self.assertEqual(version, "2.0.0")
+            assert version == "2.0.0"
             environment["TEST_OFFLINE"] = "1"
             result = subprocess.run(
-                ["bash", installer],
+                [require_tool("bash"), installer],
                 env=environment,
                 check=False,
                 capture_output=True,
                 text=True,
                 timeout=20,
             )
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("Registry unreachable; keeping installed", result.stdout)
-            self.assertEqual(
-                subprocess.check_output(
-                    [str(binaries / "codex"), "--version"], text=True
-                ).strip(),
-                version,
+            assert result.returncode == 0, result.stderr
+            assert "Registry unreachable; keeping installed" in result.stdout
+            assert (
+                subprocess.check_output([str(binaries / "codex"), "--version"], text=True).strip()
+                == version
             )
-            self.assertEqual(state.read_text(), "synthetic refreshed credential")
+            assert state.read_text() == "synthetic refreshed credential"
 
 
 @unittest.skipUnless(
@@ -542,23 +572,24 @@ else: sys.exit(2)
     "Set DEVCONTAINER_PERSISTENCE_IMAGE to a local devcontainer image for real Docker checks",
 )
 class DockerPersistenceTests(unittest.TestCase):
-    def test_replacement_permissions_and_database_integrity(self):
+    def test_replacement_permissions_and_database_integrity(self) -> None:
         import uuid
 
         identifier = "agent-state-test-" + uuid.uuid4().hex[:12]
         image = identifier + ":test"
-        containers, volumes = [], []
+        containers: list[str] = []
+        volumes: list[str] = []
 
-        def docker(*arguments, **kwargs):
+        def docker(*arguments: str, stdin: str | None = None) -> str:
             result = subprocess.run(
-                ["docker", *arguments],
+                [require_tool("docker"), *arguments],
                 check=False,
                 capture_output=True,
                 text=True,
                 timeout=60,
-                **kwargs,
+                input=stdin,
             )
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            assert result.returncode == 0, result.stdout + result.stderr
             return result.stdout.strip()
 
         try:
@@ -573,12 +604,12 @@ class DockerPersistenceTests(unittest.TestCase):
                 "-t",
                 image,
                 "-",
-                input="FROM "
+                stdin="FROM "
                 + os.environ["DEVCONTAINER_PERSISTENCE_IMAGE"]
                 + "\nUSER root\n"
                 + block,
             )
-            mounts = []
+            mounts: list[str] = []
             for index, relative in enumerate(TARGETS):
                 volume = identifier + "-" + str(index)
                 volumes.append(volume)
@@ -614,7 +645,7 @@ for relative in {TARGETS!r}:
 with sqlite3.connect(home / '.codex/state.sqlite') as connection:
     connection.execute('CREATE TABLE history (prompt TEXT)')
     connection.execute("INSERT INTO history VALUES ('synthetic conversation')")
-"""
+"""  # noqa: S608 - fixed synthetic SQL with fixture-only paths.
                     docker("exec", "--user", "vscode", container, "python3", "-c", code)
                     docker(
                         "exec",
@@ -652,21 +683,25 @@ assert (home / '.codex').stat().st_uid == 1000
 with sqlite3.connect(home / '.codex/state.sqlite') as connection:
     assert connection.execute('PRAGMA integrity_check').fetchone()[0] == 'ok'
     assert connection.execute('SELECT prompt FROM history').fetchone()[0] == 'synthetic conversation'
-"""
+"""  # noqa: S608 - fixed synthetic SQL with fixture-only paths.
                     docker("exec", "--user", "vscode", container, "python3", "-c", code)
                 docker("rm", "-f", container)
                 containers.remove(container)
         finally:
             for container in containers:
                 subprocess.run(
-                    ["docker", "rm", "-f", container], check=False, capture_output=True
+                    [require_tool("docker"), "rm", "-f", container],
+                    check=False,
+                    capture_output=True,
                 )
             for volume in volumes:
                 subprocess.run(
-                    ["docker", "volume", "rm", volume], check=False, capture_output=True
+                    [require_tool("docker"), "volume", "rm", volume],
+                    check=False,
+                    capture_output=True,
                 )
             subprocess.run(
-                ["docker", "image", "rm", image], check=False, capture_output=True
+                [require_tool("docker"), "image", "rm", image], check=False, capture_output=True
             )
 
 

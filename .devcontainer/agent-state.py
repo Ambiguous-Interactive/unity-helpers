@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Back up, restore, and initialize private devcontainer agent state."""
 
+from __future__ import annotations
+
 import argparse
 import hashlib
 import io
@@ -14,6 +16,14 @@ import tempfile
 from contextlib import closing
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
+from typing import TypedDict, cast
+
+
+class StateManifest(TypedDict):
+    version: int
+    files: dict[str, str]
+    links: dict[str, str]
+
 
 DIRECTORIES = (
     ".codex",
@@ -33,13 +43,13 @@ MANIFEST = "agent-state-manifest.json"
 MARKER = ".devcontainer-restored-sha256"
 
 
-def digest(path):
+def digest(path: Path) -> str:
     with path.open("rb") as stream:
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
-def copy_directory(source, destination):
-    def ignore_special(directory, names):
+def copy_directory(source: Path, destination: Path) -> None:
+    def ignore_special(directory: str, names: list[str]) -> list[str]:
         return [
             name
             for name in names
@@ -62,9 +72,7 @@ def copy_directory(source, destination):
         target = destination / database.relative_to(source)
         target.unlink()
         with (
-            closing(
-                sqlite3.connect(database.as_uri() + "?mode=ro", uri=True)
-            ) as original,
+            closing(sqlite3.connect(database.as_uri() + "?mode=ro", uri=True)) as original,
             closing(sqlite3.connect(target)) as snapshot,
         ):
             original.backup(snapshot)
@@ -74,7 +82,7 @@ def copy_directory(source, destination):
             Path(str(target) + suffix).unlink(missing_ok=True)
 
 
-def backup(home, workspace, archive):
+def backup(home: Path, workspace: Path, archive: Path) -> None:
     if archive.exists() or archive.with_suffix(archive.suffix + ".sha256").exists():
         raise ValueError("Backup already exists; choose a new archive path")
     archive.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -105,9 +113,7 @@ def backup(home, workspace, archive):
             if (
                 destination.exists()
                 and any(destination.iterdir())
-                and any(
-                    path.name != "mcp-config.json" for path in legacy_copilot.iterdir()
-                )
+                and any(path.name != "mcp-config.json" for path in legacy_copilot.iterdir())
             ):
                 raise ValueError(
                     "Both home and workspace Copilot state exist; resolve before backup"
@@ -116,11 +122,11 @@ def backup(home, workspace, archive):
                 if destination.exists():
                     destination.rmdir()
                 copy_directory(legacy_copilot, destination)
-        files = {}
-        links = {}
+        files: dict[str, str] = {}
+        links: dict[str, str] = {}
         for path in staging.rglob("*"):
             if path.is_symlink():
-                links[path.relative_to(staging).as_posix()] = os.readlink(path)
+                links[path.relative_to(staging).as_posix()] = os.readlink(path)  # noqa: PTH115 - preserve the exact stored link text.
                 path.unlink()
             elif path.is_file():
                 files[path.relative_to(staging).as_posix()] = digest(path)
@@ -154,7 +160,20 @@ def backup(home, workspace, archive):
     print(f"Backup saved: {archive} ({len(files)} verified files; archive mode 0600)")
 
 
-def stage_restore(home, archive, staging, automatic):
+def string_map(value: object) -> dict[str, str]:
+    if not isinstance(value, dict):
+        raise ValueError("Invalid backup manifest; nothing restored")
+    result: dict[str, str] = {}
+    for key, item in cast("dict[object, object]", value).items():
+        if not isinstance(key, str) or not isinstance(item, str):
+            raise ValueError("Invalid backup manifest; nothing restored")
+        result[key] = item
+    return result
+
+
+def stage_restore(
+    home: Path, archive: Path, staging: Path, automatic: bool
+) -> tuple[StateManifest, str] | None:
     expected = archive.with_suffix(archive.suffix + ".sha256").read_text().strip()
     marker = home / ".codex" / MARKER
     if automatic and marker.is_file() and marker.read_text().strip() == expected:
@@ -164,12 +183,11 @@ def stage_restore(home, archive, staging, automatic):
         raise ValueError("Backup checksum mismatch; nothing restored")
     with tarfile.open(archive, "r:gz") as bundle:
         for member in bundle.getmembers():
-            path = PurePosixPath(member.name)
-            if path.is_absolute() or ".." in path.parts:
+            member_path = PurePosixPath(member.name)
+            if member_path.is_absolute() or ".." in member_path.parts:
                 raise ValueError("Unsafe archive path; nothing restored")
             if member.name != MANIFEST and not any(
-                member.name == root or member.name.startswith(root + "/")
-                for root in DIRECTORIES
+                member.name == root or member.name.startswith(root + "/") for root in DIRECTORIES
             ):
                 raise ValueError("Unexpected archive entry; nothing restored")
         for member in bundle.getmembers():
@@ -178,29 +196,31 @@ def stage_restore(home, archive, staging, automatic):
                 destination.mkdir(mode=0o700, parents=True, exist_ok=True)
             elif member.isfile():
                 destination.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-                with (
-                    bundle.extractfile(member) as source,
-                    destination.open("xb") as target,
-                ):
-                    shutil.copyfileobj(source, target)
+                source = bundle.extractfile(member)
+                if source is None:
+                    raise ValueError("Missing archive payload; nothing restored")
+                with source, destination.open("xb") as target_stream:
+                    shutil.copyfileobj(source, target_stream)
                 destination.chmod(member.mode & 0o700)
             else:
                 raise ValueError("Unsupported archive entry type; nothing restored")
-    manifest = json.loads((staging / MANIFEST).read_text())
-    if not isinstance(manifest, dict) or manifest.get("version") != 1:
+    manifest: object = json.loads((staging / MANIFEST).read_text())
+    if not isinstance(manifest, dict):
         raise ValueError("Unsupported backup version; nothing restored")
-    if not isinstance(manifest.get("files"), dict) or not isinstance(
-        manifest.get("links", {}), dict
-    ):
-        raise ValueError("Invalid backup manifest; nothing restored")
+    record = cast("dict[str, object]", manifest)
+    if record.get("version") != 1:
+        raise ValueError("Unsupported backup version; nothing restored")
+    files = string_map(record.get("files"))
+    links = string_map(record.get("links", {}))
+    validated: StateManifest = {"version": 1, "files": files, "links": links}
     staged_files = {
         path.relative_to(staging).as_posix()
         for path in staging.rglob("*")
         if path.is_file() and path != staging / MANIFEST
     }
-    if set(manifest["files"]) != staged_files:
+    if set(files) != staged_files:
         raise ValueError("Backup file inventory mismatch; nothing restored")
-    for relative, expected_hash in manifest["files"].items():
+    for relative, expected_hash in files.items():
         path = staging / relative
         if (
             not path.resolve().is_relative_to(staging)
@@ -209,43 +229,34 @@ def stage_restore(home, archive, staging, automatic):
             or digest(path) != expected_hash
         ):
             raise ValueError("Backup file verification failed; nothing restored")
-    for relative, link in manifest.get("links", {}).items():
-        if (
-            not isinstance(relative, str)
-            or not isinstance(link, str)
-            or not link
-            or "\0" in link
-        ):
+    for relative, link in links.items():
+        if not link or "\0" in link:
             raise ValueError("Invalid backup link; nothing restored")
-        path = PurePosixPath(relative)
+        link_path = PurePosixPath(relative)
         if (
-            path.is_absolute()
-            or ".." in path.parts
+            link_path.is_absolute()
+            or ".." in link_path.parts
             or not any(relative.startswith(root + "/") for root in DIRECTORIES)
         ):
             raise ValueError("Unsafe link path; nothing restored")
         if (staging / relative).exists() or any(
-            str(parent) in manifest.get("links", {}) for parent in path.parents
+            str(parent) in links for parent in link_path.parents
         ):
             raise ValueError("Conflicting link paths; nothing restored")
     for relative in DIRECTORIES:
         target = home / relative
         if not target.resolve().is_relative_to(home):
             raise ValueError("Restore destination escapes home; nothing restored")
-        includes_links = any(
-            link.startswith(relative + "/") for link in manifest.get("links", {})
-        )
+        includes_links = any(link.startswith(relative + "/") for link in links)
         if ((staging / relative).exists() or includes_links) and (
             target.is_symlink()
             or (target.exists() and (not target.is_dir() or any(target.iterdir())))
         ):
-            raise ValueError(
-                f"Restore destination is not empty: {target}; nothing restored"
-            )
-    return manifest, actual
+            raise ValueError(f"Restore destination is not empty: {target}; nothing restored")
+    return validated, actual
 
 
-def restore(home, archive, automatic=False):
+def restore(home: Path, archive: Path, automatic: bool = False) -> None:
     with tempfile.TemporaryDirectory(prefix="agent-restore-") as directory:
         staging = Path(directory)
         try:
@@ -275,7 +286,7 @@ def restore(home, archive, automatic=False):
                 destination = home / relative
                 destination.mkdir(mode=0o700, parents=True, exist_ok=True)
                 shutil.copytree(source, destination, dirs_exist_ok=True, symlinks=True)
-        for relative, link in manifest.get("links", {}).items():
+        for relative, link in manifest["links"].items():
             destination = home / relative
             if (
                 not destination.parent.resolve().is_relative_to(home)
@@ -291,7 +302,7 @@ def restore(home, archive, automatic=False):
     print("Agent state restored and checksums verified; backup retained.")
 
 
-def prepare(home, workspace):
+def prepare(home: Path, workspace: Path) -> None:
     archive = workspace / "progress/devcontainer-state/migration.tar.gz"
     if archive.is_file():
         restore(home, archive, automatic=True)
@@ -316,7 +327,7 @@ def prepare(home, workspace):
     link_mcp(home, workspace)
 
 
-def link_mcp(home, workspace):
+def link_mcp(home: Path, workspace: Path) -> None:
     (home / ".copilot").mkdir(mode=0o700, parents=True, exist_ok=True)
     generated = workspace / ".copilot/mcp-config.json"
     target = home / ".copilot/mcp-config.json"
@@ -327,27 +338,21 @@ def link_mcp(home, workspace):
             if target.is_file() and target.read_bytes() == generated.read_bytes():
                 target.unlink()
             else:
-                print(
-                    "WARNING: Keeping personal Copilot MCP config; workspace config differs."
-                )
+                print("WARNING: Keeping personal Copilot MCP config; workspace config differs.")
                 return
         target.symlink_to(generated)
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("backup", "restore", "prepare", "link-mcp"))
     parser.add_argument("archive", nargs="?", type=Path)
     parser.add_argument("--home", type=Path, default=Path.home())
-    parser.add_argument(
-        "--workspace", type=Path, default=Path(__file__).resolve().parent.parent
-    )
+    parser.add_argument("--workspace", type=Path, default=Path(__file__).resolve().parent.parent)
     args = parser.parse_args()
     os.umask(0o077)
     home, workspace = args.home.resolve(), args.workspace.resolve()
-    archive = (
-        args.archive or workspace / "progress/devcontainer-state/migration.tar.gz"
-    ).resolve()
+    archive = (args.archive or workspace / "progress/devcontainer-state/migration.tar.gz").resolve()
     try:
         if args.command == "backup":
             backup(home, workspace, archive)
