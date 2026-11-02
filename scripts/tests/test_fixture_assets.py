@@ -283,6 +283,14 @@ def test_fixture_pixels_and_metadata_survive_regeneration(
         importer = read_mapping(metadata["TextureImporter"])
         assert importer["isReadable"] == 1
         assert importer["nPOTScale"] == 0
+        expected_mode = (
+            0
+            if kind == "textures"
+            else 1
+            if path.name in ("test_single.png", "test_prime_127.png")
+            else 2
+        )
+        assert importer["spriteMode"] == expected_mode
         sheet = read_mapping(importer["spriteSheet"])
         if kind == "textures":
             assert importer["spriteMode"] == 0
@@ -294,7 +302,6 @@ def test_fixture_pixels_and_metadata_survive_regeneration(
             assert "    sprites: []\n" in metadata_text
             assert "    nameFileIdTable: {}\n" in metadata_text
         else:
-            assert importer["spriteMode"] == 2
             sprites = sheet["sprites"]
             assert isinstance(sprites, list)
             assert sprites
