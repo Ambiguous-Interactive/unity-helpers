@@ -436,7 +436,8 @@ Notes:
 
 - Warms the live declarations and the same cached accessors and collection factories used by assignment. Stale or incomplete serialized metadata cannot hide a field.
 - Field access shares the initializer's cached delegates. On AOT platforms it uses reflection without creating a closed generic accessor for every consumer field type; private and inherited fields retain their declared types.
-- Logs warnings for missing fields/types and logs errors for unexpected exceptions; processing continues.
+- Counts unsupported relational field declarations as warnings and skips them. An unexpected exception stops warming that type, counts as an error, and processing continues with the next type.
+- The default scan visits every loaded Component type, including engine and third-party types. It can add substantial startup work in a large project; schedule it during loading and measure on each target backend.
 - Scope the work by providing specific types: `RelationalComponentInitializer.Initialize(new[]{ typeof(MyComponent) });`
 - To auto‑prewarm on app load, enable the toggle on the AttributeMetadataCache asset: “Prewarm Relational On Load”.
 

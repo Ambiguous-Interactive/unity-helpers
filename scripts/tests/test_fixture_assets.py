@@ -7,6 +7,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import cast
@@ -55,20 +56,36 @@ PIXELS: dict[str, tuple[int, int, str]] = {
         75,
         "94b48bddbf4963443574642f39e9043c6057292b88c44d81cd264af7549fc3dd",
     ),
-    "test_odd.png": (63, 63, "c12d80a58584afe5cca71ef315cbbfd82dcf4181a8dbddb077b5c0f369ffb4a1"),
+    "test_odd.png": (
+        63,
+        63,
+        "c12d80a58584afe5cca71ef315cbbfd82dcf4181a8dbddb077b5c0f369ffb4a1",
+    ),
     "test_prime_127.png": (
         127,
         127,
         "3e2f7f5bd22ce005186ee36c4433960736d1b4bb84b6135875a4d652aeb4c868",
     ),
-    "test_single.png": (32, 32, "4ab589b8423c13f8f33994356d5b696d9b3b56d968e1939f2088c53b5149e6cf"),
+    "test_single.png": (
+        32,
+        32,
+        "4ab589b8423c13f8f33994356d5b696d9b3b56d968e1939f2088c53b5149e6cf",
+    ),
     "test_small_16x16.png": (
         16,
         16,
         "8485f72a3f18aefc7e2f859a54cd39557bb06b542aaaac99e4f6b03c68c4b8c0",
     ),
-    "test_tall.png": (64, 128, "a657cc74e9556d2fbc1b830dfca9ccd16f5f0cebf2ba2710798aa98c3964f15d"),
-    "test_wide.png": (128, 64, "480c126873b7a4b24d766d210db0f182e87cfbc92ff58d2c35f30c2b55f9caa6"),
+    "test_tall.png": (
+        64,
+        128,
+        "a657cc74e9556d2fbc1b830dfca9ccd16f5f0cebf2ba2710798aa98c3964f15d",
+    ),
+    "test_wide.png": (
+        128,
+        64,
+        "480c126873b7a4b24d766d210db0f182e87cfbc92ff58d2c35f30c2b55f9caa6",
+    ),
     "solid_100x200_green.png": (
         100,
         200,
@@ -263,7 +280,10 @@ def test_fixture_pixels_and_metadata_survive_regeneration(
                 assert table[name] == identifier
                 rect = read_mapping(sprite["rect"])
                 x, y = cast("int", rect["x"]), cast("int", rect["y"])
-                cell_width, cell_height = cast("int", rect["width"]), cast("int", rect["height"])
+                cell_width, cell_height = (
+                    cast("int", rect["width"]),
+                    cast("int", rect["height"]),
+                )
                 assert 0 < cell_width <= width
                 assert 0 < cell_height <= height
                 assert 0 <= x <= width - cell_width
@@ -295,6 +315,62 @@ def test_competing_metadata_creation_preserves_winner(tmp_path: Path) -> None:
         outcomes = list(executor.map(write, range(32)))
     assert sum(outcomes) == 1
     assert path.read_text(encoding="utf-8") == str(outcomes.index(True))
+
+
+def test_failed_metadata_encoding_leaves_no_destination_or_temporary_file(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "fixture.png.meta"
+    with pytest.raises(UnicodeEncodeError):
+        write_metadata(path, "prefix\n\ud800")
+    assert list(tmp_path.iterdir()) == []
+    assert write_metadata(path, "complete\n")
+    assert path.read_bytes() == b"complete\r\n"
+
+
+@pytest.mark.parametrize("phase", ["write", "close", "publish"])
+def test_failed_metadata_io_leaves_no_destination_or_temporary_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, phase: str
+) -> None:
+    path = tmp_path / "fixture.png.meta"
+    original_factory = tempfile.NamedTemporaryFile
+
+    def failing_stream(**_parameters: object) -> object:
+        stream = original_factory(
+            mode="w", encoding="utf-8", newline="\r\n", dir=tmp_path, delete=False
+        )
+        original_write, original_close = stream.write, stream.close
+
+        def fail_write(content: str) -> int:
+            original_write(content[:3])
+            raise OSError("synthetic metadata write failure")
+
+        def fail_close() -> None:
+            original_close()
+            raise OSError("synthetic metadata close failure")
+
+        monkeypatch.setattr(
+            stream,
+            "write" if phase == "write" else "close",
+            fail_write if phase == "write" else fail_close,
+        )
+        return stream
+
+    def fail_publish(source: Path, destination: Path) -> None:
+        assert source.read_bytes() == b"complete\r\n"
+        assert destination == path
+        raise OSError("synthetic metadata publish failure")
+
+    with monkeypatch.context() as faults:
+        if phase == "publish":
+            faults.setattr(os, "link", fail_publish)
+        else:
+            faults.setattr(tempfile, "NamedTemporaryFile", failing_stream)
+        with pytest.raises(OSError, match=f"synthetic metadata {phase} failure"):
+            write_metadata(path, "complete\n")
+        assert list(tmp_path.iterdir()) == []
+    assert write_metadata(path, "complete\n")
+    assert path.read_bytes() == b"complete\r\n"
 
 
 @pytest.mark.parametrize("kind", ["sprites", "textures"])

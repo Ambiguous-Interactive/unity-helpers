@@ -72,6 +72,8 @@ run the bootstrap and locked sync above before these developer entry points.
 Image fixture generators use the locked `fixtures` dependency group. They keep existing `.meta`
 files byte for byte, including asset GUIDs and sprite IDs. Missing metadata is created once;
 competing creators preserve the first file. Pixel output remains the same on repeated runs.
+New metadata is published with a hard link after its temporary file closes. Unsupported filesystems
+report an error and leave the destination absent; failed writes do not leave a partial metadata file.
 Use `--output-dir` to generate an isolated fixture set:
 
 ```bash
@@ -339,8 +341,9 @@ uv pip install --python .venv/bin/python -r requirements-docs.lock
 | Optional local hooks and Unity/result helpers | No Python packages installed by hooks                 | Existing interpreter or optional yamllint tool                      | Hooks call `yamllint` when available; helper scripts call `python3`                                                         |
 
 Release, metadata, binary-check, feedback, wiki, changelog, and XML-summary commands use the shared locked uv project.
-The asset fixture generators and some inline Unity/result helpers remain legacy entry points;
-see the explicit migration inventory in `scripts/python~/pyproject.toml`. The old
+The asset fixture generators use its `fixtures` group, and the bounded-random proof uses its `proof` group.
+Every Python source is in strict scope; PowerShell, Bash, JavaScript, and inline workflow implementations
+still need migration. The old
 `requirements-wiki.in` and `requirements-wiki.txt` remain compatibility inputs for existing
 standalone environments; current wiki CI uses the shared uv lock.
 
@@ -348,7 +351,7 @@ Earlier installer comparisons measured the bootstrap costs. On Python 3.11, fres
 warm caches gave documentation installs of 8.66/5.90 seconds with pip and 5.42/0.15 seconds
 with uv. Pytest took 1.26/0.85 seconds with pip and 0.35/0.04 seconds with uv; Z3 took
 2.94/0.76 seconds with pip and 2.20/0.04 seconds with uv. Bootstrapping pinned uv itself
-with pip took another 3.57/0.99 seconds. The bounded-random proof still uses pip. Wiki CI now uses the shared uv project; these
+with pip took another 3.57/0.99 seconds. Wiki CI and the bounded-random proof now use the shared uv project; these
 historical install measurements do not describe its current end-to-end runtime.
 
 To update Python dependencies, edit the direct constraints, then regenerate the locks with
