@@ -10,7 +10,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     using System.Runtime.CompilerServices;
     using Extension;
     using Helper;
-    using Tags;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Utils;
 
@@ -21,6 +20,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     /// <remarks>
     /// <para>
     /// Unsupported field types are left unchanged with a warning; other fields continue binding.
+    /// Binding uses live field declarations even when the serialized metadata cache is stale or incomplete.
     /// Field access shares cached object delegates with the initializer and falls back to reflection
     /// when dynamic code is unavailable, without closing generic accessors for consumer field types.
     /// Used by <see cref="ParentComponentAttribute"/>, <see cref="SiblingComponentAttribute"/>, and
@@ -144,125 +144,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         internal static FieldMetadata<TAttribute>[] GetFieldMetadata<TAttribute>(Type componentType)
             where TAttribute : BaseRelationalComponentAttribute
         {
-            AttributeMetadataCache cache = AttributeMetadataCache.Instance;
-            AttributeMetadataCache.RelationalAttributeKind targetKind =
-                GetRelationalKind<TAttribute>();
-
-            if (
-                cache != null
-                && cache.TryGetRelationalFields(
-                    componentType,
-                    out AttributeMetadataCache.RelationalFieldMetadata[] cachedFields
-                )
-            )
-            {
-                using PooledResource<List<FieldMetadata<TAttribute>>> resultBuffer = Buffers<
-                    FieldMetadata<TAttribute>
-                >.List.Get(out List<FieldMetadata<TAttribute>> result);
-
-                // Private base and derived fields can share a name; only live FieldInfo identifies the declaration.
-                using PooledResource<HashSet<string>> namesLease = Buffers<string>.HashSet.Get(
-                    out HashSet<string> namesForKind
-                );
-                foreach (AttributeMetadataCache.RelationalFieldMetadata cachedField in cachedFields)
-                {
-                    if (cachedField.attributeKind == targetKind)
-                    {
-                        namesForKind.Add(cachedField.fieldName);
-                    }
-                }
-
-                foreach (
-                    FieldInfo field in ReflectionHelpers.GetInstanceFieldsIncludingBaseTypes(
-                        componentType
-                    )
-                )
-                {
-                    if (!namesForKind.Contains(field.Name))
-                    {
-                        continue;
-                    }
-
-                    if (!field.IsAttributeDefined(out TAttribute attribute, inherit: false))
-                    {
-                        continue;
-                    }
-
-                    if (
-                        !TryGetFieldKind(
-                            field.FieldType,
-                            out FieldKind kind,
-                            out Type resolvedElementType
-                        )
-                    )
-                    {
-                        LogUnsupportedField(field);
-                        continue;
-                    }
-
-                    Func<int, Array> arrayCreator = null;
-                    Func<int, IList> listCreator = null;
-                    Func<int, object> hashSetCreator = null;
-                    Action<object, object> hashSetAdder = null;
-                    Action<object> hashSetClearer = null;
-
-                    switch (kind)
-                    {
-                        case FieldKind.Array:
-                            arrayCreator = ReflectionHelpers.GetArrayCreator(resolvedElementType);
-                            break;
-                        case FieldKind.List:
-                            listCreator = ReflectionHelpers.GetListWithCapacityCreator(
-                                resolvedElementType
-                            );
-                            break;
-                        case FieldKind.HashSet:
-                            hashSetCreator = ReflectionHelpers.GetHashSetWithCapacityCreator(
-                                resolvedElementType
-                            );
-                            hashSetAdder = ReflectionHelpers.GetHashSetAdder(resolvedElementType);
-                            hashSetClearer = ReflectionHelpers.GetHashSetClearer(
-                                resolvedElementType
-                            );
-                            break;
-                    }
-
-                    bool isInterface =
-                        resolvedElementType != null
-                        && (
-                            resolvedElementType.IsInterface
-                            || (
-                                !resolvedElementType.IsSealed
-                                && (
-                                    resolvedElementType != typeof(Component)
-                                    || !attribute.AllowInterfaces
-                                )
-                            )
-                        );
-
-                    FilterParameters filters = new(attribute);
-
-                    result.Add(
-                        new FieldMetadata<TAttribute>(
-                            field,
-                            attribute,
-                            filters,
-                            CreateFieldAccessor(componentType, field),
-                            kind,
-                            resolvedElementType,
-                            arrayCreator,
-                            listCreator,
-                            hashSetCreator,
-                            hashSetAdder,
-                            hashSetClearer,
-                            isInterface
-                        )
-                    );
-                }
-
-                return result.ToArray();
-            }
-
             FieldInfo[] fields = ReflectionHelpers.GetInstanceFieldsIncludingBaseTypes(
                 componentType
             );
@@ -732,21 +613,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             return buffer;
         }
 
-        private static FieldKind MapFieldKind(AttributeMetadataCache.FieldKind cacheKind)
-        {
-            return cacheKind switch
-            {
-#pragma warning disable CS0618
-                AttributeMetadataCache.FieldKind.None => FieldKind.Single,
-#pragma warning restore CS0618
-                AttributeMetadataCache.FieldKind.Single => FieldKind.Single,
-                AttributeMetadataCache.FieldKind.Array => FieldKind.Array,
-                AttributeMetadataCache.FieldKind.List => FieldKind.List,
-                AttributeMetadataCache.FieldKind.HashSet => FieldKind.HashSet,
-                _ => FieldKind.Single,
-            };
-        }
-
         private static void LogUnsupportedField(FieldInfo field)
         {
             Debug.LogWarning(
@@ -762,31 +628,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             }
 
             return new RelationalFieldAccessor(field);
-        }
-
-        private static AttributeMetadataCache.RelationalAttributeKind GetRelationalKind<TAttribute>()
-            where TAttribute : BaseRelationalComponentAttribute
-        {
-            Type attributeType = typeof(TAttribute);
-
-            if (attributeType == typeof(ParentComponentAttribute))
-            {
-                return AttributeMetadataCache.RelationalAttributeKind.Parent;
-            }
-            else if (attributeType == typeof(ChildComponentAttribute))
-            {
-                return AttributeMetadataCache.RelationalAttributeKind.Child;
-            }
-            else if (attributeType == typeof(SiblingComponentAttribute))
-            {
-                return AttributeMetadataCache.RelationalAttributeKind.Sibling;
-            }
-
-#pragma warning disable CS0618
-
-            return AttributeMetadataCache.RelationalAttributeKind.Unknown;
-
-#pragma warning restore CS0618
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

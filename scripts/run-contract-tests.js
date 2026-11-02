@@ -29,6 +29,16 @@ const { runChecks, runRegistry } = require("./check-runner");
 /** A check whose `run` is executed with `bash -c` from the repository root. */
 const CHECKS = [
   {
+    id: "bounded-sampling-parser",
+    name: "Typed production arithmetic parser",
+    run: "npm run test:bounded-sampling"
+  },
+  {
+    id: "fixture-assets",
+    name: "Image fixture pixels and Unity identities",
+    run: "npm run test:fixture-assets"
+  },
+  {
     id: "meta-generation",
     name: "Unity metadata historical importer contracts",
     run: "npm run test:meta-generation"

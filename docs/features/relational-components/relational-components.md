@@ -412,7 +412,8 @@ Relational fields support components, interfaces, and one-dimensional arrays, `L
 - Call in `Awake()` or `OnEnable()` so references exist early
 - Prefer selective calls (`AssignSibling/Parent/Child`) when you only use one category
 - Use `MaxDepth` to cap traversal cost in deep trees
-- Use `MaxCount` to reduce allocations when you only need a subset. Assignment excludes missing-script and destroyed query entries before this limit in every collection shape, including searches without other filters.
+- Binding and explicit prewarming use the live field declarations. An empty, partial, or stale serialized metadata cache cannot hide newly added fields or change their relation. Private base and derived fields remain separate even when they share a name.
+- Use `MaxCount` to reduce allocations when you only need a subset. Assignment excludes missing-script and destroyed query entries before this limit in every collection shape, including parent and sibling searches for nonsealed base types such as `MonoBehaviour` without other filters.
 - Mark non-critical references `Optional = true` to avoid noise
 
 ## Explicit Initialization (Prewarm)
@@ -433,9 +434,10 @@ void Start()
 
 Notes:
 
-- Uses AttributeMetadataCache when available, with reflection fallback per type if not cached.
+- Warms the live declarations and the same cached accessors and collection factories used by assignment. Stale or incomplete serialized metadata cannot hide a field.
 - Field access shares the initializer's cached delegates. On AOT platforms it uses reflection without creating a closed generic accessor for every consumer field type; private and inherited fields retain their declared types.
-- Logs warnings for missing fields/types and logs errors for unexpected exceptions; processing continues.
+- Counts unsupported relational field declarations as warnings and skips them. An unexpected exception stops warming that type, counts as an error, and processing continues with the next type.
+- The default scan visits every loaded Component type, including engine and third-party types. It can add substantial startup work in a large project; schedule it during loading and measure on each target backend.
 - Scope the work by providing specific types: `RelationalComponentInitializer.Initialize(new[]{ typeof(MyComponent) });`
 - To auto‑prewarm on app load, enable the toggle on the AttributeMetadataCache asset: “Prewarm Relational On Load”.
 
@@ -673,7 +675,7 @@ Common pitfalls and how to avoid them
 
 - "No such registration … RelationalComponentEntryPoint": You're resolving in a plain container without `LifetimeScope`. Construct the entry point manually as shown above.
 - Optional integrations don't compile: Ensure the scripting define symbols are present. UPM adds them automatically via `versionDefines`; manual imports require adding them in Player Settings.
-- Fields remain null in tests: Ensure your test `AttributeMetadataCache` has the relational metadata for your test component types and that the DI container uses the same cache instance (register it and prefer constructors that accept the cache).
+- Fields remain null in tests: Create the required components on the expected hierarchy, then run the DI initialization entry point after that hierarchy is ready. An incomplete `AttributeMetadataCache` cannot hide live fields.
 
 ---
 

@@ -59,6 +59,7 @@ npm run test:asmdef
 npm run test:protobuf-candidate
 npm run test:native-debugger-download
 npm run test:meta-generation
+npm run test:fixture-assets
 npm run meta:generate -- Runtime/Example.cs
 uv run --project scripts/python~ --locked --no-dev python scripts/unity/create_unitypackage.py --output .artifacts/release/local.unitypackage
 uv run --project scripts/python~ --locked --no-dev python scripts/unity/stage_unitypackage.py --project-dir .artifacts/unity/local-export
@@ -67,6 +68,18 @@ uv run --project scripts/python~ --locked --no-dev python scripts/unity/stage_un
 `lint:repo`, `validate:local`, `validate:tests:fast`, `validate:tests:hook-regressions`, and
 `test:agent-preflight` require uv, including the metadata parity check. Outside the devcontainer,
 run the bootstrap and locked sync above before these developer entry points.
+
+Image fixture generators use the locked `fixtures` dependency group. They keep existing `.meta`
+files byte for byte, including asset GUIDs and sprite IDs. Missing metadata is created once;
+competing creators preserve the first file. Pixel output remains the same on repeated runs.
+New metadata is published with a hard link after its temporary file closes. Unsupported filesystems
+report an error and leave the destination absent; failed writes do not leave a partial metadata file.
+Use `--output-dir` to generate an isolated fixture set:
+
+```bash
+uv run --project scripts/python~ --locked --no-dev --group fixtures python scripts/generate-test-sprites.py --output-dir .artifacts/sprites
+uv run --project scripts/python~ --locked --no-dev --group fixtures python scripts/generate-test-textures.py --extended --output-dir .artifacts/textures
+```
 
 Repository lint and contract execution share `scripts/check_runner.py`. Existing Node entry points
 retain their importable interfaces and delegate process execution, concurrency, selection, and
@@ -86,6 +99,13 @@ is required; uv can provision a compatible interpreter. The environment lives un
 folder. The release CLI still accepts `--output`; staging still accepts `--project-dir` and
 `UNITY_VERSION`, with the same safe scratch-directory restrictions. Invalid framework and module policies fail
 before an existing export project is removed. Archive checksums support UTF-8 output filenames.
+
+All repository Python sources now belong to the strict scope, including the standard-library-only
+agent-state tool that runs before uv is available during container startup. The source registry
+also covers Python stubs. The bounded-random proof uses the locked `proof` group and a narrow
+stub for the public Z3 API it uses. Z3 comparisons return symbolic formulas; their stub return
+types state that behavior explicitly. Production arithmetic is parsed with a closed Python AST
+grammar rather than evaluated as Python code.
 
 The lockfile pins Ruff, mypy, Pyright, pytest, and their dependencies. `lint:python` checks Ruff
 formatting and correctness rules plus both type checkers in strict mode. Function signatures must
@@ -312,17 +332,18 @@ uv pip install --python .venv/bin/python -r requirements-docs.lock
 .venv/bin/mkdocs build --strict
 ```
 
-| Python path                                   | Dependency source                                     | Installer and cache                                                 | Invocation                                                                                                          |
-| --------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Documentation validation and Pages deployment | `requirements-docs.lock` from `requirements-docs.txt` | Pinned uv; `setup-python` caches the pip bootstrap wheel            | `mkdocs build --strict`                                                                                             |
-| Wiki validation and generation                | `scripts/python~/uv.lock`                             | Pinned uv; the shared project installs test tools only for tests    | `uv run --project scripts/python~ --locked pytest scripts/wiki/test_wiki_scripts.py -v`; generation uses `--no-dev` |
-| Local Gates bounded-random proof              | `requirements-random-quality.txt`                     | pip cache from `setup-python`                                       | `python3 scripts/random-quality/verify-bounded-sampling.py`                                                         |
-| Dev container image                           | `.devcontainer/requirements-tools.txt`                | Pinned uv installs yamllint and pinned MCP tools; pip bootstraps uv | Tools run from the image, not during hooks                                                                          |
-| Optional local hooks and Unity/result helpers | No Python packages installed by hooks                 | Existing interpreter or optional yamllint tool                      | Hooks call `yamllint` when available; helper scripts call `python3`                                                 |
+| Python path                                   | Dependency source                                     | Installer and cache                                                 | Invocation                                                                                                                  |
+| --------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Documentation validation and Pages deployment | `requirements-docs.lock` from `requirements-docs.txt` | Pinned uv; `setup-python` caches the pip bootstrap wheel            | `mkdocs build --strict`                                                                                                     |
+| Wiki validation and generation                | `scripts/python~/uv.lock`                             | Pinned uv; the shared project installs test tools only for tests    | `uv run --project scripts/python~ --locked pytest scripts/wiki/test_wiki_scripts.py -v`; generation uses `--no-dev`         |
+| Local Gates bounded-random proof              | `scripts/python~/uv.lock`                             | locked uv environment                                               | `uv run --project scripts/python~ --locked --no-dev --group proof python scripts/random-quality/verify-bounded-sampling.py` |
+| Dev container image                           | `.devcontainer/requirements-tools.txt`                | Pinned uv installs yamllint and pinned MCP tools; pip bootstraps uv | Tools run from the image, not during hooks                                                                                  |
+| Optional local hooks and Unity/result helpers | No Python packages installed by hooks                 | Existing interpreter or optional yamllint tool                      | Hooks call `yamllint` when available; helper scripts call `python3`                                                         |
 
 Release, metadata, binary-check, feedback, wiki, changelog, and XML-summary commands use the shared locked uv project.
-The asset fixture generators and some inline Unity/result helpers remain legacy entry points;
-see the explicit migration inventory in `scripts/python~/pyproject.toml`. The old
+The asset fixture generators use its `fixtures` group, and the bounded-random proof uses its `proof` group.
+Every Python source is in strict scope; PowerShell, Bash, JavaScript, and inline workflow implementations
+still need migration. The old
 `requirements-wiki.in` and `requirements-wiki.txt` remain compatibility inputs for existing
 standalone environments; current wiki CI uses the shared uv lock.
 
@@ -330,7 +351,7 @@ Earlier installer comparisons measured the bootstrap costs. On Python 3.11, fres
 warm caches gave documentation installs of 8.66/5.90 seconds with pip and 5.42/0.15 seconds
 with uv. Pytest took 1.26/0.85 seconds with pip and 0.35/0.04 seconds with uv; Z3 took
 2.94/0.76 seconds with pip and 2.20/0.04 seconds with uv. Bootstrapping pinned uv itself
-with pip took another 3.57/0.99 seconds. The bounded-random proof still uses pip. Wiki CI now uses the shared uv project; these
+with pip took another 3.57/0.99 seconds. Wiki CI and the bounded-random proof now use the shared uv project; these
 historical install measurements do not describe its current end-to-end runtime.
 
 To update Python dependencies, edit the direct constraints, then regenerate the locks with

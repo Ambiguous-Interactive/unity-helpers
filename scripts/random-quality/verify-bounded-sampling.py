@@ -7,11 +7,15 @@ AbstractRandom.cs; unsupported source syntax fails instead of proving a stale mu
 
 # cspell:words cout endl unsat BitVec BitVecVal ULE
 
+from __future__ import annotations
+
 import argparse
+import ast
 import contextlib
 import io
 import pathlib
 import re
+import shutil
 import subprocess
 import tempfile
 
@@ -65,7 +69,7 @@ int main() {
 """
 
 
-def prove(name, counterexample, *assumptions):
+def prove(name: str, counterexample: z3.BoolRef, *assumptions: z3.BoolRef) -> None:
     solver = z3.Solver()
     solver.set(timeout=60000)
     solver.add(*assumptions, counterexample)
@@ -77,20 +81,45 @@ def prove(name, counterexample, *assumptions):
     print(f"proved {name}", flush=True)
 
 
-def production_multiply_high(source):
-    match = re.search(
-        r"private static ulong MulHi64\(ulong x, ulong y\)\s*\{([^}]+)\}", source
-    )
+def evaluate_expression(node: ast.expr, variables: dict[str, z3.BitVecRef]) -> z3.BitVecRef | int:
+    if isinstance(node, ast.Name) and node.id in variables:
+        return variables[node.id]
+    if isinstance(node, ast.Constant) and type(node.value) is int:
+        return node.value
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add | ast.Mult):
+        first = evaluate_expression(node.left, variables)
+        second = evaluate_expression(node.right, variables)
+        return first + second if isinstance(node.op, ast.Add) else first * second
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and not node.keywords:
+        if node.func.id == "narrow" and len(node.args) == 1:
+            value = evaluate_expression(node.args[0], variables)
+            if isinstance(value, z3.BitVecRef):
+                return value & z3.BitVecVal(0xFFFFFFFF, 64)
+        elif node.func.id == "shift" and len(node.args) == 2:
+            value = evaluate_expression(node.args[0], variables)
+            count = evaluate_expression(node.args[1], variables)
+            if isinstance(value, z3.BitVecRef) and isinstance(count, int):
+                return z3.LShR(value, count)
+    raise AssertionError("Unsupported production expression syntax")
+
+
+def production_multiply_high(
+    source: str,
+) -> tuple[dict[str, z3.BitVecRef], dict[str, z3.BitVecRef], z3.BitVecRef]:
+    match = re.search(r"private static ulong MulHi64\(ulong x, ulong y\)\s*\{([^}]+)\}", source)
     if match is None:
         raise AssertionError("Production MulHi64 body was not found")
     variables = {name: z3.BitVec(name, 64) for name in ("x", "y")}
-    partials = {}
+    partials: dict[str, z3.BitVecRef] = {}
     for statement in match[1].strip().split(";"):
         statement = statement.strip()
         if not statement:
             continue
         if statement.startswith("return "):
-            return variables, partials, variables[statement[7:].strip()]
+            result_name = statement[7:].strip()
+            if result_name not in variables:
+                raise AssertionError("Unsupported production return expression")
+            return variables, partials, variables[result_name]
         declaration = re.fullmatch(r"ulong (\w+) = (.+)", statement)
         if declaration is None:
             raise AssertionError(f"Unsupported production statement: {statement}")
@@ -99,21 +128,16 @@ def production_multiply_high(source):
         expression = re.sub(r"(\w+) >> (\d+)", r"shift(\1, \2)", expression)
         if not re.fullmatch(r"[\w\s()+*,]+", expression):
             raise AssertionError(f"Unsupported production expression: {expression}")
-        variables[name] = eval(
-            expression,
-            {"__builtins__": {}},
-            {
-                **variables,
-                "narrow": lambda value: value & z3.BitVecVal(0xFFFFFFFF, 64),
-                "shift": z3.LShR,
-            },
-        )
+        evaluated = evaluate_expression(ast.parse(expression, mode="eval").body, variables)
+        if not isinstance(evaluated, z3.BitVecRef):
+            raise AssertionError("Production declaration must produce an unsigned word")
+        variables[name] = evaluated
         if name in ("p00", "p01", "p10", "p11"):
             partials[name] = variables[name]
     raise AssertionError("Production MulHi64 return was not found")
 
 
-def proofs():
+def proofs() -> None:
     for width in (8, 16, 32, 64):
         bound = z3.BitVec(f"bound{width}", width)
         word = z3.BitVec(f"word{width}", width)
@@ -127,15 +151,13 @@ def proofs():
         # Widened unsigned multiplication cannot reach bound * 2**width.
         # State its monotonic premise over integer operands; no bit-vector
         # multiplication solver is asked to rediscover nonlinear arithmetic.
-        integer_word, integer_bound = z3.Ints(
-            f"integer_word{width} integer_bound{width}"
-        )
+        integer_word, integer_bound = z3.Ints(f"integer_word{width} integer_bound{width}")
         prove(
             f"result bounds {width}",
             integer_word * integer_bound / (1 << width) >= integer_bound,
-            0 <= integer_word,
+            integer_word >= 0,
             integer_word < 1 << width,
-            0 < integer_bound,
+            integer_bound > 0,
             integer_bound < 1 << width,
         )
         prove(
@@ -150,12 +172,12 @@ def proofs():
     prove(
         "threshold remainder",
         ((1 << 64) - divisor) % divisor != (1 << 64) % divisor,
-        0 < divisor,
+        divisor > 0,
     )
     production_proofs((ROOT / "Runtime/Core/Random/AbstractRandom.cs").read_text())
 
 
-def production_proofs(source):
+def production_proofs(source: str) -> None:
     variables, partials, actual = production_multiply_high(source)
     x, y = variables["x"], variables["y"]
     expected_limbs = {
@@ -199,12 +221,11 @@ def production_proofs(source):
     expanded = x0 * y0 + (x0 * y1 + x1 * y0) * (1 << 32) + x1 * y1 * (1 << 64)
     prove(
         "limb product identity",
-        z3.simplify((x0 + x1 * (1 << 32)) * (y0 + y1 * (1 << 32)) - expanded, som=True)
-        != 0,
+        z3.simplify((x0 + x1 * (1 << 32)) * (y0 + y1 * (1 << 32)) - expanded, som=True) != 0,
     )
 
 
-def production_mutants():
+def production_mutants() -> None:
     source = (ROOT / "Runtime/Core/Random/AbstractRandom.cs").read_text()
     mutants = (
         ("partial product", "ulong p00 = x0 * y0;", "ulong p00 = x0 * y0 + 1;"),
@@ -225,7 +246,7 @@ def production_mutants():
             raise AssertionError(f"Production mutant survived: {name}")
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--proofs-only", action="store_true")
     args = parser.parse_args()
@@ -237,12 +258,15 @@ def main():
             source = pathlib.Path(directory) / "exhaustive.cpp"
             executable = pathlib.Path(directory) / "exhaustive"
             source.write_text(EXHAUSTIVE)
-            subprocess.run(
-                ["c++", "-std=c++17", "-O3", str(source), "-o", str(executable)],
+            compiler = shutil.which("c++")
+            if compiler is None:
+                raise RuntimeError("A C++17 compiler is required for the exhaustive control")
+            subprocess.run(  # noqa: S603 - fixed compiler, temporary source and output paths.
+                [compiler, "-std=c++17", "-O3", str(source), "-o", str(executable)],
                 check=True,
                 timeout=60,
             )
-            subprocess.run([str(executable)], check=True, timeout=60)
+            subprocess.run([str(executable)], check=True, timeout=60)  # noqa: S603 - the just-built fixed exhaustive control.
 
 
 if __name__ == "__main__":

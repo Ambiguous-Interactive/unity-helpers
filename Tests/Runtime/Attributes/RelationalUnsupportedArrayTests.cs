@@ -136,8 +136,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                         logSummary: false
                     );
                 Assert.That(report.Errors, Is.Zero);
-                Assert.That(report.Warnings, Is.EqualTo(precomputed ? 21 : 7));
-                Assert.That(report.FieldsWarmed, Is.EqualTo(precomputed ? 3 : 1));
+                Assert.That(report.Warnings, Is.EqualTo(7));
+                Assert.That(report.FieldsWarmed, Is.EqualTo(1));
                 Assert.That(report.TypesVisited, Is.EqualTo(1));
                 Assert.That(report.TypesWarmed, Is.EqualTo(1));
             }

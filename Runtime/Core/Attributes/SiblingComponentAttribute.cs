@@ -28,6 +28,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     /// Use optional filters to refine results: <see cref="BaseRelationalComponentAttribute.TagFilter"/> (by tag),
     /// <see cref="BaseRelationalComponentAttribute.NameFilter"/> (substring match on name), and
     /// <see cref="BaseRelationalComponentAttribute.IncludeInactive"/> (include disabled/inactive components).
+    /// Collection results exclude missing-script entries, including unfiltered MonoBehaviour and Behaviour searches.
     ///
     /// IMPORTANT: This attribute populates fields at runtime, not during Unity serialization in Edit mode.
     /// Fields populated by this attribute will not be serialized by Unity.
@@ -163,17 +164,13 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                                     components
                                 );
 
-                                int filteredCount =
-                                    !filters.RequiresPostProcessing
-                                    && metadata.attribute.MaxCount <= 0
-                                        ? components.Count
-                                        : FilterComponentsInPlace(
-                                            components,
-                                            filters,
-                                            metadata.attribute,
-                                            metadata.elementType,
-                                            metadata.isInterface
-                                        );
+                                int filteredCount = FilterComponentsInPlace(
+                                    components,
+                                    filters,
+                                    metadata.attribute,
+                                    metadata.elementType,
+                                    metadata.isInterface
+                                );
 
                                 metadata.SetValue(
                                     component,
@@ -198,17 +195,13 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                                     components
                                 );
 
-                                int filteredCount =
-                                    !filters.RequiresPostProcessing
-                                    && metadata.attribute.MaxCount <= 0
-                                        ? components.Count
-                                        : FilterComponentsInPlace(
-                                            components,
-                                            filters,
-                                            metadata.attribute,
-                                            metadata.elementType,
-                                            metadata.isInterface
-                                        );
+                                int filteredCount = FilterComponentsInPlace(
+                                    components,
+                                    filters,
+                                    metadata.attribute,
+                                    metadata.elementType,
+                                    metadata.isInterface
+                                );
 
                                 object existing = metadata.GetValue(component);
                                 if (existing is IList instance)
@@ -240,17 +233,13 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                                     components
                                 );
 
-                                int filteredCount =
-                                    !filters.RequiresPostProcessing
-                                    && metadata.attribute.MaxCount <= 0
-                                        ? components.Count
-                                        : FilterComponentsInPlace(
-                                            components,
-                                            filters,
-                                            metadata.attribute,
-                                            metadata.elementType,
-                                            metadata.isInterface
-                                        );
+                                int filteredCount = FilterComponentsInPlace(
+                                    components,
+                                    filters,
+                                    metadata.attribute,
+                                    metadata.elementType,
+                                    metadata.isInterface
+                                );
 
                                 object instance = metadata.GetValue(component);
                                 if (instance != null && metadata.hashSetClearer != null)

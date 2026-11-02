@@ -1,43 +1,43 @@
 """Revalidate a never-started workflow before the watchdog requests cancellation."""
 
+from __future__ import annotations
+
 import argparse
-import datetime
+import datetime as dt
 import json
 import subprocess
 from pathlib import Path
+from typing import cast
 
-OPERATOR_WORKFLOWS = frozenset(
-    {"release.yml", "unity-tests.yml", "unity-benchmarks.yml"}
-)
+OPERATOR_WORKFLOWS = frozenset({"release.yml", "unity-tests.yml", "unity-benchmarks.yml"})
 IDENTITY_FIELDS = ("id", "run_attempt", "head_sha", "path", "event", "workflow_id")
 
 
-def read_api(endpoint: str, *, paginate: bool = False):
+def read_api(endpoint: str, *, paginate: bool = False) -> object:
     command = ["gh", "api"]
     if paginate:
         command.extend(["--paginate", "--slurp"])
     command.append(endpoint)
-    result = subprocess.run(
-        command, check=True, capture_output=True, text=True, timeout=30
-    )
-    return json.loads(result.stdout)
+    result = subprocess.run(command, check=True, capture_output=True, text=True, timeout=30)  # noqa: S603 - fixed CI CLI, without a shell.
+    return cast("object", json.loads(result.stdout))
 
 
-def eligible_run(run, expected, run_id: int, minimum_age: int, now) -> bool:
+def eligible_run(
+    run: object, expected: object, run_id: int, minimum_age: int, now: dt.datetime
+) -> bool:
     if not isinstance(run, dict) or not isinstance(expected, dict):
         return False
-    if any(
-        field not in expected or run.get(field) != expected[field]
-        for field in IDENTITY_FIELDS
-    ):
+    run = cast("dict[str, object]", run)
+    expected = cast("dict[str, object]", expected)
+    if any(field not in expected or run.get(field) != expected[field] for field in IDENTITY_FIELDS):
         return False
     if (
         type(run.get("id")) is not int
         or run["id"] != run_id
         or type(run.get("run_attempt")) is not int
-        or run["run_attempt"] < 1
+        or cast("int", run["run_attempt"]) < 1
         or type(run.get("workflow_id")) is not int
-        or run["workflow_id"] < 1
+        or cast("int", run["workflow_id"]) < 1
         or not isinstance(run.get("head_sha"), str)
         or not run["head_sha"]
         or not isinstance(run.get("event"), str)
@@ -46,48 +46,45 @@ def eligible_run(run, expected, run_id: int, minimum_age: int, now) -> bool:
         or "conclusion" not in run
         or run["conclusion"] is not None
         or not isinstance(run.get("path"), str)
-        or not run["path"].startswith(".github/workflows/")
-        or run["path"].split("@", 1)[0].rsplit("/", 1)[-1] in OPERATOR_WORKFLOWS
+        or not cast("str", run["path"]).startswith(".github/workflows/")
+        or cast("str", run["path"]).split("@", 1)[0].rsplit("/", 1)[-1] in OPERATOR_WORKFLOWS
     ):
         return False
     started = run.get("run_started_at") or run.get("created_at")
     if not isinstance(started, str):
         return False
     try:
-        timestamp = datetime.datetime.fromisoformat(started)
-        return (
-            timestamp.tzinfo is not None
-            and (now - timestamp).total_seconds() >= minimum_age
-        )
+        timestamp = dt.datetime.fromisoformat(started)
+        return timestamp.tzinfo is not None and (now - timestamp).total_seconds() >= minimum_age
     except (ValueError, TypeError):
         return False
 
 
-def never_started_jobs(pages, run_id: int, *, run_attempt: int = 1) -> bool:
+def never_started_jobs(pages: object, run_id: int, *, run_attempt: int = 1) -> bool:
     if not isinstance(pages, list) or not pages:
         return False
-    jobs = []
-    total = None
-    for page in pages:
-        if not isinstance(page, dict) or not isinstance(page.get("jobs"), list):
+    jobs: list[object] = []
+    total: int | None = None
+    for raw_page in cast("list[object]", pages):
+        if not isinstance(raw_page, dict):
+            return False
+        page = cast("dict[str, object]", raw_page)
+        if not isinstance(page.get("jobs"), list):
             return False
         count = page.get("total_count")
-        if (
-            type(count) is not int
-            or count < 1
-            or (total is not None and count != total)
-        ):
+        if type(count) is not int or count < 1 or (total is not None and count != total):
             return False
         total = count
-        jobs.extend(page["jobs"])
+        jobs.extend(cast("list[object]", page["jobs"]))
     if len(jobs) != total:
         return False
-    seen = set()
-    for job in jobs:
-        if not isinstance(job, dict):
+    seen: set[int] = set()
+    for raw_job in jobs:
+        if not isinstance(raw_job, dict):
             return False
+        job = cast("dict[str, object]", raw_job)
         try:
-            created = datetime.datetime.fromisoformat(job.get("created_at", ""))
+            created = dt.datetime.fromisoformat(cast("str", job.get("created_at", "")))
             if created.tzinfo is None:
                 return False
         except (ValueError, TypeError):
@@ -106,9 +103,7 @@ def never_started_jobs(pages, run_id: int, *, run_attempt: int = 1) -> bool:
                 for field in ("completed_at", "conclusion")
             )
             or "started_at" not in job
-            or (
-                job["started_at"] is not None and job["started_at"] != job["created_at"]
-            )
+            or (job["started_at"] is not None and job["started_at"] != job["created_at"])
             or "runner_id" not in job
             or (
                 job["runner_id"] is not None
@@ -118,38 +113,50 @@ def never_started_jobs(pages, run_id: int, *, run_attempt: int = 1) -> bool:
             or job.get("steps") != []
             or not isinstance(job.get("labels"), list)
             or not job["labels"]
-            or any(not isinstance(label, str) or not label for label in job["labels"])
+            or any(
+                not isinstance(label, str) or not label
+                for label in cast("list[object]", job["labels"])
+            )
         ):
             return False
     return True
 
 
 def cancel_if_eligible(
-    repository: str, run_id: int, expected, expected_jobs, minimum_age: int
+    repository: str, run_id: int, expected: object, expected_jobs: object, minimum_age: int
 ) -> bool:
     endpoint = f"repos/{repository}/actions/runs/{run_id}"
-    now = datetime.datetime.now(datetime.UTC)
+    now = dt.datetime.now(dt.UTC)
     run = read_api(endpoint)
     if not eligible_run(run, expected, run_id, minimum_age, now):
         return False
-    if not isinstance(expected_jobs, list) or not never_started_jobs(
+    expected = cast("dict[str, object]", expected)
+    if not isinstance(expected_jobs, list):
+        return False
+    expected_jobs = cast("list[object]", expected_jobs)
+    if not never_started_jobs(
         [{"total_count": len(expected_jobs), "jobs": expected_jobs}],
         run_id,
-        run_attempt=expected["run_attempt"],
+        run_attempt=cast("int", expected["run_attempt"]),
     ):
         return False
     pages = read_api(f"{endpoint}/jobs?filter=latest&per_page=100", paginate=True)
-    if not never_started_jobs(pages, run_id, run_attempt=expected["run_attempt"]):
+    if not never_started_jobs(pages, run_id, run_attempt=cast("int", expected["run_attempt"])):
         return False
-    current_jobs = [job for page in pages for job in page["jobs"]]
-    if sorted(current_jobs, key=lambda job: job["id"]) != sorted(
-        expected_jobs, key=lambda job: job["id"]
+    current_jobs = [
+        job
+        for page in cast("list[dict[str, object]]", pages)
+        for job in cast("list[dict[str, object]]", page["jobs"])
+    ]
+    expected_jobs = cast("list[dict[str, object]]", expected_jobs)
+    if sorted(current_jobs, key=lambda job: cast("int", job["id"])) != sorted(
+        expected_jobs, key=lambda job: cast("int", job["id"])
     ):
         return False
     if not eligible_run(read_api(endpoint), expected, run_id, minimum_age, now):
         return False
-    subprocess.run(
-        ["gh", "run", "cancel", str(run_id), "--repo", repository],
+    subprocess.run(  # noqa: S603 - fixed runner CLI, with eligibility checked above.
+        ["gh", "run", "cancel", str(run_id), "--repo", repository],  # noqa: S607 - CI provisions gh.
         check=True,
         capture_output=True,
         text=True,
@@ -178,9 +185,7 @@ def main() -> int:
             expected_jobs,
             args.minimum_age_seconds,
         ):
-            print(
-                f"run {args.run_id}: cancellation accepted after fresh eligibility checks."
-            )
+            print(f"run {args.run_id}: cancellation accepted after fresh eligibility checks.")
             return 0
         print(
             f"run {args.run_id}: cancellation refused; licensed, progressed, changed or incomplete state needs operator review."

@@ -17,7 +17,17 @@ def verify_registry(repository: Path, files: list[str], legacy: list[str]) -> bo
         print("Git is required to inventory Python sources.", file=sys.stderr)
         return False
     result = subprocess.run(  # noqa: S603 - fixed read-only Git inventory.
-        [git, "ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", "*.py"],
+        [
+            git,
+            "ls-files",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+            "-z",
+            "--",
+            "*.py",
+            "*.pyi",
+        ],
         cwd=repository,
         capture_output=True,
         text=True,

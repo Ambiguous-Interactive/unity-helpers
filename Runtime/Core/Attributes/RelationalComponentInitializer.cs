@@ -9,7 +9,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
-    using WallstopStudios.UnityHelpers.Tags;
     using WallstopStudios.UnityHelpers.Utils;
 
     /// <summary>
@@ -19,9 +18,9 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     /// or, if none are provided, across all loaded <see cref="UnityEngine.Component"/> types.
     /// </summary>
     /// <remarks>
-    /// - Uses <see cref="AttributeMetadataCache"/> when available to avoid heavy reflection.
-    /// - Falls back to reflection-based discovery when a type is not present in the cache.
-    /// - Logs warnings and continues when individual fields or element types cannot be resolved.
+    /// - Uses live field declarations and the same cached accessors and factories as assignment.
+    /// - Includes fields missing from stale or incomplete serialized metadata.
+    /// - Reports unsupported fields and continues warming supported declarations.
     /// - Skips unsupported field types without creating their accessors or collection factories.
     /// - Call during a loading screen or bootstrap to eliminate first-use stalls.
     /// </remarks>
@@ -37,8 +36,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         public static Report Initialize(IEnumerable<Type> types = null, bool logSummary = true)
         {
             Report report = new();
-            AttributeMetadataCache cache = AttributeMetadataCache.Instance;
-
             IEnumerable<Type> targetTypes = types ?? EnumerateAllComponentTypes();
 
             foreach (Type type in targetTypes.AsValueEnumerableRequired())
@@ -52,7 +49,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
                 try
                 {
-                    int warmed = WarmType(type, cache, report);
+                    int warmed = WarmType(type, report);
                     report.AddTypeResult(type, warmed);
                 }
                 catch (Exception e)
@@ -85,239 +82,52 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             }
         }
 
-        private static int WarmType(Type componentType, AttributeMetadataCache cache, Report report)
+        private static int WarmType(Type componentType, Report report)
         {
-            AttributeMetadataCache.ResolvedRelationalFieldMetadata[] resolved = null;
-            bool usedCache =
-                cache != null && cache.TryGetResolvedRelationalFields(componentType, out resolved);
-
-            if (!usedCache)
-            {
-                resolved = DiscoverRelationalFieldsViaReflection(componentType);
-            }
-
-            if (resolved == null || resolved.Length == 0)
-            {
-                return 0;
-            }
-
-            // Warm field metadata as well as delegates so the first Awake does not rebuild accessors.
-            _ = SiblingComponentExtensions.GetOrCreateFields(componentType);
-            _ = ChildComponentExtensions.GetOrCreateFields(componentType);
-            _ = ParentComponentExtensions.GetOrCreateFields(componentType);
-
             int warmed = 0;
-
-            foreach (AttributeMetadataCache.ResolvedRelationalFieldMetadata fieldMeta in resolved)
+            bool hasRelationalFields = false;
+            foreach (
+                FieldInfo field in ReflectionHelpers.GetInstanceFieldsIncludingBaseTypes(
+                    componentType
+                )
+            )
             {
-                FieldInfo field = ReflectionHelpers.GetInstanceFieldIncludingBaseTypes(
-                    componentType,
-                    fieldMeta.FieldName
-                );
-
-                if (field == null)
+                if (
+                    !ReflectionHelpers.HasAttributeSafe<ParentComponentAttribute>(
+                        field,
+                        inherit: false
+                    )
+                    && !ReflectionHelpers.HasAttributeSafe<ChildComponentAttribute>(
+                        field,
+                        inherit: false
+                    )
+                    && !ReflectionHelpers.HasAttributeSafe<SiblingComponentAttribute>(
+                        field,
+                        inherit: false
+                    )
+                )
                 {
-                    ++report.Warnings;
-                    Debug.LogWarning(
-                        $"RelationalComponents.Initialize: Field '{fieldMeta.FieldName}' not found on '{componentType.FullName}'."
-                    );
                     continue;
                 }
 
-                if (!RelationalComponentProcessor.TryGetFieldKind(field.FieldType, out _, out _))
+                hasRelationalFields = true;
+                if (RelationalComponentProcessor.TryGetFieldKind(field.FieldType, out _, out _))
                 {
-                    ++report.Warnings;
-                    continue;
-                }
-
-                try
-                {
-                    _ = ReflectionHelpers.GetFieldGetter(field);
-                    _ = ReflectionHelpers.GetFieldSetter(field);
-
-                    Type elementType = fieldMeta.ElementType ?? InferElementType(field.FieldType);
-                    PrewarmCollectionCreators(fieldMeta.FieldKind, elementType);
-
                     ++warmed;
                 }
-                catch (Exception e)
+                else
                 {
-                    ++report.Errors;
-                    Debug.LogError(
-                        $"RelationalComponents.Initialize: Error warming field '{componentType.FullName}.{fieldMeta.FieldName}': {e}"
-                    );
+                    ++report.Warnings;
                 }
             }
 
+            if (hasRelationalFields)
+            {
+                _ = SiblingComponentExtensions.GetOrCreateFields(componentType);
+                _ = ChildComponentExtensions.GetOrCreateFields(componentType);
+                _ = ParentComponentExtensions.GetOrCreateFields(componentType);
+            }
             return warmed;
-        }
-
-        private static void PrewarmCollectionCreators(
-            AttributeMetadataCache.FieldKind kind,
-            Type elementType
-        )
-        {
-            if (elementType == null)
-            {
-                return;
-            }
-
-            switch (kind)
-            {
-                case AttributeMetadataCache.FieldKind.Array:
-                    _ = ReflectionHelpers.GetArrayCreator(elementType);
-                    break;
-                case AttributeMetadataCache.FieldKind.List:
-                    _ = ReflectionHelpers.GetListWithCapacityCreator(elementType);
-                    break;
-                case AttributeMetadataCache.FieldKind.HashSet:
-                    _ = ReflectionHelpers.GetHashSetWithCapacityCreator(elementType);
-                    _ = ReflectionHelpers.GetHashSetAdder(elementType);
-
-                    _ = ReflectionHelpers.GetHashSetClearer(elementType);
-                    break;
-            }
-        }
-
-        private static Type InferElementType(Type fieldType)
-        {
-            if (fieldType == null)
-            {
-                return null;
-            }
-            if (fieldType.IsArray)
-            {
-                return fieldType.GetElementType();
-            }
-            if (fieldType.IsGenericType)
-            {
-                Type g = fieldType.GetGenericTypeDefinition();
-                if (g == typeof(List<>))
-                {
-                    return fieldType.GenericTypeArguments[0];
-                }
-
-                if (g == typeof(HashSet<>))
-                {
-                    return fieldType.GenericTypeArguments[0];
-                }
-            }
-            return fieldType;
-        }
-
-        private static AttributeMetadataCache.ResolvedRelationalFieldMetadata[] DiscoverRelationalFieldsViaReflection(
-            Type componentType
-        )
-        {
-            FieldInfo[] fields = ReflectionHelpers.GetInstanceFieldsIncludingBaseTypes(
-                componentType
-            );
-            if (fields.Length == 0)
-            {
-                return Array.Empty<AttributeMetadataCache.ResolvedRelationalFieldMetadata>();
-            }
-
-            PooledResource<
-                List<AttributeMetadataCache.ResolvedRelationalFieldMetadata>
-            > resultLease = default;
-            List<AttributeMetadataCache.ResolvedRelationalFieldMetadata> result = null;
-            foreach (FieldInfo f in fields)
-            {
-                if (f == null)
-                {
-                    continue;
-                }
-
-                AttributeMetadataCache.RelationalAttributeKind kindMeta;
-
-                if (ReflectionHelpers.HasAttributeSafe<ParentComponentAttribute>(f, inherit: false))
-                {
-                    kindMeta = AttributeMetadataCache.RelationalAttributeKind.Parent;
-                }
-                else if (
-                    ReflectionHelpers.HasAttributeSafe<ChildComponentAttribute>(f, inherit: false)
-                )
-                {
-                    kindMeta = AttributeMetadataCache.RelationalAttributeKind.Child;
-                }
-                else if (
-                    ReflectionHelpers.HasAttributeSafe<SiblingComponentAttribute>(f, inherit: false)
-                )
-                {
-                    kindMeta = AttributeMetadataCache.RelationalAttributeKind.Sibling;
-                }
-                else
-                {
-                    continue;
-                }
-
-                AttributeMetadataCache.FieldKind fieldKindMeta = AttributeMetadataCache
-                    .FieldKind
-                    .Single;
-                Type elementType = null;
-
-                Type ft = f.FieldType;
-                if (ft.IsArray)
-                {
-                    fieldKindMeta = AttributeMetadataCache.FieldKind.Array;
-                    elementType = ft.GetElementType();
-                }
-                else if (ft.IsGenericType)
-                {
-                    Type g = ft.GetGenericTypeDefinition();
-                    if (g == typeof(List<>))
-                    {
-                        fieldKindMeta = AttributeMetadataCache.FieldKind.List;
-                        elementType = ft.GenericTypeArguments[0];
-                    }
-                    else if (g == typeof(HashSet<>))
-                    {
-                        fieldKindMeta = AttributeMetadataCache.FieldKind.HashSet;
-                        elementType = ft.GenericTypeArguments[0];
-                    }
-                    else
-                    {
-                        elementType = ft;
-                    }
-                }
-                else
-                {
-                    elementType = ft;
-                }
-
-                bool isInterface =
-                    elementType != null
-                    && (
-                        elementType.IsInterface
-                        || (!elementType.IsSealed && elementType != typeof(Component))
-                    );
-
-                if (result == null)
-                {
-                    resultLease =
-                        Buffers<AttributeMetadataCache.ResolvedRelationalFieldMetadata>.List.Get(
-                            out result
-                        );
-                }
-                result.Add(
-                    new AttributeMetadataCache.ResolvedRelationalFieldMetadata(
-                        f.Name,
-                        kindMeta,
-                        fieldKindMeta,
-                        elementType,
-                        isInterface
-                    )
-                );
-            }
-
-            if (result == null)
-            {
-                return Array.Empty<AttributeMetadataCache.ResolvedRelationalFieldMetadata>();
-            }
-
-            AttributeMetadataCache.ResolvedRelationalFieldMetadata[] array = result.ToArray();
-            resultLease.Dispose();
-            return array;
         }
 
         /// <summary>
@@ -331,10 +141,10 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             /// <summary>Types that had at least one relational field warmed.</summary>
             public int TypesWarmed { get; internal set; }
 
-            /// <summary>Total number of relational fields warmed.</summary>
+            /// <summary>Total supported relational field declarations warmed.</summary>
             public int FieldsWarmed { get; internal set; }
 
-            /// <summary>Non-fatal issues (e.g., missing fields/types) encountered.</summary>
+            /// <summary>Unsupported relational field declarations encountered.</summary>
             public int Warnings { get; internal set; }
 
             /// <summary>Fatal errors encountered while processing a type.</summary>

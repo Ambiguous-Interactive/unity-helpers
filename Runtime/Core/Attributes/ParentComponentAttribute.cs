@@ -32,6 +32,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     /// By default, searches include the current <see cref="GameObject"/>; set <see cref="OnlyAncestors"/> to exclude it.
     /// Limit traversal with <see cref="MaxDepth"/> (depth 1 = immediate parent only). Combine with filters like
     /// <see cref="BaseRelationalComponentAttribute.TagFilter"/> and <see cref="BaseRelationalComponentAttribute.NameFilter"/>.
+    /// Collection results exclude missing-script entries, including unfiltered MonoBehaviour and Behaviour searches.
     /// Interfaces and base types are supported when <see cref="BaseRelationalComponentAttribute.AllowInterfaces"/> is true (default).
     ///
     /// IMPORTANT: This attribute populates fields at runtime, not during Unity serialization in Edit mode.
@@ -241,17 +242,14 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                                     parentComponents
                                 );
 
-                                int filteredCount =
-                                    !filters.RequiresPostProcessing && field.attribute.MaxCount <= 0
-                                        ? parentComponents.Count
-                                        : FilterComponentsInPlace(
-                                            parentComponents,
-                                            filters,
-                                            field.attribute,
-                                            field.elementType,
-                                            field.isInterface,
-                                            filterDisabledComponents: false
-                                        );
+                                int filteredCount = FilterComponentsInPlace(
+                                    parentComponents,
+                                    filters,
+                                    field.attribute,
+                                    field.elementType,
+                                    field.isInterface,
+                                    filterDisabledComponents: false
+                                );
 
                                 field.SetValue(
                                     component,
@@ -292,17 +290,14 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                                     parentComponents
                                 );
 
-                                int filteredCount =
-                                    !filters.RequiresPostProcessing && field.attribute.MaxCount <= 0
-                                        ? parentComponents.Count
-                                        : FilterComponentsInPlace(
-                                            parentComponents,
-                                            filters,
-                                            field.attribute,
-                                            field.elementType,
-                                            field.isInterface,
-                                            filterDisabledComponents: false
-                                        );
+                                int filteredCount = FilterComponentsInPlace(
+                                    parentComponents,
+                                    filters,
+                                    field.attribute,
+                                    field.elementType,
+                                    field.isInterface,
+                                    filterDisabledComponents: false
+                                );
 
                                 if (field.GetValue(component) is IList instance)
                                 {
