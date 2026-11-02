@@ -173,7 +173,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
         [Test]
         public void SameNamedRelatedFieldsUseTheirOwnDeclaredElementTypes(
             [Values(0, 1, 2)] int direction,
-            [Values(0, 1, 2, 3, 4, 5)] int cacheMode,
+            [Values(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)] int cacheMode,
             [Values(0, 1, 2)] int capability
         )
         {
@@ -227,6 +227,43 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             }
         }
 
+        [Test]
+        public void PrewarmIncludesEveryLiveDeclarationWithStaleMetadata(
+            [Values(0, 1, 6, 7, 8, 9)] int cacheMode,
+            [Values(0, 1, 2)] int capability
+        )
+        {
+            using IDisposable scope = new ReflectionCapabilityScope(
+                capability == 0,
+                capability == 1
+            );
+            Lazy<AttributeMetadataCache> previous = AttributeMetadataCache._lazyInstance;
+            AttributeMetadataCache cache = cacheMode == 0 ? null : CreateCache(cacheMode);
+            AttributeMetadataCache._lazyInstance = new Lazy<AttributeMetadataCache>(() => cache);
+            ClearBindingCaches();
+            try
+            {
+                Type type = typeof(RelationalRelatedNameDerived);
+                RelationalComponentInitializer.Report report =
+                    RelationalComponentInitializer.Initialize(new[] { type }, logSummary: false);
+                Assert.AreEqual(1, report.TypesVisited);
+                Assert.AreEqual(1, report.TypesWarmed);
+                Assert.AreEqual(24, report.FieldsWarmed);
+                Assert.IsTrue(report.WarmedFieldsPerType.TryGetValue(type, out int warmedFields));
+                Assert.AreEqual(24, warmedFields);
+                Assert.AreEqual(0, report.Warnings);
+                Assert.AreEqual(0, report.Errors);
+                AssertSharedAccessors(SiblingComponentExtensions.GetOrCreateFields(type));
+                AssertSharedAccessors(ParentComponentExtensions.GetOrCreateFields(type));
+                AssertSharedAccessors(ChildComponentExtensions.GetOrCreateFields(type));
+            }
+            finally
+            {
+                AttributeMetadataCache._lazyInstance = previous;
+                ClearBindingCaches();
+            }
+        }
+
         private AttributeMetadataCache CreateCache(int cacheMode)
         {
             AttributeMetadataCache cache = CreateScriptableObject<AttributeMetadataCache>();
@@ -238,12 +275,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                 3 => new[] { typeof(BoxCollider) },
                 4 => new Type[] { null },
                 5 => new[] { typeof(BoxCollider), typeof(Collider) },
+                7 or 8 or 9 => new[] { typeof(Collider) },
                 _ => Array.Empty<Type>(),
             };
             for (int direction = 0; direction < Relationships.Length; ++direction)
             {
                 for (int shape = 0; shape < Shapes.Length; ++shape)
                 {
+                    if (cacheMode == 7 && shape != 0)
+                    {
+                        continue;
+                    }
                     string fieldName = RelationalRelatedNameBase.RelationalFieldNames[
                         direction * Shapes.Length + shape
                     ];
@@ -251,8 +293,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                     {
                         fields.Add(
                             new AttributeMetadataCache.RelationalFieldMetadata(
-                                fieldName,
-                                Relationships[direction],
+                                cacheMode == 9 ? fieldName + "Obsolete" : fieldName,
+                                Relationships[
+                                    cacheMode == 8
+                                        ? (direction + 1) % Relationships.Length
+                                        : direction
+                                ],
                                 Shapes[shape],
                                 elementType == null
                                     ? string.Empty
@@ -277,7 +323,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                     out AttributeMetadataCache.RelationalFieldMetadata[] cachedFields
                 )
             );
-            Assert.AreEqual(12 * elementTypes.Length, cachedFields.Length);
+            Assert.AreEqual(cacheMode == 7 ? 3 : 12 * elementTypes.Length, cachedFields.Length);
             return cache;
         }
     }

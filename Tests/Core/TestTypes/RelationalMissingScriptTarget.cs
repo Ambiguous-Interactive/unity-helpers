@@ -18,6 +18,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestTypes
         [SiblingComponent(Optional = true)]
         public HashSet<Component> siblingAllSet;
 
+        [SiblingComponent(Optional = true)]
+        public MonoBehaviour[] siblingBehaviourArray;
+
+        [SiblingComponent(Optional = true)]
+        public List<MonoBehaviour> siblingBehaviourList;
+
+        [SiblingComponent(Optional = true)]
+        public HashSet<MonoBehaviour> siblingBehaviourSet;
+
         [SiblingComponent(Optional = true, NameFilter = "")]
         public Component[] siblingFilteredArray;
 
@@ -53,6 +62,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestTypes
 
         [ParentComponent(Optional = true, OnlyAncestors = true)]
         public HashSet<Component> parentAllSet;
+
+        [ParentComponent(Optional = true, OnlyAncestors = true)]
+        public MonoBehaviour[] parentBehaviourArray;
+
+        [ParentComponent(Optional = true, OnlyAncestors = true)]
+        public List<MonoBehaviour> parentBehaviourList;
+
+        [ParentComponent(Optional = true, OnlyAncestors = true)]
+        public HashSet<MonoBehaviour> parentBehaviourSet;
 
         [ParentComponent(Optional = true, OnlyAncestors = true, NameFilter = "")]
         public Component[] parentFilteredArray;
@@ -98,6 +116,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestTypes
 
         [ChildComponent(Optional = true, OnlyDescendants = true)]
         public HashSet<Component> childAllSet;
+
+        [ChildComponent(Optional = true, OnlyDescendants = true)]
+        public MonoBehaviour[] childBehaviourArray;
+
+        [ChildComponent(Optional = true, OnlyDescendants = true)]
+        public List<MonoBehaviour> childBehaviourList;
+
+        [ChildComponent(Optional = true, OnlyDescendants = true)]
+        public HashSet<MonoBehaviour> childBehaviourSet;
 
         [ChildComponent(Optional = true, OnlyDescendants = true, NameFilter = "")]
         public Component[] childFilteredArray;

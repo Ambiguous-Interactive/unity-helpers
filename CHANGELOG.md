@@ -59,7 +59,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fix missing-script entries entering relational collections or consuming `MaxCount`; array, list and set bindings now agree across filtered and unfiltered searches ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
+- Fix stale metadata skipping relational fields and prewarming. Bindings now follow the live declarations, including private base and derived fields with the same name ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
+- Fix missing-script entries entering relational collections or consuming `MaxCount`; array, list and set bindings now agree across filtered and unfiltered searches, including parent and sibling `MonoBehaviour` collections ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
 - Fix relational field access to use the shared AOT-safe delegate cache for private, inherited, interface and collection fields ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
 - Fix type discovery throwing when a partial assembly load supplies no available-type array ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
 - Fix signed random samples reaching excluded maxima. Keep ordinary rejection fallbacks bounded and report exact-sampling failure through `Try` methods and weighted shuffle bags ([guide](./docs/features/utilities/random-generators.md), [#638](https://github.com/Ambiguous-Interactive/unity-helpers/issues/638)).

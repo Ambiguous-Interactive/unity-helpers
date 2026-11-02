@@ -30,10 +30,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             ReflectionHelpers.ClearFieldSetterCache();
         }
 
-        private static List<Component> LiveComponents(Component[] queried, Transform exclude)
+        private static List<T> LiveComponents<T>(T[] queried, Transform exclude)
+            where T : Component
         {
-            List<Component> expected = new();
-            foreach (Component candidate in queried)
+            List<T> expected = new();
+            foreach (T candidate in queried)
             {
                 if (candidate != null && candidate.transform != exclude)
                 {
@@ -43,13 +44,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             return expected;
         }
 
-        private static void AssertShapes(
-            List<Component> expected,
-            Component[] array,
-            List<Component> list,
-            HashSet<Component> set,
+        private static void AssertShapes<T>(
+            List<T> expected,
+            T[] array,
+            List<T> list,
+            HashSet<T> set,
             string label
         )
+            where T : Component
         {
             Assert.IsTrue(array != null, label);
             Assert.IsTrue(list != null, label);
@@ -129,6 +131,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                         "siblingAll"
                     );
                     AssertShapes(
+                        LiveComponents(target.GetComponents<MonoBehaviour>(), null),
+                        target.siblingBehaviourArray,
+                        target.siblingBehaviourList,
+                        target.siblingBehaviourSet,
+                        "siblingBehaviour"
+                    );
+                    AssertShapes(
                         siblings,
                         target.siblingFilteredArray,
                         target.siblingFilteredList,
@@ -155,6 +164,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                         target.parentAllList,
                         target.parentAllSet,
                         "parentAll"
+                    );
+                    AssertShapes(
+                        LiveComponents(
+                            target.transform.parent.GetComponentsInParent<MonoBehaviour>(true),
+                            null
+                        ),
+                        target.parentBehaviourArray,
+                        target.parentBehaviourList,
+                        target.parentBehaviourSet,
+                        "parentBehaviour"
                     );
                     AssertShapes(
                         parents,
@@ -190,6 +209,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                         target.childAllList,
                         target.childAllSet,
                         "childAll"
+                    );
+                    AssertShapes(
+                        LiveComponents(
+                            target.GetComponentsInChildren<MonoBehaviour>(true),
+                            target.transform
+                        ),
+                        target.childBehaviourArray,
+                        target.childBehaviourList,
+                        target.childBehaviourSet,
+                        "childBehaviour"
                     );
                     AssertShapes(
                         children,
