@@ -268,7 +268,7 @@ def entry() -> int:
     configure_output()
     if sys.argv[1:] == ["--api"]:
         try:
-            payload: object = json.load(sys.stdin)
+            payload: object = json.loads(sys.stdin.buffer.read().decode("utf-8"))
             print(json.dumps(api(payload), ensure_ascii=True))
             return 0
         except (OSError, ValueError) as error:

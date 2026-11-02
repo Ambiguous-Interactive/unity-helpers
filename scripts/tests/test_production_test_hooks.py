@@ -271,6 +271,23 @@ def test_node_imports_preserve_unicode_ranges_and_crlf() -> None:
     assert hooks.utf16_length(tokens.code) == hooks.utf16_length(source)
 
 
+@pytest.mark.parametrize("encoding", ["utf-8", "cp1252"])
+def test_api_input_uses_utf8_independent_of_console_encoding(encoding: str) -> None:
+    source = '/*漢字🦄*/ var x = "café🦄";\r\n'
+    request = {"action": "tokenize", "source": source}
+    result = subprocess.run(
+        [sys.executable, str(ROOT / "scripts/lint_production_test_hooks.py"), "--api"],
+        input=json.dumps(request, ensure_ascii=False).encode("utf-8"),
+        env={**os.environ, "PYTHONIOENCODING": encoding},
+        capture_output=True,
+        check=False,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
+    response: object = json.loads(result.stdout)
+    assert response == hooks.api(request)
+
+
 def test_node_analysis_and_path_imports() -> None:
     node = shutil.which("node")
     assert node is not None
