@@ -529,12 +529,14 @@ runTest("this repository's own typecheck projects are parsed, not silently skipp
     [
       "WallstopStudios.UnityHelpers.ConsumerMigration",
       "WallstopStudios.UnityHelpers.Tests.Core",
+      "WallstopStudios.UnityHelpers.Tests.OdinCompilerCallers",
+      "WallstopStudios.UnityHelpers.Tests.OdinCompilerTargets",
       "WallstopStudios.UnityHelpers.Tests.ProtoOnly",
       "WallstopStudios.UnityHelpers.Tests.Runtime",
       "WallstopStudios.UnityHelpers.Tests.Runtime.Performance",
       "WallstopStudios.UnityHelpers.Tests.Runtime.Random"
     ],
-    "the five PlayMode test asmdefs and ordinary consumer asmdef TestCheck compiles"
+    "the five PlayMode test asmdefs and three consumer asmdefs TestCheck compiles"
   );
 
   // The #616 half. TestCheck's list above stops at `Tests/Runtime`, which is exactly the hole
@@ -578,9 +580,11 @@ runTest("this repository's own typecheck projects are parsed, not silently skipp
       "WallstopStudios.UnityHelpers.Tests.Editor.WButton",
       "WallstopStudios.UnityHelpers.Tests.Editor.WGroup",
       "WallstopStudios.UnityHelpers.Tests.Editor.Windows",
+      "WallstopStudios.UnityHelpers.Tests.OdinCompilerCallers",
+      "WallstopStudios.UnityHelpers.Tests.OdinCompilerTargets",
       "WallstopStudios.UnityHelpers.Tests.Runtime"
     ],
-    "every EditMode test asmdef, plus the shared Tests/Core pair and the Tests/Runtime doubles"
+    "every EditMode test asmdef, plus shared helpers, consumer targets, and runtime doubles"
   );
   // `Tests.Editor.Sprites.PivotAdjuster` is absent on purpose: BOTH of its two fixtures set
   // `Texture2D.alphaIsTransparency`, an Editor-only UnityEngine member the player reference
