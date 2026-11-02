@@ -59,6 +59,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix reflection getters for constant and static fields, and interface property and indexer access when using dynamic IL ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
+- Fix relational prewarming reporting errors for open generic component bases while preserving inherited fields on closed types ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
 - Fix stale metadata skipping relational fields and prewarming. Bindings now follow the live declarations, including private base and derived fields with the same name ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
 - Fix missing-script entries entering relational collections or consuming `MaxCount`; array, list and set bindings now agree across filtered and unfiltered searches, including parent and sibling `MonoBehaviour` collections ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
 - Fix relational field access to use the shared AOT-safe delegate cache for private, inherited, interface and collection fields ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).

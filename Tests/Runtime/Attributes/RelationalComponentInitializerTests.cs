@@ -14,7 +14,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
-    public sealed class RelationalComponentInitializerTests
+    public sealed class RelationalComponentInitializerTests : CommonTestBase
     {
         private static bool CacheContainsField(string cache, FieldInfo field)
         {
@@ -33,6 +33,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             SiblingComponentExtensions.ClearCachedFieldMetadata();
             ChildComponentExtensions.ClearCachedFieldMetadata();
             ParentComponentExtensions.ClearCachedFieldMetadata();
+        }
+
+        [TearDown]
+        public void ClearCachesAfterCapabilityScope()
+        {
+            ClearWarmedCaches();
         }
 
         [Test]
@@ -79,6 +85,54 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                 ReflectionHelpers.IsHashSetClearerCached(typeof(BoxCollider)),
                 "HashSet clearer not cached after prewarm."
             );
+        }
+
+        [TestCase(false, false)]
+        [TestCase(true, false)]
+        [TestCase(false, true)]
+        public void InitializeSkipsOpenGenericsAndWarmsClosedInheritedFields(
+            bool expressions,
+            bool dynamicIl
+        )
+        {
+            using ReflectionCapabilityScope capabilities = new(expressions, dynamicIl);
+            Type openType = typeof(RelationalGenericBase<>);
+            Type openDerivedType = typeof(RelationalGenericOpenDerived<>);
+            Type closedType = typeof(RelationalGenericBase<BoxCollider>);
+            Type derivedType = typeof(RelationalGenericDerived);
+            RelationalComponentInitializer.Report report =
+                RelationalComponentInitializer.Initialize(
+                    new[]
+                    {
+                        openType,
+                        openDerivedType,
+                        closedType,
+                        derivedType,
+                        typeof(PrewarmTesterComponent),
+                    },
+                    logSummary: false
+                );
+
+            Assert.AreEqual(5, report.TypesVisited);
+            Assert.AreEqual(0, report.Errors);
+            Assert.AreEqual(0, report.Warnings);
+            Assert.AreEqual(3, report.TypesWarmed);
+            Assert.AreEqual(9, report.FieldsWarmed);
+            Assert.IsFalse(report.WarmedFieldsPerType.ContainsKey(openType));
+            Assert.IsFalse(report.WarmedFieldsPerType.ContainsKey(openDerivedType));
+            Assert.AreEqual(3, report.WarmedFieldsPerType.ValueFor(closedType));
+            Assert.AreEqual(3, report.WarmedFieldsPerType.ValueFor(derivedType));
+            foreach (FieldInfo field in closedType.GetFields())
+            {
+                Assert.IsTrue(ReflectionHelpers.IsFieldGetterCached(field), field.Name);
+                Assert.IsTrue(ReflectionHelpers.IsFieldSetterCached(field), field.Name);
+            }
+            foreach (Type skippedType in new[] { openType, openDerivedType })
+            {
+                Assert.IsFalse(SiblingComponentExtensions.HasCachedFieldMetadata(skippedType));
+                Assert.IsFalse(ChildComponentExtensions.HasCachedFieldMetadata(skippedType));
+                Assert.IsFalse(ParentComponentExtensions.HasCachedFieldMetadata(skippedType));
+            }
         }
 
         [Test]
@@ -143,6 +197,36 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                 3,
                 "Per-type warmed count too low."
             );
+        }
+
+        [TestCase(false, false)]
+        [TestCase(true, false)]
+        [TestCase(false, true)]
+        public void ClosedGenericFieldsBindAfterOpenGenericPrewarm(bool expressions, bool dynamicIl)
+        {
+            using ReflectionCapabilityScope capabilities = new(expressions, dynamicIl);
+            GameObject parent = Track(new GameObject(nameof(parent)));
+            BoxCollider expectedParent = parent.AddComponent<BoxCollider>();
+            GameObject owner = Track(new GameObject(nameof(owner)));
+            owner.transform.SetParent(parent.transform);
+            BoxCollider expectedSibling = owner.AddComponent<BoxCollider>();
+            RelationalGenericDerived target = owner.AddComponent<RelationalGenericDerived>();
+            GameObject child = Track(new GameObject(nameof(child)));
+            child.transform.SetParent(owner.transform);
+            BoxCollider expectedChild = child.AddComponent<BoxCollider>();
+
+            RelationalComponentInitializer.Report report =
+                RelationalComponentInitializer.Initialize(
+                    new[] { typeof(RelationalGenericBase<>), typeof(RelationalGenericDerived) },
+                    logSummary: false
+                );
+            Assert.AreEqual(0, report.Errors);
+            Assert.AreEqual(3, report.FieldsWarmed);
+            target.AssignRelationalComponents();
+
+            Assert.AreEqual(expectedParent, target.parent);
+            CollectionAssert.AreEqual(new[] { expectedChild }, target.children);
+            CollectionAssert.AreEqual(new[] { expectedSibling }, target.siblings);
         }
     }
 }
