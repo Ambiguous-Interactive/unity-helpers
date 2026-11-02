@@ -191,7 +191,10 @@ namespace WallstopStudios.UnityHelpers.Ci
                     : relative;
             if (archive != null && stored != "package/package.json")
             {
-                ZipArchiveEntry entry = archive.CreateEntry(stored, CompressionLevel.Fastest);
+                ZipArchiveEntry entry = archive.CreateEntry(
+                    stored,
+                    System.IO.Compression.CompressionLevel.Fastest
+                );
                 using (Stream output = entry.Open())
                 {
                     output.Write(bytes, 0, bytes.Length);

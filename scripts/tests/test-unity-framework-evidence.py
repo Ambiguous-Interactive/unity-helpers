@@ -67,6 +67,7 @@ class FrameworkEvidenceTests(unittest.TestCase):
         sources = {
             "nunit.framework": "namespace NUnit.Framework { public class TestAttribute : System.Attribute {} }",
             "UnityEngine.TestRunner": """namespace UnityEngine {
+                public enum CompressionLevel { None, Fast, Normal, Best }
                 public static class Application {
                     public static string dataPath => System.Environment.GetEnvironmentVariable("CONTROL_PROJECT") + "/Assets";
                     public static string unityVersion => "HOST-SHIM-NOT-UNITY";
