@@ -77,10 +77,14 @@ and preserves unrelated assets, parent folders and their metadata.
 CI gives each editor invocation a
 fresh `framework/<capture-id>` directory at the leg artifact root, independent of nested log paths. Each invocation retains its own log and process diagnostics before retry paths can overwrite them. Its record binds those copies to the project and process. It retains the manifest before launch, then
 captures the resolved manifest and lock, framework package metadata and C# source files,
-and the loaded editor runner, runtime runner and NUnit DLLs, plus available PDBs. Package sources use short numbered filenames; the inventory retains their original package-relative paths. This keeps generated compiler and evidence paths within Windows file API limits. Each domain snapshot records
+and the loaded editor runner, runtime runner and NUnit DLLs, plus available PDBs. Package sources use short numbered entries in `sources.zip`; the inventory retains their original package-relative paths. Schema 3 checks every archive entry against its recorded length and SHA-256 and rejects missing, duplicate or unlisted entries. Historical schema 2 snapshots with loose source files remain readable. This keeps generated compiler and evidence paths within Windows file API limits. Each domain snapshot records
 its process, project, Unity version, loaded module IDs and file hashes. The readback checks
 those IDs against the retained DLL bytes and rejects missing or changed evidence. Repeated
 domain reloads produce separate snapshots. A capture error fails the evidence check.
+
+The shared runtime test base applies its existing optional allocator-warning policy to native log
+callbacks as well as managed logs. It processes explicit expectations first and leaves unrelated
+warnings and all errors subject to the strict log check.
 
 For a manually launched generated project, pass `-uhFrameworkEvidenceDirectory <new-path>`
 to collect the same snapshots. These startup records identify the loaded modules and source

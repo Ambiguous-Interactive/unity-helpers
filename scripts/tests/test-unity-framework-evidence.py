@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 from typing import TypedDict, cast
 
@@ -28,6 +29,8 @@ class AssemblyIdentity(TypedDict):
 
 
 class EvidenceReceipt(TypedDict):
+    SchemaVersion: int
+    SourceArchive: str
     UnityVersion: str
     SourceCount: int
     ProcessId: int
@@ -235,10 +238,27 @@ class FrameworkEvidenceTests(unittest.TestCase):
         assert len(paths) == 1
         return paths[0], cast("EvidenceReceipt", json.loads(paths[0].read_text()))
 
-    def retained(self, original: str) -> Path:
+    def retained(self, original: str) -> bytes:
         receipt_path, receipt = self.receipt()
         entry = next(e for e in receipt["Files"] if e["OriginalPath"] == original)
-        return receipt_path.parent / entry["Path"]
+        if entry["Path"].startswith("package/") and entry["Path"] != "package/package.json":
+            with zipfile.ZipFile(receipt_path.parent / receipt["SourceArchive"]) as archive:
+                return archive.read(entry["Path"])
+        return (receipt_path.parent / entry["Path"]).read_bytes()
+
+    def replace_retained(self, original: str, payload: bytes) -> None:
+        receipt_path, receipt = self.receipt()
+        entry = next(e for e in receipt["Files"] if e["OriginalPath"] == original)
+        if entry["Path"].startswith("package/") and entry["Path"] != "package/package.json":
+            archive_path = receipt_path.parent / receipt["SourceArchive"]
+            with zipfile.ZipFile(archive_path) as archive:
+                entries = {name: archive.read(name) for name in archive.namelist()}
+            entries[entry["Path"]] = payload
+            with zipfile.ZipFile(archive_path, "w") as archive:
+                for name, data in entries.items():
+                    archive.writestr(name, data)
+        else:
+            (receipt_path.parent / entry["Path"]).write_bytes(payload)
 
     def verify(
         self, process_id: int | None = None, project: Path | None = None
@@ -272,19 +292,71 @@ class FrameworkEvidenceTests(unittest.TestCase):
     ) -> None:
         result = self.capture()
         assert result.returncode == 0, result.stdout + result.stderr
-        path, receipt = self.receipt()
+        _path, receipt = self.receipt()
         assert receipt["UnityVersion"] == "HOST-SHIM-NOT-UNITY"
         assert receipt["SourceCount"] == 1
         assert len(receipt["Assemblies"]) == 3
         assert (
-            self.retained("package/Editor/Source.cs").read_bytes()
+            self.retained("package/Editor/Source.cs")
             == (self.package / "Editor/Source.cs").read_bytes()
         )
         for entry in receipt["Files"]:
-            payload = (path.parent / entry["Path"]).read_bytes()
+            payload = self.retained(entry["OriginalPath"])
             assert hashlib.sha256(payload).hexdigest() == entry["Sha256"]
         verified = self.verify()
         assert verified.returncode == 0, verified.stdout + verified.stderr
+
+    def test_sources_are_packed_without_losing_per_file_hashes(self) -> None:
+        for index in range(400):
+            (self.package / f"Editor/Source{index}.cs").write_text(f"// Source {index}")
+        self.capture()
+        path, receipt = self.receipt()
+        assert receipt["SchemaVersion"] == 3
+        assert receipt["SourceArchive"] == "sources.zip"
+        with zipfile.ZipFile(path.parent / receipt["SourceArchive"]) as archive:
+            assert len(archive.namelist()) == 402
+        assert len(list(path.parent.rglob("*.*"))) < 15
+        assert self.verify().returncode == 0
+
+    def test_unpacked_historical_receipts_remain_verifiable(self) -> None:
+        self.capture()
+        path, receipt = self.receipt()
+        archive_path = path.parent / receipt["SourceArchive"]
+        with zipfile.ZipFile(archive_path) as archive:
+            archive.extractall(path.parent)
+        archive_path.unlink()
+        receipt["SchemaVersion"] = 2
+        path.write_text(json.dumps(receipt))
+        assert self.verify().returncode == 0
+
+    def test_missing_or_unlisted_archive_sources_are_rejected(self) -> None:
+        self.capture()
+        path, receipt = self.receipt()
+        archive_path = path.parent / receipt["SourceArchive"]
+        with zipfile.ZipFile(archive_path) as archive:
+            entries = {name: archive.read(name) for name in archive.namelist()}
+        for mode in ("missing", "extra", "unsafe", "duplicate"):
+            with zipfile.ZipFile(archive_path, "w") as archive:
+                for index, (name, data) in enumerate(entries.items()):
+                    if mode != "missing" or index != 0:
+                        archive.writestr(name, data)
+                if mode == "extra":
+                    archive.writestr("package/4095.cs", b"// extra")
+                elif mode == "unsafe":
+                    archive.writestr("../escape.cs", b"// unsafe")
+                elif mode == "duplicate":
+                    with self.assertWarns(UserWarning):
+                        archive.writestr(next(iter(entries)), b"// duplicate")
+            assert self.verify().returncode != 0, mode
+
+    def test_archive_path_cannot_escape_snapshot(self) -> None:
+        self.capture()
+        path, receipt = self.receipt()
+        for value in ("../sources.zip", "/sources.zip", "SOURCES.ZIP", "", None):
+            changed: dict[str, object] = dict(receipt)
+            changed["SourceArchive"] = value
+            path.write_text(json.dumps(changed))
+            assert self.verify().returncode != 0, value
 
     def test_core_resolution_is_reported_separately_from_manifest_request(self) -> None:
         self.environment["CONTROL_VERSION"] = "1.8.0"
@@ -342,9 +414,11 @@ class FrameworkEvidenceTests(unittest.TestCase):
         assert result.returncode == 0, result.stdout + result.stderr
         _, receipt = self.receipt()
         assert receipt["SourceCount"] == 3
-        assert self.retained("package/" + relative).read_bytes() == source.read_bytes()
+        assert self.retained("package/" + relative) == source.read_bytes()
 
-    def test_nested_package_sources_have_short_storage_paths_and_original_names(self) -> None:
+    def test_nested_package_sources_have_short_storage_paths_and_original_names(
+        self,
+    ) -> None:
         relative = (
             "Samples~/10_LongRunningTests_Solution/PlayModeTests_10s/PlayModeTests_10s.asmdef"
         )
@@ -352,10 +426,10 @@ class FrameworkEvidenceTests(unittest.TestCase):
         source.parent.mkdir(parents=True)
         source.write_text('{"name":"LongPathControl"}')
         self.capture()
-        path, receipt = self.receipt()
+        _path, receipt = self.receipt()
         entry = next(e for e in receipt["Files"] if e.get("OriginalPath") == "package/" + relative)
         assert len(entry["Path"]) <= 19
-        assert (path.parent / entry["Path"]).read_bytes() == source.read_bytes()
+        assert self.retained(entry["OriginalPath"]) == source.read_bytes()
         assert self.verify().returncode == 0
 
     def test_oversized_source_is_refused_before_copy(self) -> None:
@@ -370,9 +444,9 @@ class FrameworkEvidenceTests(unittest.TestCase):
     def test_changed_source_after_capture_does_not_rewrite_retained_bytes(self) -> None:
         self.capture()
         _path, _ = self.receipt()
-        before = self.retained("package/Editor/Source.cs").read_bytes()
+        before = self.retained("package/Editor/Source.cs")
         (self.package / "Editor/Source.cs").write_text("CHANGED EXTERNAL PACKAGE")
-        assert self.retained("package/Editor/Source.cs").read_bytes() == before
+        assert self.retained("package/Editor/Source.cs") == before
         assert self.verify().returncode == 0
 
     def test_stale_process_or_project_is_rejected(self) -> None:
@@ -382,15 +456,14 @@ class FrameworkEvidenceTests(unittest.TestCase):
 
     def test_tampered_metadata_source_and_module_bytes_are_rejected(self) -> None:
         self.capture()
-        path, receipt = self.receipt()
+        _path, receipt = self.receipt()
         for entry in receipt["Files"]:
-            target = path.parent / entry["Path"]
-            original = target.read_bytes()
-            target.write_bytes(original + b"tampered")
+            original = self.retained(entry["OriginalPath"])
+            self.replace_retained(entry["OriginalPath"], original + b"tampered")
             result = self.verify()
             assert result.returncode != 0, entry["Path"]
             assert "evidence bytes differ" in result.stderr
-            target.write_bytes(original)
+            self.replace_retained(entry["OriginalPath"], original)
 
     def test_removed_module_duplicate_identity_and_wrong_mvid_are_rejected(
         self,
@@ -449,7 +522,9 @@ class FrameworkEvidenceTests(unittest.TestCase):
         path.write_text(json.dumps(receipt))
         assert self.verify().returncode != 0
 
-    def test_invalid_original_paths_and_duplicate_source_mappings_are_rejected(self) -> None:
+    def test_invalid_original_paths_and_duplicate_source_mappings_are_rejected(
+        self,
+    ) -> None:
         self.capture()
         path, original = self.receipt()
         for value in (
@@ -526,7 +601,8 @@ class FrameworkEvidenceTests(unittest.TestCase):
                         == self.manifest
                     )
                     invocation = cast(
-                        "Invocation", json.loads((capture / "invocation.json").read_text())
+                        "Invocation",
+                        json.loads((capture / "invocation.json").read_text()),
                     )
                     receipt = cast(
                         "EvidenceReceipt",

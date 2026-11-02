@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Ci
     using System.Collections.Generic;
     using System.Diagnostics;
     using System.IO;
+    using System.IO.Compression;
     using System.Reflection;
     using System.Security.Cryptography;
     using NUnit.Framework;
@@ -89,27 +90,35 @@ namespace WallstopStudios.UnityHelpers.Ci
                     );
                 }
                 int sourceCount = 0;
-                foreach (
-                    string path in Directory.GetFiles(
-                        package.resolvedPath,
-                        "*",
-                        SearchOption.AllDirectories
+                using (
+                    ZipArchive archive = ZipFile.Open(
+                        Path.Combine(snapshot, "sources.zip"),
+                        ZipArchiveMode.Create
                     )
                 )
                 {
-                    string relative = path.Substring(package.resolvedPath.Length)
-                        .TrimStart('/', '\\')
-                        .Replace('\\', '/');
-                    if (
-                        relative == "package.json"
-                        || path.EndsWith(".cs", StringComparison.Ordinal)
-                        || path.EndsWith(".asmdef", StringComparison.Ordinal)
+                    foreach (
+                        string path in Directory.GetFiles(
+                            package.resolvedPath,
+                            "*",
+                            SearchOption.AllDirectories
+                        )
                     )
                     {
-                        CopyFile(path, snapshot, "package/" + relative, files);
-                        if (path.EndsWith(".cs", StringComparison.Ordinal))
+                        string relative = path.Substring(package.resolvedPath.Length)
+                            .TrimStart('/', '\\')
+                            .Replace('\\', '/');
+                        if (
+                            relative == "package.json"
+                            || path.EndsWith(".cs", StringComparison.Ordinal)
+                            || path.EndsWith(".asmdef", StringComparison.Ordinal)
+                        )
                         {
-                            ++sourceCount;
+                            CopyFile(path, snapshot, "package/" + relative, files, archive);
+                            if (path.EndsWith(".cs", StringComparison.Ordinal))
+                            {
+                                ++sourceCount;
+                            }
                         }
                     }
                 }
@@ -123,7 +132,8 @@ namespace WallstopStudios.UnityHelpers.Ci
                 {
                     Receipt receipt = new Receipt
                     {
-                        SchemaVersion = 2,
+                        SchemaVersion = 3,
+                        SourceArchive = "sources.zip",
                         ProcessId = process.Id,
                         DomainId = AppDomain.CurrentDomain.Id,
                         CapturedUtc = DateTime.UtcNow.ToString("o"),
@@ -157,7 +167,8 @@ namespace WallstopStudios.UnityHelpers.Ci
             string source,
             string snapshot,
             string relative,
-            List<FileRecord> files
+            List<FileRecord> files,
+            ZipArchive archive = null
         )
         {
             FileInfo info = new FileInfo(source);
@@ -178,9 +189,20 @@ namespace WallstopStudios.UnityHelpers.Ci
                         )
                         + Path.GetExtension(relative)
                     : relative;
-            string target = Path.Combine(snapshot, stored);
-            Directory.CreateDirectory(Path.GetDirectoryName(target));
-            File.WriteAllBytes(target, bytes);
+            if (archive != null && stored != "package/package.json")
+            {
+                ZipArchiveEntry entry = archive.CreateEntry(stored, CompressionLevel.Fastest);
+                using (Stream output = entry.Open())
+                {
+                    output.Write(bytes, 0, bytes.Length);
+                }
+            }
+            else
+            {
+                string target = Path.Combine(snapshot, stored);
+                Directory.CreateDirectory(Path.GetDirectoryName(target));
+                File.WriteAllBytes(target, bytes);
+            }
             using (SHA256 algorithm = SHA256.Create())
             {
                 files.Add(
@@ -202,6 +224,7 @@ namespace WallstopStudios.UnityHelpers.Ci
         private sealed class Receipt
         {
             public int SchemaVersion;
+            public string SourceArchive;
             public int ProcessId;
             public int DomainId;
             public string CapturedUtc;
