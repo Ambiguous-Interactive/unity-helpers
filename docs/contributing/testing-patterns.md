@@ -2,6 +2,14 @@
 
 This guide documents patterns for testing states that "should never happen" but could occur in production. These tests catch edge cases that defensive programming must handle gracefully.
 
+## Isolated migration compiler tests
+
+The Odin compiler fixture rewrites a small runtime consumer asset rather than the shared test
+helpers. Its graph includes the asset assembly, a runtime caller assembly, and the editor tools
+test assembly. The fixture requires all three to compile and separately breaks runtime and editor
+member access. Keep the consumer targets out of shared test assembly references: migrating a
+shared helper recompiles its entire dependent test graph on every case.
+
 ## Give each parameterized case a stable identity
 
 For a `ValueSource` that supplies objects or structs, provide a deterministic display value, such

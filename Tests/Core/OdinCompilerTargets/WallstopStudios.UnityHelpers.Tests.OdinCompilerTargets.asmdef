@@ -1,0 +1,14 @@
+{
+  "name": "WallstopStudios.UnityHelpers.Tests.OdinCompilerTargets",
+  "rootNamespace": "WallstopStudios.UnityHelpers.Tests.Core.OdinCompilerTargets",
+  "references": ["WallstopStudios.UnityHelpers"],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": true,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": ["UNITY_INCLUDE_TESTS", "!WALLSTOP_PROTO_ONLY"],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
