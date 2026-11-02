@@ -10,7 +10,7 @@ namespace WallstopStudios.UnityHelpers.Utils
     {
         private static PoolMaintenanceRunner _instance;
 
-        private float _nextMaintenanceTime;
+        private float _lastMaintenanceTime = float.NegativeInfinity;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         internal static void Initialize()
@@ -28,11 +28,11 @@ namespace WallstopStudios.UnityHelpers.Utils
         private void Update()
         {
             float now = Time.realtimeSinceStartup;
-            if (now < _nextMaintenanceTime)
+            if (now - _lastMaintenanceTime < GlobalPoolRegistry.BudgetEnforcementIntervalSeconds)
             {
                 return;
             }
-            _nextMaintenanceTime = now + GlobalPoolRegistry.DefaultBudgetEnforcementIntervalSeconds;
+            _lastMaintenanceTime = now;
             GlobalPoolRegistry.RunMaintenance();
         }
     }

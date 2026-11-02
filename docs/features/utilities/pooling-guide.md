@@ -60,7 +60,9 @@ flowchart TB
 
 Intelligent purging is **enabled** with conservative defaults in both the Editor and players.
 Players need no Editor settings asset. A hidden runtime maintenance component checks registered
-pools every 30 seconds of real time, including when no code rents from an idle pool. Each pool
+pools every 30 seconds of real time by default, including when no code rents from an idle pool.
+`GlobalPoolRegistry.BudgetEnforcementIntervalSeconds` sets this interval; changing it takes effect
+against the previous maintenance check. Each pool
 keeps its own purge interval, idle timeout, retention floor, and gradual purge limit. Maintenance
 runs on the main thread while Unity produces frames, even when the time scale is zero.
 
