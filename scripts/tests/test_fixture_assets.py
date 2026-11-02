@@ -258,6 +258,14 @@ def test_fixture_pixels_and_metadata_survive_regeneration(
     assert str(output) in first.stdout
     images = sorted(output.glob("*.png"))
     assert len(images) == count
+    folder_metadata = Path(f"{output}.meta") if kind == "textures" else None
+    folder_before = b""
+    if folder_metadata is not None:
+        assert folder_metadata.is_file()
+        folder_text = folder_metadata.read_text(encoding="utf-8")
+        read_guid(folder_text)
+        assert "folderAsset: yes\n" in folder_text
+        folder_before = folder_metadata.read_bytes()
     identities: set[str] = set()
     for path in images:
         width, height, digest = PIXELS[path.name]
@@ -286,6 +294,7 @@ def test_fixture_pixels_and_metadata_survive_regeneration(
             assert "    sprites: []\n" in metadata_text
             assert "    nameFileIdTable: {}\n" in metadata_text
         else:
+            assert importer["spriteMode"] == 2
             sprites = sheet["sprites"]
             assert isinstance(sprites, list)
             assert sprites
@@ -316,14 +325,27 @@ def test_fixture_pixels_and_metadata_survive_regeneration(
     second = run_generator(kind, output, extended=extended)
     assert second.returncode == 0, second.stdout + second.stderr
     assert {path.name: path.read_bytes() for path in output.iterdir()} == before
+    if folder_metadata is not None:
+        assert folder_metadata.read_bytes() == folder_before
     survivor = images[0].with_suffix(".png.meta")
     survivor.write_bytes(b"existing authored metadata\r\n")
     missing = images[1].with_suffix(".png.meta")
     missing.unlink()
+    if folder_metadata is not None:
+        folder_metadata.write_bytes(b"existing authored folder metadata\r\n")
     third = run_generator(kind, output, extended=extended)
     assert third.returncode == 0, third.stdout + third.stderr
     assert survivor.read_bytes() == b"existing authored metadata\r\n"
     assert missing.is_file()
+    if folder_metadata is not None:
+        assert folder_metadata.read_bytes() == b"existing authored folder metadata\r\n"
+        folder_metadata.unlink()
+        fourth = run_generator(kind, output, extended=extended)
+        assert fourth.returncode == 0, fourth.stdout + fourth.stderr
+        assert folder_metadata.is_file()
+        recreated = folder_metadata.read_text(encoding="utf-8")
+        read_guid(recreated)
+        assert "folderAsset: yes\n" in recreated
     for name, original in before.items():
         if name not in (survivor.name, missing.name):
             assert (output / name).read_bytes() == original
