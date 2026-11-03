@@ -125,11 +125,13 @@ def make_control(tmp_path: Path) -> tuple[list[Mode], Mode, dict[str, str], str]
         [double]$ProjectRootMinimumFreeGb = 60, [string]$EditorPhaseGroup = 'All')
         $ErrorActionPreference = 'Stop'
         . 'HELPER'
+        $workerName = if ($EditorPhaseGroup -eq 'Isolated') { 'editmode_isolated' } elseif ($ProjectScope -eq 'proto-only') { 'proto_only' } else { $TestMode }
+        $expectedWorkers = [int]$env:CONTROL_MODE_COUNT
         if ($GenerateOnly) {
             $null = Read-UnityLicenseSession -Path $LicenseSessionPath -UnityVersion $UnityVersion -EditorPath $env:UNITY_EDITOR_PATH -State activated
             if ($env:CONTROL_INITIALIZATION_FAILURE -eq $TestMode) { throw 'Controlled project initialization failure.' }
             if ($ProjectRootMinimumFreeGb -ne 0) { throw 'Initializer can prune sibling projects.' }
-            [IO.File]::WriteAllText((Join-Path $env:CONTROL_EVENTS ($TestMode + '.initialized')), '')
+            [IO.File]::WriteAllText((Join-Path $env:CONTROL_EVENTS ($workerName + '.initialized')), '')
             return
         }
         $state = if ($PrepareLicenseOnly) { 'requested' } else { 'activated' }
@@ -141,11 +143,11 @@ def make_control(tmp_path: Path) -> tuple[list[Mode], Mode, dict[str, str], str]
             return
         }
         if ($ProjectRootMinimumFreeGb -ne 0) { throw 'Worker can prune sibling projects.' }
-        if (@(Get-ChildItem -LiteralPath $env:CONTROL_EVENTS -Filter '*.initialized').Count -ne 3) { throw 'Workers started before all projects were prepared.' }
+        if (@(Get-ChildItem -LiteralPath $env:CONTROL_EVENTS -Filter '*.initialized').Count -ne $expectedWorkers) { throw 'Workers started before all projects were prepared.' }
         Write-Host ('Mode diagnostics: ' + $TestMode)
-        [IO.File]::WriteAllText((Join-Path $env:CONTROL_EVENTS ($TestMode + '.started')), [string]$PID)
+        [IO.File]::WriteAllText((Join-Path $env:CONTROL_EVENTS ($workerName + '.started')), [string]$PID)
         $deadline = [DateTime]::UtcNow.AddSeconds(10)
-        while (@(Get-ChildItem -LiteralPath $env:CONTROL_EVENTS -Filter '*.started').Count -lt 3) {
+        while (@(Get-ChildItem -LiteralPath $env:CONTROL_EVENTS -Filter '*.started').Count -lt $expectedWorkers) {
             if ($deadline -lt [DateTime]::UtcNow) { throw 'Workers did not overlap.' }
             Start-Sleep -Milliseconds 10
         }
@@ -154,7 +156,7 @@ def make_control(tmp_path: Path) -> tuple[list[Mode], Mode, dict[str, str], str]
             $start.UseShellExecute = $false
             $start.ArgumentList.Add($env:CONTROL_SLEEPER)
             $child = [Diagnostics.Process]::Start($start)
-            [IO.File]::WriteAllText((Join-Path $env:CONTROL_EVENTS ($TestMode + '.child')), [string]$child.Id)
+            [IO.File]::WriteAllText((Join-Path $env:CONTROL_EVENTS ($workerName + '.child')), [string]$child.Id)
             $child.WaitForExit()
         }
         if ($env:CONTROL_FAIL -eq $TestMode) { throw 'Controlled mode failure.' }
@@ -168,7 +170,7 @@ def make_control(tmp_path: Path) -> tuple[list[Mode], Mode, dict[str, str], str]
             }
         }
         [IO.File]::WriteAllText((Join-Path $ArtifactsPath 'fixture-options.json'), (@{ RepoRoot = $RepoRoot; AssemblyNames = $AssemblyNames } | ConvertTo-Json))
-        [IO.File]::WriteAllText((Join-Path $env:CONTROL_EVENTS ($TestMode + '.completed')), 'done')
+        [IO.File]::WriteAllText((Join-Path $env:CONTROL_EVENTS ($workerName + '.completed')), 'done')
         """.replace("HELPER", helper),
         encoding="utf-8",
     )
@@ -202,6 +204,7 @@ def make_control(tmp_path: Path) -> tuple[list[Mode], Mode, dict[str, str], str]
         CONTROL_EVENTS=str(events),
         CONTROL_PYTHON=sys.executable,
         CONTROL_SLEEPER=str(sleeper),
+        CONTROL_MODE_COUNT="3",
     )
     modes = [
         Mode(
@@ -276,6 +279,7 @@ def test_editor_halves_require_both_and_publish_fixture_evidence(
         },
     )
     environment["CONTROL_FAIL_PHASE"] = failed
+    environment["CONTROL_MODE_COUNT"] = "4"
     success = run(
         [*modes, isolated],
         preparation,
@@ -295,6 +299,12 @@ def test_editor_halves_require_both_and_publish_fixture_evidence(
     }
     assert len(receipt["Workers"]) == 4
     assert receipt["ControllerCompleted"] is True
+    assert {path.stem for path in (tmp_path / "events").glob("*.started")} == {
+        "editmode",
+        "editmode_isolated",
+        "playmode",
+        "standalone",
+    }
     if failed != "Isolated":
         for name in ("compilation", "migration"):
             assert (tmp_path / "editmode" / name / "control.txt").read_text(
@@ -316,6 +326,7 @@ def test_isolated_evidence_cannot_be_missing_or_replace_existing_results(
             "ArtifactsPath": str(tmp_path / "editmode/isolated"),
         },
     )
+    environment["CONTROL_MODE_COUNT"] = "4"
     if damage == "missing":
         environment["CONTROL_MISSING_EVIDENCE"] = "compilation"
     else:
@@ -623,6 +634,7 @@ def test_complete_cli_uses_isolated_sources_and_publishes_all_four_modes(tmp_pat
         GITHUB_OUTPUT=str(output),
         UH_PARALLEL_SELECTED_MODES=json.dumps(list(PROFILES)),
         UH_PARALLEL_ASSEMBLY_PROFILES=json.dumps(PROFILES),
+        CONTROL_MODE_COUNT="5",
     )
     wrapper = tmp_path / "cli-wrapper.py"
     wrapper.write_text(
