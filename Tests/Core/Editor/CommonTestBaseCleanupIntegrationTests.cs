@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
 
     using System;
     using System.Collections.Generic;
+    using System.IO;
     using NUnit.Framework;
     using UnityEditor;
     using UnityEngine;
@@ -77,6 +78,45 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
             finally
             {
                 base.OneTimeTearDown();
+            }
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void EmptyTrackedPathCleanupDoesNotImportUnrelatedFiles(bool deferCleanup)
+        {
+            EnsureTestRoot();
+            string assetPath = $"{TestFolderRoot}/Untracked_{Guid.NewGuid():N}.txt";
+            string fullPath = Path.Combine(
+                Directory.GetParent(Application.dataPath).FullName,
+                assetPath
+            );
+            bool previousDefer = DeferAssetCleanupToOneTimeTearDown;
+            AssetDatabase.DisallowAutoRefresh();
+            try
+            {
+                DeferAssetCleanupToOneTimeTearDown = deferCleanup;
+                File.WriteAllText(
+                    fullPath,
+                    nameof(EmptyTrackedPathCleanupDoesNotImportUnrelatedFiles)
+                );
+                Assert.That(AssetDatabase.LoadAssetAtPath<TextAsset>(assetPath), Is.Null);
+
+                CleanupTrackedFoldersAndAssets();
+
+                Assert.That(
+                    AssetDatabase.LoadAssetAtPath<TextAsset>(assetPath),
+                    Is.Null,
+                    "Cleaning no tracked paths must not import an unrelated pending file."
+                );
+            }
+            finally
+            {
+                DeferAssetCleanupToOneTimeTearDown = previousDefer;
+                File.Delete(fullPath);
+                File.Delete(fullPath + ".meta");
+                AssetDatabase.AllowAutoRefresh();
+                AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
             }
         }
 
@@ -437,6 +477,57 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 Is.EqualTo(0),
                 "ActualUnityBatchDepth should be 0 after outer scope exits"
             );
+        }
+
+        [TestCase(false, false)]
+        [TestCase(false, true)]
+        [TestCase(true, false)]
+        [TestCase(true, true)]
+        public void DestroyTrackedObjectsBatchesOnlyPersistedAssets(
+            bool outerBatch,
+            bool persistedAsset
+        )
+        {
+            int? observedDepth = null;
+            CleanupObservationAsset memory = Track(
+                ScriptableObject.CreateInstance<CleanupObservationAsset>()
+            );
+            memory.Destroyed = () => observedDepth = AssetDatabaseBatchHelper.CurrentBatchDepth;
+            string assetPath = $"{TestFolderRoot}/Tracked_{Guid.NewGuid():N}.asset";
+            if (persistedAsset)
+            {
+                EnsureTestRoot();
+                CleanupObservationAsset asset = Track(
+                    ScriptableObject.CreateInstance<CleanupObservationAsset>()
+                );
+                AssetDatabase.CreateAsset(asset, assetPath);
+            }
+
+            using (
+                AssetDatabaseBatchScope? scope = outerBatch
+                    ? AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false)
+                    : null
+            )
+            {
+                DestroyTrackedObjects();
+                Assert.That(memory == null, Is.True);
+                Assert.That(
+                    observedDepth,
+                    Is.EqualTo((outerBatch ? 1 : 0) + (persistedAsset ? 1 : 0))
+                );
+                Assert.That(
+                    AssetDatabaseBatchHelper.CurrentBatchDepth,
+                    Is.EqualTo(outerBatch ? 1 : 0)
+                );
+            }
+
+            if (persistedAsset)
+            {
+                Assert.That(
+                    AssetDatabase.LoadAssetAtPath<CleanupObservationAsset>(assetPath),
+                    Is.Null
+                );
+            }
         }
 
         /// <summary>

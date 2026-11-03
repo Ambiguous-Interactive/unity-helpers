@@ -910,11 +910,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 return;
             }
 
+            Object[] snapshot = _trackedObjects.ToArray();
 #if UNITY_EDITOR
-            using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
+            AssetDatabaseBatchScope? batch = null;
+            foreach (Object candidate in snapshot)
+            {
+                if (
+                    candidate != null
+                    && !string.IsNullOrEmpty(UnityEditor.AssetDatabase.GetAssetPath(candidate))
+                )
+                {
+                    batch = AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false);
+                    break;
+                }
+            }
+
+            using (batch)
 #endif
             {
-                Object[] snapshot = _trackedObjects.ToArray();
                 foreach (Object obj in snapshot)
                 {
                     if (obj == null)
@@ -1768,6 +1781,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         protected void CleanupTrackedFoldersAndAssets()
         {
 #if UNITY_EDITOR
+            if (_trackedAssetPaths.Count == 0 && _trackedFolders.Count == 0)
+            {
+                return;
+            }
+
             if (DeferAssetCleanupToOneTimeTearDown)
             {
                 // Accumulate for batch cleanup later - don't delete or refresh yet

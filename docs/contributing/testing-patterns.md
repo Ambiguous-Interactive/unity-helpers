@@ -10,6 +10,15 @@ test assembly. The fixture requires all three to compile and separately breaks r
 member access. Keep the consumer targets out of shared test assembly references: migrating a
 shared helper recompiles its entire dependent test graph on every case.
 
+## Keep memory-only cleanup outside asset batches
+
+`CommonTestBase.DestroyTrackedObjects` opens an asset editing batch only when a tracked object
+has an asset path. Memory-only cleanup destroys objects immediately without refreshing the asset
+database. Mixed cleanup retains its batch around every destruction callback, and an existing
+outer batch remains active. Keep native coverage for these paths and for deferred asset deletion
+when changing shared cleanup.
+`CleanupTrackedFoldersAndAssets` also leaves the database untouched when no paths are tracked.
+
 ## Give each parameterized case a stable identity
 
 For a `ValueSource` that supplies objects or structs, provide a deterministic display value, such
