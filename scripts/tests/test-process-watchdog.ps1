@@ -201,6 +201,11 @@ foreach ($withSentinel in @($false, $true)) {
         Assert-That 'inherited output handles cannot replace the real failing root exit with a passing sentinel' ($r.ExitCode -eq 7 -and $observation.RawExitCode -eq 7)
         Assert-That 'an exited root with inherited output is not killed or classified as a completion hang' ($observation.ExitOrigin -eq 'process-exit' -and $null -eq $observation.KillReason -and -not $r.TimedOut)
         Assert-That 'inherited output is identified by the bounded drain observation' ($observation.ContainsKey('OutputDrainStopped') -and $observation.OutputDrainStopped)
+        $validExitTime = $null -eq $observation.ProcessExitUtc -or (
+            [DateTime]::Parse($observation.LaunchUtc) -le [DateTime]::Parse($observation.ProcessExitUtc) -and
+            [DateTime]::Parse($observation.ProcessExitUtc) -le [DateTime]::Parse($observation.EndObservedUtc)
+        )
+        Assert-That 'exit time is unknown or within the observed process lifetime' $validExitTime
         $text = [IO.File]::ReadAllText((Join-Path $tmp "uh-watchdog-inherited-output-$withSentinel.log"))
         Assert-That 'root stdout and stderr tails survive inherited writers' ($text.Contains('root-tail-stdout') -and $text.Contains('root-tail-stderr'))
         Assert-That 'all buffered root lines survive inherited writers' ([regex]::Matches($text, '(?m)^stdout-\d+\r?$').Count -eq 1000 -and [regex]::Matches($text, '(?m)^stderr-\d+\r?$').Count -eq 1000)

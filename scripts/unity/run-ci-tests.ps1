@@ -2917,7 +2917,12 @@ function Invoke-ProcessWithTreeKillTimeout {
             if ($proc.HasExited) {
                 $now = [DateTime]::UtcNow
                 if ($null -eq $postExitDrainStarted) {
-                    try { $processExitUtc = $proc.ExitTime.ToUniversalTime() } catch { }
+                    try {
+                        $reportedExitUtc = $proc.ExitTime.ToUniversalTime()
+                        if ($launchUtc -le $reportedExitUtc -and $reportedExitUtc -le $now) {
+                            $processExitUtc = $reportedExitUtc
+                        }
+                    } catch { }
                     $postExitDrainStarted = $now
                     $postExitLastOutput = $now
                 }
@@ -3023,7 +3028,12 @@ function Invoke-ProcessWithTreeKillTimeout {
         try {
             if ($reaped -and $proc.HasExited) {
                 $rawExitCode = $proc.ExitCode
-                if ($null -eq $processExitUtc) { $processExitUtc = $proc.ExitTime.ToUniversalTime() }
+                if ($null -eq $processExitUtc) {
+                    $reportedExitUtc = $proc.ExitTime.ToUniversalTime()
+                    if ($launchUtc -le $reportedExitUtc -and $reportedExitUtc -le [DateTime]::UtcNow) {
+                        $processExitUtc = $reportedExitUtc
+                    }
+                }
             }
         } catch { }
         if ($killedAfterCompletion) {
