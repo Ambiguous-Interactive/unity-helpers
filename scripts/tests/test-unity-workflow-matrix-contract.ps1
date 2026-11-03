@@ -4731,14 +4731,16 @@ if (
     Write-Info 'Checked all four central Windows cleanup lifecycles.'
 }
 
-$preActivationReturnGuardIndex = $runCiTestsContent.IndexOf('if ($hasLicenseCreds) {', [StringComparison]::Ordinal)
+$preActivationReturnGuardIndex = $runCiTestsContent.IndexOf('if ($hasLicenseCreds -and -not $reuseLicenseSession) {', [StringComparison]::Ordinal)
 $preActivationReturnIndex = $runCiTestsContent.IndexOf('Invoke-UnityLicenseReturn -EditorPath', $preActivationReturnGuardIndex + 1, [StringComparison]::Ordinal)
-$activationGuardIndex = $runCiTestsContent.IndexOf('if ($hasLicenseCreds) {', $preActivationReturnGuardIndex + 1, [StringComparison]::Ordinal)
+$activationGuardIndex = $runCiTestsContent.IndexOf('if ($hasLicenseCreds -and -not $reuseLicenseSession) {', $preActivationReturnGuardIndex + 1, [StringComparison]::Ordinal)
 $activationIndex = $runCiTestsContent.IndexOf('Invoke-UnityLicenseActivate -EditorPath', $activationGuardIndex + 1, [StringComparison]::Ordinal)
 $finalReturnGuardIndex = $runCiTestsContent.IndexOf('if ($hasLicenseCreds -and -not $centralReturnOwnsLicense) {', $activationIndex + 1, [StringComparison]::Ordinal)
 $finalReturnIndex = $runCiTestsContent.IndexOf('Invoke-UnityLicenseReturn -EditorPath', $finalReturnGuardIndex + 1, [StringComparison]::Ordinal)
 $centralReturnOwnershipContract = (
     $runCiTestsContent.Contains('$centralReturnOwnsLicense = [string]::Equals(') -and
+    $runCiTestsContent.Contains('Read-UnityLicenseSession -Path $LicenseSessionPath') -and
+    $runCiTestsContent.IndexOf('Complete-UnityLicenseSession -Path', $activationIndex + 1, [StringComparison]::Ordinal) -gt $activationIndex -and
     $preActivationReturnGuardIndex -ge 0 -and
     $preActivationReturnIndex -gt $preActivationReturnGuardIndex -and
     $activationGuardIndex -gt $preActivationReturnIndex -and

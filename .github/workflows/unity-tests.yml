@@ -676,6 +676,32 @@ jobs:
             throw 'The organization Unity lock was not acquired; selected modes cannot be waived.'
           }
 
+      - name: Run Unity modes concurrently
+        id: run_modes
+        if: ${{ !cancelled() && github.event_name != 'workflow_dispatch' && steps.unity_lock.outputs.acquired == 'true' }}
+        continue-on-error: true
+        timeout-minutes: 35
+        shell: pwsh
+        env:
+          UNITY_EDITOR_PATH: ${{ steps.ensure_unity_editor.outputs.editor-path }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_ACCELERATOR_ENDPOINT: ${{ secrets.UNITY_ACCELERATOR_ENDPOINT }}
+          UH_CENTRAL_LICENSE_RETURN: "true"
+          UH_UNITY_TEST_CATEGORY: "!Performance;!Stress"
+          UH_STREAM_TEST_RESULTS: "1"
+          UH_NATIVE_ALLOCATOR_DIAGNOSTICS: ${{ startsWith(matrix.unity-version, '6000.') && '1' || '' }}
+          GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
+          UH_PARALLEL_ASSEMBLY_PROFILES: ${{ needs.matrix-config.outputs.integration-assembly-profiles }}
+          UH_PARALLEL_SELECTED_MODES: ${{ needs.matrix-config.outputs.test-modes }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./scripts/unity/assert-no-active-unity-editor.ps1
+          uv run --project scripts/python~ --locked --no-dev python scripts/unity/run_ci_modes.py --version '${{ matrix.unity-version }}'
+          if ($LASTEXITCODE -ne 0) { throw 'One or more concurrent Unity modes failed.' }
+          ./scripts/unity/assert-no-active-unity-editor.ps1
+
       - name: Run EditMode tests
         id: run_editmode
         if: ${{ !cancelled() && steps.unity_lock.outputs.acquired == 'true' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'editmode') }}
@@ -693,6 +719,9 @@ jobs:
         timeout-minutes: 40
         shell: pwsh
         env:
+          UH_CONCURRENT_RUN: ${{ github.event_name != 'workflow_dispatch' }}
+          UH_MODE_CONTROLLER_OUTCOME: ${{ steps.run_modes.outcome }}
+          UH_MODE_OUTCOME: ${{ steps.run_modes.outputs.editmode }}
           UNITY_EDITOR_PATH: ${{ steps.ensure_unity_editor.outputs.editor-path }}
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
@@ -708,6 +737,13 @@ jobs:
           UH_STREAM_TEST_RESULTS: "1"
         run: |
           $ErrorActionPreference = 'Stop'
+          if ($env:UH_CONCURRENT_RUN -eq 'true') {
+            if ($env:UH_MODE_CONTROLLER_OUTCOME -cne 'success' -or $env:UH_MODE_OUTCOME -cne 'success') {
+              throw 'The concurrent editmode worker did not succeed.'
+            }
+            Write-Host 'The concurrent editmode worker completed; native results are verified below.'
+            exit 0
+          }
           ./scripts/unity/assert-no-active-unity-editor.ps1
           # -ProjectRoot puts the generated project and its Library OUTSIDE
           # $GITHUB_WORKSPACE. actions/checkout runs `git clean -ffdx` at the top of
@@ -788,6 +824,9 @@ jobs:
         timeout-minutes: 40
         shell: pwsh
         env:
+          UH_CONCURRENT_RUN: ${{ github.event_name != 'workflow_dispatch' }}
+          UH_MODE_CONTROLLER_OUTCOME: ${{ steps.run_modes.outcome }}
+          UH_MODE_OUTCOME: ${{ steps.run_modes.outputs.playmode }}
           UNITY_EDITOR_PATH: ${{ steps.ensure_unity_editor.outputs.editor-path }}
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
@@ -800,6 +839,13 @@ jobs:
           UH_STREAM_TEST_RESULTS: "1"
         run: |
           $ErrorActionPreference = 'Stop'
+          if ($env:UH_CONCURRENT_RUN -eq 'true') {
+            if ($env:UH_MODE_CONTROLLER_OUTCOME -cne 'success' -or $env:UH_MODE_OUTCOME -cne 'success') {
+              throw 'The concurrent playmode worker did not succeed.'
+            }
+            Write-Host 'The concurrent playmode worker completed; native results are verified below.'
+            exit 0
+          }
           ./scripts/unity/assert-no-active-unity-editor.ps1
           ./scripts/unity/run-ci-tests.ps1 `
             -UnityVersion '${{ matrix.unity-version }}' `
@@ -833,6 +879,9 @@ jobs:
         timeout-minutes: 60
         shell: pwsh
         env:
+          UH_CONCURRENT_RUN: ${{ github.event_name != 'workflow_dispatch' }}
+          UH_MODE_CONTROLLER_OUTCOME: ${{ steps.run_modes.outcome }}
+          UH_MODE_OUTCOME: ${{ steps.run_modes.outputs.standalone }}
           UH_NATIVE_ALLOCATOR_DIAGNOSTICS: ${{ startsWith(matrix.unity-version, '6000.') && '1' || '' }}
           UH_FORCE_FRESH_COMPILATION_CACHE: ${{ github.event_name == 'workflow_dispatch' && inputs.fresh-conversion && 'true' || 'false' }}
           UNITY_EDITOR_PATH: ${{ steps.ensure_unity_editor.outputs.editor-path }}
@@ -846,6 +895,13 @@ jobs:
           UH_STREAM_TEST_RESULTS: "1"
         run: |
           $ErrorActionPreference = 'Stop'
+          if ($env:UH_CONCURRENT_RUN -eq 'true') {
+            if ($env:UH_MODE_CONTROLLER_OUTCOME -cne 'success' -or $env:UH_MODE_OUTCOME -cne 'success') {
+              throw 'The concurrent standalone worker did not succeed.'
+            }
+            Write-Host 'The concurrent standalone worker completed; native results are verified below.'
+            exit 0
+          }
           ./scripts/unity/assert-no-active-unity-editor.ps1
           ./scripts/unity/run-ci-tests.ps1 `
             -UnityVersion '${{ matrix.unity-version }}' `
@@ -974,6 +1030,9 @@ jobs:
         timeout-minutes: 60
         shell: pwsh
         env:
+          UH_CONCURRENT_RUN: ${{ github.event_name != 'workflow_dispatch' }}
+          UH_MODE_CONTROLLER_OUTCOME: ${{ steps.run_modes.outcome }}
+          UH_MODE_OUTCOME: ${{ steps.run_modes.outputs.proto_only }}
           UH_FORCE_FRESH_COMPILATION_CACHE: ${{ github.event_name == 'workflow_dispatch' && inputs.fresh-conversion && 'true' || 'false' }}
           UNITY_EDITOR_PATH: ${{ steps.ensure_unity_editor.outputs.editor-path }}
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
@@ -984,6 +1043,13 @@ jobs:
           UH_STREAM_TEST_RESULTS: "1"
         run: |
           $ErrorActionPreference = 'Stop'
+          if ($env:UH_CONCURRENT_RUN -eq 'true') {
+            if ($env:UH_MODE_CONTROLLER_OUTCOME -cne 'success' -or $env:UH_MODE_OUTCOME -cne 'success') {
+              throw 'The concurrent proto_only worker did not succeed.'
+            }
+            Write-Host 'The concurrent proto_only worker completed; native results are verified below.'
+            exit 0
+          }
           ./scripts/unity/assert-no-active-unity-editor.ps1
           ./scripts/unity/run-ci-tests.ps1 `
             -UnityVersion '${{ matrix.unity-version }}' `
@@ -1515,6 +1581,32 @@ jobs:
             throw 'The organization Unity lock was not acquired; SINGLE_THREADED modes cannot be waived.'
           }
 
+      - name: Run Unity modes concurrently
+        id: run_modes
+        if: ${{ !cancelled() && github.event_name != 'workflow_dispatch' && steps.unity_lock.outputs.acquired == 'true' }}
+        continue-on-error: true
+        timeout-minutes: 35
+        shell: pwsh
+        env:
+          UNITY_EDITOR_PATH: ${{ steps.ensure_unity_editor.outputs.editor-path }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_ACCELERATOR_ENDPOINT: ${{ secrets.UNITY_ACCELERATOR_ENDPOINT }}
+          UH_CENTRAL_LICENSE_RETURN: "true"
+          UH_UNITY_TEST_CATEGORY: "!Performance;!Stress"
+          UH_STREAM_TEST_RESULTS: "1"
+          UH_NATIVE_ALLOCATOR_DIAGNOSTICS: ${{ startsWith(matrix.unity-version, '6000.') && '1' || '' }}
+          GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
+          UH_PARALLEL_ASSEMBLY_PROFILES: ${{ needs.matrix-config.outputs.core-assembly-profiles }}
+          UH_PARALLEL_SELECTED_MODES: '["editmode","playmode","standalone"]'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./scripts/unity/assert-no-active-unity-editor.ps1
+          uv run --project scripts/python~ --locked --no-dev python scripts/unity/run_ci_modes.py --version '${{ matrix.unity-version }}' --single-threaded
+          if ($LASTEXITCODE -ne 0) { throw 'One or more concurrent Unity modes failed.' }
+          ./scripts/unity/assert-no-active-unity-editor.ps1
+
       - name: Run EditMode tests (SINGLE_THREADED)
         id: run_editmode
         if: ${{ !cancelled() && steps.unity_lock.outputs.acquired == 'true' }}
@@ -1527,6 +1619,9 @@ jobs:
         timeout-minutes: 40
         shell: pwsh
         env:
+          UH_CONCURRENT_RUN: ${{ github.event_name != 'workflow_dispatch' }}
+          UH_MODE_CONTROLLER_OUTCOME: ${{ steps.run_modes.outcome }}
+          UH_MODE_OUTCOME: ${{ steps.run_modes.outputs.editmode }}
           UNITY_EDITOR_PATH: ${{ steps.ensure_unity_editor.outputs.editor-path }}
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
@@ -1542,6 +1637,13 @@ jobs:
           UH_STREAM_TEST_RESULTS: "1"
         run: |
           $ErrorActionPreference = 'Stop'
+          if ($env:UH_CONCURRENT_RUN -eq 'true') {
+            if ($env:UH_MODE_CONTROLLER_OUTCOME -cne 'success' -or $env:UH_MODE_OUTCOME -cne 'success') {
+              throw 'The concurrent editmode worker did not succeed.'
+            }
+            Write-Host 'The concurrent editmode worker completed; native results are verified below.'
+            exit 0
+          }
           ./scripts/unity/assert-no-active-unity-editor.ps1
           ./scripts/unity/run-ci-tests.ps1 `
             -UnityVersion '${{ matrix.unity-version }}' `
@@ -1574,6 +1676,9 @@ jobs:
         timeout-minutes: 40
         shell: pwsh
         env:
+          UH_CONCURRENT_RUN: ${{ github.event_name != 'workflow_dispatch' }}
+          UH_MODE_CONTROLLER_OUTCOME: ${{ steps.run_modes.outcome }}
+          UH_MODE_OUTCOME: ${{ steps.run_modes.outputs.playmode }}
           UNITY_EDITOR_PATH: ${{ steps.ensure_unity_editor.outputs.editor-path }}
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
@@ -1586,6 +1691,13 @@ jobs:
           UH_STREAM_TEST_RESULTS: "1"
         run: |
           $ErrorActionPreference = 'Stop'
+          if ($env:UH_CONCURRENT_RUN -eq 'true') {
+            if ($env:UH_MODE_CONTROLLER_OUTCOME -cne 'success' -or $env:UH_MODE_OUTCOME -cne 'success') {
+              throw 'The concurrent playmode worker did not succeed.'
+            }
+            Write-Host 'The concurrent playmode worker completed; native results are verified below.'
+            exit 0
+          }
           ./scripts/unity/assert-no-active-unity-editor.ps1
           ./scripts/unity/run-ci-tests.ps1 `
             -UnityVersion '${{ matrix.unity-version }}' `
@@ -1617,6 +1729,9 @@ jobs:
         timeout-minutes: 60
         shell: pwsh
         env:
+          UH_CONCURRENT_RUN: ${{ github.event_name != 'workflow_dispatch' }}
+          UH_MODE_CONTROLLER_OUTCOME: ${{ steps.run_modes.outcome }}
+          UH_MODE_OUTCOME: ${{ steps.run_modes.outputs.standalone }}
           UH_FORCE_FRESH_COMPILATION_CACHE: ${{ github.event_name == 'workflow_dispatch' && inputs.fresh-conversion && 'true' || 'false' }}
           UNITY_EDITOR_PATH: ${{ steps.ensure_unity_editor.outputs.editor-path }}
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
@@ -1629,6 +1744,13 @@ jobs:
           UH_STREAM_TEST_RESULTS: "1"
         run: |
           $ErrorActionPreference = 'Stop'
+          if ($env:UH_CONCURRENT_RUN -eq 'true') {
+            if ($env:UH_MODE_CONTROLLER_OUTCOME -cne 'success' -or $env:UH_MODE_OUTCOME -cne 'success') {
+              throw 'The concurrent standalone worker did not succeed.'
+            }
+            Write-Host 'The concurrent standalone worker completed; native results are verified below.'
+            exit 0
+          }
           ./scripts/unity/assert-no-active-unity-editor.ps1
           ./scripts/unity/run-ci-tests.ps1 `
             -UnityVersion '${{ matrix.unity-version }}' `

@@ -187,11 +187,19 @@ try {
     $isolationChecks = 0
     $phases = @(New-UnityEditorTestPhases -ArtifactsPath $temporary `
         -TestCategory '!Performance;!Stress' -IsolateCompilationFixtures)
-    if ($phases.Count -ne 7 -or $phases[0].TestCategory -cne 'CompilationIsolation' -or
+    if ($phases.Count -ne 4 -or $phases[0].TestCategory -cne 'CompilationIsolation' -or
         $phases[0].ArtifactsPath -ceq $phases[1].ArtifactsPath -or
         -not $phases[0].RequirePassedTests -or
         $phases[-1].TestCategory -cne '!Performance;!Stress;!CompilationIsolation;!MigrationIsolation') {
         throw 'Compiler and normal tests must have separate complete selections and artifacts.'
+    }
+    $selectedMigrationFixtures = @($phases[1..2] | ForEach-Object { $_.RequiredFixture })
+    $expectedMigrationFixtures = @(Get-UnityMigrationIsolationFixtures)
+    if ($selectedMigrationFixtures.Count -ne $expectedMigrationFixtures.Count -or
+        @(Compare-Object $selectedMigrationFixtures $expectedMigrationFixtures -CaseSensitive).Count -ne 0 -or
+        $phases[1].RequiredFixture.Count -ne 4 -or $phases[2].RequiredFixture.Count -ne 1 -or
+        $phases[1].TestFilter -cne ($phases[1].RequiredFixture -join ';')) {
+        throw 'Grouped migration phases must retain every fixture exactly once and the complete OR filter.'
     }
     $rejected = $false
     try { New-UnityEditorTestPhases -ArtifactsPath $temporary -TestFilter 'Caller.Filter' -IsolateCompilationFixtures }
@@ -232,9 +240,10 @@ try {
             throw 'Native process failure.'
         }
         $phaseSubject = $phases[$script:phaseCalls.Count - 1].RequiredFixture
-        $caseClass = if ($phaseSubject) { $phaseSubject } else { 'Normal.Subject' }
-        if ($script:phaseFailure -eq 'wrong subject' -and $first) { $caseClass = 'Wrong.Subject' }
-        Set-Content -LiteralPath $ResultsPath -Value ("<test-run total='1' passed='1' failed='0' skipped='0'><test-case classname='$caseClass' result='Passed' /></test-run>")
+        $caseClasses = @(if ($phaseSubject) { $phaseSubject } else { 'Normal.Subject' })
+        if ($script:phaseFailure -eq 'wrong subject' -and $first) { $caseClasses = @('Wrong.Subject') }
+        $caseBody = ($caseClasses | ForEach-Object { "<test-case classname='$_' result='Passed' />" }) -join ''
+        Set-Content -LiteralPath $ResultsPath -Value ("<test-run total='$($caseClasses.Count)' passed='$($caseClasses.Count)' failed='0' skipped='0'>$caseBody</test-run>")
         Set-Content -LiteralPath $LogPath -Value 'Native editor output.'
         return 0
     }
@@ -313,10 +322,11 @@ try {
             if ($null -ne $fixture.Child) {
                 Set-Content -LiteralPath (Join-Path $env:UH_RESULTS_DIR 'compilation/results.xml') -Value ("<test-run total='1' passed='1' failed='0' skipped='0'><test-case classname='Subject' result='$($fixture.Child)' /></test-run>")
             }
-            foreach ($migrationFixture in @(Get-UnityMigrationIsolationFixtures)) {
-                $migrationPath = Join-Path $env:UH_RESULTS_DIR ('migration/' + $migrationFixture.Split('.')[-1])
+            foreach ($group in @(Get-UnityMigrationIsolationGroups)) {
+                $migrationPath = Join-Path $env:UH_RESULTS_DIR ('migration/' + $group.Name)
                 New-Item -ItemType Directory -Force -Path $migrationPath | Out-Null
-                Set-Content -LiteralPath (Join-Path $migrationPath 'results.xml') -Value ("<test-run total='1' passed='1' failed='0' skipped='0'><test-case classname='$migrationFixture' result='Passed' /></test-run>")
+                $caseBody = ($group.Fixtures | ForEach-Object { "<test-case classname='$_' result='Passed' />" }) -join ''
+                Set-Content -LiteralPath (Join-Path $migrationPath 'results.xml') -Value ("<test-run total='$($group.Fixtures.Count)' passed='$($group.Fixtures.Count)' failed='0' skipped='0'>$caseBody</test-run>")
             }
             $output = & (Get-Process -Id $PID).Path -NoProfile -File $verifierScript 2>&1 | Out-String
             $actualExit = $LASTEXITCODE
@@ -331,25 +341,35 @@ try {
             $isolationChecks++
         }
         Set-Content -LiteralPath (Join-Path $env:UH_RESULTS_DIR 'results.xml') -Value '<test-run total="1" passed="1" failed="0"><test-case result="Passed" /></test-run>'
-        $migrationFixtures = @(Get-UnityMigrationIsolationFixtures)
-        foreach ($migrationFixture in $migrationFixtures) {
-            $migrationResult = Join-Path $env:UH_RESULTS_DIR ('migration/' + $migrationFixture.Split('.')[-1] + '/results.xml')
-            foreach ($damage in @('missing', 'wrong subject', 'Skipped', 'Inconclusive', 'Failed')) {
-                if ($damage -eq 'missing') {
-                    Remove-Item -LiteralPath $migrationResult
-                } else {
-                    $classname = if ($damage -eq 'wrong subject') { 'Wrong.Subject' } else { $migrationFixture }
-                    $result = if ($damage -eq 'wrong subject') { 'Passed' } else { $damage }
-                    Set-Content -LiteralPath $migrationResult -Value ("<test-run><test-case classname='$classname' result='$result' /></test-run>")
+        foreach ($group in @(Get-UnityMigrationIsolationGroups)) {
+            $migrationResult = Join-Path $env:UH_RESULTS_DIR ('migration/' + $group.Name + '/results.xml')
+            $originalMigrationXml = [IO.File]::ReadAllText($migrationResult)
+            foreach ($migrationFixture in $group.Fixtures) {
+                foreach ($damage in @('missing', 'omitted fixture', 'wrong subject', 'Skipped', 'Inconclusive', 'Failed', 'failed suite', 'failed root')) {
+                    if ($damage -eq 'missing') {
+                        Remove-Item -LiteralPath $migrationResult
+                    } else {
+                        [xml]$damaged = $originalMigrationXml
+                        $subject = $damaged.SelectSingleNode("//test-case[@classname='$migrationFixture']")
+                        if ($damage -eq 'omitted fixture') { [void]$subject.ParentNode.RemoveChild($subject) }
+                        elseif ($damage -eq 'wrong subject') { $subject.SetAttribute('classname', 'Wrong.Subject') }
+                        elseif ($damage -eq 'failed root') { $damaged.DocumentElement.SetAttribute('result', 'Failed') }
+                        elseif ($damage -eq 'failed suite') {
+                            $failedSuite = $damaged.CreateElement('test-suite')
+                            $failedSuite.SetAttribute('result', 'Failed')
+                            [void]$damaged.DocumentElement.AppendChild($failedSuite)
+                        } else { $subject.SetAttribute('result', $damage) }
+                        [IO.File]::WriteAllText($migrationResult, $damaged.OuterXml)
+                    }
+                    $output = & (Get-Process -Id $PID).Path -NoProfile -File $verifierScript 2>&1 | Out-String
+                    if ($LASTEXITCODE -eq 0) { throw "A damaged required migration fixture was accepted: $migrationFixture / $damage" }
+                    [IO.File]::WriteAllText($migrationResult, $originalMigrationXml)
+                    $isolationChecks++
                 }
                 $output = & (Get-Process -Id $PID).Path -NoProfile -File $verifierScript 2>&1 | Out-String
-                if ($LASTEXITCODE -eq 0) { throw "A missing or nonpassing isolated migration fixture was accepted: $migrationFixture" }
+                if ($LASTEXITCODE -ne 0) { throw "Restoring the damaged fixture did not restore passing evidence: $migrationFixture -- $output" }
                 $isolationChecks++
             }
-            Set-Content -LiteralPath $migrationResult -Value ("<test-run><test-case classname='$migrationFixture' result='Passed' /></test-run>")
-            $output = & (Get-Process -Id $PID).Path -NoProfile -File $verifierScript 2>&1 | Out-String
-            if ($LASTEXITCODE -ne 0) { throw "Restoring the damaged isolated fixture did not restore passing evidence: $migrationFixture -- $output" }
-            $isolationChecks++
         }
         $dumpAction = Get-Content -LiteralPath (Join-Path $PSScriptRoot '../../.github/actions/dump-unity-log-tail/action.yml') -Raw
         $dumpStart = $dumpAction.IndexOf($runMarker)

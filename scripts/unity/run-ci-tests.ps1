@@ -11,6 +11,10 @@ param(
 
     [string]$AssemblyNames,
 
+    [string]$LicenseSessionPath = '',
+
+    [switch]$PrepareLicenseOnly,
+
     [string]$ExportPackagePath,
 
     [Parameter(Mandatory = $true)]
@@ -230,6 +234,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib/compilation-fixture-results.ps1')
+. (Join-Path $PSScriptRoot 'lib/license-session.ps1')
 . (Join-Path $PSScriptRoot 'lib/test-result-evidence.ps1')
 . (Join-Path $PSScriptRoot 'lib/wproto-player-provenance.ps1')
 if ($IsolateCompilationFixtures -and $TestMode -ne 'editmode') {
@@ -1145,12 +1150,12 @@ function New-UnityEditorTestPhases {
             RequiredFixture = $fixture
             RequirePassedTests = $true
         }
-        foreach ($migrationFixture in @(Get-UnityMigrationIsolationFixtures)) {
+        foreach ($group in @(Get-UnityMigrationIsolationGroups)) {
             [pscustomobject]@{
-                ArtifactsPath = Join-Path $ArtifactsPath ('migration/' + $migrationFixture.Split('.')[-1])
-                TestFilter = $migrationFixture
+                ArtifactsPath = Join-Path $ArtifactsPath ('migration/' + $group.Name)
+                TestFilter = $group.Fixtures -join ';'
                 TestCategory = 'MigrationIsolation'
-                RequiredFixture = $migrationFixture
+                RequiredFixture = $group.Fixtures
                 RequirePassedTests = $true
             }
         }
@@ -1161,7 +1166,7 @@ function New-UnityEditorTestPhases {
         ArtifactsPath = $ArtifactsPath
         TestFilter = $TestFilter
         TestCategory = $TestCategory
-        RequiredFixture = ''
+        RequiredFixture = @()
         RequirePassedTests = -not [string]::IsNullOrWhiteSpace($TestFilter)
     }
 }
@@ -1187,7 +1192,7 @@ function Invoke-UnityEditorTestPhase {
         [string]$ArtifactsPath,
         [string]$Project,
         [string]$PackageRoot,
-        [string]$RequiredFixture,
+        [string[]]$RequiredFixture,
         [switch]$RequirePassedTests
     )
 
@@ -1204,7 +1209,7 @@ function Invoke-UnityEditorTestPhase {
     Write-AnalyzerSetupDiagnostics -Project $Project -LogPath $phaseLog -Label $Label
     Test-NUnitResults -Path $phaseResults -Label $Label -LogPath $phaseLog `
         -Project $Project -UnityExitCode $phaseExit -RequirePassedTests:$RequirePassedTests
-    if (-not [string]::IsNullOrWhiteSpace($RequiredFixture)) {
+    if ($null -ne $RequiredFixture -and $RequiredFixture.Count -ne 0) {
         Assert-UnityCompilationFixtureResults -Path $phaseResults -FixtureName $RequiredFixture
     }
     Assert-NoUnityCompilerWarnings -LogPath $phaseLog -Label $Label -PackageRoot $PackageRoot
@@ -5189,6 +5194,21 @@ if ($env:GITHUB_ACTIONS -eq 'true' -and -not $hasLicenseCreds) {
     throw "Serial Unity activation requires UNITY_SERIAL, UNITY_EMAIL, and UNITY_PASSWORD in CI. Missing or empty: $($missing -join ', ')."
 }
 
+$sharedLicenseSession = $null
+$reuseLicenseSession = $false
+if ($PrepareLicenseOnly -and [string]::IsNullOrWhiteSpace($LicenseSessionPath)) {
+    throw 'License preparation requires a shared session file.'
+}
+if (-not [string]::IsNullOrWhiteSpace($LicenseSessionPath)) {
+    if (-not $hasLicenseCreds -or -not $centralReturnOwnsLicense) {
+        throw 'Shared activation requires complete credentials and central return ownership.'
+    }
+    $sessionState = if ($PrepareLicenseOnly) { 'requested' } else { 'activated' }
+    $sharedLicenseSession = Read-UnityLicenseSession -Path $LicenseSessionPath `
+        -UnityVersion $UnityVersion -EditorPath $UnityEditorPath -State $sessionState
+    $reuseLicenseSession = -not $PrepareLicenseOnly
+}
+
 # Array-wrap the capture so it is ALWAYS an array under Set-StrictMode -Version
 # Latest. Get-AcceleratorArguments `return @()` on its empty path emits ZERO
 # objects, so a bare `$x = Get-Foo` assigns AutomationNull (the empty array
@@ -5270,7 +5290,7 @@ $returnLogPath = Join-Path $licenseLogDir "unity-return-$UnityVersion-$TestMode.
 # workflow backstop could run. This is safe for central-lifecycle callers too:
 # the fresh activation below establishes the seat that the central executor will
 # later return, so this pre-activation cleanup cannot consume that evidence.
-if ($hasLicenseCreds) {
+if ($hasLicenseCreds -and -not $reuseLicenseSession) {
     Invoke-UnityLicenseReturn -EditorPath $UnityEditorPath -Email $env:UNITY_EMAIL -Password $env:UNITY_PASSWORD -LogPath $returnLogPath
 }
 
@@ -5287,9 +5307,14 @@ try {
     # licensed. Activation THROWS on failure (caught by this try's finally, which
     # still returns the seat). Skipped locally when creds are absent (the machine
     # is assumed already licensed).
-    if ($hasLicenseCreds) {
+    if ($hasLicenseCreds -and -not $reuseLicenseSession) {
         Invoke-UnityLicenseActivate -EditorPath $UnityEditorPath -Serial $env:UNITY_SERIAL -Email $env:UNITY_EMAIL -Password $env:UNITY_PASSWORD -LogPath $activateLogPath
     }
+    if ($PrepareLicenseOnly) {
+        Complete-UnityLicenseSession -Path $LicenseSessionPath -Session $sharedLicenseSession
+        return
+    }
+
 
     if ($TestMode -eq 'export') {
         Invoke-UnityPackageExport -EditorPath $UnityEditorPath -Project $ProjectPath `

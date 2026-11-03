@@ -735,10 +735,10 @@ runs:
           Assert-UnityCompilationFixtureResults `
             -Path (Join-Path $dir 'compilation/results.xml') `
             -FixtureName $env:UH_REQUIRED_COMPILATION_FIXTURE
-          foreach ($fixture in @(Get-UnityMigrationIsolationFixtures)) {
+          foreach ($group in @(Get-UnityMigrationIsolationGroups)) {
             Assert-UnityCompilationFixtureResults `
-              -Path (Join-Path $dir ('migration/' + $fixture.Split('.')[-1] + '/results.xml')) `
-              -FixtureName $fixture
+              -Path (Join-Path $dir ('migration/' + $group.Name + '/results.xml')) `
+              -FixtureName $group.Fixtures
           }
         }
         Write-Host "::notice::${label}: total=$total passed=$passed failed=$failed skipped=$skipped"

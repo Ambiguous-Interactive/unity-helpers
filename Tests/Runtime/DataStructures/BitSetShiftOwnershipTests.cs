@@ -54,8 +54,18 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             {
                 bool expected =
                     shift <= 0 ? before[index] : shift <= index && before[index - shift];
-                Assert.AreEqual(expected, bits[index], $"Bit {index} differs.");
-                Assert.AreEqual(before[index], snapshot[index]);
+                if (expected != bits[index])
+                {
+                    Assert.Fail(
+                        $"Shifted bit {index} differs: expected {expected}, actual {bits[index]}."
+                    );
+                }
+                if (before[index] != snapshot[index])
+                {
+                    Assert.Fail(
+                        $"Snapshot bit {index} differs: expected {before[index]}, actual {snapshot[index]}."
+                    );
+                }
                 if (expected)
                 {
                     ++expectedCount;

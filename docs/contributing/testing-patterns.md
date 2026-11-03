@@ -58,6 +58,10 @@ It preserves unrelated sibling assets. Clear the tool's cached singleton referen
 Inspect full NUnit results as well as leaf counts. A fixture teardown failure can leave all
 individual test cases passing while the run itself fails.
 
+PR and push version jobs activate once, then run the selected modes concurrently in separate persistent projects and owned source worktrees. Compiler fixtures can rewrite their own sources without changing another mode's inputs. The coordinator verifies cache ownership and repository identity before restoring a worktree; unknown paths are preserved. EditMode retains its shared editor cache; PlayMode uses its own project. Each worker verifies the session's version, editor path, job identity and live owner before reusing activation. The coordinator waits for every worker and kills timed-out worker trees before central license return. Mode receipts record elapsed time and all outcomes. The existing per-mode NUnit, redaction and artifact gates still apply. Manual diagnostic dispatches keep the serial path.
+
+The isolated migration contract phase runs the API, backup recovery, import verification and apply-record fixtures in one editor invocation. The compiler fixture and domain-reloading apply fixture retain separate invocations. Each group requires every named fixture, rejects skipped or missing cases, and checks root and suite failures.
+
 ## Identify the Unity Test Framework used by a run
 
 The local test-project builder, CI builder and package exporter read the framework request
@@ -92,6 +96,8 @@ bytes observed in that domain. They do not prove a clean rebuild, map every fram
 to compiler inputs, qualify CLI result semantics, or establish native process health. Inspect
 complete NUnit roots and suites, raw process receipts and expected inconclusive outcomes
 separately. A green XML report cannot explain an abnormal native exit.
+
+Run `npm run test:unity-modes` for process overlap, cancellation, session identity and source-isolation controls. These controls use a labeled worker fixture; they do not replace native mode qualification.
 
 Run `npm run test:unity-framework` for manifest controls and compiled host collector controls.
 The host controls use labeled API shims; native framework qualification still requires the
@@ -1015,6 +1021,10 @@ Assert.Throws<SerializationException>(() => Deserialize(corruptedData));
 Assert.AreEqual(default(T), result);
 Assert.AreEqual(0, deserializedFromEmpty.Id);
 ```
+
+### Repeated primitive comparisons
+
+For exhaustive bit or scalar checks, compare every value directly and call `Assert.Fail` on a mismatch. Keep the complete input matrix and final size or aggregate assertions. This avoids allocating NUnit constraints and formatting messages for each successful comparison. Check the failure paths with changed result and snapshot values before accepting a timing improvement.
 
 ## Data-Driven Testing for Edge Cases
 

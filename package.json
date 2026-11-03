@@ -399,6 +399,7 @@
     "typecheck:unity:odin-bases-disabled": "dotnet build \"Generator~/WallstopStudios.UnityHelpers.TypeCheck/WallstopStudios.UnityHelpers.TypeCheck.csproj\" --nologo -v minimal -p:WallstopOdin=true -p:WallstopDisableOdinBases=true && dotnet build \"Generator~/WallstopStudios.UnityHelpers.TestCheck/WallstopStudios.UnityHelpers.TestCheck.csproj\" --nologo -v minimal -p:WallstopOdin=true -p:WallstopDisableOdinBases=true && dotnet build \"Generator~/WallstopStudios.UnityHelpers.EditorTestCheck/WallstopStudios.UnityHelpers.EditorTestCheck.csproj\" --nologo -v minimal -p:WallstopOdin=true -p:WallstopDisableOdinBases=true",
     "test:auto-publish-release": "node scripts/tests/test-auto-publish-release.js",
     "test:watchdog-cancellation": "uv run --project scripts/python~ --locked pytest scripts/tests/test-watchdog-cancellation.py -q",
+    "test:unity-modes": "uv run --project scripts/python~ --locked pytest scripts/tests/test_ci_modes.py -q",
     "test:unity-framework": "pwsh -NoProfile -File scripts/tests/test-unity-framework-policy.ps1 && pwsh -NoProfile -File scripts/tests/test-unity-framework-workspace.ps1 && uv run --project scripts/python~ --locked pytest scripts/tests/test-unity-framework-evidence.py -q",
     "test:assembly-launchers": "pwsh -NoProfile -File scripts/lint-asmdef.ps1 && pwsh -NoProfile -File scripts/lint-bundled-assemblies.ps1 && pwsh -NoProfile -File scripts/tests/test-lint-bundled-assemblies.ps1",
     "test:asmdef": "uv run --project scripts/python~ --locked pytest scripts/tests/test_asmdef.py -q",
