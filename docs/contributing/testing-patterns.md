@@ -10,6 +10,12 @@ test assembly. The fixture requires all three to compile and separately breaks r
 member access. Keep the consumer targets out of shared test assembly references: migrating a
 shared helper recompiles its entire dependent test graph on every case.
 
+## Configure Release before initial import
+
+Configure invocations request Release code optimization at editor startup, matching the test and
+build invocations. Setting it inside the configure method is too late for the initial import:
+even a warm project first recompiles in Debug, then recompiles again for Release tests.
+
 ## Keep memory-only cleanup outside asset batches
 
 `CommonTestBase.DestroyTrackedObjects` opens an asset editing batch only when a tracked object

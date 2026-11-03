@@ -4850,6 +4850,7 @@ function Invoke-UnityConfigurePass {
         '-quit',
         '-batchmode',
         '-nographics',
+        '-releaseCodeOptimization',
         '-projectPath', $ProjectPath,
         '-buildTarget', 'StandaloneWindows64',
         '-executeMethod', 'UhCiTestConfigurator.Apply',
