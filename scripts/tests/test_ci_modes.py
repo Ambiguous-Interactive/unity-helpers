@@ -147,7 +147,7 @@ def make_control(tmp_path: Path) -> tuple[list[Mode], Mode, dict[str, str], str]
         Write-Host ('Mode diagnostics: ' + $TestMode)
         [IO.File]::WriteAllText((Join-Path $env:CONTROL_EVENTS ($workerName + '.started')), [string]$PID)
         $deadline = [DateTime]::UtcNow.AddSeconds(10)
-        while (@(Get-ChildItem -LiteralPath $env:CONTROL_EVENTS -Filter '*.started').Count -lt [Math]::Min(3, $expectedWorkers)) {
+        while (@(Get-ChildItem -LiteralPath $env:CONTROL_EVENTS -Filter '*.started').Count -lt [Math]::Min(4, $expectedWorkers)) {
             if ($deadline -lt [DateTime]::UtcNow) { throw 'Workers did not overlap.' }
             Start-Sleep -Milliseconds 10
         }
@@ -265,8 +265,9 @@ def test_real_workers_overlap_and_keep_every_outcome(tmp_path: Path, failed: str
 
 
 @pytest.mark.parametrize("failed", ["", "Main", "Isolated"])
+@pytest.mark.parametrize("include_proto", [False, True])
 def test_editor_halves_require_both_and_publish_fixture_evidence(
-    tmp_path: Path, failed: str
+    tmp_path: Path, failed: str, include_proto: bool
 ) -> None:
     modes, preparation, environment, shell = make_control(tmp_path)
     modes[0] = Mode("editmode", {**modes[0].parameters, "EditorPhaseGroup": "Main"})
@@ -279,9 +280,21 @@ def test_editor_halves_require_both_and_publish_fixture_evidence(
         },
     )
     environment["CONTROL_FAIL_PHASE"] = failed
-    environment["CONTROL_MODE_COUNT"] = "4"
+    selected = [*modes, isolated]
+    if include_proto:
+        selected.append(
+            Mode(
+                "proto_only",
+                {
+                    **modes[2].parameters,
+                    "ProjectScope": "proto-only",
+                    "ArtifactsPath": str(tmp_path / "proto_only"),
+                },
+            )
+        )
+    environment["CONTROL_MODE_COUNT"] = str(len(selected))
     success = run(
-        [*modes, isolated],
+        selected,
         preparation,
         private=tmp_path,
         shell=shell,
@@ -292,12 +305,15 @@ def test_editor_halves_require_both_and_publish_fixture_evidence(
     )
     assert success == (failed == "")
     receipt = json.loads((tmp_path / "receipt.json").read_text(encoding="utf-8"))
-    assert receipt["Outcomes"] == {
+    expected = {
         "editmode": "failure" if failed else "success",
         "playmode": "success",
         "standalone": "success",
     }
-    assert len(receipt["Workers"]) == 4
+    if include_proto:
+        expected["proto_only"] = "success"
+    assert receipt["Outcomes"] == expected
+    assert len(receipt["Workers"]) == len(selected)
     assert receipt["ControllerCompleted"] is True
     intervals = sorted(
         [(worker["StartedAfterSeconds"], 1) for worker in receipt["Workers"]]
@@ -308,17 +324,15 @@ def test_editor_halves_require_both_and_publish_fixture_evidence(
     for _, change in intervals:
         active += change
         peak = max(peak, active)
-    assert peak == 3
-    assert [worker["Mode"] for worker in receipt["Workers"][:3]] == [
+    assert peak == 4
+    assert [worker["Mode"] for worker in receipt["Workers"][:4]] == [
         "editmode",
         "editmode_isolated",
         "standalone",
+        "playmode",
     ]
     assert {path.stem for path in (tmp_path / "events").glob("*.started")} == {
-        "editmode",
-        "editmode_isolated",
-        "playmode",
-        "standalone",
+        mode.name for mode in selected
     }
     if failed != "Isolated":
         for name in ("compilation", "migration"):
