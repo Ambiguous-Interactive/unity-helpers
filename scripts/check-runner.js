@@ -21,6 +21,21 @@ const argumentsForPython = [
   path.join(root, "scripts/check_runner.py")
 ];
 
+function runRegistryCli(registry, argv) {
+  const result = spawnSync(
+    uv,
+    [
+      ...argumentsForPython.slice(0, -1),
+      path.join(root, "scripts/check_registries.py"),
+      registry,
+      ...argv
+    ],
+    { cwd: root, stdio: "inherit" }
+  );
+  if (result.error) console.error(result.error.message);
+  return result.status === null ? 1 : result.status;
+}
+
 function invokeSync(request) {
   const result = spawnSync(uv, argumentsForPython, {
     cwd: root,
@@ -101,4 +116,12 @@ function runRegistry(registry) {
   return invoke({ operation: "runRegistry", ...registry });
 }
 
-module.exports = { defaultJobs, parseArguments, runCheck, runChecks, runRegistry, invokeSync };
+module.exports = {
+  defaultJobs,
+  parseArguments,
+  runCheck,
+  runChecks,
+  runRegistry,
+  runRegistryCli,
+  invokeSync
+};

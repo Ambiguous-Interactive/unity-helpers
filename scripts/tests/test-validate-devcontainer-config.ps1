@@ -228,6 +228,18 @@ try {
     -Passed ($realResult.ExitCode -eq 0) -Message "exit $($realResult.ExitCode): $($realResult.Output)"
   Test-Accepts -TestName 'a verbatim copy passes' -Root (New-ConfigFixture -Name 'baseline')
 
+  foreach ($invalidInvocation in @(
+    @{ Name = 'contracts-registry'; Replacement = 'python scripts/check_registries.py contracts --direct' },
+    @{ Name = 'filtered-lint-registry'; Replacement = 'python scripts/check_registries.py lint --direct --only doc-links' },
+    @{ Name = 'commented-lint-registry'; Replacement = '# python scripts/check_registries.py lint --direct' }
+  )) {
+    $root = New-ConfigFixture -Name $invalidInvocation.Name
+    Edit-FixtureFile -Root $root -RelativePath '.github/workflows/repo-lint.yml' `
+      -From 'python scripts/check_registries.py lint --direct' -To $invalidInvocation.Replacement
+    Test-Rejects -TestName "$($invalidInvocation.Name) cannot stand in for the full lint registry" -Root $root `
+      -ExpectedMessage 'A workflow must run validate-devcontainer-config.ps1'
+  }
+
   # ── Red halves: missing inputs ────────────────────────────────────────────
   $missingCases = @(
     @{ Name = 'no-devcontainer'; Path = '.devcontainer/devcontainer.json'; Message = 'devcontainer.json not found at' },

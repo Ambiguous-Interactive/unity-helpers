@@ -263,4 +263,4 @@ def test_executed_results_require_duration_before_budget_reporting(
     )
     output = capsys.readouterr().out
     assert "Missing duration" in output
-    assert "Slowest fixtures" not in output
+    assert "slowest fixtures" not in output.casefold()
