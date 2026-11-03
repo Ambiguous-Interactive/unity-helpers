@@ -2840,6 +2840,12 @@ function Invoke-ProcessWithTreeKillTimeout {
     $killReason = $null
     $killSucceeded = $false
     $exceptionType = $null
+    $processExitUtc = $null
+    $postExitDrainStarted = $null
+    $postExitLastOutput = $null
+    $outputDrainStopped = $false
+    $oDone = $false
+    $eDone = $false
     try {
         $psi = New-Object System.Diagnostics.ProcessStartInfo
         $psi.FileName = $FilePath
@@ -2873,8 +2879,6 @@ function Invoke-ProcessWithTreeKillTimeout {
             $deadline = [DateTime]::MaxValue
         }
 
-        $oDone = $false
-        $eDone = $false
         while (-not ($oDone -and $eDone)) {
             $progressed = $false
 
@@ -2908,6 +2912,28 @@ function Invoke-ProcessWithTreeKillTimeout {
                     $lastOutputAt = [DateTime]::UtcNow
                 }
                 $progressed = $true
+            }
+
+            if ($proc.HasExited) {
+                $now = [DateTime]::UtcNow
+                if ($null -eq $postExitDrainStarted) {
+                    try { $processExitUtc = $proc.ExitTime.ToUniversalTime() } catch { }
+                    $postExitDrainStarted = $now
+                    $postExitLastOutput = $now
+                }
+                $exitWithinDeadline = if ($null -ne $processExitUtc) { $processExitUtc -le $deadline } else { $postExitDrainStarted -le $deadline }
+                if ($exitWithinDeadline) {
+                    if ($progressed) { $postExitLastOutput = $now }
+                    if (($now - $postExitLastOutput).TotalSeconds -ge 1 -or ($now - $postExitDrainStarted).TotalSeconds -ge 5) {
+                        $outputDrainStopped = -not ($oDone -and $eDone)
+                        if ($outputDrainStopped) {
+                            Write-Host "::notice::$Label process exited; stopped waiting for open output streams."
+                        }
+                        break
+                    }
+                    if (-not $progressed) { Start-Sleep -Milliseconds 50 }
+                    continue
+                }
             }
 
             if ([DateTime]::UtcNow -ge $deadline) {
@@ -2981,9 +3007,10 @@ function Invoke-ProcessWithTreeKillTimeout {
 
         # Drain any reads that completed during/after the kill so no pre-kill output
         # is dropped.
+        $pendingWaitMilliseconds = if ($outputDrainStopped) { 0 } else { 2000 }
         foreach ($pending in @($oTask, $eTask)) {
             try {
-                if ($pending.Wait(2000) -and $null -ne $pending.Result) {
+                if ($pending.Wait($pendingWaitMilliseconds) -and $null -ne $pending.Result) {
                     $line = $pending.Result
                     Write-Host (ConvertTo-UnitySafeLogText -Text $line)
                     $buffer.Add([string]$line)
@@ -2994,7 +3021,10 @@ function Invoke-ProcessWithTreeKillTimeout {
         }
 
         try {
-            if ($reaped -and $proc.HasExited) { $rawExitCode = $proc.ExitCode }
+            if ($reaped -and $proc.HasExited) {
+                $rawExitCode = $proc.ExitCode
+                if ($null -eq $processExitUtc) { $processExitUtc = $proc.ExitTime.ToUniversalTime() }
+            }
         } catch { }
         if ($killedAfterCompletion) {
             $exitOrigin = 'completion-grace'
@@ -3057,6 +3087,10 @@ function Invoke-ProcessWithTreeKillTimeout {
                 $ProcessObservation.KillReason = $killReason
                 $ProcessObservation.KillSucceeded = $killSucceeded
                 $ProcessObservation.ExceptionType = $exceptionType
+                $ProcessObservation.ProcessExitUtc = if ($null -ne $processExitUtc) { $processExitUtc.ToString('o') } else { $null }
+                $ProcessObservation.OutputDrainStopped = $outputDrainStopped
+                $ProcessObservation.StandardOutputEndObserved = $oDone
+                $ProcessObservation.StandardErrorEndObserved = $eDone
             } catch {
                 Write-Host '::warning::Could not record process observation; execution outcome is unchanged.'
             }

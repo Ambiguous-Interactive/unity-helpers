@@ -310,6 +310,14 @@ later supplies passing NUnit XML, or produces a fresh player accepted by the exi
 Standalone builds retain their wall-clock timeout without a completion sentinel or silence guard;
 IL2CPP compilation can legitimately produce no output for minutes. The caller receives
 the full watchdog result, including timeout and stall state.
+
+The watchdog uses the real root process exit even when a descendant keeps stdout or stderr open.
+After that exit, it drains buffered output until one second of silence, with a five-second limit.
+Open inherited streams cannot replace a nonzero exit with a passing completion message.
+The process observation records `ProcessExitUtc`, `OutputDrainStopped`,
+`StandardOutputEndObserved` and `StandardErrorEndObserved` to distinguish this bounded drain
+from a live process stopped by the existing timeout, stall or completion-grace guards.
+
 The receipt uses the same bounded Windows event matcher and records process identity, raw and
 returned exits, watchdog provenance, and UTC capture time. Its native-log summary counts
 `Native Crash Reporting` headers and `Got a UNKNOWN while executing native code` lines separately,
