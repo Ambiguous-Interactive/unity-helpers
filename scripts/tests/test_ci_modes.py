@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import shutil
@@ -33,7 +34,9 @@ def test_mode_configuration_retains_profiles_builds_and_independent_projects(
         session=tmp_path / "session",
         single_threaded=single,
     )
-    assert [mode.name for mode in modes] == list(PROFILES) + ([] if single else ["proto_only"])
+    assert [mode.name for mode in modes] == (
+        list(PROFILES) + ([] if single else ["proto_only"]) + ["editmode_isolated"]
+    )
     assert len({str(mode.parameters["ArtifactsPath"]) for mode in modes}) == len(modes)
     for mode in modes[:3]:
         options = mode.parameters
@@ -54,6 +57,19 @@ def test_mode_configuration_retains_profiles_builds_and_independent_projects(
             assert "IncludeIntegrations" not in options
         else:
             assert options["IncludeIntegrations"] is True
+    assert modes[0].parameters["EditorPhaseGroup"] == "Main"
+    isolated = modes[-1].parameters
+    assert isolated["EditorPhaseGroup"] == "Isolated"
+    assert isolated["AssemblyNames"] == PROFILES["editmode"]
+    assert isolated["TestMode"] == "editmode"
+    assert isolated["ArtifactsPath"] == str(
+        Path(str(modes[0].parameters["ArtifactsPath"])) / "isolated"
+    )
+    assert isolated["ProjectScope"] == ("single-threaded-isolated" if single else "isolated")
+    assert isolated["RepoRoot"] == modes[0].parameters["RepoRoot"]
+    assert isolated.get("AdditionalScriptingDefines") == modes[0].parameters.get(
+        "AdditionalScriptingDefines"
+    )
     assert modes[2].parameters["ManagedStrippingLevel"] == "High"
     if not single:
         proto = modes[3].parameters
@@ -106,7 +122,7 @@ def make_control(tmp_path: Path) -> tuple[list[Mode], Mode, dict[str, str], str]
         [string]$Il2CppCompilerConfiguration, [switch]$IncludeIntegrations, [switch]$ShareEditorProject,
         [switch]$IsolateCompilationFixtures, [string]$ManagedStrippingLevel, [string]$ProjectScope,
         [string[]]$AdditionalScriptingDefines, [string]$TestCategory, [switch]$GenerateOnly,
-        [double]$ProjectRootMinimumFreeGb = 60)
+        [double]$ProjectRootMinimumFreeGb = 60, [string]$EditorPhaseGroup = 'All')
         $ErrorActionPreference = 'Stop'
         . 'HELPER'
         if ($GenerateOnly) {
@@ -126,6 +142,7 @@ def make_control(tmp_path: Path) -> tuple[list[Mode], Mode, dict[str, str], str]
         }
         if ($ProjectRootMinimumFreeGb -ne 0) { throw 'Worker can prune sibling projects.' }
         if (@(Get-ChildItem -LiteralPath $env:CONTROL_EVENTS -Filter '*.initialized').Count -ne 3) { throw 'Workers started before all projects were prepared.' }
+        Write-Host ('Mode diagnostics: ' + $TestMode)
         [IO.File]::WriteAllText((Join-Path $env:CONTROL_EVENTS ($TestMode + '.started')), [string]$PID)
         $deadline = [DateTime]::UtcNow.AddSeconds(10)
         while (@(Get-ChildItem -LiteralPath $env:CONTROL_EVENTS -Filter '*.started').Count -lt 3) {
@@ -141,6 +158,15 @@ def make_control(tmp_path: Path) -> tuple[list[Mode], Mode, dict[str, str], str]
             $child.WaitForExit()
         }
         if ($env:CONTROL_FAIL -eq $TestMode) { throw 'Controlled mode failure.' }
+        if ($env:CONTROL_FAIL_PHASE -eq $EditorPhaseGroup) { throw 'Controlled editor phase failure.' }
+        if ($EditorPhaseGroup -eq 'Isolated') {
+            foreach ($part in @('compilation', 'migration')) {
+                if ($env:CONTROL_MISSING_EVIDENCE -eq $part) { continue }
+                $folder = Join-Path $ArtifactsPath $part
+                $null = New-Item -ItemType Directory -Path $folder -Force
+                [IO.File]::WriteAllText((Join-Path $folder 'control.txt'), $part)
+            }
+        }
         [IO.File]::WriteAllText((Join-Path $ArtifactsPath 'fixture-options.json'), (@{ RepoRoot = $RepoRoot; AssemblyNames = $AssemblyNames } | ConvertTo-Json))
         [IO.File]::WriteAllText((Join-Path $env:CONTROL_EVENTS ($TestMode + '.completed')), 'done')
         """.replace("HELPER", helper),
@@ -223,12 +249,96 @@ def test_real_workers_overlap_and_keep_every_outcome(tmp_path: Path, failed: str
     expected = {mode.name: "failure" if mode.name == failed else "success" for mode in modes}
     assert receipt["Outcomes"] == expected
     assert receipt["ControllerCompleted"] is True
+    for mode in modes:
+        diagnostic = (tmp_path / mode.name / "mode-controller.log").read_text(encoding="utf-8")
+        assert "#< CLIXML" not in diagnostic
+        assert diagnostic.count("Mode diagnostics: " + mode.name) == 1
     assert receipt["CleanupFailed"] is False
     assert len(receipt["Workers"]) == 3
     assert len(list((tmp_path / "events").glob("*.completed"))) == (2 if failed else 3)
     assert output.read_text(encoding="utf-8") == "previous=value\n" + "".join(
         f"{name}={outcome}\n" for name, outcome in expected.items()
     )
+
+
+@pytest.mark.parametrize("failed", ["", "Main", "Isolated"])
+def test_editor_halves_require_both_and_publish_fixture_evidence(
+    tmp_path: Path, failed: str
+) -> None:
+    modes, preparation, environment, shell = make_control(tmp_path)
+    modes[0] = Mode("editmode", {**modes[0].parameters, "EditorPhaseGroup": "Main"})
+    isolated = Mode(
+        "editmode_isolated",
+        {
+            **modes[0].parameters,
+            "EditorPhaseGroup": "Isolated",
+            "ArtifactsPath": str(tmp_path / "editmode/isolated"),
+        },
+    )
+    environment["CONTROL_FAIL_PHASE"] = failed
+    success = run(
+        [*modes, isolated],
+        preparation,
+        private=tmp_path,
+        shell=shell,
+        environment=environment,
+        timeout=20,
+        receipt=tmp_path / "receipt.json",
+        output=None,
+    )
+    assert success == (failed == "")
+    receipt = json.loads((tmp_path / "receipt.json").read_text(encoding="utf-8"))
+    assert receipt["Outcomes"] == {
+        "editmode": "failure" if failed else "success",
+        "playmode": "success",
+        "standalone": "success",
+    }
+    assert len(receipt["Workers"]) == 4
+    assert receipt["ControllerCompleted"] is True
+    if failed != "Isolated":
+        for name in ("compilation", "migration"):
+            assert (tmp_path / "editmode" / name / "control.txt").read_text(
+                encoding="utf-8"
+            ) == name
+            assert not (tmp_path / "editmode/isolated" / name).exists()
+
+
+@pytest.mark.parametrize("damage", ["missing", "conflict"])
+def test_isolated_evidence_cannot_be_missing_or_replace_existing_results(
+    tmp_path: Path, damage: str
+) -> None:
+    modes, preparation, environment, shell = make_control(tmp_path)
+    isolated = Mode(
+        "editmode_isolated",
+        {
+            **modes[0].parameters,
+            "EditorPhaseGroup": "Isolated",
+            "ArtifactsPath": str(tmp_path / "editmode/isolated"),
+        },
+    )
+    if damage == "missing":
+        environment["CONTROL_MISSING_EVIDENCE"] = "compilation"
+    else:
+        destination = tmp_path / "editmode/compilation"
+        destination.mkdir(parents=True)
+        (destination / "canary.txt").write_text("preserve", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="evidence is missing or conflicts"):
+        run(
+            [*modes, isolated],
+            preparation,
+            private=tmp_path,
+            shell=shell,
+            environment=environment,
+            timeout=20,
+            receipt=tmp_path / "receipt.json",
+            output=None,
+        )
+    receipt = json.loads((tmp_path / "receipt.json").read_text(encoding="utf-8"))
+    assert set(receipt["Outcomes"].values()) == {"failure"}
+    if damage == "conflict":
+        assert (tmp_path / "editmode/compilation/canary.txt").read_text(
+            encoding="utf-8"
+        ) == "preserve"
 
 
 def test_failed_preparation_never_launches_a_mode(tmp_path: Path) -> None:
@@ -539,10 +649,10 @@ def test_complete_cli_uses_isolated_sources_and_publishes_all_four_modes(tmp_pat
         output.read_text(encoding="utf-8")
         == "editmode=success\nplaymode=success\nstandalone=success\nproto_only=success\n"
     )
-    artifact_paths = list((repository / ".artifacts/unity").glob("*/fixture-options.json"))
-    assert len(artifact_paths) == 4
+    artifact_paths = list((repository / ".artifacts/unity").rglob("fixture-options.json"))
+    assert len(artifact_paths) == 5
     inputs = [json.loads(path.read_text(encoding="utf-8")) for path in artifact_paths]
-    assert len({item["RepoRoot"] for item in inputs}) == 4
+    assert len({item["RepoRoot"] for item in inputs}) == 5
     assert str(repository) not in {item["RepoRoot"] for item in inputs}
     receipt = json.loads(
         (repository / ".artifacts/unity/6000.6.0f1-editmode/mode-timings.json").read_text(
@@ -550,5 +660,54 @@ def test_complete_cli_uses_isolated_sources_and_publishes_all_four_modes(tmp_pat
         )
     )
     assert receipt["ControllerCompleted"] is True
-    assert len(receipt["Workers"]) == 4
+    assert len(receipt["Workers"]) == 5
     assert receipt["ElapsedSeconds"] >= max(item["ElapsedSeconds"] for item in receipt["Workers"])
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows desktop resource isolation")
+def test_windows_workers_have_private_desktops_and_preserve_exit_and_output(tmp_path: Path) -> None:
+    shell = shutil.which("pwsh")
+    assert shell is not None
+    payload = """$ErrorActionPreference = 'Stop'
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+public static class DesktopProbe {
+ [DllImport("kernel32.dll")] private static extern uint GetCurrentThreadId();
+ [DllImport("user32.dll")] private static extern IntPtr GetThreadDesktop(uint id);
+ [DllImport("user32.dll", CharSet=CharSet.Unicode, SetLastError=true)] private static extern bool GetUserObjectInformationW(IntPtr handle, int index, StringBuilder output, int length, out int needed);
+ public static string Name() { int needed; StringBuilder text = new StringBuilder(256); if (!GetUserObjectInformationW(GetThreadDesktop(GetCurrentThreadId()), 2, text, 512, out needed)) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error()); return text.ToString(); }
+}
+'@
+[Console]::WriteLine([DesktopProbe]::Name())
+[Console]::Error.WriteLine('diagnostic retained')
+exit 37
+"""
+    encoded = base64.b64encode(payload.encode("utf-16-le")).decode("ascii")
+    names: set[str] = set()
+    for _ in range(2):
+        result = subprocess.run(
+            [
+                shell,
+                "-NoProfile",
+                "-NonInteractive",
+                "-OutputFormat",
+                "Text",
+                "-File",
+                str(ROOT / "scripts/unity/desktop-worker.ps1"),
+                "-EncodedWorker",
+                encoded,
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=20,
+            cwd=tmp_path,
+        )
+        assert result.returncode == 37, result.stdout + result.stderr
+        name = result.stdout.strip()
+        assert name.startswith("uh-mode-")
+        assert name not in names
+        names.add(name)
+        assert result.stderr.strip() == "diagnostic retained"

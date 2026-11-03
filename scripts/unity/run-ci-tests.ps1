@@ -56,6 +56,9 @@ param(
 
     [switch]$IsolateCompilationFixtures,
 
+    [ValidateSet('All', 'Main', 'Isolated')]
+    [string]$EditorPhaseGroup = 'All',
+
     # Optional diagnostic frozen-file/player provenance. No measurement eligibility.
     [string]$FrozenPlayerDeclarationPath = '',
 
@@ -1135,33 +1138,40 @@ function New-UnityEditorTestPhases {
         [string]$ArtifactsPath,
         [string]$TestFilter,
         [string]$TestCategory,
-        [switch]$IsolateCompilationFixtures
+        [switch]$IsolateCompilationFixtures,
+        [ValidateSet('All', 'Main', 'Isolated')][string]$EditorPhaseGroup = 'All'
     )
 
+    if ($EditorPhaseGroup -ne 'All' -and -not $IsolateCompilationFixtures) {
+        throw 'An editor phase group requires compilation isolation.'
+    }
     $fixture = 'WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration.OdinMigrationDictionaryCompilationTests'
     if ($IsolateCompilationFixtures) {
         if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
             throw 'Compilation isolation cannot be combined with a caller test filter.'
         }
-        [pscustomobject]@{
-            ArtifactsPath = Join-Path $ArtifactsPath 'compilation'
-            TestFilter = $fixture
-            TestCategory = 'CompilationIsolation'
-            RequiredFixture = $fixture
-            RequirePassedTests = $true
-        }
-        foreach ($group in @(Get-UnityMigrationIsolationGroups)) {
+        if ($EditorPhaseGroup -ne 'Main') {
             [pscustomobject]@{
-                ArtifactsPath = Join-Path $ArtifactsPath ('migration/' + $group.Name)
-                TestFilter = $group.Fixtures -join ';'
-                TestCategory = 'MigrationIsolation'
-                RequiredFixture = $group.Fixtures
+                ArtifactsPath = Join-Path $ArtifactsPath 'compilation'
+                TestFilter = $fixture
+                TestCategory = 'CompilationIsolation'
+                RequiredFixture = $fixture
                 RequirePassedTests = $true
+            }
+            foreach ($group in @(Get-UnityMigrationIsolationGroups)) {
+                [pscustomobject]@{
+                    ArtifactsPath = Join-Path $ArtifactsPath ('migration/' + $group.Name)
+                    TestFilter = $group.Fixtures -join ';'
+                    TestCategory = 'MigrationIsolation'
+                    RequiredFixture = $group.Fixtures
+                    RequirePassedTests = $true
+                }
             }
         }
         $TestCategory = (@($TestCategory, '!CompilationIsolation', '!MigrationIsolation') |
             Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join ';'
     }
+    if ($EditorPhaseGroup -eq 'Isolated') { return }
     [pscustomobject]@{
         ArtifactsPath = $ArtifactsPath
         TestFilter = $TestFilter
@@ -5043,6 +5053,10 @@ catch {
     Write-Host "MSVC toolchain report unavailable: $($_.Exception.Message)"
 }
 
+if ($EditorPhaseGroup -ne 'All' -and ($TestMode -ne 'editmode' -or -not $IsolateCompilationFixtures)) {
+    throw 'An editor phase group requires EditMode compilation isolation.'
+}
+
 $ExplicitProjectRequested = -not [string]::IsNullOrWhiteSpace($ProjectPath)
 $ProjectWorkspace = Resolve-UnityProjectWorkspace `
     -RepoRoot $RepoRoot `
@@ -5571,7 +5585,7 @@ try {
         # background thread during shutdown AFTER RunFinished wrote the file.
         $phases = @(New-UnityEditorTestPhases -ArtifactsPath $ArtifactsPath `
             -TestFilter $TestFilter -TestCategory $TestCategory `
-            -IsolateCompilationFixtures:$IsolateCompilationFixtures)
+            -IsolateCompilationFixtures:$IsolateCompilationFixtures -EditorPhaseGroup $EditorPhaseGroup)
         foreach ($phase in $phases) {
             $phaseArguments = @(New-UnityEditorPhaseArguments -Arguments $testArgs `
                 -TestCategory $phase.TestCategory -TestFilter $phase.TestFilter)

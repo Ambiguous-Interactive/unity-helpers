@@ -122,6 +122,7 @@ def build_modes(
         if name == "editmode":
             options["ShareEditorProject"] = True
             options["IsolateCompilationFixtures"] = True
+            options["EditorPhaseGroup"] = "Main"
         if name == "standalone":
             options["ManagedStrippingLevel"] = "High"
         jobs.append(Mode(name, options))
@@ -134,6 +135,12 @@ def build_modes(
         options["AdditionalScriptingDefines"] = ["WALLSTOP_PROTO_ONLY"]
         options["ArtifactsPath"] = str(artifacts / f"{version}-standalone-proto-only")
         jobs.append(Mode("proto_only", options))
+    if "editmode" in selected:
+        options = dict(jobs[0].parameters)
+        options["EditorPhaseGroup"] = "Isolated"
+        options["ProjectScope"] = "single-threaded-isolated" if single_threaded else "isolated"
+        options["ArtifactsPath"] = str(Path(str(options["ArtifactsPath"])) / "isolated")
+        jobs.append(Mode("editmode_isolated", options))
     return jobs
 
 
@@ -179,7 +186,7 @@ def isolate_sources(modes: list[Mode], repository: Path, cache: Path) -> list[Mo
     isolated: list[Mode] = []
     cache.mkdir(parents=True, exist_ok=True)
     for mode in modes:
-        if mode.name not in (*MODES, "proto_only"):
+        if mode.name not in (*MODES, "proto_only", "editmode_isolated"):
             raise ValueError("Unknown Unity source worktree mode")
         destination = cache / mode.name
         marker = cache / f".{mode.name}.owner.json"
@@ -231,9 +238,23 @@ def launch(
         shell,
         "-NoProfile",
         "-NonInteractive",
+        "-OutputFormat",
+        "Text",
         "-EncodedCommand",
         base64.b64encode(WORKER.encode("utf-16-le")).decode("ascii"),
     ]
+    if sys.platform == "win32":
+        command = [
+            shell,
+            "-NoProfile",
+            "-NonInteractive",
+            "-OutputFormat",
+            "Text",
+            "-File",
+            str(Path(__file__).with_name("desktop-worker.ps1")),
+            "-EncodedWorker",
+            base64.b64encode(WORKER.encode("utf-16-le")).decode("ascii"),
+        ]
     started = time.monotonic()
     process = subprocess.Popen(  # noqa: S603 - fixed PowerShell program; options travel as JSON data.
         command,
@@ -348,6 +369,14 @@ def run(
                 stream = streams.enter_context((folder / "mode-controller.log").open("wb"))
                 workers.append(launch(mode, private, shell, environment, stream))
             wait(workers, started + timeout)
+            for worker in workers:
+                if worker.mode.name == "editmode_isolated" and worker.process.returncode == 0:
+                    folder = Path(str(worker.mode.parameters["ArtifactsPath"]))
+                    for name in ("compilation", "migration"):
+                        destination = folder.parent / name
+                        if destination.exists() or not (folder / name).is_dir():
+                            raise RuntimeError("Isolated EditMode evidence is missing or conflicts")
+                        shutil.move(str(folder / name), destination)
             completed = True
     finally:
         cleanup_failed = False
@@ -362,15 +391,22 @@ def run(
                 cleanup_failed = True
             if worker.ended is None:
                 worker.ended = time.monotonic()
-        outcomes = {mode.name: "failure" for mode in modes}
-        for worker in workers:
-            if (
-                completed
-                and worker.process.returncode == 0
-                and not worker.forced
-                and not cleanup_failed
-            ):
-                outcomes[worker.mode.name] = "success"
+        outcomes = {
+            "editmode" if mode.name == "editmode_isolated" else mode.name: "failure"
+            for mode in modes
+        }
+        if completed and not cleanup_failed:
+            for name in outcomes:
+                required = [
+                    worker
+                    for worker in workers
+                    if ("editmode" if worker.mode.name == "editmode_isolated" else worker.mode.name)
+                    == name
+                ]
+                if required and all(
+                    worker.process.returncode == 0 and not worker.forced for worker in required
+                ):
+                    outcomes[name] = "success"
         receipt.parent.mkdir(parents=True, exist_ok=True)
         receipt.write_text(
             json.dumps(

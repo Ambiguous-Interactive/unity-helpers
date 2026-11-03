@@ -201,6 +201,22 @@ try {
         $phases[1].TestFilter -cne ($phases[1].RequiredFixture -join ';')) {
         throw 'Grouped migration phases must retain every fixture exactly once and the complete OR filter.'
     }
+    $mainPhases = @(New-UnityEditorTestPhases -ArtifactsPath $temporary -TestCategory '!Performance;!Stress' -IsolateCompilationFixtures -EditorPhaseGroup Main)
+    $isolatedPhases = @(New-UnityEditorTestPhases -ArtifactsPath $temporary -TestCategory '!Performance;!Stress' -IsolateCompilationFixtures -EditorPhaseGroup Isolated)
+    if ($mainPhases.Count -ne 1 -or $isolatedPhases.Count -ne 3 -or
+        $mainPhases[0].TestCategory -cne $phases[-1].TestCategory -or
+        $mainPhases[0].ArtifactsPath -cne $phases[-1].ArtifactsPath) { throw 'Editor phase split changed main coverage.' }
+    for ($index = 0; $index -lt $isolatedPhases.Count; $index++) {
+        foreach ($property in @('TestFilter', 'TestCategory', 'ArtifactsPath', 'RequirePassedTests')) {
+            if ($isolatedPhases[$index].$property -cne $phases[$index].$property) { throw "Editor phase split changed isolated $property." }
+        }
+        if (@(Compare-Object $isolatedPhases[$index].RequiredFixture $phases[$index].RequiredFixture -CaseSensitive).Count -ne 0) { throw 'Editor phase split lost a required fixture.' }
+    }
+    $isolationChecks += 4
+    $rejectedGroup = $false
+    try { New-UnityEditorTestPhases -ArtifactsPath $temporary -EditorPhaseGroup Main } catch { $rejectedGroup = $true }
+    if (-not $rejectedGroup) { throw 'A phase split without isolation must fail.' }
+    $isolationChecks++
     $rejected = $false
     try { New-UnityEditorTestPhases -ArtifactsPath $temporary -TestFilter 'Caller.Filter' -IsolateCompilationFixtures }
     catch { $rejected = $true }
