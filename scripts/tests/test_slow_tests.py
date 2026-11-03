@@ -239,3 +239,28 @@ def test_ci_reporter_tools_are_provisioned_before_unity_lock(job_name: str) -> N
     checkout_index = next(i for i, step in enumerate(steps) if step.get("id") == "checkout")
     lock_index = next(i for i, step in enumerate(steps) if step.get("id") == "unity_lock")
     assert checkout_index < setup_index < lock_index
+
+
+@pytest.mark.parametrize("result", ["Passed", "Failed", "Failed(Child)", "Inconclusive"])
+@pytest.mark.parametrize("target", ['duration="123.5"', 'duration="100"', 'duration="60"'])
+@pytest.mark.parametrize("duration", [None, "", " "])
+def test_executed_results_require_duration_before_budget_reporting(
+    results: Path,
+    result: str,
+    target: str,
+    duration: str | None,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    replacement = f'result="{result}"'
+    if duration is not None:
+        replacement += f' duration="{duration}"'
+    results.write_text(XML.replace(target, replacement), encoding="utf-8")
+    assert (
+        slow.main(
+            ["--results-path", str(results), "--fixture-budget-seconds", "1", "--fail-over-budget"]
+        )
+        == 1
+    )
+    output = capsys.readouterr().out
+    assert "Missing duration" in output
+    assert "Slowest fixtures" not in output

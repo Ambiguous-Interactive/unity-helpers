@@ -2,6 +2,31 @@
 
 This guide documents patterns for testing states that "should never happen" but could occur in production. These tests catch edge cases that defensive programming must handle gracefully.
 
+## Run script checks through Python
+
+Use `npm run lint:repo -- --only <id>` or `npm run validate:tests:fast -- --only <id>`
+for focused checks. Both commands run the locked, strictly typed Python runner through uv.
+Add `--list` to inspect the available ids and `--jobs 1` to run them serially.
+The runners execute every selected check, retain failures, and preserve registry order in
+the final report. Checks that rewrite shared inputs run exclusively before shared work.
+
+The lint, contract, and hook check definitions live in `scripts/lint-checks.json`,
+`scripts/contracts-checks.json`, and `scripts/hooks-checks.json`. Keep commands and required
+completion markers with their check. Empty registries, duplicate ids, unknown fields, and
+mistyped exclusivity policies fail before execution. Register new Python sources in
+`scripts/python~/pyproject.toml`; `npm run lint:python` runs Ruff, mypy, and Pyright.
+
+The npm entry points resolve exact `npm run <name>` commands directly from `package.json`,
+avoiding an npm process for each check. Raw shell commands retain their original behavior.
+The Node entry points remain compatibility launchers for existing callers and imports.
+Use `npm run test:check-registries` for selection and CLI controls and
+`npm run test:check-runner` for process, concurrency, and completion controls.
+
+Timing reports require durations for executed NUnit results, including passed, failed and
+inconclusive cases. Missing or blank durations fail reporting before fixture budgets are
+evaluated. Explicit zero durations remain valid; skipped and older result records without
+an outcome retain the zero-duration fallback.
+
 ## Isolated migration compiler tests
 
 The Odin compiler fixture rewrites a small runtime consumer asset rather than the shared test

@@ -1,0 +1,422 @@
+[
+  {
+    "id": "comment-stripping",
+    "name": "Comment-stripping helper",
+    "run": "pwsh -NoProfile -File scripts/tests/test-comment-stripping.ps1 -VerboseOutput"
+  },
+  {
+    "id": "workflow-action-pins",
+    "name": "Immutable action pins",
+    "run": "pwsh -NoProfile -File scripts/tests/test-workflow-action-pins.ps1"
+  },
+  {
+    "id": "pwsh-invocations",
+    "name": "PowerShell invocations",
+    "run": "npm run lint:pwsh-invocations"
+  },
+  {
+    "id": "workflow-run-expression-length",
+    "name": "Workflow run-expression length",
+    "run": "npm run lint:workflow-run-expression-length"
+  },
+  {
+    "id": "asmdef",
+    "name": "Assembly definitions",
+    "run": "uv run --project scripts/python~ --locked --no-dev python scripts/lint_asmdef.py --verbose"
+  },
+  {
+    "id": "conditional-call-chains",
+    "name": "[Conditional] call chains",
+    "run": "npm run lint:conditional-call-chains"
+  },
+  {
+    "id": "concurrent-cache-fill-test",
+    "name": "Concurrent cache fill linter self-test",
+    "run": "npm run test:lint-concurrent-cache-fill"
+  },
+  {
+    "id": "concurrent-cache-fill",
+    "name": "Concurrent cache fills",
+    "run": "npm run lint:concurrent-cache-fill"
+  },
+  {
+    "id": "bundled-assemblies",
+    "name": "Bundled assembly importers",
+    "run": "npm run lint:bundled-assemblies"
+  },
+  {
+    "id": "typecheck-asmdef-references",
+    "name": "Typecheck projects reference only what their asmdefs declare",
+    "run": "npm run lint:typecheck-asmdef-references"
+  },
+  {
+    "id": "editor-assembly-monobehaviours-test",
+    "name": "Editor-assembly MonoBehaviour gate self-test",
+    "run": "npm run test:lint-editor-assembly-monobehaviours"
+  },
+  {
+    "id": "editor-assembly-monobehaviours",
+    "name": "No AddComponent-able MonoBehaviour in an Editor-only assembly",
+    "run": "npm run lint:editor-assembly-monobehaviours"
+  },
+  {
+    "id": "csharp-naming-test",
+    "name": "C# naming linter self-test",
+    "run": "pwsh -NoProfile -File scripts/tests/test-lint-csharp-naming.ps1 -VerboseOutput"
+  },
+  {
+    "id": "csharp-naming",
+    "name": "C# method names",
+    "run": "npm run lint:csharp-naming"
+  },
+  {
+    "id": "unsafe-code-test",
+    "name": "Unsafe-code gate self-test",
+    "run": "npm run test:lint-unsafe-code"
+  },
+  {
+    "id": "unsafe-code",
+    "name": "No compiler-unsafe code",
+    "run": "npm run lint:unsafe-code"
+  },
+  {
+    "id": "no-regions",
+    "name": "No #region directives",
+    "run": "pwsh -NoProfile -File scripts/lint-no-regions.ps1 -VerboseOutput"
+  },
+  {
+    "id": "license-headers",
+    "name": "MIT license headers",
+    "run": "pwsh -NoProfile -File scripts/lint-license-headers.ps1 -VerboseOutput"
+  },
+  {
+    "id": "drawer-multiobject-test",
+    "name": "Drawer multiobject linter self-test",
+    "run": "pwsh -NoProfile -File scripts/tests/test-lint-drawer-multiobject.ps1 -VerboseOutput"
+  },
+  {
+    "id": "drawer-multiobject",
+    "name": "Drawer multiobject",
+    "run": "pwsh -NoProfile -File scripts/lint-drawer-multiobject.ps1 -VerboseOutput"
+  },
+  {
+    "id": "odin-undo-safety-test",
+    "name": "Odin undo-safety linter self-test",
+    "run": "pwsh -NoProfile -File scripts/tests/test-lint-odin-undo-safety.ps1 -VerboseOutput"
+  },
+  {
+    "id": "odin-undo-safety",
+    "name": "Odin undo safety",
+    "run": "pwsh -NoProfile -File scripts/lint-odin-undo-safety.ps1 -VerboseOutput"
+  },
+  {
+    "id": "unity-file-naming-test",
+    "name": "Unity file-naming linter self-test",
+    "run": "pwsh -NoProfile -File scripts/tests/test-lint-unity-file-naming.ps1 -VerboseOutput"
+  },
+  {
+    "id": "unity-file-naming",
+    "name": "Unity Object file naming",
+    "run": "npm run lint:unity-file-naming"
+  },
+  {
+    "id": "preserve-attributes",
+    "name": "IL2CPP-preserved runtime attributes",
+    "run": "npm run lint:preserve-attributes"
+  },
+  {
+    "id": "comparison-direction",
+    "name": "Left-to-right comparisons",
+    "run": "npm run lint:comparison-direction"
+  },
+  {
+    "id": "comment-block-form",
+    "name": "Multi-line comments in block form",
+    "run": "npm run lint:comment-block-form"
+  },
+  {
+    "id": "nested-type-placement",
+    "name": "Nested types at the end of their containing type",
+    "run": "npm run lint:nested-type-placement"
+  },
+  {
+    "id": "production-test-hooks",
+    "name": "Production code excludes test-only hooks",
+    "run": "npm run lint:production-test-hooks"
+  },
+  {
+    "id": "xml-doc-summaries",
+    "name": "One <summary> per doc comment block",
+    "run": "npm run lint:xml-doc-summaries"
+  },
+  {
+    "id": "shipped-analyzers",
+    "name": "Shipped analyzer assemblies match their sources",
+    "run": "npm run verify:shipped-analyzers"
+  },
+  {
+    "id": "meta-exclusions",
+    "name": "Meta lint exclusions",
+    "run": "bash scripts/tests/test-lint-meta-exclusions.sh"
+  },
+  {
+    "id": "meta-files",
+    "name": "Unity meta files",
+    "run": "pwsh -NoProfile -File scripts/lint-meta-files.ps1 -VerboseOutput"
+  },
+  {
+    "id": "changelog",
+    "name": "CHANGELOG format",
+    "run": "npm run lint:changelog"
+  },
+  {
+    "id": "doc-links-test",
+    "name": "Doc-link linter self-test",
+    "run": "pwsh -NoProfile -File scripts/tests/test-lint-doc-links.ps1 -VerboseOutput"
+  },
+  {
+    "id": "deprecated-external-links",
+    "name": "Deprecated external link rules",
+    "run": "pwsh -NoProfile -File scripts/tests/test-deprecated-external-links.ps1 -VerboseOutput"
+  },
+  {
+    "id": "doc-links",
+    "name": "Markdown links (targets and format)",
+    "run": "pwsh -NoProfile -File scripts/lint-doc-links.ps1 -Mode All -VerboseOutput"
+  },
+  {
+    "id": "gitignore-docs",
+    "name": "Gitignore safety docs",
+    "run": "pwsh -NoProfile -File scripts/lint-gitignore-docs.ps1 -VerboseOutput"
+  },
+  {
+    "id": "github-pages-css",
+    "name": "GitHub Pages CSS",
+    "run": "bash scripts/validate-github-pages-css.sh"
+  },
+  {
+    "id": "code-fence-syntax",
+    "name": "Code fence syntax",
+    "run": "bash scripts/check-code-fence-syntax.sh"
+  },
+  {
+    "id": "markdown",
+    "name": "Markdownlint",
+    "run": "npm run lint:markdown"
+  },
+  {
+    "id": "doc-code-samples",
+    "name": "Documentation code samples",
+    "run": "npm run lint:code-samples"
+  },
+  {
+    "id": "doc-identifiers",
+    "name": "Documentation namespace and assembly names",
+    "run": "npm run lint:doc-identifiers"
+  },
+  {
+    "id": "doc-counts",
+    "name": "Documentation counts",
+    "run": "npm run lint:doc-counts"
+  },
+  {
+    "id": "readme-mirror-test",
+    "name": "README mirror generator self-test",
+    "run": "npm run test:sync-readme-mirror"
+  },
+  {
+    "id": "readme-mirror",
+    "name": "README / docs mirror",
+    "run": "npm run lint:readme-mirror"
+  },
+  {
+    "id": "format-md",
+    "name": "Prettier (Markdown)",
+    "run": "npm run format:md:check"
+  },
+  {
+    "id": "format-json",
+    "name": "Prettier (JSON / asmdef)",
+    "run": "npm run format:json:check"
+  },
+  {
+    "id": "format-js",
+    "name": "Prettier (JS)",
+    "run": "npm run format:js:check"
+  },
+  {
+    "id": "format-yaml",
+    "name": "Prettier (YAML)",
+    "run": "npm run format:yaml:check"
+  },
+  {
+    "id": "yaml",
+    "name": "YAML style",
+    "run": "npm run lint:yaml"
+  },
+  {
+    "id": "duplicate-usings",
+    "name": "Duplicate using directives",
+    "run": "npm run lint:duplicate-usings"
+  },
+  {
+    "id": "eol",
+    "name": "Line endings and BOM",
+    "run": "npm run eol:check"
+  },
+  {
+    "id": "final-newline",
+    "name": "Final newline contract",
+    "run": "bash scripts/tests/test-final-newline.sh"
+  },
+  {
+    "id": "formatting",
+    "name": "Formatter coverage",
+    "run": "bash scripts/validate-formatting.sh"
+  },
+  {
+    "id": "dependabot",
+    "name": "Dependabot config",
+    "run": "npm run lint:dependabot"
+  },
+  {
+    "id": "lint-error-codes",
+    "name": "Lint-error-code cspell coverage",
+    "run": "npm run validate:lint-error-codes"
+  },
+  {
+    "id": "lint-error-codes-test",
+    "name": "Lint-error-code validator self-test",
+    "run": "npm run test:validate-lint-error-codes"
+  },
+  {
+    "id": "mcp-config",
+    "name": "MCP config",
+    "run": "npm run validate:mcp-config"
+  },
+  {
+    "id": "npm-package",
+    "name": "NPM package",
+    "run": "npm run validate:npm-package"
+  },
+  {
+    "id": "devcontainer-config",
+    "name": "Devcontainer config",
+    "run": "pwsh -NoProfile -File scripts/validate-devcontainer-config.ps1 -VerboseOutput"
+  },
+  {
+    "id": "devcontainer-urls",
+    "name": "Devcontainer download URLs",
+    "run": "bash scripts/validate-devcontainer-urls.sh"
+  },
+  {
+    "id": "devcontainer-urls-test",
+    "name": "Devcontainer URL contracts",
+    "run": "bash scripts/tests/test-validate-devcontainer-urls.sh"
+  },
+  {
+    "id": "post-create",
+    "name": "Post-create script",
+    "run": "bash scripts/tests/test-post-create.sh --verbose"
+  },
+  {
+    "id": "hook-patterns",
+    "name": "Hook patterns",
+    "run": "bash scripts/tests/test-hook-patterns.sh"
+  },
+  {
+    "id": "hook-permissions",
+    "name": "Hook permissions",
+    "run": "bash scripts/validate-hook-permissions.sh"
+  },
+  {
+    "id": "hook-sync-calls",
+    "name": "Hook sync calls",
+    "run": "pwsh -NoProfile -File scripts/validate-hook-sync-calls.ps1 -VerboseOutput"
+  },
+  {
+    "id": "hook-spell-parity",
+    "name": "Hook spell-check parity",
+    "run": "bash scripts/tests/test-hook-spell-parity.sh"
+  },
+  {
+    "id": "lint-tests-test",
+    "name": "Test linter self-test",
+    "run": "pwsh -NoProfile -File scripts/tests/test-lint-tests.ps1 -VerboseOutput"
+  },
+  {
+    "id": "unity-mode-coordinator",
+    "name": "Concurrent Unity mode controls",
+    "run": "uv run --project scripts/python~ --locked pytest scripts/tests/test_ci_modes.py -q"
+  },
+  {
+    "id": "report-slow-tests",
+    "name": "Slow-test reporter",
+    "run": "uv run --project scripts/python~ --locked pytest scripts/tests/test_slow_tests.py -q"
+  },
+  {
+    "id": "unity-nunit-results",
+    "name": "Unity NUnit results gate",
+    "run": "bash scripts/tests/test-unity-nunit-results.sh"
+  },
+  {
+    "id": "wproto-claim-catalog",
+    "name": "WProto capability catalog",
+    "run": "pwsh -NoProfile -File scripts/verify-wproto-evidence.ps1 -Mode catalog"
+  },
+  {
+    "id": "process-watchdog",
+    "name": "Process watchdog",
+    "run": "pwsh -NoProfile -File scripts/tests/test-process-watchdog.ps1 -VerboseOutput"
+  },
+  {
+    "id": "native-debugger-download",
+    "name": "Bounded native debugger download",
+    "run": "npm run test:native-debugger-download"
+  },
+  {
+    "id": "native-fault-capture",
+    "name": "Native fault capture controls",
+    "run": "pwsh -NoProfile -File scripts/tests/test-native-fault-capture.ps1"
+  },
+  {
+    "id": "unity-license-activation-retry",
+    "name": "Unity license activation retry",
+    "run": "pwsh -NoProfile -File scripts/tests/test-unity-license-activation-retry.ps1 -VerboseOutput"
+  },
+  {
+    "id": "unity-configure-upm-retry",
+    "name": "Unity configure UPM retry",
+    "run": "pwsh -NoProfile -File scripts/tests/test-unity-configure-upm-retry.ps1 -VerboseOutput"
+  },
+  {
+    "id": "unity-environment-warnings",
+    "name": "Unity environment warnings",
+    "run": "pwsh -NoProfile -File scripts/tests/test-unity-environment-warnings.ps1 -VerboseOutput"
+  },
+  {
+    "id": "unity-compiler-warnings",
+    "name": "Unity compiler warnings",
+    "run": "pwsh -NoProfile -File scripts/tests/test-unity-compiler-warnings.ps1 -VerboseOutput"
+  },
+  {
+    "id": "catastrophic-pattern-sync",
+    "name": "Catastrophic pattern sync",
+    "run": "pwsh -NoProfile -File scripts/tests/test-catastrophic-pattern-sync.ps1 -VerboseOutput"
+  },
+  {
+    "id": "spelling",
+    "name": "Spell check",
+    "run": "npm run lint:spelling"
+  },
+  {
+    "id": "spelling-config",
+    "name": "cspell dictionary hygiene",
+    "run": "npm run lint:spelling:config"
+  },
+  {
+    "id": "license-years",
+    "name": "License year audit",
+    "run": "bash scripts/audit-license-years.sh --summary"
+  }
+]

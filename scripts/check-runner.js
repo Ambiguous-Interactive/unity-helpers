@@ -101,4 +101,4 @@ function runRegistry(registry) {
   return invoke({ operation: "runRegistry", ...registry });
 }
 
-module.exports = { defaultJobs, parseArguments, runCheck, runChecks, runRegistry };
+module.exports = { defaultJobs, parseArguments, runCheck, runChecks, runRegistry, invokeSync };

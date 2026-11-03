@@ -310,7 +310,7 @@
     "test:random-quality-outcomes": "node scripts/tests/test-random-quality-outcomes.mjs",
     "test:validate-git-push-config": "pwsh -NoProfile -File scripts/tests/test-validate-git-push-config.ps1 -VerboseOutput",
     "test:validate-lint-error-codes": "pwsh -NoProfile -File scripts/tests/test-validate-lint-error-codes.ps1 -VerboseOutput",
-    "lint:repo": "node scripts/run-repo-lint.js",
+    "lint:repo": "uv run --project scripts/python~ --locked --no-dev python scripts/check_registries.py lint --direct",
     "test:run-repo-lint": "node scripts/tests/test-run-repo-lint.js",
     "test:check-runner": "uv run --project scripts/python~ --locked pytest scripts/tests/test_check_runner.py -q",
     "test:runner-maintenance": "uv run --project scripts/python~ --locked pytest scripts/tests/test_runner_maintenance_matrix.py scripts/tests/test_unity_cli_maintenance.py -q",
@@ -329,9 +329,9 @@
     "lint:markdown": "node scripts/lint-markdown.mjs",
     "test:lint-markdown": "node scripts/tests/test-lint-markdown.mjs",
     "validate:content": "npm run lint:docs && npm run test:deprecated-external-links && npm run lint:markdown && npm run lint:changelog && npm run lint:yaml && npm run format:check && npm run lint:llm && npm run lint:doc-counts && npm run lint:dependabot && npm run lint:bundled-assemblies && npm run lint:typecheck-asmdef-references && npm run lint:conditional-call-chains && npm run lint:concurrent-cache-fill && npm run lint:pwsh-invocations && npm run lint:workflow-run-expression-length && npm run validate:lint-error-codes && npm run validate:mcp-config && npm run check:upm-changelog",
-    "validate:tests:fast": "node scripts/run-contract-tests.js --direct",
+    "validate:tests:fast": "uv run --project scripts/python~ --locked --no-dev python scripts/check_registries.py contracts --direct",
     "validate:tests:hook-regressions": "npm run test:agent-preflight && npm run test:precommit-integration && npm run test:pre-push-changed-files",
-    "validate:tests": "node scripts/run-contract-tests.js --include-hook-regressions --direct",
+    "validate:tests": "uv run --project scripts/python~ --locked --no-dev python scripts/check_registries.py contracts --include-hook-regressions --direct",
     "validate:prepush": "npm run validate:git-push-config",
     "validate:local": "npm run validate:git-push-config && npm run validate:content && npm run lint:spelling && npm run eol:check && npm run validate:tests:fast && npm run format:csharp:check && npm run lint:csharp-naming && npm run lint:duplicate-usings && npm run lint:comparison-direction && npm run lint:spelling:config && npm run validate:devcontainer && npm run validate:hook-sync && npm run validate:hook-perms && npm run validate:hook-spell-parity && npm run validate:cspell-files-parity",
     "validate:devcontainer": "npm run test:devcontainer-persistence && pwsh -NoProfile -File scripts/validate-devcontainer-config.ps1 -VerboseOutput && npm run test:validate-devcontainer-urls && npm run test:post-create && npm run test:ai-backends",
@@ -409,7 +409,8 @@
     "test:bounded-sampling": "uv run --project scripts/python~ --locked pytest scripts/tests/test_bounded_sampling.py -q",
     "test:fixture-assets": "uv run --project scripts/python~ --locked pytest scripts/tests/test_fixture_assets.py -q",
     "test:meta-generation": "uv run --project scripts/python~ --locked pytest scripts/tests/test_meta_generation.py -q",
-    "meta:generate": "uv run --project scripts/python~ --locked --no-dev python scripts/generate_meta.py"
+    "meta:generate": "uv run --project scripts/python~ --locked --no-dev python scripts/generate_meta.py",
+    "test:check-registries": "uv run --project scripts/python~ --locked pytest scripts/tests/test_check_registries.py -q"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",

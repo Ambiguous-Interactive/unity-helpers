@@ -1,0 +1,609 @@
+[
+  {
+    "id": "check-registries",
+    "name": "Typed check registry contracts",
+    "run": "npm run test:check-registries"
+  },
+  {
+    "id": "bounded-sampling-parser",
+    "name": "Typed production arithmetic parser",
+    "run": "npm run test:bounded-sampling"
+  },
+  {
+    "id": "fixture-assets",
+    "name": "Image fixture pixels and Unity identities",
+    "run": "npm run test:fixture-assets"
+  },
+  {
+    "id": "meta-generation",
+    "name": "Unity metadata historical importer contracts",
+    "run": "npm run test:meta-generation"
+  },
+  {
+    "id": "assembly-launchers",
+    "name": "Assembly Python compatibility launchers",
+    "run": "npm run test:assembly-launchers"
+  },
+  {
+    "id": "asmdef",
+    "name": "Assembly definition contracts",
+    "run": "npm run test:asmdef"
+  },
+  {
+    "id": "protobuf-candidate",
+    "name": "Protobuf binary identity controls",
+    "run": "npm run test:protobuf-candidate"
+  },
+  {
+    "id": "python-policy",
+    "name": "Strict migrated Python policies",
+    "run": "npm run lint:python"
+  },
+  {
+    "id": "unity-framework",
+    "name": "Unity Test Framework policy and loaded-source evidence",
+    "run": "npm run test:unity-framework"
+  },
+  {
+    "id": "watchdog-cancellation",
+    "name": "Watchdog cancellation and scheduling controls",
+    "run": "npm run test:watchdog-cancellation"
+  },
+  {
+    "id": "native-build-readback",
+    "name": "Historical native Build receipt readback",
+    "run": "npm run validate:tests:native-build-readback"
+  },
+  {
+    "id": "native-fault-capture",
+    "name": "Native capture and loader-flag transaction controls",
+    "run": "npm run test:native-fault-capture"
+  },
+  {
+    "id": "auto-publish-release",
+    "name": "Automatic release publication",
+    "run": "npm run test:auto-publish-release"
+  },
+  {
+    "id": "browser-storage",
+    "name": "Browser storage bridge and platform metadata",
+    "run": "npm run test:browser-storage"
+  },
+  {
+    "id": "browser-consumer",
+    "name": "WebGL consumer identity and failure controls",
+    "run": "npm run test:browser-consumer"
+  },
+  {
+    "id": "durable-file",
+    "name": "Durable file unsupported-replacement preservation",
+    "run": "npm run test:durable-file"
+  },
+  {
+    "id": "csharp-syntax",
+    "name": "C# syntax policies and migration controls",
+    "run": "npm run lint:csharp-syntax"
+  },
+  {
+    "id": "lint-tests",
+    "name": "Test lifecycle linter",
+    "run": "npm run lint:tests"
+  },
+  {
+    "id": "check-eol",
+    "name": "Line-ending checker",
+    "run": "npm run test:check-eol"
+  },
+  {
+    "id": "out-parameters",
+    "name": "Out-parameter discipline",
+    "run": "npm run test:out-parameters"
+  },
+  {
+    "id": "analyzer-placement",
+    "name": "Shipped analyzer placement",
+    "run": "npm run test:analyzer-placement"
+  },
+  {
+    "id": "random-periods",
+    "name": "Generator period declarations and docs",
+    "run": "npm run test:random-periods"
+  },
+  {
+    "id": "reference-upstream-drift",
+    "name": "Reference upstream drift check",
+    "run": "npm run test:reference-upstream-drift"
+  },
+  {
+    "id": "verify-shipped-analyzers",
+    "name": "Shipped analyzer freshness gate self-test",
+    "run": "npm run test:verify-shipped-analyzers"
+  },
+  {
+    "id": "asset-postprocessor-reachability",
+    "name": "AssetPostprocessor reachability",
+    "run": "npm run test:asset-postprocessor-reachability"
+  },
+  {
+    "id": "wproto-annotations",
+    "name": "WallstopProto annotations",
+    "run": "npm run test:wproto-annotations"
+  },
+  {
+    "id": "test-result-evidence",
+    "name": "Strict NUnit and TRX evidence controls",
+    "run": "npm run test:test-result-evidence"
+  },
+  {
+    "id": "wproto-evidence",
+    "name": "WProto catalog and provenance controls",
+    "run": "npm run test:wproto-evidence"
+  },
+  {
+    "id": "run-wproto-evidence",
+    "name": "WProto evidence process collector controls",
+    "run": "npm run test:run-wproto-evidence"
+  },
+  {
+    "id": "wproto-corpus",
+    "name": "WProto frozen corpus measurement controls",
+    "run": "npm run test:wproto-corpus"
+  },
+  {
+    "id": "lint-markdown",
+    "name": "Markdown inventory and lint failure controls",
+    "run": "npm run test:lint-markdown"
+  },
+  {
+    "id": "agent-skill-migration",
+    "name": "Agent skill migration and discovery",
+    "run": "npm run test:agent-skill-migration"
+  },
+  {
+    "id": "lint-changelog",
+    "name": "Changelog linter self-test",
+    "run": "npm run test:lint-changelog"
+  },
+  {
+    "id": "lint-unity-test-modules",
+    "name": "Unity test-project module manifest linter self-test",
+    "run": "npm run test:lint-unity-test-modules"
+  },
+  {
+    "id": "lint-bundled-assemblies",
+    "name": "Bundled assembly constraint linter self-test",
+    "run": "npm run test:lint-bundled-assemblies"
+  },
+  {
+    "id": "sync-readme-mirror",
+    "name": "README mirror generator self-test",
+    "run": "npm run test:sync-readme-mirror"
+  },
+  {
+    "id": "lint-doc-counts",
+    "name": "Documentation count linter self-test",
+    "run": "npm run test:lint-doc-counts"
+  },
+  {
+    "id": "validate-devcontainer-config",
+    "name": "Devcontainer configuration validator self-test",
+    "run": "npm run test:validate-devcontainer-config"
+  },
+  {
+    "id": "devcontainer-persistence",
+    "name": "Persistent agent state and container recovery",
+    "run": "npm run test:devcontainer-persistence"
+  },
+  {
+    "id": "validate-hook-permissions",
+    "name": "Git hook permission validator self-test",
+    "run": "npm run test:validate-hook-permissions"
+  },
+  {
+    "id": "validate-hook-sync-calls",
+    "name": "Git hook sync-call validator self-test",
+    "run": "npm run test:validate-hook-sync-calls"
+  },
+  {
+    "id": "validate-github-pages-css",
+    "name": "GitHub Pages CSS validator self-test",
+    "run": "npm run test:validate-github-pages-css"
+  },
+  {
+    "id": "check-code-fence-syntax",
+    "name": "Code fence syntax gate self-test",
+    "run": "npm run test:check-code-fence-syntax"
+  },
+  {
+    "id": "lint-doc-identifiers",
+    "name": "Documentation identifier linter self-test",
+    "run": "npm run test:lint-doc-identifiers"
+  },
+  {
+    "id": "lint-dependabot",
+    "name": "Dependabot linter self-test",
+    "run": "npm run test:lint-dependabot"
+  },
+  {
+    "id": "lint-duplicate-usings",
+    "name": "Duplicate-usings linter self-test",
+    "run": "npm run test:lint-duplicate-usings"
+  },
+  {
+    "id": "lint-preserve-attributes",
+    "name": "Preserve-attributes linter self-test",
+    "run": "npm run test:lint-preserve-attributes"
+  },
+  {
+    "id": "extract-code-samples",
+    "name": "Documentation code-sample extractor self-test",
+    "run": "npm run test:extract-code-samples"
+  },
+  {
+    "id": "extract-doc-samples",
+    "name": "Documentation sample compile-gate self-test",
+    "run": "npm run test:extract-doc-samples"
+  },
+  {
+    "id": "empty-corpus-gates",
+    "name": "Empty-corpus gate self-test",
+    "run": "npm run test:empty-corpus-gates"
+  },
+  {
+    "id": "lint-comparison-direction",
+    "name": "Comparison-direction linter self-test",
+    "run": "npm run test:lint-comparison-direction"
+  },
+  {
+    "id": "evaluate-testu01",
+    "name": "TestU01 verdict evaluator self-test",
+    "run": "npm run test:evaluate-testu01"
+  },
+  {
+    "id": "lint-nested-type-placement",
+    "name": "Nested-type placement linter self-test",
+    "run": "npm run test:lint-nested-type-placement"
+  },
+  {
+    "id": "typecheck-controls",
+    "name": "Type-check gate control self-test",
+    "run": "npm run test:typecheck-controls"
+  },
+  {
+    "id": "typecheck-iterate",
+    "name": "Fast compiler iteration contract",
+    "run": "npm run test:typecheck-iterate"
+  },
+  {
+    "id": "lint-comment-block-form",
+    "name": "Comment block-form linter self-test",
+    "run": "npm run test:lint-comment-block-form"
+  },
+  {
+    "id": "lint-typecheck-asmdef-references",
+    "name": "Typecheck asmdef-reference linter self-test",
+    "run": "npm run test:lint-typecheck-asmdef-references"
+  },
+  {
+    "id": "lint-production-test-hooks",
+    "name": "Production test-hook policy controls",
+    "run": "npm run test:lint-production-test-hooks"
+  },
+  {
+    "id": "lint-xml-doc-summaries",
+    "name": "XML doc summary linter self-test",
+    "run": "npm run test:lint-xml-doc-summaries"
+  },
+  {
+    "id": "lint-concurrent-cache-fill",
+    "name": "Concurrent cache fill linter self-test",
+    "run": "npm run test:lint-concurrent-cache-fill"
+  },
+  {
+    "id": "lint-pwsh-invocations",
+    "name": "PowerShell invocation linter self-test",
+    "run": "npm run test:lint-pwsh-invocations"
+  },
+  {
+    "id": "lint-workflow-run-expression-length",
+    "name": "Workflow run-expression linter self-test",
+    "run": "npm run test:lint-workflow-run-expression-length"
+  },
+  {
+    "id": "validate-lint-error-codes",
+    "name": "Lint-error-code validator self-test",
+    "run": "npm run test:validate-lint-error-codes"
+  },
+  {
+    "id": "gitignore-docs",
+    "name": "Gitignore-docs linter self-test",
+    "run": "npm run test:gitignore-docs"
+  },
+  {
+    "id": "runner-maintenance",
+    "name": "Runner maintenance selection and CLI",
+    "run": "npm run test:runner-maintenance"
+  },
+  {
+    "id": "python-compatibility",
+    "name": "Python migration compatibility entry points",
+    "run": "npm run test:python-compatibility"
+  },
+  {
+    "id": "check-runner",
+    "name": "Python check execution and completion",
+    "run": "npm run test:check-runner"
+  },
+  {
+    "id": "run-repo-lint",
+    "name": "Repo Lint runner contracts",
+    "run": "npm run test:run-repo-lint"
+  },
+  {
+    "id": "run-contract-tests",
+    "name": "Contract runner contracts",
+    "run": "npm run test:run-contract-tests"
+  },
+  {
+    "id": "git-path-helpers",
+    "name": "Git path helpers",
+    "run": "npm run test:git-path-helpers"
+  },
+  {
+    "id": "git-staging-helpers",
+    "name": "Git staging helpers",
+    "run": "npm run test:git-staging-helpers"
+  },
+  {
+    "id": "configure-git-defaults",
+    "name": "Git default configuration",
+    "run": "npm run test:configure-git-defaults"
+  },
+  {
+    "id": "normalize-container-git-config",
+    "name": "Container git config normalization",
+    "run": "npm run test:normalize-container-git-config"
+  },
+  {
+    "id": "validate-git-push-config",
+    "name": "Git push configuration validator",
+    "run": "npm run test:validate-git-push-config"
+  },
+  {
+    "id": "github-token",
+    "name": "GitHub token helper",
+    "run": "npm run test:github-token"
+  },
+  {
+    "id": "format-on-demand-workflow",
+    "name": "Opt-in formatting command and PR-state guards",
+    "run": "npm run test:format-on-demand-workflow"
+  },
+  {
+    "id": "sync-script-contracts",
+    "name": "Script and workflow sync contracts",
+    "run": "npm run test:sync-script-contracts"
+  },
+  {
+    "id": "pr-workflow-concurrency",
+    "name": "Pull-request workflow concurrency",
+    "run": "npm run test:pr-workflow-concurrency"
+  },
+  {
+    "id": "workflow-repository-guard",
+    "name": "Workflow repository guard",
+    "run": "npm run test:workflow-repository-guard"
+  },
+  {
+    "id": "workflow-license-secret-scope",
+    "name": "Workflow licensing-credential scope",
+    "run": "npm run test:workflow-license-secret-scope"
+  },
+  {
+    "id": "asmdef-discovery",
+    "name": "Asmdef discovery classification",
+    "run": "npm run test:asmdef-discovery"
+  },
+  {
+    "id": "unity-workflow-matrix-contract",
+    "name": "Unity workflow matrix contract",
+    "run": "npm run test:unity-workflow-matrix-contract"
+  },
+  {
+    "id": "release-export-only",
+    "name": "Release export without publication",
+    "run": "npm run test:release-export-only"
+  },
+  {
+    "id": "unity-package-export",
+    "name": "Unity native package export",
+    "run": "npm run test:unity-package-export"
+  },
+  {
+    "id": "create-unitypackage",
+    "name": "Portable Unity package archive",
+    "run": "npm run test:create-unitypackage"
+  },
+  {
+    "id": "unity-test-filter",
+    "name": "Unity test filter arguments and results",
+    "run": "npm run test:unity-test-filter"
+  },
+  {
+    "id": "unity-frozen-player-provenance",
+    "name": "Unity frozen player provenance",
+    "run": "npm run test:unity-frozen-player-provenance"
+  },
+  {
+    "id": "unity-acceptance-runner",
+    "name": "Unity native acceptance orchestration",
+    "run": "npm run test:unity-acceptance-runner",
+    "completionPattern": "^[1-9][0-9]* orchestration, exact XML and raw evidence integration controls passed\\.\\r?$"
+  },
+  {
+    "id": "unity-acceptance-evidence",
+    "name": "Unity raw acceptance evidence",
+    "run": "npm run test:unity-acceptance-evidence"
+  },
+  {
+    "id": "unity-acceptance-workflow",
+    "name": "Unity optional acceptance workflow",
+    "run": "npm run test:unity-acceptance-workflow"
+  },
+  {
+    "id": "unity-grouped-modes",
+    "name": "Grouped Unity mode dispatch and outcome controls",
+    "run": "npm run test:unity-grouped-modes"
+  },
+  {
+    "id": "standalone-scene-provision",
+    "name": "Standalone packed-scene build provision controls",
+    "run": "npm run test:standalone-scene-provision"
+  },
+  {
+    "id": "build-lock-action-inputs",
+    "name": "Build-lock action inputs",
+    "run": "npm run test:build-lock-action-inputs"
+  },
+  {
+    "id": "build-lock-action-input-parser",
+    "name": "Build-lock action input parser",
+    "run": "npm run test:build-lock-action-input-parser"
+  },
+  {
+    "id": "portable-cleanup-classifier",
+    "name": "Portable cleanup classifier",
+    "run": "npm run test:portable-cleanup-classifier"
+  },
+  {
+    "id": "license-cache",
+    "name": "Unity license cache",
+    "run": "npm run test:license-cache"
+  },
+  {
+    "id": "license-year-rename",
+    "name": "License year resolution across a rename",
+    "run": "npm run test:license-year-rename"
+  },
+  {
+    "id": "license-year-copy-detection",
+    "name": "License year copy detection",
+    "run": "npm run test:license-year-copy-detection"
+  },
+  {
+    "id": "unity-nunit-results",
+    "name": "Unity NUnit results gate",
+    "run": "npm run test:unity-nunit-results"
+  },
+  {
+    "id": "redact-unity-artifacts",
+    "name": "Unity artifact credential redactor",
+    "run": "npm run test:redact-unity-artifacts"
+  },
+  {
+    "id": "unity-artifact-redaction",
+    "name": "Unity artifact redaction coverage",
+    "run": "npm run test:unity-artifact-redaction"
+  },
+  {
+    "id": "unity-license-cache-location",
+    "name": "Unity license cache location",
+    "run": "npm run test:unity-license-cache-location"
+  },
+  {
+    "id": "shell-portability",
+    "name": "Shell portability",
+    "run": "npm run test:shell-portability"
+  },
+  {
+    "id": "read-stdin-sync",
+    "name": "Synchronous stdin reader",
+    "run": "npm run test:read-stdin-sync"
+  },
+  {
+    "id": "validate-mcp-config",
+    "name": "MCP configuration validator",
+    "run": "npm run test:validate-mcp-config"
+  },
+  {
+    "id": "github-mcp",
+    "name": "GitHub MCP launcher",
+    "run": "npm run test:github-mcp"
+  },
+  {
+    "id": "unity-mcp",
+    "name": "Unity MCP helpers",
+    "run": "npm run test:unity-mcp"
+  },
+  {
+    "id": "zai-mcp",
+    "name": "Z.AI MCP launcher",
+    "run": "npm run test:zai-mcp"
+  },
+  {
+    "id": "accelerator",
+    "name": "Unity Accelerator configuration",
+    "run": "npm run test:accelerator"
+  },
+  {
+    "id": "project-workspace",
+    "name": "Project workspace resolution",
+    "run": "npm run test:project-workspace"
+  },
+  {
+    "id": "postinstall-hooks",
+    "name": "Postinstall hook wiring",
+    "run": "npm run test:postinstall-hooks"
+  },
+  {
+    "id": "add-cspell-word",
+    "name": "cspell word insertion",
+    "run": "npm run test:add-cspell-word"
+  },
+  {
+    "id": "github-pages-sortable",
+    "name": "GitHub Pages sortable tables",
+    "run": "npm run test:github-pages-sortable"
+  },
+  {
+    "id": "wiki-generation",
+    "name": "Wiki generation",
+    "run": "npm run test:wiki-generation"
+  },
+  {
+    "id": "npm-package-signature",
+    "name": "npm package signature",
+    "run": "npm run test:npm-package-signature"
+  },
+  {
+    "id": "npm-package-changelog",
+    "name": "npm package changelog",
+    "run": "npm run test:npm-package-changelog",
+    "exclusive": true
+  },
+  {
+    "id": "release-tools",
+    "name": "Release tooling",
+    "run": "npm run test:release-tools"
+  },
+  {
+    "id": "verify-release-tag",
+    "name": "Release tag contract",
+    "run": "npm run test:verify-release-tag"
+  },
+  {
+    "id": "perf-tools",
+    "name": "Performance report tooling",
+    "run": "npm run test:perf-tools"
+  },
+  {
+    "id": "random-quality-stream",
+    "name": "Random-quality stream",
+    "run": "npm run test:random-quality-stream"
+  },
+  {
+    "id": "random-quality-outcomes",
+    "name": "Random-quality outcomes",
+    "run": "npm run test:random-quality-outcomes"
+  }
+]

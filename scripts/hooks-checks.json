@@ -1,0 +1,17 @@
+[
+  {
+    "id": "agent-preflight",
+    "name": "Agent preflight regressions",
+    "run": "npm run test:agent-preflight"
+  },
+  {
+    "id": "precommit-integration",
+    "name": "Pre-commit integration regressions",
+    "run": "npm run test:precommit-integration"
+  },
+  {
+    "id": "pre-push-changed-files",
+    "name": "Pre-push changed-file regressions",
+    "run": "npm run test:pre-push-changed-files"
+  }
+]
