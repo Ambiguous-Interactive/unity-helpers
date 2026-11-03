@@ -21,11 +21,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING, BinaryIO, cast
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
+    from collections.abc import Callable, Generator
     from types import FrameType
 
 ROOT = Path(__file__).resolve().parents[2]
 MODES = ("editmode", "playmode", "standalone")
+MAX_CONCURRENT_WORKERS = 3
+WORKER_PRIORITY = ("editmode", "editmode_isolated", "standalone", "playmode", "proto_only")
 WORKER = """
 $ErrorActionPreference = 'Stop'
 try {
@@ -287,9 +289,14 @@ def stop(worker: Worker) -> None:
     worker.process.wait(timeout=30)
 
 
-def wait(workers: list[Worker], deadline: float) -> None:
+def wait(workers: list[Worker], deadline: float, refill: Callable[[], None] | None = None) -> None:
     last_report = 0.0
     while True:
+        for worker in workers:
+            if worker.process.poll() is not None and worker.ended is None:
+                worker.ended = time.monotonic()
+        if refill is not None:
+            refill()
         running: list[str] = []
         for worker in workers:
             if worker.process.poll() is None:
@@ -363,12 +370,27 @@ def run(
                         folder / "project-initialization.log",
                     )
                     raise RuntimeError(f"Unity project initialization failed for {mode.name}")
-            for mode in modes:
-                folder = Path(str(mode.parameters["ArtifactsPath"]))
-                folder.mkdir(parents=True, exist_ok=True)
-                stream = streams.enter_context((folder / "mode-controller.log").open("wb"))
-                workers.append(launch(mode, private, shell, environment, stream))
-            wait(workers, started + timeout)
+            pending = sorted(modes, key=lambda mode: WORKER_PRIORITY.index(mode.name))
+
+            def fill_available_slots() -> None:
+                while pending:
+                    active = 0
+                    for worker in workers:
+                        if worker.process.poll() is None:
+                            active += 1
+                        elif worker.ended is None:
+                            worker.ended = time.monotonic()
+                    if active >= MAX_CONCURRENT_WORKERS:
+                        return
+                    if started + timeout <= time.monotonic():
+                        raise TimeoutError("Unity mode deadline expired before worker launch")
+                    mode = pending.pop(0)
+                    folder = Path(str(mode.parameters["ArtifactsPath"]))
+                    folder.mkdir(parents=True, exist_ok=True)
+                    stream = streams.enter_context((folder / "mode-controller.log").open("wb"))
+                    workers.append(launch(mode, private, shell, environment, stream))
+
+            wait(workers, started + timeout, fill_available_slots)
             for worker in workers:
                 if worker.mode.name == "editmode_isolated" and worker.process.returncode == 0:
                     folder = Path(str(worker.mode.parameters["ArtifactsPath"]))
@@ -422,6 +444,8 @@ def run(
                             "ProcessId": worker.process.pid,
                             "ExitCode": worker.process.returncode,
                             "Forced": worker.forced,
+                            "StartedAfterSeconds": worker.started - started,
+                            "EndedAfterSeconds": cast("float", worker.ended) - started,
                             "ElapsedSeconds": cast("float", worker.ended) - worker.started,
                         }
                         for worker in workers

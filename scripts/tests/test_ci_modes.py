@@ -147,7 +147,7 @@ def make_control(tmp_path: Path) -> tuple[list[Mode], Mode, dict[str, str], str]
         Write-Host ('Mode diagnostics: ' + $TestMode)
         [IO.File]::WriteAllText((Join-Path $env:CONTROL_EVENTS ($workerName + '.started')), [string]$PID)
         $deadline = [DateTime]::UtcNow.AddSeconds(10)
-        while (@(Get-ChildItem -LiteralPath $env:CONTROL_EVENTS -Filter '*.started').Count -lt $expectedWorkers) {
+        while (@(Get-ChildItem -LiteralPath $env:CONTROL_EVENTS -Filter '*.started').Count -lt [Math]::Min(3, $expectedWorkers)) {
             if ($deadline -lt [DateTime]::UtcNow) { throw 'Workers did not overlap.' }
             Start-Sleep -Milliseconds 10
         }
@@ -299,6 +299,21 @@ def test_editor_halves_require_both_and_publish_fixture_evidence(
     }
     assert len(receipt["Workers"]) == 4
     assert receipt["ControllerCompleted"] is True
+    intervals = sorted(
+        [(worker["StartedAfterSeconds"], 1) for worker in receipt["Workers"]]
+        + [(worker["EndedAfterSeconds"], -1) for worker in receipt["Workers"]]
+    )
+    active = 0
+    peak = 0
+    for _, change in intervals:
+        active += change
+        peak = max(peak, active)
+    assert peak == 3
+    assert [worker["Mode"] for worker in receipt["Workers"][:3]] == [
+        "editmode",
+        "editmode_isolated",
+        "standalone",
+    ]
     assert {path.stem for path in (tmp_path / "events").glob("*.started")} == {
         "editmode",
         "editmode_isolated",
