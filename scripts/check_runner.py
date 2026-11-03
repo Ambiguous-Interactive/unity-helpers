@@ -20,6 +20,7 @@ from typing import Literal, cast
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_LOCK = threading.Lock()
+OUTPUT_FORMAT: Literal["json", "text"] = "json"
 
 
 @dataclass(frozen=True)
@@ -41,7 +42,10 @@ class Result:
 
 def emit(kind: Literal["output", "result"], value: object) -> None:
     with OUTPUT_LOCK:
-        print(json.dumps({"kind": kind, "value": value}, ensure_ascii=True), flush=True)
+        if OUTPUT_FORMAT == "text" and kind == "output":
+            print(value, end="", flush=True)
+        else:
+            print(json.dumps({"kind": kind, "value": value}, ensure_ascii=True), flush=True)
 
 
 def write(text: str) -> None:
@@ -308,6 +312,10 @@ def read_checks(value: object) -> list[Check]:
     checks: list[Check] = []
     for item in cast("list[object]", value):
         fields = mapping(item)
+        if fields.keys() - {"id", "name", "run", "exclusive", "completionPattern"}:
+            raise ValueError("Unknown check configuration field")
+        if "exclusive" in fields and not isinstance(fields["exclusive"], bool):
+            raise ValueError("Check exclusive policy must be a boolean")
         pattern = fields.get("completionPattern")
         if pattern is not None:
             re.compile(string(pattern))
@@ -325,6 +333,30 @@ def read_checks(value: object) -> list[Check]:
 
 def dispatch(request: dict[str, object]) -> object:
     operation = request.get("operation")
+    if operation == "registryChecks":
+        from check_registries import Registry, checks_for
+
+        registry = string(request["registry"])
+        if registry not in {"lint", "contracts"}:
+            raise ValueError("Expected lint or contracts registry")
+        return [
+            {
+                "id": check.id,
+                "name": check.name,
+                "run": check.run,
+                **({"exclusive": True} if check.exclusive else {}),
+                **(
+                    {"completionPattern": check.completion_pattern}
+                    if check.completion_pattern is not None
+                    else {}
+                ),
+            }
+            for check in checks_for(
+                cast("Registry", registry),
+                request.get("includeHooks") is True,
+                request.get("direct") is True,
+            )
+        ]
     if operation == "defaultJobs":
         raw = request.get("environment")
         environment = (

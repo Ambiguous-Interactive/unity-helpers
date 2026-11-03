@@ -4,7 +4,7 @@ babel==2.18.0
     # via
     #   mkdocs-git-revision-date-localized-plugin
     #   mkdocs-material
-backrefs==8.1
+backrefs==8.2
     # via mkdocs-material
 cairocffi==1.7.1
     # via cairosvg

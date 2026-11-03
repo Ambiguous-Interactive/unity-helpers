@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 
 ROOT = Path(__file__).resolve().parents[2]
 MODES = ("editmode", "playmode", "standalone")
-MAX_CONCURRENT_WORKERS = 3
+MAX_CONCURRENT_WORKERS = 4
 WORKER_PRIORITY = ("editmode", "editmode_isolated", "standalone", "playmode", "proto_only")
 WORKER = """
 $ErrorActionPreference = 'Stop'

@@ -5,16 +5,20 @@ from __future__ import annotations
 import hashlib
 import os
 import re
+import runpy
 import subprocess
 import sys
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import pytest
 import yaml
 from PIL import Image
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from fixture_assets import write_metadata
@@ -265,9 +269,7 @@ def assert_image_metadata(path: Path, kind: str) -> str:
     assert importer["spriteMode"] == expected_mode
     assert importer["textureType"] == (0 if kind == "textures" else 8)
     sheet = read_mapping(importer["spriteSheet"])
-    if kind == "textures":
-        assert importer["spriteMode"] == 0
-    elif importer["spriteMode"] == 1:
+    if kind == "textures" or importer["spriteMode"] == 1:
         assert sheet["sprites"] == []
         assert sheet["nameFileIdTable"] == {}
         metadata_text = path.with_suffix(".png.meta").read_text(encoding="utf-8")
@@ -301,6 +303,28 @@ def assert_image_metadata(path: Path, kind: str) -> str:
             assert 0 <= x <= width - cell_width
             assert 0 <= y <= height - cell_height
     return guid
+
+
+@pytest.mark.parametrize("field", ["sprites", "nameFileIdTable"])
+def test_recreated_texture_metadata_rejects_sprite_entries(field: str, tmp_path: Path) -> None:
+    functions = cast(
+        "dict[str, object]", runpy.run_path(str(ROOT / "scripts/generate-test-textures.py"))
+    )
+    generate = cast("Callable[[str], None]", functions["generate_texture_meta_file"])
+    image = tmp_path / "solid_32x32_black.png"
+    sidecar = image.with_suffix(".png.meta")
+    generate(str(sidecar))
+    assert_image_metadata(image, "textures")
+    sidecar.unlink()
+    generate(str(sidecar))
+    assert_image_metadata(image, "textures")
+    content = sidecar.read_bytes()
+    original = f"    {field}: {'[]' if field == 'sprites' else '{}'}\r\n".encode()
+    corrupt = f"    {field}: [123]\r\n".encode()
+    assert original in content
+    sidecar.write_bytes(content.replace(original, corrupt))
+    with pytest.raises(AssertionError):
+        assert_image_metadata(image, "textures")
 
 
 @pytest.mark.parametrize(

@@ -11,7 +11,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// Returned by <see cref="WProtoWriter.TryBeginLengthDelimited(int, out WProtoLengthToken)"/> and consumed by
     /// <see cref="WProtoWriter.TryCloseLengthDelimited"/>. It carries positions rather than a length
     /// because the length is precisely what the caller does not yet know -- which is the point of
-    /// writing the payload first and the prefix afterwards.
+    /// writing the payload first and the prefix afterwards. Tokens belong to their originating writer
+    /// session and must be closed exactly once in reverse opening order.
     /// </remarks>
     public readonly struct WProtoLengthToken : global::System.IEquatable<WProtoLengthToken>
     {
@@ -34,18 +35,27 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// it on the write side would make a deep-but-legal message decodable and not encodable.
         /// </remarks>
         internal readonly bool Nested;
+        internal readonly long Owner;
+        internal readonly long Identifier;
+        internal readonly long ParentIdentifier;
 
         internal WProtoLengthToken(
             int prefixStart,
             int payloadStart,
             int reservedPrefixSize,
-            bool nested
+            bool nested,
+            long owner,
+            long identifier,
+            long parentIdentifier
         )
         {
             PrefixStart = prefixStart;
             PayloadStart = payloadStart;
             ReservedPrefixSize = reservedPrefixSize;
             Nested = nested;
+            Owner = owner;
+            Identifier = identifier;
+            ParentIdentifier = parentIdentifier;
         }
 
         /// <summary>Compares the stored fields with another value.</summary>
@@ -54,7 +64,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             return PrefixStart.Equals(other.PrefixStart)
                 && PayloadStart.Equals(other.PayloadStart)
                 && ReservedPrefixSize.Equals(other.ReservedPrefixSize)
-                && Nested.Equals(other.Nested);
+                && Nested.Equals(other.Nested)
+                && Owner.Equals(other.Owner)
+                && Identifier.Equals(other.Identifier)
+                && ParentIdentifier.Equals(other.ParentIdentifier);
         }
 
         /// <inheritdoc />
@@ -70,7 +83,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 PrefixStart,
                 PayloadStart,
                 ReservedPrefixSize,
-                Nested
+                Nested,
+                Owner,
+                Identifier,
+                ParentIdentifier
             );
         }
     }

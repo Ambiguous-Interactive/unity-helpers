@@ -8,7 +8,7 @@ name: Repo Lint
 # scripts/tests/test-comment-stripping.ps1. One boot, one checkout, one `npm install` now serve all
 # of it.
 #
-# The registry lives in scripts/run-repo-lint.js so it is data rather than YAML: the runner keeps
+# The registry lives in scripts/lint-checks.json: the typed Python runner keeps
 # going after a failure and reports every failing check at once, and
 # scripts/tests/test-run-repo-lint.js asserts no linter in scripts/ has been left unreachable.
 #
@@ -135,7 +135,7 @@ jobs:
       - name: Repository checks
         id: checks
         continue-on-error: true
-        run: node scripts/run-repo-lint.js
+        run: uv run --project scripts/python~ --locked --no-dev python scripts/check_registries.py lint --direct
 
       - name: Report memory safety findings
         id: safety

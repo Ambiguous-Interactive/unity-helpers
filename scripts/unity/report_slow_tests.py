@@ -28,8 +28,11 @@ class Report:
     cases: tuple[Timing, ...]
 
 
-def seconds(value: str) -> float:
+def seconds(value: str, result_state: str = "") -> float:
     if not value.strip():
+        outcome = result_state.split("(", 1)[0].split(":", 1)[0]
+        if outcome in {"Passed", "Failed", "Inconclusive", "Warning"}:
+            raise ValueError(f"Missing duration for executed result '{result_state}'")
         return 0.0
     try:
         result = float(value)
@@ -56,14 +59,14 @@ def read_report(path: Path) -> Report:
         target.append(
             Timing(
                 node.get("fullname") or node.get("name") or "",
-                seconds(node.get("duration", "")),
+                seconds(node.get("duration", ""), node.get("result", "")),
             )
         )
     if not fixtures or not cases:
         raise ValueError("Results require at least one test fixture and test case")
     return Report(
         root.get("total", ""),
-        seconds(root.get("duration", "")),
+        seconds(root.get("duration", ""), root.get("result", "")),
         tuple(fixtures),
         tuple(cases),
     )

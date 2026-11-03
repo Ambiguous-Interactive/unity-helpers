@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     using System;
     using System.Runtime.CompilerServices;
     using System.Text;
+    using System.Threading;
 
     /// <summary>
     /// Writes protobuf wire-format primitives into a caller-owned <see cref="Span{T}"/>.
@@ -33,6 +34,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// </remarks>
     public ref struct WProtoWriter
     {
+        private static long _nextOwner;
+
         /// <summary>Bytes written so far.</summary>
         public int Position => _position;
 
@@ -56,10 +59,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
         private readonly Span<byte> _buffer;
         private readonly ReadOnlySpan<int> _sizePlan;
+        private readonly long _owner;
         private int _position;
         private int _sizePlanPosition;
         private int _depth;
         private bool _faulted;
+        private long _nextTokenIdentifier;
+        private long _openTokenIdentifier;
 
         /// <summary>
         /// Initializes a writer over <paramref name="buffer"/>.
@@ -72,10 +78,30 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             _buffer = buffer;
             _sizePlan = sizePlan;
+            _owner = Interlocked.Increment(ref _nextOwner);
+            if (_owner == 0)
+            {
+                _owner = Interlocked.Increment(ref _nextOwner);
+            }
             _position = 0;
             _sizePlanPosition = 0;
             _depth = 0;
             _faulted = false;
+            _nextTokenIdentifier = 0;
+            _openTokenIdentifier = 0;
+        }
+
+        internal static bool WriteCompleted(
+            bool formatterSucceeded,
+            in WProtoWriter writer,
+            in WProtoWriter expected
+        )
+        {
+            return formatterSucceeded
+                && !writer._faulted
+                && writer._owner == expected._owner
+                && writer._openTokenIdentifier == expected._openTokenIdentifier
+                && writer._depth == expected._depth;
         }
 
         /// <summary>
@@ -269,7 +295,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <returns><c>true</c> when the whole field was written.</returns>
         /// <remarks>
         /// The prefix and the payload are reserved together, so a payload that does not fit leaves
-        /// no orphaned length prefix behind.
+        /// no orphaned length prefix behind. Input may overlap the destination; its bytes are copied
+        /// before the length prefix is written.
         /// </remarks>
         public bool TryWriteBytes(ReadOnlySpan<byte> value)
         {
@@ -283,12 +310,15 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
+            // Preserve aliased input before the length prefix can overwrite it.
+            value.CopyTo(_buffer.Slice(_position + prefixSize, valueLength));
             if (!TryWriteVarint32((uint)valueLength))
             {
                 return false;
             }
 
-            return TryWriteRaw(value);
+            _position += valueLength;
+            return true;
         }
 
         /// <summary>
@@ -429,6 +459,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
+            WProtoWriter expected = this;
             bool written;
             try
             {
@@ -437,15 +468,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             catch
             {
                 // Unwind failed frames here; successful frames remain open until TryCloseLengthDelimited decrements them.
-                _depth--;
-                _faulted = true;
+                RestoreFailedFrame(in expected, in token);
                 throw;
             }
 
-            if (!written || _faulted)
+            if (!WriteCompleted(written, in this, in expected))
             {
-                _depth--;
-                _faulted = true;
+                RestoreFailedFrame(in expected, in token);
                 return false;
             }
 
@@ -469,9 +498,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// before-serialization hook a second time.
         /// </para>
         /// <para>
-        /// The caller must close every token it opens. A failure between the two leaves the writer
-        /// faulted, and a faulted writer refuses all further work, so an unclosed token cannot produce
-        /// a wrong payload -- only a dead one.
+        /// Close every token once, in reverse opening order, through the originating writer session.
+        /// Default, foreign, reused and out-of-order tokens latch a fault without changing the output.
+        /// The facade and message formatter boundaries reject unclosed fields, including packed runs.
         /// </para>
         /// </remarks>
         public bool TryBeginLengthDelimited(int fieldNumber, out WProtoLengthToken token)
@@ -504,9 +533,20 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// Closes a field opened by <see cref="TryBeginLengthDelimited(int, out WProtoLengthToken)"/>, back-filling its length.
         /// </summary>
         /// <param name="token">The token from the matching open.</param>
-        /// <returns><c>true</c> when the length was written.</returns>
+        /// <returns><c>true</c> when the matching open field's length was written; invalid tokens latch a fault.</returns>
         public bool TryCloseLengthDelimited(in WProtoLengthToken token)
         {
+            if (
+                token.Owner == 0
+                || token.Owner != _owner
+                || token.Identifier != _openTokenIdentifier
+            )
+            {
+                _faulted = true;
+                return false;
+            }
+
+            _openTokenIdentifier = token.ParentIdentifier;
             if (token.Nested)
             {
                 _depth--;
@@ -566,8 +606,34 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 ++_depth;
             }
 
-            token = new WProtoLengthToken(prefixStart, _position, reservedPrefixSize, nested);
+            _nextTokenIdentifier = unchecked(_nextTokenIdentifier + 1);
+            if (_nextTokenIdentifier == 0)
+            {
+                _nextTokenIdentifier = unchecked(_nextTokenIdentifier + 1);
+            }
+            long parentIdentifier = _openTokenIdentifier;
+            _openTokenIdentifier = _nextTokenIdentifier;
+            token = new WProtoLengthToken(
+                prefixStart,
+                _position,
+                reservedPrefixSize,
+                nested,
+                _owner,
+                _nextTokenIdentifier,
+                parentIdentifier
+            );
             return true;
+        }
+
+        private void RestoreFailedFrame(in WProtoWriter expected, in WProtoLengthToken token)
+        {
+            if (_owner != expected._owner)
+            {
+                this = expected;
+            }
+            _openTokenIdentifier = token.ParentIdentifier;
+            _depth = expected._depth - (token.Nested ? 1 : 0);
+            _faulted = true;
         }
 
         private bool TryBackfillLength(int prefixStart, int payloadStart, int reservedPrefixSize)

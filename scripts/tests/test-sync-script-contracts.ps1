@@ -212,7 +212,7 @@ function Run-AgentValidationContractTests {
   # asserted against that registry by scripts/tests/test-run-contract-tests.js. What belongs here is
   # the delegation itself: a chain reappearing in package.json is how the registry would stop
   # describing what runs.
-  $fastTestsDelegateToRunner = $fastTestScript -ceq 'node scripts/run-contract-tests.js --direct'
+  $fastTestsDelegateToRunner = $fastTestScript -ceq 'uv run --project scripts/python~ --locked --no-dev python scripts/check_registries.py contracts --direct'
   Write-TestResult `
     -TestName 'The fast test aggregate delegates to the concurrent contract runner' `
     -Passed $fastTestsDelegateToRunner `
@@ -224,7 +224,7 @@ function Run-AgentValidationContractTests {
     -Passed $hookTestsAreSplit `
     -Message "hook regressions = $hookRegressionScript"
 
-  $expectedFullTestScript = 'node scripts/run-contract-tests.js --include-hook-regressions --direct'
+  $expectedFullTestScript = 'uv run --project scripts/python~ --locked --no-dev python scripts/check_registries.py contracts --include-hook-regressions --direct'
   $fullTestsComposeBothAggregates = $fullTestScript -ceq $expectedFullTestScript
   Write-TestResult `
     -TestName 'Full CI test aggregate retains fast and exhaustive hook suites' `
@@ -1487,7 +1487,7 @@ function Run-DocumentationWorkflowContractTests {
   Write-Host ""
 
   # These contracts used to be written against two named jobs in validate-docs.yml. Those jobs are
-  # checks in scripts/run-repo-lint.js now, and every assertion below broke on a layout change while
+  # checks in scripts/lint-checks.json now, and every assertion below broke on a layout change while
   # the thing each one protected was still true. They are restated against the REQUIREMENT -- the
   # doc-link modes run, bounded, on any change that could affect them -- and locate the owner rather
   # than naming it.
@@ -1497,9 +1497,9 @@ function Run-DocumentationWorkflowContractTests {
   # checks, so it was preserving names for a mechanism that does not exist.
   $repoRoot = Get-RepoRoot
   $workflowDir = Join-Path $repoRoot '.github/workflows'
-  $runnerPath = Join-Path $repoRoot 'scripts/run-repo-lint.js'
+  $runnerPath = Join-Path $repoRoot 'scripts/lint-checks.json'
   [string]$runnerContent = if (Test-Path -LiteralPath $runnerPath) {
-    Get-Content -LiteralPath $runnerPath -Raw
+    (@(Get-Content -LiteralPath $runnerPath -Raw | ConvertFrom-Json) | ForEach-Object { $_.run }) -join "`n"
   }
   else {
     ''
@@ -1519,7 +1519,8 @@ function Run-DocumentationWorkflowContractTests {
         $candidateText = Get-WorkflowContentWithoutComments -Path $_.FullName
         # Anchored so `test-lint-doc-links.ps1` does not read as an invocation of the linter itself.
         ($candidateText -match '(?<![\w-])lint-doc-links\.ps1') -or
-        $candidateText.Contains('run-repo-lint.js')
+        $candidateText.Contains('run-repo-lint.js') -or
+        $candidateText -match '(?m)^\s*(?:run:\s*)?uv run --project scripts/python~ --locked --no-dev python scripts/check_registries\.py lint(?: --direct)?\s*$'
       }
   )
 
@@ -1534,7 +1535,8 @@ function Run-DocumentationWorkflowContractTests {
   foreach ($workflowFile in $docLinkWorkflows) {
     $ownerText = Get-WorkflowContentWithoutComments -Path $workflowFile.FullName
     $docLinkSources += $ownerText
-    if ($ownerText.Contains('run-repo-lint.js')) {
+    if ($ownerText.Contains('run-repo-lint.js') -or
+      $ownerText -match '(?m)^\s*(?:run:\s*)?uv run --project scripts/python~ --locked --no-dev python scripts/check_registries\.py lint(?: --direct)?\s*$') {
       $runnerIsInvoked = $true
     }
   }
@@ -1618,7 +1620,7 @@ function Run-DocumentationWorkflowContractTests {
   Write-TestResult `
     -TestName 'doc link checks run somewhere' `
     -Passed ($docLinkWorkflows.Count -gt 0) `
-    -Message 'No workflow invokes scripts/lint-doc-links.ps1 or scripts/run-repo-lint.js, so documentation links are unchecked.'
+    -Message 'No workflow invokes scripts/lint-doc-links.ps1 or the lint registry, so documentation links are unchecked.'
 
   Write-TestResult `
     -TestName 'doc link checks cover both Targets and Format modes' `

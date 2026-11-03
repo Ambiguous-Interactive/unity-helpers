@@ -182,7 +182,7 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
         }
         $checks++
     }
-    foreach ($function in @('New-ConfiguratorSource', 'Set-EphemeralProjectContent', 'Initialize-EphemeralProject')) {
+    foreach ($function in @('New-ConfiguratorSource', 'Set-EphemeralProjectContent', 'Initialize-EphemeralScriptingDefines', 'Initialize-EphemeralProject')) {
         $definition = $runner.Find({ param($node)
             $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $function
         }, $true)
@@ -213,9 +213,14 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
             $Il2CppCompilerConfiguration = 'Release'
             $ManagedStrippingLevel = 'Disabled'
             $UseReleasePlayerBuild = $true
+            $AdditionalScriptingDefinesJoined = 'SINGLE_THREADED'
             $frozenPlayerDeclaration = if ($campaignKind -ceq 'ordinary') { $null } else { [pscustomobject]@{ CampaignKind = $campaignKind } }
             $project = Invoke-Expression $initializeCall.Extent.Text
             $generated = [IO.File]::ReadAllText((Join-Path $project 'Assets/Editor/UhCiTestConfigurator.cs'))
+            $settings = [IO.File]::ReadAllText((Join-Path $project 'ProjectSettings/ProjectSettings.asset'))
+            if (-not $settings.Contains('SINGLE_THREADED')) {
+                throw 'The runner must seed its requested scripting defines before first import.'
+            }
             $expected = if ($campaignKind -ceq 'wproto-seven-families-v1') { 'true' } else { 'false' }
             if (-not $generated.Contains("if ($expected || PlayerSettings.GetScriptingBackend(target) == ScriptingImplementation.Mono2x)")) {
                 throw "The runner lost the WProto-only managed variant selection for $campaignKind/$backend."

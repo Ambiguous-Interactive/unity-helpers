@@ -1110,8 +1110,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void SamePriorityProfilesSecondMatchedFirstInListWins()
         {
-            string path = CreatePng("priority_order_test", asSprite: true);
-            _assetPath = path;
+            string path = Path.Combine(_testFolder, "priority_order_test.png");
 
             List<SpriteSettings> profiles = new()
             {
@@ -1163,8 +1162,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             bool expectedMatch
         )
         {
-            string path = CreatePng("pattern_test", asSprite: true);
-            _assetPath = path;
+            string path = Path.Combine(_testFolder, "pattern_test.png");
 
             List<SpriteSettings> profiles = new()
             {
@@ -1205,8 +1203,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             bool expectedMatch
         )
         {
-            string path = CreatePng("case_sensitive_test", asSprite: true);
-            _assetPath = path;
+            string path = Path.Combine(_testFolder, "case_sensitive_test.png");
 
             List<SpriteSettings> profiles = new()
             {
@@ -1247,8 +1244,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void NameContainsCaseInsensitiveWithActualCaseVariation()
         {
-            string path = CreatePng("MixedCASEname", asSprite: true);
-            _assetPath = path;
+            string path = Path.Combine(_testFolder, "MixedCASEname.png");
 
             List<SpriteSettings> profiles = new()
             {
@@ -1278,8 +1274,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void PathContainsCaseInsensitiveWithActualCaseVariation()
         {
-            string path = CreatePng("pathtest", asSprite: true);
-            _assetPath = path;
+            string path = Path.Combine(_testFolder, "pathtest.png");
 
             List<SpriteSettings> profiles = new()
             {
@@ -1309,8 +1304,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void ExtensionMatchIsCaseInsensitive()
         {
-            string path = CreatePng("extension_case_test", asSprite: true);
-            _assetPath = path;
+            string path = Path.Combine(_testFolder, "extension_case_test.png");
 
             List<SpriteSettings> profiles = new()
             {
@@ -1340,8 +1334,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void ExtensionMatchWithoutDotPrefix()
         {
-            string path = CreatePng("extension_no_dot_test", asSprite: true);
-            _assetPath = path;
+            string path = Path.Combine(_testFolder, "extension_no_dot_test.png");
 
             List<SpriteSettings> profiles = new()
             {
@@ -1426,8 +1419,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void FindMatchingSettingsWithNullPreparedListReturnsNull()
         {
-            string path = CreatePng("null_prepared", asSprite: true);
-            _assetPath = path;
+            string path = Path.Combine(_testFolder, "null_prepared.png");
 
             SpriteSettings matched = SpriteSettingsApplierAPI.FindMatchingSettings(path, null);
 
@@ -1440,8 +1432,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void FindMatchingSettingsWithEmptyPreparedListReturnsNull()
         {
-            string path = CreatePng("empty_prepared", asSprite: true);
-            _assetPath = path;
+            string path = Path.Combine(_testFolder, "empty_prepared.png");
 
             List<SpriteSettingsApplierAPI.PreparedProfile> prepared =
                 SpriteSettingsApplierAPI.PrepareProfiles(new List<SpriteSettings>());
@@ -1471,8 +1462,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void RegexMatchIsCaseInsensitive()
         {
-            string path = CreatePng("regex_case_test", asSprite: true);
-            _assetPath = path;
+            string path = Path.Combine(_testFolder, "regex_case_test.png");
 
             List<SpriteSettings> profiles = new()
             {
@@ -1502,8 +1492,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void InvalidRegexPatternDoesNotMatch()
         {
-            string path = CreatePng("invalid_regex_test", asSprite: true);
-            _assetPath = path;
+            string path = Path.Combine(_testFolder, "invalid_regex_test.png");
 
             List<SpriteSettings> profiles = new()
             {
@@ -1585,8 +1574,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             int expectedWinningPriority
         )
         {
-            string path = CreatePng("negative_priority_test", asSprite: true);
-            _assetPath = path;
+            string path = Path.Combine(_testFolder, "negative_priority_test.png");
 
             List<SpriteSettings> profiles = new()
             {

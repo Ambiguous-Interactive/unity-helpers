@@ -135,7 +135,8 @@ foreach ($workflowFile in (Get-ChildItem -LiteralPath $workflowDir -Filter '*.ym
 
     $runsValidator = (
         $workflowContent.Contains('validate-devcontainer-config.ps1') -or
-        $workflowContent.Contains('run-repo-lint.js')
+        $workflowContent.Contains('run-repo-lint.js') -or
+        $workflowContent -match '(?m)^\s*(?:run:\s*)?uv run --project scripts/python~ --locked --no-dev python scripts/check_registries\.py lint(?: --direct)?\s*$'
     )
     if (-not $runsValidator) {
         continue
@@ -158,7 +159,7 @@ foreach ($workflowFile in (Get-ChildItem -LiteralPath $workflowDir -Filter '*.ym
     }
 }
 if (-not $devcontainerValidationIsWired) {
-    Write-Error "A workflow must run validate-devcontainer-config.ps1 (directly or via scripts/run-repo-lint.js) on changes to build-publish-devcontainer.yml."
+    Write-Error "A workflow must run validate-devcontainer-config.ps1 (directly or via the lint registry) on changes to build-publish-devcontainer.yml."
     exit 1
 }
 

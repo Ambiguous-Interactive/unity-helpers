@@ -2,6 +2,31 @@
 
 This guide documents patterns for testing states that "should never happen" but could occur in production. These tests catch edge cases that defensive programming must handle gracefully.
 
+## Run script checks through Python
+
+Use `npm run lint:repo -- --only <id>` or `npm run validate:tests:fast -- --only <id>`
+for focused checks. Both commands run the locked, strictly typed Python runner through uv.
+Add `--list` to inspect the available ids and `--jobs 1` to run them serially.
+The runners execute every selected check, retain failures, and preserve registry order in
+the final report. Checks that rewrite shared inputs run exclusively before shared work.
+
+The lint, contract, and hook check definitions live in `scripts/lint-checks.json`,
+`scripts/contracts-checks.json`, and `scripts/hooks-checks.json`. Keep commands and required
+completion markers with their check. Empty registries, duplicate ids, unknown fields, and
+mistyped exclusivity policies fail before execution. Register new Python sources in
+`scripts/python~/pyproject.toml`; `npm run lint:python` runs Ruff, mypy, and Pyright.
+
+The npm entry points resolve exact `npm run <name>` commands directly from `package.json`,
+avoiding an npm process for each check. Raw shell commands retain their original behavior.
+The Node entry points remain compatibility launchers for existing callers and imports.
+Use `npm run test:check-registries` for selection and CLI controls and
+`npm run test:check-runner` for process, concurrency, and completion controls.
+
+Timing reports require durations for executed NUnit results, including passed, failed and
+inconclusive cases. Missing or blank durations fail reporting before fixture budgets are
+evaluated. Explicit zero durations remain valid; skipped and older result records without
+an outcome retain the zero-duration fallback.
+
 ## Isolated migration compiler tests
 
 The Odin compiler fixture rewrites a small runtime consumer asset rather than the shared test
@@ -9,6 +34,15 @@ helpers. Its graph includes the asset assembly, a runtime caller assembly, and t
 test assembly. The fixture requires all three to compile and separately breaks runtime and editor
 member access. Keep the consumer targets out of shared test assembly references: migrating a
 shared helper recompiles its entire dependent test graph on every case.
+
+## Configure Release before initial import
+
+Configure invocations request Release code optimization at editor startup, matching the test and
+build invocations. Setting it inside the configure method is too late for the initial import:
+even a warm project first recompiles in Debug, then recompiles again for Release tests.
+Fresh generated Unity 6 projects also seed requested Standalone scripting defines before the first
+editor import. Earlier editors keep define configuration in their configure pass. Existing player
+settings remain intact; the configure pass still merges requested defines and verifies the final settings.
 
 ## Keep memory-only cleanup outside asset batches
 
@@ -18,6 +52,14 @@ database. Mixed cleanup retains its batch around every destruction callback, and
 outer batch remains active. Keep native coverage for these paths and for deferred asset deletion
 when changing shared cleanup.
 `CleanupTrackedFoldersAndAssets` also leaves the database untouched when no paths are tracked.
+
+## Isolate inputs when deferring asset cleanup
+
+When a fixture defers asset deletion until its final cleanup, give each case its own input
+folder. A shared input folder lets later searches discover earlier cases' assets and repeat
+imports or transformations. `SpriteCropperAdditionalTests` uses the NUnit case ID for its
+folder and requires exact input and processing counts. Keep deferred deletion so isolation
+does not add a database refresh after every case.
 
 ## Give each parameterized case a stable identity
 
@@ -67,7 +109,7 @@ It preserves unrelated sibling assets. Clear the tool's cached singleton referen
 Inspect full NUnit results as well as leaf counts. A fixture teardown failure can leave all
 individual test cases passing while the run itself fails.
 
-PR and push version jobs activate once, then run the selected modes concurrently in separate persistent projects and owned source worktrees. Compiler fixtures can rewrite their own sources without changing another mode's inputs. The coordinator verifies cache ownership and repository identity before restoring a worktree; unknown paths are preserved. The main EditMode suite retains its shared editor cache. Its compiler and migration phases run in a separate project at the same time; both workers must pass. PlayMode uses its own project. Windows workers use private desktops so concurrent editors do not share menu and window resources. Worker output uses plain text; raw Unity logs remain available. Cache pruning runs once during preparation. All projects retire legacy collectors before any parallel worker starts; workers do not prune sibling projects. Each worker verifies the session's version, editor path, job identity and live owner before reusing activation. At most three workers run at once, with the two EditMode groups and Standalone started first to limit contention. The coordinator waits for every worker and kills timed-out worker trees before central license return. Mode receipts record elapsed time and all outcomes. The existing per-mode NUnit, redaction and artifact gates still apply. Manual diagnostic dispatches keep the serial path.
+PR and push version jobs activate once, then run the selected modes concurrently in separate persistent projects and owned source worktrees. Compiler fixtures can rewrite their own sources without changing another mode's inputs. The coordinator verifies cache ownership and repository identity before restoring a worktree; unknown paths are preserved. The main EditMode suite retains its shared editor cache. Its compiler and migration phases run in a separate project at the same time; both workers must pass. PlayMode uses its own project. Windows workers use private desktops so concurrent editors do not share menu and window resources. Worker output uses plain text; raw Unity logs remain available. Cache pruning runs once during preparation. All projects retire legacy collectors before any parallel worker starts; workers do not prune sibling projects. Each worker verifies the session's version, editor path, job identity and live owner before reusing activation. At most four workers run at once, so both EditMode groups, Standalone and PlayMode can start together. The WProto-only worker waits for a free slot. The coordinator waits for every worker and kills timed-out worker trees before central license return. Mode receipts record elapsed time and all outcomes. The existing per-mode NUnit, redaction and artifact gates still apply. Manual diagnostic dispatches keep the serial path.
 
 The isolated migration contract phase runs the API, backup recovery, import verification and apply-record fixtures in one editor invocation. The compiler fixture and domain-reloading apply fixture retain separate invocations. Each group requires every named fixture, rejects skipped or missing cases, and checks root and suite failures.
 

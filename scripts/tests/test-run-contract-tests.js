@@ -90,7 +90,7 @@ runTest("validate:tests:fast is the runner, not a serial chain", () => {
   // silently stops describing what runs.
   assert.strictEqual(
     packageScripts["validate:tests:fast"],
-    "node scripts/run-contract-tests.js --direct",
+    "uv run --project scripts/python~ --locked --no-dev python scripts/check_registries.py contracts --direct",
     "validate:tests:fast must delegate to the registry runner"
   );
 });
@@ -121,7 +121,7 @@ runTest("the heavy hook regressions stay out of the fast aggregate", () => {
 runTest("the full aggregate selects exactly the fast checks and all hook regressions", () => {
   assert.strictEqual(
     packageScripts["validate:tests"],
-    "node scripts/run-contract-tests.js --include-hook-regressions --direct"
+    "uv run --project scripts/python~ --locked --no-dev python scripts/check_registries.py contracts --include-hook-regressions --direct"
   );
   assert.strictEqual(
     checksFor(false),

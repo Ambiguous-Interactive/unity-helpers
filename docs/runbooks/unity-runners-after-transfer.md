@@ -317,6 +317,8 @@ Open inherited streams cannot replace a nonzero exit with a passing completion m
 The process observation records `ProcessExitUtc`, `OutputDrainStopped`,
 `StandardOutputEndObserved` and `StandardErrorEndObserved` to distinguish this bounded drain
 from a live process stopped by the existing timeout, stall or completion-grace guards.
+An unset or out-of-range exit timestamp remains unknown. In that case, deadline checks use
+the time the watchdog first observed the exit.
 
 The receipt uses the same bounded Windows event matcher and records process identity, raw and
 returned exits, watchdog provenance, and UTC capture time. Its native-log summary counts

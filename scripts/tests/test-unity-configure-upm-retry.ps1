@@ -194,9 +194,10 @@ function Invoke-ConfigureCase {
 
     $marker = Join-Path $artifacts 'configure.marker'
     $log = Join-Path $artifacts 'configure.log'
-    $state = [pscustomobject]@{ Count = 0 }
+    $state = [pscustomobject]@{ Count = 0; Arguments = @() }
     $invoker = {
         param($arguments, $logPath, $label)
+        $state.Arguments = @($arguments)
         $state.Count++
         $token = $Attempts[[Math]::Min($state.Count - 1, $Attempts.Count - 1)]
         switch ($token) {
@@ -252,6 +253,7 @@ function Invoke-ConfigureCase {
 
     return [pscustomobject]@{
         Attempts = $state.Count
+        Arguments = $state.Arguments
         Threw = $threw
         Message = $message
         Marker = $marker
@@ -267,6 +269,7 @@ function Invoke-ConfigureCase {
 try {
     $ordinarySuccess = Invoke-ConfigureCase -Name 'ordinary-success' -Attempts @('success')
     Assert-That 'success runs once' ($ordinarySuccess.Attempts -eq 1)
+    Assert-That 'configure imports scripts with Release code optimization' ($ordinarySuccess.Arguments -contains '-releaseCodeOptimization')
     Assert-That 'success does not throw' (-not $ordinarySuccess.Threw)
     Assert-That 'success clears the marker-path environment variable' (
         $ordinarySuccess.EnvironmentCleared

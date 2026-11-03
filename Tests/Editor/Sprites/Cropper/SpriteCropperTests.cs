@@ -243,8 +243,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [Test]
         public void WritesToOutputDirectoryWhenNotOverwriting()
         {
-            string src = Path.Combine(Root, "src2.png").SanitizePath();
-            string outDir = Path.Combine(Root, "Out").SanitizePath();
+            string inputDirectory = Path.Combine(
+                    Root,
+                    nameof(WritesToOutputDirectoryWhenNotOverwriting)
+                )
+                .SanitizePath();
+            string src = Path.Combine(inputDirectory, "src2.png").SanitizePath();
+            string outDir = Path.Combine(inputDirectory, "Out").SanitizePath();
             EnsureFolder(outDir);
             CreatePngWithOpaqueRect(src, 8, 8, 2, 2, 4, 4, Color.green);
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
@@ -260,9 +265,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             window._outputDirectory = AssetDatabase.LoadAssetAtPath<Object>(outDir);
             window._inputDirectories = new System.Collections.Generic.List<Object>
             {
-                AssetDatabase.LoadAssetAtPath<Object>(Root),
+                AssetDatabase.LoadAssetAtPath<Object>(inputDirectory),
             };
             window.FindFilesToProcess();
+            Assert.That(window._filesToProcess.Count, Is.EqualTo(1));
             window.ProcessFoundSprites();
 
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
@@ -280,13 +286,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 "aSsets\\" + outDir.Substring("Assets/".Length).Replace('/', '\\') + "\\";
             Assert.IsTrue(
                 SpriteCropperAPI.TryBuildReplacementMap(
-                    new[] { Root },
+                    new[] { inputDirectory },
                     replacements,
                     out string mappingError,
                     alternateOutputFolder
                 ),
                 mappingError
             );
+            Assert.That(replacements.Count, Is.EqualTo(1));
             Sprite original = AssetDatabase.LoadAssetAtPath<Sprite>(src);
             Sprite cropped = AssetDatabase.LoadAssetAtPath<Sprite>(dst);
             Assert.IsTrue(original != null);
@@ -296,7 +303,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
 
             SpriteReferenceReplacementResult overwriteReplacement =
                 SpriteCropperAPI.ReplaceReferences(
-                    new[] { Root },
+                    new[] { inputDirectory },
                     applyChanges: true,
                     outputFolder: outDir,
                     overwriteOriginals: true

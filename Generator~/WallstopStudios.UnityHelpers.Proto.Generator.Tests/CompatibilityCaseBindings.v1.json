@@ -211,6 +211,27 @@
       "sha256": "856acf8fa3dee70b530bcf79f85e39d10d422cea65bca00f6c06345b9ab29193",
       "purpose": "case-discovery-only",
       "qualification": "none"
+    },
+    {
+      "id": "write-completion-host-v2",
+      "label": "final-v2.trx",
+      "sha256": "47dccbb0e428eb0d74b3fa7a6ac13675079b22f680365fa9e75817e3803364c0",
+      "purpose": "case-discovery-only",
+      "qualification": "none"
+    },
+    {
+      "id": "write-completion-host-v3",
+      "label": "final-v3.trx",
+      "sha256": "b18d61477649c9ba2021b8ea058a24d75172ae5db48431a0def6f8bf69907245",
+      "purpose": "case-discovery-only",
+      "qualification": "none"
+    },
+    {
+      "id": "write-completion-unity-editor-playmode",
+      "label": "writer-native-final-all.xml",
+      "sha256": "1a750bc75b9e9cfc821117ecd39700b9d0d0c60f6b00087fa23f6b8039e8239a",
+      "purpose": "case-discovery-only",
+      "qualification": "none"
     }
   ],
   "selectors": [
@@ -3393,6 +3414,51 @@
       "id": "WProtoContractConstructionBudgetTests.UnseededImmutableReadChargesOnlyItsFinalInstance",
       "sourcePath": "Tests/Runtime/Serialization/WProtoContractConstructionBudgetTests.cs",
       "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests"
+    },
+    {
+      "id": "WProtoWriteCompletionTests.UnclosedFieldsCannotCompleteAnyFacadeWrite",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoWriteCompletionTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests"
+    },
+    {
+      "id": "WProtoWriteCompletionTests.UnclosedInnerFieldsLatchMessageFailureAndRestoreOuterDepth",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoWriteCompletionTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests"
+    },
+    {
+      "id": "WProtoWriteCompletionTests.ReplacingWriterCannotClearAFaultOrPublishAnotherDestination",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoWriteCompletionTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests"
+    },
+    {
+      "id": "WProtoWriteCompletionTests.InvalidCloseRefusesWithoutChangingBytesOrDepth",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoWriteCompletionTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests"
+    },
+    {
+      "id": "WProtoWriteCompletionTests.BalancedFieldsRetainTheirWireBytes",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoWriteCompletionTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests"
+    },
+    {
+      "id": "WProtoWriteCompletionTests.BalancedCustomFormatterRetainsFacadeBytes",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoWriteCompletionTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests"
+    },
+    {
+      "id": "WProtoWriteCompletionTests.ReplacingMessageWriterRestoresTheOriginalFailedFrame",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoWriteCompletionTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests"
+    },
+    {
+      "id": "WProtoWriteCompletionTests.OverlappingBytePayloadPreservesItsOriginalContents",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoWriteCompletionTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests"
+    },
+    {
+      "id": "WProtoWriteCompletionTests.RefusedOverlappingByteWritePreservesTheEntireDestination",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoWriteCompletionTests.cs",
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests"
     }
   ],
   "fixtures": [
@@ -13220,6 +13286,176 @@
           "caseNames": [],
           "discoveryArtifact": null,
           "reason": "This runtime fixture is not part of this lane."
+        }
+      ]
+    },
+    {
+      "fixture": "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests",
+      "sourcePath": "Tests/Runtime/Serialization/WProtoWriteCompletionTests.cs",
+      "lanes": [
+        {
+          "lane": "host-v2",
+          "status": "discovered",
+          "caseNames": [
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.BalancedCustomFormatterRetainsFacadeBytes(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.BalancedCustomFormatterRetainsFacadeBytes(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.BalancedFieldsRetainTheirWireBytes(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.BalancedFieldsRetainTheirWireBytes(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.InvalidCloseRefusesWithoutChangingBytesOrDepth(0,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.InvalidCloseRefusesWithoutChangingBytesOrDepth(0,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.InvalidCloseRefusesWithoutChangingBytesOrDepth(1,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.InvalidCloseRefusesWithoutChangingBytesOrDepth(1,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.InvalidCloseRefusesWithoutChangingBytesOrDepth(2,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.InvalidCloseRefusesWithoutChangingBytesOrDepth(2,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.InvalidCloseRefusesWithoutChangingBytesOrDepth(3,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.InvalidCloseRefusesWithoutChangingBytesOrDepth(3,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.InvalidCloseRefusesWithoutChangingBytesOrDepth(4,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.InvalidCloseRefusesWithoutChangingBytesOrDepth(4,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.OverlappingBytePayloadPreservesItsOriginalContents(0,0,0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.OverlappingBytePayloadPreservesItsOriginalContents(0,0,128)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.OverlappingBytePayloadPreservesItsOriginalContents(0,0,3)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.OverlappingBytePayloadPreservesItsOriginalContents(0,1,3)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.OverlappingBytePayloadPreservesItsOriginalContents(0,3,3)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.OverlappingBytePayloadPreservesItsOriginalContents(1,0,128)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.OverlappingBytePayloadPreservesItsOriginalContents(1,0,3)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.OverlappingBytePayloadPreservesItsOriginalContents(1,1,3)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.OverlappingBytePayloadPreservesItsOriginalContents(1,2,3)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.RefusedOverlappingByteWritePreservesTheEntireDestination(0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.RefusedOverlappingByteWritePreservesTheEntireDestination(1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.RefusedOverlappingByteWritePreservesTheEntireDestination(128)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.ReplacingMessageWriterRestoresTheOriginalFailedFrame(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.ReplacingMessageWriterRestoresTheOriginalFailedFrame(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.ReplacingWriterCannotClearAFaultOrPublishAnotherDestination(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.ReplacingWriterCannotClearAFaultOrPublishAnotherDestination(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.UnclosedFieldsCannotCompleteAnyFacadeWrite(False,0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.UnclosedFieldsCannotCompleteAnyFacadeWrite(False,1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.UnclosedFieldsCannotCompleteAnyFacadeWrite(False,2)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.UnclosedFieldsCannotCompleteAnyFacadeWrite(False,3)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.UnclosedFieldsCannotCompleteAnyFacadeWrite(False,4)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.UnclosedFieldsCannotCompleteAnyFacadeWrite(True,0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.UnclosedFieldsCannotCompleteAnyFacadeWrite(True,1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.UnclosedFieldsCannotCompleteAnyFacadeWrite(True,2)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.UnclosedFieldsCannotCompleteAnyFacadeWrite(True,3)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.UnclosedFieldsCannotCompleteAnyFacadeWrite(True,4)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.UnclosedInnerFieldsLatchMessageFailureAndRestoreOuterDepth(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.UnclosedInnerFieldsLatchMessageFailureAndRestoreOuterDepth(True)"
+          ],
+          "discoveryArtifact": "write-completion-host-v2",
+          "reason": "Exact names from ordinary complete fixture execution; discovery alone does not qualify source, process health or backend acceptance."
+        },
+        {
+          "lane": "host-v3",
+          "status": "discovered",
+          "caseNames": [
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.BalancedCustomFormatterRetainsFacadeBytes(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.BalancedCustomFormatterRetainsFacadeBytes(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.BalancedFieldsRetainTheirWireBytes(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.BalancedFieldsRetainTheirWireBytes(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.InvalidCloseRefusesWithoutChangingBytesOrDepth(0,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.InvalidCloseRefusesWithoutChangingBytesOrDepth(0,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.InvalidCloseRefusesWithoutChangingBytesOrDepth(1,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.InvalidCloseRefusesWithoutChangingBytesOrDepth(1,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.InvalidCloseRefusesWithoutChangingBytesOrDepth(2,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.InvalidCloseRefusesWithoutChangingBytesOrDepth(2,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.InvalidCloseRefusesWithoutChangingBytesOrDepth(3,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.InvalidCloseRefusesWithoutChangingBytesOrDepth(3,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.InvalidCloseRefusesWithoutChangingBytesOrDepth(4,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.InvalidCloseRefusesWithoutChangingBytesOrDepth(4,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.OverlappingBytePayloadPreservesItsOriginalContents(0,0,0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.OverlappingBytePayloadPreservesItsOriginalContents(0,0,128)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.OverlappingBytePayloadPreservesItsOriginalContents(0,0,3)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.OverlappingBytePayloadPreservesItsOriginalContents(0,1,3)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.OverlappingBytePayloadPreservesItsOriginalContents(0,3,3)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.OverlappingBytePayloadPreservesItsOriginalContents(1,0,128)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.OverlappingBytePayloadPreservesItsOriginalContents(1,0,3)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.OverlappingBytePayloadPreservesItsOriginalContents(1,1,3)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.OverlappingBytePayloadPreservesItsOriginalContents(1,2,3)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.RefusedOverlappingByteWritePreservesTheEntireDestination(0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.RefusedOverlappingByteWritePreservesTheEntireDestination(1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.RefusedOverlappingByteWritePreservesTheEntireDestination(128)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.ReplacingMessageWriterRestoresTheOriginalFailedFrame(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.ReplacingMessageWriterRestoresTheOriginalFailedFrame(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.ReplacingWriterCannotClearAFaultOrPublishAnotherDestination(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.ReplacingWriterCannotClearAFaultOrPublishAnotherDestination(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.UnclosedFieldsCannotCompleteAnyFacadeWrite(False,0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.UnclosedFieldsCannotCompleteAnyFacadeWrite(False,1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.UnclosedFieldsCannotCompleteAnyFacadeWrite(False,2)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.UnclosedFieldsCannotCompleteAnyFacadeWrite(False,3)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.UnclosedFieldsCannotCompleteAnyFacadeWrite(False,4)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.UnclosedFieldsCannotCompleteAnyFacadeWrite(True,0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.UnclosedFieldsCannotCompleteAnyFacadeWrite(True,1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.UnclosedFieldsCannotCompleteAnyFacadeWrite(True,2)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.UnclosedFieldsCannotCompleteAnyFacadeWrite(True,3)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.UnclosedFieldsCannotCompleteAnyFacadeWrite(True,4)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.UnclosedInnerFieldsLatchMessageFailureAndRestoreOuterDepth(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.UnclosedInnerFieldsLatchMessageFailureAndRestoreOuterDepth(True)"
+          ],
+          "discoveryArtifact": "write-completion-host-v3",
+          "reason": "Exact names from ordinary complete fixture execution; discovery alone does not qualify source, process health or backend acceptance."
+        },
+        {
+          "lane": "unity-editor-playmode",
+          "status": "discovered",
+          "caseNames": [
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.BalancedCustomFormatterRetainsFacadeBytes(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.BalancedCustomFormatterRetainsFacadeBytes(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.BalancedFieldsRetainTheirWireBytes(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.BalancedFieldsRetainTheirWireBytes(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.InvalidCloseRefusesWithoutChangingBytesOrDepth(0,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.InvalidCloseRefusesWithoutChangingBytesOrDepth(0,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.InvalidCloseRefusesWithoutChangingBytesOrDepth(1,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.InvalidCloseRefusesWithoutChangingBytesOrDepth(1,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.InvalidCloseRefusesWithoutChangingBytesOrDepth(2,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.InvalidCloseRefusesWithoutChangingBytesOrDepth(2,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.InvalidCloseRefusesWithoutChangingBytesOrDepth(3,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.InvalidCloseRefusesWithoutChangingBytesOrDepth(3,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.InvalidCloseRefusesWithoutChangingBytesOrDepth(4,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.InvalidCloseRefusesWithoutChangingBytesOrDepth(4,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.OverlappingBytePayloadPreservesItsOriginalContents(0,0,0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.OverlappingBytePayloadPreservesItsOriginalContents(0,0,128)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.OverlappingBytePayloadPreservesItsOriginalContents(0,0,3)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.OverlappingBytePayloadPreservesItsOriginalContents(0,1,3)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.OverlappingBytePayloadPreservesItsOriginalContents(0,3,3)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.OverlappingBytePayloadPreservesItsOriginalContents(1,0,128)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.OverlappingBytePayloadPreservesItsOriginalContents(1,0,3)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.OverlappingBytePayloadPreservesItsOriginalContents(1,1,3)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.OverlappingBytePayloadPreservesItsOriginalContents(1,2,3)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.RefusedOverlappingByteWritePreservesTheEntireDestination(0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.RefusedOverlappingByteWritePreservesTheEntireDestination(1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.RefusedOverlappingByteWritePreservesTheEntireDestination(128)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.ReplacingMessageWriterRestoresTheOriginalFailedFrame(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.ReplacingMessageWriterRestoresTheOriginalFailedFrame(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.ReplacingWriterCannotClearAFaultOrPublishAnotherDestination(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.ReplacingWriterCannotClearAFaultOrPublishAnotherDestination(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.UnclosedFieldsCannotCompleteAnyFacadeWrite(False,0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.UnclosedFieldsCannotCompleteAnyFacadeWrite(False,1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.UnclosedFieldsCannotCompleteAnyFacadeWrite(False,2)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.UnclosedFieldsCannotCompleteAnyFacadeWrite(False,3)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.UnclosedFieldsCannotCompleteAnyFacadeWrite(False,4)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.UnclosedFieldsCannotCompleteAnyFacadeWrite(True,0)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.UnclosedFieldsCannotCompleteAnyFacadeWrite(True,1)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.UnclosedFieldsCannotCompleteAnyFacadeWrite(True,2)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.UnclosedFieldsCannotCompleteAnyFacadeWrite(True,3)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.UnclosedFieldsCannotCompleteAnyFacadeWrite(True,4)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.UnclosedInnerFieldsLatchMessageFailureAndRestoreOuterDepth(False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoWriteCompletionTests.UnclosedInnerFieldsLatchMessageFailureAndRestoreOuterDepth(True)"
+          ],
+          "discoveryArtifact": "write-completion-unity-editor-playmode",
+          "reason": "Exact names from ordinary complete fixture execution; discovery alone does not qualify source, process health or backend acceptance."
+        },
+        {
+          "lane": "unity-editor-editmode",
+          "status": "not-applicable",
+          "caseNames": [],
+          "discoveryArtifact": null,
+          "reason": "This fixture is not bound to this lane."
+        },
+        {
+          "lane": "unity-editor-playmode-wproto-only",
+          "status": "not-applicable",
+          "caseNames": [],
+          "discoveryArtifact": null,
+          "reason": "This fixture is not bound to this lane."
         }
       ]
     }
