@@ -2,6 +2,23 @@
 
 This guide documents patterns for testing states that "should never happen" but could occur in production. These tests catch edge cases that defensive programming must handle gracefully.
 
+## Isolated migration compiler tests
+
+The Odin compiler fixture rewrites a small runtime consumer asset rather than the shared test
+helpers. Its graph includes the asset assembly, a runtime caller assembly, and the editor tools
+test assembly. The fixture requires all three to compile and separately breaks runtime and editor
+member access. Keep the consumer targets out of shared test assembly references: migrating a
+shared helper recompiles its entire dependent test graph on every case.
+
+## Keep memory-only cleanup outside asset batches
+
+`CommonTestBase.DestroyTrackedObjects` opens an asset editing batch only when a tracked object
+has an asset path. Memory-only cleanup destroys objects immediately without refreshing the asset
+database. Mixed cleanup retains its batch around every destruction callback, and an existing
+outer batch remains active. Keep native coverage for these paths and for deferred asset deletion
+when changing shared cleanup.
+`CleanupTrackedFoldersAndAssets` also leaves the database untouched when no paths are tracked.
+
 ## Give each parameterized case a stable identity
 
 For a `ValueSource` that supplies objects or structs, provide a deterministic display value, such
@@ -50,6 +67,10 @@ It preserves unrelated sibling assets. Clear the tool's cached singleton referen
 Inspect full NUnit results as well as leaf counts. A fixture teardown failure can leave all
 individual test cases passing while the run itself fails.
 
+PR and push version jobs activate once, then run the selected modes concurrently in separate persistent projects and owned source worktrees. Compiler fixtures can rewrite their own sources without changing another mode's inputs. The coordinator verifies cache ownership and repository identity before restoring a worktree; unknown paths are preserved. The main EditMode suite retains its shared editor cache. Its compiler and migration phases run in a separate project at the same time; both workers must pass. PlayMode uses its own project. Windows workers use private desktops so concurrent editors do not share menu and window resources. Worker output uses plain text; raw Unity logs remain available. Cache pruning runs once during preparation. All projects retire legacy collectors before any parallel worker starts; workers do not prune sibling projects. Each worker verifies the session's version, editor path, job identity and live owner before reusing activation. At most three workers run at once, with the two EditMode groups and Standalone started first to limit contention. The coordinator waits for every worker and kills timed-out worker trees before central license return. Mode receipts record elapsed time and all outcomes. The existing per-mode NUnit, redaction and artifact gates still apply. Manual diagnostic dispatches keep the serial path.
+
+The isolated migration contract phase runs the API, backup recovery, import verification and apply-record fixtures in one editor invocation. The compiler fixture and domain-reloading apply fixture retain separate invocations. Each group requires every named fixture, rejects skipped or missing cases, and checks root and suite failures.
+
 ## Identify the Unity Test Framework used by a run
 
 The local test-project builder, CI builder and package exporter read the framework request
@@ -69,10 +90,14 @@ and preserves unrelated assets, parent folders and their metadata.
 CI gives each editor invocation a
 fresh `framework/<capture-id>` directory at the leg artifact root, independent of nested log paths. Each invocation retains its own log and process diagnostics before retry paths can overwrite them. Its record binds those copies to the project and process. It retains the manifest before launch, then
 captures the resolved manifest and lock, framework package metadata and C# source files,
-and the loaded editor runner, runtime runner and NUnit DLLs, plus available PDBs. Package sources use short numbered filenames; the inventory retains their original package-relative paths. This keeps generated compiler and evidence paths within Windows file API limits. Each domain snapshot records
+and the loaded editor runner, runtime runner and NUnit DLLs, plus available PDBs. Package sources use short numbered entries in `sources.zip`; the inventory retains their original package-relative paths. Schema 3 checks every archive entry against its recorded length and SHA-256 and rejects missing, duplicate or unlisted entries. Historical schema 2 snapshots with loose source files remain readable. This keeps generated compiler and evidence paths within Windows file API limits. Each domain snapshot records
 its process, project, Unity version, loaded module IDs and file hashes. The readback checks
 those IDs against the retained DLL bytes and rejects missing or changed evidence. Repeated
 domain reloads produce separate snapshots. A capture error fails the evidence check.
+
+The shared runtime test base applies its existing optional allocator-warning policy to native log
+callbacks as well as managed logs. It processes explicit expectations first and leaves unrelated
+warnings and all errors subject to the strict log check.
 
 For a manually launched generated project, pass `-uhFrameworkEvidenceDirectory <new-path>`
 to collect the same snapshots. These startup records identify the loaded modules and source
@@ -80,6 +105,8 @@ bytes observed in that domain. They do not prove a clean rebuild, map every fram
 to compiler inputs, qualify CLI result semantics, or establish native process health. Inspect
 complete NUnit roots and suites, raw process receipts and expected inconclusive outcomes
 separately. A green XML report cannot explain an abnormal native exit.
+
+Run `npm run test:unity-modes` for process overlap, cancellation, session identity and source-isolation controls. These controls use a labeled worker fixture; they do not replace native mode qualification.
 
 Run `npm run test:unity-framework` for manifest controls and compiled host collector controls.
 The host controls use labeled API shims; native framework qualification still requires the
@@ -1003,6 +1030,10 @@ Assert.Throws<SerializationException>(() => Deserialize(corruptedData));
 Assert.AreEqual(default(T), result);
 Assert.AreEqual(0, deserializedFromEmpty.Id);
 ```
+
+### Repeated primitive comparisons
+
+For exhaustive bit or scalar checks, compare every value directly and call `Assert.Fail` on a mismatch. Keep the complete input matrix and final size or aggregate assertions. This avoids allocating NUnit constraints and formatting messages for each successful comparison. Check the failure paths with changed result and snapshot values before accepting a timing improvement.
 
 ## Data-Driven Testing for Edge Cases
 

@@ -7,6 +7,8 @@
     "WallstopStudios.UnityHelpers",
     "WallstopStudios.UnityHelpers.Editor",
     "WallstopStudios.UnityHelpers.Tests.Core",
+    "WallstopStudios.UnityHelpers.Tests.OdinCompilerTargets",
+    "WallstopStudios.UnityHelpers.Tests.OdinCompilerCallers",
     "WallstopStudios.UnityHelpers.Tests.Editor.AssetProcessors"
   ],
   "includePlatforms": ["Editor"],

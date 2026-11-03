@@ -350,9 +350,14 @@ const CHECKS = [
     run: "pwsh -NoProfile -File scripts/tests/test-lint-tests.ps1 -VerboseOutput"
   },
   {
+    id: "unity-mode-coordinator",
+    name: "Concurrent Unity mode controls",
+    run: "uv run --project scripts/python~ --locked pytest scripts/tests/test_ci_modes.py -q"
+  },
+  {
     id: "report-slow-tests",
     name: "Slow-test reporter",
-    run: "pwsh -NoProfile -File scripts/tests/test-report-slow-tests.ps1 -VerboseOutput"
+    run: "uv run --project scripts/python~ --locked pytest scripts/tests/test_slow_tests.py -q"
   },
   {
     id: "unity-nunit-results",

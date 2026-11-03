@@ -13,6 +13,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
     using WallstopStudios.UnityHelpers.Core.Serialization.OdinMigration;
     using WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration;
     using WallstopStudios.UnityHelpers.Tests.Core;
+    using WallstopStudios.UnityHelpers.Tests.Core.OdinCompilerCallers;
+    using WallstopStudios.UnityHelpers.Tests.Core.OdinCompilerTargets;
 
     [TestFixture]
     [Category("Slow")]
@@ -24,17 +26,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
         {
             Assert.IsTrue(
                 OdinMigrationCompiledBindings.TryGet(
-                    typeof(OdinMigrationBindingAsset),
+                    typeof(OdinMigrationCompilerAsset),
                     out OdinMigrationCompiledBinding binding
                 )
             );
             OdinMigrationDictionaryField[] fields =
             {
                 OdinMigrationDictionaryField.Create<SpriteAlignment, Texture2D>(
-                    nameof(OdinMigrationBindingAsset.Variations)
+                    nameof(OdinMigrationCompilerAsset.Variations)
                 ),
                 OdinMigrationDictionaryField.Create<HideFlags, Texture2D>(
-                    nameof(OdinMigrationBindingAsset.Other)
+                    nameof(OdinMigrationCompilerAsset.Other)
                 ),
             };
             Assert.IsTrue(
@@ -62,6 +64,63 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                 compilation.Completed,
                 "Isolated compilation did not finish within the fixture deadline."
             );
+        }
+
+        private static IEnumerator CheckChangedFieldRejected(
+            string fieldName,
+            bool runtimeCallerCompiled
+        )
+        {
+            Dictionary<string, OdinMigrationSourceProposal> sources =
+                new Dictionary<string, OdinMigrationSourceProposal>();
+            foreach (KeyValuePair<string, OdinMigrationSourceProposal> source in Sources())
+            {
+                sources.Add(
+                    source.Key,
+                    new OdinMigrationSourceProposal(
+                        source.Key,
+                        source.Value.OriginalSource,
+                        source.Value.ProposedSource.Replace(fieldName, "ChangedField")
+                    )
+                );
+            }
+            Assert.IsTrue(
+                OdinMigrationDictionaryCompilation.TryStart(
+                    sources,
+                    out OdinMigrationDictionaryCompilation compilation,
+                    out string failure
+                ),
+                failure
+            );
+            using (compilation)
+            {
+                yield return Await(compilation);
+                Assert.IsFalse(compilation.Succeeded);
+                StringAssert.Contains("dependent caller", compilation.Failure);
+                CollectionAssert.Contains(
+                    compilation.CompiledAssemblies,
+                    typeof(OdinMigrationCompilerAsset).Assembly.GetName().Name
+                );
+                CollectionAssert.Contains(
+                    compilation.Assemblies,
+                    typeof(OdinMigrationCompilerCaller).Assembly.GetName().Name
+                );
+                if (runtimeCallerCompiled)
+                {
+                    CollectionAssert.Contains(
+                        compilation.CompiledAssemblies,
+                        typeof(OdinMigrationCompilerCaller).Assembly.GetName().Name
+                    );
+                }
+                else
+                {
+                    CollectionAssert.DoesNotContain(
+                        compilation.CompiledAssemblies,
+                        typeof(OdinMigrationCompilerCaller).Assembly.GetName().Name
+                    );
+                }
+                StringAssert.Contains(fieldName, string.Join("\n", compilation.Diagnostics));
+            }
         }
 
         [UnitySetUp]
@@ -179,11 +238,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                 StringAssert.Contains("differs", failure);
                 CollectionAssert.Contains(
                     compilation.Assemblies,
-                    typeof(OdinMigrationBindingAsset).Assembly.GetName().Name
+                    typeof(OdinMigrationCompilerAsset).Assembly.GetName().Name
                 );
                 CollectionAssert.Contains(
                     compilation.Assemblies,
                     typeof(OdinMigrationDictionaryCompilationTests).Assembly.GetName().Name
+                );
+                CollectionAssert.AreEquivalent(
+                    new[]
+                    {
+                        typeof(OdinMigrationCompilerAsset).Assembly.GetName().Name,
+                        typeof(OdinMigrationCompilerCaller).Assembly.GetName().Name,
+                        typeof(OdinMigrationDictionaryCompilationTests).Assembly.GetName().Name,
+                    },
+                    compilation.Assemblies
                 );
                 CollectionAssert.AreEqual(compilation.Assemblies, compilation.CompiledAssemblies);
                 foreach (KeyValuePair<string, byte[]> original in originals)
@@ -264,44 +332,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
         [UnityTest]
         public IEnumerator AChangedFieldThatBreaksAnEditorCallerIsRejected()
         {
-            Dictionary<string, OdinMigrationSourceProposal> sources =
-                new Dictionary<string, OdinMigrationSourceProposal>();
-            foreach (KeyValuePair<string, OdinMigrationSourceProposal> source in Sources())
-            {
-                sources.Add(
-                    source.Key,
-                    new OdinMigrationSourceProposal(
-                        source.Key,
-                        source.Value.OriginalSource,
-                        source.Value.ProposedSource.Replace(
-                            nameof(OdinMigrationBindingAsset.Variations),
-                            "ChangedVariations"
-                        )
-                    )
-                );
-            }
-            Assert.IsTrue(
-                OdinMigrationDictionaryCompilation.TryStart(
-                    sources,
-                    out OdinMigrationDictionaryCompilation compilation,
-                    out string failure
-                ),
-                failure
+            yield return CheckChangedFieldRejected(
+                nameof(OdinMigrationCompilerAsset.Other),
+                runtimeCallerCompiled: true
             );
-            using (compilation)
-            {
-                yield return Await(compilation);
-                Assert.IsFalse(compilation.Succeeded);
-                StringAssert.Contains("dependent caller", compilation.Failure);
-                CollectionAssert.Contains(
-                    compilation.CompiledAssemblies,
-                    typeof(OdinMigrationBindingAsset).Assembly.GetName().Name
-                );
-                StringAssert.Contains(
-                    nameof(OdinMigrationBindingAsset.Variations),
-                    string.Join("\n", compilation.Diagnostics)
-                );
-            }
+        }
+
+        [UnityTest]
+        public IEnumerator AChangedFieldThatBreaksARuntimeCallerIsRejected()
+        {
+            yield return CheckChangedFieldRejected(
+                nameof(OdinMigrationCompilerAsset.Variations),
+                runtimeCallerCompiled: false
+            );
         }
 
         [Test]

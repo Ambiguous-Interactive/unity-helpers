@@ -174,6 +174,48 @@ $r = Invoke-Watchdog -ProcessObservation $observation -ChildCommand 'Write-Host 
 Assert-That "sentinel + clean exit returns the REAL editor exit code (5), not the parsed sentinel code (0)" ($r.ExitCode -eq 5)
 Assert-That "sentinel + clean exit is NOT treated as a timeout" (-not $r.TimedOut)
 
+$nestedCommand = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes('Start-Sleep -Seconds 30'))
+$inheritedTemplate = @'
+$info = [Diagnostics.ProcessStartInfo]::new()
+$info.FileName = '__PWSH__'
+$info.UseShellExecute = $false
+$info.CreateNoWindow = $true
+$info.Arguments = '-NoProfile -NonInteractive -EncodedCommand __COMMAND__'
+$child = [Diagnostics.Process]::Start($info)
+[IO.File]::WriteAllText('__PID__', "$($child.Id)|$($child.StartTime.ToUniversalTime().Ticks)")
+if (__SENTINEL__) { [Console]::Out.WriteLine('Test run completed. Exiting with code 0') }
+for ($i = 0; $i -lt 1000; ++$i) {
+    [Console]::Out.WriteLine("stdout-$i")
+    [Console]::Error.WriteLine("stderr-$i")
+}
+[Console]::Out.WriteLine('root-tail-stdout')
+[Console]::Error.WriteLine('root-tail-stderr')
+exit 7
+'@
+foreach ($withSentinel in @($false, $true)) {
+    $inheritedPidPath = Join-Path $tmp ("uh-watchdog-inherited-{0}.pid" -f [Guid]::NewGuid().ToString('N'))
+    $inheritedCommand = $inheritedTemplate.Replace('__SENTINEL__', $withSentinel.ToString().ToLowerInvariant().Insert(0, '$')).Replace('__PWSH__', $pwshPath.Replace("'", "''")).Replace('__COMMAND__', $nestedCommand).Replace('__PID__', $inheritedPidPath.Replace("'", "''"))
+    try {
+        $observation = @{}
+        $r = Invoke-Watchdog -ProcessObservation $observation -ChildCommand $inheritedCommand -TimeoutSeconds 10 -GraceSeconds 3 -Label "inherited-output-$withSentinel"
+        Assert-That 'inherited output handles cannot replace the real failing root exit with a passing sentinel' ($r.ExitCode -eq 7 -and $observation.RawExitCode -eq 7)
+        Assert-That 'an exited root with inherited output is not killed or classified as a completion hang' ($observation.ExitOrigin -eq 'process-exit' -and $null -eq $observation.KillReason -and -not $r.TimedOut)
+        Assert-That 'inherited output is identified by the bounded drain observation' ($observation.ContainsKey('OutputDrainStopped') -and $observation.OutputDrainStopped)
+        $text = [IO.File]::ReadAllText((Join-Path $tmp "uh-watchdog-inherited-output-$withSentinel.log"))
+        Assert-That 'root stdout and stderr tails survive inherited writers' ($text.Contains('root-tail-stdout') -and $text.Contains('root-tail-stderr'))
+        Assert-That 'all buffered root lines survive inherited writers' ([regex]::Matches($text, '(?m)^stdout-\d+\r?$').Count -eq 1000 -and [regex]::Matches($text, '(?m)^stderr-\d+\r?$').Count -eq 1000)
+    } finally {
+        if (Test-Path -LiteralPath $inheritedPidPath) {
+            $identity = [IO.File]::ReadAllText($inheritedPidPath).Split('|')
+            $child = Get-Process -Id ([int]$identity[0]) -ErrorAction SilentlyContinue
+            if ($null -ne $child -and $child.StartTime.ToUniversalTime().Ticks -eq [long]$identity[1]) {
+                Stop-Process -Id $child.Id -Force -ErrorAction SilentlyContinue
+            }
+            Remove-Item -LiteralPath $inheritedPidPath -Force
+        }
+    }
+}
+
 # 4. hang with no sentinel -> wall-clock backstop fires (timeout, exit 124).
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
 $observation = @{}

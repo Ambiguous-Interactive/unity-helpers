@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
     using System.Collections;
     using System.Collections.Generic;
     using System.IO;
+    using System.Reflection;
     using System.Threading.Tasks;
     using NUnit.Framework;
     using UnityEngine;
@@ -89,6 +90,29 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 
         private static UnityEngine.ILogHandler _expectErrorInnerHandler;
         private static ExpectedErrorSuppressingHandler _expectErrorHandler;
+
+        private static readonly Type _unityLogScopeType = typeof(LogAssert).Assembly.GetType(
+            "UnityEngine.TestTools.Logging.LogScope"
+        );
+        private static readonly Type _unityLogEventType = typeof(LogAssert).Assembly.GetType(
+            "UnityEngine.TestTools.Logging.LogEvent"
+        );
+        private static readonly PropertyInfo _unityLogScopeCurrent =
+            _unityLogScopeType?.GetProperty("Current");
+        private static readonly PropertyInfo _unityLogScopeAllLogs =
+            _unityLogScopeType?.GetProperty("AllLogs");
+        private static readonly FieldInfo _unityLogScopeLock = _unityLogScopeType?.GetField(
+            "m_Lock",
+            BindingFlags.Instance | BindingFlags.NonPublic
+        );
+        private static readonly MethodInfo _unityLogScopeProcessExpectedLogs =
+            _unityLogScopeType?.GetMethod("ProcessExpectedLogs");
+        private static readonly PropertyInfo _unityLogEventTypeProperty =
+            _unityLogEventType?.GetProperty("LogType");
+        private static readonly PropertyInfo _unityLogEventMessage =
+            _unityLogEventType?.GetProperty("Message");
+        private static readonly PropertyInfo _unityLogEventHandled =
+            _unityLogEventType?.GetProperty("IsHandled");
 
         protected readonly List<Object> _trackedObjects = new();
         protected readonly List<IDisposable> _trackedDisposables = new();
@@ -257,6 +281,42 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 + $"'{Escape(fieldName)}'$";
 
             ExpectError(LogType.Error, pattern);
+        }
+
+        /// <summary>Checks expectations and rejects logs outside the existing tolerance policy.</summary>
+        protected static void AssertNoUnexpectedLogs()
+        {
+            object scope = _unityLogScopeCurrent?.GetValue(null);
+            object scopeLock = scope == null ? null : _unityLogScopeLock?.GetValue(scope);
+            IList logs = scope == null ? null : _unityLogScopeAllLogs?.GetValue(scope) as IList;
+            if (
+                scope == null
+                || scopeLock == null
+                || logs == null
+                || _unityLogScopeProcessExpectedLogs == null
+                || _unityLogEventTypeProperty == null
+                || _unityLogEventMessage == null
+                || _unityLogEventHandled == null
+            )
+            {
+                Assert.Fail("The loaded Unity Test Framework must expose its strict log scope.");
+            }
+            lock (scopeLock)
+            {
+                _unityLogScopeProcessExpectedLogs.Invoke(scope, null);
+                int logCount = logs.Count;
+                for (int index = 0; index < logCount; ++index)
+                {
+                    object log = logs[index];
+                    LogType type = (LogType)_unityLogEventTypeProperty.GetValue(log);
+                    string message = _unityLogEventMessage.GetValue(log) as string;
+                    if (message != null && IsToleratedLog(type, message))
+                    {
+                        _unityLogEventHandled.SetValue(log, true);
+                    }
+                }
+                LogAssert.NoUnexpectedReceived();
+            }
         }
 
         private static string DescribeRoot(GameObject root)
@@ -694,7 +754,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 DrainUnityMainThreadDispatchersForTeardown();
                 yield return null;
                 DrainUnityMainThreadDispatchersForTeardown();
-                LogAssert.NoUnexpectedReceived();
+                AssertNoUnexpectedLogs();
             }
 
             // Report failures after log reconciliation; prioritize hangs and leaks over their secondary errors.
@@ -850,11 +910,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 return;
             }
 
+            Object[] snapshot = _trackedObjects.ToArray();
 #if UNITY_EDITOR
-            using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
+            AssetDatabaseBatchScope? batch = null;
+            foreach (Object candidate in snapshot)
+            {
+                if (
+                    candidate != null
+                    && !string.IsNullOrEmpty(UnityEditor.AssetDatabase.GetAssetPath(candidate))
+                )
+                {
+                    batch = AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false);
+                    break;
+                }
+            }
+
+            using (batch)
 #endif
             {
-                Object[] snapshot = _trackedObjects.ToArray();
                 foreach (Object obj in snapshot)
                 {
                     if (obj == null)
@@ -1708,6 +1781,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         protected void CleanupTrackedFoldersAndAssets()
         {
 #if UNITY_EDITOR
+            if (_trackedAssetPaths.Count == 0 && _trackedFolders.Count == 0)
+            {
+                return;
+            }
+
             if (DeferAssetCleanupToOneTimeTearDown)
             {
                 // Accumulate for batch cleanup later - don't delete or refresh yet

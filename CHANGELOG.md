@@ -59,6 +59,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix concurrent semaphore leases losing permits and corrupting shared disposal slots in `SINGLE_THREADED` builds ([guide](./docs/features/utilities/helper-utilities.md#semaphore-leases), [#1106](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1106)).
+- Fix reflection getters for constant and static fields, and interface property and indexer access when using dynamic IL ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
+- Fix relational prewarming reporting errors for open generic component bases while preserving inherited fields on closed types ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
 - Fix stale metadata skipping relational fields and prewarming. Bindings now follow the live declarations, including private base and derived fields with the same name ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
 - Fix missing-script entries entering relational collections or consuming `MaxCount`; array, list and set bindings now agree across filtered and unfiltered searches, including parent and sibling `MonoBehaviour` collections ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
 - Fix relational field access to use the shared AOT-safe delegate cache for private, inherited, interface and collection fields ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
@@ -89,7 +92,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix plain .NET Standard consumers failing to compile when another library contains an internal module-initializer polyfill ([#1030](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1030)).
 - Fix nested WProto writes remaining usable after a custom formatter throws; preserve the original exception and reject further writes ([#647](https://github.com/Ambiguous-Interactive/unity-helpers/issues/647)).
 - Fix WProto readers allowing further reads or partial results after rejecting data, including generated readers, built-in values, collection restoration, and formatter forwarding ([#647](https://github.com/Ambiguous-Interactive/unity-helpers/issues/647)).
-- Fix player pools retaining their peak indefinitely: enable conservative idle maintenance and automatic budget checks, while honoring explicit idle opt-outs, capacity limits, and retention floors ([#1008](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1008)).
+- Fix player pools retaining their peak indefinitely: enable conservative idle maintenance and automatic budget checks, while honoring live interval changes, idle opt-outs, capacity limits, and retention floors ([#1008](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1008)).
 - Fix variable coroutine wait durations when quantization overflows or the wait cache is full; document support for computed and random values ([#1007](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1007)).
 - Require exact-source native Unity export and confirmed cleanup before release tag changes or publication ([#323](https://github.com/Ambiguous-Interactive/unity-helpers/issues/323)).
 - Fix generated protobuf writes through interface and object save roots, including reusable buffers, declined-formatter fallback, and `WALLSTOP_PROTO_ONLY` builds ([guide](./docs/features/serialization/serialization.md#serving-through-serializer), [#343](https://github.com/Ambiguous-Interactive/unity-helpers/issues/343)).

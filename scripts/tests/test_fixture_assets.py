@@ -245,6 +245,64 @@ def test_guid_reader_rejects_invalid_literal_identifiers(guid: str) -> None:
         read_guid(f"guid: {guid}\r\n")
 
 
+def assert_image_metadata(path: Path, kind: str) -> str:
+    width, height, _ = PIXELS[path.name]
+    metadata_bytes = path.with_suffix(".png.meta").read_bytes()
+    assert b"\n" not in metadata_bytes.replace(b"\r\n", b"")
+    metadata_text = metadata_bytes.decode("utf-8")
+    metadata = read_mapping(yaml.safe_load(metadata_text))
+    guid = read_guid(metadata_text)
+    importer = read_mapping(metadata["TextureImporter"])
+    assert importer["isReadable"] == 1
+    assert importer["nPOTScale"] == 0
+    expected_mode = (
+        0
+        if kind == "textures"
+        else 1
+        if path.name in ("test_single.png", "test_prime_127.png")
+        else 2
+    )
+    assert importer["spriteMode"] == expected_mode
+    assert importer["textureType"] == (0 if kind == "textures" else 8)
+    sheet = read_mapping(importer["spriteSheet"])
+    if kind == "textures":
+        assert importer["spriteMode"] == 0
+    elif importer["spriteMode"] == 1:
+        assert sheet["sprites"] == []
+        assert sheet["nameFileIdTable"] == {}
+        metadata_text = path.with_suffix(".png.meta").read_text(encoding="utf-8")
+        assert "    sprites: []\n" in metadata_text
+        assert "    nameFileIdTable: {}\n" in metadata_text
+    else:
+        sprites = sheet["sprites"]
+        assert isinstance(sprites, list)
+        assert sprites
+        table = read_mapping(sheet["nameFileIdTable"])
+        assert len(cast("list[object]", sprites)) == len(table)
+        local_ids: set[int] = set()
+        for value in cast("list[object]", sprites):
+            sprite = read_mapping(value)
+            name = sprite["name"]
+            identifier = sprite["internalID"]
+            assert isinstance(name, str)
+            assert isinstance(identifier, int)
+            assert -(1 << 63) <= identifier < (1 << 63)
+            assert identifier not in local_ids
+            local_ids.add(identifier)
+            assert table[name] == identifier
+            rect = read_mapping(sprite["rect"])
+            x, y = cast("int", rect["x"]), cast("int", rect["y"])
+            cell_width, cell_height = (
+                cast("int", rect["width"]),
+                cast("int", rect["height"]),
+            )
+            assert 0 < cell_width <= width
+            assert 0 < cell_height <= height
+            assert 0 <= x <= width - cell_width
+            assert 0 <= y <= height - cell_height
+    return guid
+
+
 @pytest.mark.parametrize(
     ("kind", "extended", "count"),
     [("sprites", False, 13), ("textures", False, 6), ("textures", True, 21)],
@@ -273,61 +331,9 @@ def test_fixture_pixels_and_metadata_survive_regeneration(
             assert image.mode == "RGBA"
             assert image.size == (width, height)
             assert hashlib.sha256(image.tobytes()).hexdigest() == digest
-        metadata_bytes = path.with_suffix(".png.meta").read_bytes()
-        assert b"\n" not in metadata_bytes.replace(b"\r\n", b"")
-        metadata_text = metadata_bytes.decode("utf-8")
-        metadata = read_mapping(yaml.safe_load(metadata_text))
-        guid = read_guid(metadata_text)
+        guid = assert_image_metadata(path, kind)
         assert guid not in identities
         identities.add(guid)
-        importer = read_mapping(metadata["TextureImporter"])
-        assert importer["isReadable"] == 1
-        assert importer["nPOTScale"] == 0
-        expected_mode = (
-            0
-            if kind == "textures"
-            else 1
-            if path.name in ("test_single.png", "test_prime_127.png")
-            else 2
-        )
-        assert importer["spriteMode"] == expected_mode
-        sheet = read_mapping(importer["spriteSheet"])
-        if kind == "textures":
-            assert importer["spriteMode"] == 0
-            assert importer["textureType"] == 0
-        elif importer["spriteMode"] == 1:
-            assert sheet["sprites"] == []
-            assert sheet["nameFileIdTable"] == {}
-            metadata_text = path.with_suffix(".png.meta").read_text(encoding="utf-8")
-            assert "    sprites: []\n" in metadata_text
-            assert "    nameFileIdTable: {}\n" in metadata_text
-        else:
-            sprites = sheet["sprites"]
-            assert isinstance(sprites, list)
-            assert sprites
-            table = read_mapping(sheet["nameFileIdTable"])
-            assert len(cast("list[object]", sprites)) == len(table)
-            local_ids: set[int] = set()
-            for value in cast("list[object]", sprites):
-                sprite = read_mapping(value)
-                name = sprite["name"]
-                identifier = sprite["internalID"]
-                assert isinstance(name, str)
-                assert isinstance(identifier, int)
-                assert -(1 << 63) <= identifier < (1 << 63)
-                assert identifier not in local_ids
-                local_ids.add(identifier)
-                assert table[name] == identifier
-                rect = read_mapping(sprite["rect"])
-                x, y = cast("int", rect["x"]), cast("int", rect["y"])
-                cell_width, cell_height = (
-                    cast("int", rect["width"]),
-                    cast("int", rect["height"]),
-                )
-                assert 0 < cell_width <= width
-                assert 0 < cell_height <= height
-                assert 0 <= x <= width - cell_width
-                assert 0 <= y <= height - cell_height
     before = {path.name: path.read_bytes() for path in output.iterdir()}
     second = run_generator(kind, output, extended=extended)
     assert second.returncode == 0, second.stdout + second.stderr
@@ -344,6 +350,12 @@ def test_fixture_pixels_and_metadata_survive_regeneration(
     assert third.returncode == 0, third.stdout + third.stderr
     assert survivor.read_bytes() == b"existing authored metadata\r\n"
     assert missing.is_file()
+    regenerated_guid = assert_image_metadata(images[1], kind)
+    # The authored survivor deliberately has no GUID.
+    other_guids = {
+        read_guid(path.with_suffix(".png.meta").read_text(encoding="utf-8")) for path in images[2:]
+    }
+    assert regenerated_guid not in other_guids
     if folder_metadata is not None:
         assert folder_metadata.read_bytes() == b"existing authored folder metadata\r\n"
         folder_metadata.unlink()

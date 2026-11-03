@@ -116,6 +116,26 @@ try {
     Remove-Item -LiteralPath (Join-Path $incomplete 'Assets/UhCiTestFrameworkEvidence/Editor/UhCiTestFrameworkEvidence.asmdef')
     Reject { Remove-LegacyUnityTestFrameworkCollector -Project $incomplete -ArtifactsPath $artifacts } 'Incomplete legacy'
     Require (Test-Path -LiteralPath (Join-Path $incomplete 'Assets/UhCiTestFrameworkEvidence/Editor/UhCiTestFrameworkEvidence.cs')) 'partial collector preserved'
+    $runnerTokens = $null
+    $runnerErrors = $null
+    $runnerAst = [Management.Automation.Language.Parser]::ParseFile((Join-Path $root 'scripts/unity/run-ci-tests.ps1'), [ref]$runnerTokens, [ref]$runnerErrors)
+    Require ($runnerErrors.Count -eq 0) 'runner parses for actual initialization guard'
+    $retirement = @($runnerAst.EndBlock.Statements | Where-Object {
+        $_ -is [Management.Automation.Language.IfStatementAst] -and $_.Extent.Text.Contains('Remove-LegacyUnityTestFrameworkCollector')
+    })
+    Require ($retirement.Count -eq 1) 'exactly one project retirement guard'
+    $GenerateOnly = $true
+    $TestMode = 'standalone'
+    $ArtifactsPath = $artifacts
+    $ProjectWorkspace = @{ Persistent = $true; LegacyProjectPath = (New-Legacy -Name 'coordinated-initializer') }
+    $LicenseSessionPath = ''
+    $guard = [scriptblock]::Create($retirement[0].Extent.Text)
+    & $guard
+    $legacySource = Join-Path $ProjectWorkspace.LegacyProjectPath 'Assets/UhCiTestFrameworkEvidence/Editor/UhCiTestFrameworkEvidence.cs'
+    Require (Test-Path -LiteralPath $legacySource) 'ordinary generate-only preserves legacy collector'
+    $LicenseSessionPath = 'owned-session.json'
+    & $guard
+    Require (-not (Test-Path -LiteralPath $legacySource)) 'coordinated initializer retires legacy collector before workers launch'
     $active = New-Legacy -Name 'active'
     function Get-Process { return [pscustomobject]@{ ProcessName = 'Unity'; Id = 123 } }
     try { Reject { Remove-LegacyUnityTestFrameworkCollector -Project $active -ArtifactsPath $artifacts } 'Unity editor is still running' }

@@ -68,6 +68,10 @@ adapter in a frame loop.
 
 ## Fields
 
+Both boxed and typed getters can read constant fields. Ordinary field getters ignore the
+instance argument for static fields, so it can be null. Constants keep their declared types,
+including enums, and string constants can return null.
+
 Use typed overloads when both types are known at compile time. They avoid object-shaped calls,
 but field access may still box values on the reflection fallback. Use the boxed
 overloads when the type is only known at runtime (a serializer walking arbitrary fields).
@@ -114,6 +118,10 @@ setValue(ref stat, 100); // stat.Value == 100
 ---
 
 ## Properties and indexers
+
+A `PropertyInfo` declared on an interface works with either a concrete implementation or an
+interface reference. This includes closed generic interfaces and indexed properties. Reuse the
+resulting delegates just as you would for class members.
 
 Same shape as fields: boxed for runtime-typed work, typed for hot paths. Non-public accessors are
 supported; a property with no setter throws `ArgumentException` from `GetPropertySetter`.

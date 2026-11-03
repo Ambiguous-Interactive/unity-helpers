@@ -36,7 +36,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         }
 
         [UnityTest]
-        public IEnumerator IdlePoolIsReapedAtZeroTimeScaleWithoutAnotherRental()
+        public IEnumerator IdlePoolIsReapedAtZeroTimeScaleWithoutAnotherRental(
+            [Values(false, true)] bool lengthenIntervalFirst
+        )
         {
             bool previousMemoryMonitoring = MemoryPressureMonitor.Enabled;
             float previousScale = Time.timeScale;
@@ -52,10 +54,38 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 );
                 Assert.IsTrue(pool.UseIntelligentPurging);
                 Assert.AreEqual(3, pool.Count);
+                GlobalPoolRegistry.BudgetEnforcementIntervalSeconds = lengthenIntervalFirst
+                    ? float.Epsilon
+                    : GlobalPoolRegistry.DefaultBudgetEnforcementIntervalSeconds;
+                foreach (
+                    PoolMaintenanceRunner runner in Resources.FindObjectsOfTypeAll<PoolMaintenanceRunner>()
+                )
+                {
+                    Object.Destroy(runner.gameObject); // UNH-SUPPRESS: Restart the global frame-loop owner to establish a fresh interval.
+                }
+                yield return null;
+                PoolMaintenanceRunner.Initialize();
+                yield return null;
+                yield return null;
                 clock += PoolPurgeSettings.DefaultIdleTimeoutSeconds + 1f;
                 Time.timeScale = 0f;
+                if (lengthenIntervalFirst)
+                {
+                    GlobalPoolRegistry.BudgetEnforcementIntervalSeconds =
+                        GlobalPoolRegistry.DefaultBudgetEnforcementIntervalSeconds;
+                    for (int frame = 0; frame < 3; ++frame)
+                    {
+                        yield return null;
+                    }
+                    Assert.AreEqual(
+                        3,
+                        pool.Count,
+                        "Lengthening the live interval must defer maintenance."
+                    );
+                }
+                GlobalPoolRegistry.BudgetEnforcementIntervalSeconds = float.Epsilon;
                 Stopwatch deadline = Stopwatch.StartNew();
-                while (0 < pool.Count && deadline.Elapsed.TotalSeconds < 45)
+                while (0 < pool.Count && deadline.Elapsed.TotalSeconds < 5)
                 {
                     yield return null;
                 }
@@ -67,6 +97,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 Time.timeScale = previousScale;
                 MemoryPressureMonitor.Enabled = previousMemoryMonitoring;
                 PoolPurgeSettings.ResetToDefaults();
+                PoolMaintenanceRunner.Initialize();
             }
         }
     }

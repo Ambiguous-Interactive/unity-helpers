@@ -22,6 +22,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     /// - Includes fields missing from stale or incomplete serialized metadata.
     /// - Reports unsupported fields and continues warming supported declarations.
     /// - Skips unsupported field types without creating their accessors or collection factories.
+    /// - Skips open generic types; closed types still warm inherited generic fields.
     /// - Call during a loading screen or bootstrap to eliminate first-use stalls.
     /// </remarks>
     public static class RelationalComponentInitializer
@@ -84,6 +85,11 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
         private static int WarmType(Type componentType, Report report)
         {
+            if (componentType.ContainsGenericParameters)
+            {
+                return 0;
+            }
+
             int warmed = 0;
             bool hasRelationalFields = false;
             foreach (

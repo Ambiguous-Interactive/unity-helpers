@@ -11,6 +11,10 @@ param(
 
     [string]$AssemblyNames,
 
+    [string]$LicenseSessionPath = '',
+
+    [switch]$PrepareLicenseOnly,
+
     [string]$ExportPackagePath,
 
     [Parameter(Mandatory = $true)]
@@ -51,6 +55,9 @@ param(
     [string]$TestFilter = '',
 
     [switch]$IsolateCompilationFixtures,
+
+    [ValidateSet('All', 'Main', 'Isolated')]
+    [string]$EditorPhaseGroup = 'All',
 
     # Optional diagnostic frozen-file/player provenance. No measurement eligibility.
     [string]$FrozenPlayerDeclarationPath = '',
@@ -230,6 +237,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib/compilation-fixture-results.ps1')
+. (Join-Path $PSScriptRoot 'lib/license-session.ps1')
 . (Join-Path $PSScriptRoot 'lib/test-result-evidence.ps1')
 . (Join-Path $PSScriptRoot 'lib/wproto-player-provenance.ps1')
 if ($IsolateCompilationFixtures -and $TestMode -ne 'editmode') {
@@ -1130,38 +1138,45 @@ function New-UnityEditorTestPhases {
         [string]$ArtifactsPath,
         [string]$TestFilter,
         [string]$TestCategory,
-        [switch]$IsolateCompilationFixtures
+        [switch]$IsolateCompilationFixtures,
+        [ValidateSet('All', 'Main', 'Isolated')][string]$EditorPhaseGroup = 'All'
     )
 
+    if ($EditorPhaseGroup -ne 'All' -and -not $IsolateCompilationFixtures) {
+        throw 'An editor phase group requires compilation isolation.'
+    }
     $fixture = 'WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration.OdinMigrationDictionaryCompilationTests'
     if ($IsolateCompilationFixtures) {
         if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
             throw 'Compilation isolation cannot be combined with a caller test filter.'
         }
-        [pscustomobject]@{
-            ArtifactsPath = Join-Path $ArtifactsPath 'compilation'
-            TestFilter = $fixture
-            TestCategory = 'CompilationIsolation'
-            RequiredFixture = $fixture
-            RequirePassedTests = $true
-        }
-        foreach ($migrationFixture in @(Get-UnityMigrationIsolationFixtures)) {
+        if ($EditorPhaseGroup -ne 'Main') {
             [pscustomobject]@{
-                ArtifactsPath = Join-Path $ArtifactsPath ('migration/' + $migrationFixture.Split('.')[-1])
-                TestFilter = $migrationFixture
-                TestCategory = 'MigrationIsolation'
-                RequiredFixture = $migrationFixture
+                ArtifactsPath = Join-Path $ArtifactsPath 'compilation'
+                TestFilter = $fixture
+                TestCategory = 'CompilationIsolation'
+                RequiredFixture = $fixture
                 RequirePassedTests = $true
+            }
+            foreach ($group in @(Get-UnityMigrationIsolationGroups)) {
+                [pscustomobject]@{
+                    ArtifactsPath = Join-Path $ArtifactsPath ('migration/' + $group.Name)
+                    TestFilter = $group.Fixtures -join ';'
+                    TestCategory = 'MigrationIsolation'
+                    RequiredFixture = $group.Fixtures
+                    RequirePassedTests = $true
+                }
             }
         }
         $TestCategory = (@($TestCategory, '!CompilationIsolation', '!MigrationIsolation') |
             Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join ';'
     }
+    if ($EditorPhaseGroup -eq 'Isolated') { return }
     [pscustomobject]@{
         ArtifactsPath = $ArtifactsPath
         TestFilter = $TestFilter
         TestCategory = $TestCategory
-        RequiredFixture = ''
+        RequiredFixture = @()
         RequirePassedTests = -not [string]::IsNullOrWhiteSpace($TestFilter)
     }
 }
@@ -1187,7 +1202,7 @@ function Invoke-UnityEditorTestPhase {
         [string]$ArtifactsPath,
         [string]$Project,
         [string]$PackageRoot,
-        [string]$RequiredFixture,
+        [string[]]$RequiredFixture,
         [switch]$RequirePassedTests
     )
 
@@ -1204,7 +1219,7 @@ function Invoke-UnityEditorTestPhase {
     Write-AnalyzerSetupDiagnostics -Project $Project -LogPath $phaseLog -Label $Label
     Test-NUnitResults -Path $phaseResults -Label $Label -LogPath $phaseLog `
         -Project $Project -UnityExitCode $phaseExit -RequirePassedTests:$RequirePassedTests
-    if (-not [string]::IsNullOrWhiteSpace($RequiredFixture)) {
+    if ($null -ne $RequiredFixture -and $RequiredFixture.Count -ne 0) {
         Assert-UnityCompilationFixtureResults -Path $phaseResults -FixtureName $RequiredFixture
     }
     Assert-NoUnityCompilerWarnings -LogPath $phaseLog -Label $Label -PackageRoot $PackageRoot
@@ -2825,6 +2840,12 @@ function Invoke-ProcessWithTreeKillTimeout {
     $killReason = $null
     $killSucceeded = $false
     $exceptionType = $null
+    $processExitUtc = $null
+    $postExitDrainStarted = $null
+    $postExitLastOutput = $null
+    $outputDrainStopped = $false
+    $oDone = $false
+    $eDone = $false
     try {
         $psi = New-Object System.Diagnostics.ProcessStartInfo
         $psi.FileName = $FilePath
@@ -2858,8 +2879,6 @@ function Invoke-ProcessWithTreeKillTimeout {
             $deadline = [DateTime]::MaxValue
         }
 
-        $oDone = $false
-        $eDone = $false
         while (-not ($oDone -and $eDone)) {
             $progressed = $false
 
@@ -2893,6 +2912,28 @@ function Invoke-ProcessWithTreeKillTimeout {
                     $lastOutputAt = [DateTime]::UtcNow
                 }
                 $progressed = $true
+            }
+
+            if ($proc.HasExited) {
+                $now = [DateTime]::UtcNow
+                if ($null -eq $postExitDrainStarted) {
+                    try { $processExitUtc = $proc.ExitTime.ToUniversalTime() } catch { }
+                    $postExitDrainStarted = $now
+                    $postExitLastOutput = $now
+                }
+                $exitWithinDeadline = if ($null -ne $processExitUtc) { $processExitUtc -le $deadline } else { $postExitDrainStarted -le $deadline }
+                if ($exitWithinDeadline) {
+                    if ($progressed) { $postExitLastOutput = $now }
+                    if (($now - $postExitLastOutput).TotalSeconds -ge 1 -or ($now - $postExitDrainStarted).TotalSeconds -ge 5) {
+                        $outputDrainStopped = -not ($oDone -and $eDone)
+                        if ($outputDrainStopped) {
+                            Write-Host "::notice::$Label process exited; stopped waiting for open output streams."
+                        }
+                        break
+                    }
+                    if (-not $progressed) { Start-Sleep -Milliseconds 50 }
+                    continue
+                }
             }
 
             if ([DateTime]::UtcNow -ge $deadline) {
@@ -2966,9 +3007,10 @@ function Invoke-ProcessWithTreeKillTimeout {
 
         # Drain any reads that completed during/after the kill so no pre-kill output
         # is dropped.
+        $pendingWaitMilliseconds = if ($outputDrainStopped) { 0 } else { 2000 }
         foreach ($pending in @($oTask, $eTask)) {
             try {
-                if ($pending.Wait(2000) -and $null -ne $pending.Result) {
+                if ($pending.Wait($pendingWaitMilliseconds) -and $null -ne $pending.Result) {
                     $line = $pending.Result
                     Write-Host (ConvertTo-UnitySafeLogText -Text $line)
                     $buffer.Add([string]$line)
@@ -2979,7 +3021,10 @@ function Invoke-ProcessWithTreeKillTimeout {
         }
 
         try {
-            if ($reaped -and $proc.HasExited) { $rawExitCode = $proc.ExitCode }
+            if ($reaped -and $proc.HasExited) {
+                $rawExitCode = $proc.ExitCode
+                if ($null -eq $processExitUtc) { $processExitUtc = $proc.ExitTime.ToUniversalTime() }
+            }
         } catch { }
         if ($killedAfterCompletion) {
             $exitOrigin = 'completion-grace'
@@ -3042,6 +3087,10 @@ function Invoke-ProcessWithTreeKillTimeout {
                 $ProcessObservation.KillReason = $killReason
                 $ProcessObservation.KillSucceeded = $killSucceeded
                 $ProcessObservation.ExceptionType = $exceptionType
+                $ProcessObservation.ProcessExitUtc = if ($null -ne $processExitUtc) { $processExitUtc.ToString('o') } else { $null }
+                $ProcessObservation.OutputDrainStopped = $outputDrainStopped
+                $ProcessObservation.StandardOutputEndObserved = $oDone
+                $ProcessObservation.StandardErrorEndObserved = $eDone
             } catch {
                 Write-Host '::warning::Could not record process observation; execution outcome is unchanged.'
             }
@@ -5038,6 +5087,10 @@ catch {
     Write-Host "MSVC toolchain report unavailable: $($_.Exception.Message)"
 }
 
+if ($EditorPhaseGroup -ne 'All' -and ($TestMode -ne 'editmode' -or -not $IsolateCompilationFixtures)) {
+    throw 'An editor phase group requires EditMode compilation isolation.'
+}
+
 $ExplicitProjectRequested = -not [string]::IsNullOrWhiteSpace($ProjectPath)
 $ProjectWorkspace = Resolve-UnityProjectWorkspace `
     -RepoRoot $RepoRoot `
@@ -5052,7 +5105,7 @@ $ProjectPath = Resolve-FullPath -Path $ProjectWorkspace.ProjectPath
 
 Initialize-UnityCacheEnvironment -CacheRoot (Resolve-FullPath -Path $ProjectWorkspace.CacheRoot)
 
-if ($TestMode -ne 'export' -and -not $GenerateOnly -and $ProjectWorkspace.Persistent) {
+if ($TestMode -ne 'export' -and (-not $GenerateOnly -or -not [string]::IsNullOrWhiteSpace($LicenseSessionPath)) -and $ProjectWorkspace.Persistent) {
     Remove-LegacyUnityTestFrameworkCollector -Project $ProjectWorkspace.LegacyProjectPath -ArtifactsPath $ArtifactsPath
 }
 
@@ -5189,6 +5242,21 @@ if ($env:GITHUB_ACTIONS -eq 'true' -and -not $hasLicenseCreds) {
     throw "Serial Unity activation requires UNITY_SERIAL, UNITY_EMAIL, and UNITY_PASSWORD in CI. Missing or empty: $($missing -join ', ')."
 }
 
+$sharedLicenseSession = $null
+$reuseLicenseSession = $false
+if ($PrepareLicenseOnly -and [string]::IsNullOrWhiteSpace($LicenseSessionPath)) {
+    throw 'License preparation requires a shared session file.'
+}
+if (-not [string]::IsNullOrWhiteSpace($LicenseSessionPath)) {
+    if (-not $hasLicenseCreds -or -not $centralReturnOwnsLicense) {
+        throw 'Shared activation requires complete credentials and central return ownership.'
+    }
+    $sessionState = if ($PrepareLicenseOnly) { 'requested' } else { 'activated' }
+    $sharedLicenseSession = Read-UnityLicenseSession -Path $LicenseSessionPath `
+        -UnityVersion $UnityVersion -EditorPath $UnityEditorPath -State $sessionState
+    $reuseLicenseSession = -not $PrepareLicenseOnly
+}
+
 # Array-wrap the capture so it is ALWAYS an array under Set-StrictMode -Version
 # Latest. Get-AcceleratorArguments `return @()` on its empty path emits ZERO
 # objects, so a bare `$x = Get-Foo` assigns AutomationNull (the empty array
@@ -5270,7 +5338,7 @@ $returnLogPath = Join-Path $licenseLogDir "unity-return-$UnityVersion-$TestMode.
 # workflow backstop could run. This is safe for central-lifecycle callers too:
 # the fresh activation below establishes the seat that the central executor will
 # later return, so this pre-activation cleanup cannot consume that evidence.
-if ($hasLicenseCreds) {
+if ($hasLicenseCreds -and -not $reuseLicenseSession) {
     Invoke-UnityLicenseReturn -EditorPath $UnityEditorPath -Email $env:UNITY_EMAIL -Password $env:UNITY_PASSWORD -LogPath $returnLogPath
 }
 
@@ -5287,9 +5355,14 @@ try {
     # licensed. Activation THROWS on failure (caught by this try's finally, which
     # still returns the seat). Skipped locally when creds are absent (the machine
     # is assumed already licensed).
-    if ($hasLicenseCreds) {
+    if ($hasLicenseCreds -and -not $reuseLicenseSession) {
         Invoke-UnityLicenseActivate -EditorPath $UnityEditorPath -Serial $env:UNITY_SERIAL -Email $env:UNITY_EMAIL -Password $env:UNITY_PASSWORD -LogPath $activateLogPath
     }
+    if ($PrepareLicenseOnly) {
+        Complete-UnityLicenseSession -Path $LicenseSessionPath -Session $sharedLicenseSession
+        return
+    }
+
 
     if ($TestMode -eq 'export') {
         Invoke-UnityPackageExport -EditorPath $UnityEditorPath -Project $ProjectPath `
@@ -5546,7 +5619,7 @@ try {
         # background thread during shutdown AFTER RunFinished wrote the file.
         $phases = @(New-UnityEditorTestPhases -ArtifactsPath $ArtifactsPath `
             -TestFilter $TestFilter -TestCategory $TestCategory `
-            -IsolateCompilationFixtures:$IsolateCompilationFixtures)
+            -IsolateCompilationFixtures:$IsolateCompilationFixtures -EditorPhaseGroup $EditorPhaseGroup)
         foreach ($phase in $phases) {
             $phaseArguments = @(New-UnityEditorPhaseArguments -Arguments $testArgs `
                 -TestCategory $phase.TestCategory -TestFilter $phase.TestFilter)

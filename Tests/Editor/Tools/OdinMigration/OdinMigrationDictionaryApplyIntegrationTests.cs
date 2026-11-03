@@ -91,7 +91,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                     FullPath(baseDefinition),
                     "{\"name\":\""
                         + assemblyName
-                        + ".Base\",\"references\":[\"WallstopStudios.UnityHelpers\"],\"includePlatforms\":[\"Editor\"]}",
+                        + ".Base\",\"references\":[\"WallstopStudios.UnityHelpers\"],\"autoReferenced\":false,\"includePlatforms\":[\"Editor\"]}",
                     new UTF8Encoding(false)
                 );
                 File.WriteAllText(FullPath(SourcePath(folder)), Source, new UTF8Encoding(false));
@@ -104,7 +104,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                         + assemblyName
                         + "\",\"references\":[\"WallstopStudios.UnityHelpers\",\""
                         + assemblyName
-                        + ".Base\"],\"includePlatforms\":[\"Editor\"]}",
+                        + ".Base\"],\"autoReferenced\":false,\"includePlatforms\":[\"Editor\"]}",
                     new UTF8Encoding(false)
                 );
                 WriteImporterMeta(definition, true);
@@ -364,6 +364,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                     }
                     Assert.IsTrue(compilation.Completed);
                     Assert.IsTrue(compilation.Succeeded, compilation.Failure);
+                    string assemblyName = Path.GetFileName(folder);
+                    CollectionAssert.AreEqual(
+                        new[] { assemblyName + ".Base", assemblyName },
+                        compilation.CompiledAssemblies,
+                        "The migration must compile both consumer assemblies without unrelated editor callers."
+                    );
                     bool started = OdinMigrationTool.TryApplyDictionaryMigration(
                         preview,
                         compilation,
@@ -646,7 +652,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                         definition,
                         "{\"name\":\""
                             + assemblyName
-                            + "\",\"references\":[\"WallstopStudios.UnityHelpers\"],\"includePlatforms\":[\"Editor\"],"
+                            + "\",\"references\":[\"WallstopStudios.UnityHelpers\"],\"autoReferenced\":false,\"includePlatforms\":[\"Editor\"],"
                             + "\"defineConstraints\":[\"WALLSTOP_MIGRATION_RETIRED_CONSUMER\"]}",
                         new UTF8Encoding(false)
                     );
@@ -654,7 +660,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                         FullPath(folder + "/Base/" + assemblyName + ".Base.asmdef"),
                         "{\"name\":\""
                             + assemblyName
-                            + ".Base\",\"references\":[\"WallstopStudios.UnityHelpers\"],\"includePlatforms\":[\"Editor\"],\"defineConstraints\":[\"WALLSTOP_MIGRATION_RETIRED_CONSUMER\"]}",
+                            + ".Base\",\"references\":[\"WallstopStudios.UnityHelpers\"],\"autoReferenced\":false,\"includePlatforms\":[\"Editor\"],\"defineConstraints\":[\"WALLSTOP_MIGRATION_RETIRED_CONSUMER\"]}",
                         new UTF8Encoding(false)
                     );
                     SessionState.SetBool(RetirementKey, true);

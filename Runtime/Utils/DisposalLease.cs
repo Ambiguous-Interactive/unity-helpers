@@ -142,6 +142,11 @@ namespace WallstopStudios.UnityHelpers.Utils
         private const int BlockSize = 1 << BlockShift;
         private const int BlockMask = BlockSize - 1;
 
+        /// <summary>
+        /// How many slots have ever been created, for diagnostics and tests.
+        /// </summary>
+        internal static int SlotsCreated => Volatile.Read(ref _nextNewSlot) - 1;
+
         // Slot 0 is burned so it can mean "not held", which is why _nextNewSlot starts at 1.
         private static long[][] _generations = { new long[BlockSize] };
         private static int[][] _freeNext = { new int[BlockSize] };
@@ -150,9 +155,6 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         private static readonly object GrowthGate = new();
 
-#if SINGLE_THREADED
-        private static int _freeHead;
-#else
         private static readonly object ForeignFreeGate = new();
         private static int _foreignFreeHead;
 
@@ -161,12 +163,6 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         [ThreadStatic]
         private static int _currentThreadId;
-#endif
-
-        /// <summary>
-        /// How many slots have ever been created, for diagnostics and tests.
-        /// </summary>
-        internal static int SlotsCreated => Volatile.Read(ref _nextNewSlot) - 1;
 
         /// <summary>
         /// Takes a slot and leases it. The lease is surrendered by a winning
@@ -213,18 +209,10 @@ namespace WallstopStudios.UnityHelpers.Utils
                 slot = AcquireSlow();
             }
 
-#if !SINGLE_THREADED
             int ownerThreadId = CurrentThreadId();
-#else
-            const int ownerThreadId = 0;
-#endif
             ref long generation = ref GenerationRef(slot);
             long acquired = generation + 1;
-#if SINGLE_THREADED
-            generation = acquired;
-#else
             Volatile.Write(ref generation, acquired);
-#endif
             return new DisposalLease(slot, ownerThreadId, acquired);
         }
 
@@ -234,11 +222,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static long CurrentGeneration(int slot)
         {
-#if SINGLE_THREADED
-            return GenerationRef(slot);
-#else
             return Interlocked.Read(ref GenerationRef(slot));
-#endif
         }
 
         /// <summary>
@@ -249,25 +233,14 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// This is the only place two threads can contend, and it is the one place that must not be
         /// resolved by anything weaker than a compare-and-swap: copies of a lease are exactly the
         /// callers racing here, and electing more than one winner is the defect being prevented.
-        /// Under <c>SINGLE_THREADED</c> there is no second thread to race, and the package strips
-        /// synchronization there as it does in its pools.
+        /// Threading APIs share this store, so claims remain synchronized under
+        /// <c>SINGLE_THREADED</c> as well.
         /// </remarks>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static bool TryClaim(int slot, long generation)
         {
-#if SINGLE_THREADED
-            ref long current = ref GenerationRef(slot);
-            if (current != generation)
-            {
-                return false;
-            }
-
-            current = generation + 1;
-            return true;
-#else
             return Interlocked.CompareExchange(ref GenerationRef(slot), generation + 1, generation)
                 == generation;
-#endif
         }
 
         /// <summary>
@@ -281,19 +254,16 @@ namespace WallstopStudios.UnityHelpers.Utils
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static void Release(int slot, int ownerThreadId)
         {
-#if !SINGLE_THREADED
             if (ownerThreadId != CurrentThreadId())
             {
                 ReleaseForeign(slot);
 
                 return;
             }
-#endif
             SetFreeNext(slot, _freeHead);
             _freeHead = slot;
         }
 
-#if !SINGLE_THREADED
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ReleaseForeign(int slot)
         {
@@ -316,7 +286,6 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             return current;
         }
-#endif
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static ref long GenerationRef(int slot)
@@ -340,7 +309,6 @@ namespace WallstopStudios.UnityHelpers.Utils
         private static int AcquireSlow()
         {
             int slot = 0;
-#if !SINGLE_THREADED
             lock (ForeignFreeGate)
             {
                 slot = _foreignFreeHead;
@@ -353,12 +321,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             {
                 return slot;
             }
-#endif
-#if SINGLE_THREADED
-            slot = _nextNewSlot++;
-#else
             slot = Interlocked.Increment(ref _nextNewSlot) - 1;
-#endif
             EnsureBlock(slot >> BlockShift);
             return slot;
         }

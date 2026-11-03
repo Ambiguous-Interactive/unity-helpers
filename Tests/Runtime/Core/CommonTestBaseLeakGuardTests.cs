@@ -3,7 +3,9 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.Core
 {
+    using System;
     using System.Collections;
+    using System.Reflection;
     using NUnit.Framework;
     using UnityEngine;
     using UnityEngine.TestTools;
@@ -16,6 +18,76 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
     /// </summary>
     public sealed class CommonTestBaseLeakGuardTests : CommonTestBase
     {
+        private const string AllocatorWarning =
+            "Internal: deleting an allocation that is older than its permitted lifetime of 4 frames (age = 7)";
+
+        private static void EmitNativeLog(LogType type, string message, bool mainThread = true)
+        {
+            MethodInfo callback = typeof(Application).GetMethod(
+                "CallLogCallback",
+                BindingFlags.Static | BindingFlags.NonPublic
+            );
+            Assert.IsTrue(callback != null, "Unity's native log dispatch must be available.");
+            callback.Invoke(null, new object[] { message, string.Empty, type, mainThread });
+        }
+
+        [Test]
+        public void NativeAllocatorWarningsFollowExistingTolerance(
+            [Values(5, 7, 8)] int age,
+            [Values(false, true)] bool mainThread
+        )
+        {
+            EmitNativeLog(
+                LogType.Warning,
+                AllocatorWarning.Replace("age = 7", "age = " + age),
+                mainThread
+            );
+            AssertNoUnexpectedLogs();
+        }
+
+        [Test]
+        public void RepeatedNativeAllocatorWarningsAreMatchedIndividually()
+        {
+            EmitNativeLog(LogType.Warning, AllocatorWarning);
+            EmitNativeLog(LogType.Warning, AllocatorWarning);
+            AssertNoUnexpectedLogs();
+        }
+
+        [TestCase(LogType.Warning, "Unrelated native warning")]
+        [TestCase(LogType.Error, AllocatorWarning)]
+        public void NativeLogTolerancePreservesOtherFailures(LogType type, string message)
+        {
+            EmitNativeLog(type, message);
+            Exception failure = Assert.Catch(AssertNoUnexpectedLogs);
+            Assert.IsTrue(failure != null, "Only the existing optional warning may be tolerated.");
+            LogAssert.Expect(type, message);
+            AssertNoUnexpectedLogs();
+        }
+
+        [Test]
+        public void NativeLogTolerancePreservesPendingExpectationOrder()
+        {
+            const string expected = "Expected native warning after the optional warning";
+            LogAssert.Expect(LogType.Warning, expected);
+            EmitNativeLog(LogType.Warning, AllocatorWarning);
+            EmitNativeLog(LogType.Warning, expected);
+            AssertNoUnexpectedLogs();
+        }
+
+        [Test]
+        public void NativeLogToleranceHonorsAnExplicitAllocatorExpectation()
+        {
+            LogAssert.Expect(LogType.Warning, AllocatorWarning);
+            EmitNativeLog(LogType.Warning, AllocatorWarning);
+            AssertNoUnexpectedLogs();
+        }
+
+        [Test]
+        public void NativeLogToleranceDoesNotRequireAnOptionalMessage()
+        {
+            AssertNoUnexpectedLogs();
+        }
+
         [UnityTest]
         public IEnumerator SweepDetectsAndDestroysUntrackedLeak()
         {

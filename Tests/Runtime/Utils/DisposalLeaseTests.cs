@@ -3,15 +3,13 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.Runtime.Utils
 {
+    using System.Collections.Concurrent;
     using System.Collections.Generic;
+    using System.Threading;
+    using System.Threading.Tasks;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Tests.TestUtils;
     using WallstopStudios.UnityHelpers.Utils;
-#if !SINGLE_THREADED
-    using System.Collections.Concurrent;
-    using System.Threading;
-    using System.Threading.Tasks;
-#endif
 
     /// <summary>
     /// The generational handle every struct-based <c>IDisposable</c> in the package relies on to be
@@ -162,7 +160,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Utils
             Assert.That(claimed, Is.EqualTo(Count));
         }
 
-#if !SINGLE_THREADED
         /*
             A shared spin release makes claims collide; barrier scheduling previously let a deliberately non-
             atomic mutation pass.
@@ -360,6 +357,5 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Utils
                 "Cross-thread claims left reusable slots unavailable."
             );
         }
-#endif
     }
 }

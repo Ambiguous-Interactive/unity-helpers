@@ -34,6 +34,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     /// dynamic collection creation, and type/attribute scanning with caching and optional IL emission.
     /// </summary>
     /// <remarks>
+    /// <para>
+    /// Interface properties and indexers support concrete and interface targets.
+    /// Constant fields retain their declared value types across the access tiers.
+    /// </para>
     /// <para><b>Architecture Overview</b></para>
     /// <para>
     /// This class provides a unified API for reflection-based operations while automatically selecting
@@ -486,6 +490,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// </summary>
         /// <param name="field">Field to read.</param>
         /// <returns>Delegate: <c>object instance =&gt; object value</c></returns>
+        /// <remarks>Includes constant fields; static fields ignore the instance argument.</remarks>
         /// <example>
         /// <code><![CDATA[
         /// var fi = typeof(Player).GetField("Score");
@@ -720,7 +725,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 #if EMIT_DYNAMIC_IL
         private static Func<object, object> BuildFieldGetterIL(FieldInfo field)
         {
-            DynamicMethod dynamicMethod = new(
+            if (field.IsLiteral)
+            {
+                return null;
+            }
+
+            DynamicMethod dynamicMethod = CreateMemberDynamicMethod(
                 $"Get{field.DeclaringType.Name}_{field.Name}",
                 typeof(object),
                 new[] { typeof(object) },
@@ -729,13 +739,19 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             );
 
             ILGenerator il = dynamicMethod.GetILGenerator();
-            il.Emit(OpCodes.Ldarg_0);
-            il.Emit(
-                field.DeclaringType.IsValueType ? OpCodes.Unbox : OpCodes.Castclass,
-                field.DeclaringType
-            );
-
-            il.Emit(OpCodes.Ldfld, field);
+            if (field.IsStatic)
+            {
+                il.Emit(OpCodes.Ldsfld, field);
+            }
+            else
+            {
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(
+                    field.DeclaringType.IsValueType ? OpCodes.Unbox : OpCodes.Castclass,
+                    field.DeclaringType
+                );
+                il.Emit(OpCodes.Ldfld, field);
+            }
 
             if (field.FieldType.IsValueType)
             {
@@ -771,7 +787,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         {
             MethodInfo getMethod = property.GetGetMethod(true);
 
-            DynamicMethod dynamicMethod = new(
+            DynamicMethod dynamicMethod = CreateMemberDynamicMethod(
                 $"Get{property.DeclaringType.Name}_{property.Name}",
                 typeof(object),
                 new[] { typeof(object) },
@@ -887,6 +903,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return DelegateFactory.GetStaticPropertySetterTyped<TValue>(property);
         }
 
+        /// <summary>Builds a cached getter for an indexed property.</summary>
         public static Func<object, object[], object> GetIndexerGetter(PropertyInfo property)
         {
             if (property == null)
@@ -906,6 +923,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return DelegateFactory.GetIndexerGetter(property);
         }
 
+        /// <summary>Builds a cached setter for an indexed property.</summary>
         public static Action<object, object, object[]> GetIndexerSetter(PropertyInfo property)
         {
             if (property == null)
@@ -929,7 +947,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         private static Action<object, object> BuildPropertySetterIL(PropertyInfo property)
         {
             MethodInfo setMethod = property.GetSetMethod(true);
-            DynamicMethod dynamicMethod = new(
+            DynamicMethod dynamicMethod = CreateMemberDynamicMethod(
                 $"SetProperty{property.DeclaringType.Name}_{property.Name}",
                 typeof(void),
                 new[] { typeof(object), typeof(object) },
@@ -1004,7 +1022,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
         /// <summary>
-        /// Builds a cached delegate that returns the value of a static field as <see cref="object"/>.
+        /// Builds a cached reader for a static or constant field as <see cref="object"/>.
         /// </summary>
         /// <param name="field">Static field to read.</param>
         /// <returns>Delegate: <c>() =&gt; object value</c></returns>
@@ -1021,6 +1039,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 #if EMIT_DYNAMIC_IL
         private static Func<object> BuildStaticFieldGetterIL(FieldInfo field)
         {
+            if (field.IsLiteral)
+            {
+                return null;
+            }
+
             DynamicMethod dynamicMethod = new(
                 $"Get{field.DeclaringType.Name}_{field.Name}",
                 typeof(object),
@@ -1040,7 +1063,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 #endif
 
         /// <summary>
-        /// Builds a strongly-typed field getter delegate for instance fields.
+        /// Builds a typed field reader; static and constant fields ignore the instance argument.
         /// </summary>
         public static Func<TInstance, TValue> GetFieldGetter<TInstance, TValue>(FieldInfo field)
         {
@@ -3906,7 +3929,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 #if !EMIT_DYNAMIC_IL
                 return CreateCompiledEnabledPropertyGetter(property, type);
 #else
-                DynamicMethod dynamicMethod = new(
+                DynamicMethod dynamicMethod = CreateMemberDynamicMethod(
                     $"GetEnabled_{type.Name}",
                     typeof(bool),
                     new[] { typeof(object) },
@@ -4020,7 +4043,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         {
             try
             {
-                DynamicMethod dynamicMethod = new(
+                DynamicMethod dynamicMethod = CreateMemberDynamicMethod(
                     $"Invoke{method.DeclaringType.Name}_{method.Name}",
                     typeof(object),
                     new[] { typeof(object), typeof(object[]) },
@@ -4081,7 +4104,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         {
             try
             {
-                DynamicMethod dynamicMethod = new(
+                DynamicMethod dynamicMethod = CreateMemberDynamicMethod(
                     $"InvokeStatic{method.DeclaringType.Name}_{method.Name}",
                     typeof(object),
                     new[] { typeof(object[]) },
@@ -5207,7 +5230,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 property.GetGetMethod(true)
                 ?? throw new ArgumentException("Indexer has no getter", nameof(property));
 
-            DynamicMethod dynamicMethod = new(
+            DynamicMethod dynamicMethod = CreateMemberDynamicMethod(
                 $"GetIndexer_{property.DeclaringType.Name}_{property.Name}",
                 typeof(object),
                 new[] { typeof(object), typeof(object[]) },
@@ -5253,7 +5276,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 property.GetSetMethod(true)
                 ?? throw new ArgumentException("Indexer has no setter", nameof(property));
 
-            DynamicMethod dynamicMethod = new(
+            DynamicMethod dynamicMethod = CreateMemberDynamicMethod(
                 $"SetIndexer_{property.DeclaringType.Name}_{property.Name}",
                 typeof(void),
                 new[] { typeof(object), typeof(object), typeof(object[]) },
@@ -5298,7 +5321,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             FieldInfo field
         )
         {
-            DynamicMethod dynamicMethod = new(
+            if (field.IsLiteral)
+            {
+                return null;
+            }
+
+            DynamicMethod dynamicMethod = CreateMemberDynamicMethod(
                 $"GetGeneric{field.DeclaringType.Name}_{field.Name}",
                 typeof(TValue),
                 new[] { typeof(TInstance) },
@@ -5390,6 +5418,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         private static Func<TValue> BuildTypedStaticFieldGetterIL<TValue>(FieldInfo field)
         {
+            if (field.IsLiteral)
+            {
+                return null;
+            }
+
             DynamicMethod dynamicMethod = new(
                 $"GetStaticTyped{field.DeclaringType.Name}_{field.Name}",
                 typeof(TValue),
@@ -5426,7 +5459,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             MethodInfo getMethod
         )
         {
-            DynamicMethod dynamicMethod = new(
+            DynamicMethod dynamicMethod = CreateMemberDynamicMethod(
                 $"GetGeneric{property.DeclaringType.Name}_{property.Name}",
                 typeof(TValue),
                 new[] { typeof(TInstance) },
@@ -5477,7 +5510,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             MethodInfo setMethod
         )
         {
-            DynamicMethod dynamicMethod = new(
+            DynamicMethod dynamicMethod = CreateMemberDynamicMethod(
                 $"SetPropertyGeneric{property.DeclaringType.Name}_{property.Name}",
                 typeof(void),
                 new[] { typeof(TInstance), typeof(TValue) },
@@ -5529,7 +5562,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             MethodInfo getMethod
         )
         {
-            DynamicMethod dynamicMethod = new(
+            DynamicMethod dynamicMethod = CreateMemberDynamicMethod(
                 $"GetStaticTyped{property.DeclaringType.Name}_{property.Name}",
                 typeof(TValue),
                 Type.EmptyTypes,
@@ -5549,7 +5582,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             MethodInfo setMethod
         )
         {
-            DynamicMethod dynamicMethod = new(
+            DynamicMethod dynamicMethod = CreateMemberDynamicMethod(
                 $"SetStaticTyped{property.DeclaringType.Name}_{property.Name}",
                 typeof(void),
                 new[] { typeof(TValue) },
@@ -5826,6 +5859,29 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return null;
             }
         }
+
+#if EMIT_DYNAMIC_IL
+        private static DynamicMethod CreateMemberDynamicMethod(
+            string name,
+            Type returnType,
+            Type[] parameterTypes,
+            Type owner,
+            bool skipVisibility
+        )
+        {
+            if (owner != null && owner.IsInterface)
+            {
+                return new DynamicMethod(
+                    name,
+                    returnType,
+                    parameterTypes,
+                    owner.Module,
+                    skipVisibility
+                );
+            }
+            return new DynamicMethod(name, returnType, parameterTypes, owner, skipVisibility);
+        }
+#endif
 
         private static class TypedArrayBuilders<TSource>
             where TSource : class
