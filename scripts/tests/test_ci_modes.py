@@ -752,3 +752,92 @@ exit 37
         assert name not in names
         names.add(name)
         assert result.stderr.strip() == "diagnostic retained"
+
+
+def generate_project_settings(
+    project: Path, artifacts: Path, defines: str | None, version: str = "6000.6.0f1"
+) -> None:
+    shell = shutil.which("pwsh")
+    assert shell is not None
+    command = [
+        shell,
+        "-NoProfile",
+        "-File",
+        str(ROOT / "scripts/unity/run-ci-tests.ps1"),
+        "-UnityVersion",
+        version,
+        "-TestMode",
+        "editmode",
+        "-ProjectPath",
+        str(project),
+        "-RepoRoot",
+        str(ROOT),
+        "-ArtifactsPath",
+        str(artifacts),
+        "-AssemblyNames",
+        "WallstopStudios.UnityHelpers.Tests.Core",
+        "-GenerateOnly",
+    ]
+    if defines is not None:
+        command.extend(["-AdditionalScriptingDefines", defines])
+    environment = {
+        key: value
+        for key, value in os.environ.items()
+        if key not in {"UNITY_EMAIL", "UNITY_PASSWORD", "UNITY_SERIAL"}
+    }
+    result = subprocess.run(
+        command, capture_output=True, text=True, env=environment, timeout=30, check=False
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert (project / "Assets/Editor/UhCiTestConfigurator.cs").is_file()
+
+
+@pytest.mark.parametrize(
+    ("defines", "expected"),
+    [
+        ("SINGLE_THREADED", "SINGLE_THREADED"),
+        (" FIRST , SECOND;FIRST ", "FIRST;SECOND"),
+        ('SYMBOL"\n  injected: value', 'SYMBOL"\n  injected: value'),
+    ],
+)
+def test_new_project_seeds_global_defines_before_editor_import(
+    tmp_path: Path, defines: str, expected: str
+) -> None:
+    project = tmp_path / "project with spaces"
+    generate_project_settings(project, tmp_path / "artifacts", defines)
+    lines = (
+        (project / "ProjectSettings/ProjectSettings.asset").read_text(encoding="utf-8").splitlines()
+    )
+    document = cast("dict[str, object]", yaml.safe_load("\n".join(lines[3:])))
+    player = cast("dict[str, object]", document["PlayerSettings"])
+    assert set(player) == {"serializedVersion", "scriptingDefineSymbols"}
+    assert player["serializedVersion"] == 26
+    assert player["scriptingDefineSymbols"] == {"Standalone": expected}
+
+
+@pytest.mark.parametrize("defines", [None, " , ; "])
+def test_project_without_requested_defines_keeps_default_settings_creation(
+    tmp_path: Path, defines: str | None
+) -> None:
+    project = tmp_path / "project"
+    generate_project_settings(project, tmp_path / "artifacts", defines)
+    assert not (project / "ProjectSettings/ProjectSettings.asset").exists()
+
+
+def test_existing_player_settings_are_preserved_byte_for_byte(tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    settings = project / "ProjectSettings/ProjectSettings.asset"
+    settings.parent.mkdir(parents=True)
+    retained = b"owned settings and symbols\r\n"
+    settings.write_bytes(retained)
+    generate_project_settings(project, tmp_path / "artifacts", "SINGLE_THREADED")
+    assert settings.read_bytes() == retained
+
+
+@pytest.mark.parametrize("version", ["2021.3.45f1", "2022.3.45f1"])
+def test_legacy_editors_keep_define_configuration_in_the_editor(
+    tmp_path: Path, version: str
+) -> None:
+    project = tmp_path / "project"
+    generate_project_settings(project, tmp_path / "artifacts", "SINGLE_THREADED", version)
+    assert not (project / "ProjectSettings/ProjectSettings.asset").exists()

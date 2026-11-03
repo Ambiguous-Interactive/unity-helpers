@@ -2180,6 +2180,50 @@ function Set-EphemeralProjectContent {
     }
 }
 
+function Initialize-EphemeralScriptingDefines {
+    param(
+        [Parameter(Mandatory = $true)][string]$Project,
+        [Parameter(Mandatory = $true)][string]$Version,
+        [string]$Defines = ''
+    )
+
+    if ($Version -notmatch '^6000\.') { return }
+
+    $symbols = @(
+        $Defines -split '[,;]' |
+            ForEach-Object { $_.Trim() } |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            Select-Object -Unique
+    )
+    if ($symbols.Count -eq 0) { return }
+
+    $path = Join-Path $Project 'ProjectSettings/ProjectSettings.asset'
+    if (Test-Path -LiteralPath $path -PathType Leaf) { return }
+
+    $quotedSymbols = ConvertTo-Json -InputObject ($symbols -join ';') -Compress
+    $content = @"
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!129 &1
+PlayerSettings:
+  serializedVersion: 26
+  scriptingDefineSymbols:
+    Standalone: $quotedSymbols
+"@
+    try {
+        $stream = [IO.File]::Open($path, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::Read)
+    } catch [IO.IOException] {
+        if (Test-Path -LiteralPath $path -PathType Leaf) { return }
+        throw
+    }
+    try {
+        $bytes = [Text.Encoding]::UTF8.GetBytes("$content`n")
+        $stream.Write($bytes, 0, $bytes.Length)
+    } finally {
+        $stream.Dispose()
+    }
+}
+
 function Initialize-EphemeralProject {
     param(
         [Parameter(Mandatory = $true)][string]$Root,
@@ -2195,6 +2239,7 @@ function Initialize-EphemeralProject {
         [string]$ManagedStrippingLevel = 'Disabled',
         [bool]$DevelopmentBuild = $false,
         [switch]$RequireReleaseManagedCodeVariant,
+        [string]$ScriptingDefines = '',
         [string]$RepoRoot
     )
 
@@ -2213,6 +2258,8 @@ function Initialize-EphemeralProject {
     New-Item -ItemType Directory -Force -Path (Join-Path $project 'Packages') | Out-Null
     New-Item -ItemType Directory -Force -Path (Join-Path $project 'ProjectSettings') | Out-Null
     New-Item -ItemType Directory -Force -Path (Join-Path $project 'Assets\Editor') | Out-Null
+
+    Initialize-EphemeralScriptingDefines -Project $project -Version $Version -Defines $ScriptingDefines
 
     $testLinkerSource = Join-Path $Root 'Tests/Runtime/Serialization/link.xml'
     $testLinkerTarget = Join-Path $project 'Assets/UhCiTestLinker/link.xml'
@@ -5164,7 +5211,7 @@ if ($TestMode -ne 'export') {
 $LibraryWarmth = if (Test-Path -LiteralPath (Join-Path $ProjectPath 'Library') -PathType Container) { 'warm (reused)' } else { 'cold (first run on this runner)' }
 
 if ($TestMode -ne 'export') {
-    $ProjectPath = Initialize-EphemeralProject -Root $RepoRoot -Version $UnityVersion -Mode $TestMode -Path $ProjectPath -IncludeComparisons:$IncludeComparisons -IncludeIntegrations:$IncludeIntegrations -Backend $StandaloneScriptingBackend -Il2CppCompilerConfiguration $Il2CppCompilerConfiguration -ManagedStrippingLevel $ManagedStrippingLevel -DevelopmentBuild:(-not $UseReleasePlayerBuild) -RequireReleaseManagedCodeVariant:($null -ne $frozenPlayerDeclaration -and $frozenPlayerDeclaration.CampaignKind -ceq 'wproto-seven-families-v1') -RepoRoot $RepoRoot
+    $ProjectPath = Initialize-EphemeralProject -Root $RepoRoot -Version $UnityVersion -Mode $TestMode -Path $ProjectPath -IncludeComparisons:$IncludeComparisons -IncludeIntegrations:$IncludeIntegrations -Backend $StandaloneScriptingBackend -Il2CppCompilerConfiguration $Il2CppCompilerConfiguration -ManagedStrippingLevel $ManagedStrippingLevel -DevelopmentBuild:(-not $UseReleasePlayerBuild) -RequireReleaseManagedCodeVariant:($null -ne $frozenPlayerDeclaration -and $frozenPlayerDeclaration.CampaignKind -ceq 'wproto-seven-families-v1') -ScriptingDefines $AdditionalScriptingDefinesJoined -RepoRoot $RepoRoot
     $LibraryPath = Join-Path $ProjectPath 'Library'
     New-Item -ItemType Directory -Force -Path $LibraryPath | Out-Null
     Clear-StaleUnityCompilationCache -Project $ProjectPath -RepoRoot $RepoRoot -Force:$ForceFreshCompilationCache

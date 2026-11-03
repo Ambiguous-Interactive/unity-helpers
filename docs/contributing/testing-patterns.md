@@ -15,6 +15,9 @@ shared helper recompiles its entire dependent test graph on every case.
 Configure invocations request Release code optimization at editor startup, matching the test and
 build invocations. Setting it inside the configure method is too late for the initial import:
 even a warm project first recompiles in Debug, then recompiles again for Release tests.
+Fresh generated Unity 6 projects also seed requested Standalone scripting defines before the first
+editor import. Earlier editors keep define configuration in their configure pass. Existing player
+settings remain intact; the configure pass still merges requested defines and verifies the final settings.
 
 ## Keep memory-only cleanup outside asset batches
 
