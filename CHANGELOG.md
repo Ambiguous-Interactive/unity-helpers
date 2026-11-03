@@ -59,6 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix concurrent semaphore leases losing permits and corrupting shared disposal slots in `SINGLE_THREADED` builds ([guide](./docs/features/utilities/helper-utilities.md#semaphore-leases), [#1106](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1106)).
 - Fix reflection getters for constant and static fields, and interface property and indexer access when using dynamic IL ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
 - Fix relational prewarming reporting errors for open generic component bases while preserving inherited fields on closed types ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
 - Fix stale metadata skipping relational fields and prewarming. Bindings now follow the live declarations, including private base and derived fields with the same name ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).

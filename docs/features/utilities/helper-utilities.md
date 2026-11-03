@@ -813,6 +813,8 @@ if (_gate.TryAcquire(TimeSpan.FromMilliseconds(50), out SemaphoreLease lease))
 `SemaphoreLease` is a struct, so an uncontended acquire allocates nothing.
 Its shared disposal slots are recycled when a lease is disposed on another thread, including after
 an `await` that resumes on a worker thread.
+Ownership tracking remains thread-safe with `SINGLE_THREADED` defined, including concurrent
+leases from independent semaphores and disposal through copies on different threads.
 
 **Disposal is tracked and idempotent.** Disposing a lease twice returns one permit, not two. Without
 an explicit maximum, a stray `Release()` can raise the permit count above the intended limit and

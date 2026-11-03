@@ -32,6 +32,7 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
     /// <see cref="WallstopStudios.UnityHelpers.Utils.DisposalLease"/>, held outside the struct where
     /// every copy reads the same state, rather than a field each copy would carry its own version
     /// of. <see cref="IsHeld"/> reports false on every copy once any of them has released.
+    /// Ownership tracking remains thread-safe with <c>SINGLE_THREADED</c> defined.
     /// </para>
     /// <para>
     /// This matters because of what a second release would do, which depends on how the semaphore

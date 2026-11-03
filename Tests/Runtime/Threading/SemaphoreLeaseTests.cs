@@ -263,6 +263,68 @@ namespace WallstopStudios.UnityHelpers.Tests.Threading
             Assert.AreEqual(1, semaphore.CurrentCount);
         }
 
+        [TestCase(2)]
+        [TestCase(8)]
+        public void ConcurrentIndependentSemaphoresPreserveLeaseOwnership(int workerCount)
+        {
+            const int iterations = 5000;
+            using CountdownEvent ready = new(workerCount);
+            using ManualResetEventSlim start = new(false);
+            int lost = 0;
+            int completed = 0;
+            Thread[] workers = new Thread[workerCount];
+            for (int worker = 0; worker < workerCount; ++worker)
+            {
+                workers[worker] = new Thread(() =>
+                {
+                    using SemaphoreSlim semaphore = new(1, 1);
+                    ready.Signal();
+                    if (!start.Wait(5000))
+                    {
+                        Interlocked.Increment(ref lost);
+                        return;
+                    }
+                    for (int i = 0; i < iterations; ++i)
+                    {
+                        if (!semaphore.TryAcquire(NoWait, out SemaphoreLease lease))
+                        {
+                            Interlocked.Increment(ref lost);
+                            break;
+                        }
+                        Thread.Yield();
+                        bool held = lease.IsHeld;
+                        lease.Dispose();
+                        if (!held || semaphore.CurrentCount != 1)
+                        {
+                            Interlocked.Increment(ref lost);
+                            break;
+                        }
+                        Interlocked.Increment(ref completed);
+                    }
+                });
+                workers[worker].IsBackground = true;
+                workers[worker].Start();
+            }
+            bool allReady = ready.Wait(5000);
+            start.Set();
+            bool allJoined = true;
+            foreach (Thread worker in workers)
+            {
+                if (!worker.Join(10000))
+                {
+                    allJoined = false;
+                }
+            }
+            Assert.That(allJoined, Is.True);
+            Assert.That(allReady, Is.True);
+            Assert.That(
+                lost,
+                Is.Zero,
+                "Independent semaphores lost ownership in the shared lease store."
+            );
+            Assert.That(completed, Is.EqualTo(workerCount * iterations));
+        }
+
         [UnityTest]
         public IEnumerator AcquireAsyncTakesThePermitAndDisposeReturnsIt()
         {
