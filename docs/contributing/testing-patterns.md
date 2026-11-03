@@ -28,6 +28,14 @@ outer batch remains active. Keep native coverage for these paths and for deferre
 when changing shared cleanup.
 `CleanupTrackedFoldersAndAssets` also leaves the database untouched when no paths are tracked.
 
+## Isolate inputs when deferring asset cleanup
+
+When a fixture defers asset deletion until its final cleanup, give each case its own input
+folder. A shared input folder lets later searches discover earlier cases' assets and repeat
+imports or transformations. `SpriteCropperAdditionalTests` uses the NUnit case ID for its
+folder and requires exact input and processing counts. Keep deferred deletion so isolation
+does not add a database refresh after every case.
+
 ## Give each parameterized case a stable identity
 
 For a `ValueSource` that supplies objects or structs, provide a deterministic display value, such

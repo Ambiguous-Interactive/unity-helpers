@@ -25,6 +25,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
     {
         private const string Root = "Assets/Temp/SpriteCropperAdditionalTests";
 
+        private string _testRoot;
+
         private static string RelToFull(string rel)
         {
             return Path.Combine(
@@ -43,7 +45,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             // Must precede base.BaseSetUp(); AssertCleanAndClearAll documents why it runs first.
             AssetPostprocessorTestHandlers.AssertCleanAndClearAll();
             base.BaseSetUp();
-            EnsureFolder(Root);
+            _testRoot = Root + "/" + TestContext.CurrentContext.Test.ID;
+            EnsureFolder(_testRoot);
         }
 
         [TearDown]
@@ -71,7 +74,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [Test]
         public void AppliesPaddingAndAdjustsPivotCorrectly()
         {
-            string src = (Root + "/pad_src.png").SanitizePath();
+            string src = (_testRoot + "/pad_src.png").SanitizePath();
 
             CreatePngWithOpaqueRect(src, 20, 20, 5, 5, 10, 10, Color.white);
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
@@ -88,7 +91,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             window._overwriteOriginals = false;
             window._inputDirectories = new System.Collections.Generic.List<Object>
             {
-                AssetDatabase.LoadAssetAtPath<Object>(Root),
+                AssetDatabase.LoadAssetAtPath<Object>(_testRoot),
             };
             window._leftPadding = 2;
             window._bottomPadding = 3;
@@ -98,14 +101,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             window.FindFilesToProcess();
             Assert.That(
                 window._filesToProcess.Count,
-                Is.GreaterThan(0),
-                "Should have found files to process"
+                Is.EqualTo(1),
+                "Only the sprite created by this case should be processed"
             );
 
             window.ProcessFoundSprites();
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
 
-            string dst = (Root + "/Cropped_pad_src.png").SanitizePath();
+            string dst = (_testRoot + "/Cropped_pad_src.png").SanitizePath();
             Texture2D tex = AssetDatabase.LoadAssetAtPath<Texture2D>(dst);
             Assert.IsTrue(
                 tex != null,
@@ -147,7 +150,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [Test]
         public void SkipsWhenOnlyNecessaryAndNoTrimNeeded()
         {
-            string src = (Root + "/full_opaque.png").SanitizePath();
+            string src = (_testRoot + "/full_opaque.png").SanitizePath();
 
             CreatePngFilled(src, 8, 8, Color.white);
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
@@ -164,14 +167,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             window._onlyNecessary = true;
             window._inputDirectories = new System.Collections.Generic.List<Object>
             {
-                AssetDatabase.LoadAssetAtPath<Object>(Root),
+                AssetDatabase.LoadAssetAtPath<Object>(_testRoot),
             };
             window.FindFilesToProcess();
             window.ProcessFoundSprites();
 
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
 
-            string dst = (Root + "/Cropped_full_opaque.png").SanitizePath();
+            string dst = (_testRoot + "/Cropped_full_opaque.png").SanitizePath();
             string fullPath = RelToFull(dst);
             Assert.That(
                 File.Exists(fullPath),
@@ -183,7 +186,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [Test]
         public void RestoresOriginalReadabilityWhenWritingToOutput()
         {
-            string src = (Root + "/readable_toggle.png").SanitizePath();
+            string src = (_testRoot + "/readable_toggle.png").SanitizePath();
             CreatePngWithOpaqueRect(src, 10, 10, 2, 2, 6, 6, Color.white);
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
 
@@ -196,10 +199,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
 
             SpriteCropper window = Track(ScriptableObject.CreateInstance<SpriteCropper>());
             window._overwriteOriginals = false;
-            window._outputDirectory = AssetDatabase.LoadAssetAtPath<Object>(Root);
+            window._outputDirectory = AssetDatabase.LoadAssetAtPath<Object>(_testRoot);
             window._inputDirectories = new System.Collections.Generic.List<Object>
             {
-                AssetDatabase.LoadAssetAtPath<Object>(Root),
+                AssetDatabase.LoadAssetAtPath<Object>(_testRoot),
             };
 
             window.FindFilesToProcess();
@@ -217,7 +220,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 "Original texture should be restored to unreadable after processing"
             );
 
-            string dst = (Root + "/Cropped_readable_toggle.png").SanitizePath();
+            string dst = (_testRoot + "/Cropped_readable_toggle.png").SanitizePath();
             TextureImporter newImp = AssetImporter.GetAtPath(dst) as TextureImporter;
             Assert.IsTrue(
                 newImp != null,
@@ -234,7 +237,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 new SpriteCropperAPI.CropOptions
                 {
                     OutputFolder =
-                        "aSsets\\" + Root.Substring("Assets/".Length).Replace('/', '\\') + "\\",
+                        "aSsets\\"
+                        + _testRoot.Substring("Assets/".Length).Replace('/', '\\')
+                        + "\\",
                     OutputReadability = SpriteCropperAPI.OutputReadability.Readable,
                 }
             );
@@ -245,7 +250,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             );
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
 
-            string dst2 = (Root + "/Cropped_readable_toggle.png").SanitizePath();
+            string dst2 = (_testRoot + "/Cropped_readable_toggle.png").SanitizePath();
             newImp = AssetImporter.GetAtPath(dst2) as TextureImporter;
             Assert.IsTrue(
                 newImp != null,
@@ -264,7 +269,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [Test]
         public void ProducesOneByOneForFullyTransparentImage()
         {
-            string src = (Root + "/all_transparent.png").SanitizePath();
+            string src = (_testRoot + "/all_transparent.png").SanitizePath();
             CreateTransparentPng(src, 12, 9);
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
 
@@ -279,13 +284,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             window._overwriteOriginals = false;
             window._inputDirectories = new System.Collections.Generic.List<Object>
             {
-                AssetDatabase.LoadAssetAtPath<Object>(Root),
+                AssetDatabase.LoadAssetAtPath<Object>(_testRoot),
             };
             window.FindFilesToProcess();
             window.ProcessFoundSprites();
 
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
-            string dst = (Root + "/Cropped_all_transparent.png").SanitizePath();
+            string dst = (_testRoot + "/Cropped_all_transparent.png").SanitizePath();
             Texture2D tex = AssetDatabase.LoadAssetAtPath<Texture2D>(dst);
             Assert.IsTrue(
                 tex != null,
@@ -323,7 +328,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [Test]
         public void SkipsMultipleSpriteTextures()
         {
-            string src = (Root + "/multi.png").SanitizePath();
+            string src = (_testRoot + "/multi.png").SanitizePath();
             CreatePngWithOpaqueRect(src, 16, 16, 4, 4, 8, 8, Color.white);
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
 
@@ -337,13 +342,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             window._overwriteOriginals = false;
             window._inputDirectories = new System.Collections.Generic.List<Object>
             {
-                AssetDatabase.LoadAssetAtPath<Object>(Root),
+                AssetDatabase.LoadAssetAtPath<Object>(_testRoot),
             };
             window.FindFilesToProcess();
             window.ProcessFoundSprites();
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
 
-            string dst = (Root + "/Cropped_multi.png").SanitizePath();
+            string dst = (_testRoot + "/Cropped_multi.png").SanitizePath();
             Assert.That(
                 File.Exists(RelToFull(dst)),
                 Is.False,
@@ -371,7 +376,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [Test]
         public void ProcessFoundSpritesSkipCountIsNeverNegativeWhenSingleSpriteSucceeds()
         {
-            string src = (Root + "/single_test.png").SanitizePath();
+            string src = (_testRoot + "/single_test.png").SanitizePath();
             CreatePngWithOpaqueRect(src, 20, 20, 5, 5, 10, 10, Color.white);
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
 
@@ -389,14 +394,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             window._overwriteOriginals = false;
             window._inputDirectories = new System.Collections.Generic.List<Object>
             {
-                AssetDatabase.LoadAssetAtPath<Object>(Root),
+                AssetDatabase.LoadAssetAtPath<Object>(_testRoot),
             };
 
             window.FindFilesToProcess();
             Assert.That(
                 window._filesToProcess.Count,
-                Is.GreaterThan(0),
-                "Should have found at least one file to process"
+                Is.EqualTo(1),
+                "Only the sprite created by this case should be processed"
             );
 
             window.ProcessFoundSprites();
@@ -404,12 +409,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             LogAssert.Expect(
                 LogType.Log,
                 new System.Text.RegularExpressions.Regex(
-                    @"\d+ sprites processed successfully\. Skipped: \d+"
+                    @"\b1 sprites processed successfully\. Skipped: 0\b"
                 )
             );
 
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
-            string dst = (Root + "/Cropped_single_test.png").SanitizePath();
+            string dst = (_testRoot + "/Cropped_single_test.png").SanitizePath();
             Texture2D tex = AssetDatabase.LoadAssetAtPath<Texture2D>(dst);
             Assert.IsTrue(tex != null, $"Cropped texture should exist at '{dst}'");
         }
@@ -420,9 +425,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [Test]
         public void ProcessFoundSpritesCountsMultipleSpritesCorrectly()
         {
-            string src1 = (Root + "/multi_test1.png").SanitizePath();
-            string src2 = (Root + "/multi_test2.png").SanitizePath();
-            string src3 = (Root + "/multi_test3.png").SanitizePath();
+            string src1 = (_testRoot + "/multi_test1.png").SanitizePath();
+            string src2 = (_testRoot + "/multi_test2.png").SanitizePath();
+            string src3 = (_testRoot + "/multi_test3.png").SanitizePath();
 
             CreatePngWithOpaqueRect(src1, 20, 20, 5, 5, 10, 10, Color.white);
             CreatePngWithOpaqueRect(src2, 30, 30, 5, 5, 15, 15, Color.red);
@@ -443,15 +448,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             window._overwriteOriginals = false;
             window._inputDirectories = new System.Collections.Generic.List<Object>
             {
-                AssetDatabase.LoadAssetAtPath<Object>(Root),
+                AssetDatabase.LoadAssetAtPath<Object>(_testRoot),
             };
 
             window.FindFilesToProcess();
             int fileCount = window._filesToProcess.Count;
             Assert.That(
                 fileCount,
-                Is.GreaterThanOrEqualTo(3),
-                $"Should have found at least 3 files to process, found {fileCount}"
+                Is.EqualTo(3),
+                $"Only the three sprites created by this case should be processed, found {fileCount}"
             );
 
             window.ProcessFoundSprites();
@@ -459,7 +464,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             LogAssert.Expect(
                 LogType.Log,
                 new System.Text.RegularExpressions.Regex(
-                    @"\d+ sprites processed successfully\. Skipped: \d+"
+                    @"\b3 sprites processed successfully\. Skipped: 0\b"
                 )
             );
 
@@ -467,7 +472,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             foreach (string src in new[] { src1, src2, src3 })
             {
                 string baseName = Path.GetFileName(src);
-                string dst = (Root + "/Cropped_" + baseName).SanitizePath();
+                string dst = (_testRoot + "/Cropped_" + baseName).SanitizePath();
                 Texture2D tex = AssetDatabase.LoadAssetAtPath<Texture2D>(dst);
                 Assert.IsTrue(tex != null, $"Cropped texture should exist at '{dst}'");
             }
@@ -479,7 +484,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [Test]
         public void ProcessFoundSpritesSkipsSpritesWithNoTransparentPixels()
         {
-            string src = (Root + "/fully_opaque.png").SanitizePath();
+            string src = (_testRoot + "/fully_opaque.png").SanitizePath();
             CreatePngFilled(src, 20, 20, Color.white);
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
 
@@ -495,16 +500,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
 
             SpriteCropper window = Track(ScriptableObject.CreateInstance<SpriteCropper>());
             window._overwriteOriginals = false;
+            window._onlyNecessary = true;
             window._inputDirectories = new System.Collections.Generic.List<Object>
             {
-                AssetDatabase.LoadAssetAtPath<Object>(Root),
+                AssetDatabase.LoadAssetAtPath<Object>(_testRoot),
             };
 
             window.FindFilesToProcess();
             Assert.That(
                 window._filesToProcess.Count,
-                Is.GreaterThan(0),
-                "Should have found at least one file to process"
+                Is.EqualTo(1),
+                "Only the sprite created by this case should be processed"
             );
 
             window.ProcessFoundSprites();
@@ -512,7 +518,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             LogAssert.Expect(
                 LogType.Log,
                 new System.Text.RegularExpressions.Regex(
-                    @"\d+ sprites processed successfully\. Skipped: \d+"
+                    @"\b0 sprites processed successfully\. Skipped: 1\b"
                 )
             );
         }
