@@ -3112,6 +3112,18 @@ nesting frame and propagates the original exception. An enclosing formatter cann
 catch that exception and complete the write successfully. Compound writes may already have
 written a tag, reserved prefix or partial payload; discard that output after failure.
 
+Close each token from `TryBeginLengthDelimited` exactly once in reverse opening order, using
+the writer session that opened it. A default, foreign, reused, or out-of-order token faults
+the writer without changing its bytes or depth. Packed runs also require closing, although
+they do not consume nesting depth. Facade and nested message writes reject unclosed fields
+and newly constructed replacement writers. A rejected buffer-writer call does not advance the destination;
+discard any partial bytes in its writable span. Valid writes keep their existing wire bytes.
+
+`WProtoWriter.TryWriteBytes` accepts input spans that overlap its destination. It copies the
+payload before writing its length prefix and uses no temporary storage. This preserves the
+input as it exists when the method is called; earlier writes must still leave future input
+bytes available. A refused write leaves the buffer and position unchanged and latches a fault.
+
 ### Wire compatibility
 
 The frozen protobuf-net v2 oracle has reader defects even when its writer matches generated

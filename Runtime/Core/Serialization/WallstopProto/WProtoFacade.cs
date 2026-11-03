@@ -116,9 +116,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 Span<byte> span =
                     size == 0 ? Span<byte>.Empty : destination.GetSpan(size).Slice(0, size);
                 WProtoWriter writer = new WProtoWriter(span, sizePlan);
+                WProtoWriter expected = writer;
                 if (
-                    !formatter.Write(ref writer, value)
-                    || writer.Faulted
+                    !WProtoWriter.WriteCompleted(
+                        formatter.Write(ref writer, value),
+                        in writer,
+                        in expected
+                    )
                     || writer.Position != size
                 )
                 {
@@ -307,8 +311,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
             // Restrict the writer to this payload so it cannot expose bytes from a previous pool user.
             WProtoWriter writer = new WProtoWriter(new Span<byte>(buffer, 0, size), sizePlan);
+            WProtoWriter expected = writer;
             bool written = formatter.Write(ref writer, value);
-            if (!written || writer.Faulted || writer.Position != size)
+            if (
+                !WProtoWriter.WriteCompleted(written, in writer, in expected)
+                || writer.Position != size
+            )
             {
                 // Formatter failure must not fall through to the reflection serializer with a partially written payload.
                 throw new InvalidOperationException(

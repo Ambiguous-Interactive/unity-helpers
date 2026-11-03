@@ -80,6 +80,7 @@
     <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoCollectionBudgetGenericContract.cs" />
     <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoDecodedPayloadContract.cs" />
     <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoFormatterFailureTests.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Runtime/Serialization/WProtoWriteCompletionTests.cs" />
     <Compile Include="$(RepoRoot)/Tests/Runtime/Core/PairedMeasurementTests.cs" />
     <Compile Include="$(RepoRoot)/Tests/Core/BenchmarkCpuSetRecord.cs" />
     <Compile Include="$(RepoRoot)/Tests/Core/BenchmarkCpuSetTopology.cs" />
