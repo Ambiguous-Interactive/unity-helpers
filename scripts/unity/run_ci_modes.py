@@ -104,6 +104,7 @@ def build_modes(
             "AssemblyNames": profiles[name],
             "RepoRoot": str(repository),
             "ProjectRoot": str(workspace),
+            "ProjectRootMinimumFreeGb": "0",
             "ArtifactsPath": str(artifacts / f"{version}-{name}{suffix}"),
             "LicenseSessionPath": str(session),
             "ReleaseCodeOptimization": True,
@@ -249,7 +250,7 @@ def stop(worker: Worker) -> None:
     if worker.process.poll() is not None:
         return
     worker.forced = True
-    if os.name == "nt":
+    if sys.platform == "win32":
         taskkill = Path(os.environ["SYSTEMROOT"]) / "System32/taskkill.exe"
         result = subprocess.run(  # noqa: S603 - OS tool and the PID of our still-owned child.
             [str(taskkill), "/PID", str(worker.process.pid), "/T", "/F"],
@@ -307,20 +308,6 @@ def run(
     completed = False
     try:
         with contextlib.ExitStack() as streams:
-            for mode in modes:
-                initialization = Mode(
-                    "initialize-" + mode.name, {**mode.parameters, "GenerateOnly": True}
-                )
-                initialization_log = streams.enter_context(
-                    (private / f"{initialization.name}.log").open("wb")
-                )
-                initializer = launch(
-                    initialization, private, shell, environment, initialization_log
-                )
-                initializers.append(initializer)
-                wait([initializer], started + timeout)
-                if initializer.process.returncode != 0:
-                    raise RuntimeError(f"Unity project initialization failed for {mode.name}")
             preparation_log = streams.enter_context((private / "activation.log").open("wb"))
             preparation_worker = launch(preparation, private, shell, environment, preparation_log)
             wait([preparation_worker], started + min(timeout, 600))
@@ -334,6 +321,27 @@ def run(
             )
             if session.get("State") != "activated" or session.get("OwnerProcessId") != os.getpid():
                 raise RuntimeError("Unity license preparation did not publish its owned session")
+            for mode in modes:
+                initialization = Mode(
+                    "initialize-" + mode.name, {**mode.parameters, "GenerateOnly": True}
+                )
+                initialization_log = streams.enter_context(
+                    (private / f"{initialization.name}.log").open("wb")
+                )
+                initializer = launch(
+                    initialization, private, shell, environment, initialization_log
+                )
+                initializers.append(initializer)
+                wait([initializer], started + timeout)
+                if initializer.process.returncode != 0:
+                    initialization_log.flush()
+                    folder = Path(str(mode.parameters["ArtifactsPath"]))
+                    folder.mkdir(parents=True, exist_ok=True)
+                    shutil.copyfile(
+                        private / f"{initialization.name}.log",
+                        folder / "project-initialization.log",
+                    )
+                    raise RuntimeError(f"Unity project initialization failed for {mode.name}")
             for mode in modes:
                 folder = Path(str(mode.parameters["ArtifactsPath"]))
                 folder.mkdir(parents=True, exist_ok=True)
@@ -479,6 +487,7 @@ def main(argv: list[str] | None = None) -> int:
             )
             preparation_parameters = dict(modes[0].parameters)
             preparation_parameters["PrepareLicenseOnly"] = True
+            preparation_parameters.pop("ProjectRootMinimumFreeGb", None)
             suffix = "-single-threaded" if args.single_threaded else ""
             success = run(
                 modes,

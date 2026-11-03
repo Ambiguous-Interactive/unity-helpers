@@ -39,6 +39,7 @@ def test_mode_configuration_retains_profiles_builds_and_independent_projects(
         options = mode.parameters
         assert options["AssemblyNames"] == PROFILES[mode.name]
         assert options["ProjectRoot"] == str(tmp_path / "workspace")
+        assert options["ProjectRootMinimumFreeGb"] == "0"
         assert options["ReleaseCodeOptimization"] is True
         assert options["ReleasePlayerBuild"] is True
         assert options["Il2CppCompilerConfiguration"] == "Release"
@@ -104,17 +105,27 @@ def make_control(tmp_path: Path) -> tuple[list[Mode], Mode, dict[str, str], str]
         [string]$ProjectRoot, [switch]$ReleaseCodeOptimization, [switch]$ReleasePlayerBuild,
         [string]$Il2CppCompilerConfiguration, [switch]$IncludeIntegrations, [switch]$ShareEditorProject,
         [switch]$IsolateCompilationFixtures, [string]$ManagedStrippingLevel, [string]$ProjectScope,
-        [string[]]$AdditionalScriptingDefines, [string]$TestCategory, [switch]$GenerateOnly)
+        [string[]]$AdditionalScriptingDefines, [string]$TestCategory, [switch]$GenerateOnly,
+        [double]$ProjectRootMinimumFreeGb = 60)
         $ErrorActionPreference = 'Stop'
         . 'HELPER'
-        if ($GenerateOnly) { return }
+        if ($GenerateOnly) {
+            $null = Read-UnityLicenseSession -Path $LicenseSessionPath -UnityVersion $UnityVersion -EditorPath $env:UNITY_EDITOR_PATH -State activated
+            if ($env:CONTROL_INITIALIZATION_FAILURE -eq $TestMode) { throw 'Controlled project initialization failure.' }
+            if ($ProjectRootMinimumFreeGb -ne 0) { throw 'Initializer can prune sibling projects.' }
+            [IO.File]::WriteAllText((Join-Path $env:CONTROL_EVENTS ($TestMode + '.initialized')), '')
+            return
+        }
         $state = if ($PrepareLicenseOnly) { 'requested' } else { 'activated' }
         $session = Read-UnityLicenseSession -Path $LicenseSessionPath -UnityVersion $UnityVersion -EditorPath $env:UNITY_EDITOR_PATH -State $state
         if ($PrepareLicenseOnly) {
+            if ($ProjectRootMinimumFreeGb -ne 60) { throw 'Preparation must prune once before workers start.' }
             if ($env:CONTROL_PREPARATION_FAILURE -eq '1') { throw 'Controlled preparation failure.' }
             Complete-UnityLicenseSession -Path $LicenseSessionPath -Session $session
             return
         }
+        if ($ProjectRootMinimumFreeGb -ne 0) { throw 'Worker can prune sibling projects.' }
+        if (@(Get-ChildItem -LiteralPath $env:CONTROL_EVENTS -Filter '*.initialized').Count -ne 3) { throw 'Workers started before all projects were prepared.' }
         [IO.File]::WriteAllText((Join-Path $env:CONTROL_EVENTS ($TestMode + '.started')), [string]$PID)
         $deadline = [DateTime]::UtcNow.AddSeconds(10)
         while (@(Get-ChildItem -LiteralPath $env:CONTROL_EVENTS -Filter '*.started').Count -lt 3) {
@@ -174,11 +185,20 @@ def make_control(tmp_path: Path) -> tuple[list[Mode], Mode, dict[str, str], str]
                 "ArtifactsPath": str(tmp_path / name),
                 "UnityVersion": "6000.6.0f1",
                 "TestMode": name,
+                "ProjectRootMinimumFreeGb": "0",
             },
         )
         for name in PROFILES
     ]
-    preparation = Mode("prepare", {**modes[0].parameters, "PrepareLicenseOnly": True})
+    preparation = Mode(
+        "prepare",
+        {
+            key: value
+            for key, value in modes[0].parameters.items()
+            if key != "ProjectRootMinimumFreeGb"
+        }
+        | {"PrepareLicenseOnly": True},
+    )
     return modes, preparation, environment, shell
 
 
@@ -230,6 +250,32 @@ def test_failed_preparation_never_launches_a_mode(tmp_path: Path) -> None:
     assert receipt["ControllerCompleted"] is False
     assert set(receipt["Outcomes"].values()) == {"failure"}
     assert list((tmp_path / "events").iterdir()) == []
+
+
+def test_failed_initialization_retains_diagnostics_without_launching_workers(
+    tmp_path: Path,
+) -> None:
+    modes, preparation, environment, shell = make_control(tmp_path)
+    environment["CONTROL_INITIALIZATION_FAILURE"] = "playmode"
+    with pytest.raises(RuntimeError, match="project initialization failed for playmode"):
+        run(
+            modes,
+            preparation,
+            private=tmp_path,
+            shell=shell,
+            environment=environment,
+            timeout=20,
+            receipt=tmp_path / "receipt.json",
+            output=None,
+        )
+    receipt = json.loads((tmp_path / "receipt.json").read_text(encoding="utf-8"))
+    assert receipt["Workers"] == []
+    assert receipt["ControllerCompleted"] is False
+    assert set(receipt["Outcomes"].values()) == {"failure"}
+    assert list((tmp_path / "events").glob("*.started")) == []
+    assert "Controlled project initialization failure" in (
+        tmp_path / "playmode/project-initialization.log"
+    ).read_text(encoding="utf-8")
 
 
 def test_timeout_kills_and_reaps_owned_workers(tmp_path: Path) -> None:

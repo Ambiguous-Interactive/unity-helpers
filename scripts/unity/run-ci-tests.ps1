@@ -5057,7 +5057,7 @@ $ProjectPath = Resolve-FullPath -Path $ProjectWorkspace.ProjectPath
 
 Initialize-UnityCacheEnvironment -CacheRoot (Resolve-FullPath -Path $ProjectWorkspace.CacheRoot)
 
-if ($TestMode -ne 'export' -and -not $GenerateOnly -and $ProjectWorkspace.Persistent) {
+if ($TestMode -ne 'export' -and (-not $GenerateOnly -or -not [string]::IsNullOrWhiteSpace($LicenseSessionPath)) -and $ProjectWorkspace.Persistent) {
     Remove-LegacyUnityTestFrameworkCollector -Project $ProjectWorkspace.LegacyProjectPath -ArtifactsPath $ArtifactsPath
 }
 

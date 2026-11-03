@@ -141,6 +141,8 @@ try {
     $activateLogPath = $logPath
     $returnLogPath = $logPath
     $hasLicenseCreds = $true
+    $reuseLicenseSession = $false
+    $PrepareLicenseOnly = $false
     $TestMode = 'export'
     $acceleratorArgs = @()
     $frozenPlayerDeclaration = $null
