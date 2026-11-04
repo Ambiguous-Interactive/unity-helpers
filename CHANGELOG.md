@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add `LiveComponents<T>` registries with attribute-based registration and adapters for third-party components, active and scene queries, and reusable result lists ([guide](./docs/features/utilities/helper-utilities.md#live-component-registries), [#1110](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1110)).
+- Add automatic `LiveComponents<T>` discovery by component class, base class or interface, with active and scene queries and reusable result lists ([guide](./docs/features/utilities/helper-utilities.md#live-component-registries), [#1110](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1110)).
 - Add `WUH026` to report bitwise boolean operators, with guidance for preserving required calls and nullable results ([#1092](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1092)).
 - Add `WUH025` compiler diagnostics for unsupported relational field types, with an Analyzer Policies severity control to reject invalid declarations before runtime. ([#1086](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1086)).
 - Add opt-in `WUH024` suggestions for typed enum flag checks and cached enum names, with semantic guards and Analyzer Policies examples ([guide](./docs/performance/analyzers.md#wuh024-typed-enum-helpers-opt-in), [#917](https://github.com/Ambiguous-Interactive/unity-helpers/issues/917)).

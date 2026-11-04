@@ -9,7 +9,7 @@ Static helper classes and utilities that solve common programming problems witho
 ## Contents
 
 - [Gameplay Helpers](#gameplay-helpers): Predictive aiming, spatial sampling, rotation
-- [Live Component Registries](#live-component-registries): Opt-in active components without repeated scene searches
+- [Live Component Registries](#live-component-registries): Automatic discovery by component class or interface
 - [GameObject & Component Helpers](#gameobject--component-helpers): Component discovery, hierarchy manipulation
 - [Transform Helpers](#transform-helpers): Hierarchy traversal
 - [Coroutine Wait Pools](#coroutine-wait-pools): Configure `Buffers.GetWaitForSeconds*` caching
@@ -25,14 +25,10 @@ Static helper classes and utilities that solve common programming problems witho
 
 ## Live Component Registries
 
-Use `LiveComponents<T>` from `WallstopStudios.UnityHelpers.Utils` to query explicitly registered
-components. Add `LiveComponentRegistration` to their GameObject. The adapter registers attached
-components through its own lifecycle, preserving their existing base classes and callbacks.
-
-For your own components, Unity's `RequireComponent` attribute adds the adapter automatically when
-you add the component. Existing scenes and prefabs need the adapter added explicitly after an
-attribute is introduced. For third-party assets, add the same adapter in the Inspector or a prefab
-variant; their scripts need no changes.
+Use `LiveComponents<T>` from `WallstopStudios.UnityHelpers.Utils` to select a component class,
+base class or interface. Queries discover matching components automatically, including third-party
+scripts and native components. Existing objects, subclasses and interface implementations need no
+adapter, attribute, registration call or lifecycle change.
 
 <!-- doc-sample: compiles -->
 
@@ -40,7 +36,6 @@ variant; their scripts need no changes.
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Utils;
 
-[RequireComponent(typeof(LiveComponentRegistration))]
 public sealed class RegisteredLevelStatus : MonoBehaviour
 {
     public bool started;
@@ -53,36 +48,35 @@ public sealed class RegisteredLevelStatus : MonoBehaviour
 }
 ```
 
-Each enabled adapter indexes all components on its GameObject by exact runtime type. Queries finish
-pending enable-time registration before reading the per-type entries. The adapter also refreshes
-at `Start`. Call `Refresh()` after adding or removing components from an already registered object.
-Refreshing preserves the order of existing registrations. A query for a base type needs an explicit
-manual registration under that closed generic type when the component's runtime type differs.
+| Operation                    | Behavior                                                                          |
+| ---------------------------- | --------------------------------------------------------------------------------- |
+| `Count`                      | Reconcile scenes and count all active matches.                                    |
+| `TryGetFirst(out found)`     | Return the first active cached match; reconcile on a miss.                        |
+| `TryGetIn(scene, out found)` | Return the first active match in the object's current scene; reconcile on a miss. |
+| `CopyTo(destination)`        | Reconcile and replace a reusable list with all active matches. Null is ignored.   |
 
-| Operation                    | Behavior                                                                                       |
-| ---------------------------- | ---------------------------------------------------------------------------------------------- |
-| `Register(component)`        | Add manual ownership once; duplicate manual registrations return false.                        |
-| `Unregister(component)`      | Remove manual ownership, including a destroyed managed reference. An adapter may still own it. |
-| `Count`                      | Count active registered objects, excluding disabled `Behaviour` components.                    |
-| `TryGetFirst(out found)`     | Return the first active registration; an empty query returns false and null.                   |
-| `TryGetIn(scene, out found)` | Select within a loaded scene, using each object's current scene after any move.                |
-| `CopyTo(destination)`        | Replace a reusable list with active registrations in registration order. Null is ignored.      |
+Results retain first-discovery order. Initial discovery order is unspecified. Inactive GameObjects,
+disabled `Behaviour` components and destroyed objects are excluded. Enabling, adding, instantiating,
+and moving components take effect in subsequent queries, even within the same frame.
+A cached first match remains first when later components are discovered. No negative result is
+cached across calls. Counts and complete copies always reconcile to include new instances.
 
-Manual registration and adapter ownership are independent. Disabling an adapter releases its
-ownership while preserving manual registrations. Removing manual ownership preserves an enabled
-adapter's registration. An inactive registered component stays hidden until its GameObject and
-Behaviour are active. Destroyed entries are pruned on reads and registration.
+Only queried types retain entries. Per-type lists and identity sets are reused. A valid cached first
+match avoids scene traversal. Reconciliation visits loaded scene roots and collects only components
+assignable to `T`; its cost grows with the loaded hierarchy. This is a completeness tradeoff, not a
+constant-time replacement for every scene search. Initial discovery and queries during scene loading
+also use Unity's object search and can allocate. Stable warmed queries allocate no managed memory
+when internal buffers and the caller's list have enough capacity.
 
-Warm queries and copies need no new managed allocations once the caller's list can hold the result.
+The registry includes the `DontDestroyOnLoad` scene. It creates one hidden, scriptless persistent
+GameObject to access that scene through supported Unity APIs; this internal object is excluded from
+results. Subsystem registration clears type caches. The next query discovers surviving objects again,
+including when domain or scene reload is disabled. Existing component callbacks are untouched.
+
 All operations require Unity's initialized main thread. Worker calls return empty results or false;
-`CopyTo` leaves its destination untouched on a worker. The adapter also supports Edit Mode; queries
-during Play Mode exclude objects belonging only to an editor or prefab world.
-
-An object whose adapter has never enabled is absent. An `Awake` query can run before another
-object's adapter enables, so retain scene searches when early discovery or inactive objects are
-required. Subsystem registration clears every registry and pending registration for a new play
-session. Owners surviving without another `OnEnable` must call their adapter's `Refresh()` or
-register manually before queries resume.
+`CopyTo` leaves its destination untouched on a worker. In Edit Mode, queries visit loaded scenes.
+During Play Mode, results exclude objects belonging only to an editor or prefab world. A class that
+is neither a component class nor an interface produces empty results.
 
 ## Coroutine Wait Pools
 

@@ -3,40 +3,38 @@
 
 namespace WallstopStudios.UnityHelpers.Utils
 {
+    using System;
     using System.Collections.Generic;
     using UnityEngine;
     using UnityEngine.SceneManagement;
+    using WallstopStudios.UnityHelpers.Core.Extension;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
-    /// <summary>Finds registered active components without searching loaded scenes.</summary>
-    /// <typeparam name="T">The component type queried by its owners.</typeparam>
+    /// <summary>Discovers active components by component class, base class or interface.</summary>
+    /// <typeparam name="T">The component or interface type to track.</typeparam>
     /// <remarks>
-    /// Use LiveComponentRegistration for attribute-based and third-party registration, or call Register and Unregister.
-    /// Adapter registrations use exact runtime types; manual registrations use the closed generic type.
-    /// Results follow registration order and exclude destroyed objects, inactive GameObjects and disabled Behaviours.
-    /// Subsystem registration clears every entry. All operations require Unity's initialized main thread;
-    /// workers observe an empty registry and cannot change registrations or caller buffers.
+    /// No object setup or lifecycle changes are required. Valid first matches use the cache;
+    /// misses, counts and copies reconcile loaded scenes, including DontDestroyOnLoad.
+    /// Results retain first-discovery order and exclude inactive objects and disabled Behaviours.
+    /// Main-thread operations observe same-frame changes. Workers return empty results and leave buffers unchanged.
     /// </remarks>
     public static class LiveComponents<T>
-        where T : Component
+        where T : class
     {
-        /// <summary>Gets the number of active registered components.</summary>
+        /// <summary>Gets the current number of active matching components.</summary>
         public static int Count
         {
             get
             {
-                if (
-                    !LiveComponentRegistry.TryGetEntries(
-                        typeof(T),
-                        out List<LiveComponentRegistrationEntry> entries
-                    )
-                )
+                if (!Prepare())
                 {
                     return 0;
                 }
+                Reconcile();
                 int count = 0;
-                foreach (LiveComponentRegistrationEntry entry in entries)
+                foreach (Component component in Entries)
                 {
-                    if (LiveComponentRegistry.IsActive(entry.component))
+                    if (LiveComponentRegistry.IsActive(component))
                     {
                         ++count;
                     }
@@ -45,77 +43,56 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
         }
 
-        /// <summary>Adds manual ownership once; returns false for duplicate manual registrations or unavailable inputs.</summary>
-        /// <remarks>Manual ownership is independent of an adapter and remains when that adapter is disabled.</remarks>
-        public static bool Register(T component)
-        {
-            return LiveComponentRegistry.RegisterManual(typeof(T), component);
-        }
+        private static readonly bool Supported =
+            typeof(T).IsInterface || typeof(Component).IsAssignableFrom(typeof(T));
+        private static readonly List<Component> Entries = new();
+        private static readonly List<T> Scratch = new();
+        private static readonly List<GameObject> Roots = new();
+        private static readonly HashSet<Component> Known = new(
+            ReferenceIdentityComparer<Component>.Instance
+        );
+        private static readonly HashSet<Component> Seen = new(
+            ReferenceIdentityComparer<Component>.Instance
+        );
+        private static bool _tracked;
+        private static bool _cold = true;
 
-        /// <summary>Removes manual ownership, including a destroyed managed reference.</summary>
-        /// <remarks>An adapter may still own the same component.</remarks>
-        public static bool Unregister(T component)
-        {
-            return LiveComponentRegistry.UnregisterManual(typeof(T), component);
-        }
-
-        /// <summary>Returns the first active registration, or null when none is available.</summary>
+        /// <summary>Returns the first active match, or null when none is available.</summary>
         public static bool TryGetFirst(out T found)
         {
-            if (
-                LiveComponentRegistry.TryGetEntries(
-                    typeof(T),
-                    out List<LiveComponentRegistrationEntry> entries
-                )
-            )
+            if (Prepare())
             {
-                foreach (LiveComponentRegistrationEntry entry in entries)
+                if (TryFind(default, false, out T cached))
                 {
-                    if (LiveComponentRegistry.IsActive(entry.component))
-                    {
-                        found = (T)entry.component;
-                        return true;
-                    }
+                    found = cached;
+                    return true;
                 }
+                Reconcile();
+                return TryFind(default, false, out found);
             }
             found = null;
             return false;
         }
 
-        /// <summary>Returns the first active registration in a loaded scene.</summary>
-        /// <remarks>The object's current scene is checked, so moving it needs no registration update.</remarks>
+        /// <summary>Returns the first active match in the specified scene.</summary>
         public static bool TryGetIn(Scene scene, out T found)
         {
-            if (!LiveComponentRegistry.CanAccess || !scene.IsValid() || !scene.isLoaded)
+            if (Prepare() && scene.IsValid())
             {
-                found = null;
-                return false;
-            }
-            if (
-                LiveComponentRegistry.TryGetEntries(
-                    typeof(T),
-                    out List<LiveComponentRegistrationEntry> entries
-                )
-            )
-            {
-                foreach (LiveComponentRegistrationEntry entry in entries)
+                if (TryFind(scene, true, out T cached))
                 {
-                    if (
-                        LiveComponentRegistry.IsActive(entry.component)
-                        && entry.component.gameObject.scene == scene
-                    )
-                    {
-                        found = (T)entry.component;
-                        return true;
-                    }
+                    found = cached;
+                    return true;
                 }
+                Reconcile();
+                return TryFind(scene, true, out found);
             }
             found = null;
             return false;
         }
 
-        /// <summary>Replaces a caller list with active registrations in registration order.</summary>
-        /// <remarks>A null destination is ignored; a sufficiently sized destination needs no new managed allocations.</remarks>
+        /// <summary>Replaces a caller list with all active matches in first-discovery order.</summary>
+        /// <remarks>Null is ignored. Initial discovery, scene loading and buffer growth can allocate.</remarks>
         public static void CopyTo(List<T> destination)
         {
             if (!LiveComponentRegistry.CanAccess || destination == null)
@@ -123,22 +100,158 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return;
             }
             destination.Clear();
-            if (
-                !LiveComponentRegistry.TryGetEntries(
-                    typeof(T),
-                    out List<LiveComponentRegistrationEntry> entries
-                )
-            )
+            if (!Prepare())
             {
                 return;
             }
-            foreach (LiveComponentRegistrationEntry entry in entries)
+            Reconcile();
+            foreach (Component component in Entries)
             {
-                if (LiveComponentRegistry.IsActive(entry.component))
+                if (LiveComponentRegistry.IsActive(component))
                 {
-                    destination.Add((T)entry.component);
+                    destination.Add((T)(object)component);
                 }
             }
+        }
+
+        private static bool Prepare()
+        {
+            if (!LiveComponentRegistry.CanAccess || !Supported)
+            {
+                return false;
+            }
+            if (!_tracked)
+            {
+                LiveComponentRegistry.TrackType(Reset);
+                _tracked = true;
+            }
+            return true;
+        }
+
+        private static bool TryFind(Scene scene, bool inScene, out T found)
+        {
+            foreach (Component component in Entries)
+            {
+                if (
+                    LiveComponentRegistry.IsActive(component)
+                    && (!inScene || component.gameObject.scene == scene)
+                )
+                {
+                    found = (T)(object)component;
+                    return true;
+                }
+            }
+            found = null;
+            return false;
+        }
+
+        private static void Reconcile()
+        {
+            Seen.Clear();
+            bool loading = false;
+            int sceneCount = SceneManager.sceneCount;
+            for (int index = 0; index < sceneCount; ++index)
+            {
+                Scene scene = SceneManager.GetSceneAt(index);
+                if (scene.isLoaded)
+                {
+                    Visit(scene);
+                }
+                else
+                {
+                    loading = true;
+                }
+            }
+            Scene persistent = LiveComponentRegistry.GetPersistentScene();
+            if (persistent.IsValid() && persistent.isLoaded)
+            {
+                Visit(persistent);
+            }
+            if (_cold || loading)
+            {
+                Type searchType = typeof(T).IsInterface ? typeof(Component) : typeof(T);
+                foreach (
+                    UnityEngine.Object item in UnityObjectExtensions.FindObjectsOfTypeShim(
+                        searchType,
+                        true
+                    )
+                )
+                {
+                    if (
+                        item is T
+                        && item is Component component
+                        && component.gameObject.scene.IsValid()
+                        && !LiveComponentRegistry.IsAnchor(component.gameObject)
+                    )
+                    {
+                        Observe(component);
+                    }
+                }
+                _cold = false;
+            }
+            int write = 0;
+            int count = Entries.Count;
+            for (int read = 0; read < count; ++read)
+            {
+                Component component = Entries[read];
+                if (component == null || !Seen.Contains(component))
+                {
+                    Known.Remove(component);
+                    continue;
+                }
+                Entries[write++] = component;
+            }
+            if (write < count)
+            {
+                Entries.RemoveRange(write, count - write);
+            }
+            Scratch.Clear();
+            Roots.Clear();
+            Seen.Clear();
+        }
+
+        private static void Visit(Scene scene)
+        {
+            int rootCount = scene.rootCount;
+            if (Roots.Capacity <= rootCount)
+            {
+                Roots.Capacity = rootCount + 1;
+            }
+            scene.GetRootGameObjects(Roots);
+            foreach (GameObject root in Roots)
+            {
+                if (root == null || LiveComponentRegistry.IsAnchor(root))
+                {
+                    continue;
+                }
+                root.GetComponentsInChildren(true, Scratch);
+                foreach (T item in Scratch)
+                {
+                    if (item is Component component && component != null)
+                    {
+                        Observe(component);
+                    }
+                }
+            }
+        }
+
+        private static void Observe(Component component)
+        {
+            Seen.Add(component);
+            if (Known.Add(component))
+            {
+                Entries.Add(component);
+            }
+        }
+
+        private static void Reset()
+        {
+            Entries.Clear();
+            Known.Clear();
+            Seen.Clear();
+            Scratch.Clear();
+            Roots.Clear();
+            _cold = true;
         }
     }
 }

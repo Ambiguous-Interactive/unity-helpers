@@ -4,11 +4,9 @@
 namespace WallstopStudios.UnityHelpers.Tests.Utils
 {
     using UnityEngine;
-    using WallstopStudios.UnityHelpers.Utils;
 
     [ExecuteAlways]
-    [RequireComponent(typeof(LiveComponentRegistration))]
-    public sealed class LiveRegistryTestComponent : MonoBehaviour
+    public class LiveRegistryTestComponent : MonoBehaviour, ILiveRegistryTestComponent
     {
         internal int enableCalls;
         internal int disableCalls;
