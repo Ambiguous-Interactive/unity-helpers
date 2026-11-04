@@ -53,7 +53,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     ///
     /// <para><b>Notes</b></para>
     /// <list type="bullet">
-    /// <item>Tag filtering uses <see cref="GameObject.CompareTag(string)"/> for efficient exact matches</item>
+    /// <item>Tag filtering uses ordinal tag-name equality; undefined tags match nothing without engine errors</item>
     /// <item>Name filtering performs a case-sensitive substring match on <see cref="UnityEngine.Object.name"/></item>
     /// <item>When <see cref="IncludeInactive"/> is false, only enabled components on active-in-hierarchy GameObjects are considered</item>
     /// <item>For single fields, <see cref="MaxCount"/> has no effect</item>
@@ -101,7 +101,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
         /// <summary>
         /// If set, only finds components on GameObjects with this tag.
-        /// Uses <see cref="GameObject.CompareTag(string)"/> for matching.
+        /// Uses ordinal tag-name equality; undefined tags match nothing without engine errors.
         /// </summary>
         public string TagFilter { get; set; } = null;
 
@@ -433,7 +433,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 candidateGameObject = candidate.gameObject;
             }
 
-            if (filters._checkTag && !candidateGameObject.CompareTag(filters._tag))
+            if (filters._checkTag && !MatchesTag(candidateGameObject, filters._tag))
             {
                 return false;
             }
@@ -611,6 +611,26 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 }
             }
             return buffer;
+        }
+
+        private static bool MatchesTag(GameObject candidate, string tag)
+        {
+            if (string.IsNullOrEmpty(tag))
+            {
+                return false;
+            }
+#if UNITY_2023_2_OR_NEWER
+            try
+            {
+                return candidate.CompareTag(TagHandle.GetExistingTag(tag));
+            }
+            catch (UnityException)
+            {
+                return false;
+            }
+#else
+            return string.Equals(candidate.tag, tag, StringComparison.Ordinal);
+#endif
         }
 
         private static void LogUnsupportedField(FieldInfo field)

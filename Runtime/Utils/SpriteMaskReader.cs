@@ -20,7 +20,10 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// <param name="error">The reason reading failed, or null on success.</param>
         /// <param name="alphaThreshold">The minimum nonzero alpha byte considered opaque.</param>
         /// <returns>Whether the sprite's exact pixel mask could be read.</returns>
-        /// <remarks>Alpha zero is always transparent; other pixels are opaque at or above the threshold.</remarks>
+        /// <remarks>
+        /// Alpha zero is always transparent; other pixels are opaque at or above the threshold.
+        /// Separate alpha textures require original PNG pixels in the Editor.
+        /// </remarks>
         public static bool TryRead(
             Sprite sprite,
             out SpriteAlphaMask mask,
@@ -115,6 +118,13 @@ namespace WallstopStudios.UnityHelpers.Utils
                     );
                 }
 #endif
+                if (sprite.associatedAlphaSplitTexture != null)
+                {
+                    error =
+                        "Sprites with a separate alpha texture require source PNG pixels or an explicit alpha mask.";
+                    mask = default;
+                    return false;
+                }
                 Texture2D texture = sprite.texture;
                 if (texture == null || !texture.isReadable || sprite.packed)
                 {

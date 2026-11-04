@@ -24,6 +24,7 @@
 - [Pooling IDisposable Objects](#pooling-idisposable-objects)
 - [Renting an Array](#renting-an-array)
 - [Borrowing a Buffer for One Operation](#borrowing-a-buffer-for-one-operation)
+- [Keeping a Grow-Only Scratch Array](#keeping-a-grow-only-scratch-array)
 - [Best Practices](#best-practices)
 
 ---
@@ -652,6 +653,33 @@ array before reading it (a sort's scratch buffer, a copy destination) should not
 For an exactly-sized array whose size comes from a small, known set, use `WallstopArrayPool<T>`,
 which is always zeroed on return. Do not use it for a size derived from a collection count: it
 creates a permanent bucket per distinct size.
+
+## Keeping a Grow-Only Scratch Array
+
+Use `GrowOnlyBuffers` when one owner keeps scratch storage across frames and the logical size
+changes. It keeps the same array for equal or smaller requests. A larger request replaces the
+array and discards its old contents. This storage belongs to the caller and is not pooled.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using System;
+using WallstopStudios.UnityHelpers.Utils;
+
+int[] scratch = null;
+int count = 8;
+bool grew = GrowOnlyBuffers.EnsureCapacity(ref scratch, count);
+GrowOnlyBuffers.Clear(scratch, count);
+ReadOnlySpan<int> live = GrowOnlyBuffers.AsSpan(scratch, count);
+```
+
+Keep the logical count separately. `Clear` and `AsSpan` clamp that count to the existing capacity;
+null buffers and nonpositive counts produce no work or an empty span. Neither helper grows storage.
+`EnsureCapacity` initializes a null buffer to an empty array for nonpositive requests.
+
+Size storage from trusted application bounds. Do not pass unchecked sizes from a save or network
+payload. Use exact-size storage when passing arrays to APIs such as `Texture2D.SetPixels32`, which
+require the array length to match the texture dimensions.
 
 ## Borrowing a Buffer for One Operation
 

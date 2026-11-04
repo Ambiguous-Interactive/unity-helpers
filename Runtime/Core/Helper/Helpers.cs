@@ -702,6 +702,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <remarks>
         /// The job continues when either the action or handler throws. A handler failure is reported
         /// once through Unity, while later action failures still reach the handler.
+        /// Exception formatting and custom log-handler failures cannot stop the job.
         /// </remarks>
         public static Coroutine StartFunctionAsCoroutine(
             this MonoBehaviour monoBehaviour,
@@ -815,7 +816,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     {
                         if (!reportedFailure)
                         {
-                            ReportRepeatingJobFailure(e, null);
+                            ReportRepeatingJobFailure(e, null, null);
                             reportedFailure = true;
                         }
                     }
@@ -836,7 +837,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 {
                     if (!reportedFailure)
                     {
-                        ReportRepeatingJobFailure(e, null);
+                        ReportRepeatingJobFailure(e, null, null);
                         reportedFailure = true;
                     }
                 }
@@ -1280,14 +1281,14 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         {
                             if (!reportedFailure)
                             {
-                                ReportRepeatingJobHandlerFailure(e, handlerException, context);
+                                ReportRepeatingJobFailure(e, handlerException, context);
                                 reportedFailure = true;
                             }
                         }
                     }
                     else if (!reportedFailure)
                     {
-                        ReportRepeatingJobFailure(e, context);
+                        ReportRepeatingJobFailure(e, null, context);
                         reportedFailure = true;
                     }
                 }
@@ -1303,28 +1304,46 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 
-        // Unity stops a coroutine after an exception; isolate callback failures and report only the first.
-        private static void ReportRepeatingJobFailure(Exception e, Object context)
-        {
-            Debug.LogError(
-                "A repeating job threw; it will keep running, and further failures of this job "
-                    + $"will not be reported. {e}",
-                context
-            );
-        }
-
-        private static void ReportRepeatingJobHandlerFailure(
+        private static void ReportRepeatingJobFailure(
             Exception actionException,
             Exception handlerException,
             Object context
         )
         {
-            Debug.LogError(
-                "A repeating job and its exception handler threw; the job will keep running, and "
-                    + $"further handler failures will not be reported. Action: {actionException} "
-                    + $"Handler: {handlerException}",
-                context
-            );
+            try
+            {
+                if (handlerException == null)
+                {
+                    Debug.LogError(
+                        "A repeating job threw; it will keep running, and further failures of this job "
+                            + $"will not be reported. {actionException}",
+                        context
+                    );
+                }
+                else
+                {
+                    Debug.LogError(
+                        "A repeating job and its exception handler threw; the job will keep running, and "
+                            + $"further handler failures will not be reported. Action: {actionException} "
+                            + $"Handler: {handlerException}",
+                        context
+                    );
+                }
+            }
+            catch (Exception)
+            {
+                try
+                {
+                    Debug.LogError(
+                        "A repeating job threw; its diagnostic could not be written. The job will keep running.",
+                        context
+                    );
+                }
+                catch (Exception)
+                {
+                    /* A failing custom log handler must not terminate recurring work. */
+                }
+            }
         }
 
         private static float ResolveInvocationDelay(float baseDelay)

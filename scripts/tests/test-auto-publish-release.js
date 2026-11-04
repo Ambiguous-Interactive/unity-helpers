@@ -409,6 +409,14 @@ async function main() {
     fs.readFileSync(path.join(root, ".github/workflows/release-prepare.yml"), "utf8")
   );
   assert.equal(prepare.on.workflow_dispatch.inputs.auto_publish.default, true);
+  for (const job of [prepare.jobs.prepare, publishWorkflow.jobs["validate-package"]]) {
+    const setup = job.steps.findIndex(
+      (step) => step.uses === "./.github/actions/setup-python-tools"
+    );
+    const validation = job.steps.findIndex((step) => step.run?.includes("npm run lint:changelog"));
+    assert.ok(0 <= setup && setup < validation, "Release validation requires Python and uv first");
+    assert.equal(job.steps[setup].if, undefined, "Dry runs also require Python tooling");
+  }
   assert.ok(
     prepare.jobs.prepare.steps.some(
       (step) =>

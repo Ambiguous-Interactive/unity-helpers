@@ -254,6 +254,9 @@ jobs:
             npm i --no-audit --no-fund --package-lock=false
           fi
 
+      - name: Setup Python tooling
+        uses: ./.github/actions/setup-python-tools
+
       - name: Run release package validation
         run: |
           set -euo pipefail

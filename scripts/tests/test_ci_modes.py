@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import base64
+import ctypes
 import json
 import os
 import shutil
 import subprocess
 import sys
+import uuid
 from pathlib import Path
 from typing import cast
 
@@ -15,9 +17,31 @@ import pytest
 import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "unity"))
-from run_ci_modes import ROOT, Mode, build_modes, git, isolate_sources, read_selection, run
+import desktop_worker
+from desktop_worker import validate_payload
+from run_ci_modes import (
+    ROOT,
+    Mode,
+    build_modes,
+    git,
+    isolate_sources,
+    read_selection,
+    run,
+)
 
 PROFILES = {name: f"Subject.{name}" for name in ("editmode", "playmode", "standalone")}
+
+
+@pytest.mark.parametrize("encoded", ["", "!", "A", "AA==", "a" * 32769, "YQ==", "ANg="])
+def test_private_desktop_refuses_malformed_or_oversized_payloads(encoded: str) -> None:
+    with pytest.raises(ValueError, match="Worker payload"):
+        validate_payload(encoded)
+
+
+def test_private_desktop_accepts_utf16_payload_as_data() -> None:
+    validate_payload(
+        base64.b64encode("Write-Output '雪'; exit 37".encode("utf-16-le")).decode("ascii")
+    )
 
 
 @pytest.mark.parametrize("single", [False, True])
@@ -629,14 +653,17 @@ def test_unknown_source_paths_are_preserved(tmp_path: Path, damage: str) -> None
     assert canary.read_text(encoding="utf-8") == "preserve me\n"
 
 
-def test_complete_cli_uses_isolated_sources_and_publishes_all_four_modes(tmp_path: Path) -> None:
+def test_complete_cli_uses_isolated_sources_and_publishes_all_four_modes(
+    tmp_path: Path,
+) -> None:
     _modes, _preparation, environment, _shell = make_control(tmp_path)
     repository = tmp_path / "repository"
     seed_repository(repository)
     runner = repository / "scripts/unity/run-ci-tests.ps1"
     runner.parent.mkdir(parents=True)
     runner.write_text(
-        Path(environment["UH_MODE_RUNNER"]).read_text(encoding="utf-8"), encoding="utf-8"
+        Path(environment["UH_MODE_RUNNER"]).read_text(encoding="utf-8"),
+        encoding="utf-8",
     )
     helper = str(ROOT / "scripts/git-staging-helpers.ps1").replace("'", "''")
     shell = shutil.which("pwsh")
@@ -706,7 +733,10 @@ def test_complete_cli_uses_isolated_sources_and_publishes_all_four_modes(tmp_pat
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows desktop resource isolation")
-def test_windows_workers_have_private_desktops_and_preserve_exit_and_output(tmp_path: Path) -> None:
+@pytest.mark.parametrize("exit_code", [0, 37, 2147483647, 0xC0000005])
+def test_windows_workers_have_private_desktops_and_preserve_exit_and_output(
+    tmp_path: Path, exit_code: int
+) -> None:
     shell = shutil.which("pwsh")
     assert shell is not None
     payload = """$ErrorActionPreference = 'Stop'
@@ -725,19 +755,18 @@ public static class DesktopProbe {
 [Console]::Error.WriteLine('diagnostic retained')
 exit 37
 """
+    signed = exit_code if exit_code < 0x80000000 else exit_code - 0x100000000
+    payload = payload.replace("exit 37", f"exit {signed}")
     encoded = base64.b64encode(payload.encode("utf-16-le")).decode("ascii")
     names: set[str] = set()
     for _ in range(2):
         result = subprocess.run(
             [
+                sys.executable,
+                str(ROOT / "scripts/unity/desktop_worker.py"),
+                "--shell",
                 shell,
-                "-NoProfile",
-                "-NonInteractive",
-                "-OutputFormat",
-                "Text",
-                "-File",
-                str(ROOT / "scripts/unity/desktop-worker.ps1"),
-                "-EncodedWorker",
+                "--encoded-worker",
                 encoded,
             ],
             capture_output=True,
@@ -746,12 +775,102 @@ exit 37
             timeout=20,
             cwd=tmp_path,
         )
-        assert result.returncode == 37, result.stdout + result.stderr
+        assert result.returncode == exit_code, result.stdout + result.stderr
         name = result.stdout.strip()
         assert name.startswith("uh-mode-")
         assert name not in names
         names.add(name)
         assert result.stderr.strip() == "diagnostic retained"
+
+
+def test_private_desktop_cli_reports_launch_failure(tmp_path: Path) -> None:
+    payload = base64.b64encode("exit 0".encode("utf-16-le")).decode("ascii")
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts/unity/desktop_worker.py"),
+            "--shell",
+            str(tmp_path / "missing shell.exe"),
+            "--encoded-worker",
+            payload,
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=20,
+    )
+    assert result.returncode == 1
+    assert "Cannot launch private Unity worker" in result.stderr
+
+
+def desktop_names() -> set[str]:
+    names: set[str] = set()
+    if sys.platform == "win32":
+        from ctypes import wintypes
+
+        user = ctypes.WinDLL("user32", use_last_error=True)
+        callback_type = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.LPWSTR, wintypes.LPARAM)
+        user.GetProcessWindowStation.argtypes = ()
+        user.GetProcessWindowStation.restype = wintypes.HANDLE
+        user.EnumDesktopsW.argtypes = (wintypes.HANDLE, callback_type, wintypes.LPARAM)
+        user.EnumDesktopsW.restype = wintypes.BOOL
+
+        def collect(name: str, _context: int) -> bool:
+            names.add(name)
+            return True
+
+        callback = callback_type(collect)
+        if not user.EnumDesktopsW(user.GetProcessWindowStation(), callback, 0):
+            raise ctypes.WinError(ctypes.get_last_error())
+    return names
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows desktop resource isolation")
+def test_private_desktops_are_closed_after_success_and_failed_launch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    identity = uuid.uuid4()
+    name = "uh-mode-" + identity.hex
+    assert name not in desktop_names()
+    monkeypatch.setattr(uuid, "uuid4", lambda: identity)
+    shell = shutil.which("pwsh")
+    assert shell is not None
+    encoded = base64.b64encode("exit 0".encode("utf-16-le")).decode("ascii")
+    for _ in range(2):
+        with pytest.raises(OSError, match=r"\[WinError 2\]"):
+            desktop_worker.run(str(tmp_path / "missing shell.exe"), encoded)
+        assert name not in desktop_names()
+        assert desktop_worker.run(shell, encoded) == 0
+        assert name not in desktop_names()
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows desktop compatibility launcher")
+def test_powershell_desktop_compatibility_entry_point_from_another_directory(
+    tmp_path: Path,
+) -> None:
+    shell = shutil.which("pwsh")
+    assert shell is not None
+    payload = "[Console]::WriteLine('compatibility worker'); exit 37"
+    encoded = base64.b64encode(payload.encode("utf-16-le")).decode("ascii")
+    result = subprocess.run(
+        [
+            shell,
+            "-NoProfile",
+            "-NonInteractive",
+            "-File",
+            str(ROOT / "scripts/unity/desktop-worker.ps1"),
+            "-EncodedWorker",
+            encoded,
+        ],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=20,
+    )
+    assert result.returncode == 37, result.stdout + result.stderr
+    assert result.stdout.strip() == "compatibility worker"
+    assert not result.stderr.strip()
 
 
 def generate_project_settings(
@@ -786,7 +905,12 @@ def generate_project_settings(
         if key not in {"UNITY_EMAIL", "UNITY_PASSWORD", "UNITY_SERIAL"}
     }
     result = subprocess.run(
-        command, capture_output=True, text=True, env=environment, timeout=30, check=False
+        command,
+        capture_output=True,
+        text=True,
+        env=environment,
+        timeout=30,
+        check=False,
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert (project / "Assets/Editor/UhCiTestConfigurator.cs").is_file()

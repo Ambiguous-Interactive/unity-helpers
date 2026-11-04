@@ -332,7 +332,9 @@ Unbounded collections without filters or depth limits use a cached Unity query a
 Relational fields support components, interfaces, and one-dimensional arrays, `List<T>`, or `HashSet<T>` of those values. Multidimensional arrays, nested collections, and unrelated value types are left unchanged with an authoring warning, so they cannot interrupt other bindings. Prewarming skips those fields too.
 
 - `TagFilter`
-  - Exact tag match using `CompareTag`
+  - Exact, case-sensitive tag-name match. Empty or undefined tags match nothing. Optional fields
+    remain silent; required fields use the normal missing-component diagnostic. Invalid filters do
+    not emit extra engine errors or stop other bindings.
 
 - `NameFilter`
   - Case-sensitive substring match on the GameObject name

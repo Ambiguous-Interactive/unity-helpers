@@ -89,6 +89,9 @@ jobs:
         with:
           node-version: "22.23.4"
 
+      - name: Setup Python tooling
+        uses: ./.github/actions/setup-python-tools
+
       - name: Install Node dependencies
         run: |
           set -euo pipefail
