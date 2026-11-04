@@ -208,7 +208,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         public void AtlasReadsKeepSourceImportSettingsAndReportUnavailablePixels(bool tight)
         {
             using RestorableGlobal<SpritePackerMode>.Scope packingMode = PackingMode.Borrow(
-                SpritePackerMode.AlwaysOnAtlas
+                SpritePackerMode.SpriteAtlasV2
             );
             string path = CreatePng();
             TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
@@ -230,22 +230,37 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 error
             );
             string before = EditorJsonUtility.ToJson(importer);
-            SpriteAtlas atlas = Track(new SpriteAtlas());
-            string atlasPath = _folder + "/Bounds.spriteatlas";
+            SpriteAtlasAsset atlasSource = Track(new SpriteAtlasAsset());
+            atlasSource.Add(new UnityEngine.Object[] { original });
+            string atlasPath = _folder + "/Bounds.spriteatlasv2";
             TrackAssetPath(atlasPath);
-            AssetDatabase.CreateAsset(atlas, atlasPath);
-            SpriteAtlasPackingSettings packing = atlas.GetPackingSettings();
+#if !UNITY_2022_1_OR_NEWER
+            SpriteAtlasPackingSettings packing = atlasSource.GetPackingSettings();
             packing.enableTightPacking = tight;
             packing.enableRotation = true;
-            atlas.SetPackingSettings(packing);
-            SpriteAtlasTextureSettings texture = atlas.GetTextureSettings();
+            atlasSource.SetPackingSettings(packing);
+            SpriteAtlasTextureSettings texture = atlasSource.GetTextureSettings();
             texture.readable = false;
-            atlas.SetTextureSettings(texture);
-            atlas.Add(new UnityEngine.Object[] { original });
-            SpriteAtlasUtility.PackAtlases(
-                new[] { atlas },
-                EditorUserBuildSettings.activeBuildTarget
-            );
+            atlasSource.SetTextureSettings(texture);
+#endif
+            SpriteAtlasAsset.Save(atlasSource, atlasPath);
+            AssetDatabase.ImportAsset(atlasPath, ImportAssetOptions.ForceSynchronousImport);
+#if UNITY_2022_1_OR_NEWER
+            SpriteAtlasImporter atlasImporter =
+                AssetImporter.GetAtPath(atlasPath) as SpriteAtlasImporter;
+            Assert.IsTrue(atlasImporter != null);
+            SpriteAtlasPackingSettings packing = atlasImporter.packingSettings;
+            packing.enableTightPacking = tight;
+            packing.enableRotation = true;
+            atlasImporter.packingSettings = packing;
+            SpriteAtlasTextureSettings texture = atlasImporter.textureSettings;
+            texture.readable = false;
+            atlasImporter.textureSettings = texture;
+            atlasImporter.SaveAndReimport();
+#endif
+            SpriteAtlas atlas = AssetDatabase.LoadAssetAtPath<SpriteAtlas>(atlasPath);
+            Assert.IsTrue(atlas != null);
+            Assert.IsTrue(atlas.CanBindTo(original));
             Sprite packed = Track(atlas.GetSprite(original.name));
             Assert.IsTrue(packed != null);
             Texture2D atlasTexture = UnityEditor.Sprites.SpriteUtility.GetSpriteTexture(
