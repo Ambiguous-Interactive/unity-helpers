@@ -3,7 +3,30 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.Utils
 {
+    using UnityEngine;
     using WallstopStudios.UnityHelpers.Utils;
 
-    public sealed class LiveRegistryTestComponent : LiveComponent<LiveRegistryTestComponent> { }
+    [ExecuteAlways]
+    [RequireComponent(typeof(LiveComponentRegistration))]
+    public sealed class LiveRegistryTestComponent : MonoBehaviour
+    {
+        internal int enableCalls;
+        internal int disableCalls;
+        internal int destroyCalls;
+
+        private void OnEnable()
+        {
+            ++enableCalls;
+        }
+
+        private void OnDisable()
+        {
+            ++disableCalls;
+        }
+
+        private void OnDestroy()
+        {
+            ++destroyCalls;
+        }
+    }
 }

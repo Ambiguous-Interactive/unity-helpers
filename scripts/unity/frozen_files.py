@@ -13,7 +13,10 @@ import subprocess
 import sys
 import uuid
 from pathlib import Path
-from typing import TypedDict, cast
+from typing import TYPE_CHECKING, TypedDict, cast
+
+if TYPE_CHECKING:
+    import io
 
 SOURCE_ROOTS = ("Runtime", "Editor", "Tests", "Generator~", "scripts/unity")
 GENERATOR_SUFFIXES = frozenset(
@@ -260,6 +263,8 @@ def request_identifier(value: object) -> object:
 
 
 def serve() -> int:
+    input_stream = cast("io.TextIOWrapper[io.BufferedReader]", sys.stdin)
+    input_stream.reconfigure(encoding="utf-8", errors="strict")
     implementation = Path(__file__)
     loaded_hash = file_hash(implementation)[0]
     session = uuid.uuid4().hex

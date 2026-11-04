@@ -92,13 +92,14 @@ function bodyOf(text, openBraceIndex) {
 }
 
 function isTerminalExit(statement) {
-  return /^(?:return\b|throw(?:\s|;))/.test(statement);
+  return /^(?:return\b|throw\b)/.test(statement);
 }
 
 for (const [statement, expected] of [
   ["return false;", true],
   ["return;", true],
   ["throw;", true],
+  ["throw", true],
   ["throw new InvalidOperationException();", true],
   ["if (condition)", false],
   ["throwable = failure;", false],
@@ -288,7 +289,7 @@ const swept = violations.filter((v) => !BASELINE.has(v.file));
 if (0 < swept.length) {
   console.error(
     `out-parameter discipline: ${swept.length} assignment(s) not immediately before a method exit.\n` +
-      "Assign an out parameter exactly once, on the line before each return, so the value and the\n" +
+      "Assign an out parameter exactly once, on the line before each method exit, so the value and the\n" +
       "exit are visible together.\n"
   );
   for (const v of swept) {

@@ -25,7 +25,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public void ResetRegistrations()
         {
             Assert.IsTrue(UnityMainThreadGuard.IsInitialized);
+            CreateTempScene("LiveRegistryFixture");
             LiveComponentRegistry.OnSubsystemRegistration();
+        }
+
+        public override void TearDown()
+        {
+            try
+            {
+                base.TearDown();
+            }
+            finally
+            {
+#if UNITY_EDITOR
+                CleanupTrackedFoldersAndAssets();
+#endif
+            }
         }
 
         [Test]
@@ -82,6 +97,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             GameObject owner = Track(new GameObject("Lifecycle"));
             LiveRegistryTestComponent component = owner.AddComponent<LiveRegistryTestComponent>();
             Assert.AreEqual(1, LiveComponents<LiveRegistryTestComponent>.Count);
+            Assert.AreEqual(1, component.enableCalls);
             component.enabled = false;
             Assert.AreEqual(0, LiveComponents<LiveRegistryTestComponent>.Count);
             component.enabled = true;
@@ -93,6 +109,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             UnityEngine.Object.DestroyImmediate(owner); // UNH-SUPPRESS: Exercise OnDisable and OnDestroy registration cleanup.
             Assert.AreEqual(0, LiveComponents<LiveRegistryTestComponent>.Count);
             Assert.IsFalse(LiveComponents<LiveRegistryTestComponent>.TryGetFirst(out _));
+            Assert.AreEqual(3, component.enableCalls);
+            Assert.AreEqual(3, component.disableCalls);
+            Assert.AreEqual(1, component.destroyCalls);
         }
 
         [Test]
@@ -110,6 +129,113 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 )
             );
             Assert.AreSame(component, found);
+        }
+
+        [Test]
+        public void ThirdPartyComponentsNeedNoInheritanceOrLifecycleChanges()
+        {
+            GameObject owner = Track(new GameObject("ThirdPartyOwner"));
+            AudioListener listener = owner.AddComponent<AudioListener>();
+            LiveComponentRegistration registration =
+                owner.AddComponent<LiveComponentRegistration>();
+            Assert.IsTrue(LiveComponents<AudioListener>.TryGetFirst(out AudioListener found));
+            Assert.AreSame(listener, found);
+            listener.enabled = false;
+            Assert.AreEqual(0, LiveComponents<AudioListener>.Count);
+            listener.enabled = true;
+            Assert.AreEqual(1, LiveComponents<AudioListener>.Count);
+            registration.enabled = false;
+            Assert.AreEqual(0, LiveComponents<AudioListener>.Count);
+            registration.enabled = true;
+            Assert.AreEqual(1, LiveComponents<AudioListener>.Count);
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void ManualAndAdapterOwnershipCannotRemoveEachOther(bool removeManualFirst)
+        {
+            GameObject owner = Track(new GameObject("SharedOwnership"));
+            AudioListener listener = owner.AddComponent<AudioListener>();
+            LiveComponentRegistration registration =
+                owner.AddComponent<LiveComponentRegistration>();
+            Assert.AreEqual(1, LiveComponents<AudioListener>.Count);
+            Assert.IsTrue(LiveComponents<AudioListener>.Register(listener));
+            Assert.IsFalse(LiveComponents<AudioListener>.Register(listener));
+            if (removeManualFirst)
+            {
+                Assert.IsTrue(LiveComponents<AudioListener>.Unregister(listener));
+                Assert.AreEqual(1, LiveComponents<AudioListener>.Count);
+                registration.enabled = false;
+            }
+            else
+            {
+                registration.enabled = false;
+                Assert.AreEqual(1, LiveComponents<AudioListener>.Count);
+                Assert.IsTrue(LiveComponents<AudioListener>.Unregister(listener));
+            }
+            Assert.AreEqual(0, LiveComponents<AudioListener>.Count);
+        }
+
+        [Test]
+        public void RefreshDiscoversLateComponentsAndPreservesExistingOrder()
+        {
+            GameObject owner = Track(new GameObject("LateComponents"));
+            LiveComponentRegistration registration =
+                owner.AddComponent<LiveComponentRegistration>();
+            Assert.AreEqual(0, LiveComponents<BoxCollider>.Count);
+            BoxCollider first = owner.AddComponent<BoxCollider>();
+            Assert.AreEqual(0, LiveComponents<BoxCollider>.Count);
+            registration.Refresh();
+            Assert.IsTrue(LiveComponents<BoxCollider>.TryGetFirst(out BoxCollider found));
+            Assert.AreSame(first, found);
+            BoxCollider second = owner.AddComponent<BoxCollider>();
+            registration.Refresh();
+            registration.Refresh();
+            List<BoxCollider> destination = new();
+            LiveComponents<BoxCollider>.CopyTo(destination);
+            CollectionAssert.AreEqual(new[] { first, second }, destination);
+            UnityEngine.Object.DestroyImmediate(first); // UNH-SUPPRESS: Refresh the cached component snapshot after removal.
+            registration.Refresh();
+            LiveComponents<BoxCollider>.CopyTo(destination);
+            CollectionAssert.AreEqual(new[] { second }, destination);
+        }
+
+        [Test]
+        public void DisabledPendingAdaptersCannotRegisterAfterTheirDisable()
+        {
+            GameObject owner = Track(new GameObject("PendingOwner"));
+            AudioListener listener = owner.AddComponent<AudioListener>();
+            LiveComponentRegistration registration =
+                owner.AddComponent<LiveComponentRegistration>();
+            registration.enabled = false;
+            Assert.AreEqual(0, LiveComponents<AudioListener>.Count);
+            registration.Refresh();
+            Assert.AreEqual(0, LiveComponents<AudioListener>.Count);
+            registration.enabled = true;
+            Assert.IsTrue(LiveComponents<AudioListener>.TryGetFirst(out AudioListener found));
+            Assert.AreSame(listener, found);
+        }
+
+        [TestCase(1)]
+        [TestCase(8)]
+        public void WarmAdapterQueriesAndCopiesDoNotAllocate(int count)
+        {
+            AllocationProbe.IgnoreWhenUnmeasurable();
+            List<LiveRegistryTestComponent> destination = new(count);
+            for (int index = 0; index < count; ++index)
+            {
+                Track(new GameObject("AdapterAllocation"))
+                    .AddComponent<LiveRegistryTestComponent>();
+            }
+            TestDelegate query = () =>
+            {
+                LiveComponents<LiveRegistryTestComponent>.CopyTo(destination);
+                _ = LiveComponents<LiveRegistryTestComponent>.TryGetFirst(out _);
+                _ = LiveComponents<LiveRegistryTestComponent>.Count;
+            };
+            query();
+            Assert.AreEqual(count, destination.Count);
+            Assert.That(query, AllocationIs.Not.AllocatingGCMemory());
         }
 
         [TestCase(false)]
@@ -194,7 +320,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public void SceneQueriesFollowTheCurrentSceneAfterAnObjectMoves()
         {
             Scene firstScene = CreateTempScene("LiveRegistryFirst", setActive: false);
-            Scene secondScene = CreateTempScene("LiveRegistrySecond", setActive: false);
+#if UNITY_EDITOR
+            if (!Application.isPlaying)
+            {
+                string path = UnityEditor.AssetDatabase.GenerateUniqueAssetPath(
+                    "Assets/LiveRegistryScene.unity"
+                );
+                TrackAssetPath(path);
+                Assert.IsTrue(
+                    UnityEditor.SceneManagement.EditorSceneManager.SaveScene(firstScene, path)
+                );
+            }
+#endif
+            Scene secondScene = CreateTempScene(
+                "LiveRegistrySecond",
+                setActive: false,
+                additive: true
+            );
             GameObject first = Track(new GameObject("FirstSceneEntry"));
             GameObject second = Track(new GameObject("SecondSceneEntry"));
             SceneManager.MoveGameObjectToScene(first, firstScene);
@@ -225,8 +367,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.AreEqual(0, LiveComponents<Transform>.Count);
             Assert.IsFalse(LiveComponents<LiveRegistryTestComponent>.TryGetFirst(out _));
             Assert.IsTrue(LiveComponents<Transform>.Register(owner.transform));
-            component.enabled = false;
-            component.enabled = true;
+            owner.GetComponent<LiveComponentRegistration>().Refresh();
             Assert.IsTrue(
                 LiveComponents<LiveRegistryTestComponent>.TryGetFirst(
                     out LiveRegistryTestComponent found
@@ -267,6 +408,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         {
             Transform item = Track(new GameObject("MainThreadEntry")).transform;
             LiveComponents<Transform>.Register(item);
+            LiveComponentRegistration registration =
+                item.gameObject.AddComponent<LiveComponentRegistration>();
             List<Transform> destination = new() { item };
             Exception failure = null;
             bool registered = true;
@@ -282,6 +425,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                     found = LiveComponents<Transform>.TryGetFirst(out _);
                     count = LiveComponents<Transform>.Count;
                     LiveComponents<Transform>.CopyTo(destination);
+                    registration.Refresh();
                 }
                 catch (Exception exception)
                 {

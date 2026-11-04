@@ -466,7 +466,7 @@ def test_powershell_worker_reuses_fresh_snapshots_restarts_and_stops(
         target = toolkit / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(ROOT / relative, target)
-    root = tmp_path / "owner's inputs"
+    root = tmp_path / "owner's \u03b4 inputs"
     sources(root)
     write(root / "Runtime/file.txt", b"before")
     changed_path = (
@@ -527,7 +527,8 @@ try {
     )
     result = subprocess.run(
         [pwsh, "-NoProfile", "-File", str(control)],
-        env=os.environ | {"UV_PROJECT_ENVIRONMENT": str(tmp_path / "environment")},
+        env=os.environ
+        | {"UV_PROJECT_ENVIRONMENT": str(tmp_path / "environment"), "PYTHONIOENCODING": "cp1252"},
         text=True,
         encoding="utf-8",
         capture_output=True,

@@ -12,12 +12,15 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Every read reports success rather than throwing, and a read that cannot be satisfied latches
+    /// A read that cannot be satisfied from the payload reports failure rather than throwing, and latches
     /// <see cref="Malformed"/>. Once latched every later read is refused, so a caller that checks
     /// only at the end cannot mistake garbage recovered mid-message for data.
     /// <see cref="Position"/> is <b>not</b> rewound on failure -- a rejected length or field key may
     /// already have consumed its varint -- so once <see cref="Malformed"/> is set, treat the
     /// position as meaningless rather than as a resume point.
+    /// </para>
+    /// <para>
+    /// A throwing formatter instead latches the reader, clears the output and rethrows the original exception.
     /// </para>
     /// <para>
     /// Payloads arrive from disk and from the network, so the reader treats every length, tag and

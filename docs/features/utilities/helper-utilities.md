@@ -25,21 +25,23 @@ Static helper classes and utilities that solve common programming problems witho
 
 ## Live Component Registries
 
-Use `LiveComponents<T>` from `WallstopStudios.UnityHelpers.Utils` when component owners can register
-with the game. Queries inspect those registrations without searching every loaded object or creating
-a replacement component. Each closed component type has its own registry.
+Use `LiveComponents<T>` from `WallstopStudios.UnityHelpers.Utils` to query explicitly registered
+components. Add `LiveComponentRegistration` to their GameObject. The adapter registers attached
+components through its own lifecycle, preserving their existing base classes and callbacks.
 
-Derive from `LiveComponent<T>` to register in `OnEnable` and unregister in `OnDisable` and
-`OnDestroy`. Call the base implementation when overriding those methods. Existing components,
-including components with another base class, can call `LiveComponents<T>.Register(this)` and
-`Unregister(this)` in the same callbacks.
+For your own components, Unity's `RequireComponent` attribute adds the adapter automatically when
+you add the component. Existing scenes and prefabs need the adapter added explicitly after an
+attribute is introduced. For third-party assets, add the same adapter in the Inspector or a prefab
+variant; their scripts need no changes.
 
 <!-- doc-sample: compiles -->
 
 ```csharp
+using UnityEngine;
 using WallstopStudios.UnityHelpers.Utils;
 
-public sealed class RegisteredLevelStatus : LiveComponent<RegisteredLevelStatus>
+[RequireComponent(typeof(LiveComponentRegistration))]
+public sealed class RegisteredLevelStatus : MonoBehaviour
 {
     public bool started;
 
@@ -51,29 +53,36 @@ public sealed class RegisteredLevelStatus : LiveComponent<RegisteredLevelStatus>
 }
 ```
 
-| Operation                    | Behavior                                                                                      |
-| ---------------------------- | --------------------------------------------------------------------------------------------- |
-| `Register(component)`        | Add a live managed reference once; duplicates return false.                                   |
-| `Unregister(component)`      | Remove that managed reference, even after its Unity object has been destroyed.                |
-| `Count`                      | Count active registered objects, excluding disabled `Behaviour` components.                   |
-| `TryGetFirst(out found)`     | Return the first active registration; an empty query returns false and null.                  |
-| `TryGetIn(scene, out found)` | Select within a loaded scene, using each object's current scene after any move.               |
-| `CopyTo(destination)`        | Replace a reusable list with the active registrations in registration order. Null is ignored. |
+Each enabled adapter indexes all components on its GameObject by exact runtime type. Queries finish
+pending enable-time registration before reading the per-type entries. The adapter also refreshes
+at `Start`. Call `Refresh()` after adding or removing components from an already registered object.
+Refreshing preserves the order of existing registrations. A query for a base type needs an explicit
+manual registration under that closed generic type when the component's runtime type differs.
 
-Destroyed registrations are pruned on reads and registration. Removing and adding an entry again
-puts it at the end. An inactive manually registered object stays registered and becomes queryable
-when enabled; lifecycle registration through the base class instead removes and adds it again.
-`CopyTo` needs no new managed allocations once the caller's list can hold the result.
+| Operation                    | Behavior                                                                                       |
+| ---------------------------- | ---------------------------------------------------------------------------------------------- |
+| `Register(component)`        | Add manual ownership once; duplicate manual registrations return false.                        |
+| `Unregister(component)`      | Remove manual ownership, including a destroyed managed reference. An adapter may still own it. |
+| `Count`                      | Count active registered objects, excluding disabled `Behaviour` components.                    |
+| `TryGetFirst(out found)`     | Return the first active registration; an empty query returns false and null.                   |
+| `TryGetIn(scene, out found)` | Select within a loaded scene, using each object's current scene after any move.                |
+| `CopyTo(destination)`        | Replace a reusable list with active registrations in registration order. Null is ignored.      |
+
+Manual registration and adapter ownership are independent. Disabling an adapter releases its
+ownership while preserving manual registrations. Removing manual ownership preserves an enabled
+adapter's registration. An inactive registered component stays hidden until its GameObject and
+Behaviour are active. Destroyed entries are pruned on reads and registration.
+
+Warm queries and copies need no new managed allocations once the caller's list can hold the result.
 All operations require Unity's initialized main thread. Worker calls return empty results or false;
-`CopyTo` leaves its destination untouched on a worker.
+`CopyTo` leaves its destination untouched on a worker. The adapter also supports Edit Mode; queries
+during Play Mode exclude objects belonging only to an editor or prefab world.
 
-Registration is an explicit contract, not a replacement for every scene search. An object that has
-never enabled is absent unless another owner registers it. An `Awake` query can run before a
-target's `OnEnable`; delay that query until registration is guaranteed, or retain the scene search
-when early discovery or inactive objects are required. There is no automatic scene scan or baked
-inactive-object index. Subsystem registration clears every registry for a new play session,
-including when domain reload is disabled. Owners that survive without another `OnEnable` must
-register again before queries resume.
+An object whose adapter has never enabled is absent. An `Awake` query can run before another
+object's adapter enables, so retain scene searches when early discovery or inactive objects are
+required. Subsystem registration clears every registry and pending registration for a new play
+session. Owners surviving without another `OnEnable` must call their adapter's `Refresh()` or
+register manually before queries resume.
 
 ## Coroutine Wait Pools
 
