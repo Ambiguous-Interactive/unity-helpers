@@ -9,6 +9,7 @@ Static helper classes and utilities that solve common programming problems witho
 ## Contents
 
 - [Gameplay Helpers](#gameplay-helpers): Predictive aiming, spatial sampling, rotation
+- [Live Component Registries](#live-component-registries): Opt-in active components without repeated scene searches
 - [GameObject & Component Helpers](#gameobject--component-helpers): Component discovery, hierarchy manipulation
 - [Transform Helpers](#transform-helpers): Hierarchy traversal
 - [Coroutine Wait Pools](#coroutine-wait-pools): Configure `Buffers.GetWaitForSeconds*` caching
@@ -21,6 +22,58 @@ Static helper classes and utilities that solve common programming problems witho
 - [Environment Detection](#environment-detection): CI, batch mode, and runtime environment
 
 ---
+
+## Live Component Registries
+
+Use `LiveComponents<T>` from `WallstopStudios.UnityHelpers.Utils` when component owners can register
+with the game. Queries inspect those registrations without searching every loaded object or creating
+a replacement component. Each closed component type has its own registry.
+
+Derive from `LiveComponent<T>` to register in `OnEnable` and unregister in `OnDisable` and
+`OnDestroy`. Call the base implementation when overriding those methods. Existing components,
+including components with another base class, can call `LiveComponents<T>.Register(this)` and
+`Unregister(this)` in the same callbacks.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using WallstopStudios.UnityHelpers.Utils;
+
+public sealed class RegisteredLevelStatus : LiveComponent<RegisteredLevelStatus>
+{
+    public bool started;
+
+    public static bool IsLevelStarted()
+    {
+        return LiveComponents<RegisteredLevelStatus>.TryGetFirst(out RegisteredLevelStatus level)
+            && level.started;
+    }
+}
+```
+
+| Operation                    | Behavior                                                                                      |
+| ---------------------------- | --------------------------------------------------------------------------------------------- |
+| `Register(component)`        | Add a live managed reference once; duplicates return false.                                   |
+| `Unregister(component)`      | Remove that managed reference, even after its Unity object has been destroyed.                |
+| `Count`                      | Count active registered objects, excluding disabled `Behaviour` components.                   |
+| `TryGetFirst(out found)`     | Return the first active registration; an empty query returns false and null.                  |
+| `TryGetIn(scene, out found)` | Select within a loaded scene, using each object's current scene after any move.               |
+| `CopyTo(destination)`        | Replace a reusable list with the active registrations in registration order. Null is ignored. |
+
+Destroyed registrations are pruned on reads and registration. Removing and adding an entry again
+puts it at the end. An inactive manually registered object stays registered and becomes queryable
+when enabled; lifecycle registration through the base class instead removes and adds it again.
+`CopyTo` needs no new managed allocations once the caller's list can hold the result.
+All operations require Unity's initialized main thread. Worker calls return empty results or false;
+`CopyTo` leaves its destination untouched on a worker.
+
+Registration is an explicit contract, not a replacement for every scene search. An object that has
+never enabled is absent unless another owner registers it. An `Awake` query can run before a
+target's `OnEnable`; delay that query until registration is guaranteed, or retain the scene search
+when early discovery or inactive objects are required. There is no automatic scene scan or baked
+inactive-object index. Subsystem registration clears every registry for a new play session,
+including when domain reload is disabled. Owners that survive without another `OnEnable` must
+register again before queries resume.
 
 ## Coroutine Wait Pools
 
