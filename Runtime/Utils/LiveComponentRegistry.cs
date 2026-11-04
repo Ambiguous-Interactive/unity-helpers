@@ -177,7 +177,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         internal static void Cancel(LiveComponentRegistration owner)
         {
-            for (int index = Pending.Count - 1; index >= 0; --index)
+            for (int index = Pending.Count - 1; 0 <= index; --index)
             {
                 if (ReferenceEquals(Pending[index], owner))
                 {
