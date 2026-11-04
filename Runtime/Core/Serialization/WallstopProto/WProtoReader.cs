@@ -1061,6 +1061,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// a formatter that descends without carrying the count. It also latches
         /// <see cref="Malformed"/> here when the nested read fails, so the refusal reaches this
         /// reader's caller rather than dying inside a reader nobody up the stack can see.
+        /// A throwing formatter also latches this reader, clears the output and rethrows the original
+        /// exception, so an enclosing formatter cannot catch it and accept an incomplete message.
         /// </remarks>
         public bool TryReadMessage<T>(IWProtoFormatter<T> formatter, out T value)
         {
@@ -1084,15 +1086,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
-            WProtoReader expected = nested;
-            if (ReadCompleted(formatter.TryRead(ref nested, out value), in nested, in expected))
-            {
-                return true;
-            }
-
-            _malformed = true;
-            value = default;
-            return false;
+            return TryDecodeMessage(ref nested, formatter, null, default, out value);
         }
 
         /// <summary>
@@ -1143,15 +1137,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
-            WProtoReader expected = nested;
-            if (ReadCompleted(formatter.TryRead(ref nested, out value), in nested, in expected))
-            {
-                return true;
-            }
-
-            _malformed = true;
-            value = default;
-            return false;
+            return TryDecodeMessage(ref nested, formatter, null, default, out value);
         }
 
         /// <summary>
@@ -1172,6 +1158,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// hand-implementable. A formatter that does not implement
         /// <see cref="IWProtoMergeFormatter{T}"/> decodes fresh here, which is what every formatter
         /// did before and is still correct for a member with nothing to preserve.
+        /// A throwing formatter clears the output, latches this reader and rethrows the original exception.
         /// </remarks>
         public bool TryReadMessage<T>(
             ReadOnlySpan<byte> payload,
@@ -1205,18 +1192,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
-            WProtoReader expected = nested;
-            bool read = formatter is IWProtoMergeFormatter<T> merging
-                ? merging.TryReadInto(ref nested, seed, out value)
-                : formatter.TryRead(ref nested, out value);
-            if (ReadCompleted(read, in nested, in expected))
-            {
-                return true;
-            }
-
-            _malformed = true;
-            value = default;
-            return false;
+            return TryDecodeMessage(
+                ref nested,
+                formatter,
+                formatter as IWProtoMergeFormatter<T>,
+                seed,
+                out value
+            );
         }
 
         /// <summary>
@@ -1423,6 +1405,37 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                     return false;
                 }
             }
+        }
+
+        private bool TryDecodeMessage<T>(
+            ref WProtoReader nested,
+            IWProtoFormatter<T> formatter,
+            IWProtoMergeFormatter<T> merging,
+            in T seed,
+            out T value
+        )
+        {
+            WProtoReader expected = nested;
+            try
+            {
+                bool read =
+                    merging != null
+                        ? merging.TryReadInto(ref nested, seed, out value)
+                        : formatter.TryRead(ref nested, out value);
+                if (ReadCompleted(read, in nested, in expected))
+                {
+                    return true;
+                }
+            }
+            catch
+            {
+                _malformed = true;
+                value = default;
+                throw;
+            }
+            _malformed = true;
+            value = default;
+            return false;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -30,6 +30,31 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.AreEqual(position, reader.Position);
         }
 
+        private static bool ReadMessage(
+            ref WProtoReader reader,
+            ExceptionalReaderFormatter formatter,
+            int surface,
+            out string value
+        )
+        {
+            if (surface == 0)
+            {
+                return reader.TryReadMessage(formatter, out value);
+            }
+            if (!reader.TryReadBytes(out ReadOnlySpan<byte> payload))
+            {
+                value = default;
+                return false;
+            }
+            if (surface == 1)
+            {
+                return reader.TryReadMessage(payload, formatter, out value);
+            }
+            IWProtoFormatter<string> selected =
+                surface == 2 ? formatter : new NonMergingReaderFormatter(formatter);
+            return reader.TryReadMessage(payload, selected, "seed", out value);
+        }
+
         private static byte[] ParseHex(string hex)
         {
             Assert.AreEqual(0, hex.Length % 2, "Each test byte requires two hexadecimal digits.");
@@ -373,6 +398,216 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.AreEqual(0, writer.Depth);
             Assert.AreEqual(expected.Length + 2, writer.Position);
             CollectionAssert.AreEqual(ParseHex(expectedHex + "1807"), writer.Written.ToArray());
+        }
+
+        [Test]
+        [Combinatorial]
+        public void NestedReaderExceptionsLatchParentAndClearPartialOutput(
+            [Values(0, 1, 2, 3)] int surface,
+            [Values(false, true)] bool consume,
+            [Values(false, true)] bool replace
+        )
+        {
+            byte[] bytes = { 1, 42, 7 };
+            WProtoReader reader = new WProtoReader(bytes);
+            InvalidOperationException failure = new InvalidOperationException(
+                "Nested read failed."
+            );
+            ExceptionalReaderFormatter formatter = new ExceptionalReaderFormatter(
+                failure,
+                consume,
+                replace
+            );
+            Exception caught = null;
+            string value = "original";
+            try
+            {
+                ReadMessage(ref reader, formatter, surface, out value);
+            }
+            catch (Exception exception)
+            {
+                caught = exception;
+            }
+            Assert.AreSame(failure, caught);
+            Assert.IsTrue(value == null);
+            Assert.AreEqual(2, reader.Position);
+            Assert.AreEqual(1, reader.Remaining);
+            Assert.AreEqual(0, reader.Depth);
+            AssertCannotContinue(ref reader);
+            CollectionAssert.AreEqual(new byte[] { 1, 42, 7 }, bytes);
+        }
+
+        [Test]
+        [Combinatorial]
+        public void CaughtNestedReadExceptionsCannotCompleteTheFacade(
+            [Values(0, 1, 2, 3)] int surface,
+            [Values(false, true)] bool consume
+        )
+        {
+            IWProtoFormatter<string> previous = WProtoFormatterProvider.TryGet(
+                out IWProtoFormatter<string> registered
+            )
+                ? registered
+                : null;
+            InvalidOperationException failure = new InvalidOperationException(
+                "Nested read failed."
+            );
+            try
+            {
+                WProtoFormatterProvider.Register<string>(
+                    new CatchingReaderFormatter(surface, failure, consume)
+                );
+                Assert.Throws<InvalidOperationException>(() =>
+                    WProtoFacade.TryDeserialize(new byte[] { 1, 42 }, out string _)
+                );
+            }
+            finally
+            {
+                WProtoFormatterProvider.Register(previous);
+            }
+        }
+
+        [Test]
+        [Combinatorial]
+        public void SuccessfulNestedReadersPreserveAllEntryPoints([Values(0, 1, 2, 3)] int surface)
+        {
+            WProtoReader reader = new WProtoReader(new byte[] { 1, 42, 7 });
+            Assert.IsTrue(
+                ReadMessage(
+                    ref reader,
+                    new ExceptionalReaderFormatter(null, true, false),
+                    surface,
+                    out string value
+                )
+            );
+            Assert.AreEqual("partial", value);
+            Assert.IsFalse(reader.Malformed);
+            Assert.AreEqual(2, reader.Position);
+            Assert.IsTrue(reader.TryReadVarint64(out ulong trailing));
+            Assert.AreEqual(7UL, trailing);
+        }
+
+        private readonly struct ExceptionalReaderFormatter
+            : IWProtoFormatter<string>,
+                IWProtoMergeFormatter<string>
+        {
+            private readonly Exception _failure;
+            private readonly bool _consume;
+            private readonly bool _replace;
+
+            internal ExceptionalReaderFormatter(Exception failure, bool consume, bool replace)
+            {
+                _failure = failure;
+                _consume = consume;
+                _replace = replace;
+            }
+
+            public int Measure(in string value)
+            {
+                return 0;
+            }
+
+            public bool Write(ref WProtoWriter writer, in string value)
+            {
+                return false;
+            }
+
+            public bool TryRead(ref WProtoReader reader, out string value)
+            {
+                Assert.AreEqual(1, reader.Depth);
+                value = "partial";
+                if (_consume)
+                {
+                    Assert.IsTrue(reader.TryReadVarint64(out ulong actual));
+                    Assert.AreEqual(42UL, actual);
+                }
+                if (_replace)
+                {
+                    reader = new WProtoReader(ReadOnlySpan<byte>.Empty);
+                }
+                if (_failure != null)
+                {
+                    throw _failure;
+                }
+                return true;
+            }
+
+            public bool TryReadInto(ref WProtoReader reader, in string seed, out string value)
+            {
+                Assert.AreEqual("seed", seed);
+                return TryRead(ref reader, out value);
+            }
+        }
+
+        private readonly struct NonMergingReaderFormatter : IWProtoFormatter<string>
+        {
+            private readonly ExceptionalReaderFormatter _inner;
+
+            internal NonMergingReaderFormatter(ExceptionalReaderFormatter inner)
+            {
+                _inner = inner;
+            }
+
+            public int Measure(in string value)
+            {
+                return 0;
+            }
+
+            public bool Write(ref WProtoWriter writer, in string value)
+            {
+                return false;
+            }
+
+            public bool TryRead(ref WProtoReader reader, out string value)
+            {
+                return _inner.TryRead(ref reader, out value);
+            }
+        }
+
+        private readonly struct CatchingReaderFormatter : IWProtoFormatter<string>
+        {
+            private readonly int _surface;
+            private readonly Exception _failure;
+            private readonly bool _consume;
+
+            internal CatchingReaderFormatter(int surface, Exception failure, bool consume)
+            {
+                _surface = surface;
+                _failure = failure;
+                _consume = consume;
+            }
+
+            public int Measure(in string value)
+            {
+                return 0;
+            }
+
+            public bool Write(ref WProtoWriter writer, in string value)
+            {
+                return false;
+            }
+
+            public bool TryRead(ref WProtoReader reader, out string value)
+            {
+                Exception caught = null;
+                try
+                {
+                    ReadMessage(
+                        ref reader,
+                        new ExceptionalReaderFormatter(_failure, _consume, false),
+                        _surface,
+                        out _
+                    );
+                }
+                catch (Exception exception)
+                {
+                    caught = exception;
+                }
+                Assert.AreSame(_failure, caught);
+                Assert.IsTrue(reader.End);
+                value = "silently accepted";
+                return true;
+            }
         }
 
         private readonly struct ExceptionalWriterFormatter : IWProtoFormatter<Exception>
