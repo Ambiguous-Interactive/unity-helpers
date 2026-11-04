@@ -48,7 +48,7 @@ Use the feature guides to choose an API, then profile the complete operation in 
 
 ### 3. ✅ Testing & Compatibility
 
-The package has **17,000+ automated tests** and supports Unity 2021.3 and later. Test the features
+The package has **18,000+ automated tests** and supports Unity 2021.3 and later. Test the features
 you use in your actual player configuration, especially reflection, stripping, optional integrations
 and platform storage. An Editor pass does not establish every backend's behavior.
 
@@ -316,7 +316,7 @@ Based on your needs:
 Yes! Unity Helpers is:
 
 - ✅ Used in shipped commercial games
-- ✅ 17,000+ automated test cases
+- ✅ 18,000+ automated test cases
 - ✅ Compatible with Unity 2022, 2023, and Unity 6
 - ✅ Zero external dependencies: protobuf-net is bundled
 - ✅ **Fully WebGL/IL2CPP compatible** with optimized SINGLE_THREADED hot paths

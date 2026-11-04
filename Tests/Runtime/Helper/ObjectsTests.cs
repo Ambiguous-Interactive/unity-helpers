@@ -540,6 +540,42 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             );
         }
 
+        [TestCase("", 0xcbf29ce484222325UL)]
+        [TestCase("a", 0xaf63dc4c8601ec8cUL)]
+        [TestCase("foobar", 0x85944171f73967e8UL)]
+        [TestCase("hello", 0xa430d84680aabd0bUL)]
+        public void StableHash64V1MatchesPublishedUtf8Vectors(string text, ulong expected)
+        {
+            Assert.AreEqual(
+                expected,
+                Objects.StableHash64V1(System.Text.Encoding.UTF8.GetBytes(text))
+            );
+        }
+
+        [TestCase(0UL)]
+        [TestCase(1UL)]
+        [TestCase(ulong.MaxValue)]
+        [TestCase(Objects.Fnv64OffsetBasis)]
+        public void StableHash64V1PreservesEmptySeedsAndFoldsEverySplit(ulong seed)
+        {
+            Assert.AreEqual(seed, Objects.StableHash64V1(ReadOnlySpan<byte>.Empty, seed));
+            byte[] bytes = System.Text.Encoding.UTF8.GetBytes("é\0漢字🙂");
+            ulong expected = Objects.StableHash64V1(bytes, seed);
+            for (int split = 0; split <= bytes.Length; ++split)
+            {
+                ulong head = Objects.StableHash64V1(bytes.AsSpan(0, split), seed);
+                Assert.AreEqual(expected, Objects.StableHash64V1(bytes.AsSpan(split), head));
+            }
+        }
+
+        [Test]
+        public void StableHash64V1HonorsSliceAndDefaultSpan()
+        {
+            byte[] bytes = { 255, 102, 111, 111, 98, 97, 114, 0 };
+            Assert.AreEqual(0x85944171f73967e8UL, Objects.StableHash64V1(bytes.AsSpan(1, 6)));
+            Assert.AreEqual(Objects.Fnv64OffsetBasis, Objects.StableHash64V1(default));
+        }
+
         private readonly struct CustomStruct
         {
             private readonly int _value;

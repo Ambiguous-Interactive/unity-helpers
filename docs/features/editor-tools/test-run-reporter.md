@@ -93,7 +93,7 @@ The whole file is rewritten, so this line replaces the running marker in place.
 #### `ASSEMBLY`, one per test assembly
 
 ```text
-ASSEMBLY name=WallstopStudios.UnityHelpers.Tests.Editor.dll pass=100 fail=1 skip=0 inconclusive=0 seconds=30.100 built=2026-09-02T09:58:11.000Z
+ASSEMBLY name=WallstopStudios.UnityHelpers.Tests.Editor.dll pass=100 fail=1 skip=0 inconclusive=0 seconds=30.100 built=2026-09-02T09:58:11.000Z freshness=current
 ```
 
 One line per direct child of the result tree's root, in the order the test runner reported them.
@@ -103,6 +103,9 @@ One line per direct child of the result tree's root, in the order the test runne
 - `seconds` — the duration the test runner itself reported for the assembly, not wall clock.
 - `built` — when the compiled assembly was last written, read from the DLL in
   `Library/ScriptAssemblies`. Empty when the assembly could not be located.
+- `freshness` — `stale`, `unknown` or `current`. See [Assembly source freshness](#assembly-source-freshness).
+- `staleSource` / `freshnessError` — repeated fields naming each stale source and unreadable input.
+  Both are omitted when empty.
 
 #### `FAILURE`, one per failing test case
 
@@ -206,13 +209,25 @@ The reporter restores its callbacks after a PlayMode domain reload using the sum
 token and the current Editor session. It ignores runs it did not start. An Editor restart does not
 resume the old run's ownership; use the recovery steps above if a running marker remains.
 
-### Assembly build times are reported, staleness is not judged
+### Assembly source freshness
 
-Each `ASSEMBLY` line carries `built=`, the compiled DLL's write time. Use it as diagnostic context,
-not proof that Unity compiled your latest source. A timestamp alone does not establish source
-identity: files can be rewritten without changing their content, and builds can reuse outputs.
-When freshness matters, confirm compilation completed and compare the source/build identities your
-automation records.
+Each `ASSEMBLY` line carries `built=`, the compiled DLL's write time, and a `freshness=` assessment:
+
+- `stale`: a source in the assembly's transitive reference closure is newer than the test DLL or
+  its owning dependency DLL. Each `staleSource=` field names the dependency and source path.
+- `unknown`: compilation inputs, a DLL or a source could not be read, or no source was inspected. Each `freshnessError=` field
+  explains the missing evidence.
+- `current`: every available source timestamp in that closure is no newer than those DLLs.
+
+A stale source takes precedence over unknown inputs, and the report retains both diagnostic lists.
+Reference cycles terminate, shared source timestamps are read once per report, and precompiled
+third-party references without project sources are outside this source check. Test pass/fail counts
+remain the Test Runner's actual results; freshness is reported separately.
+
+Treat this as an advisory timestamp check. Rewriting identical source can report stale, while
+backdated edits or reused timestamps can escape it. It does not establish source identity or prove
+which bytes the editor executed. When that guarantee matters, confirm compilation completed and
+compare retained source/build identities as well.
 
 ## What is not covered
 

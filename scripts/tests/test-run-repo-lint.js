@@ -166,6 +166,15 @@ function fileInvokes(containerRelativePath, file) {
   return false;
 }
 
+/** True when the registered typed suite executes a retained compatibility launcher. */
+function csharpControlsInvoke(file) {
+  const suite = "scripts/tests/test_csharp_lints.py";
+  const contractChecks = require(path.join(repoRoot, "scripts", "run-contract-tests.js")).checksFor(
+    true
+  );
+  return scriptPathsIn(leafCommands(contractChecks)).has(suite) && fileInvokes(suite, file);
+}
+
 /**
  * @param {string} dir Repo-relative directory to scan, recursively.
  * @param {string} file Repo-relative script path.
@@ -543,6 +552,9 @@ runTest("no linter in scripts/ has been left unreachable", () => {
   // (#453). An allowlist whose entries are prose excuses whatever is put in it -- the quiet half of
   // #445, one level up: the thing named still exists, so nothing goes red.
   const runElsewhere = new Map([
+    ["scripts/lint-license-headers.ps1", "csharp-controls"],
+    ["scripts/lint-conditional-call-chains.ps1", "csharp-controls"],
+    ["scripts/lint-odin-undo-safety.ps1", "csharp-controls"],
     ["scripts/lint-llm-instructions.ps1", "workflow"],
     ["scripts/lint-skill-sizes.ps1", "workflow"],
     ["scripts/lint-unity-test-modules.ps1", "workflow"],
@@ -554,6 +566,7 @@ runTest("no linter in scripts/ has been left unreachable", () => {
   // Only the kinds something actually claims. A registered predicate nothing uses is a dead branch
   // inside the one test whose whole point is that a claim has to be executable.
   const owners = new Map([
+    ["csharp-controls", csharpControlsInvoke],
     ["workflow", (file) => filesInvoking(".github/workflows", file).length > 0],
     ["preflight", (file) => fileInvokes("scripts/agent-preflight.ps1", file)],
     ["prepush", (file) => scriptPathsIn(expandNpmScript("validate:prepush")).has(file)]
@@ -781,7 +794,14 @@ runTest("no linter in scripts/ has been left unfalsifiable", () => {
 // Exported so scripts/tests/test-run-contract-tests.js can make the same "is this claim true"
 // assertions against the sibling registry without a second copy of the mention-stripping rules --
 // every one of which exists because a shape produced a false "this owner runs it".
-module.exports = { expandNpmScript, scriptPathsIn, leafCommands, fileInvokes, filesInvoking };
+module.exports = {
+  expandNpmScript,
+  scriptPathsIn,
+  leafCommands,
+  fileInvokes,
+  filesInvoking,
+  csharpControlsInvoke
+};
 
 if (require.main === module) {
   console.log("Testing scripts/run-repo-lint.js...\n");

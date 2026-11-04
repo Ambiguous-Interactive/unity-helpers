@@ -25,7 +25,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         private const string PlayModeMenuPath =
             "Tools/Wallstop Studios/Unity Helpers/Run PlayMode Tests With Summary";
         private const string LogPrefix = "[TestRunReporter] ";
-        private const string CompiledAssemblyExtension = ".dll";
         private const string OwnerSessionKey = nameof(TestRunReporter) + "." + nameof(_owner);
         private const string RunStartedSessionKey =
             nameof(TestRunReporter) + "." + nameof(_runStarted);
@@ -148,6 +147,73 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             _runStarted = false;
             SessionState.EraseString(OwnerSessionKey);
             SessionState.EraseBool(RunStartedSessionKey);
+        }
+
+        /// <summary>Collects assembly build times and source freshness for a result tree.</summary>
+        internal static void PopulateAssemblyBuildTimes(TestRunResultNode root)
+        {
+            if (root == null)
+            {
+                return;
+            }
+            try
+            {
+                UnityEditor.Compilation.Assembly[] assemblies = CompilationPipeline.GetAssemblies(
+                    AssembliesType.Editor
+                );
+                List<TestRunAssemblyInput> inputs = new(assemblies.Length);
+                Dictionary<string, string> packages = new(StringComparer.Ordinal);
+                foreach (UnityEditor.Compilation.Assembly assembly in assemblies)
+                {
+                    if (assembly == null || string.IsNullOrWhiteSpace(assembly.name))
+                    {
+                        continue;
+                    }
+                    List<string> references = new();
+                    foreach (
+                        UnityEditor.Compilation.Assembly reference in assembly.assemblyReferences
+                    )
+                    {
+                        if (reference != null)
+                        {
+                            references.Add(reference.name);
+                        }
+                    }
+                    int sourceCount = assembly.sourceFiles.Length;
+                    string[] sources = new string[sourceCount];
+                    for (int index = 0; index < sourceCount; ++index)
+                    {
+                        sources[index] = TestRunCompilationPaths.Resolve(
+                            assembly.sourceFiles[index],
+                            packages
+                        );
+                    }
+                    inputs.Add(
+                        new TestRunAssemblyInput(
+                            assembly.name,
+                            TestRunCompilationPaths.Resolve(assembly.outputPath, packages),
+                            sources,
+                            references.ToArray()
+                        )
+                    );
+                }
+                TestRunAssemblyFreshness.Populate(root, inputs);
+            }
+            catch (Exception exception)
+            {
+                foreach (TestRunResultNode node in root.children)
+                {
+                    if (node != null)
+                    {
+                        node.freshnessErrors.Add(
+                            $"Cannot enumerate compilation inputs: {exception.Message}"
+                        );
+                    }
+                }
+                Debug.LogWarning(
+                    $"{LogPrefix}Could not enumerate compiled assemblies: {exception}"
+                );
+            }
         }
 
         // Re-register synchronously after reload so early RunFinished events are captured even when delayCall never runs.
@@ -279,85 +345,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             }
 
             return node;
-        }
-
-        // Report DLL timestamps without freshness verdicts; identical-content source rewrites can legitimately be newer.
-        private static void PopulateAssemblyBuildTimes(TestRunResultNode root)
-        {
-            if (root == null || root.children.Count == 0)
-            {
-                return;
-            }
-
-            Dictionary<string, string> outputPathsByAssemblyName = new(
-                StringComparer.OrdinalIgnoreCase
-            );
-            try
-            {
-                UnityEditor.Compilation.Assembly[] assemblies = CompilationPipeline.GetAssemblies(
-                    AssembliesType.Editor
-                );
-                foreach (UnityEditor.Compilation.Assembly assembly in assemblies)
-                {
-                    if (assembly == null || string.IsNullOrEmpty(assembly.name))
-                    {
-                        continue;
-                    }
-
-                    outputPathsByAssemblyName[assembly.name] = assembly.outputPath;
-                }
-            }
-            catch (Exception exception)
-            {
-                Debug.LogWarning(
-                    $"{LogPrefix}Could not enumerate compiled assemblies: {exception}"
-                );
-                return;
-            }
-
-            foreach (TestRunResultNode child in root.children)
-            {
-                if (child == null)
-                {
-                    continue;
-                }
-
-                string assemblyName = TrimCompiledAssemblyExtension(child.fullName);
-                if (
-                    !outputPathsByAssemblyName.TryGetValue(assemblyName, out string outputPath)
-                    || string.IsNullOrEmpty(outputPath)
-                )
-                {
-                    continue;
-                }
-
-                try
-                {
-                    if (File.Exists(outputPath))
-                    {
-                        child.assemblyBuiltUtc = File.GetLastWriteTimeUtc(outputPath);
-                    }
-                }
-                catch (Exception)
-                {
-                    child.assemblyBuiltUtc = null;
-                }
-            }
-        }
-
-        private static string TrimCompiledAssemblyExtension(string name)
-        {
-            if (string.IsNullOrEmpty(name))
-            {
-                return string.Empty;
-            }
-
-            if (!name.EndsWith(CompiledAssemblyExtension, StringComparison.OrdinalIgnoreCase))
-            {
-                return name;
-            }
-
-            return name.Substring(0, name.Length - CompiledAssemblyExtension.Length);
         }
 
         /// <summary>

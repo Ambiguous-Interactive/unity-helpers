@@ -21,9 +21,13 @@ const repoRoot = path.resolve(__dirname, "..", "..");
 const runnerPath = path.join(repoRoot, "scripts", "run-contract-tests.js");
 const { CHECKS, HOOK_CHECKS, checksFor, directChecksFor, runChecks } = require(runnerPath);
 const repoLintChecks = require(path.join(repoRoot, "scripts", "run-repo-lint.js")).CHECKS;
-const { expandNpmScript, scriptPathsIn, leafCommands, filesInvoking } = require(
-  path.join(repoRoot, "scripts", "tests", "test-run-repo-lint.js")
-);
+const {
+  expandNpmScript,
+  scriptPathsIn,
+  leafCommands,
+  filesInvoking,
+  csharpControlsInvoke
+} = require(path.join(repoRoot, "scripts", "tests", "test-run-repo-lint.js"));
 const packageScripts = JSON.parse(
   fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")
 ).scripts;
@@ -361,6 +365,7 @@ runTest("no contract test in scripts/tests/ has been left unreachable", () => {
   // consolidation trades a loud failure (a chain that visibly lost an entry) for a quiet one (a
   // suite that still exists and no longer runs). The excuse is a PREDICATE, not prose.
   const runElsewhere = new Map([
+    ["scripts/tests/test-lint-odin-undo-safety.ps1", "csharp-controls"],
     ["scripts/tests/test-lint-skill-sizes.ps1", "workflow"],
     ["scripts/tests/test-llm-instructions-lint.ps1", "workflow"],
     ["scripts/tests/test-protobuf-candidate.py", "workflow"],
@@ -372,6 +377,7 @@ runTest("no contract test in scripts/tests/ has been left unreachable", () => {
     ["scripts/tests/test-sync-issue-template-versions.ps1", "workflow"]
   ]);
   const owners = new Map([
+    ["csharp-controls", csharpControlsInvoke],
     ["workflow", (file) => filesInvoking(".github/workflows", file).length > 0]
   ]);
 

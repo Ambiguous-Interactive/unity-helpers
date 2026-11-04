@@ -18,6 +18,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation.TestTypes
     /// </remarks>
     internal sealed class AuthoredRequirementTestAsset : ScriptableObject
     {
+        internal const string ManagedFieldName = nameof(_managed);
+
+        internal static int ResetCalls { get; private set; }
+
+        internal object ManagedValue => _managed;
+
         /// <summary>A single required object reference.</summary>
         [WNotNull]
         public Material requiredMaterial;
@@ -44,5 +50,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation.TestTypes
 
         /// <summary>A number, which has no empty state the inspector reports.</summary>
         public int weight;
+
+        [SerializeReference]
+        private object _managed;
+
+        private void Reset()
+        {
+            ++ResetCalls;
+        }
     }
 }

@@ -84,6 +84,24 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         /// </summary>
         internal const string BuiltKey = "built";
 
+        /// <summary>The timestamp-based source freshness assessment.</summary>
+        internal const string FreshnessKey = "freshness";
+
+        /// <summary>The sources newer than their compiled assembly.</summary>
+        internal const string StaleSourceKey = "staleSource";
+
+        /// <summary>The inputs that could not be checked.</summary>
+        internal const string FreshnessErrorKey = "freshnessError";
+
+        /// <summary>The freshness value for a newer source.</summary>
+        internal const string FreshnessStale = "stale";
+
+        /// <summary>The freshness value when evidence is incomplete.</summary>
+        internal const string FreshnessUnknown = "unknown";
+
+        /// <summary>The freshness value when inspected sources are no newer.</summary>
+        internal const string FreshnessCurrent = "current";
+
         /// <summary>
         ///     The key naming an elapsed duration in seconds.
         /// </summary>
@@ -200,6 +218,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                         ? FormatTimestamp(assembly.assemblyBuiltUtc.Value)
                         : string.Empty
                 );
+                AppendField(builder, FreshnessKey, ClassifyFreshness(assembly));
+                foreach (string source in assembly.staleSources)
+                {
+                    AppendField(builder, StaleSourceKey, source);
+                }
+                foreach (string error in assembly.freshnessErrors)
+                {
+                    AppendField(builder, FreshnessErrorKey, error);
+                }
                 builder.Append(LineSeparator);
             }
 
@@ -415,6 +442,23 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             }
 
             return string.Empty;
+        }
+
+        private static string ClassifyFreshness(TestRunResultNode assembly)
+        {
+            if (0 < assembly.staleSources.Count)
+            {
+                return FreshnessStale;
+            }
+            if (
+                0 < assembly.freshnessErrors.Count
+                || !assembly.assemblyBuiltUtc.HasValue
+                || !assembly.sourceFilesInspected
+            )
+            {
+                return FreshnessUnknown;
+            }
+            return FreshnessCurrent;
         }
 
         private static void AppendFailures(

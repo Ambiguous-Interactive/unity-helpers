@@ -8,6 +8,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     using System.IO;
     using System.Linq;
     using NUnit.Framework;
+    using UnityEditor;
+    using UnityEditor.SceneManagement;
+    using UnityEngine;
+    using UnityEngine.SceneManagement;
     using WallstopStudios.UnityHelpers.Editor.Validation;
     using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Tests.Editor.Validation.TestTypes;
@@ -21,7 +25,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     /// doing their job as orphans, and a reader acting on that report deletes live data.
     /// </remarks>
     [TestFixture]
-    public sealed class StaleSerializedKeyValidatorTests
+    public sealed class StaleSerializedKeyValidatorTests : CommonTestBase
     {
         private const string TestTypesFolder = "/TestTypes/";
 
@@ -67,6 +71,190 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             _root = null;
             _scriptGuid = null;
             _committedEmpty = null;
+        }
+
+        [Test]
+        public void ScanningAnAuthoredAssetDoesNotCreateAProbeOrInvokeReset()
+        {
+            AuthoredRequirementTestAsset instance =
+                AssetDatabase.LoadAssetAtPath<AuthoredRequirementTestAsset>(_committedEmpty);
+            Assert.IsTrue(instance != null);
+            int before = AuthoredRequirementTestAsset.ResetCalls;
+            string[] assetPathsBefore = AssetDatabase.GetAllAssetPaths();
+            List<StaleSerializedKeyFinding> findings = new();
+            Assert.IsTrue(
+                StaleSerializedKeyValidator.TryScan(
+                    new[] { _committedEmpty },
+                    findings,
+                    out int unresolved
+                )
+            );
+            Assert.AreEqual(0, unresolved);
+            Assert.AreEqual(before, AuthoredRequirementTestAsset.ResetCalls);
+            CollectionAssert.AreEquivalent(assetPathsBefore, AssetDatabase.GetAllAssetPaths());
+            Assert.IsTrue(instance != null);
+        }
+
+        [TestCase(false, false, false, false)]
+        [TestCase(true, false, false, false)]
+        [TestCase(true, true, false, false)]
+        [TestCase(true, true, false, true)]
+        [TestCase(true, false, true, false)]
+        public void PublicScanFindsRetiredKeysOnNativeComponentsInPrefabsAndScenes(
+            bool sceneAsset,
+            bool keepOpen,
+            bool keepUnloaded,
+            bool unsavedRemoval
+        )
+        {
+            string folder = AssetDatabase.GenerateUniqueAssetPath("Assets/StaleKeyNativeComponent");
+            Assert.IsFalse(
+                string.IsNullOrWhiteSpace(
+                    AssetDatabase.CreateFolder("Assets", Path.GetFileName(folder))
+                )
+            );
+            Scene originalActive = SceneManager.GetActiveScene();
+            Scene authoredScene = default;
+            GameObject host = Track(
+                new GameObject(
+                    nameof(PublicScanFindsRetiredKeysOnNativeComponentsInPrefabsAndScenes)
+                )
+            );
+            GameObject child = Track(new GameObject("Child"));
+            child.transform.SetParent(host.transform);
+            GameObject grandchild = Track(new GameObject("InactiveGrandchild"));
+            grandchild.transform.SetParent(child.transform);
+            grandchild.SetActive(false);
+            Track(child.AddComponent<BoxCollider>());
+            SerializationMode previous = EditorSettings.serializationMode;
+            try
+            {
+                EditorSettings.serializationMode = SerializationMode.ForceText;
+                string prefabPath = folder + "/Native.prefab";
+                Assert.IsTrue(PrefabUtility.SaveAsPrefabAsset(host, prefabPath) != null);
+                string path = sceneAsset ? folder + "/Native.unity" : prefabPath;
+                string file = AuthoredAssetPaths.ToFileSystemPath(path);
+                string original = File.ReadAllText(AuthoredAssetPaths.ToFileSystemPath(prefabPath));
+                const string Marker = "  m_LocalPosition:";
+                StringAssert.Contains(Marker, original);
+                string edited = original.Replace(Marker, "  retiredTransformValue: 1\n" + Marker);
+                if (unsavedRemoval)
+                {
+                    const string ColliderMarker = "  m_IsTrigger:";
+                    StringAssert.Contains(ColliderMarker, edited);
+                    edited = original.Replace(
+                        ColliderMarker,
+                        "  retiredColliderValue: 1\n" + ColliderMarker
+                    );
+                }
+                File.WriteAllText(file, edited);
+                if (sceneAsset)
+                {
+                    AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
+                    if (keepOpen || keepUnloaded)
+                    {
+                        authoredScene = EditorSceneManager.OpenScene(path, OpenSceneMode.Additive);
+                        if (keepUnloaded)
+                        {
+                            Assert.IsTrue(EditorSceneManager.CloseScene(authoredScene, false));
+                        }
+                    }
+                }
+                if (unsavedRemoval)
+                {
+                    BoxCollider removed = authoredScene
+                        .GetRootGameObjects()[0]
+                        .GetComponentInChildren<BoxCollider>(true);
+                    Assert.IsTrue(removed != null);
+                    UnityEngine.Object.DestroyImmediate(removed); // UNH-SUPPRESS UNH001: simulate an unsaved component removal from the saved document.
+                    Assert.IsTrue(EditorSceneManager.MarkSceneDirty(authoredScene));
+                }
+                int sceneCount = SceneManager.sceneCount;
+                bool dirty = originalActive.isDirty;
+                List<StaleSerializedKeyFinding> findings = new();
+                List<string> unreadable = new();
+                Assert.IsTrue(
+                    StaleSerializedKeyValidator.TryScan(
+                        new[] { path },
+                        findings,
+                        unreadable,
+                        out int unresolved
+                    )
+                );
+                Assert.AreEqual(0, unresolved);
+                if (unsavedRemoval)
+                {
+                    CollectionAssert.AreEqual(new[] { path }, unreadable);
+                    CollectionAssert.IsEmpty(findings);
+                    Assert.IsTrue(authoredScene.isDirty);
+                }
+                else
+                {
+                    CollectionAssert.IsEmpty(unreadable);
+                    Assert.AreEqual(3, findings.Count, string.Join(Environment.NewLine, findings));
+                    Assert.AreEqual("retiredTransformValue", findings[0].Key);
+                    Assert.AreEqual(typeof(Transform), findings[0].OwnerType);
+                }
+                Assert.AreEqual(edited, File.ReadAllText(file));
+                Assert.AreEqual(sceneCount, SceneManager.sceneCount);
+                Assert.AreEqual(originalActive, SceneManager.GetActiveScene());
+                Assert.AreEqual(dirty, originalActive.isDirty);
+                Assert.IsTrue(host != null);
+                if (keepUnloaded)
+                {
+                    Scene retained = SceneManager.GetSceneByPath(path);
+                    Assert.IsTrue(retained.IsValid());
+                    Assert.IsFalse(retained.isLoaded);
+                }
+                if (keepOpen)
+                {
+                    Assert.IsTrue(authoredScene.isLoaded);
+                }
+            }
+            finally
+            {
+                EditorSettings.serializationMode = previous;
+                if (authoredScene.IsValid())
+                {
+                    Assert.IsTrue(EditorSceneManager.CloseScene(authoredScene, true));
+                }
+                if (originalActive.IsValid() && originalActive.isLoaded)
+                {
+                    SceneManager.SetActiveScene(originalActive);
+                }
+                Assert.IsTrue(AssetDatabase.DeleteAsset(folder));
+            }
+        }
+
+        [Test]
+        public void NativeComponentsExposeTheirOwnSerializedKeys()
+        {
+            GameObject host = Track(
+                new GameObject(nameof(NativeComponentsExposeTheirOwnSerializedKeys))
+            );
+
+            HashSet<string> keys = StaleSerializedKeyValidator.BuildDeclaredKeys(host.transform);
+            Assert.IsTrue(keys != null);
+            CollectionAssert.Contains(keys, "m_LocalPosition");
+            CollectionAssert.Contains(keys, "m_LocalRotation");
+            Assert.IsTrue(host != null);
+            Assert.IsTrue(host.transform != null);
+        }
+
+        [Test]
+        public void UnimportedAssetsRetainPrivateManagedReferenceKeys()
+        {
+            string path = WriteAsset(
+                "PrivateManaged",
+                _scriptGuid,
+                new[] { $"  {AuthoredRequirementTestAsset.ManagedFieldName}: {{rid: -2}}" }
+            );
+            List<StaleSerializedKeyFinding> findings = new();
+            Assert.IsTrue(
+                StaleSerializedKeyValidator.TryScan(new[] { path }, findings, out int unresolved)
+            );
+            Assert.AreEqual(0, unresolved);
+            CollectionAssert.IsEmpty(findings);
         }
 
         [Test]

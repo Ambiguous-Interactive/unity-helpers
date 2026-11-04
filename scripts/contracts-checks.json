@@ -610,5 +610,10 @@
     "id": "frozen-files",
     "name": "Frozen file Python inventory controls",
     "run": "npm run test:frozen-files"
+  },
+  {
+    "id": "csharp-lints",
+    "name": "Typed C# license and Conditional checks",
+    "run": "npm run test:csharp-lints"
   }
 ]

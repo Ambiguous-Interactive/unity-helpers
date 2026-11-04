@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 #if UNITY_EDITOR
     using System;
     using System.Collections.Generic;
+    using System.Globalization;
     using System.Reflection;
     using UnityEditor;
     using UnityEngine;
@@ -25,6 +26,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
     /// </remarks>
     public static class AuthoredRequirementValidator
     {
+        private const int MaximumDefaultValueDepth = 64;
+
         /// <summary>
         /// Reports every empty slot a <see cref="WNotNullAttribute"/> requires to be filled.
         /// </summary>
@@ -130,8 +133,72 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             out int documentsInspected
         )
         {
+            return TryScan(
+                requirementAttributeType,
+                AuthoredRequirementKind.Assigned,
+                assetPaths,
+                findings,
+                exemptions,
+                unreadable,
+                out documentsInspected
+            );
+        }
+
+        /// <summary>Reports fields that violate the selected requirement kind.</summary>
+        /// <param name="requirementAttributeType">The attribute identifying required fields.</param>
+        /// <param name="kind">The condition applied to those fields.</param>
+        /// <param name="assetPaths">The authored assets to scan.</param>
+        /// <param name="findings">Receives requirement violations.</param>
+        /// <param name="exemptions">Receives fields whose representation cannot be judged.</param>
+        /// <param name="documentsInspected">Receives the number of matching documents.</param>
+        /// <returns>Whether the scan could run.</returns>
+        public static bool TryScan(
+            Type requirementAttributeType,
+            AuthoredRequirementKind kind,
+            IReadOnlyList<string> assetPaths,
+            List<AuthoredRequirementFinding> findings,
+            List<AuthoredRequirementExemption> exemptions,
+            out int documentsInspected
+        )
+        {
+            return TryScan(
+                requirementAttributeType,
+                kind,
+                assetPaths,
+                findings,
+                exemptions,
+                new List<string>(),
+                out documentsInspected
+            );
+        }
+
+        /// <summary>Reports requirement violations and unreadable assets.</summary>
+        /// <param name="requirementAttributeType">The attribute identifying required fields.</param>
+        /// <param name="kind">The condition applied to those fields.</param>
+        /// <param name="assetPaths">The authored assets to scan.</param>
+        /// <param name="findings">Receives requirement violations.</param>
+        /// <param name="exemptions">Receives fields whose representation cannot be judged.</param>
+        /// <param name="unreadable">Receives asset paths that could not be read.</param>
+        /// <param name="documentsInspected">Receives the number of matching documents.</param>
+        /// <returns>Whether the scan could run.</returns>
+        public static bool TryScan(
+            Type requirementAttributeType,
+            AuthoredRequirementKind kind,
+            IReadOnlyList<string> assetPaths,
+            List<AuthoredRequirementFinding> findings,
+            List<AuthoredRequirementExemption> exemptions,
+            List<string> unreadable,
+            out int documentsInspected
+        )
+        {
             if (
                 requirementAttributeType == null
+                || !typeof(Attribute).IsAssignableFrom(requirementAttributeType)
+                || (
+                    kind != AuthoredRequirementKind.Assigned
+                    && kind != AuthoredRequirementKind.NotEmpty
+                    && kind != AuthoredRequirementKind.NotDefault
+                )
                 || assetPaths == null
                 || findings == null
                 || exemptions == null
@@ -148,7 +215,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
             Dictionary<string, List<AuthoredRequirementField>> byScriptGuid = FieldsByScriptGuid(
                 requirementAttributeType,
-                exemptions
+                exemptions,
+                kind
             );
 
             if (byScriptGuid.Count <= 0)
@@ -244,7 +312,21 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 return AuthoredAssetYaml.IsNullObjectReference(value);
             }
 
-            return string.IsNullOrEmpty(value);
+            if (field.Kind == AuthoredRequirementKind.NotDefault && field.IsNumeric)
+            {
+                return string.Equals(value, "false", StringComparison.OrdinalIgnoreCase)
+                    || double.TryParse(
+                        value,
+                        NumberStyles.Float,
+                        CultureInfo.InvariantCulture,
+                        out double number
+                    )
+                        && number == 0d;
+            }
+
+            return string.IsNullOrEmpty(value)
+                || string.Equals(value, "\"\"", StringComparison.Ordinal)
+                || string.Equals(value, "''", StringComparison.Ordinal);
         }
 
         /// <summary>
@@ -255,7 +337,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         /// <returns>The annotated fields, keyed by the guid of every script that carries them.</returns>
         internal static Dictionary<string, List<AuthoredRequirementField>> FieldsByScriptGuid(
             Type requirementAttributeType,
-            List<AuthoredRequirementExemption> exemptions
+            List<AuthoredRequirementExemption> exemptions,
+            AuthoredRequirementKind kind = AuthoredRequirementKind.Assigned
         )
         {
             Dictionary<string, List<AuthoredRequirementField>> byScriptGuid = new(
@@ -270,7 +353,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                     continue;
                 }
 
-                if (!TryClassify(field, out AuthoredRequirementField required))
+                if (!TryClassify(field, out AuthoredRequirementField required, kind))
                 {
                     exemptions.Add(
                         new AuthoredRequirementExemption(
@@ -310,14 +393,34 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             return byScriptGuid;
         }
 
-        internal static bool TryClassify(FieldInfo field, out AuthoredRequirementField required)
+        internal static bool TryClassify(
+            FieldInfo field,
+            out AuthoredRequirementField required,
+            AuthoredRequirementKind kind = AuthoredRequirementKind.Assigned
+        )
         {
-            if (field.IsDefined(typeof(SerializeReference), inherit: true))
+            if (
+                field == null
+                || field.IsStatic
+                || field.IsInitOnly
+                || field.IsLiteral
+                || field.IsDefined(typeof(NonSerializedAttribute), inherit: false)
+            )
             {
                 required = default;
                 return false;
             }
 
+            bool isManagedReference = field.IsDefined(typeof(SerializeReference), inherit: true);
+            if (
+                !field.IsPublic
+                && !field.IsDefined(typeof(SerializeField), inherit: false)
+                && !isManagedReference
+            )
+            {
+                required = default;
+                return false;
+            }
             Type fieldType = field.FieldType;
             bool isCollection = false;
             if (fieldType.IsArray)
@@ -334,14 +437,36 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 fieldType = fieldType.GetGenericArguments()[0];
             }
 
-            if (fieldType == null)
+            if (
+                fieldType == null
+                || isManagedReference && (kind != AuthoredRequirementKind.NotEmpty || !isCollection)
+            )
             {
                 required = default;
                 return false;
             }
 
             bool isObjectReference = typeof(Object).IsAssignableFrom(fieldType);
-            if (!isObjectReference && fieldType != typeof(string))
+            bool isNumeric =
+                fieldType.IsEnum
+                || fieldType.IsPrimitive
+                    && fieldType != typeof(IntPtr)
+                    && fieldType != typeof(UIntPtr);
+            bool isComposite = fieldType.IsValueType && !isNumeric;
+            bool supported =
+                kind == AuthoredRequirementKind.NotEmpty
+                    ? isCollection || fieldType == typeof(string)
+                : kind == AuthoredRequirementKind.NotDefault
+                    ? !isCollection
+                        && (
+                            isNumeric
+                            || isComposite
+                            || isObjectReference
+                            || fieldType == typeof(string)
+                        )
+                : kind == AuthoredRequirementKind.Assigned
+                    && (isObjectReference || fieldType == typeof(string));
+            if (!supported)
             {
                 required = default;
                 return false;
@@ -352,7 +477,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 field.Name,
                 isObjectReference,
                 isCollection,
-                AliasesOf(field)
+                AliasesOf(field),
+                kind,
+                isNumeric,
+                isComposite
             );
             return true;
         }
@@ -374,11 +502,44 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
                 if (field.IsCollection)
                 {
+                    if (field.Kind == AuthoredRequirementKind.NotEmpty)
+                    {
+                        bool hasElement =
+                            !string.IsNullOrEmpty(entry.InlineValue)
+                            && !string.Equals(entry.InlineValue, "[]", StringComparison.Ordinal);
+                        foreach (
+                            AuthoredSequenceElement element in AuthoredAssetYaml.EnumerateSequenceElements(
+                                lines,
+                                entry
+                            )
+                        )
+                        {
+                            hasElement = true;
+                            break;
+                        }
+                        if (!hasElement)
+                        {
+                            findings.Add(
+                                new AuthoredRequirementFinding(
+                                    assetPath,
+                                    entry.LineNumber,
+                                    field.DeclaringType,
+                                    field.Name,
+                                    field.Kind
+                                )
+                            );
+                        }
+                        continue;
+                    }
                     JudgeElements(assetPath, lines, field, entry, findings);
                     continue;
                 }
 
-                if (!IsEmptyValue(field, entry.InlineValue))
+                if (
+                    field.Kind == AuthoredRequirementKind.NotDefault && field.IsComposite
+                        ? !IsDefaultComposite(lines, document, entry)
+                        : !IsEmptyValue(field, entry.InlineValue)
+                )
                 {
                     continue;
                 }
@@ -388,10 +549,129 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                         assetPath,
                         entry.LineNumber,
                         field.DeclaringType,
-                        field.Name
+                        field.Name,
+                        field.Kind
                     )
                 );
             }
+        }
+
+        private static bool IsDefaultComposite(
+            IReadOnlyList<string> lines,
+            AuthoredAssetDocument document,
+            AuthoredAssetEntry entry
+        )
+        {
+            if (!string.IsNullOrEmpty(entry.InlineValue))
+            {
+                return IsDefaultFlowValue(entry.InlineValue.AsSpan(), 0);
+            }
+            bool sawValue = false;
+            IReadOnlyList<AuthoredAssetEntry> entries = document.Entries;
+            for (int index = 0; index < entries.Count; ++index)
+            {
+                AuthoredAssetEntry child = entries[index];
+                if (
+                    child.LineNumber <= entry.LineNumber
+                    || entry.EndLineNumber <= child.LineNumber
+                    || string.Equals(child.Key, "serializedVersion", StringComparison.Ordinal)
+                )
+                {
+                    continue;
+                }
+                if (string.IsNullOrEmpty(child.InlineValue))
+                {
+                    foreach (
+                        AuthoredSequenceElement element in AuthoredAssetYaml.EnumerateSequenceElements(
+                            lines,
+                            child
+                        )
+                    )
+                    {
+                        return false;
+                    }
+                    if (index + 1 < entries.Count && child.Indent < entries[index + 1].Indent)
+                    {
+                        continue;
+                    }
+                }
+                sawValue = true;
+                if (!IsDefaultFlowValue(child.InlineValue.AsSpan(), 0))
+                {
+                    return false;
+                }
+            }
+            return sawValue;
+        }
+
+        private static bool IsDefaultFlowValue(ReadOnlySpan<char> value, int depth)
+        {
+            if (MaximumDefaultValueDepth <= depth)
+            {
+                return false;
+            }
+            value = value.Trim();
+            if (
+                value.IsEmpty
+                || value.SequenceEqual("\"\"".AsSpan())
+                || value.SequenceEqual("''".AsSpan())
+                || value.SequenceEqual("[]".AsSpan())
+                || value.Equals("false".AsSpan(), StringComparison.OrdinalIgnoreCase)
+            )
+            {
+                return true;
+            }
+            if (value[0] != '{' || value[value.Length - 1] != '}')
+            {
+                return double.TryParse(
+                        value,
+                        NumberStyles.Float,
+                        CultureInfo.InvariantCulture,
+                        out double number
+                    )
+                    && number == 0d;
+            }
+            value = value.Slice(1, value.Length - 2);
+            bool sawValue = false;
+            while (!value.IsEmpty)
+            {
+                int colon = value.IndexOf(':');
+                if (colon < 0)
+                {
+                    return false;
+                }
+                ReadOnlySpan<char> key = value.Slice(0, colon).Trim();
+                value = value.Slice(colon + 1);
+                int end = 0;
+                int nesting = 0;
+                int valueLength = value.Length;
+                for (; end < valueLength; ++end)
+                {
+                    char character = value[end];
+                    if (character == '{' || character == '[')
+                    {
+                        ++nesting;
+                    }
+                    else if (character == '}' || character == ']')
+                    {
+                        --nesting;
+                    }
+                    else if (character == ',' && nesting == 0)
+                    {
+                        break;
+                    }
+                }
+                if (!key.SequenceEqual("serializedVersion".AsSpan()))
+                {
+                    sawValue = true;
+                    if (!IsDefaultFlowValue(value.Slice(0, end), depth + 1))
+                    {
+                        return false;
+                    }
+                }
+                value = end < value.Length ? value.Slice(end + 1).Trim() : ReadOnlySpan<char>.Empty;
+            }
+            return sawValue;
         }
 
         /// <summary>
@@ -432,7 +712,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                         assetPath,
                         element.LineNumber,
                         field.DeclaringType,
-                        field.Name
+                        field.Name,
+                        field.Kind
                     )
                 );
             }
@@ -444,19 +725,31 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             out AuthoredAssetEntry entry
         )
         {
-            if (document.TryGetEntry(field.Name, out entry))
+            int fieldIndent = int.MaxValue;
+            foreach (AuthoredAssetEntry candidate in document.Entries)
             {
+                fieldIndent = Math.Min(fieldIndent, candidate.Indent);
+            }
+            if (
+                document.TryGetEntry(field.Name, out AuthoredAssetEntry named)
+                && named.Indent == fieldIndent
+            )
+            {
+                entry = named;
                 return true;
             }
-
             for (int index = 0; index < field.Aliases.Count; ++index)
             {
-                if (document.TryGetEntry(field.Aliases[index], out entry))
+                if (
+                    document.TryGetEntry(field.Aliases[index], out AuthoredAssetEntry alias)
+                    && alias.Indent == fieldIndent
+                )
                 {
+                    entry = alias;
                     return true;
                 }
             }
-
+            entry = default;
             return false;
         }
 

@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add test report source-freshness diagnostics across transitive assembly references, with named stale sources and missing-input reports ([#1112](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1112)).
+- Add nonempty collection and nondefault value checks to `AuthoredRequirementValidator`, with explicit requirement kinds and project-owned annotations ([#1112](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1112)).
+- Add `Objects.StableHash64V1` for standard 64-bit FNV-1a byte hashes with a frozen algorithm and optional seed ([#1112](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1112)).
 - Add automatic `LiveComponents<T>` discovery by component class, base class or interface, with active and scene queries and reusable result lists ([guide](./docs/features/utilities/helper-utilities.md#live-component-registries), [#1110](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1110)).
 - Add `WUH026` to report bitwise boolean operators, with guidance for preserving required calls and nullable results ([#1092](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1092)).
 - Add `WUH025` compiler diagnostics for unsupported relational field types, with an Analyzer Policies severity control to reject invalid declarations before runtime. ([#1086](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1086)).
@@ -60,6 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix stale-key scans invoking `Reset` through temporary objects; inspect authored instances and include native components ([#1112](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1112)).
 - Fix concurrent semaphore leases losing permits and corrupting shared disposal slots in `SINGLE_THREADED` builds ([guide](./docs/features/utilities/helper-utilities.md#semaphore-leases), [#1106](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1106)).
 - Fix WProto custom formatters publishing incomplete fields or switching to a newly constructed writer. Reject invalid length tokens without changing the output, and preserve valid wire bytes ([guide](./docs/features/serialization/serialization.md)).
 - Fix overlapping byte input spans losing data when `WProtoWriter.TryWriteBytes` writes the length prefix ([guide](./docs/features/serialization/serialization.md)).

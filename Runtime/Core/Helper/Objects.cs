@@ -31,6 +31,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// </summary>
         public const uint Fnv32OffsetBasis = 2166136261u;
 
+        /// <summary>The standard 64-bit FNV-1a offset basis.</summary>
+        public const ulong Fnv64OffsetBasis = 14695981039346656037UL;
+
+        private const ulong Fnv64Prime = 1099511628211UL;
+
         private const uint Fnv32Prime = 16777619u;
 
         private const string HexDigits = "0123456789abcdef";
@@ -875,6 +880,22 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             {
                 hash ^= value;
                 hash *= Fnv32Prime;
+            }
+
+            return hash;
+        }
+
+        /// <summary>Computes a versioned 64-bit FNV-1a hash over the supplied bytes.</summary>
+        /// <param name="bytes">The bytes to hash; an empty span returns the seed.</param>
+        /// <param name="seed">The initial state, conventionally <see cref="Fnv64OffsetBasis"/>.</param>
+        /// <returns>The unsigned 64-bit hash.</returns>
+        /// <remarks>The algorithm is frozen across platforms and package versions. Encode text as UTF-8 for interoperable text hashes. This is not a cryptographic hash.</remarks>
+        public static ulong StableHash64V1(ReadOnlySpan<byte> bytes, ulong seed = Fnv64OffsetBasis)
+        {
+            ulong hash = seed;
+            foreach (byte value in bytes)
+            {
+                hash = unchecked((hash ^ value) * Fnv64Prime);
             }
 
             return hash;

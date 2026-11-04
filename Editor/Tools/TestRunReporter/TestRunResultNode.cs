@@ -44,6 +44,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         /// </summary>
         public DateTime? assemblyBuiltUtc;
 
+        /// <summary>Whether the report examined at least one source timestamp in the assembly closure.</summary>
+        public bool sourceFilesInspected;
+
+        /// <summary>Sources newer than this assembly or their owning dependency assembly.</summary>
+        public readonly List<string> staleSources = new();
+
+        /// <summary>Inputs whose timestamps could not be checked.</summary>
+        public readonly List<string> freshnessErrors = new();
+
         /// <summary>
         ///     The children of this node; a node with none is a single test case.
         /// </summary>

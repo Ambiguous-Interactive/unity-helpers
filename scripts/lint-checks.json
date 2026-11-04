@@ -87,7 +87,7 @@
   {
     "id": "license-headers",
     "name": "MIT license headers",
-    "run": "pwsh -NoProfile -File scripts/lint-license-headers.ps1 -VerboseOutput"
+    "run": "npm run lint:license-headers"
   },
   {
     "id": "drawer-multiobject-test",
@@ -102,12 +102,12 @@
   {
     "id": "odin-undo-safety-test",
     "name": "Odin undo-safety linter self-test",
-    "run": "pwsh -NoProfile -File scripts/tests/test-lint-odin-undo-safety.ps1 -VerboseOutput"
+    "run": "npm run test:odin-undo-safety"
   },
   {
     "id": "odin-undo-safety",
     "name": "Odin undo safety",
-    "run": "pwsh -NoProfile -File scripts/lint-odin-undo-safety.ps1 -VerboseOutput"
+    "run": "npm run lint:odin-undo-safety"
   },
   {
     "id": "unity-file-naming-test",
