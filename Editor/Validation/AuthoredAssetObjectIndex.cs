@@ -53,6 +53,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                             SceneManager.SetActiveScene(previousActive);
                         }
                     }
+                    if (scene.isDirty)
+                    {
+                        Failed = true;
+                        return;
+                    }
                     List<Object> components = new();
                     foreach (GameObject root in scene.GetRootGameObjects())
                     {

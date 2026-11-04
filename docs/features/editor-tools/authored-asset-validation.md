@@ -67,7 +67,7 @@ that a sprite or other referenced sub-object still exists. The stale-key command
 It does not call `CreateInstance` or `AddComponent` to discover fields. Loading an asset can still
 run its deserialization or enable callbacks. Unloaded scenes open additively for the scan and close
 afterward; already open scenes stay open. Scenes kept unloaded in the Hierarchy return to that state. If Unity refuses to open a scene, the path is reported as unreadable. The scanner does not save or
-replace the active scene.
+replace the active scene. Dirty loaded scenes are reported as unreadable because their objects can differ from the saved YAML.
 
 ## Script bindings
 
@@ -122,7 +122,7 @@ Choose a requirement kind with the overload that takes `AuthoredRequirementKind`
 | `NotDefault` | A number, boolean, enum, reference or structured value must differ from its serialized default. Vectors, colors and nested numeric mappings are checked by their values. |
 
 The attribute type remains a parameter, so projects can pass their own `[NotEmpty]` and
-`[NotDefault]` annotations. The existing overloads keep `Assigned` behavior. Unsupported shapes
+`[NotDefault]` annotations. The existing overloads keep `Assigned` behavior. `NotEmpty` also supports `[SerializeReference]` arrays and lists because it judges their length, not their elements. Unsupported shapes
 appear in the exemption list. An absent key remains unassessed because a field initializer can supply
 a value when an older asset is loaded. Default checks compare serialized values: Unity writes null
 strings as empty strings and may write null collections as empty collections.

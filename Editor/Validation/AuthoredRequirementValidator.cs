@@ -405,14 +405,22 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 || field.IsInitOnly
                 || field.IsLiteral
                 || field.IsDefined(typeof(NonSerializedAttribute), inherit: false)
-                || !field.IsPublic && !field.IsDefined(typeof(SerializeField), inherit: false)
-                || field.IsDefined(typeof(SerializeReference), inherit: true)
             )
             {
                 required = default;
                 return false;
             }
 
+            bool isManagedReference = field.IsDefined(typeof(SerializeReference), inherit: true);
+            if (
+                !field.IsPublic
+                && !field.IsDefined(typeof(SerializeField), inherit: false)
+                && !isManagedReference
+            )
+            {
+                required = default;
+                return false;
+            }
             Type fieldType = field.FieldType;
             bool isCollection = false;
             if (fieldType.IsArray)
@@ -429,7 +437,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 fieldType = fieldType.GetGenericArguments()[0];
             }
 
-            if (fieldType == null)
+            if (
+                fieldType == null
+                || isManagedReference && (kind != AuthoredRequirementKind.NotEmpty || !isCollection)
+            )
             {
                 required = default;
                 return false;
@@ -570,10 +581,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 }
                 if (string.IsNullOrEmpty(child.InlineValue))
                 {
-                    if (index + 1 < entries.Count && child.Indent < entries[index + 1].Indent)
-                    {
-                        continue;
-                    }
                     foreach (
                         AuthoredSequenceElement element in AuthoredAssetYaml.EnumerateSequenceElements(
                             lines,
@@ -582,6 +589,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                     )
                     {
                         return false;
+                    }
+                    if (index + 1 < entries.Count && child.Indent < entries[index + 1].Indent)
+                    {
+                        continue;
                     }
                 }
                 sawValue = true;

@@ -144,6 +144,28 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             "  composite:\n    values: []\n    count: 0",
             1
         )]
+        [TestCase(
+            AuthoredRequirementKind.NotDefault,
+            "  composite:\n    vectors:\n    - x: 0\n      y: 0\n      z: 0\n    count: 0",
+            0
+        )]
+        [TestCase(
+            AuthoredRequirementKind.NotDefault,
+            "  composite:\n    vectors: []\n    count: 0",
+            1
+        )]
+        [TestCase(
+            AuthoredRequirementKind.NotEmpty,
+            "  managedArray: []\n  " + RequirementKindTestAsset.ManagedListFieldName + ": []",
+            2
+        )]
+        [TestCase(
+            AuthoredRequirementKind.NotEmpty,
+            "  managedArray:\n  - {rid: -2}\n  "
+                + RequirementKindTestAsset.ManagedListFieldName
+                + ":\n  - {rid: -2}",
+            0
+        )]
         [TestCase(AuthoredRequirementKind.NotDefault, "  flags: 0", 1)]
         [TestCase(AuthoredRequirementKind.NotDefault, "  flags: 1", 0)]
         public void ExplicitRequirementKindsJudgeTheirOwnConditions(

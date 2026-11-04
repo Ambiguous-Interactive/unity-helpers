@@ -95,14 +95,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             Assert.IsTrue(instance != null);
         }
 
-        [TestCase(false, false, false)]
-        [TestCase(true, false, false)]
-        [TestCase(true, true, false)]
-        [TestCase(true, false, true)]
+        [TestCase(false, false, false, false)]
+        [TestCase(true, false, false, false)]
+        [TestCase(true, true, false, false)]
+        [TestCase(true, true, false, true)]
+        [TestCase(true, false, true, false)]
         public void PublicScanFindsRetiredKeysOnNativeComponentsInPrefabsAndScenes(
             bool sceneAsset,
             bool keepOpen,
-            bool keepUnloaded
+            bool keepUnloaded,
+            bool unsavedRemoval
         )
         {
             string folder = AssetDatabase.GenerateUniqueAssetPath("Assets/StaleKeyNativeComponent");
@@ -123,6 +125,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             GameObject grandchild = Track(new GameObject("InactiveGrandchild"));
             grandchild.transform.SetParent(child.transform);
             grandchild.SetActive(false);
+            Track(child.AddComponent<BoxCollider>());
             SerializationMode previous = EditorSettings.serializationMode;
             try
             {
@@ -135,6 +138,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 const string Marker = "  m_LocalPosition:";
                 StringAssert.Contains(Marker, original);
                 string edited = original.Replace(Marker, "  retiredTransformValue: 1\n" + Marker);
+                if (unsavedRemoval)
+                {
+                    const string ColliderMarker = "  m_IsTrigger:";
+                    StringAssert.Contains(ColliderMarker, edited);
+                    edited = original.Replace(
+                        ColliderMarker,
+                        "  retiredColliderValue: 1\n" + ColliderMarker
+                    );
+                }
                 File.WriteAllText(file, edited);
                 if (sceneAsset)
                 {
@@ -148,6 +160,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                         }
                     }
                 }
+                if (unsavedRemoval)
+                {
+                    BoxCollider removed = authoredScene
+                        .GetRootGameObjects()[0]
+                        .GetComponentInChildren<BoxCollider>(true);
+                    Assert.IsTrue(removed != null);
+                    UnityEngine.Object.DestroyImmediate(removed); // UNH-SUPPRESS UNH001: simulate an unsaved component removal from the saved document.
+                    Assert.IsTrue(EditorSceneManager.MarkSceneDirty(authoredScene));
+                }
                 int sceneCount = SceneManager.sceneCount;
                 bool dirty = originalActive.isDirty;
                 List<StaleSerializedKeyFinding> findings = new();
@@ -160,11 +181,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                         out int unresolved
                     )
                 );
-                CollectionAssert.IsEmpty(unreadable);
                 Assert.AreEqual(0, unresolved);
-                Assert.AreEqual(3, findings.Count, string.Join(Environment.NewLine, findings));
-                Assert.AreEqual("retiredTransformValue", findings[0].Key);
-                Assert.AreEqual(typeof(Transform), findings[0].OwnerType);
+                if (unsavedRemoval)
+                {
+                    CollectionAssert.AreEqual(new[] { path }, unreadable);
+                    CollectionAssert.IsEmpty(findings);
+                    Assert.IsTrue(authoredScene.isDirty);
+                }
+                else
+                {
+                    CollectionAssert.IsEmpty(unreadable);
+                    Assert.AreEqual(3, findings.Count, string.Join(Environment.NewLine, findings));
+                    Assert.AreEqual("retiredTransformValue", findings[0].Key);
+                    Assert.AreEqual(typeof(Transform), findings[0].OwnerType);
+                }
                 Assert.AreEqual(edited, File.ReadAllText(file));
                 Assert.AreEqual(sceneCount, SceneManager.sceneCount);
                 Assert.AreEqual(originalActive, SceneManager.GetActiveScene());

@@ -10,7 +10,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation.TestTypes
 
     internal sealed class RequirementKindTestAsset : ScriptableObject
     {
+        internal const string ManagedListFieldName = nameof(_managedList);
+
         public static int shared;
+
+        internal List<object> ManagedList => _managedList;
 
         [NonEmptyRequirementTest]
         public int[] numbers;
@@ -53,5 +57,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation.TestTypes
         public int nonSerialized;
 
         public readonly int fixedValue;
+
+        [NonEmptyRequirementTest]
+        [SerializeReference]
+        public object[] managedArray;
+
+        [NonEmptyRequirementTest]
+        [SerializeReference]
+        private List<object> _managedList;
     }
 }
