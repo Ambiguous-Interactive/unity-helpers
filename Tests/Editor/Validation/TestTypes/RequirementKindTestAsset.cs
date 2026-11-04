@@ -46,6 +46,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation.TestTypes
         [NonDefaultRequirementTest]
         public HideFlags flags;
 
+        [NonDefaultRequirementTest]
+        public CompositeRequirementTestValue composite;
+
         [NonSerialized]
         public int nonSerialized;
 

@@ -95,12 +95,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             Assert.IsTrue(instance != null);
         }
 
-        [TestCase(false, false)]
-        [TestCase(true, false)]
-        [TestCase(true, true)]
+        [TestCase(false, false, false)]
+        [TestCase(true, false, false)]
+        [TestCase(true, true, false)]
+        [TestCase(true, false, true)]
         public void PublicScanFindsRetiredKeysOnNativeComponentsInPrefabsAndScenes(
             bool sceneAsset,
-            bool keepOpen
+            bool keepOpen,
+            bool keepUnloaded
         )
         {
             string folder = AssetDatabase.GenerateUniqueAssetPath("Assets/StaleKeyNativeComponent");
@@ -116,6 +118,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                     nameof(PublicScanFindsRetiredKeysOnNativeComponentsInPrefabsAndScenes)
                 )
             );
+            GameObject child = Track(new GameObject("Child"));
+            child.transform.SetParent(host.transform);
+            GameObject grandchild = Track(new GameObject("InactiveGrandchild"));
+            grandchild.transform.SetParent(child.transform);
+            grandchild.SetActive(false);
             SerializationMode previous = EditorSettings.serializationMode;
             try
             {
@@ -132,9 +139,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 if (sceneAsset)
                 {
                     AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
-                    if (keepOpen)
+                    if (keepOpen || keepUnloaded)
                     {
                         authoredScene = EditorSceneManager.OpenScene(path, OpenSceneMode.Additive);
+                        if (keepUnloaded)
+                        {
+                            Assert.IsTrue(EditorSceneManager.CloseScene(authoredScene, false));
+                        }
                     }
                 }
                 int sceneCount = SceneManager.sceneCount;
@@ -151,7 +162,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 );
                 CollectionAssert.IsEmpty(unreadable);
                 Assert.AreEqual(0, unresolved);
-                Assert.AreEqual(1, findings.Count, string.Join(Environment.NewLine, findings));
+                Assert.AreEqual(3, findings.Count, string.Join(Environment.NewLine, findings));
                 Assert.AreEqual("retiredTransformValue", findings[0].Key);
                 Assert.AreEqual(typeof(Transform), findings[0].OwnerType);
                 Assert.AreEqual(edited, File.ReadAllText(file));
@@ -159,6 +170,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 Assert.AreEqual(originalActive, SceneManager.GetActiveScene());
                 Assert.AreEqual(dirty, originalActive.isDirty);
                 Assert.IsTrue(host != null);
+                if (keepUnloaded)
+                {
+                    Scene retained = SceneManager.GetSceneByPath(path);
+                    Assert.IsTrue(retained.IsValid());
+                    Assert.IsFalse(retained.isLoaded);
+                }
                 if (keepOpen)
                 {
                     Assert.IsTrue(authoredScene.isLoaded);
@@ -167,7 +184,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             finally
             {
                 EditorSettings.serializationMode = previous;
-                if (authoredScene.IsValid() && authoredScene.isLoaded)
+                if (authoredScene.IsValid())
                 {
                     Assert.IsTrue(EditorSceneManager.CloseScene(authoredScene, true));
                 }
@@ -192,6 +209,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             CollectionAssert.Contains(keys, "m_LocalRotation");
             Assert.IsTrue(host != null);
             Assert.IsTrue(host.transform != null);
+        }
+
+        [Test]
+        public void UnimportedAssetsRetainPrivateManagedReferenceKeys()
+        {
+            string path = WriteAsset(
+                "PrivateManaged",
+                _scriptGuid,
+                new[] { $"  {AuthoredRequirementTestAsset.ManagedFieldName}: {{rid: -2}}" }
+            );
+            List<StaleSerializedKeyFinding> findings = new();
+            Assert.IsTrue(
+                StaleSerializedKeyValidator.TryScan(new[] { path }, findings, out int unresolved)
+            );
+            Assert.AreEqual(0, unresolved);
+            CollectionAssert.IsEmpty(findings);
         }
 
         [Test]

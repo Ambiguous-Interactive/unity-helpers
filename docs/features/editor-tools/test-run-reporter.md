@@ -93,7 +93,7 @@ The whole file is rewritten, so this line replaces the running marker in place.
 #### `ASSEMBLY`, one per test assembly
 
 ```text
-ASSEMBLY name=WallstopStudios.UnityHelpers.Tests.Editor.dll pass=100 fail=1 skip=0 inconclusive=0 seconds=30.100 built=2026-09-02T09:58:11.000Z
+ASSEMBLY name=WallstopStudios.UnityHelpers.Tests.Editor.dll pass=100 fail=1 skip=0 inconclusive=0 seconds=30.100 built=2026-09-02T09:58:11.000Z freshness=current
 ```
 
 One line per direct child of the result tree's root, in the order the test runner reported them.
@@ -103,6 +103,9 @@ One line per direct child of the result tree's root, in the order the test runne
 - `seconds` — the duration the test runner itself reported for the assembly, not wall clock.
 - `built` — when the compiled assembly was last written, read from the DLL in
   `Library/ScriptAssemblies`. Empty when the assembly could not be located.
+- `freshness` — `stale`, `unknown` or `current`. See [Assembly source freshness](#assembly-source-freshness).
+- `staleSource` / `freshnessError` — repeated fields naming each stale source and unreadable input.
+  Both are omitted when empty.
 
 #### `FAILURE`, one per failing test case
 

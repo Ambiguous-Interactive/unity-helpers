@@ -129,6 +129,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             "  bounds:\n    m_Center: {x: 0, y: 1, z: 0}\n    m_Extent: {x: 0, y: 0, z: 0}",
             0
         )]
+        [TestCase(
+            AuthoredRequirementKind.NotDefault,
+            "  composite:\n    values:\n    - filled\n    count: 0",
+            0
+        )]
+        [TestCase(
+            AuthoredRequirementKind.NotDefault,
+            "  composite:\n    values:\n    - \n    count: 0",
+            0
+        )]
+        [TestCase(
+            AuthoredRequirementKind.NotDefault,
+            "  composite:\n    values: []\n    count: 0",
+            1
+        )]
         [TestCase(AuthoredRequirementKind.NotDefault, "  flags: 0", 1)]
         [TestCase(AuthoredRequirementKind.NotDefault, "  flags: 1", 0)]
         public void ExplicitRequirementKindsJudgeTheirOwnConditions(

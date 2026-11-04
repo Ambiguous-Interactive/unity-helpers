@@ -526,7 +526,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
                 if (
                     field.Kind == AuthoredRequirementKind.NotDefault && field.IsComposite
-                        ? !IsDefaultComposite(document, entry)
+                        ? !IsDefaultComposite(lines, document, entry)
                         : !IsEmptyValue(field, entry.InlineValue)
                 )
                 {
@@ -546,6 +546,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         }
 
         private static bool IsDefaultComposite(
+            IReadOnlyList<string> lines,
             AuthoredAssetDocument document,
             AuthoredAssetEntry entry
         )
@@ -567,13 +568,21 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 {
                     continue;
                 }
-                if (
-                    string.IsNullOrEmpty(child.InlineValue)
-                    && index + 1 < entries.Count
-                    && child.Indent < entries[index + 1].Indent
-                )
+                if (string.IsNullOrEmpty(child.InlineValue))
                 {
-                    continue;
+                    if (index + 1 < entries.Count && child.Indent < entries[index + 1].Indent)
+                    {
+                        continue;
+                    }
+                    foreach (
+                        AuthoredSequenceElement element in AuthoredAssetYaml.EnumerateSequenceElements(
+                            lines,
+                            child
+                        )
+                    )
+                    {
+                        return false;
+                    }
                 }
                 sawValue = true;
                 if (!IsDefaultFlowValue(child.InlineValue.AsSpan(), 0))
@@ -705,19 +714,31 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             out AuthoredAssetEntry entry
         )
         {
-            if (document.TryGetEntry(field.Name, out entry))
+            int fieldIndent = int.MaxValue;
+            foreach (AuthoredAssetEntry candidate in document.Entries)
             {
+                fieldIndent = Math.Min(fieldIndent, candidate.Indent);
+            }
+            if (
+                document.TryGetEntry(field.Name, out AuthoredAssetEntry named)
+                && named.Indent == fieldIndent
+            )
+            {
+                entry = named;
                 return true;
             }
-
             for (int index = 0; index < field.Aliases.Count; ++index)
             {
-                if (document.TryGetEntry(field.Aliases[index], out entry))
+                if (
+                    document.TryGetEntry(field.Aliases[index], out AuthoredAssetEntry alias)
+                    && alias.Indent == fieldIndent
+                )
                 {
+                    entry = alias;
                     return true;
                 }
             }
-
+            entry = default;
             return false;
         }
 

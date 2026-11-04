@@ -2165,15 +2165,7 @@ $licenseReaderControls = {
     if ($yearFunctions.Count -ne 1) { throw 'Expected one production license-year reader.' }
     . ([scriptblock]::Create($yearFunctions[0].Extent.Text))
 
-    $linterAst = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $SourceRoot 'scripts/lint-license-headers.ps1'), [ref]$tokens, [ref]$errors)
-    if ($errors.Count -ne 0) { throw 'License header linter source must parse.' }
-    foreach ($function in @($linterAst.FindAll({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $false))) {
-        . ([scriptblock]::Create($function.Extent.Text))
-    }
-    $fileLoops = @($linterAst.FindAll({ param($node) $node -is [System.Management.Automation.Language.ForEachStatementAst] -and $node.Variable.VariablePath.UserPath -eq 'file' -and $node.Condition.Extent.Text -eq '$csFiles' }, $true))
-    if ($fileLoops.Count -ne 1) { throw 'Expected one production license-header file loop.' }
-    # Execute the real complete loop body, including classification and early continues.
-    $linterLoop = [scriptblock]::Create('foreach ($file in @($readerPath)) ' + $fileLoops[0].Body.Extent.Text)
+    # The migrated header reader has encoding, bounds and real-handle cleanup controls in test_csharp_lints.py.
     $readerRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('license-reader-controls-' + [guid]::NewGuid().ToString('N'))
     [void][System.IO.Directory]::CreateDirectory($readerRoot)
     try {
@@ -2183,31 +2175,13 @@ $licenseReaderControls = {
             @{ Name = 'Year.BlankFirstLine'; Reader = 'Year'; Text = "`n// Copyright (c) 2025`n"; Expected = ''; Encoding = [System.Text.UTF8Encoding]::new($false) },
             @{ Name = 'Year.Empty'; Reader = 'Year'; Text = ''; Expected = ''; Encoding = [System.Text.UTF8Encoding]::new($false) },
             @{ Name = 'Year.Utf8Bom'; Reader = 'Year'; Text = "// Copyright (c) 2025`n// second`n"; Expected = '2025'; Encoding = [System.Text.UTF8Encoding]::new($true) },
-            @{ Name = 'Year.Utf16Bom'; Reader = 'Year'; Text = "// Copyright (c) 2025`n// second`n"; Expected = '2025'; Encoding = [System.Text.Encoding]::Unicode },
-            @{ Name = 'Linter.MitAt20'; Reader = 'Linter'; Text = ((@('') * 19 + @('// MIT License', '// tail')) -join "`n"); Expected = 'Accepted'; Encoding = [System.Text.UTF8Encoding]::new($false) },
-            @{ Name = 'Linter.MitAt21'; Reader = 'Linter'; Text = ((@('') * 20 + @('// MIT License', '// tail')) -join "`n"); Expected = 'Violation'; Encoding = [System.Text.UTF8Encoding]::new($false) },
-            @{ Name = 'Linter.OptOut'; Reader = 'Linter'; Text = "// No license header required`n// tail`n"; Expected = 'Skipped'; Encoding = [System.Text.UTF8Encoding]::new($false) },
-            @{ Name = 'Linter.Empty'; Reader = 'Linter'; Text = ''; Expected = 'Skipped'; Encoding = [System.Text.UTF8Encoding]::new($false) },
-            @{ Name = 'Linter.Utf8Bom'; Reader = 'Linter'; Text = "// MIT License`n// tail`n"; Expected = 'Accepted'; Encoding = [System.Text.UTF8Encoding]::new($true) },
-            @{ Name = 'Linter.Utf16Bom'; Reader = 'Linter'; Text = "// MIT License`n// tail`n"; Expected = 'Accepted'; Encoding = [System.Text.Encoding]::Unicode }
+            @{ Name = 'Year.Utf16Bom'; Reader = 'Year'; Text = "// Copyright (c) 2025`n// second`n"; Expected = '2025'; Encoding = [System.Text.Encoding]::Unicode }
         )
         foreach ($readerCase in $readerCases) {
             $readerPath = Join-Path $readerRoot ($readerCase.Name + '.cs')
             [System.IO.File]::WriteAllText($readerPath, $readerCase.Text, $readerCase.Encoding)
             $originalBytes = [System.IO.File]::ReadAllBytes($readerPath)
-            if ($readerCase.Reader -eq 'Year') {
-                $actual = Get-LicenseHeaderYear -Path $readerPath
-            } else {
-                $repoRoot = $readerRoot
-                $VerboseOutput = $false
-                $linesToCheck = 20
-                $optOutMarker = 'No license header required'
-                $checkedCount = 0
-                $skippedCount = 0
-                $violations = @()
-                . $linterLoop
-                $actual = if ($skippedCount -eq 1) { 'Skipped' } elseif ($violations.Count -eq 1) { 'Violation' } else { 'Accepted' }
-            }
+            $actual = Get-LicenseHeaderYear -Path $readerPath
             Write-TestResult "LicenseReader.$($readerCase.Name).Classification" ($actual -ceq $readerCase.Expected) "Expected '$($readerCase.Expected)', got '$actual'."
             $exclusive = $null
             $releaseError = ''
@@ -2223,10 +2197,7 @@ $licenseReaderControls = {
         }
         $missingPath = Join-Path $readerRoot 'missing.cs'
         Write-TestResult 'LicenseReader.Year.MissingReturnsEmpty' ((Get-LicenseHeaderYear -Path $missingPath) -ceq '') 'Expected preflight read errors to return empty.'
-        $readerPath = $missingPath
-        $linterThrew = $false
-        try { . $linterLoop } catch { $linterThrew = $true }
-        Write-TestResult 'LicenseReader.Linter.MissingPropagates' $linterThrew 'Expected linter read errors to propagate.'
+
     }
     finally {
         Remove-Item -LiteralPath $readerRoot -Recurse -Force -ErrorAction SilentlyContinue

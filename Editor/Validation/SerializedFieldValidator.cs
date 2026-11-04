@@ -396,7 +396,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 return false;
             }
 
-            return field.IsPublic || field.IsDefined(typeof(SerializeField), inherit: false);
+            return field.IsPublic
+                || field.IsDefined(typeof(SerializeField), inherit: false)
+                || field.IsDefined(typeof(SerializeReference), inherit: false);
         }
     }
 #endif

@@ -61,7 +61,9 @@ def mask_noise(source: str, *, preserve_strings: bool = False) -> str:
     while index < length:
         start = index
         literal = False
-        if source.startswith("//", index):
+        if source.startswith("//", index) or (
+            source[index] == "#" and not source[source.rfind("\n", 0, index) + 1 : index].strip()
+        ):
             end = source.find("\n", index)
             index = length if end < 0 else end
         elif source.startswith("/*", index):
@@ -84,6 +86,8 @@ def mask_noise(source: str, *, preserve_strings: bool = False) -> str:
                 )
                 index += 1
                 while index < length:
+                    if not verbatim and source[index] in "\r\n":
+                        break
                     if source[index] == quote:
                         index += 1
                         if verbatim and index < length and source[index] == quote:
@@ -91,6 +95,9 @@ def mask_noise(source: str, *, preserve_strings: bool = False) -> str:
                             continue
                         break
                     if not verbatim and source[index] == "\\":
+                        if index + 1 < length and source[index + 1] in "\r\n":
+                            index += 1
+                            break
                         index += 1
                     index += 1
         else:

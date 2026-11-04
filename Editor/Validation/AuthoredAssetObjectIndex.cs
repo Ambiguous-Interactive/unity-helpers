@@ -20,6 +20,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
         private readonly Dictionary<long, Object> _objects = new();
         private Scene _openedScene;
+        private bool _removeOpenedScene;
 
         internal AuthoredAssetObjectIndex(string assetPath)
         {
@@ -40,6 +41,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                     Scene scene = SceneManager.GetSceneByPath(assetPath);
                     if (!scene.IsValid() || !scene.isLoaded)
                     {
+                        _removeOpenedScene = !scene.IsValid();
                         Scene previousActive = SceneManager.GetActiveScene();
                         _openedScene = EditorSceneManager.OpenScene(
                             assetPath,
@@ -51,21 +53,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                             SceneManager.SetActiveScene(previousActive);
                         }
                     }
+                    List<Object> components = new();
                     foreach (GameObject root in scene.GetRootGameObjects())
                     {
-                        AddHierarchy(root);
+                        components.AddRange(root.GetComponentsInChildren<Component>(true));
                     }
+                    AddAll(components);
                     return;
                 }
 
-                foreach (Object instance in AssetDatabase.LoadAllAssetsAtPath(assetPath))
-                {
-                    Add(instance);
-                    if (instance is GameObject root)
-                    {
-                        AddHierarchy(root);
-                    }
-                }
+                AddAll(AssetDatabase.LoadAllAssetsAtPath(assetPath));
             }
             catch (Exception)
             {
@@ -82,7 +79,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 if (
                     _openedScene.IsValid()
                     && _openedScene.isLoaded
-                    && !EditorSceneManager.CloseScene(_openedScene, removeScene: true)
+                    && !EditorSceneManager.CloseScene(_openedScene, removeScene: _removeOpenedScene)
                 )
                 {
                     Debug.LogWarning(
@@ -107,24 +104,36 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             return _objects.TryGetValue(fileId, out instance);
         }
 
-        private void AddHierarchy(GameObject root)
+        /// <summary>Indexes each live authored object with one batch ID lookup.</summary>
+        /// <remarks>
+        /// Prefab loading already includes descendants. Repeating hierarchy walks made deep
+        /// prefabs costlier. Paired 8/32/96-node Editor probes reduced index time and allocation
+        /// events; small and flat full-scan timings were inconclusive. See PR #1115 for the captures.
+        /// </remarks>
+        private void AddAll(IReadOnlyList<Object> instances)
         {
-            foreach (Component component in root.GetComponentsInChildren<Component>(true))
+            List<Object> valid = new(instances.Count);
+            for (int index = 0; index < instances.Count; ++index)
             {
-                Add(component);
+                Object instance = instances[index];
+                if (instance != null)
+                {
+                    valid.Add(instance);
+                }
             }
-        }
-
-        private void Add(Object instance)
-        {
-            if (instance == null)
+            if (valid.Count == 0)
             {
                 return;
             }
-            GlobalObjectId id = GlobalObjectId.GetGlobalObjectIdSlow(instance);
-            if (id.targetObjectId != 0)
+            Object[] objects = valid.ToArray();
+            GlobalObjectId[] ids = new GlobalObjectId[objects.Length];
+            GlobalObjectId.GetGlobalObjectIdsSlow(objects, ids);
+            for (int index = 0; index < objects.Length; ++index)
             {
-                _objects[unchecked((long)id.targetObjectId)] = instance;
+                if (ids[index].targetObjectId != 0)
+                {
+                    _objects[unchecked((long)ids[index].targetObjectId)] = objects[index];
+                }
             }
         }
     }

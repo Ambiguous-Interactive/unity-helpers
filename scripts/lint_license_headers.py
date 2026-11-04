@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+import codecs
+import io
 import re
 from concurrent.futures import ThreadPoolExecutor
 from itertools import islice
@@ -20,8 +22,18 @@ LICENSE = re.compile(r"\bMIT\b|MIT\s+License", re.IGNORECASE)
 
 
 def header_is_valid(path: Path) -> bool:
-    with path.open(encoding="utf-8-sig") as stream:
-        header = "".join(islice(stream, HEADER_LINES))
+    with path.open("rb") as binary:
+        prefix = binary.read(4)
+        binary.seek(0)
+        encoding = (
+            "utf-32"
+            if prefix.startswith((codecs.BOM_UTF32_LE, codecs.BOM_UTF32_BE))
+            else "utf-16"
+            if prefix.startswith((codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE))
+            else "utf-8-sig"
+        )
+        with io.TextIOWrapper(binary, encoding=encoding) as stream:
+            header = "".join(islice(stream, HEADER_LINES))
     return (
         not header or OPT_OUT.casefold() in header.casefold() or LICENSE.search(header) is not None
     )

@@ -151,7 +151,7 @@ helpers for content tests that make many calls.
 The MIT-header and conditional-call checks also run in typed Python. Use
 `npm run lint:license-headers` and `npm run lint:conditional-call-chains`; the PowerShell entry points
 forward existing calls. Both checks require their source roots and a nonempty corpus, avoid linked
-or generated directories, and fail on unreadable UTF-8 input. Header reads stop after 20 lines and use at most eight concurrent readers; findings keep a fixed order.
+or generated directories, and fail on unreadable input. Body checks require UTF-8; header checks also retain BOM-marked UTF-16 and UTF-32 support. Header reads stop after 20 lines and use at most eight concurrent readers; findings keep a fixed order.
 The conditional check masks comments and string literals, includes same-line bodies and generic
 calls, and rejects methods whose bodies cannot be inspected. It remains a source check by method
 name, with explicit external receivers; it does not replace C# semantic analysis.

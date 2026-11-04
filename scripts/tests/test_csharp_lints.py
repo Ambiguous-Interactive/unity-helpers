@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import BinaryIO
 
 import pytest
 
@@ -183,13 +184,15 @@ def test_direct_and_legacy_cli_preserve_status_and_unicode_paths(
         shell = shutil.which("pwsh")
         assert shell is not None
         filename = (
-            "lint-license-headers.ps1" if kind == "license" else "lint-conditional-call-chains.ps1"
+            "scripts/lint-license-headers.ps1"
+            if kind == "license"
+            else "scripts/lint-conditional-call-chains.ps1"
         )
         command = [
             shell,
             "-NoProfile",
             "-File",
-            str(ROOT / "scripts" / filename),
+            str(ROOT / filename),
             "-RepoRoot",
             str(root),
             "-VerboseOutput",
@@ -313,3 +316,90 @@ def test_odin_cli_checks_every_explicit_path_and_ignores_caller_directory(
     assert result.returncode == 1, result.stdout + result.stderr
     assert "UNH006" in result.stdout
     assert bad.name in result.stdout
+
+
+@pytest.mark.parametrize(
+    "directive", ["#region Player's stats", '#warning Missing "quote', '  #error Missing "quote']
+)
+def test_directive_text_cannot_hide_conditional_calls(directive: str) -> None:
+    source = (
+        directive
+        + "\n"
+        + conditional("Inner();")
+        + '[Conditional("DEBUG")]\nstatic void Inner() {}'
+    )
+    methods, errors = chains.methods_in(source, "Runtime/A.cs")
+    assert not errors
+    assert len(methods) == 2
+    assert len(chains.violations(methods)) == 1
+
+
+@pytest.mark.parametrize("quote", ['"', "'"])
+@pytest.mark.parametrize("newline", ["\n", "\r\n", "\r"])
+@pytest.mark.parametrize("escape", ["", "\\"])
+def test_an_unterminated_ordinary_literal_cannot_hide_later_lines(
+    quote: str, newline: str, escape: str
+) -> None:
+    assert "Actual();" in csharp_sources.mask_noise(
+        quote + "unfinished" + escape + newline + "Actual();"
+    )
+
+
+@pytest.mark.parametrize("encoding", ["utf-16", "utf-16-be", "utf-32", "utf-32-be"])
+def test_license_preserves_bom_marked_unicode_headers(tmp_path: Path, encoding: str) -> None:
+    import codecs
+
+    prefix = (
+        codecs.BOM_UTF16_BE
+        if encoding == "utf-16-be"
+        else codecs.BOM_UTF32_BE
+        if encoding == "utf-32-be"
+        else b""
+    )
+    path = tmp_path / "A.cs"
+    path.write_bytes(prefix + "// MIT License\n".encode(encoding))
+    assert licenses.header_is_valid(path)
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [b"// MIT License\n", b"// No license header required\n", b"", b"bad header", b"\xff\xfe\x80"],
+)
+def test_license_closes_the_actual_file_before_gc_or_process_exit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, payload: bytes
+) -> None:
+    path = tmp_path / "A.cs"
+    path.write_bytes(payload)
+    stream = path.open("rb")
+
+    def open_stream(_path: Path, _mode: str) -> BinaryIO:
+        return stream
+
+    monkeypatch.setattr(Path, "open", open_stream)
+    if payload == b"\xff\xfe\x80":
+        with pytest.raises(UnicodeError):
+            licenses.header_is_valid(path)
+    else:
+        assert licenses.header_is_valid(path) == (payload != b"bad header")
+    assert stream.closed
+    path.unlink()
+    assert not path.exists()
+
+
+def test_license_missing_file_propagates(tmp_path: Path) -> None:
+    with pytest.raises(FileNotFoundError):
+        licenses.header_is_valid(tmp_path / "absent.cs")
+
+
+def test_legacy_self_test_entrypoint_executes_the_typed_suite(tmp_path: Path) -> None:
+    shell = shutil.which("pwsh")
+    assert shell is not None
+    result = subprocess.run(
+        [shell, "-NoProfile", "-File", str(ROOT / "scripts/tests/test-lint-odin-undo-safety.ps1")],
+        cwd=tmp_path,
+        capture_output=True,
+        encoding="utf-8",
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "passed" in result.stdout

@@ -66,7 +66,7 @@ Animation-keyframe checks use Unity's animation APIs because a valid GUID alone 
 that a sprite or other referenced sub-object still exists. The stale-key command reads the asset's own objects, including native components.
 It does not call `CreateInstance` or `AddComponent` to discover fields. Loading an asset can still
 run its deserialization or enable callbacks. Unloaded scenes open additively for the scan and close
-afterward; already open scenes stay open. If Unity refuses to open a scene, the path is reported as unreadable. The scanner does not save or
+afterward; already open scenes stay open. Scenes kept unloaded in the Hierarchy return to that state. If Unity refuses to open a scene, the path is reported as unreadable. The scanner does not save or
 replace the active scene.
 
 ## Script bindings
