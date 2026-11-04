@@ -250,7 +250,9 @@ def git_output(root: Path, arguments: list[str]) -> bytes:
 
 def host_source_files(repository: Path) -> list[HostSourceFile]:
     root = regular_path(repository, directory=True)
-    actual_root = git_output(root, ["rev-parse", "--show-toplevel"]).decode().removesuffix("\n")
+    actual_root = os.fsdecode(
+        git_output(root, ["rev-parse", "--show-toplevel"]).removesuffix(b"\n")
+    )
     if Path(actual_root) != root:
         raise ValueError("Host source census requires the Git repository root.")
     listing = git_output(

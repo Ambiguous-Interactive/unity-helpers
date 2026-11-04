@@ -364,9 +364,16 @@ def test_host_cli_matches_current_physical_inputs(tmp_path: Path) -> None:
             for suffix in (" ", "\t", "\r", "\n", "\r\n")
         ),
         "repository \u00a0",
+        pytest.param(
+            "repository\udcff",
+            marks=pytest.mark.skipif(
+                sys.platform == "win32", reason="Non-UTF-8 byte names require POSIX paths"
+            ),
+            id="non-utf8",
+        ),
     ],
 )
-def test_host_census_preserves_repository_root_whitespace(
+def test_host_census_preserves_repository_root_names(
     entrypoint: str, name: str, tmp_path: Path
 ) -> None:
     root = tmp_path / name
