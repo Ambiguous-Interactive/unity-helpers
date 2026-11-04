@@ -134,20 +134,32 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
         public void Setup()
         {
-            bool createParent = !AssetDatabase.IsValidFolder("Assets/Temp");
-            SessionState.SetBool(ParentCreatedKey, createParent);
-            if (createParent)
+            if (0 <= SessionState.GetInt(ModeKey, -1))
             {
-                AssetDatabase.CreateFolder("Assets", "Temp");
+                Cleanup();
             }
-            string folder = FolderPrefix + Guid.NewGuid().ToString("N");
-            SessionState.SetString(FolderKey, folder);
             SessionState.SetInt(ModeKey, (int)EditorSettings.spritePackerMode);
-            EditorSettings.spritePackerMode = SpritePackerMode.SpriteAtlasV2;
-            AssetDatabase.CreateFolder("Assets/Temp", Path.GetFileName(folder));
-            CreateAtlas(folder, true, false);
-            CreateAtlas(folder, false, false);
-            CreateAtlas(folder, true, true);
+            try
+            {
+                bool createParent = !AssetDatabase.IsValidFolder("Assets/Temp");
+                SessionState.SetBool(ParentCreatedKey, createParent);
+                if (createParent)
+                {
+                    AssetDatabase.CreateFolder("Assets", "Temp");
+                }
+                string folder = FolderPrefix + Guid.NewGuid().ToString("N");
+                SessionState.SetString(FolderKey, folder);
+                EditorSettings.spritePackerMode = SpritePackerMode.SpriteAtlasV2;
+                AssetDatabase.CreateFolder("Assets/Temp", Path.GetFileName(folder));
+                CreateAtlas(folder, true, false);
+                CreateAtlas(folder, false, false);
+                CreateAtlas(folder, true, true);
+            }
+            catch
+            {
+                Cleanup();
+                throw;
+            }
         }
 
         public void Cleanup()
