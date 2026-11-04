@@ -5,8 +5,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 {
     using System;
     using System.Collections.Generic;
+    using System.IO;
     using System.Linq;
     using NUnit.Framework;
+    using UnityEngine;
     using WallstopStudios.UnityHelpers.Editor.Validation;
     using WallstopStudios.UnityHelpers.Tests.Editor.Validation.TestTypes;
 
@@ -78,6 +80,171 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             _filled = null;
             _empty = null;
             _inherited = null;
+        }
+
+        [TestCase(AuthoredRequirementKind.NotEmpty, "  numbers: []\n  names: []\n  text: ", 3)]
+        [TestCase(
+            AuthoredRequirementKind.NotEmpty,
+            "  numbers:\n  - 0\n  names:\n  - \n  text: filled",
+            0
+        )]
+        [TestCase(AuthoredRequirementKind.NotEmpty, "  numbers: []\n  text: \"\"", 2)]
+        [TestCase(
+            AuthoredRequirementKind.NotDefault,
+            "  count: 0\n  enabledFlag: 0\n  amount: -0.0\n  material: {fileID: 0}",
+            4
+        )]
+        [TestCase(
+            AuthoredRequirementKind.NotDefault,
+            "  oldCount: 0\n  enabledFlag: false\n  amount: 0e0",
+            3
+        )]
+        [TestCase(
+            AuthoredRequirementKind.NotDefault,
+            "  count: -1\n  enabledFlag: 1\n  amount: 0.125\n  material: {fileID: 12}",
+            0
+        )]
+        [TestCase(
+            AuthoredRequirementKind.NotEmpty,
+            "  numbers: 0000000000000000\n  names:\n  - ",
+            0
+        )]
+        [TestCase(
+            AuthoredRequirementKind.NotDefault,
+            "  direction: {x: 0, y: -0.0, z: 0e-3}\n  tint: {r: 0, g: 0, b: 0, a: 0}",
+            2
+        )]
+        [TestCase(
+            AuthoredRequirementKind.NotDefault,
+            "  direction: {x: 0, y: 0.00001, z: 0}\n  tint: {r: 0, g: 0, b: 0, a: 1}",
+            0
+        )]
+        [TestCase(
+            AuthoredRequirementKind.NotDefault,
+            "  bounds:\n    m_Center: {x: 0, y: 0, z: 0}\n    m_Extent: {x: 0, y: 0, z: 0}",
+            1
+        )]
+        [TestCase(
+            AuthoredRequirementKind.NotDefault,
+            "  bounds:\n    m_Center: {x: 0, y: 1, z: 0}\n    m_Extent: {x: 0, y: 0, z: 0}",
+            0
+        )]
+        [TestCase(AuthoredRequirementKind.NotDefault, "  flags: 0", 1)]
+        [TestCase(AuthoredRequirementKind.NotDefault, "  flags: 1", 0)]
+        public void ExplicitRequirementKindsJudgeTheirOwnConditions(
+            AuthoredRequirementKind kind,
+            string body,
+            int expected
+        )
+        {
+            Assert.IsTrue(
+                MonoScriptIndex.TryGetScriptGuid(typeof(RequirementKindTestAsset), out string guid)
+            );
+            string path = Path.Combine(
+                Path.GetTempPath(),
+                $"requirement-kind-{Guid.NewGuid():N}.asset"
+            );
+            try
+            {
+                File.WriteAllText(
+                    path,
+                    $"%YAML 1.1\n--- !u!114 &11400000\nMonoBehaviour:\n  m_Script: {{fileID: 11500000, guid: {guid}, type: 3}}\n{body}\n"
+                );
+                List<AuthoredRequirementFinding> findings = new();
+                List<AuthoredRequirementExemption> exemptions = new();
+                Type attribute =
+                    kind == AuthoredRequirementKind.NotEmpty
+                        ? typeof(NonEmptyRequirementTestAttribute)
+                        : typeof(NonDefaultRequirementTestAttribute);
+                Assert.IsTrue(
+                    AuthoredRequirementValidator.TryScan(
+                        attribute,
+                        kind,
+                        new[] { path },
+                        findings,
+                        exemptions,
+                        out int inspected
+                    )
+                );
+                Assert.AreEqual(1, inspected);
+                Assert.AreEqual(
+                    expected,
+                    findings.Count,
+                    string.Join(Environment.NewLine, findings)
+                );
+                foreach (AuthoredRequirementFinding finding in findings)
+                {
+                    Assert.AreEqual(kind, finding.Kind);
+                }
+                Assert.IsFalse(
+                    exemptions.Any(item => item.DeclaringType == typeof(RequirementKindTestAsset))
+                );
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
+
+        [Test]
+        public void FindingsRetainRequirementKindAndTheOriginalConstructor()
+        {
+            AuthoredRequirementFinding original = new(
+                "Assets/Value.asset",
+                3,
+                typeof(RequirementKindTestAsset),
+                nameof(RequirementKindTestAsset.count)
+            );
+            AuthoredRequirementFinding assigned = new(
+                "Assets/Value.asset",
+                3,
+                typeof(RequirementKindTestAsset),
+                nameof(RequirementKindTestAsset.count),
+                AuthoredRequirementKind.Assigned
+            );
+            AuthoredRequirementFinding nondefault = new(
+                "Assets/Value.asset",
+                3,
+                typeof(RequirementKindTestAsset),
+                nameof(RequirementKindTestAsset.count),
+                AuthoredRequirementKind.NotDefault
+            );
+            Assert.IsTrue(original.Equals(assigned));
+            Assert.AreEqual(original.GetHashCode(), assigned.GetHashCode());
+            Assert.IsFalse(original.Equals(nondefault));
+            StringAssert.Contains("default", nondefault.ToString());
+        }
+
+        [TestCase(nameof(RequirementKindTestAsset.nonSerialized))]
+        [TestCase(nameof(RequirementKindTestAsset.shared))]
+        [TestCase(nameof(RequirementKindTestAsset.fixedValue))]
+        public void NonserializedFieldsCannotBeReportedAsSatisfiedRequirements(string name)
+        {
+            Assert.IsFalse(
+                AuthoredRequirementValidator.TryClassify(
+                    typeof(RequirementKindTestAsset).GetField(name),
+                    out AuthoredRequirementField _,
+                    AuthoredRequirementKind.NotDefault
+                )
+            );
+        }
+
+        [TestCase(0)]
+        [TestCase(-1)]
+        [TestCase(4)]
+        public void AnUnknownRequirementKindCannotReportACleanScan(int kind)
+        {
+            Assert.IsFalse(
+                AuthoredRequirementValidator.TryScan(
+                    typeof(NonDefaultRequirementTestAttribute),
+                    (AuthoredRequirementKind)kind,
+                    Array.Empty<string>(),
+                    new List<AuthoredRequirementFinding>(),
+                    new List<AuthoredRequirementExemption>(),
+                    out int inspected
+                )
+            );
+            Assert.AreEqual(0, inspected);
         }
 
         [Test]

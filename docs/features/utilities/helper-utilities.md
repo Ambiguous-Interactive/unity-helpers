@@ -1487,6 +1487,25 @@ result as the next seed. Encode text yourself, so the encoding is part of your f
 assumption of this one. Being a 32-bit non-cryptographic hash, it is for identity and change
 detection, never for security.
 
+`Objects.StableHash64V1(bytes, seed)` provides the standard 64-bit FNV-1a variant. Its optional
+seed defaults to `Objects.Fnv64OffsetBasis` (`14695981039346656037`). It has the same frozen
+algorithm and chunk-folding contract as the 32-bit method. Encode text as UTF-8 when matching
+existing UTF-8 hashes or persisted scene identifiers. No byte-order conversion or terminating null
+byte is added.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using System.Text;
+using WallstopStudios.UnityHelpers.Core.Helper;
+
+ulong signature = Objects.StableHash64V1(Encoding.UTF8.GetBytes("foobar"));
+// signature is 0x85944171f73967e8.
+```
+
+The constants and test vectors follow the [FNV specification](https://www.ietf.org/archive/id/draft-eastlake-fnv-35.html).
+Both FNV variants allow collisions and are non-cryptographic.
+
 ---
 
 ### SHA-256 Digests (`Objects`)

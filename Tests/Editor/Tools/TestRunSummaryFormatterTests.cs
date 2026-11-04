@@ -26,6 +26,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             {
                 fullName = "First.Tests.dll",
                 durationSeconds = 1.5d,
+                sourceFilesInspected = true,
                 assemblyBuiltUtc = new DateTime(2026, 9, 1, 8, 30, 0, DateTimeKind.Utc),
             };
             root.children.Add(first);
@@ -211,11 +212,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             );
 
             Assert.AreEqual(
-                "ASSEMBLY name=First.Tests.dll pass=2 fail=1 skip=1 inconclusive=0 seconds=1.500 built=2026-09-01T08:30:00.000Z",
+                "ASSEMBLY name=First.Tests.dll pass=2 fail=1 skip=1 inconclusive=0 seconds=1.500 built=2026-09-01T08:30:00.000Z freshness=current",
                 lines[1]
             );
             Assert.AreEqual(
-                "ASSEMBLY name=Second.Tests.dll pass=1 fail=1 skip=0 inconclusive=1 seconds=0.250 built=",
+                "ASSEMBLY name=Second.Tests.dll pass=1 fail=1 skip=0 inconclusive=1 seconds=0.250 built= freshness=unknown",
                 lines[2]
             );
         }

@@ -148,6 +148,20 @@ naming check, not a semantic C# parser: references inside interpolation expressi
 its scope. Existing Node commands and imports remain compatibility entry points; import the Python
 helpers for content tests that make many calls.
 
+The MIT-header and conditional-call checks also run in typed Python. Use
+`npm run lint:license-headers` and `npm run lint:conditional-call-chains`; the PowerShell entry points
+forward existing calls. Both checks require their source roots and a nonempty corpus, avoid linked
+or generated directories, and fail on unreadable UTF-8 input. Header reads stop after 20 lines and use at most eight concurrent readers; findings keep a fixed order.
+The conditional check masks comments and string literals, includes same-line bodies and generic
+calls, and rejects methods whose bodies cannot be inspected. It remains a source check by method
+name, with explicit external receivers; it does not replace C# semantic analysis.
+The Odin Undo check shares that lexer and keeps its PowerShell path selectors. Missing inputs fail;
+an unrelated nearby null check cannot excuse an unsafe array cast. Suppressions must be comments,
+not string literals. Its remaining nearby-filter recognition is a source heuristic, not proof that
+every Undo target is valid. `npm run lint:odin-undo-safety` checks drawers and
+`npm run test:odin-undo-safety` runs its focused tests.
+Run `npm run test:csharp-lints` for discovery, parser and direct/PowerShell CLI controls.
+
 The lockfile pins Ruff, mypy, Pyright, pytest, and their dependencies. `lint:python` checks Ruff
 formatting and correctness rules plus both type checkers in strict mode. Function signatures must
 be fully annotated and explicit `Any` is forbidden. CI runs these checks on Linux and Windows,

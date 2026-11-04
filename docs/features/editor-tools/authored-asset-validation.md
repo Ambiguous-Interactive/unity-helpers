@@ -28,11 +28,9 @@ time through the [Asset Validation](./asset-validation.md) engine — in the win
 CI — instead of only when somebody remembers the menu. They are the same code asked one asset at a
 time, so a finding here and a finding there are the same finding.
 
-Stale serialized keys is the one that is not, and the reason is its instrument: the declared-key set is
-`SerializedObject` over a throwaway instance, so answering the question constructs a `ScriptableObject`
-or adds a component to a hidden `GameObject` for every type it meets. That is a consumer's own
-constructors and `OnEnable` running from inside an editor tick, which is exactly what a continuous
-engine must not do. It stays a command you invoke deliberately.
+The stale-key command remains an explicit scan. It reads the serialized layout of each authored
+object instead of creating probe objects. Loading assets or opening an unloaded scene can still
+run consumer lifecycle callbacks, so it is not an import-time rule.
 
 The severity each rule reports at, the rule ids, and what a rule says about an asset it could not
 read are all in [Asset Validation](./asset-validation.md).
@@ -65,9 +63,11 @@ your `OnValidate` or other lifecycle code and dirty the asset. Text inspection a
 serialized keys that a loaded object's current fields no longer represent.
 
 Animation-keyframe checks use Unity's animation APIs because a valid GUID alone does not prove
-that a sprite or other referenced sub-object still exists. The stale-key command also creates
-temporary instances to discover Unity's serialized fields. Run that command deliberately when your
-components' construction and lifecycle behavior is safe for inspection; it is not a continuous rule.
+that a sprite or other referenced sub-object still exists. The stale-key command reads the asset's own objects, including native components.
+It does not call `CreateInstance` or `AddComponent` to discover fields. Loading an asset can still
+run its deserialization or enable callbacks. Unloaded scenes open additively for the scan and close
+afterward; already open scenes stay open. If Unity refuses to open a scene, the path is reported as unreadable. The scanner does not save or
+replace the active scene.
 
 ## Script bindings
 
@@ -112,6 +112,43 @@ that quietly cannot see part of its subject is the failure this exists to preven
 
 `AuthoredRequirementValidator.TryScan` takes the attribute type, so a project's own "author must
 fill this" attribute gets the same treatment.
+
+Choose a requirement kind with the overload that takes `AuthoredRequirementKind`:
+
+| Kind         | Condition                                                                                                                                                                |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Assigned`   | A reference or string must be assigned; collections retain the existing per-element checks.                                                                              |
+| `NotEmpty`   | A string, array or `List<T>` must contain at least one item. A collection containing a null item is still nonempty.                                                      |
+| `NotDefault` | A number, boolean, enum, reference or structured value must differ from its serialized default. Vectors, colors and nested numeric mappings are checked by their values. |
+
+The attribute type remains a parameter, so projects can pass their own `[NotEmpty]` and
+`[NotDefault]` annotations. The existing overloads keep `Assigned` behavior. Unsupported shapes
+appear in the exemption list. An absent key remains unassessed because a field initializer can supply
+a value when an older asset is loaded. Default checks compare serialized values: Unity writes null
+strings as empty strings and may write null collections as empty collections.
+
+<!-- doc-sample: compiles-editor -->
+
+```csharp
+using System;
+using System.Collections.Generic;
+using WallstopStudios.UnityHelpers.Editor.Validation;
+
+public static class RequirementScanExample
+{
+    public static bool Scan(Type nonEmptyAttribute, IReadOnlyList<string> assets)
+    {
+        List<AuthoredRequirementFinding> findings = new();
+        List<AuthoredRequirementExemption> exemptions = new();
+        List<string> unreadable = new();
+        return AuthoredRequirementValidator.TryScan(
+            nonEmptyAttribute, AuthoredRequirementKind.NotEmpty, assets,
+            findings, exemptions, unreadable, out int inspected)
+            && 0 < inspected && findings.Count == 0
+            && exemptions.Count == 0 && unreadable.Count == 0;
+    }
+}
+```
 
 ## Serializable dictionaries
 

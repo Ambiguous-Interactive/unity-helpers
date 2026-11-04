@@ -105,28 +105,57 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                     continue;
                 }
 
+                using AuthoredAssetObjectIndex instances = new(assetPath);
+                if (instances.Failed)
+                {
+                    unreadable.Add(assetPath);
+                    continue;
+                }
                 for (int document = 0; document < documents.Count; ++document)
                 {
                     AuthoredAssetDocument candidate = documents[document];
+                    if (candidate.IsStripped)
+                    {
+                        continue;
+                    }
+
+                    Type owner;
+                    HashSet<string> keys;
                     if (
-                        candidate.UnityTypeId != AuthoredAssetYaml.MonoBehaviourTypeId
-                        || candidate.IsStripped
-                        || string.IsNullOrEmpty(candidate.ScriptGuid)
+                        instances.TryGetValue(candidate.FileId, out Object instance)
+                        && (instance is ScriptableObject || instance is Component)
                     )
                     {
-                        continue;
+                        owner = instance.GetType();
+                        keys = BuildDeclaredKeys(instance);
+                        if (keys == null)
+                        {
+                            ++unresolved;
+                            continue;
+                        }
                     }
-
-                    if (!MonoScriptIndex.TryGetScriptType(candidate.ScriptGuid, out Type owner))
+                    else
                     {
-                        ++unresolved;
-                        continue;
-                    }
-
-                    if (!TryGetDeclaredKeys(owner, declared, out HashSet<string> keys))
-                    {
-                        ++unresolved;
-                        continue;
+                        if (
+                            candidate.UnityTypeId != AuthoredAssetYaml.MonoBehaviourTypeId
+                            || string.IsNullOrEmpty(candidate.ScriptGuid)
+                        )
+                        {
+                            continue;
+                        }
+                        if (instances.IsImported)
+                        {
+                            ++unresolved;
+                            continue;
+                        }
+                        if (
+                            !MonoScriptIndex.TryGetScriptType(candidate.ScriptGuid, out owner)
+                            || !TryGetDeclaredKeys(owner, declared, out keys)
+                        )
+                        {
+                            ++unresolved;
+                            continue;
+                        }
                     }
 
                     Judge(assetPath, candidate, owner, keys, findings);
@@ -167,35 +196,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             return causes;
         }
 
-        internal static HashSet<string> BuildDeclaredKeys(Type owner)
+        internal static HashSet<string> BuildDeclaredKeys(Object instance)
         {
-            Object instance = null;
-            GameObject host = null;
+            if (instance == null || !(instance is ScriptableObject || instance is Component))
+            {
+                return null;
+            }
+
             try
             {
-                if (typeof(ScriptableObject).IsAssignableFrom(owner))
-                {
-                    instance = ScriptableObject.CreateInstance(owner);
-                }
-                else if (typeof(MonoBehaviour).IsAssignableFrom(owner))
-                {
-                    host = new GameObject("WallstopStudios.StaleSerializedKeyProbe")
-                    {
-                        hideFlags = HideFlags.HideAndDontSave,
-                    };
-
-                    host.SetActive(false);
-                    instance = host.AddComponent(owner);
-                }
-
-                if (instance == null)
-                {
-                    return null;
-                }
-
                 HashSet<string> keys = new(UnityOwnedKeys, StringComparer.Ordinal);
                 using SerializedObject serialized = new(instance);
-                SerializedProperty iterator = serialized.GetIterator();
+                using SerializedProperty iterator = serialized.GetIterator();
                 bool remaining = iterator.Next(true);
                 while (remaining)
                 {
@@ -203,23 +215,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                     remaining = iterator.Next(false);
                 }
 
-                AddAliases(owner, keys);
+                AddAliases(instance.GetType(), keys);
                 return keys;
             }
             catch (Exception)
             {
                 return null;
-            }
-            finally
-            {
-                if (host != null)
-                {
-                    Object.DestroyImmediate(host);
-                }
-                else if (instance != null)
-                {
-                    Object.DestroyImmediate(instance);
-                }
             }
         }
 
@@ -272,7 +273,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 return cached != null;
             }
 
-            HashSet<string> built = BuildDeclaredKeys(owner);
+            HashSet<string> built = new(UnityOwnedKeys, StringComparer.Ordinal);
+            foreach (
+                FieldInfo field in SerializedFieldValidator.DeclaredSerializationCandidates(owner)
+            )
+            {
+                built.Add(field.Name);
+            }
+            AddAliases(owner, built);
             cache[owner] = built;
             keys = built;
             return built != null;

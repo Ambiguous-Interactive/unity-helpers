@@ -18,6 +18,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation.TestTypes
     /// </remarks>
     internal sealed class AuthoredRequirementTestAsset : ScriptableObject
     {
+        internal static int ResetCalls { get; private set; }
+
         /// <summary>A single required object reference.</summary>
         [WNotNull]
         public Material requiredMaterial;
@@ -44,5 +46,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation.TestTypes
 
         /// <summary>A number, which has no empty state the inspector reports.</summary>
         public int weight;
+
+        private void Reset()
+        {
+            ++ResetCalls;
+        }
     }
 }

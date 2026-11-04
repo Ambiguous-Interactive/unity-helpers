@@ -11,6 +11,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
     public readonly struct AuthoredRequirementFinding
         : global::System.IEquatable<AuthoredRequirementFinding>
     {
+        /// <summary>The requirement the authored value violates.</summary>
+        public AuthoredRequirementKind Kind { get; }
+
         /// <summary>The asset carrying the empty slot.</summary>
         public string AssetPath { get; }
 
@@ -34,7 +37,29 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             Type declaringType,
             string fieldName
         )
+            : this(
+                assetPath,
+                lineNumber,
+                declaringType,
+                fieldName,
+                AuthoredRequirementKind.Assigned
+            ) { }
+
+        /// <summary>Creates a finding for an explicit requirement kind.</summary>
+        /// <param name="assetPath">The asset carrying the value.</param>
+        /// <param name="lineNumber">The one-based source line.</param>
+        /// <param name="declaringType">The type declaring the annotated field.</param>
+        /// <param name="fieldName">The annotated field's name.</param>
+        /// <param name="kind">The requirement that was violated.</param>
+        public AuthoredRequirementFinding(
+            string assetPath,
+            int lineNumber,
+            Type declaringType,
+            string fieldName,
+            AuthoredRequirementKind kind
+        )
         {
+            Kind = kind;
             AssetPath = assetPath;
             LineNumber = lineNumber;
             DeclaringType = declaringType;
@@ -45,13 +70,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         /// <returns>A human-readable description.</returns>
         public override string ToString()
         {
-            return $"{AssetPath}:{LineNumber}: {DeclaringType?.Name}.{FieldName} is required and empty.";
+            string state = Kind == AuthoredRequirementKind.NotDefault ? "default" : "empty";
+            return $"{AssetPath}:{LineNumber}: {DeclaringType?.Name}.{FieldName} is required and {state}.";
         }
 
         /// <summary>Compares the stored fields with another value.</summary>
         public bool Equals(AuthoredRequirementFinding other)
         {
-            return EqualityComparer<string>.Default.Equals(AssetPath, other.AssetPath)
+            return Kind == other.Kind
+                && EqualityComparer<string>.Default.Equals(AssetPath, other.AssetPath)
                 && LineNumber.Equals(other.LineNumber)
                 && EqualityComparer<Type>.Default.Equals(DeclaringType, other.DeclaringType)
                 && EqualityComparer<string>.Default.Equals(FieldName, other.FieldName);
@@ -70,7 +97,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 AssetPath,
                 LineNumber,
                 DeclaringType,
-                FieldName
+                FieldName,
+                Kind
             );
         }
     }

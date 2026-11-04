@@ -84,6 +84,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         /// </summary>
         internal const string BuiltKey = "built";
 
+        /// <summary>The timestamp-based source freshness assessment.</summary>
+        internal const string FreshnessKey = "freshness";
+
+        /// <summary>The sources newer than their compiled assembly.</summary>
+        internal const string StaleSourceKey = "staleSource";
+
+        /// <summary>The inputs that could not be checked.</summary>
+        internal const string FreshnessErrorKey = "freshnessError";
+
         /// <summary>
         ///     The key naming an elapsed duration in seconds.
         /// </summary>
@@ -200,6 +209,24 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                         ? FormatTimestamp(assembly.assemblyBuiltUtc.Value)
                         : string.Empty
                 );
+                AppendField(
+                    builder,
+                    FreshnessKey,
+                    0 < assembly.staleSources.Count ? "stale"
+                        : 0 < assembly.freshnessErrors.Count
+                        || !assembly.assemblyBuiltUtc.HasValue
+                        || !assembly.sourceFilesInspected
+                            ? "unknown"
+                        : "current"
+                );
+                foreach (string source in assembly.staleSources)
+                {
+                    AppendField(builder, StaleSourceKey, source);
+                }
+                foreach (string error in assembly.freshnessErrors)
+                {
+                    AppendField(builder, FreshnessErrorKey, error);
+                }
                 builder.Append(LineSeparator);
             }
 

@@ -10,6 +10,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
     /// <summary>One annotated field, classified into the shape the text reader can judge.</summary>
     internal readonly struct AuthoredRequirementField
     {
+        /// <summary>The condition applied to the field.</summary>
+        public AuthoredRequirementKind Kind { get; }
+
+        /// <summary>Whether the scalar is serialized as a number or boolean.</summary>
+        public bool IsNumeric { get; }
+
+        /// <summary>Whether the field is a structured value with serialized child values.</summary>
+        public bool IsComposite { get; }
+
         /// <summary>The type declaring the field.</summary>
         public Type DeclaringType { get; }
 
@@ -31,14 +40,23 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         /// <param name="isObjectReference">Whether the field holds an object reference.</param>
         /// <param name="isCollection">Whether the field holds a collection.</param>
         /// <param name="aliases">The names older assets still record the field under.</param>
+        /// <param name="kind">The requirement applied to the field.</param>
+        /// <param name="isNumeric">Whether the scalar is numeric or boolean.</param>
+        /// <param name="isComposite">Whether the field contains structured serialized values.</param>
         public AuthoredRequirementField(
             Type declaringType,
             string name,
             bool isObjectReference,
             bool isCollection,
-            IReadOnlyList<string> aliases
+            IReadOnlyList<string> aliases,
+            AuthoredRequirementKind kind = AuthoredRequirementKind.Assigned,
+            bool isNumeric = false,
+            bool isComposite = false
         )
         {
+            Kind = kind;
+            IsNumeric = isNumeric;
+            IsComposite = isComposite;
             DeclaringType = declaringType;
             Name = name;
             IsObjectReference = isObjectReference;
