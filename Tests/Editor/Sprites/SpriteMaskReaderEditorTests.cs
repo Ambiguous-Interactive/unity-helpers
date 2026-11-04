@@ -260,6 +260,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
 #endif
             SpriteAtlas atlas = AssetDatabase.LoadAssetAtPath<SpriteAtlas>(atlasPath);
             Assert.IsTrue(atlas != null);
+#if !UNITY_2022_1_OR_NEWER
+            SpriteAtlasUtility.PackAtlases(
+                new[] { atlas },
+                EditorUserBuildSettings.activeBuildTarget,
+                false
+            );
+#endif
             Assert.IsTrue(atlas.CanBindTo(original));
             Sprite packed = Track(atlas.GetSprite(original.name));
             Assert.IsTrue(packed != null);

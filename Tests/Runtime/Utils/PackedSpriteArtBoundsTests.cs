@@ -27,18 +27,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             nameof(PackedSpriteArtBoundsTests) + "." + nameof(FolderKey);
         private const string ModeKey = nameof(PackedSpriteArtBoundsTests) + "." + nameof(ModeKey);
 
-        private static string CaseName(bool readable, bool tight)
-        {
-            return !readable ? "Unreadable"
-                : tight ? "Tight"
-                : "Rectangular";
-        }
-
         private static void CreateAtlas(string folder, bool readable, bool tight)
         {
-            string name = CaseName(readable, tight);
+            string name = PackedSpriteArtBoundsPlayerTests.CaseName(readable, tight);
             AssetDatabase.CreateFolder(folder, name);
-            string path = folder + "/" + name + "/Source.png";
+            string path =
+                folder + "/" + name + "/" + PackedSpriteArtBoundsPlayerTests.SourceName + ".png";
             Texture2D source = new(16, 16, TextureFormat.RGBA32, false);
             try
             {
@@ -142,9 +136,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 SessionState.SetString(FolderKey, folder);
                 EditorSettings.spritePackerMode = SpritePackerMode.SpriteAtlasV2;
                 AssetDatabase.CreateFolder("Assets", Path.GetFileName(folder));
-                CreateAtlas(folder, true, false);
-                CreateAtlas(folder, false, false);
-                CreateAtlas(folder, true, true);
+                AssetDatabase.CreateFolder(folder, "Resources");
+                string resources = folder + "/Resources";
+                AssetDatabase.CreateFolder(
+                    resources,
+                    PackedSpriteArtBoundsPlayerTests.ResourceRoot
+                );
+                string atlasFolder =
+                    resources + "/" + PackedSpriteArtBoundsPlayerTests.ResourceRoot;
+                CreateAtlas(atlasFolder, true, false);
+                CreateAtlas(atlasFolder, false, false);
+                CreateAtlas(atlasFolder, true, true);
             }
             catch
             {
@@ -191,8 +193,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         {
             string folder = SessionState.GetString(FolderKey, string.Empty);
             Assert.IsFalse(string.IsNullOrWhiteSpace(folder));
-            string caseFolder = folder + "/" + CaseName(readable, tight);
-            string path = caseFolder + "/Source.png";
+            string caseFolder =
+                folder
+                + "/Resources/"
+                + PackedSpriteArtBoundsPlayerTests.ResourceRoot
+                + "/"
+                + PackedSpriteArtBoundsPlayerTests.CaseName(readable, tight);
+            string path = caseFolder + "/" + PackedSpriteArtBoundsPlayerTests.SourceName + ".png";
             TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
             Assert.IsTrue(importer != null);
             Assert.IsFalse(importer.isReadable);
