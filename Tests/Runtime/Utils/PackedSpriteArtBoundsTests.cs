@@ -22,13 +22,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             IPrebuildSetup,
             IPostBuildCleanup
     {
-        private const string FolderPrefix = "Assets/Temp/" + nameof(PackedSpriteArtBoundsTests);
+        private const string FolderPrefix = "Assets/" + nameof(PackedSpriteArtBoundsTests);
         private const string FolderKey =
             nameof(PackedSpriteArtBoundsTests) + "." + nameof(FolderKey);
         private const string ModeKey = nameof(PackedSpriteArtBoundsTests) + "." + nameof(ModeKey);
-
-        private const string ParentCreatedKey =
-            nameof(PackedSpriteArtBoundsTests) + "." + nameof(ParentCreatedKey);
 
         private static string CaseName(bool readable, bool tight)
         {
@@ -141,16 +138,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             SessionState.SetInt(ModeKey, (int)EditorSettings.spritePackerMode);
             try
             {
-                bool createParent = !AssetDatabase.IsValidFolder("Assets/Temp");
-                SessionState.SetBool(ParentCreatedKey, createParent);
-                if (createParent)
-                {
-                    AssetDatabase.CreateFolder("Assets", "Temp");
-                }
                 string folder = FolderPrefix + Guid.NewGuid().ToString("N");
                 SessionState.SetString(FolderKey, folder);
                 EditorSettings.spritePackerMode = SpritePackerMode.SpriteAtlasV2;
-                AssetDatabase.CreateFolder("Assets/Temp", Path.GetFileName(folder));
+                AssetDatabase.CreateFolder("Assets", Path.GetFileName(folder));
                 CreateAtlas(folder, true, false);
                 CreateAtlas(folder, false, false);
                 CreateAtlas(folder, true, true);
@@ -176,15 +167,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                     }
                     SessionState.EraseString(FolderKey);
                 }
-                if (
-                    SessionState.GetBool(ParentCreatedKey, false)
-                    && AssetDatabase.IsValidFolder("Assets/Temp")
-                )
-                {
-                    Assert.That(Directory.GetFileSystemEntries("Assets/Temp"), Is.Empty);
-                    Assert.IsTrue(AssetDatabase.DeleteAsset("Assets/Temp"));
-                }
-                SessionState.EraseBool(ParentCreatedKey);
             }
             finally
             {
