@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import errno
 import hashlib
 import json
 import os
@@ -377,6 +378,12 @@ def test_host_census_preserves_repository_root_names(
     entrypoint: str, name: str, tmp_path: Path
 ) -> None:
     root = tmp_path / name
+    try:
+        root.mkdir()
+    except OSError as error:
+        if error.errno not in (errno.EILSEQ, errno.EINVAL):
+            raise
+        pytest.skip(f"Filesystem cannot create the repository name: {error}")
     host_sources(root)
     expected = [
         {"path": relative, "sha256": hashlib.sha256((root / relative).read_bytes()).hexdigest()}
