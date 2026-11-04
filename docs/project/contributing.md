@@ -117,8 +117,8 @@ in its four source trees, while the player filters compiler sources and also sca
 The scans reject redirects and missing roots. They compare file identity, size and timestamps
 before opening, after reading and through the final path, refusing observed changes. Windows
 hashing permits concurrent readers while excluding writers and deletion until its handle closes.
-On other platforms, metadata checks cannot detect a rewrite that preserves every observed value;
-keep source inputs unchanged throughout a capture.
+On other platforms, metadata checks cannot detect a rewrite that preserves every observed value.
+Keep source inputs unchanged throughout a capture on every platform.
 Every request reads the current bytes. A PowerShell process reuses one locked Python worker for
 source scans. It checks the implementation, project and lock hashes before and after each request;
 changes restart the worker or refuse the capture. Protocol, request and process identities must
