@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
     using System;
     using System.Collections;
     using System.Collections.Generic;
+    using System.Globalization;
     using System.IO;
     using System.Reflection;
     using System.Threading.Tasks;
@@ -275,8 +276,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 return System.Text.RegularExpressions.Regex.Escape(value);
             }
 
+            string decimalSeparator = Escape(
+                CultureInfo.CurrentCulture.NumberFormat.NumberDecimalSeparator
+            );
             string pattern =
-                $@"^\d+(\.\d+)?\|{Escape(ownerName)}\[{Escape(ownerType)}\]\|Unable to find "
+                $@"^\d+({decimalSeparator}\d+)?\|{Escape(ownerName)}\[{Escape(ownerType)}\]\|Unable to find "
                 + $"{relationship} component of type {Escape(fieldType)} for field "
                 + $"'{Escape(fieldName)}'$";
 
