@@ -112,7 +112,8 @@ The WProto player and host source censuses use `scripts/unity/frozen_files.py` t
 library entry points retain their names and result properties. Census walks include untracked and
 hidden inputs, prune only generated compiler output, and bind the Python project and lock alongside
 the source files. The host census also binds its Python implementation and requires the actual Git
-repository root. Each variant retains its own selection rules: the host scans every physical file
+repository root. Spaces in Git root directory names are preserved.
+Each variant retains its own selection rules: the host scans every physical file
 in its four source trees, while the player filters compiler sources and also scans Unity scripts.
 The scans reject redirects and missing roots. They compare file identity, size and timestamps
 before opening, after reading and through the final path, refusing observed changes. Windows

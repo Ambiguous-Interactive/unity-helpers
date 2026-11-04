@@ -349,6 +349,66 @@ def test_host_cli_matches_current_physical_inputs(tmp_path: Path) -> None:
     assert json.loads(result.stdout) == frozen_files.host_source_files(tmp_path)
 
 
+@pytest.mark.parametrize("entrypoint", ["direct", "cli", "worker"])
+@pytest.mark.parametrize(
+    "name",
+    [
+        *(
+            pytest.param(
+                f"repository{suffix}",
+                marks=pytest.mark.skipif(
+                    sys.platform == "win32",
+                    reason="Win32 trims ASCII spaces or rejects control characters",
+                ),
+            )
+            for suffix in (" ", "\t", "\r", "\n", "\r\n")
+        ),
+        "repository \u00a0",
+    ],
+)
+def test_host_census_preserves_repository_root_whitespace(
+    entrypoint: str, name: str, tmp_path: Path
+) -> None:
+    root = tmp_path / name
+    host_sources(root)
+    expected = [
+        {"path": relative, "sha256": hashlib.sha256((root / relative).read_bytes()).hexdigest()}
+        for relative in sorted(
+            {
+                "Runtime/Core/Serialization/WallstopProto/WProtoReader.cs",
+                *frozen_files.HOST_TOOL_INPUTS,
+            }
+        )
+    ]
+    actual: object
+    if entrypoint == "direct":
+        actual = frozen_files.host_source_files(root)
+    else:
+        arguments = [sys.executable, str(ROOT / "scripts/unity/frozen_files.py")]
+        request: str | None = None
+        if entrypoint == "worker":
+            arguments.append("--serve")
+            request = json.dumps(server_request(root) | {"operation": "host-sources"}) + "\n"
+        else:
+            arguments.extend([str(root), "--host"])
+        result = subprocess.run(
+            arguments,
+            input=request,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=10,
+        )
+        assert result.returncode == 0, result.stderr
+        if entrypoint == "worker":
+            response = response_object(result.stdout)
+            assert response["ok"] is True, response
+            actual = response["value"]
+        else:
+            actual = json.loads(result.stdout)
+    assert actual == expected
+
+
 @pytest.mark.parametrize("host", [False, True])
 def test_source_changes_after_enumeration_refuse(
     host: bool, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
