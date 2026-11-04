@@ -74,6 +74,7 @@ npm run test:protobuf-candidate
 npm run test:native-debugger-download
 npm run test:meta-generation
 npm run test:fixture-assets
+npm run test:frozen-files
 npm run meta:generate -- Runtime/Example.cs
 uv run --project scripts/python~ --locked --no-dev python scripts/unity/create_unitypackage.py --output .artifacts/release/local.unitypackage
 uv run --project scripts/python~ --locked --no-dev python scripts/unity/stage_unitypackage.py --project-dir .artifacts/unity/local-export
@@ -106,6 +107,26 @@ A check can declare a `completionPattern` when exit status alone is insufficient
 acceptance self-test requires its final completion line after cleanup as well as exit zero.
 Missing completion evidence fails the aggregate and preserves the captured output; it cannot count
 as a passing suite. This requirement does not imply that other checks have completion receipts.
+
+The WProto player and host source censuses use `scripts/unity/frozen_files.py` through locked uv. The PowerShell
+library entry points retain their names and result properties. Census walks include untracked and
+hidden inputs, prune only generated compiler output, and bind the Python project and lock alongside
+the source files. The host census also binds its Python implementation and requires the actual Git
+repository root. Spaces in Git root directory names are preserved.
+Each variant retains its own selection rules: the host scans every physical file
+in its four source trees, while the player filters compiler sources and also scans Unity scripts.
+The scans reject redirects and missing roots. They compare file identity, size and timestamps
+before opening, after reading and through the final path, refusing observed changes. Windows
+hashing permits concurrent readers while excluding writers and deletion until its handle closes.
+On other platforms, metadata checks cannot detect a rewrite that preserves every observed value.
+Keep source inputs unchanged throughout a capture on every platform.
+Every request reads the current bytes. A PowerShell process reuses one locked Python worker for
+source scans. It checks the implementation, project and lock hashes before and after each request;
+changes restart the worker or refuse the capture. Protocol, request and process identities must
+match. The worker exits when its owner's input closes, or callers can explicitly call
+`Stop-WProtoSourceCensusWorker`. Small player inventories retain
+their existing implementation to avoid process startup overhead. Run `npm run test:frozen-files`
+for the focused controls.
 
 The devcontainer runs the locked sync during creation. Python 3.11.8 or newer
 is required; uv can provision a compatible interpreter. The environment lives under

@@ -11,6 +11,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'unity/lib/test-result-evidence.ps1')
 . (Join-Path $PSScriptRoot 'unity/lib/catastrophic-patterns.ps1')
+. (Join-Path $PSScriptRoot 'unity/lib/source-census-python.ps1')
 
 function Get-WProtoFileHash {
     param([string]$Path)
@@ -126,29 +127,7 @@ function Resolve-WProtoSourcePath {
 
 function Get-WProtoSourceInventory {
     param([string]$Root)
-    $paths = (& git -C $Root ls-files --cached --others --exclude-standard -z -- .editorconfig .gitignore .gitattributes global.json NuGet.Config nuget.config Directory.Build.props Directory.Build.targets .github/workflows/wproto-generator.yml scripts/verify-wproto-evidence.ps1 scripts/run-wproto-evidence.ps1 scripts/unity/lib/test-result-evidence.ps1 scripts/unity/lib/catastrophic-patterns.ps1) -join "`n"
-    if ($LASTEXITCODE -ne 0) { throw 'Cannot enumerate WProto build inputs.' }
-    $unique = [Collections.Generic.SortedSet[string]]::new([StringComparer]::Ordinal)
-    foreach ($path in $paths.Split([char]0)) {
-        if (-not [string]::IsNullOrEmpty($path)) { [void]$unique.Add($path) }
-    }
-    $pending = [Collections.Generic.Stack[string]]::new()
-    foreach ($tree in @('Runtime', 'Editor', 'Tests', 'Generator~')) {
-        $directory = Join-Path $Root $tree
-        if (Test-Path -LiteralPath $directory -PathType Container) { $pending.Push($directory) }
-    }
-    while ($pending.Count -gt 0) {
-        foreach ($entry in Get-ChildItem -LiteralPath $pending.Pop() -Force -ErrorAction Stop) {
-            if ($entry.PSIsContainer -and $entry.Name -cin @('bin', 'obj', '.git')) { continue }
-            if (($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'Source census cannot follow an unrecorded link.' }
-            if ($entry.PSIsContainer) { $pending.Push($entry.FullName) }
-            else { [void]$unique.Add([IO.Path]::GetRelativePath($Root, $entry.FullName).Replace('\', '/')) }
-        }
-    }
-    if ($unique.Count -eq 0 -or -not $unique.Contains('Runtime/Core/Serialization/WallstopProto/WProtoReader.cs')) { throw 'Missing WProto source inputs.' }
-    foreach ($path in $unique) {
-        [ordered]@{ path = $path; sha256 = Get-WProtoFileHash (Resolve-WProtoSourcePath $Root $path) }
-    }
+    Invoke-WProtoSourceCensus -Operation host-sources -Root $Root
 }
 
 function Assert-WProtoUniqueIds {

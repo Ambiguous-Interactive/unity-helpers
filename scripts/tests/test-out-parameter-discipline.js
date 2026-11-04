@@ -1,6 +1,6 @@
 "use strict";
 
-// Every `out` parameter must be assigned immediately before a return.
+// Every `out` parameter must be assigned immediately before a method exit.
 //
 // The rule is the owner's, and the reason is that the compiler only proves an `out` is assigned on
 // every path -- it says nothing about assigning the RIGHT value. The common shape it rejects is a
@@ -89,6 +89,26 @@ function bodyOf(text, openBraceIndex) {
     }
   }
   return null;
+}
+
+function isTerminalExit(statement) {
+  return /^(?:return\b|throw\b)/.test(statement);
+}
+
+for (const [statement, expected] of [
+  ["return false;", true],
+  ["return;", true],
+  ["throw;", true],
+  ["throw", true],
+  ["throw new InvalidOperationException();", true],
+  ["if (condition)", false],
+  ["throwable = failure;", false],
+  ["returnValue = false;", false],
+  ["}", false]
+]) {
+  if (isTerminalExit(statement) !== expected) {
+    throw new Error(`Out-parameter exit control failed: ${statement}`);
+  }
 }
 
 function scanRoot(rootName) {
@@ -185,7 +205,7 @@ function scanRoot(rootName) {
           }
 
           const following = lines[next].trim();
-          if (following.startsWith("return")) {
+          if (isTerminalExit(following)) {
             continue;
           }
 
@@ -268,8 +288,8 @@ const swept = violations.filter((v) => !BASELINE.has(v.file));
 
 if (0 < swept.length) {
   console.error(
-    `out-parameter discipline: ${swept.length} assignment(s) not immediately before a return.\n` +
-      "Assign an out parameter exactly once, on the line before each return, so the value and the\n" +
+    `out-parameter discipline: ${swept.length} assignment(s) not immediately before a method exit.\n` +
+      "Assign an out parameter exactly once, on the line before each method exit, so the value and the\n" +
       "exit are visible together.\n"
   );
   for (const v of swept) {

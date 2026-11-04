@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add automatic `LiveComponents<T>` discovery by component class, base class or interface, with active and scene queries and reusable result lists ([guide](./docs/features/utilities/helper-utilities.md#live-component-registries), [#1110](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1110)).
 - Add `WUH026` to report bitwise boolean operators, with guidance for preserving required calls and nullable results ([#1092](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1092)).
 - Add `WUH025` compiler diagnostics for unsupported relational field types, with an Analyzer Policies severity control to reject invalid declarations before runtime. ([#1086](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1086)).
 - Add opt-in `WUH024` suggestions for typed enum flag checks and cached enum names, with semantic guards and Analyzer Policies examples ([guide](./docs/performance/analyzers.md#wuh024-typed-enum-helpers-opt-in), [#917](https://github.com/Ambiguous-Interactive/unity-helpers/issues/917)).
@@ -93,7 +94,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix exported protobuf schemas for concrete subtype roots and members, preserving their inheritance envelopes and field ownership ([#1035](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1035)).
 - Fix plain .NET Standard consumers failing to compile when another library contains an internal module-initializer polyfill ([#1030](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1030)).
 - Fix nested WProto writes remaining usable after a custom formatter throws; preserve the original exception and reject further writes ([#647](https://github.com/Ambiguous-Interactive/unity-helpers/issues/647)).
-- Fix WProto readers allowing further reads or partial results after rejecting data, including generated readers, built-in values, collection restoration, and formatter forwarding ([#647](https://github.com/Ambiguous-Interactive/unity-helpers/issues/647)).
+- Fix WProto readers allowing further reads or partial results after rejecting data, including nested formatter exceptions, generated readers, built-in values, and collection restoration ([#647](https://github.com/Ambiguous-Interactive/unity-helpers/issues/647)).
 - Fix player pools retaining their peak indefinitely: enable conservative idle maintenance and automatic budget checks, while honoring live interval changes, idle opt-outs, capacity limits, and retention floors ([#1008](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1008)).
 - Fix variable coroutine wait durations when quantization overflows or the wait cache is full; document support for computed and random values ([#1007](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1007)).
 - Require exact-source native Unity export and confirmed cleanup before release tag changes or publication ([#323](https://github.com/Ambiguous-Interactive/unity-helpers/issues/323)).

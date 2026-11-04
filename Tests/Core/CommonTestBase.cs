@@ -858,13 +858,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             return producer;
         }
 
-        protected Scene CreateTempScene(string name, bool setActive = true)
+        protected Scene CreateTempScene(string name, bool setActive = true, bool additive = false)
         {
             Scene scene;
 #if UNITY_EDITOR
             if (!Application.isPlaying)
             {
-                scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+                scene = EditorSceneManager.NewScene(
+                    NewSceneSetup.EmptyScene,
+                    additive ? NewSceneMode.Additive : NewSceneMode.Single
+                );
             }
             else
 #endif

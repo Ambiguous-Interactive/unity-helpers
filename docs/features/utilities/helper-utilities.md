@@ -9,6 +9,7 @@ Static helper classes and utilities that solve common programming problems witho
 ## Contents
 
 - [Gameplay Helpers](#gameplay-helpers): Predictive aiming, spatial sampling, rotation
+- [Live Component Registries](#live-component-registries): Automatic discovery by component class or interface
 - [GameObject & Component Helpers](#gameobject--component-helpers): Component discovery, hierarchy manipulation
 - [Transform Helpers](#transform-helpers): Hierarchy traversal
 - [Coroutine Wait Pools](#coroutine-wait-pools): Configure `Buffers.GetWaitForSeconds*` caching
@@ -21,6 +22,61 @@ Static helper classes and utilities that solve common programming problems witho
 - [Environment Detection](#environment-detection): CI, batch mode, and runtime environment
 
 ---
+
+## Live Component Registries
+
+Use `LiveComponents<T>` from `WallstopStudios.UnityHelpers.Utils` to select a component class,
+base class or interface. Queries discover matching components automatically, including third-party
+scripts and native components. Existing objects, subclasses and interface implementations need no
+adapter, attribute, registration call or lifecycle change.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using UnityEngine;
+using WallstopStudios.UnityHelpers.Utils;
+
+public sealed class RegisteredLevelStatus : MonoBehaviour
+{
+    public bool started;
+
+    public static bool IsLevelStarted()
+    {
+        return LiveComponents<RegisteredLevelStatus>.TryGetFirst(out RegisteredLevelStatus level)
+            && level.started;
+    }
+}
+```
+
+| Operation                    | Behavior                                                                          |
+| ---------------------------- | --------------------------------------------------------------------------------- |
+| `Count`                      | Reconcile scenes and count all active matches.                                    |
+| `TryGetFirst(out found)`     | Return the first active cached match; reconcile on a miss.                        |
+| `TryGetIn(scene, out found)` | Return the first active match in the object's current scene; reconcile on a miss. |
+| `CopyTo(destination)`        | Reconcile and replace a reusable list with all active matches. Null is ignored.   |
+
+Results retain first-discovery order. Initial discovery order is unspecified. Inactive GameObjects,
+disabled `Behaviour` components and destroyed objects are excluded. Enabling, adding, instantiating,
+and moving components take effect in subsequent queries, even within the same frame.
+A cached first match remains first when later components are discovered. No negative result is
+cached across calls. Counts and complete copies always reconcile to include new instances.
+
+Only queried types retain entries. Per-type lists and identity sets are reused. A valid cached first
+match avoids scene traversal. Reconciliation visits loaded scene roots and collects only components
+assignable to `T`; its cost grows with the loaded hierarchy. This is a completeness tradeoff, not a
+constant-time replacement for every scene search. Initial discovery and queries during scene loading
+also use Unity's object search and can allocate. Stable warmed queries allocate no managed memory
+when internal buffers and the caller's list have enough capacity.
+
+The registry includes the `DontDestroyOnLoad` scene. It creates one hidden, scriptless persistent
+GameObject to access that scene through supported Unity APIs; this internal object is excluded from
+results. Subsystem registration clears type caches. The next query discovers surviving objects again,
+including when domain or scene reload is disabled. Existing component callbacks are untouched.
+
+All operations require Unity's initialized main thread. Worker calls return empty results or false;
+`CopyTo` leaves its destination untouched on a worker. In Edit Mode, queries visit loaded scenes.
+During Play Mode, results exclude objects belonging only to an editor or prefab world. A class that
+is neither a component class nor an interface produces empty results.
 
 ## Coroutine Wait Pools
 

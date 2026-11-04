@@ -120,9 +120,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             ClearCaches();
             AttributeMetadataCache cache = CreateCache(precomputed);
             Lazy<AttributeMetadataCache> previous = AttributeMetadataCache._lazyInstance;
+            StackTraceLogType warningStackTrace = Application.GetStackTraceLogType(LogType.Warning);
             AttributeMetadataCache._lazyInstance = new Lazy<AttributeMetadataCache>(() => cache);
             try
             {
+                Application.SetStackTraceLogType(LogType.Warning, StackTraceLogType.None);
                 for (int warning = 0; warning < 21; ++warning)
                 {
                     LogAssert.Expect(
@@ -144,6 +146,31 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             finally
             {
                 AttributeMetadataCache._lazyInstance = previous;
+                Application.SetStackTraceLogType(LogType.Warning, warningStackTrace);
+            }
+        }
+
+        [Test]
+        public void ExpectedWarningChecksRestoreStackTraceSettings()
+        {
+            StackTraceLogType warningStackTrace = Application.GetStackTraceLogType(LogType.Warning);
+            try
+            {
+                Application.SetStackTraceLogType(LogType.Warning, StackTraceLogType.Full);
+                PrewarmReportsUnsupportedFieldsWithoutBindingThem(true, 0);
+                Assert.AreEqual(
+                    StackTraceLogType.Full,
+                    Application.GetStackTraceLogType(LogType.Warning)
+                );
+                VerifyUnsupportedFields(0, 0, true);
+                Assert.AreEqual(
+                    StackTraceLogType.Full,
+                    Application.GetStackTraceLogType(LogType.Warning)
+                );
+            }
+            finally
+            {
+                Application.SetStackTraceLogType(LogType.Warning, warningStackTrace);
             }
         }
 
@@ -218,9 +245,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             SpriteRenderer[][] jagged = target.jagged;
             AttributeMetadataCache cache = CreateCache(precomputed);
             Lazy<AttributeMetadataCache> previous = AttributeMetadataCache._lazyInstance;
+            StackTraceLogType warningStackTrace = Application.GetStackTraceLogType(LogType.Warning);
             AttributeMetadataCache._lazyInstance = new Lazy<AttributeMetadataCache>(() => cache);
             try
             {
+                Application.SetStackTraceLogType(LogType.Warning, StackTraceLogType.None);
                 for (int warning = 0; warning < 7; ++warning)
                 {
                     LogAssert.Expect(
@@ -255,6 +284,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             finally
             {
                 AttributeMetadataCache._lazyInstance = previous;
+                Application.SetStackTraceLogType(LogType.Warning, warningStackTrace);
             }
         }
     }

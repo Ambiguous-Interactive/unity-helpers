@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "sourceRevision": "1053338b435a8f706e1d52970469695acbc3af66",
   "scope": "Reviewed WProto guide capability claims and explicit limitations; source witness additions after this revision are unqualified until fresh ordinary artifacts are verified.",
-  "guideSha256": "9b5e7b09e620fbfc324d62c0e7dddc6c6653481295304ca2d8f0d2ba14445066",
+  "guideSha256": "ee25e6ef3e4bfe157d94f638eca0a0297e86ee16ade51008979ecb05bb921e41",
   "qualificationPolicy": "This catalog records no current qualification. Complete means complete declared selector coverage, not semantic/backend acceptance. Fixture receipts are verified separately; missing or partial lane requirements prevent full-catalog completion.",
   "lanes": [
     {
@@ -10808,6 +10808,70 @@
           "scope": "none",
           "selectors": [],
           "reason": "This fixture is not bound to this lane."
+        }
+      ]
+    },
+    {
+      "id": "formatter.nested-read-exception",
+      "guideAnchor": "docs/features/serialization/serialization.md#wallstopproto-the-reflection-free-wire-layer-preview",
+      "claim": "TryReadMessage latches nested formatter exceptions, clears partial output and preserves the original exception across plain, payload and seeded read entry points",
+      "classification": "behavior",
+      "readerDirections": ["malformed/current-read"],
+      "selectors": [
+        "WProtoFormatterFailureTests.NestedReaderExceptionsLatchParentAndClearPartialOutput",
+        "WProtoFormatterFailureTests.CaughtNestedReadExceptionsCannotCompleteTheFacade",
+        "WProtoFormatterFailureTests.SuccessfulNestedReadersPreserveAllEntryPoints"
+      ],
+      "limitations": "Formatters must not throw. This protects nested-message boundaries, including merge and non-merge fallback; caller-owned seed mutations are not rolled back. Reader copies retain local failure state. Direct arbitrary formatter calls are outside this guarantee.",
+      "gapIds": [],
+      "status": "supported-with-witness",
+      "laneRequirements": [
+        {
+          "lane": "host-v2",
+          "status": "witnesses",
+          "scope": "complete",
+          "selectors": [
+            "WProtoFormatterFailureTests.NestedReaderExceptionsLatchParentAndClearPartialOutput",
+            "WProtoFormatterFailureTests.CaughtNestedReadExceptionsCannotCompleteTheFacade",
+            "WProtoFormatterFailureTests.SuccessfulNestedReadersPreserveAllEntryPoints"
+          ],
+          "reason": "All three selectors apply; exact complete-fixture execution evidence is required."
+        },
+        {
+          "lane": "host-v3",
+          "status": "witnesses",
+          "scope": "complete",
+          "selectors": [
+            "WProtoFormatterFailureTests.NestedReaderExceptionsLatchParentAndClearPartialOutput",
+            "WProtoFormatterFailureTests.CaughtNestedReadExceptionsCannotCompleteTheFacade",
+            "WProtoFormatterFailureTests.SuccessfulNestedReadersPreserveAllEntryPoints"
+          ],
+          "reason": "All three selectors apply; exact complete-fixture execution evidence is required."
+        },
+        {
+          "lane": "unity-editor-playmode",
+          "status": "witnesses",
+          "scope": "complete",
+          "selectors": [
+            "WProtoFormatterFailureTests.NestedReaderExceptionsLatchParentAndClearPartialOutput",
+            "WProtoFormatterFailureTests.CaughtNestedReadExceptionsCannotCompleteTheFacade",
+            "WProtoFormatterFailureTests.SuccessfulNestedReadersPreserveAllEntryPoints"
+          ],
+          "reason": "All three selectors apply; exact complete-fixture execution evidence is required."
+        },
+        {
+          "lane": "unity-editor-editmode",
+          "status": "not-applicable",
+          "scope": "none",
+          "selectors": [],
+          "reason": "The shared runtime fixture is not part of this lane; no behavior is qualified here."
+        },
+        {
+          "lane": "unity-editor-playmode-wproto-only",
+          "status": "not-applicable",
+          "scope": "none",
+          "selectors": [],
+          "reason": "The shared runtime fixture is not part of this lane; no behavior is qualified here."
         }
       ]
     }

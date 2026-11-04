@@ -1138,7 +1138,11 @@ The reader and writer are `ref struct`s over spans. Caller-owned output can avoi
 registration and buffer setup; deserialization still allocates returned strings and object graphs.
 Finite shared read limits also allocate accounting state. Checked wire operations report success;
 malformed input and insufficient output latch the reader or writer so later operations refuse to
-continue. A clean end of input from `TryReadTag` is not malformed:
+continue. All `TryReadMessage` formatter overloads also latch the parent reader and clear their
+output if the nested formatter throws, then rethrow the original exception. Catching that exception
+inside an outer formatter cannot turn the failed message into a successful facade read; merge
+formatters and the fallback for formatters without merge support follow the same rule.
+A clean end of input from `TryReadTag` is not malformed:
 
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
