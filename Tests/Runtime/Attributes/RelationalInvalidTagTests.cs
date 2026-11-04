@@ -4,10 +4,8 @@
 namespace WallstopStudios.UnityHelpers.Tests.Attributes
 {
     using System.Collections.Generic;
-    using System.Text.RegularExpressions;
     using NUnit.Framework;
     using UnityEngine;
-    using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Core.Attributes;
     using WallstopStudios.UnityHelpers.Tests.Core;
 
@@ -27,6 +25,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             child.transform.SetParent(owner.transform);
             RelationalInvalidTagProbe probe = owner.GetComponent<RelationalInvalidTagProbe>();
             Assert.AreEqual("Untagged", owner.tag);
+            ExpectMissingRelationalComponentError(
+                owner.name,
+                nameof(RelationalInvalidTagProbe),
+                "parent",
+                typeof(Transform).FullName,
+                nameof(probe.requiredParent)
+            );
+            ExpectMissingRelationalComponentError(
+                owner.name,
+                nameof(RelationalInvalidTagProbe),
+                "sibling",
+                typeof(Transform).FullName,
+                nameof(probe.requiredSibling)
+            );
+            ExpectMissingRelationalComponentError(
+                owner.name,
+                nameof(RelationalInvalidTagProbe),
+                "child",
+                typeof(Transform).FullName,
+                nameof(probe.requiredChild)
+            );
             for (int invocation = 0; invocation < 2; ++invocation)
             {
                 probe.invalidParent = parent.transform;
@@ -41,9 +60,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                 probe.invalidParentSet = new HashSet<Transform> { parent.transform };
                 probe.invalidSiblingSet = new HashSet<Transform> { owner.transform };
                 probe.invalidChildSet = new HashSet<Transform> { child.transform };
-                LogAssert.Expect(LogType.Error, new Regex(nameof(probe.requiredParent)));
-                LogAssert.Expect(LogType.Error, new Regex(nameof(probe.requiredSibling)));
-                LogAssert.Expect(LogType.Error, new Regex(nameof(probe.requiredChild)));
                 Assert.DoesNotThrow(() => probe.AssignRelationalComponents());
                 Assert.IsTrue(probe.invalidParent == null);
                 Assert.IsTrue(probe.invalidSibling == null);

@@ -657,8 +657,8 @@ creates a permanent bucket per distinct size.
 ## Keeping a Grow-Only Scratch Array
 
 Use `GrowOnlyBuffers` when one owner keeps scratch storage across frames and the logical size
-changes. It keeps the same array for equal or smaller requests. A larger request replaces the
-array and discards its old contents. This storage belongs to the caller and is not pooled.
+changes. It keeps the same array for equal or smaller requests. A larger request preserves all
+existing elements and initializes the new slots. This storage belongs to the caller and is not pooled.
 
 <!-- doc-sample: compiles -->
 
@@ -675,7 +675,8 @@ ReadOnlySpan<int> live = GrowOnlyBuffers.AsSpan(scratch, count);
 
 Keep the logical count separately. `Clear` and `AsSpan` clamp that count to the existing capacity;
 null buffers and nonpositive counts produce no work or an empty span. Neither helper grows storage.
-`EnsureCapacity` initializes a null buffer to an empty array for nonpositive requests.
+`EnsureCapacity` initializes a null buffer to an empty array for nonpositive requests. Growth
+retains data; call `Clear` explicitly when previous contents should be discarded.
 
 Size storage from trusted application bounds. Do not pass unchecked sizes from a save or network
 payload. Use exact-size storage when passing arrays to APIs such as `Texture2D.SetPixels32`, which

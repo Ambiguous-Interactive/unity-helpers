@@ -7,7 +7,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
     /// <summary>Reuses caller-owned scratch arrays across changing logical lengths.</summary>
     /// <remarks>
-    /// Keep the logical count separately from array capacity. Growth discards prior contents;
+    /// Keep the logical count separately from array capacity. Growth preserves existing contents;
     /// use exact-size arrays for Unity APIs that require an exact pixel or element count.
     /// </remarks>
     public static class GrowOnlyBuffers
@@ -28,7 +28,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return false;
             }
 
-            buffer = new T[count];
+            Array.Resize(ref buffer, count);
             return true;
         }
 

@@ -29,8 +29,30 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.IsTrue(GrowOnlyBuffers.EnsureCapacity(ref buffer, count + 1));
             Assert.AreNotSame(first, buffer);
             Assert.That(buffer.Length, Is.EqualTo(count + 1));
-            Assert.That(buffer[0], Is.Zero);
+            Assert.That(buffer[0], Is.EqualTo(41));
+            Assert.That(buffer[count], Is.Zero);
             Assert.That(first[0], Is.EqualTo(41));
+        }
+
+        [Test]
+        public void GrowthPreservesEveryReferenceAndInitializesAddedSlots()
+        {
+            object first = new();
+            object second = new();
+            object[] buffer = { first, null, second };
+            object[] original = buffer;
+            Assert.IsTrue(GrowOnlyBuffers.EnsureCapacity(ref buffer, 6));
+            Assert.AreNotSame(original, buffer);
+            CollectionAssert.AreEqual(
+                new object[] { first, null, second, null, null, null },
+                buffer
+            );
+            Assert.AreSame(first, buffer[0]);
+            Assert.AreSame(second, buffer[2]);
+            CollectionAssert.AreEqual(new object[] { first, null, second }, original);
+            Assert.IsFalse(GrowOnlyBuffers.EnsureCapacity(ref buffer, 2));
+            Assert.AreSame(first, buffer[0]);
+            Assert.AreSame(second, buffer[2]);
         }
 
         [TestCase(int.MinValue)]
