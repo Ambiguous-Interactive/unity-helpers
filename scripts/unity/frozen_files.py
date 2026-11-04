@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import ctypes
 import hashlib
 import json
 import os
@@ -12,6 +13,7 @@ import stat
 import subprocess
 import sys
 import uuid
+from functools import cache
 from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict, cast
 
@@ -109,9 +111,57 @@ def identity(info: os.stat_result) -> tuple[int, int, int, int, int, int]:
     return (*content_identity(info), info.st_ctime_ns)
 
 
+if sys.platform == "win32":
+
+    @cache
+    def windows_kernel32() -> ctypes.WinDLL:
+        from ctypes import wintypes
+
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel.CreateFileW.argtypes = (
+            wintypes.LPCWSTR,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            wintypes.LPVOID,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            wintypes.HANDLE,
+        )
+        kernel.CreateFileW.restype = wintypes.HANDLE
+        kernel.CloseHandle.argtypes = (wintypes.HANDLE,)
+        kernel.CloseHandle.restype = wintypes.BOOL
+        return kernel
+
+    def open_source(path: Path) -> io.BufferedReader[io.FileIO]:
+        import msvcrt
+
+        kernel = windows_kernel32()
+        generic_read, share_read, open_existing, ordinary_attributes = 0x80000000, 1, 3, 0x80
+        handle: int | None = kernel.CreateFileW(
+            str(path), generic_read, share_read, None, open_existing, ordinary_attributes, None
+        )
+        if handle is None or handle == ctypes.c_void_p(-1).value:
+            raise ctypes.WinError(ctypes.get_last_error())
+        try:
+            descriptor = msvcrt.open_osfhandle(handle, os.O_RDONLY | os.O_BINARY)
+        except BaseException:
+            kernel.CloseHandle(handle)
+            raise
+        try:
+            return cast("io.BufferedReader[io.FileIO]", os.fdopen(descriptor, "rb"))
+        except BaseException:
+            os.close(descriptor)
+            raise
+
+else:
+
+    def open_source(path: Path) -> io.BufferedReader[io.FileIO]:
+        return cast("io.BufferedReader[io.FileIO]", path.open("rb"))
+
+
 def file_hash(path: Path, observed: os.stat_result | None = None) -> tuple[str, int]:
     before = ordinary(path, directory=False) if observed is None else observed
-    with path.open("rb") as stream:
+    with open_source(path) as stream:
         opened = os.fstat(stream.fileno())
         # Windows Python 3.11 stat and fstat expose different meanings for ctime.
         if content_identity(before) != content_identity(opened):

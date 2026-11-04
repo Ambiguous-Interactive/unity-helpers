@@ -134,6 +134,8 @@ def test_same_length_mutation_during_hashing_refuses(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     path = write(tmp_path / "file", b"before")
+    initial = path.stat()
+    os.utime(path, ns=(initial.st_atime_ns, initial.st_mtime_ns - 2_000_000_000))
     original = hashlib.file_digest
 
     def mutate(stream: BufferedReader, algorithm: str) -> object:
@@ -142,8 +144,65 @@ def test_same_length_mutation_during_hashing_refuses(
         return digest
 
     monkeypatch.setattr(hashlib, "file_digest", mutate)
-    with pytest.raises(ValueError, match="changed while hashing"):
+    if sys.platform == "win32":
+        with pytest.raises(PermissionError):
+            frozen_files.file_hash(path)
+        assert path.read_bytes() == b"before"
+    else:
+        with pytest.raises(ValueError, match="changed while hashing"):
+            frozen_files.file_hash(path)
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows file sharing contract")
+@pytest.mark.parametrize("operation", ["write", "replace", "delete"])
+def test_windows_hash_handle_excludes_writes_and_allows_readers(
+    operation: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = write(tmp_path / "file", b"before")
+    replacement = write(tmp_path / "replacement", b"after!")
+    original = hashlib.file_digest
+
+    def mutate_path() -> None:
+        if operation == "write":
+            path.write_bytes(b"after!")
+        elif operation == "replace":
+            replacement.replace(path)
+        else:
+            path.unlink()
+
+    def attempt_mutation(stream: BufferedReader, algorithm: str) -> object:
+        assert path.read_bytes() == b"before"
+        with pytest.raises(PermissionError):
+            mutate_path()
+        return original(stream, algorithm)
+
+    monkeypatch.setattr(hashlib, "file_digest", attempt_mutation)
+    assert frozen_files.file_hash(path) == (hashlib.sha256(b"before").hexdigest(), 6)
+    path.write_bytes(b"after!")
+    assert path.read_bytes() == b"after!"
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows file sharing contract")
+def test_windows_hash_refuses_an_existing_writer(tmp_path: Path) -> None:
+    path = write(tmp_path / "file", b"before")
+    with path.open("r+b"), pytest.raises(PermissionError):
         frozen_files.file_hash(path)
+    assert frozen_files.file_hash(path) == (hashlib.sha256(b"before").hexdigest(), 6)
+
+
+def test_hash_failure_closes_the_owned_handle(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = write(tmp_path / "file", b"before")
+
+    def fail(_: BufferedReader, __: str) -> object:
+        raise ValueError("injected digest failure")
+
+    monkeypatch.setattr(hashlib, "file_digest", fail)
+    with pytest.raises(ValueError, match="injected digest failure"):
+        frozen_files.file_hash(path)
+    path.write_bytes(b"after!")
+    path.unlink()
 
 
 def test_source_bound_covers_every_delivered_input(tmp_path: Path) -> None:
@@ -299,6 +358,8 @@ def test_source_changes_after_enumeration_refuse(
     else:
         sources(tmp_path)
     path = write(tmp_path / "Runtime/raced.cs", b"before")
+    initial = path.stat()
+    os.utime(path, ns=(initial.st_atime_ns, initial.st_mtime_ns - 2_000_000_000))
     original_walk = frozen_files.walk
 
     def mutate(

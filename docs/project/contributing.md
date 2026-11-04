@@ -114,8 +114,11 @@ hidden inputs, prune only generated compiler output, and bind the Python project
 the source files. The host census also binds its Python implementation and requires the actual Git
 repository root. Each variant retains its own selection rules: the host scans every physical file
 in its four source trees, while the player filters compiler sources and also scans Unity scripts.
-The scans reject redirects, missing roots, and files modified between enumeration and hashing or
-while hashing.
+The scans reject redirects and missing roots. They compare file identity, size and timestamps
+before opening, after reading and through the final path, refusing observed changes. Windows
+hashing permits concurrent readers while excluding writers and deletion until its handle closes.
+On other platforms, metadata checks cannot detect a rewrite that preserves every observed value;
+keep source inputs unchanged throughout a capture.
 Every request reads the current bytes. A PowerShell process reuses one locked Python worker for
 source scans. It checks the implementation, project and lock hashes before and after each request;
 changes restart the worker or refuse the capture. Protocol, request and process identities must
