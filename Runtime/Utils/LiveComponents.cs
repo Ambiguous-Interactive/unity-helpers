@@ -57,7 +57,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         private static bool _tracked;
         private static bool _cold = true;
 
-        /// <summary>Returns the first active match, or null when none is available.</summary>
+        /// <summary>Returns true with the first active match, or false with a null output.</summary>
         public static bool TryGetFirst(out T found)
         {
             if (Prepare())
@@ -74,7 +74,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             return false;
         }
 
-        /// <summary>Returns the first active match in the specified scene.</summary>
+        /// <summary>Returns true with the first active match in the scene, or false with a null output.</summary>
         public static bool TryGetIn(Scene scene, out T found)
         {
             if (Prepare() && scene.IsValid())
