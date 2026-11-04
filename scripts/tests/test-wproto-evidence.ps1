@@ -102,6 +102,12 @@ function New-ControlFixture {
     & git -C $root -c user.name=EvidenceControls -c user.email=controls@example.invalid -c "core.hooksPath=$hooks" -c commit.gpgsign=false commit --quiet --allow-empty -m 'Empty evidence control fixture'
     if ($LASTEXITCODE -ne 0) { throw 'Cannot create isolated empty control commit.' }
     $revision = (& git -C $root rev-parse HEAD) -join ''
+    [void][IO.Directory]::CreateDirectory((Join-Path $root 'Editor'))
+    foreach ($relative in @('scripts/unity/frozen_files.py', 'scripts/unity/lib/source-census-python.ps1', 'scripts/python~/pyproject.toml', 'scripts/python~/uv.lock')) {
+        $target = Join-Path $root $relative
+        [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($target))
+        [IO.File]::Copy((Join-Path $repository $relative), $target)
+    }
     Write-ControlFile (Join-Path $root '.gitignore') "**/bin/`nIgnoredByGit.cs`n"
     Write-ControlFile (Join-Path $root 'Runtime/Core/Serialization/WallstopProto/WProtoReader.cs') 'internal class WProtoReader {}'
     Write-ControlFile (Join-Path $root 'Runtime/PreservedInput.cs') 'internal class PreservedInput {}'

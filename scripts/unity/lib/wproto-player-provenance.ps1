@@ -1,52 +1,11 @@
 # Shared source census for the WProto synthetic player declaration and verifier.
 . (Join-Path $PSScriptRoot 'catastrophic-patterns.ps1')
 . (Join-Path $PSScriptRoot 'frozen-player-files.ps1')
+. (Join-Path $PSScriptRoot 'source-census-python.ps1')
 function Get-WProtoPlayerSourceFiles {
     [CmdletBinding()]
     param([Parameter(Mandatory = $true)][string]$Repository)
-
-    $root = [IO.Path]::GetFullPath($Repository).TrimEnd([IO.Path]::DirectorySeparatorChar)
-    $paths = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
-    foreach ($directory in @('Runtime', 'Editor', 'Tests', 'Generator~', 'scripts/unity')) {
-        $pending = New-Object 'System.Collections.Generic.Stack[string]'
-        $pending.Push((Join-Path $root $directory))
-        while ($pending.Count -gt 0) {
-            $current = Get-Item -LiteralPath $pending.Pop() -Force -ErrorAction Stop
-            if (-not $current.PSIsContainer -or ($current.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
-                throw 'WProto source roots and directories must be ordinary directories.'
-            }
-            foreach ($item in @(Get-ChildItem -LiteralPath $current.FullName -Force -ErrorAction Stop)) {
-                if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'WProto source census refuses reparse points.' }
-                if ($item.PSIsContainer) {
-                    if ($directory -eq 'Generator~' -and $item.Name -in @('bin', 'obj', '.git')) { continue }
-                    $pending.Push($item.FullName)
-                } else {
-                    if ($directory -eq 'Generator~' -and $item.Extension -notin @('.cs', '.csproj', '.props', '.targets', '.rsp', '.json', '.xml', '.dll', '.meta')) { continue }
-                    $relative = $item.FullName.Substring($root.Length + 1).Replace('\', '/')
-                    $null = $paths.Add($relative)
-                    if ($paths.Count -gt 16384) { throw 'WProto source census exceeds 16384 files.' }
-                }
-            }
-        }
-    }
-    foreach ($path in @('package.json', '.github/unity-versions.json', '.github/workflows/unity-tests.yml',
-            'scripts/unity/run-ci-tests.ps1', 'scripts/unity/run-acceptance.ps1', 'scripts/unity/verify-acceptance.ps1',
-            'scripts/unity/verify-wproto-corpus.js', 'scripts/unity/wproto-corpus.v1.json',
-            'scripts/unity/lib/wproto-player-provenance.ps1', 'scripts/unity/lib/wproto-player-provenance.ps1.meta')) {
-        $null = $paths.Add($path)
-    }
-    foreach ($item in @(Get-ChildItem -LiteralPath $root -File -Force)) {
-        if ($item.Extension -in @('.rsp', '.props', '.targets', '.csproj')) { $null = $paths.Add($item.Name) }
-    }
-    [string[]]$ordered = @($paths)
-    [Array]::Sort($ordered, [StringComparer]::Ordinal)
-    foreach ($relative in $ordered) {
-        $item = Get-Item -LiteralPath (Join-Path $root $relative) -Force -ErrorAction Stop
-        if ($item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
-            throw "WProto source input must be an ordinary file: $relative"
-        }
-        [pscustomobject][ordered]@{ Path = $relative; Sha256 = (Get-FileHash -LiteralPath $item.FullName -Algorithm SHA256).Hash.ToLowerInvariant() }
-    }
+    Invoke-WProtoSourceCensus -Operation sources -Root $Repository
 }
 
 # Retain complete original byte lines, including unknown or malformed records. The

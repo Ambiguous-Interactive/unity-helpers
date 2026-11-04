@@ -121,13 +121,14 @@ function Write-RuntimeRecords {
 function New-WProtoFixture {
     param([string]$RunId)
     $fixture = New-CanonicalFixture $RunId
-    foreach ($directory in @('Runtime/Protobuf-Net', 'Editor', 'Tests', 'Generator~', 'scripts/unity/lib', '.github/workflows', 'generated project/Assets/Editor', 'generated project/Packages', 'generated project/ProjectSettings')) {
+    foreach ($directory in @('Runtime/Protobuf-Net', 'Editor', 'Tests', 'Generator~', 'scripts/unity/lib', 'scripts/python~', '.github/workflows', 'generated project/Assets/Editor', 'generated project/Packages', 'generated project/ProjectSettings')) {
         $null = New-Item -ItemType Directory -Path (Join-Path $fixture.Root $directory) -Force
     }
     foreach ($relative in @('package.json', '.github/unity-versions.json', '.github/workflows/unity-tests.yml',
             'scripts/unity/run-ci-tests.ps1', 'scripts/unity/run-acceptance.ps1', 'scripts/unity/verify-acceptance.ps1',
             'scripts/unity/verify-wproto-corpus.js', 'scripts/unity/wproto-corpus.v1.json',
             'scripts/unity/lib/wproto-player-provenance.ps1', 'scripts/unity/lib/wproto-player-provenance.ps1.meta',
+            'scripts/python~/pyproject.toml', 'scripts/python~/uv.lock',
             'generated project/Packages/manifest.json', 'generated project/ProjectSettings/ProjectSettings.asset')) {
         [IO.File]::WriteAllText((Join-Path $fixture.Root $relative), 'controlled ' + $relative)
     }

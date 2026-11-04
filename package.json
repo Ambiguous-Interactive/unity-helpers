@@ -410,7 +410,8 @@
     "test:fixture-assets": "uv run --project scripts/python~ --locked pytest scripts/tests/test_fixture_assets.py -q",
     "test:meta-generation": "uv run --project scripts/python~ --locked pytest scripts/tests/test_meta_generation.py -q",
     "meta:generate": "uv run --project scripts/python~ --locked --no-dev python scripts/generate_meta.py",
-    "test:check-registries": "uv run --project scripts/python~ --locked pytest scripts/tests/test_check_registries.py -q"
+    "test:check-registries": "uv run --project scripts/python~ --locked pytest scripts/tests/test_check_registries.py -q",
+    "test:frozen-files": "uv run --project scripts/python~ --locked pytest scripts/tests/test_frozen_files.py -q"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",
