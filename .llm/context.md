@@ -7,7 +7,7 @@ Procedural skills are in the [skills/](./skills/) directory.
 ## Repository Overview
 
 **Package**: `com.wallstop-studios.unity-helpers`
-**Version**: 3.6.2
+**Version**: 3.7.0
 **Repository**: <https://github.com/wallstop/unity-helpers>
 **Root Namespace**: `WallstopStudios.UnityHelpers`
 
