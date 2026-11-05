@@ -62,7 +62,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int sum = 0;
             if (wrapped)
             {
-                foreach (int value in source.AsValueEnumerable())
+                foreach (int value in source.WAsValueEnumerable())
                 {
                     sum += value;
                 }

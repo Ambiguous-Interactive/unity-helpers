@@ -907,7 +907,7 @@ image's RGB intact instead of flattening it to black.
 See [avoiding enumerator boxing](../../performance/enumeration-audit.md) to choose a traversal,
 handle null sources and understand allocation limits.
 
-`AsValueEnumerable` provides a lazy value view over `IEnumerable<T>`, including
+`WAsValueEnumerable` provides a lazy value view over `IEnumerable<T>`, including
 `IReadOnlyList<T>` and `IReadOnlyCollection<T>` sources. Arrays, exact `List<T>` and
 exact `HashSet<T>` instances avoid boxing their enumerators. Null and default views
 are empty. The view does not copy the collection or read its count or indexer.
@@ -923,7 +923,7 @@ public static class CollectionSum
     public static int Sum(IEnumerable<int> source)
     {
         int result = 0;
-        foreach (int item in source.AsValueEnumerable())
+        foreach (int item in source.WAsValueEnumerable())
         {
             result += item;
         }
@@ -932,18 +932,18 @@ public static class CollectionSum
 }
 ```
 
-If a consumer also imports ZLinq, both libraries expose `AsValueEnumerable` for
-`IEnumerable<T>`. C# reports `CS0121` for an ambiguous extension call. Select the
-intended implementation explicitly: `ZLinq.ValueEnumerable.AsValueEnumerable(source)`
-for an existing ZLinq query, or
-`WallstopStudios.UnityHelpers.Core.Extension.IEnumerableExtensions.AsValueEnumerable(source)`
-for the unity-helpers view. Retain that choice when migrating consumer code so later
-query operators keep their intended library and behavior.
+Starting with 3.7.1, the unity-helpers extensions use the `W` prefix so both namespaces can
+be imported together. `source.AsValueEnumerable()` continues to select ZLinq, including its
+query operators; `source.WAsValueEnumerable()` selects the unity-helpers traversal view.
+Rename unity-helpers extension calls from 3.7.0 to `WAsValueEnumerable` or
+`WAsValueDictionaryEnumerable`. The original names remain ordinary static factories on
+`IEnumerableExtensions`, so explicit static calls and existing compiled callers remain supported.
+They no longer participate in extension-method lookup.
 
-`AsValueDictionaryEnumerable` provides the same lazy behavior for
+`WAsValueDictionaryEnumerable` provides the same lazy behavior for
 `IEnumerable<KeyValuePair<TKey, TValue>>`, including dictionary interfaces. Exact
 `Dictionary<TKey, TValue>` instances use their concrete value enumerator. Derived dictionaries keep their interface protocol. Other sources, including sorted
-dictionaries, keep their original enumerator and its allocations. Use `AsValueEnumerable`
+dictionaries, keep their original enumerator and its allocations. Use `WAsValueEnumerable`
 for pair arrays, lists and hash sets.
 
 Use `ValueEnumerable<T>.RequireSource` or
@@ -963,7 +963,7 @@ public static class DictionaryTotal
     public static int Sum(IReadOnlyDictionary<string, int> source)
     {
         int result = 0;
-        foreach (KeyValuePair<string, int> entry in source.AsValueDictionaryEnumerable())
+        foreach (KeyValuePair<string, int> entry in source.WAsValueDictionaryEnumerable())
         {
             result += entry.Value;
         }

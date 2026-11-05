@@ -46,6 +46,12 @@ settings remain intact; the configure pass still merges requested defines and ve
 
 ## Keep memory-only cleanup outside asset batches
 
+When a fixture explicitly imports a known path with `ImportAsset` or `SaveAndReimport`, call
+`ExecuteWithImmediateImport(..., refreshBefore: false)` to pause the batch without first scanning
+the entire project. The default remains a synchronous pre-refresh. Keep that default for operations
+that rely on discovering arbitrary pending filesystem changes. Asset creation, import assertions,
+and final folder cleanup must still run; the option only removes the preceding global scan.
+
 `CommonTestBase.DestroyTrackedObjects` opens an asset editing batch only when a tracked object
 has an asset path. Memory-only cleanup destroys objects immediately without refreshing the asset
 database. Mixed cleanup retains its batch around every destruction callback, and an existing

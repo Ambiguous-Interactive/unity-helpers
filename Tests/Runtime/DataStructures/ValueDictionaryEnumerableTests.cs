@@ -28,7 +28,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int sum = 0;
             if (wrapped)
             {
-                foreach (KeyValuePair<int, int> entry in source.AsValueDictionaryEnumerable())
+                foreach (KeyValuePair<int, int> entry in source.WAsValueDictionaryEnumerable())
                 {
                     sum += entry.Value;
                 }
@@ -85,7 +85,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             foreach (IEnumerable<KeyValuePair<int, int>> source in sources)
             {
                 List<KeyValuePair<int, int>> expected = new List<KeyValuePair<int, int>>(source);
-                ValueDictionaryEnumerable<int, int> view = source.AsValueDictionaryEnumerable();
+                ValueDictionaryEnumerable<int, int> view = source.WAsValueDictionaryEnumerable();
                 for (int repetition = 0; repetition < 2; ++repetition)
                 {
                     List<KeyValuePair<int, int>> actual = new List<KeyValuePair<int, int>>();
@@ -104,7 +104,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             IEnumerable<KeyValuePair<int, int>> source = null;
             ValueDictionaryEnumerable<int, int>[] views =
             {
-                source.AsValueDictionaryEnumerable(),
+                source.WAsValueDictionaryEnumerable(),
                 default,
             };
             foreach (ValueDictionaryEnumerable<int, int> view in views)
@@ -155,7 +155,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Dictionary<int, int> source = new Dictionary<int, int> { { 1, 2 } };
             using Dictionary<int, int>.Enumerator original = source.GetEnumerator();
             using ValueDictionaryEnumerator<int, int> wrapped = source
-                .AsValueDictionaryEnumerable()
+                .WAsValueDictionaryEnumerable()
                 .GetEnumerator();
             Assert.IsTrue(original.MoveNext());
             Assert.IsTrue(wrapped.MoveNext());
@@ -173,7 +173,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 FailOnMove = failOnMove,
             };
             source.Add(1, 2);
-            ValueDictionaryEnumerable<int, int> view = source.AsValueDictionaryEnumerable();
+            ValueDictionaryEnumerable<int, int> view = source.WAsValueDictionaryEnumerable();
             Assert.AreEqual(0, source.Acquisitions);
             if (failOnMove)
             {
@@ -216,7 +216,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.Throws<InvalidOperationException>(() =>
             {
                 foreach (
-                    KeyValuePair<int, int> entry in ToPairs(wrapped).AsValueDictionaryEnumerable()
+                    KeyValuePair<int, int> entry in ToPairs(wrapped).WAsValueDictionaryEnumerable()
                 )
                 {
                     Assert.AreEqual(1, entry.Key);
@@ -233,7 +233,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             {
                 FailOnAcquire = true,
             };
-            ValueDictionaryEnumerable<int, int> view = source.AsValueDictionaryEnumerable();
+            ValueDictionaryEnumerable<int, int> view = source.WAsValueDictionaryEnumerable();
             Assert.AreEqual(0, source.Acquisitions);
             Assert.Throws<InvalidOperationException>(() => view.GetEnumerator());
             Assert.AreEqual(1, source.Acquisitions);

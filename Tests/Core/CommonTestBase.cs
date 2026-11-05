@@ -2060,13 +2060,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         /// </summary>
         /// <param name="action">The action to execute outside of batch mode.</param>
         /// <param name="refreshAfter">Whether to refresh the asset database after the action completes. Default is false.</param>
+        /// <param name="refreshBefore">Whether to scan all assets first; disable only when the action explicitly imports its own paths.</param>
         /// <remarks>
         /// <para>
         /// This method:
         /// </para>
         /// <list type="bullet">
         /// <item>Pauses the current batch scope (if any)</item>
-        /// <item>Refreshes the AssetDatabase to ensure all pending operations are complete</item>
+        /// <item>Refreshes the AssetDatabase first when <paramref name="refreshBefore"/> is true</item>
         /// <item>Executes the provided action</item>
         /// <item>Optionally refreshes the AssetDatabase again after the action (if <paramref name="refreshAfter"/> is true)</item>
         /// <item>Resumes the batch scope</item>
@@ -2086,7 +2087,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         /// }, refreshAfter: true);
         /// </code>
         /// </example>
-        protected void ExecuteWithImmediateImport(Action action, bool refreshAfter = false)
+        protected void ExecuteWithImmediateImport(
+            Action action,
+            bool refreshAfter = false,
+            bool refreshBefore = true
+        )
         {
             if (action == null)
             {
@@ -2095,9 +2100,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 
             using (AssetDatabaseBatchHelper.PauseBatch())
             {
-                UnityEditor.AssetDatabase.Refresh(
-                    UnityEditor.ImportAssetOptions.ForceSynchronousImport
-                );
+                if (refreshBefore)
+                {
+                    UnityEditor.AssetDatabase.Refresh(
+                        UnityEditor.ImportAssetOptions.ForceSynchronousImport
+                    );
+                }
                 action();
                 if (refreshAfter)
                 {
@@ -2118,11 +2126,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         /// If <c>true</c>, a second <see cref="UnityEditor.AssetDatabase.Refresh"/> is called after <paramref name="func"/>
         /// completes to ensure any newly created or modified assets are available. Default is <c>false</c>.
         /// </param>
+        /// <param name="refreshBefore">Whether to scan all assets first; disable only when the function explicitly imports its own paths.</param>
         /// <returns>The result of the function, or <c>default(T)</c> if <paramref name="func"/> is <c>null</c>.</returns>
         /// <remarks>
         /// This method is useful when you need to perform asset operations that return values while
         /// ensuring proper AssetDatabase synchronization. For void operations, use
-        /// <see cref="ExecuteWithImmediateImport(Action, bool)"/> instead.
+        /// <see cref="ExecuteWithImmediateImport(Action, bool, bool)"/> instead.
         /// </remarks>
         /// <example>
         /// <code>
@@ -2132,7 +2141,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         /// });
         /// </code>
         /// </example>
-        protected T ExecuteWithImmediateImport<T>(Func<T> func, bool refreshAfter = false)
+        protected T ExecuteWithImmediateImport<T>(
+            Func<T> func,
+            bool refreshAfter = false,
+            bool refreshBefore = true
+        )
         {
             if (func == null)
             {
@@ -2141,9 +2154,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 
             using (AssetDatabaseBatchHelper.PauseBatch())
             {
-                UnityEditor.AssetDatabase.Refresh(
-                    UnityEditor.ImportAssetOptions.ForceSynchronousImport
-                );
+                if (refreshBefore)
+                {
+                    UnityEditor.AssetDatabase.Refresh(
+                        UnityEditor.ImportAssetOptions.ForceSynchronousImport
+                    );
+                }
                 T result = func();
                 if (refreshAfter)
                 {

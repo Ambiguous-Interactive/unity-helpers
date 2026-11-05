@@ -320,7 +320,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Action enumerated = () =>
             {
                 target.Clear();
-                foreach (int value in source.AsValueEnumerable())
+                foreach (int value in source.WAsValueEnumerable())
                 {
                     view.Add(value);
                 }

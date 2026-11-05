@@ -1239,7 +1239,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return Mathf.Min(jitter, interval);
         }
 
-        private static IEnumerator FunctionAsCoroutine(
+        internal static IEnumerator FunctionAsCoroutine(
             Object context,
             Action action,
             float updateRate,
@@ -1258,7 +1258,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             if (0f < initialDelay)
             {
-                yield return WaitForDelay(initialDelay);
+                float initialStart = Time.time;
+                do
+                {
+                    yield return null;
+                } while (!HasEnoughTimePassed(initialStart, initialDelay));
             }
 
             bool reportedFailure = false;
@@ -1300,7 +1304,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     continue;
                 }
 
-                yield return WaitForDelay(interval);
+                float startTime = Time.time;
+                do
+                {
+                    yield return null;
+                } while (!HasEnoughTimePassed(startTime, interval));
             }
         }
 
@@ -1359,16 +1367,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
 
             return ClampInitialJitter(PRNG.Instance.NextFloat(0f, interval), interval);
-        }
-
-        private static IEnumerator WaitForDelay(float duration)
-        {
-            float clamped = Mathf.Max(0f, duration);
-            float startTime = Time.time;
-            do
-            {
-                yield return null;
-            } while (!HasEnoughTimePassed(startTime, clamped));
         }
 
         private static IEnumerator FunctionDelayAsCoroutine(Action action, float delay)

@@ -67,7 +67,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 if (valueView)
                 {
                     foreach (
-                        KeyValuePair<int, int> pair in subject.Pairs.AsValueDictionaryEnumerable()
+                        KeyValuePair<int, int> pair in subject.Pairs.WAsValueDictionaryEnumerable()
                     )
                     {
                         sum += (long)pair.Key + pair.Value;
@@ -83,7 +83,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             }
             else if (valueView)
             {
-                foreach (int value in subject.Values.AsValueEnumerable())
+                foreach (int value in subject.Values.WAsValueEnumerable())
                 {
                     sum += value;
                 }

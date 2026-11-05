@@ -62,6 +62,12 @@ missing durations on skipped tests count as zero. A step summary appends UTF-8 M
 
 ### Typed Python scripts
 
+Documentation counts use `scripts/doc_counts.py` through locked uv. `npm run lint:doc-counts`
+checks without writing; `npm run sync:doc-counts` updates only the documented target files.
+For metadata JSON, run `uv run --project scripts/python~ --locked --no-dev python scripts/doc_counts.py generate`.
+The three PowerShell commands remain compatibility entry points. Run `npm run test:lint-doc-counts`
+for count, encoding, newline, read-only, and wrapper exit-code controls.
+
 Release payload staging, archive creation, and Unity metadata generation run through uv. Install uv 0.13.6, then use:
 
 ```bash

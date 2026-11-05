@@ -42,7 +42,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 }
                 ValueEnumerable<int> view = required
                     ? ValueEnumerable<int>.RequireSource(source)
-                    : source.AsValueEnumerable();
+                    : source.WAsValueEnumerable();
                 for (int repetition = 0; repetition < 2; ++repetition)
                 {
                     List<int> actual = new List<int>();
@@ -59,7 +59,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void NullAndDefaultViewsAreEmpty()
         {
             IEnumerable<int> source = null;
-            ValueEnumerable<int>[] views = { source.AsValueEnumerable(), default };
+            ValueEnumerable<int>[] views = { source.WAsValueEnumerable(), default };
             foreach (ValueEnumerable<int> view in views)
             {
                 using ValueEnumerator<int> enumerator = view.GetEnumerator();
@@ -100,7 +100,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             foreach (IEnumerable<object> source in sources)
             {
                 int index = 0;
-                foreach (object value in source.AsValueEnumerable())
+                foreach (object value in source.WAsValueEnumerable())
                 {
                     Assert.That(value, Is.SameAs(values[index]));
                     ++index;
@@ -113,7 +113,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void ViewAcquiresLazilyAndFallbackDoesNotUseIndexers()
         {
             EnumerationProbe source = new EnumerationProbe();
-            ValueEnumerable<int> view = source.AsValueEnumerable();
+            ValueEnumerable<int> view = source.WAsValueEnumerable();
             Assert.That(source.Events, Is.Empty);
             List<int> actual = new List<int>();
             foreach (int value in view)
@@ -156,7 +156,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             });
             Assert.Throws<InvalidOperationException>(() =>
             {
-                foreach (int value in wrapped.AsValueEnumerable())
+                foreach (int value in wrapped.WAsValueEnumerable())
                 {
                     Assert.That(value, Is.EqualTo(1));
                     break;
@@ -172,7 +172,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             EnumerationProbe source = new EnumerationProbe();
             TestDelegate run = () =>
             {
-                foreach (int value in source.AsValueEnumerable())
+                foreach (int value in source.WAsValueEnumerable())
                 {
                     Assert.That(value, Is.EqualTo(1));
                     if (fail)
@@ -211,7 +211,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             foreach (IEnumerable<int> source in sources)
             {
                 List<int> actual = new List<int>();
-                foreach (int value in source.AsValueEnumerable())
+                foreach (int value in source.WAsValueEnumerable())
                 {
                     actual.Add(value);
                 }
@@ -233,7 +233,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             List<int> values = new List<int> { 1, 2, 3 };
             using ValueEnumerator<int> enumerator = ((IEnumerable<int>)values)
-                .AsValueEnumerable()
+                .WAsValueEnumerable()
                 .GetEnumerator();
             Assert.That(enumerator.MoveNext(), Is.True);
             if (clear)
@@ -252,7 +252,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             HashSet<int> values = new HashSet<int> { 1, 2, 3 };
             using ValueEnumerator<int> enumerator = ((IEnumerable<int>)values)
-                .AsValueEnumerable()
+                .WAsValueEnumerable()
                 .GetEnumerator();
             Assert.That(enumerator.MoveNext(), Is.True);
             values.Add(4);
@@ -264,7 +264,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             int[] values = { 1, 2 };
             using ValueEnumerator<int> enumerator = ((IEnumerable<int>)values)
-                .AsValueEnumerable()
+                .WAsValueEnumerable()
                 .GetEnumerator();
             Assert.That(enumerator.MoveNext(), Is.True);
             values[1] = 7;
@@ -287,7 +287,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void FallbackCopiesRetainTheOriginalSharedLifetime()
         {
             EnumerationProbe source = new EnumerationProbe();
-            ValueEnumerator<int> enumerator = source.AsValueEnumerable().GetEnumerator();
+            ValueEnumerator<int> enumerator = source.WAsValueEnumerable().GetEnumerator();
             ValueEnumerator<int> copy = enumerator;
             Assert.That(enumerator.MoveNext(), Is.True);
             Assert.That(copy.MoveNext(), Is.True);
@@ -308,7 +308,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void NestedEnumeratorsRemainIndependent()
         {
             IEnumerable<int> source = new List<int> { 1, 2, 3 };
-            ValueEnumerable<int> view = source.AsValueEnumerable();
+            ValueEnumerable<int> view = source.WAsValueEnumerable();
             int pairs = 0;
             foreach (int outer in view)
             {

@@ -341,7 +341,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
         private static ValueEnumerable<T> Safe<T>(IReadOnlyList<T> values)
         {
-            return values.AsValueEnumerable();
+            return values.WAsValueEnumerable();
         }
 
         private static void Claim(Dictionary<string, HashSet<int>> taken, string baseName, int tag)
