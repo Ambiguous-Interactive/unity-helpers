@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add `BendableLine` for animated sprite curves with bounded segments, sorting controls, and unreadable sprite-sheet support without a tween dependency ([#1113](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1113)).
+- Add Sprite Pivot Copier with configurable name matching, effective-pivot copying across texture sizes, and rejection of ambiguous batches ([#1113](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1113)).
+
 ## [3.7.1] - 2026-11-05
 
 ### Added
