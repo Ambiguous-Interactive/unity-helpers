@@ -38,6 +38,11 @@ listed direct Unity base classes; it does not resolve arbitrary user-defined inh
 The compatibility test launcher accepts `-TestFilter` for a pytest name expression; it preserves
 the pytest exit status, including an empty selection.
 
+Standalone players using `-nographics` can omit material texture state. Keep geometry, UV,
+animation, and lifecycle assertions active in those players. Texture-state inspections require
+the Editor or a graphics backend other than `GraphicsDeviceType.Null`; qualify those assertions
+with a graphics-enabled batch player as well.
+
 ## Isolated migration compiler tests
 
 The Odin compiler fixture rewrites a small runtime consumer asset rather than the shared test

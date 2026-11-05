@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
     using System.Collections;
     using NUnit.Framework;
     using UnityEngine;
+    using UnityEngine.Rendering;
     using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Visuals;
@@ -43,10 +44,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
                 Vector3.Distance(vertices[2], vertices[3]),
                 Is.EqualTo(0.5f).Within(0.0001f)
             );
-            Assert.That(
-                line.GetComponent<MeshRenderer>().sharedMaterial.mainTexture,
-                Is.SameAs(line.Sprite.texture)
-            );
+            if (Application.isEditor || SystemInfo.graphicsDeviceType != GraphicsDeviceType.Null)
+            {
+                Assert.That(
+                    line.GetComponent<MeshRenderer>().sharedMaterial.mainTexture,
+                    Is.SameAs(line.Sprite.texture)
+                );
+            }
         }
 
         [Test]
@@ -116,10 +120,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             Assert.AreEqual(new Vector2(0.75f, 0.125f), uv[1]);
             Assert.AreEqual(new Vector2(0.25f, 0.375f), uv[2]);
             Assert.AreEqual(new Vector2(0.75f, 0.375f), uv[3]);
-            Assert.That(
-                line.GetComponent<MeshRenderer>().sharedMaterial.mainTexture,
-                Is.SameAs(texture)
-            );
+            if (Application.isEditor || SystemInfo.graphicsDeviceType != GraphicsDeviceType.Null)
+            {
+                Assert.That(
+                    line.GetComponent<MeshRenderer>().sharedMaterial.mainTexture,
+                    Is.SameAs(texture)
+                );
+            }
             Assert.IsFalse(texture.isReadable);
         }
 

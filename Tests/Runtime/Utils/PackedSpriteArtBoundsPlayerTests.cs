@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 {
     using NUnit.Framework;
     using UnityEngine;
+    using UnityEngine.Rendering;
     using UnityEngine.U2D;
     using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Utils;
@@ -64,10 +65,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 Assert.AreEqual(0, mesh.vertexCount);
                 return;
             }
-            Assert.AreSame(
-                sprite.texture,
-                host.GetComponent<MeshRenderer>().sharedMaterial.mainTexture
-            );
+            if (Application.isEditor || SystemInfo.graphicsDeviceType != GraphicsDeviceType.Null)
+            {
+                Assert.AreSame(
+                    sprite.texture,
+                    host.GetComponent<MeshRenderer>().sharedMaterial.mainTexture
+                );
+            }
             Assert.AreEqual(readable, sprite.texture.isReadable);
             Vector2[] lineUv = mesh.uv;
             Vector2[] spriteUv = sprite.uv;
