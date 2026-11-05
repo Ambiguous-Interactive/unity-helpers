@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.7.0] - 2026-11-05
+
 ### Added
 
 - Add grow-only scratch arrays, tracked one-shot delays, and sprite pixel bounds with flip and transformed-corner helpers ([#1113](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1113)).
