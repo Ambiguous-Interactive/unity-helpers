@@ -2214,15 +2214,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         /// </remarks>
         protected static void CleanupAllKnownTestFolders()
         {
-            // Reuse an active batch to avoid redundant refreshes.
-            bool shouldBatch = !AssetDatabaseBatchHelper.IsCurrentlyBatching;
-            AssetDatabaseBatchScope? batchScope = shouldBatch
-                ? AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: true)
-                : null;
+            AssetDatabaseBatchScope? batchScope = null;
 
             try
             {
-                CleanupAllKnownTestFoldersInternal();
+                CleanupAllKnownTestFoldersInternal(ref batchScope);
             }
             finally
             {
@@ -2232,9 +2228,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 
         /// <summary>
         /// Internal implementation of CleanupAllKnownTestFolders that performs the actual cleanup.
-        /// This method assumes it's called either within a batch scope or that batching is not needed.
+        /// A cleanup-owned batch is opened only when an unprotected matching folder is removed.
         /// </summary>
-        private static void CleanupAllKnownTestFoldersInternal()
+        private static void CleanupAllKnownTestFoldersInternal(
+            ref AssetDatabaseBatchScope? batchScope
+        )
         {
             // Keep CleanupAllKnownTestFoldersTests.ResourcesTestFolderPatterns synchronized with this list.
             string[] resourcesTestFolderPatterns = new[]
@@ -2292,27 +2290,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 
             foreach (string pattern in resourcesTestFolderPatterns)
             {
-                CleanupFolderAndDuplicates(resourcesRoot, pattern);
+                CleanupFolderAndDuplicates(resourcesRoot, pattern, ref batchScope);
             }
 
             foreach (string pattern in assetsTestFolderPatterns)
             {
-                CleanupFolderAndDuplicates(assetsRoot, pattern);
+                CleanupFolderAndDuplicates(assetsRoot, pattern, ref batchScope);
             }
 
             foreach (string pattern in wallstopDuplicatePatterns)
             {
-                CleanupDuplicateFoldersOnly(resourcesRoot, pattern);
+                CleanupDuplicateFoldersOnly(resourcesRoot, pattern, ref batchScope);
             }
 
             foreach (string pattern in unityHelpersDuplicatePatterns)
             {
-                CleanupDuplicateFoldersOnly(wallstopStudiosRoot, pattern);
+                CleanupDuplicateFoldersOnly(wallstopStudiosRoot, pattern, ref batchScope);
             }
 
             foreach (string pattern in resourcesDuplicatePatterns)
             {
-                CleanupDuplicateFoldersOnly(assetsRoot, pattern);
+                CleanupDuplicateFoldersOnly(assetsRoot, pattern, ref batchScope);
             }
 
             string projectRoot = System.IO.Path.GetDirectoryName(Application.dataPath);
@@ -2323,12 +2321,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 {
                     foreach (string pattern in resourcesTestFolderPatterns)
                     {
-                        CleanupFolderAndDuplicatesOnDisk(resourcesOnDisk, pattern);
+                        CleanupFolderAndDuplicatesOnDisk(resourcesOnDisk, pattern, ref batchScope);
                     }
 
                     foreach (string pattern in wallstopDuplicatePatterns)
                     {
-                        CleanupDuplicateFoldersOnlyOnDisk(resourcesOnDisk, pattern);
+                        CleanupDuplicateFoldersOnlyOnDisk(resourcesOnDisk, pattern, ref batchScope);
                     }
 
                     string wallstopOnDisk = System.IO.Path.Combine(
@@ -2339,7 +2337,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     {
                         foreach (string pattern in unityHelpersDuplicatePatterns)
                         {
-                            CleanupDuplicateFoldersOnlyOnDisk(wallstopOnDisk, pattern);
+                            CleanupDuplicateFoldersOnlyOnDisk(
+                                wallstopOnDisk,
+                                pattern,
+                                ref batchScope
+                            );
                         }
                     }
                 }
@@ -2349,21 +2351,33 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 {
                     foreach (string pattern in assetsTestFolderPatterns)
                     {
-                        CleanupFolderAndDuplicatesOnDisk(assetsOnDisk, pattern);
+                        CleanupFolderAndDuplicatesOnDisk(assetsOnDisk, pattern, ref batchScope);
                     }
 
                     foreach (string pattern in resourcesDuplicatePatterns)
                     {
-                        CleanupDuplicateFoldersOnlyOnDisk(assetsOnDisk, pattern);
+                        CleanupDuplicateFoldersOnlyOnDisk(assetsOnDisk, pattern, ref batchScope);
                     }
                 }
+            }
+        }
+
+        private static void EnsureKnownFolderCleanupBatch(ref AssetDatabaseBatchScope? batchScope)
+        {
+            if (!batchScope.HasValue && !AssetDatabaseBatchHelper.IsCurrentlyBatching)
+            {
+                batchScope = AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: true);
             }
         }
 
         /// <summary>
         /// Deletes a folder and all its duplicates (e.g., "Folder", "Folder 1", "Folder 2").
         /// </summary>
-        private static void CleanupFolderAndDuplicates(string parentPath, string folderName)
+        private static void CleanupFolderAndDuplicates(
+            string parentPath,
+            string folderName,
+            ref AssetDatabaseBatchScope? batchScope
+        )
         {
             if (!UnityEditor.AssetDatabase.IsValidFolder(parentPath))
             {
@@ -2389,7 +2403,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     || IsDuplicateFolder(name, folderName)
                 )
                 {
-                    DeleteFolderRecursivelyWithContents(folder);
+                    DeleteFolderRecursivelyWithContents(folder, ref batchScope);
                 }
             }
         }
@@ -2397,7 +2411,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         /// <summary>
         /// Deletes only duplicate folders (e.g., "Folder 1", "Folder 2") but NOT the main folder.
         /// </summary>
-        private static void CleanupDuplicateFoldersOnly(string parentPath, string folderName)
+        private static void CleanupDuplicateFoldersOnly(
+            string parentPath,
+            string folderName,
+            ref AssetDatabaseBatchScope? batchScope
+        )
         {
             if (!UnityEditor.AssetDatabase.IsValidFolder(parentPath))
             {
@@ -2420,7 +2438,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 
                 if (IsDuplicateFolder(name, folderName))
                 {
-                    DeleteFolderRecursivelyWithContents(folder);
+                    DeleteFolderRecursivelyWithContents(folder, ref batchScope);
                 }
             }
         }
@@ -2525,7 +2543,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         /// Deletes a folder and all its contents through AssetDatabase.
         /// IMPORTANT: Will NOT delete protected production folders.
         /// </summary>
-        private static void DeleteFolderRecursivelyWithContents(string folderPath)
+        private static void DeleteFolderRecursivelyWithContents(
+            string folderPath,
+            ref AssetDatabaseBatchScope? batchScope
+        )
         {
             if (!UnityEditor.AssetDatabase.IsValidFolder(folderPath))
             {
@@ -2541,6 +2562,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 return;
             }
 
+            EnsureKnownFolderCleanupBatch(ref batchScope);
             string[] assetGuids = UnityEditor.AssetDatabase.FindAssets(
                 string.Empty,
                 new[] { folderPath }
@@ -2573,7 +2595,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             {
                 foreach (string sub in subFolders)
                 {
-                    DeleteFolderRecursivelyWithContents(sub);
+                    DeleteFolderRecursivelyWithContents(sub, ref batchScope);
                 }
             }
 
@@ -2619,7 +2641,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         /// Cleans up folders on disk (handles orphaned folders not in AssetDatabase).
         /// IMPORTANT: Will NOT delete protected production folders.
         /// </summary>
-        private static void CleanupFolderAndDuplicatesOnDisk(string parentPath, string folderName)
+        private static void CleanupFolderAndDuplicatesOnDisk(
+            string parentPath,
+            string folderName,
+            ref AssetDatabaseBatchScope? batchScope
+        )
         {
             if (!System.IO.Directory.Exists(parentPath))
             {
@@ -2652,6 +2678,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 
                         try
                         {
+                            EnsureKnownFolderCleanupBatch(ref batchScope);
                             System.IO.Directory.Delete(dir, recursive: true);
                         }
                         catch
@@ -2668,7 +2695,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         /// Cleans up duplicate folders on disk (not the main folder).
         /// IMPORTANT: Will NOT delete protected production folders.
         /// </summary>
-        private static void CleanupDuplicateFoldersOnlyOnDisk(string parentPath, string folderName)
+        private static void CleanupDuplicateFoldersOnlyOnDisk(
+            string parentPath,
+            string folderName,
+            ref AssetDatabaseBatchScope? batchScope
+        )
         {
             if (!System.IO.Directory.Exists(parentPath))
             {
@@ -2698,6 +2729,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 
                         try
                         {
+                            EnsureKnownFolderCleanupBatch(ref batchScope);
                             System.IO.Directory.Delete(dir, recursive: true);
                         }
                         catch
