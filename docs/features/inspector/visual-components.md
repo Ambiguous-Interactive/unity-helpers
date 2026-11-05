@@ -61,7 +61,8 @@ folder is searched recursively.
 
 Both sprites must use Single import mode. The target texture and metadata must be open for
 editing, and read-only metadata is refused. Editability uses fresh version-control status during
-planning and again before each copy. The copier reads the source's effective normalized
+planning and again before each copy. Texture type and Single mode are also rechecked before
+applying each pivot. The copier reads the source's effective normalized
 pivot, including built-in alignment presets, then gives the target Custom alignment with that
 pivot. Different texture dimensions are supported. Other texture settings and source importers
 are preserved, and textures do not need Read/Write enabled.

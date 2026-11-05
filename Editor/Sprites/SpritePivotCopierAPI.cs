@@ -344,6 +344,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return false;
             }
             if (
+                importer.textureType != TextureImporterType.Sprite
+                || importer.spriteImportMode != SpriteImportMode.Single
+            )
+            {
+                error = "The target texture importer is no longer a Single-mode sprite.";
+                changed = false;
+                return false;
+            }
+            if (
                 !importer.assetPath.StartsWith("Assets/", StringComparison.Ordinal)
                 || !AssetDatabase.IsOpenForEdit(importer.assetPath, StatusQueryOptions.ForceUpdate)
                 || !IsMetadataEditable(importer)

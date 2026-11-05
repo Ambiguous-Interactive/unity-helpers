@@ -204,10 +204,33 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         public void UnpackedPolygonKeepsTheAuthoredRectangle()
         {
             BendableLine line = CreateLine();
+            const int spriteSize = 64;
+            Texture2D texture = Track(
+                new Texture2D(spriteSize, spriteSize, TextureFormat.RGBA32, false)
+            );
+            Color32[] pixels = new Color32[spriteSize * spriteSize];
+            for (int index = 0; index < pixels.Length; ++index)
+            {
+                pixels[index] = new Color32(255, 255, 255, 255);
+            }
+            texture.SetPixels32(pixels);
+            texture.Apply();
+            line.Sprite = Track(
+                Sprite.Create(
+                    texture,
+                    new Rect(0, 0, spriteSize, spriteSize),
+                    Vector2.zero,
+                    1f,
+                    0,
+                    SpriteMeshType.Tight
+                )
+            );
             line.Sprite.OverrideGeometry(
-                new[] { new Vector2(0, 0), new Vector2(1, 0), new Vector2(0, 1) },
+                new[] { Vector2.zero, new Vector2(spriteSize, 0), new Vector2(0, spriteSize) },
                 new ushort[] { 0, 1, 2 }
             );
+            Assert.AreEqual(3, line.Sprite.vertices.Length);
+            Assert.AreEqual(3, line.Sprite.triangles.Length);
             Assert.IsTrue(line.TryRefresh());
             Vector2[] uv = line.GetComponent<MeshFilter>().sharedMesh.uv;
             Assert.AreEqual(Vector2.zero, uv[0]);

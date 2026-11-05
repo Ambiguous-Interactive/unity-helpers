@@ -272,6 +272,45 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             }
         }
 
+        [TestCase(TextureImporterType.Sprite, SpriteImportMode.Multiple)]
+        [TestCase(TextureImporterType.Default, SpriteImportMode.Single)]
+        public void ImporterChangingAfterPlanningRefusesThePendingWrite(
+            TextureImporterType textureType,
+            SpriteImportMode spriteMode
+        )
+        {
+            CreateSprite("late_pivot_frame", new Vector2(0.25f, 0.75f));
+            CreateSprite("late_frame", Vector2.zero);
+            byte[] callbackMetadata = null;
+            string metadataPath = _folder + "/late_frame.png.meta";
+            Assert.IsFalse(
+                SpritePivotCopierAPI.TryCopyPivotsInDirectory(
+                    _folder,
+                    out int changed,
+                    out string error,
+                    cancelRequested: (processed, total, path) =>
+                    {
+                        TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
+                        Assert.IsTrue(importer != null);
+                        importer.textureType = textureType;
+                        importer.spriteImportMode = spriteMode;
+                        ExecuteWithImmediateImport(importer.SaveAndReimport, refreshBefore: false);
+                        Assert.AreEqual(textureType, importer.textureType);
+                        if (textureType == TextureImporterType.Sprite)
+                        {
+                            Assert.AreEqual(spriteMode, importer.spriteImportMode);
+                        }
+                        callbackMetadata = File.ReadAllBytes(metadataPath);
+                        return false;
+                    }
+                )
+            );
+            Assert.AreEqual(0, changed);
+            Assert.That(error, Does.Contain("Single"));
+            Assert.IsTrue(callbackMetadata != null);
+            CollectionAssert.AreEqual(callbackMetadata, File.ReadAllBytes(metadataPath));
+        }
+
         [Test]
         public void ImporterUndoRestoresThePreviousPivotBeforeExplicitReimport()
         {
