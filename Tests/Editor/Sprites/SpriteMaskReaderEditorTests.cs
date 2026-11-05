@@ -5,11 +5,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
 {
 #if UNITY_EDITOR
     using System;
+    using System.Collections;
     using System.IO;
     using NUnit.Framework;
     using UnityEditor;
     using UnityEditor.U2D;
     using UnityEngine;
+    using UnityEngine.TestTools;
     using UnityEngine.U2D;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Tests.Core;
@@ -26,7 +28,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             value => EditorSettings.spritePackerMode = value
         );
 
+        private static readonly RestorableGlobal<EnterPlayModeOptions> PlayModeOptions = new(
+            () => EditorSettings.enterPlayModeOptions,
+            value => EditorSettings.enterPlayModeOptions = value
+        );
+
+        private static readonly RestorableGlobal<bool> PlayModeOptionsEnabled = new(
+            () => EditorSettings.enterPlayModeOptionsEnabled,
+            value => EditorSettings.enterPlayModeOptionsEnabled = value
+        );
+
         private string _folder;
+        private RestorableGlobal<SpritePackerMode>.Scope _atlasPackingScope;
+        private RestorableGlobal<EnterPlayModeOptions>.Scope _atlasPlayModeOptionsScope;
+        private RestorableGlobal<bool>.Scope _atlasPlayModeOptionsEnabledScope;
+        private bool _atlasPlayModeRequested;
 
         [SetUp]
         public override void BaseSetUp()
@@ -41,6 +57,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         {
             CleanupTrackedFoldersAndAssets();
             base.TearDown();
+        }
+
+        [UnityTearDown]
+        public IEnumerator ReturnFromAtlasPlayMode()
+        {
+            try
+            {
+                if (_atlasPlayModeRequested && EditorApplication.isPlayingOrWillChangePlaymode)
+                {
+                    yield return new ExitPlayMode();
+                }
+            }
+            finally
+            {
+                _atlasPlayModeRequested = false;
+                _atlasPackingScope.Dispose();
+                _atlasPlayModeOptionsScope.Dispose();
+                _atlasPlayModeOptionsEnabledScope.Dispose();
+            }
         }
 
         [Test]
@@ -331,13 +366,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             Assert.IsFalse(importer.isReadable);
         }
 
-        [TestCase(false)]
-        [TestCase(true)]
-        public void AtlasReadsKeepSourceImportSettingsAndReportUnavailablePixels(bool tight)
+        [UnityTest]
+        public IEnumerator RectangularAtlasReadsKeepSourceImportSettingsAndReportUnavailablePixels()
         {
-            using RestorableGlobal<SpritePackerMode>.Scope packingMode = PackingMode.Borrow(
-                SpritePackerMode.SpriteAtlasV2
-            );
+            return AtlasReadsKeepSourceImportSettingsAndReportUnavailablePixels(false);
+        }
+
+        [UnityTest]
+        public IEnumerator TightAtlasReadsKeepSourceImportSettingsAndReportUnavailablePixels()
+        {
+            return AtlasReadsKeepSourceImportSettingsAndReportUnavailablePixels(true);
+        }
+
+        private IEnumerator AtlasReadsKeepSourceImportSettingsAndReportUnavailablePixels(bool tight)
+        {
+            _atlasPackingScope = PackingMode.Borrow(SpritePackerMode.SpriteAtlasV2);
             string path = CreatePng();
             TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
             Assert.IsTrue(importer != null);
@@ -386,83 +429,49 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             atlasImporter.textureSettings = texture;
             atlasImporter.SaveAndReimport();
 #endif
+#if !UNITY_2022_1_OR_NEWER
+            DestroyTrackedObjects();
+            _atlasPlayModeOptionsEnabledScope = PlayModeOptionsEnabled.Borrow(true);
+            _atlasPlayModeOptionsScope = PlayModeOptions.Borrow(
+                EnterPlayModeOptions.DisableDomainReload | EnterPlayModeOptions.DisableSceneReload
+            );
+            _atlasPlayModeRequested = true;
+            yield return new EnterPlayMode(false);
+#endif
             SpriteAtlas atlas = AssetDatabase.LoadAssetAtPath<SpriteAtlas>(atlasPath);
             Assert.IsTrue(atlas != null);
-            string bundleFolder = Path.Combine(
-                Application.temporaryCachePath,
-                nameof(SpriteMaskReaderEditorTests) + System.Guid.NewGuid().ToString("N")
-            );
-            AssetBundle bundle = null;
-            try
-            {
+            Assert.IsTrue(atlas.CanBindTo(original));
+            Sprite packed = Track(atlas.GetSprite(original.name));
+            Assert.IsTrue(packed != null);
 #if !UNITY_2022_1_OR_NEWER
-                Directory.CreateDirectory(bundleFolder);
-                string bundleName = Path.GetFileNameWithoutExtension(atlasPath).ToLowerInvariant();
-                AssetBundleBuild build = new()
-                {
-                    assetBundleName = bundleName,
-                    assetNames = new[] { atlasPath },
-                };
-                AssetBundleManifest manifest = Track(
-                    BuildPipeline.BuildAssetBundles(
-                        bundleFolder,
-                        new[] { build },
-                        BuildAssetBundleOptions.UncompressedAssetBundle,
-                        EditorUserBuildSettings.activeBuildTarget
-                    )
-                );
-                Assert.IsTrue(manifest != null);
-                bundle = AssetBundle.LoadFromFile(Path.Combine(bundleFolder, bundleName));
-                Assert.IsTrue(bundle != null);
-                atlas = bundle.LoadAsset<SpriteAtlas>(atlasPath);
-                Assert.IsTrue(atlas != null);
-#endif
-                Assert.IsTrue(atlas.CanBindTo(original));
-                Sprite packed = Track(atlas.GetSprite(original.name));
-                Assert.IsTrue(packed != null);
-#if !UNITY_2022_1_OR_NEWER
-                Assert.IsTrue(packed.packed);
-                Texture2D atlasTexture = packed.texture;
+            Assert.IsTrue(packed.packed);
+            Texture2D atlasTexture = packed.texture;
 #else
-                Texture2D atlasTexture = UnityEditor.Sprites.SpriteUtility.GetSpriteTexture(
-                    packed,
-                    true
-                );
+            Texture2D atlasTexture = UnityEditor.Sprites.SpriteUtility.GetSpriteTexture(
+                packed,
+                true
+            );
 #endif
-                Assert.IsTrue(atlasTexture != null);
-                Assert.IsFalse(atlasTexture.isReadable);
-                bool measured = SpriteArtBounds.TryGetLocalArtBounds(
-                    packed,
-                    out Bounds actual,
-                    out error
-                );
-                if (measured)
-                {
-                    Assert.That(
-                        Vector3.Distance(expected.center, actual.center),
-                        Is.LessThan(0.0001f)
-                    );
-                    Assert.That(Vector3.Distance(expected.size, actual.size), Is.LessThan(0.0001f));
-                }
-                else
-                {
-                    Assert.AreEqual(default(Bounds), actual);
-                    Assert.IsFalse(string.IsNullOrWhiteSpace(error));
-                }
-                Assert.AreEqual(before, EditorJsonUtility.ToJson(importer));
-                Assert.IsFalse(importer.isReadable);
-            }
-            finally
+            Assert.IsTrue(atlasTexture != null);
+            Assert.IsFalse(atlasTexture.isReadable);
+            bool measured = SpriteArtBounds.TryGetLocalArtBounds(
+                packed,
+                out Bounds actual,
+                out error
+            );
+            if (measured)
             {
-                if (bundle != null)
-                {
-                    bundle.Unload(true);
-                }
-                if (Directory.Exists(bundleFolder))
-                {
-                    Directory.Delete(bundleFolder, true);
-                }
+                Assert.That(Vector3.Distance(expected.center, actual.center), Is.LessThan(0.0001f));
+                Assert.That(Vector3.Distance(expected.size, actual.size), Is.LessThan(0.0001f));
             }
+            else
+            {
+                Assert.AreEqual(default(Bounds), actual);
+                Assert.IsFalse(string.IsNullOrWhiteSpace(error));
+            }
+            Assert.AreEqual(before, EditorJsonUtility.ToJson(importer));
+            Assert.IsFalse(importer.isReadable);
+            yield break;
         }
 
         private string CreatePng()
