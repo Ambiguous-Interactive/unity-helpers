@@ -18,6 +18,8 @@ namespace WallstopStudios.UnityHelpers.Visuals
 
         private const string ShaderResource = "WallstopStudios/UnityHelpers/BendableLine";
 
+        private static readonly int MainTextureId = Shader.PropertyToID("_MainTex");
+
         private static readonly int UvBoundsId = Shader.PropertyToID("_UvBounds");
 
         /// <summary>The sprite stretched along the curve, including unreadable rectangular atlas sprites.</summary>
@@ -186,11 +188,13 @@ namespace WallstopStudios.UnityHelpers.Visuals
         private Vector2 _endAnimationStart;
         private double _endAnimationTime;
         private double _progressAnimationTime;
+        private double _animationPausedAt;
         private float _progressAnimationStart;
         private float _progressTarget;
         private float _progress;
         private bool _animateEnd;
         private bool _animateProgress;
+        private bool _animationsPaused;
         private bool _dirty = true;
         private bool _spriteChanged = true;
         private bool _hasSpriteMapping;
@@ -202,6 +206,7 @@ namespace WallstopStudios.UnityHelpers.Visuals
         private MeshRenderer _renderer;
         private Mesh _mesh;
         private Material _material;
+        private Texture2D _examinedTexture;
         private Vector3[] _vertices;
         private Vector2[] _uv;
         private int[] _triangles;
@@ -213,6 +218,7 @@ namespace WallstopStudios.UnityHelpers.Visuals
         }
 
         /// <summary>Animates drawing toward the end or back to the start, optionally restarting at the opposite extreme.</summary>
+        /// <remarks>Animation timing pauses while the line cannot be drawn.</remarks>
         public void AnimateLine(bool forward = true, bool resetProgress = false)
         {
             if (resetProgress)
@@ -236,6 +242,7 @@ namespace WallstopStudios.UnityHelpers.Visuals
         {
             if (!EnsureResources())
             {
+                PauseAnimations();
                 return false;
             }
             if (_start.HasValue)
@@ -248,10 +255,16 @@ namespace WallstopStudios.UnityHelpers.Visuals
                 _renderer.sortingLayerID = _sortingLayerId;
             }
             _renderer.sortingOrder = Mathf.Clamp(_sortingOrder, short.MinValue, short.MaxValue);
-            if (_spriteChanged || (_sprite != null && _material.mainTexture != _sprite.texture))
+            Texture2D texture = _sprite != null ? _sprite.texture : null;
+            if (
+                _spriteChanged
+                || _examinedTexture != texture
+                || (_hasSpriteMapping && texture == null)
+            )
             {
+                _examinedTexture = texture;
                 _hasSpriteMapping = TryReadSpriteMapping();
-                _material.mainTexture = _hasSpriteMapping ? _sprite.texture : null;
+                _material.SetTexture(MainTextureId, _hasSpriteMapping ? _examinedTexture : null);
                 _spriteChanged = false;
             }
             _previousTransform = transform.localToWorldMatrix;
@@ -269,9 +282,11 @@ namespace WallstopStudios.UnityHelpers.Visuals
             {
                 _mesh.Clear();
                 _hasCurrentEnd = false;
+                PauseAnimations();
                 _dirty = false;
                 return false;
             }
+            ResumeAnimations();
             Vector3 worldEnd = new(_end.Value.x, _end.Value.y, transform.position.z);
             Vector2 targetEnd = transform.InverseTransformPoint(worldEnd);
             float endpointFraction = AnimationFraction(_endAnimationTime);
@@ -290,9 +305,38 @@ namespace WallstopStudios.UnityHelpers.Visuals
             if (!built)
             {
                 _mesh.Clear();
+                PauseAnimations();
             }
             _dirty = false;
             return built;
+        }
+
+        private void PauseAnimations()
+        {
+            if (!_animationsPaused)
+            {
+                _animationPausedAt = Time.timeAsDouble;
+                _animationsPaused = true;
+            }
+        }
+
+        private void ResumeAnimations()
+        {
+            if (!_animationsPaused)
+            {
+                return;
+            }
+            double now = Time.timeAsDouble;
+            if (_animateEnd)
+            {
+                _endAnimationTime = now - Math.Max(0d, _animationPausedAt - _endAnimationTime);
+            }
+            if (_animateProgress)
+            {
+                _progressAnimationTime =
+                    now - Math.Max(0d, _animationPausedAt - _progressAnimationTime);
+            }
+            _animationsPaused = false;
         }
 
         private float AnimationFraction(double startTime)
@@ -542,12 +586,8 @@ namespace WallstopStudios.UnityHelpers.Visuals
                 || _animateEnd
                 || _animateProgress
                 || _previousTransform != transform.localToWorldMatrix
-                || (_hasSpriteMapping && _sprite == null)
-                || (
-                    _sprite != null
-                    && _material != null
-                    && (_sprite.texture == null || _material.mainTexture != _sprite.texture)
-                )
+                || (_hasSpriteMapping && (_sprite == null || _sprite.texture == null))
+                || (_sprite != null && _material != null && _examinedTexture != _sprite.texture)
             )
             {
                 TryRefresh();
@@ -558,6 +598,7 @@ namespace WallstopStudios.UnityHelpers.Visuals
         {
             _animateEnd = false;
             _animateProgress = false;
+            _animationsPaused = false;
             _progress = 0f;
             if (_mesh != null)
             {

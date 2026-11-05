@@ -2,7 +2,7 @@ Shader "Wallstop Studios/Unity Helpers/Bendable Line"
 {
     Properties
     {
-        _MainTex("Sprite", 2D) = "white" {}
+        [MainTexture] _MainTex("Sprite", 2D) = "white" {}
         _UvBounds("Sprite UV Bounds", Vector) = (0,0,1,1)
     }
     SubShader

@@ -30,22 +30,29 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             out string error
         )
         {
-            changed = false;
             try
             {
-                return TryReadCopy(
+                if (
+                    !TryReadCopy(
                         source,
                         target,
                         out TextureImporter importer,
                         out Vector2 pivot,
                         out error
-                    ) && TryApplyPivot(importer, pivot, out changed, out error);
+                    )
+                )
+                {
+                    changed = false;
+                    return false;
+                }
+                return TryApplyPivot(importer, pivot, out changed, out error);
             }
             catch (Exception exception)
             {
                 error =
                     "Pivot copy failed; inspect the target importer before retrying. "
                     + exception.Message;
+                changed = false;
                 return false;
             }
         }
@@ -66,7 +73,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             Func<int, int, string, bool> cancelRequested = null
         )
         {
-            changedCount = 0;
+            int completed = 0;
             if (
                 string.IsNullOrWhiteSpace(directory)
                 || string.IsNullOrWhiteSpace(marker)
@@ -75,6 +82,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 error =
                     "An Assets folder and a nonblank source marker different from its replacement are required.";
+                changedCount = completed;
                 return false;
             }
             string normalized = directory.Replace('\\', '/').TrimEnd('/');
@@ -88,6 +96,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             )
             {
                 error = "Choose a project folder beneath Assets.";
+                changedCount = completed;
                 return false;
             }
             try
@@ -95,6 +104,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 if (!AssetDatabase.IsValidFolder(normalized))
                 {
                     error = "The sprite folder does not exist: " + normalized;
+                    changedCount = completed;
                     return false;
                 }
                 using PooledResource<Dictionary<string, Sprite>> namesLease = DictionaryBuffer<
@@ -145,6 +155,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             + entry.Key
                             + " -> "
                             + targetName;
+                        changedCount = completed;
                         return false;
                     }
                     if (
@@ -157,17 +168,20 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         )
                     )
                     {
+                        changedCount = completed;
                         return false;
                     }
                     if (!plan.TryAdd(importer, pivot))
                     {
                         error = "Multiple pivot sources select the same target: " + targetName;
+                        changedCount = completed;
                         return false;
                     }
                 }
                 if (plan.Count == 0)
                 {
                     error = "No sprite names contain the configured source marker.";
+                    changedCount = completed;
                     return false;
                 }
                 int processed = 0;
@@ -182,37 +196,39 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         )
                     )
                     {
-                        error =
-                            "Pivot copy cancelled after " + changedCount + " completed changes.";
+                        error = "Pivot copy cancelled after " + completed + " completed changes.";
+                        changedCount = completed;
                         return false;
                     }
                     if (!TryApplyPivot(operation.Key, operation.Value, out bool changed, out error))
                     {
+                        changedCount = completed;
                         return false;
                     }
                     if (changed)
                     {
-                        ++changedCount;
+                        ++completed;
                     }
                     ++processed;
                 }
                 error = null;
+                changedCount = completed;
                 return true;
             }
             catch (Exception exception)
             {
                 error =
                     "Pivot copy failed after "
-                    + changedCount
+                    + completed
                     + " completed changes. "
                     + exception.Message;
+                changedCount = completed;
                 return false;
             }
         }
 
         internal static bool TryNormalizePivot(Vector2 pixels, Vector2 size, out Vector2 normalized)
         {
-            normalized = default;
             if (
                 !float.IsFinite(pixels.x)
                 || !float.IsFinite(pixels.y)
@@ -222,11 +238,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 || !(0f < size.y)
             )
             {
+                normalized = default;
                 return false;
             }
             Vector2 result = new(pixels.x / size.x, pixels.y / size.y);
             if (!float.IsFinite(result.x) || !float.IsFinite(result.y))
             {
+                normalized = default;
                 return false;
             }
             normalized = result;
@@ -241,11 +259,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             out string error
         )
         {
-            targetImporter = null;
-            pivot = default;
             if (source == null || target == null)
             {
                 error = "Live source and target sprites are required.";
+                targetImporter = null;
+                pivot = default;
                 return false;
             }
             string sourcePath = AssetDatabase.GetAssetPath(source);
@@ -253,32 +271,42 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             if (!targetPath.StartsWith("Assets/", StringComparison.Ordinal))
             {
                 error = "The target sprite must be an editable project asset under Assets.";
+                targetImporter = null;
+                pivot = default;
                 return false;
             }
             TextureImporter sourceImporter = AssetImporter.GetAtPath(sourcePath) as TextureImporter;
-            targetImporter = AssetImporter.GetAtPath(targetPath) as TextureImporter;
+            TextureImporter targetMetadata = AssetImporter.GetAtPath(targetPath) as TextureImporter;
             if (
                 sourceImporter == null
-                || targetImporter == null
+                || targetMetadata == null
                 || sourceImporter.textureType != TextureImporterType.Sprite
-                || targetImporter.textureType != TextureImporterType.Sprite
+                || targetMetadata.textureType != TextureImporterType.Sprite
                 || sourceImporter.spriteImportMode != SpriteImportMode.Single
-                || targetImporter.spriteImportMode != SpriteImportMode.Single
+                || targetMetadata.spriteImportMode != SpriteImportMode.Single
             )
             {
                 error = "Both sprites must belong to Single-mode texture importers.";
+                targetImporter = null;
+                pivot = default;
                 return false;
             }
-            if (!TryNormalizePivot(source.pivot, source.rect.size, out pivot))
+            if (!TryNormalizePivot(source.pivot, source.rect.size, out Vector2 normalizedPivot))
             {
                 error = "The source sprite has an unrepresentable normalized pivot.";
+                targetImporter = null;
+                pivot = default;
                 return false;
             }
             if (!AssetDatabase.IsOpenForEdit(targetPath))
             {
                 error = "The target texture is not open for editing: " + targetPath;
+                targetImporter = null;
+                pivot = default;
                 return false;
             }
+            targetImporter = targetMetadata;
+            pivot = normalizedPivot;
             error = null;
             return true;
         }
@@ -290,10 +318,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             out string error
         )
         {
-            changed = false;
             if (importer == null)
             {
                 error = "The target texture importer no longer exists.";
+                changed = false;
                 return false;
             }
             if (
@@ -302,6 +330,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             )
             {
                 error = "The target texture is no longer an editable project asset.";
+                changed = false;
                 return false;
             }
             TextureImporterSettings settings = new();
@@ -311,6 +340,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 && settings.spritePivot.Equals(pivot)
             )
             {
+                changed = false;
                 error = null;
                 return true;
             }

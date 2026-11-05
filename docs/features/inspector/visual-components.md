@@ -35,7 +35,8 @@ accepts values through five. `Segments` is clamped from one through 4,096.
 New lines start with zero `Progress`. Set it directly or call `AnimateLine(forward: true,
 resetProgress: true)` to draw the line. `AnimateLine(false)` retracts it from the current fraction.
 Changing `End` after the first successful draw animates the endpoint over `AnimationDuration`.
-Both animations use scaled time; a nonpositive or nonfinite duration settles immediately.
+Both animations use scaled time and pause while the line cannot be drawn, preserving elapsed
+progress across temporary invalid states. A nonpositive or nonfinite duration settles immediately.
 Disabling the component stops animation and clears its visible progress. `LateUpdate` applies
 changes; `TryRefresh()` updates immediately and returns whether usable geometry was built.
 

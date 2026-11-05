@@ -313,6 +313,51 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         }
 
         [UnityTest]
+        public IEnumerator PendingAnimationBeginsWhenTheLineFirstBecomesDrawable()
+        {
+            BendableLine line = CreateLine();
+            line.End = null;
+            line.AnimationDuration = 1000f;
+            line.AnimateLine(true, true);
+            double requestedAt = Time.timeAsDouble;
+            Assert.IsFalse(line.TryRefresh());
+            yield return null;
+            yield return null;
+            double elapsed = Time.timeAsDouble - requestedAt;
+            Assert.That(elapsed, Is.GreaterThan(0.000002));
+            line.AnimationDuration = (float)(elapsed * 0.5);
+            line.End = new Vector2(4f, 0f);
+            Assert.IsTrue(line.TryRefresh());
+            Assert.AreEqual(0f, line.Progress);
+        }
+
+        [UnityTest]
+        public IEnumerator TemporaryInvalidityPreservesElapsedDrawAndEndpointAnimation()
+        {
+            BendableLine line = CreateLine();
+            Assert.IsTrue(line.TryRefresh());
+            Sprite sprite = line.Sprite;
+            line.AnimationDuration = 1000f;
+            line.End = new Vector2(8f, 0f);
+            line.AnimateLine(true, true);
+            yield return null;
+            yield return null;
+            Assert.IsTrue(line.TryRefresh());
+            float progress = line.Progress;
+            Vector2 endpoint = line.CurrentEnd.Value;
+            Assert.That(progress, Is.GreaterThan(0f));
+            Assert.That(progress, Is.LessThan(1f));
+            line.Sprite = null;
+            Assert.IsFalse(line.TryRefresh());
+            yield return null;
+            yield return null;
+            line.Sprite = sprite;
+            Assert.IsTrue(line.TryRefresh());
+            Assert.That(line.Progress, Is.EqualTo(progress).Within(0.00000001f));
+            Assert.That(Vector2.Distance(endpoint, line.CurrentEnd.Value), Is.LessThan(0.000001f));
+        }
+
+        [UnityTest]
         public IEnumerator DestroyReleasesOwnedResourcesAndPreservesSpriteTexture()
         {
             BendableLine line = CreateLine();
