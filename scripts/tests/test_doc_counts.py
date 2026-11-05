@@ -219,3 +219,15 @@ def test_comments_and_literals_do_not_change_source_counts(tmp_path: Path, noise
     for folder in ("Tests", "Runtime/Core/Random", "Editor"):
         (tmp_path / folder / "Noise.cs").write_text(noise, encoding="utf-8")
     assert collect(tmp_path) == Counts(4, 1, 2)
+
+
+@pytest.mark.parametrize("prefix", ["@", "$@", "@$"])
+@pytest.mark.parametrize("quotes", [4, 6])
+def test_verbatim_quote_strings_keep_later_test_attributes_visible(
+    tmp_path: Path, prefix: str, quotes: int
+) -> None:
+    corpus(tmp_path)
+    (tmp_path / "Tests/Cases.cs").write_text(
+        "string quote = " + prefix + '"' * quotes + ";\n[Test]\n", encoding="utf-8"
+    )
+    assert collect(tmp_path) == Counts(1, 1, 2)
