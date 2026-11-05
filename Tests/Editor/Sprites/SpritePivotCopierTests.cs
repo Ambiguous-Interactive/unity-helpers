@@ -186,6 +186,92 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             AssertPivot(visited[visited.Count - 1], Vector2.zero);
         }
 
+        [TestCase(false)]
+        [TestCase(true)]
+        public void ReadOnlyMetadataRefusesCopiesBeforeAnyWrites(bool batch)
+        {
+            Sprite source = CreateSprite("locked_pivot_frame", new Vector2(0.25f, 0.75f));
+            Sprite target = CreateSprite("locked_frame", Vector2.zero);
+            CreateSprite("neighbor_pivot_frame", Vector2.one);
+            CreateSprite("neighbor_frame", Vector2.zero);
+            string targetPath = AssetDatabase.GetAssetPath(target);
+            string metaPath = targetPath + ".meta";
+            string neighborMeta = _folder + "/neighbor_frame.png.meta";
+            byte[] before = File.ReadAllBytes(metaPath);
+            byte[] neighborBefore = File.ReadAllBytes(neighborMeta);
+            FileAttributes attributes = File.GetAttributes(metaPath);
+            try
+            {
+                File.SetAttributes(metaPath, attributes | FileAttributes.ReadOnly);
+                Assert.IsTrue(AssetDatabase.IsOpenForEdit(targetPath));
+                bool succeeded;
+                int changed;
+                string error;
+                if (batch)
+                {
+                    succeeded = SpritePivotCopierAPI.TryCopyPivotsInDirectory(
+                        _folder,
+                        out changed,
+                        out error
+                    );
+                }
+                else
+                {
+                    succeeded = SpritePivotCopierAPI.TryCopyPivot(
+                        source,
+                        target,
+                        out bool singleChanged,
+                        out error
+                    );
+                    changed = singleChanged ? 1 : 0;
+                }
+                Assert.IsFalse(succeeded);
+                Assert.AreEqual(0, changed);
+                Assert.That(error, Does.Contain("metadata"));
+                CollectionAssert.AreEqual(before, File.ReadAllBytes(metaPath));
+                CollectionAssert.AreEqual(neighborBefore, File.ReadAllBytes(neighborMeta));
+            }
+            finally
+            {
+                File.SetAttributes(metaPath, attributes);
+            }
+        }
+
+        [Test]
+        public void MetadataBecomingReadOnlyAfterPlanningRefusesThePendingWrite()
+        {
+            CreateSprite("late_pivot_frame", new Vector2(0.25f, 0.75f));
+            CreateSprite("late_frame", Vector2.zero);
+            string metaPath = _folder + "/late_frame.png.meta";
+            byte[] before = File.ReadAllBytes(metaPath);
+            FileAttributes attributes = File.GetAttributes(metaPath);
+            try
+            {
+                Assert.IsFalse(
+                    SpritePivotCopierAPI.TryCopyPivotsInDirectory(
+                        _folder,
+                        out int changed,
+                        out string error,
+                        cancelRequested: (processed, total, path) =>
+                        {
+                            File.SetAttributes(
+                                path + ".meta",
+                                attributes | FileAttributes.ReadOnly
+                            );
+                            return false;
+                        }
+                    )
+                );
+                Assert.AreEqual(0, changed);
+                Assert.That(error, Does.Contain("metadata"));
+                CollectionAssert.AreEqual(before, File.ReadAllBytes(metaPath));
+            }
+            finally
+            {
+                File.SetAttributes(metaPath, attributes);
+            }
+        }
+
         [Test]
         public void ImporterUndoRestoresThePreviousPivotBeforeExplicitReimport()
         {

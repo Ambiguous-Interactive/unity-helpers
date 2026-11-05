@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 #if UNITY_EDITOR
     using System;
     using System.Collections.Generic;
+    using System.IO;
     using UnityEditor;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Helper;
@@ -298,9 +299,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 pivot = default;
                 return false;
             }
-            if (!AssetDatabase.IsOpenForEdit(targetPath))
+            if (!AssetDatabase.IsOpenForEdit(targetPath) || !IsMetadataEditable(targetMetadata))
             {
-                error = "The target texture is not open for editing: " + targetPath;
+                error = "The target texture or metadata is not open for editing: " + targetPath;
                 targetImporter = null;
                 pivot = default;
                 return false;
@@ -309,6 +310,21 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             pivot = normalizedPivot;
             error = null;
             return true;
+        }
+
+        private static bool IsMetadataEditable(TextureImporter importer)
+        {
+            if (!AssetDatabase.IsMetaFileOpenForEdit(importer))
+            {
+                return false;
+            }
+            string projectDirectory = Path.GetDirectoryName(Application.dataPath);
+            if (string.IsNullOrWhiteSpace(projectDirectory))
+            {
+                return false;
+            }
+            string metadataPath = Path.Combine(projectDirectory, importer.assetPath + ".meta");
+            return (File.GetAttributes(metadataPath) & FileAttributes.ReadOnly) == 0;
         }
 
         private static bool TryApplyPivot(
@@ -327,9 +343,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             if (
                 !importer.assetPath.StartsWith("Assets/", StringComparison.Ordinal)
                 || !AssetDatabase.IsOpenForEdit(importer.assetPath)
+                || !IsMetadataEditable(importer)
             )
             {
-                error = "The target texture is no longer an editable project asset.";
+                error = "The target texture or metadata is no longer an editable project asset.";
                 changed = false;
                 return false;
             }
