@@ -253,6 +253,85 @@ for fixture_arch in amd64 arm64; do
 done
 
 echo ""
+echo -e "${BLUE}── HTTP method and transfer controls ──${NC}"
+
+probe_bin="$TMP_DIR/probe-bin"
+mkdir -p "$probe_bin"
+cat > "$probe_bin/curl" <<'EOT'
+#!/usr/bin/env bash
+set -euo pipefail
+is_head=0
+range=""
+limit=""
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -sI) is_head=1 ;;
+        --range) shift; range="$1" ;;
+        --max-filesize) shift; limit="$1" ;;
+    esac
+    shift
+done
+if [[ "$is_head" -eq 1 ]]; then
+    case "$URL_PROBE_MODE" in
+        head-ok) printf '200' ;;
+        head-transport) printf '302'; exit 7 ;;
+        missing) printf '404' ;;
+        *) printf '504' ;;
+    esac
+    exit 0
+fi
+[[ "$range" == 0-0 && "$limit" == 1 ]] || exit 99
+printf 'GET\n' >> "$URL_PROBE_LOG"
+case "$URL_PROBE_MODE" in
+    range-ok) printf '206' ;;
+    range-ignored) printf '200' ;;
+    size-limited) printf '200'; exit 63 ;;
+    missing) printf '404' ;;
+    gateway) printf '504' ;;
+    redirect) printf '302' ;;
+    transport|head-transport) printf '206'; exit 7 ;;
+    size-limited-missing) printf '404'; exit 63 ;;
+    head-ok) exit 99 ;;
+esac
+EOT
+printf '#!/bin/sh\nexit 0\n' > "$probe_bin/sleep"
+chmod +x "$probe_bin/curl" "$probe_bin/sleep"
+
+while IFS='|' read -r probe_mode expected_rc; do
+    probe_log="$TMP_DIR/$probe_mode.log"
+    : > "$probe_log"
+    probe_rc=0
+    probe_output="$(PATH="$probe_bin:$PATH" URL_PROBE_MODE="$probe_mode" URL_PROBE_LOG="$probe_log" \
+        bash "$VALIDATOR" --dockerfile "$DOCKERFILE" 2>&1)" || probe_rc=$?
+    if [[ "$probe_rc" -eq "$expected_rc" ]]; then
+        pass "HTTP probe $probe_mode preserves exit $expected_rc"
+    else
+        fail "HTTP probe $probe_mode preserves exit $expected_rc" "$probe_output"
+    fi
+    if [[ "$probe_mode" == head-ok ]]; then
+        if [[ ! -s "$probe_log" ]]; then
+            pass "Healthy HEAD avoids a GET"
+        else
+            fail "Healthy HEAD avoids a GET"
+        fi
+    elif [[ -s "$probe_log" ]]; then
+        pass "HTTP probe $probe_mode confirms through a bounded GET"
+    else
+        fail "HTTP probe $probe_mode confirms through a bounded GET"
+    fi
+done <<'EOT'
+head-ok|0
+range-ok|0
+range-ignored|0
+size-limited|0
+missing|1
+gateway|1
+redirect|1
+transport|1
+head-transport|1
+size-limited-missing|1
+EOT
+
 echo -e "${BLUE}── Summary ──${NC}"
 echo "  Tests run:    $tests_run"
 echo -e "  ${GREEN}Passed${NC}:      $tests_passed"

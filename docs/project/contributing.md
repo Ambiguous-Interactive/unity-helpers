@@ -23,6 +23,12 @@ The easiest way to contribute is using the included dev container, which has all
 2. Click "Reopen in Container" when prompted
 3. Run `npm run verify:tools` to confirm all tools are available
 
+Run `bash scripts/validate-devcontainer-urls.sh` to check the Dockerfile's download URLs.
+If HEAD probes fail, the validator confirms reachability with a GET limited to one byte.
+A successful 200 or 206 response also permits curl's size-limit stop when a server ignores the range.
+Missing resources, HTTP errors, and other transfer failures still fail validation.
+Run `npm run test:validate-devcontainer-urls` for the offline HTTP and parser controls.
+
 ### Fast C# Feedback
 
 Use fixture-scoped builds while editing runtime or Editor tests:
