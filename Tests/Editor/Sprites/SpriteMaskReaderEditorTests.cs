@@ -420,10 +420,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 Assert.IsTrue(atlas.CanBindTo(original));
                 Sprite packed = Track(atlas.GetSprite(original.name));
                 Assert.IsTrue(packed != null);
+#if !UNITY_2022_1_OR_NEWER
+                Assert.IsTrue(packed.packed);
+                Texture2D atlasTexture = packed.texture;
+#else
                 Texture2D atlasTexture = UnityEditor.Sprites.SpriteUtility.GetSpriteTexture(
                     packed,
                     true
                 );
+#endif
                 Assert.IsTrue(atlasTexture != null);
                 Assert.IsFalse(atlasTexture.isReadable);
                 bool measured = SpriteArtBounds.TryGetLocalArtBounds(
