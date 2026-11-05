@@ -53,7 +53,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         /// <summary>Copies pivots to uniquely named counterparts beneath an Assets folder.</summary>
         /// <remarks>
         /// Names, importers and source pivots are captured before writing. Invalid plans change nothing.
-        /// Completed copies remain on a later import failure; changedCount reports completed changes.
+        /// Completed copies remain on cancellation or later import failure; changedCount reports completed changes.
+        /// The optional cancellation callback receives processed entries, total entries and the next target path.
         /// Source markers use ordinal replacement; a null replacement removes the marker.
         /// </remarks>
         public static bool TryCopyPivotsInDirectory(
@@ -61,7 +62,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             out int changedCount,
             out string error,
             string marker = DefaultMarker,
-            string replacement = DefaultReplacement
+            string replacement = DefaultReplacement,
+            Func<int, int, string, bool> cancelRequested = null
         )
         {
             changedCount = 0;
@@ -168,8 +170,22 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     error = "No sprite names contain the configured source marker.";
                     return false;
                 }
+                int processed = 0;
                 foreach (KeyValuePair<TextureImporter, Vector2> operation in plan)
                 {
+                    if (
+                        cancelRequested != null
+                        && cancelRequested(
+                            processed,
+                            plan.Count,
+                            operation.Key != null ? operation.Key.assetPath : string.Empty
+                        )
+                    )
+                    {
+                        error =
+                            "Pivot copy cancelled after " + changedCount + " completed changes.";
+                        return false;
+                    }
                     if (!TryApplyPivot(operation.Key, operation.Value, out bool changed, out error))
                     {
                         return false;
@@ -178,6 +194,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     {
                         ++changedCount;
                     }
+                    ++processed;
                 }
                 error = null;
                 return true;

@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     using UnityEditor;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Editor.CustomEditors;
+    using WallstopStudios.UnityHelpers.Editor.Utils;
 
     /// <summary>Copies Single-mode sprite pivots using configurable counterpart names.</summary>
     public sealed class SpritePivotCopier : EditorWindow
@@ -35,6 +36,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         public static void ShowWindow()
         {
             GetWindow<SpritePivotCopier>("Sprite Pivot Copier");
+        }
+
+        private static bool ShowCopyProgress(int processed, int total, string path)
+        {
+            return EditorUi.CancelableProgress(
+                "Copy Sprite Pivots",
+                path,
+                total > 0 ? (float)processed / total : 0f
+            );
         }
 
         private void OnEnable()
@@ -88,7 +98,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             out int changed,
                             out string error,
                             _marker,
-                            _replacement
+                            _replacement,
+                            ShowCopyProgress
                         );
                         _lastMessage = _lastSucceeded
                             ? $"Updated {changed} sprite pivots."
@@ -96,6 +107,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
                     finally
                     {
+                        EditorUi.ClearProgress();
                         Undo.CollapseUndoOperations(group);
                     }
                 }

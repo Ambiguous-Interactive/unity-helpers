@@ -65,7 +65,10 @@ are preserved, and textures do not need Read/Write enabled.
 
 `SpritePivotCopierAPI.TryCopyPivot(source, target, out changed, out error)` performs one copy.
 `TryCopyPivotsInDirectory(folder, out changedCount, out error, marker, replacement)` performs
-the named batch. Names match using ordinal matching. A null replacement removes the marker. Duplicate names,
+the named batch. Its optional `cancelRequested` callback receives the processed-entry count, total
+entry count, and next target path; returning true cancels before that target changes. The window
+shows cancelable progress. Cancellation preserves earlier completed copies and reports their
+change count. Names use ordinal matching. A null replacement removes the marker. Duplicate names,
 missing counterparts, conflicting sources, and invalid importers refuse the plan before writes.
 All source pivots are captured first, so a sprite that is both source and target cannot propagate
 a newly copied pivot through a chain.

@@ -144,6 +144,48 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             AssertPivot(_folder + "/chain_frame.png", new Vector2(0.75f, 0.875f));
         }
 
+        [TestCase(0)]
+        [TestCase(1)]
+        public void CancellationRetainsOnlyCompletedChanges(int cancelAt)
+        {
+            CreateSprite("first_pivot_frame", new Vector2(0.25f, 0.75f));
+            CreateSprite("first_frame", Vector2.zero);
+            CreateSprite("second_pivot_frame", new Vector2(0.75f, 0.25f));
+            CreateSprite("second_frame", Vector2.zero);
+            List<string> visited = new();
+            Assert.IsFalse(
+                SpritePivotCopierAPI.TryCopyPivotsInDirectory(
+                    _folder,
+                    out int changed,
+                    out string error,
+                    cancelRequested: (processed, total, path) =>
+                    {
+                        Assert.AreEqual(2, total);
+                        Assert.AreEqual(visited.Count, processed);
+                        Assert.IsTrue(path.StartsWith(_folder + "/", StringComparison.Ordinal));
+                        visited.Add(path);
+                        return cancelAt <= processed;
+                    }
+                )
+            );
+            Assert.AreEqual(cancelAt, changed);
+            Assert.That(error, Does.Contain("cancelled"));
+            Assert.AreEqual(cancelAt + 1, visited.Count);
+            int actualChanges = 0;
+            foreach (string name in new[] { "first", "second" })
+            {
+                string path = _folder + "/" + name + "_frame.png";
+                Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+                Assert.IsTrue(sprite != null);
+                if (!sprite.pivot.Equals(Vector2.zero))
+                {
+                    ++actualChanges;
+                }
+            }
+            Assert.AreEqual(cancelAt, actualChanges);
+            AssertPivot(visited[visited.Count - 1], Vector2.zero);
+        }
+
         [Test]
         public void ImporterUndoRestoresThePreviousPivotBeforeExplicitReimport()
         {
