@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Utils
     using System;
     using System.Collections.Generic;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     /// <summary>Traces exact pixel-corner contours with eight-connected opaque regions.</summary>
     public static class SpriteBoundaryTracer
@@ -28,13 +29,13 @@ namespace WallstopStudios.UnityHelpers.Utils
                 || mask.Width <= 0
                 || mask.Height <= 0
                 || (long)mask.Width * mask.Height != mask.Pixels.Length
-                || !IsFinite(mask.Pivot.x)
-                || !IsFinite(mask.Pivot.y)
-                || !IsFinite(mask.UnitsPerPixel.x)
-                || !IsFinite(mask.UnitsPerPixel.y)
+                || !WallMath.IsFinite(mask.Pivot.x)
+                || !WallMath.IsFinite(mask.Pivot.y)
+                || !WallMath.IsFinite(mask.UnitsPerPixel.x)
+                || !WallMath.IsFinite(mask.UnitsPerPixel.y)
                 || mask.UnitsPerPixel.x <= 0
                 || mask.UnitsPerPixel.y <= 0
-                || !IsFinite(minimumArea)
+                || !WallMath.IsFinite(minimumArea)
                 || minimumArea < 0
             )
             {
@@ -152,7 +153,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                         (corner.x - mask.Pivot.x) * mask.UnitsPerPixel.x,
                         (corner.y - mask.Pivot.y) * mask.UnitsPerPixel.y
                     );
-                    if (!IsFinite(point.x) || !IsFinite(point.y))
+                    if (!WallMath.IsFinite(point.x) || !WallMath.IsFinite(point.y))
                     {
                         tracedPaths.Clear();
                         paths = tracedPaths;
@@ -175,11 +176,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
             paths = tracedPaths;
             return true;
-        }
-
-        private static bool IsFinite(float value)
-        {
-            return !float.IsNaN(value) && !float.IsInfinity(value);
         }
 
         private static void AddEdge(

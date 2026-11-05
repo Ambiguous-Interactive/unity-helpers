@@ -4,17 +4,33 @@
 namespace WallstopStudios.UnityHelpers.Editor.Sprites
 {
 #if UNITY_EDITOR
+    using System;
     using UnityEditor;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Editor.CustomEditors;
     using WallstopStudios.UnityHelpers.Editor.Utils;
+    using WallstopStudios.UnityHelpers.Utils;
 
     /// <summary>Copies Single-mode sprite pivots using configurable counterpart names.</summary>
     public sealed class SpritePivotCopier : EditorWindow
     {
-        private static readonly GUIContent DirectoryLabel = new("Sprite Folder");
-        private static readonly GUIContent MarkerLabel = new("Source Name Marker");
-        private static readonly GUIContent ReplacementLabel = new("Replace Marker With");
+        private const string CopyOperationTitle = "Copy Sprite Pivots";
+        private const string WindowTitle = "Sprite Pivot Copier";
+        private const string FolderDialogTitle = "Choose Sprite Folder";
+        private const string CopyButtonLabel = "Copy Pivots";
+        private const string DirectoryLabelText = "Sprite Folder";
+        private const string MarkerLabelText = "Source Name Marker";
+        private const string ReplacementLabelText = "Replace Marker With";
+        private const string UndoNotice =
+            "Copies effective pivots between Single-mode sprites. Importer Undo is recorded; reimport and file effects are not fully reversible.";
+
+        private const string MenuPath = "Tools/Wallstop Studios/Unity Helpers/Sprite Pivot Copier";
+        private const int MenuPriority = -1;
+        private static readonly Func<int, int, string, bool> ProgressCallback = ShowCopyProgress;
+
+        private static readonly GUIContent DirectoryLabel = new(DirectoryLabelText);
+        private static readonly GUIContent MarkerLabel = new(MarkerLabelText);
+        private static readonly GUIContent ReplacementLabel = new(ReplacementLabelText);
 
         [SerializeField]
         private string _directoryPath = "Assets";
@@ -32,19 +48,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         private bool _lastSucceeded;
 
         /// <summary>Opens the sprite pivot copier window.</summary>
-        [MenuItem("Tools/Wallstop Studios/Unity Helpers/Sprite Pivot Copier", priority = -1)]
+        [MenuItem(MenuPath, priority = MenuPriority)]
         public static void ShowWindow()
         {
-            GetWindow<SpritePivotCopier>("Sprite Pivot Copier");
+            GetWindow<SpritePivotCopier>(WindowTitle);
         }
 
         private static bool ShowCopyProgress(int processed, int total, string path)
         {
-            return EditorUi.CancelableProgress(
-                "Copy Sprite Pivots",
-                path,
-                0 < total ? (float)processed / total : 0f
-            );
+            float progress = 0 < total ? (float)processed / total : 0f;
+            return EditorUi.CancelableProgress(CopyOperationTitle, path, progress);
         }
 
         private void OnEnable()
@@ -74,50 +87,43 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             PersistentDirectoryGUI.PathSelectorString(
                 _directoryProperty,
                 nameof(SpritePivotCopier),
-                "Choose Sprite Folder",
+                FolderDialogTitle,
                 DirectoryLabel
             );
             EditorGUILayout.PropertyField(_markerProperty, MarkerLabel);
             EditorGUILayout.PropertyField(_replacementProperty, ReplacementLabel);
             _serializedObject.ApplyModifiedProperties();
-            EditorGUILayout.HelpBox(
-                "Copies effective pivots between Single-mode sprites. Importer Undo is recorded; reimport and file effects are not fully reversible.",
-                MessageType.Info
-            );
-            using (new EditorGUI.DisabledScope(string.IsNullOrWhiteSpace(_marker)))
+            EditorGUILayout.HelpBox(UndoNotice, MessageType.Info);
+            bool markerMissing = string.IsNullOrWhiteSpace(_marker);
+            using (new EditorGUI.DisabledScope(markerMissing))
             {
-                if (GUILayout.Button("Copy Pivots"))
+                if (GUILayout.Button(CopyButtonLabel))
                 {
-                    Undo.IncrementCurrentGroup();
-                    int group = Undo.GetCurrentGroup();
-                    Undo.SetCurrentGroupName("Copy Sprite Pivots");
-                    try
+                    using UndoGroupScope undoScope = UndoGroupScope.Begin(CopyOperationTitle);
+                    if (!undoScope.IsHeld)
                     {
-                        _lastSucceeded = SpritePivotCopierAPI.TryCopyPivotsInDirectory(
-                            _directoryPath,
-                            out int changed,
-                            out string error,
-                            _marker,
-                            _replacement,
-                            ShowCopyProgress
-                        );
-                        _lastMessage = _lastSucceeded
-                            ? $"Updated {changed} sprite pivots."
-                            : $"Updated {changed} sprite pivots. {error}";
+                        _lastSucceeded = false;
+                        _lastMessage = "Could not begin the pivot Undo group.";
+                        return;
                     }
-                    finally
-                    {
-                        EditorUi.ClearProgress();
-                        Undo.CollapseUndoOperations(group);
-                    }
+                    using DisposableScope progressScope = EditorUi.BeginProgressScope();
+                    _lastSucceeded = SpritePivotCopierAPI.TryCopyPivotsInDirectory(
+                        _directoryPath,
+                        out int changed,
+                        out string error,
+                        _marker,
+                        _replacement,
+                        ProgressCallback
+                    );
+                    _lastMessage = _lastSucceeded
+                        ? $"Updated {changed} sprite pivots."
+                        : $"Updated {changed} sprite pivots. {error}";
                 }
             }
             if (!string.IsNullOrWhiteSpace(_lastMessage))
             {
-                EditorGUILayout.HelpBox(
-                    _lastMessage,
-                    _lastSucceeded ? MessageType.Info : MessageType.Error
-                );
+                MessageType messageType = _lastSucceeded ? MessageType.Info : MessageType.Error;
+                EditorGUILayout.HelpBox(_lastMessage, messageType);
             }
         }
     }

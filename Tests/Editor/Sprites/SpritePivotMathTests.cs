@@ -10,6 +10,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
     [TestFixture]
     public sealed class SpritePivotMathTests
     {
+        [TestCase((int)SpriteAlignment.Center, true)]
+        [TestCase((int)SpriteAlignment.TopLeft, true)]
+        [TestCase((int)SpriteAlignment.TopCenter, true)]
+        [TestCase((int)SpriteAlignment.TopRight, true)]
+        [TestCase((int)SpriteAlignment.LeftCenter, true)]
+        [TestCase((int)SpriteAlignment.RightCenter, true)]
+        [TestCase((int)SpriteAlignment.BottomLeft, true)]
+        [TestCase((int)SpriteAlignment.BottomCenter, true)]
+        [TestCase((int)SpriteAlignment.BottomRight, true)]
+        [TestCase((int)SpriteAlignment.Custom, true)]
+        [TestCase(-1, false)]
+        [TestCase(10, false)]
+        [TestCase(int.MinValue, false)]
+        [TestCase(int.MaxValue, false)]
+        public void SpriteAlignmentsAcceptOnlyTheSupportedNamedValues(int alignment, bool expected)
+        {
+            bool actual = SpritePivotCopierAPI.IsSupportedAlignment(alignment);
+            Assert.AreEqual(expected, actual);
+        }
+
         [TestCase(2f, 3f, 8f, 12f, 0.25f, 0.25f)]
         [TestCase(0f, 0f, 8f, 12f, 0f, 0f)]
         [TestCase(8f, 12f, 8f, 12f, 1f, 1f)]

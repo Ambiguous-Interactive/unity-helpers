@@ -29,7 +29,7 @@ namespace WallstopStudios.UnityHelpers.Integrations.Zenject
     /// // Toggle "Assign Scene On Initialize" to run the one-time scene scan on startup.
     /// </code>
     /// </example>
-    [AddComponentMenu("Wallstop Studios/Relational Components/Zenject Installer")]
+    [AddComponentMenu("Wallstop Studios/Unity Helpers/Relational Components/Zenject Installer")]
     public sealed class RelationalComponentsInstaller : MonoInstaller
     {
         [SerializeField]

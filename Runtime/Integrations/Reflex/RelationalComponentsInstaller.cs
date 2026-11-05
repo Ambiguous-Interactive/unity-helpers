@@ -14,7 +14,7 @@ namespace WallstopStudios.UnityHelpers.Integrations.Reflex
     /// <summary>
     /// Reflex installer that binds relational component services and optionally hydrates scenes.
     /// </summary>
-    [AddComponentMenu("Wallstop Studios/Relational Components/Reflex Installer")]
+    [AddComponentMenu("Wallstop Studios/Unity Helpers/Relational Components/Reflex Installer")]
     public sealed class RelationalComponentsInstaller : MonoBehaviour, IInstaller
     {
         [SerializeField]

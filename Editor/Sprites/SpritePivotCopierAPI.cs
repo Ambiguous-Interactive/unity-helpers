@@ -22,6 +22,21 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         /// <summary>The default replacement used to find counterpart sprites.</summary>
         public const string DefaultReplacement = "_";
 
+        private const string AssetsRoot = "Assets";
+        private const string AssetsPrefix = AssetsRoot + "/";
+        private const string ParentSegment = "/../";
+        private const string TrailingParentSegment = "/..";
+        private const string SpriteSearchFilter = "t:Sprite";
+        private const string MetadataSuffix = ".meta";
+        private const string UndoName = "Copy Sprite Pivot";
+        private const char DirectorySeparator = '/';
+
+        private static readonly Func<TextureImporterSettings> SettingsFactory =
+            CreateTextureSettings;
+        private static readonly WallstopGenericPool<TextureImporterSettings> SettingsPool = new(
+            SettingsFactory
+        );
+
         /// <summary>Copies a source sprite's normalized pivot and uses Custom alignment on the target.</summary>
         /// <remarks>Records importer Undo. Reimport and file effects are not fully reversible; an import failure can leave settings changed.</remarks>
         public static bool TryCopyPivot(
@@ -86,14 +101,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 changedCount = completed;
                 return false;
             }
-            string normalized = directory.Replace('\\', '/').TrimEnd('/');
+            string normalized = PathHelper.Sanitize(directory);
+            normalized = normalized.TrimEnd(DirectorySeparator);
             if (
                 !(
-                    string.Equals(normalized, "Assets", StringComparison.Ordinal)
-                    || normalized.StartsWith("Assets/", StringComparison.Ordinal)
+                    string.Equals(normalized, AssetsRoot, StringComparison.Ordinal)
+                    || normalized.StartsWith(AssetsPrefix, StringComparison.Ordinal)
                 )
-                || normalized.Contains("/../", StringComparison.Ordinal)
-                || normalized.EndsWith("/..", StringComparison.Ordinal)
+                || normalized.Contains(ParentSegment, StringComparison.Ordinal)
+                || normalized.EndsWith(TrailingParentSegment, StringComparison.Ordinal)
             )
             {
                 error = "Choose a project folder beneath Assets.";
@@ -108,22 +124,31 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     changedCount = completed;
                     return false;
                 }
-                using PooledResource<Dictionary<string, Sprite>> namesLease = DictionaryBuffer<
+                StringComparer comparer = StringComparer.Ordinal;
+                WallstopGenericPool<Dictionary<string, Sprite>> namesPool = DictionaryBuffer<
                     string,
                     Sprite
-                >
-                    .GetDictionaryPool(StringComparer.Ordinal)
-                    .Get(out Dictionary<string, Sprite> names);
-                using PooledResource<Dictionary<TextureImporter, Vector2>> planLease =
-                    DictionaryBuffer<TextureImporter, Vector2>.Dictionary.Get(
-                        out Dictionary<TextureImporter, Vector2> plan
-                    );
-                string[] guids = AssetDatabase.FindAssets("t:Sprite", new[] { normalized });
+                >.GetDictionaryPool(comparer);
+                using PooledResource<Dictionary<string, Sprite>> namesLease = namesPool.Get(
+                    out Dictionary<string, Sprite> names
+                );
+                WallstopGenericPool<HashSet<string>> ambiguousPool =
+                    SetBuffers<string>.GetHashSetPool(comparer);
+                using PooledResource<HashSet<string>> ambiguousLease = ambiguousPool.Get(
+                    out HashSet<string> ambiguousNames
+                );
+                WallstopGenericPool<Dictionary<TextureImporter, Vector2>> planPool =
+                    DictionaryBuffer<TextureImporter, Vector2>.Dictionary;
+                using PooledResource<Dictionary<TextureImporter, Vector2>> planLease = planPool.Get(
+                    out Dictionary<TextureImporter, Vector2> plan
+                );
+                string[] searchFolders = { normalized };
+                string[] guids = AssetDatabase.FindAssets(SpriteSearchFilter, searchFolders);
+                string normalizedReplacement = replacement ?? string.Empty;
                 foreach (string guid in guids)
                 {
-                    Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(
-                        AssetDatabase.GUIDToAssetPath(guid)
-                    );
+                    string assetPath = AssetDatabase.GUIDToAssetPath(guid);
+                    Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(assetPath);
                     if (sprite == null)
                     {
                         continue;
@@ -131,29 +156,33 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     string name = sprite.name;
                     if (!names.TryAdd(name, sprite))
                     {
-                        names[name] = null;
+                        ambiguousNames.Add(name);
                     }
                 }
                 foreach (KeyValuePair<string, Sprite> entry in names)
                 {
-                    if (!entry.Key.Contains(marker, StringComparison.Ordinal))
+                    string sourceName = entry.Key;
+                    Sprite sourceSprite = entry.Value;
+                    if (!sourceName.Contains(marker, StringComparison.Ordinal))
                     {
                         continue;
                     }
-                    string targetName = entry.Key.Replace(
+                    string targetName = sourceName.Replace(
                         marker,
-                        replacement ?? string.Empty,
+                        normalizedReplacement,
                         StringComparison.Ordinal
                     );
                     if (
-                        entry.Value == null
+                        ambiguousNames.Contains(sourceName)
+                        || ambiguousNames.Contains(targetName)
+                        || sourceSprite == null
                         || !names.TryGetValue(targetName, out Sprite target)
                         || target == null
                     )
                     {
                         error =
                             "The source or its counterpart is missing or ambiguous: "
-                            + entry.Key
+                            + sourceName
                             + " -> "
                             + targetName;
                         changedCount = completed;
@@ -161,7 +190,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
                     if (
                         !TryReadCopy(
-                            entry.Value,
+                            sourceSprite,
                             target,
                             out TextureImporter importer,
                             out Vector2 pivot,
@@ -169,6 +198,24 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         )
                     )
                     {
+                        changedCount = completed;
+                        return false;
+                    }
+                    if (!IsEditableTarget(importer))
+                    {
+                        string targetPath = importer.assetPath;
+                        error =
+                            "The target texture or metadata is not open for editing: " + targetPath;
+                        changedCount = completed;
+                        return false;
+                    }
+                    using PooledResource<TextureImporterSettings> targetSettingsLease =
+                        SettingsPool.Get(out TextureImporterSettings targetSettings);
+                    importer.ReadTextureSettings(targetSettings);
+                    int targetAlignment = targetSettings.spriteAlignment;
+                    if (!IsSupportedAlignment(targetAlignment))
+                    {
+                        error = "The target sprite alignment is unsupported.";
                         changedCount = completed;
                         return false;
                     }
@@ -186,22 +233,19 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     return false;
                 }
                 int processed = 0;
+                int total = plan.Count;
                 foreach (KeyValuePair<TextureImporter, Vector2> operation in plan)
                 {
-                    if (
-                        cancelRequested != null
-                        && cancelRequested(
-                            processed,
-                            plan.Count,
-                            operation.Key != null ? operation.Key.assetPath : string.Empty
-                        )
-                    )
+                    TextureImporter importer = operation.Key;
+                    string nextPath = importer != null ? importer.assetPath : string.Empty;
+                    if (cancelRequested != null && cancelRequested(processed, total, nextPath))
                     {
                         error = "Pivot copy cancelled after " + completed + " completed changes.";
                         changedCount = completed;
                         return false;
                     }
-                    if (!TryApplyPivot(operation.Key, operation.Value, out bool changed, out error))
+                    Vector2 plannedPivot = operation.Value;
+                    if (!TryApplyPivot(importer, plannedPivot, out bool changed, out error))
                     {
                         changedCount = completed;
                         return false;
@@ -231,10 +275,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         internal static bool TryNormalizePivot(Vector2 pixels, Vector2 size, out Vector2 normalized)
         {
             if (
-                !float.IsFinite(pixels.x)
-                || !float.IsFinite(pixels.y)
-                || !float.IsFinite(size.x)
-                || !float.IsFinite(size.y)
+                !WallMath.IsFinite(pixels)
+                || !WallMath.IsFinite(size)
                 || !(0f < size.x)
                 || !(0f < size.y)
             )
@@ -242,14 +284,43 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 normalized = default;
                 return false;
             }
-            Vector2 result = new(pixels.x / size.x, pixels.y / size.y);
-            if (!float.IsFinite(result.x) || !float.IsFinite(result.y))
+            float normalizedX = pixels.x / size.x;
+            float normalizedY = pixels.y / size.y;
+            Vector2 result = new(normalizedX, normalizedY);
+            if (!WallMath.IsFinite(result))
             {
                 normalized = default;
                 return false;
             }
             normalized = result;
             return true;
+        }
+
+        internal static bool IsSupportedAlignment(int alignment)
+        {
+            return alignment
+                is (int)SpriteAlignment.Center
+                    or (int)SpriteAlignment.TopLeft
+                    or (int)SpriteAlignment.TopCenter
+                    or (int)SpriteAlignment.TopRight
+                    or (int)SpriteAlignment.LeftCenter
+                    or (int)SpriteAlignment.RightCenter
+                    or (int)SpriteAlignment.BottomLeft
+                    or (int)SpriteAlignment.BottomCenter
+                    or (int)SpriteAlignment.BottomRight
+                    or (int)SpriteAlignment.Custom;
+        }
+
+        private static TextureImporterSettings CreateTextureSettings()
+        {
+            return new TextureImporterSettings();
+        }
+
+        private static bool IsSingleSpriteImporter(TextureImporter importer)
+        {
+            return importer != null
+                && importer.textureType == TextureImporterType.Sprite
+                && importer.spriteImportMode == SpriteImportMode.Single;
         }
 
         private static bool TryReadCopy(
@@ -267,44 +338,37 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 pivot = default;
                 return false;
             }
-            string sourcePath = AssetDatabase.GetAssetPath(source);
             string targetPath = AssetDatabase.GetAssetPath(target);
-            if (!targetPath.StartsWith("Assets/", StringComparison.Ordinal))
+            if (!targetPath.StartsWith(AssetsPrefix, StringComparison.Ordinal))
             {
                 error = "The target sprite must be an editable project asset under Assets.";
                 targetImporter = null;
                 pivot = default;
                 return false;
             }
-            TextureImporter sourceImporter = AssetImporter.GetAtPath(sourcePath) as TextureImporter;
             TextureImporter targetMetadata = AssetImporter.GetAtPath(targetPath) as TextureImporter;
-            if (
-                sourceImporter == null
-                || targetMetadata == null
-                || sourceImporter.textureType != TextureImporterType.Sprite
-                || targetMetadata.textureType != TextureImporterType.Sprite
-                || sourceImporter.spriteImportMode != SpriteImportMode.Single
-                || targetMetadata.spriteImportMode != SpriteImportMode.Single
-            )
+            if (!IsSingleSpriteImporter(targetMetadata))
             {
-                error = "Both sprites must belong to Single-mode texture importers.";
+                error = "The target must belong to a Single-mode sprite importer.";
                 targetImporter = null;
                 pivot = default;
                 return false;
             }
-            if (!TryNormalizePivot(source.pivot, source.rect.size, out Vector2 normalizedPivot))
+            string sourcePath = AssetDatabase.GetAssetPath(source);
+            TextureImporter sourceImporter = AssetImporter.GetAtPath(sourcePath) as TextureImporter;
+            if (!IsSingleSpriteImporter(sourceImporter))
+            {
+                error = "The source must belong to a Single-mode sprite importer.";
+                targetImporter = null;
+                pivot = default;
+                return false;
+            }
+            Vector2 sourcePivot = source.pivot;
+            Rect sourceRect = source.rect;
+            Vector2 sourceSize = sourceRect.size;
+            if (!TryNormalizePivot(sourcePivot, sourceSize, out Vector2 normalizedPivot))
             {
                 error = "The source sprite has an unrepresentable normalized pivot.";
-                targetImporter = null;
-                pivot = default;
-                return false;
-            }
-            if (
-                !AssetDatabase.IsOpenForEdit(targetPath, StatusQueryOptions.ForceUpdate)
-                || !IsMetadataEditable(targetMetadata)
-            )
-            {
-                error = "The target texture or metadata is not open for editing: " + targetPath;
                 targetImporter = null;
                 pivot = default;
                 return false;
@@ -315,18 +379,28 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             return true;
         }
 
+        private static bool IsEditableTarget(TextureImporter importer)
+        {
+            string targetPath = importer.assetPath;
+            return targetPath.StartsWith(AssetsPrefix, StringComparison.Ordinal)
+                && AssetDatabase.IsOpenForEdit(targetPath, StatusQueryOptions.ForceUpdate)
+                && IsMetadataEditable(importer);
+        }
+
         private static bool IsMetadataEditable(TextureImporter importer)
         {
             if (!AssetDatabase.IsMetaFileOpenForEdit(importer, StatusQueryOptions.ForceUpdate))
             {
                 return false;
             }
-            string projectDirectory = Path.GetDirectoryName(Application.dataPath);
+            string assetsDirectory = Application.dataPath;
+            string projectDirectory = Path.GetDirectoryName(assetsDirectory);
             if (string.IsNullOrWhiteSpace(projectDirectory))
             {
                 return false;
             }
-            string metadataPath = Path.Combine(projectDirectory, importer.assetPath + ".meta");
+            string relativeMetadataPath = importer.assetPath + MetadataSuffix;
+            string metadataPath = Path.Combine(projectDirectory, relativeMetadataPath);
             return (File.GetAttributes(metadataPath) & FileAttributes.ReadOnly) == 0;
         }
 
@@ -343,29 +417,31 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 changed = false;
                 return false;
             }
-            if (
-                importer.textureType != TextureImporterType.Sprite
-                || importer.spriteImportMode != SpriteImportMode.Single
-            )
+            if (!IsSingleSpriteImporter(importer))
             {
                 error = "The target texture importer is no longer a Single-mode sprite.";
                 changed = false;
                 return false;
             }
-            if (
-                !importer.assetPath.StartsWith("Assets/", StringComparison.Ordinal)
-                || !AssetDatabase.IsOpenForEdit(importer.assetPath, StatusQueryOptions.ForceUpdate)
-                || !IsMetadataEditable(importer)
-            )
+            if (!IsEditableTarget(importer))
             {
                 error = "The target texture or metadata is no longer an editable project asset.";
                 changed = false;
                 return false;
             }
-            TextureImporterSettings settings = new();
+            using PooledResource<TextureImporterSettings> settingsLease = SettingsPool.Get(
+                out TextureImporterSettings settings
+            );
             importer.ReadTextureSettings(settings);
+            int targetAlignment = settings.spriteAlignment;
+            if (!IsSupportedAlignment(targetAlignment))
+            {
+                error = "The target sprite alignment is unsupported.";
+                changed = false;
+                return false;
+            }
             if (
-                settings.spriteAlignment == (int)SpriteAlignment.Custom
+                targetAlignment == (int)SpriteAlignment.Custom
                 && settings.spritePivot.Equals(pivot)
             )
             {
@@ -375,7 +451,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
             using (AssetDatabaseBatchHelper.PauseBatch())
             {
-                Undo.RecordObject(importer, "Copy Sprite Pivot");
+                Undo.RecordObject(importer, UndoName);
                 settings.spriteAlignment = (int)SpriteAlignment.Custom;
                 settings.spritePivot = pivot;
                 importer.SetTextureSettings(settings);

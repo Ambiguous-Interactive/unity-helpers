@@ -25,6 +25,12 @@ Contents
 
 ## Numeric Helpers
 
+`WallMath.IsFinite` checks `float`, `double`, `Vector2`, `Vector3`, `Vector4`, and `Color` values.
+The same overloads work as extensions, such as `position.IsFinite()`. Vectors require every
+component to be finite. Colors include alpha by default; `color.IsFinite(includeAlpha: false)`
+checks RGB only. NaN and either infinity return false; finite extremes and subnormal values remain
+valid. These checks allocate no managed memory.
+
 - Positive modulo and wrap-around arithmetic
   - Use `PositiveMod` to ensure non-negative modulo results for indices and cyclic counters.
   - Use `WrappedAdd`/`WrappedIncrement` for ring buffer indexes and cursor navigation.

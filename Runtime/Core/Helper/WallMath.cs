@@ -18,6 +18,53 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     /// </remarks>
     public static class WallMath
     {
+        /// <summary>Reports whether both vector components are finite.</summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool IsFinite(this Vector2 value)
+        {
+            return IsFinite(value.x) && IsFinite(value.y);
+        }
+
+        /// <summary>Reports whether every vector component is finite.</summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool IsFinite(this Vector3 value)
+        {
+            return IsFinite(value.x) && IsFinite(value.y) && IsFinite(value.z);
+        }
+
+        /// <summary>Reports whether every vector component is finite.</summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool IsFinite(this Vector4 value)
+        {
+            return IsFinite(value.x) && IsFinite(value.y) && IsFinite(value.z) && IsFinite(value.w);
+        }
+
+        /// <summary>Reports whether the selected color components are finite.</summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool IsFinite(this Color value, bool includeAlpha = true)
+        {
+            if (!IsFinite(value.r) || !IsFinite(value.g) || !IsFinite(value.b))
+            {
+                return false;
+            }
+
+            return !includeAlpha || IsFinite(value.a);
+        }
+
+        /// <summary>Reports whether the value is finite.</summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool IsFinite(this double value)
+        {
+            return double.IsFinite(value);
+        }
+
+        /// <summary>Reports whether the value is finite.</summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool IsFinite(this float value)
+        {
+            return float.IsFinite(value);
+        }
+
         /// <summary>
         /// Returns <paramref name="value"/> if it is already below <paramref name="max"/>, and
         /// otherwise the largest representable value below it.
@@ -2319,31 +2366,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             int bits = BitConverter.SingleToInt32Bits(value);
             bits += 0f < value ? -1 : 1;
             return BitConverter.Int32BitsToSingle(bits);
-        }
-
-        private static bool IsFinite(Vector2 value)
-        {
-            return IsFinite(value.x) && IsFinite(value.y);
-        }
-
-        private static bool IsFinite(Vector3 value)
-        {
-            return IsFinite(value.x) && IsFinite(value.y) && IsFinite(value.z);
-        }
-
-        private static bool IsFinite(Color value, bool includeAlpha)
-        {
-            if (!IsFinite(value.r) || !IsFinite(value.g) || !IsFinite(value.b))
-            {
-                return false;
-            }
-
-            return !includeAlpha || IsFinite(value.a);
-        }
-
-        private static bool IsFinite(float value)
-        {
-            return !float.IsNaN(value) && !float.IsInfinity(value);
         }
 
         /// <summary>

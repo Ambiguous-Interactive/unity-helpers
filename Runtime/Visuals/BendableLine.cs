@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Visuals
 {
     using System;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     /// <summary>Draws and animates a sprite along a quadratic curve without a tween dependency.</summary>
     /// <remarks>Endpoints are world XY positions; Control is local. Use transforms in the XY plane. The component owns its mesh and material.</remarks>
@@ -16,11 +17,18 @@ namespace WallstopStudios.UnityHelpers.Visuals
         /// <summary>The largest accepted number of curve segments.</summary>
         public const int MaximumSegments = 4096;
 
+        private const float Zero = 0f;
+        private const int MinimumSegments = 1;
+        private const float MaximumCurveIntensity = 5f;
+        private const double MinimumElapsedSeconds = 0d;
+        private const string MainTextureProperty = "_MainTex";
+        private const string UvBoundsProperty = "_UvBounds";
+
         private const string ShaderResource = "WallstopStudios/UnityHelpers/BendableLine";
 
-        private static readonly int MainTextureId = Shader.PropertyToID("_MainTex");
+        private static readonly int MainTextureId = Shader.PropertyToID(MainTextureProperty);
 
-        private static readonly int UvBoundsId = Shader.PropertyToID("_UvBounds");
+        private static readonly int UvBoundsId = Shader.PropertyToID(UvBoundsProperty);
 
         /// <summary>The sprite stretched along the curve, including unreadable rectangular atlas sprites.</summary>
         public Sprite Sprite
@@ -40,7 +48,7 @@ namespace WallstopStudios.UnityHelpers.Visuals
             get => _start;
             set
             {
-                _start = value.HasValue && IsFinite(value.Value) ? value : null;
+                _start = NormalizePosition(value);
                 _dirty = true;
             }
         }
@@ -54,7 +62,7 @@ namespace WallstopStudios.UnityHelpers.Visuals
             get => _end;
             set
             {
-                Vector2? next = value.HasValue && IsFinite(value.Value) ? value : null;
+                Vector2? next = NormalizePosition(value);
                 if (_end == next)
                 {
                     return;
@@ -77,7 +85,7 @@ namespace WallstopStudios.UnityHelpers.Visuals
             get => _control;
             set
             {
-                _control = IsFinite(value) ? value : Vector2.zero;
+                _control = WallMath.IsFinite(value) ? value : Vector2.zero;
                 _dirty = true;
             }
         }
@@ -88,7 +96,9 @@ namespace WallstopStudios.UnityHelpers.Visuals
             get => _curveIntensity;
             set
             {
-                _curveIntensity = float.IsFinite(value) ? Mathf.Clamp(value, 0f, 5f) : 0f;
+                _curveIntensity = float.IsFinite(value)
+                    ? Mathf.Clamp(value, Zero, MaximumCurveIntensity)
+                    : 0f;
                 _dirty = true;
             }
         }
@@ -99,7 +109,7 @@ namespace WallstopStudios.UnityHelpers.Visuals
             get => _thickness;
             set
             {
-                _thickness = float.IsFinite(value) ? Mathf.Max(0f, value) : 0f;
+                _thickness = float.IsFinite(value) ? Mathf.Max(Zero, value) : 0f;
                 _dirty = true;
             }
         }
@@ -110,7 +120,7 @@ namespace WallstopStudios.UnityHelpers.Visuals
             get => _segments;
             set
             {
-                _segments = Mathf.Clamp(value, 1, MaximumSegments);
+                _segments = Mathf.Clamp(value, MinimumSegments, MaximumSegments);
                 _dirty = true;
             }
         }
@@ -119,7 +129,7 @@ namespace WallstopStudios.UnityHelpers.Visuals
         public float AnimationDuration
         {
             get => _animationDuration;
-            set => _animationDuration = float.IsFinite(value) ? Mathf.Max(0f, value) : 0f;
+            set => _animationDuration = float.IsFinite(value) ? Mathf.Max(Zero, value) : 0f;
         }
 
         /// <summary>The renderer sorting layer identifier.</summary>
@@ -212,9 +222,14 @@ namespace WallstopStudios.UnityHelpers.Visuals
         private int[] _triangles;
         private Matrix4x4 _previousTransform;
 
-        private static bool IsFinite(Vector2 value)
+        private static Vector2? NormalizePosition(Vector2? value)
         {
-            return float.IsFinite(value.x) && float.IsFinite(value.y);
+            if (!value.HasValue)
+            {
+                return null;
+            }
+            Vector2 position = value.Value;
+            return WallMath.IsFinite(position) ? value : null;
         }
 
         /// <summary>Animates drawing toward the end or back to the start, optionally restarting at the opposite extreme.</summary>
@@ -248,7 +263,8 @@ namespace WallstopStudios.UnityHelpers.Visuals
             if (_start.HasValue)
             {
                 Vector3 position = transform.position;
-                transform.position = new Vector3(_start.Value.x, _start.Value.y, position.z);
+                Vector2 requestedStart = _start.Value;
+                transform.position = new Vector3(requestedStart.x, requestedStart.y, position.z);
             }
             if (SortingLayer.IsValid(_sortingLayerId))
             {
@@ -264,7 +280,8 @@ namespace WallstopStudios.UnityHelpers.Visuals
             {
                 _examinedTexture = texture;
                 _hasSpriteMapping = TryReadSpriteMapping();
-                _material.SetTexture(MainTextureId, _hasSpriteMapping ? _examinedTexture : null);
+                Texture2D mappedTexture = _hasSpriteMapping ? _examinedTexture : null;
+                _material.SetTexture(MainTextureId, mappedTexture);
                 _spriteChanged = false;
             }
             _previousTransform = transform.localToWorldMatrix;
@@ -287,7 +304,9 @@ namespace WallstopStudios.UnityHelpers.Visuals
                 return false;
             }
             ResumeAnimations();
-            Vector3 worldEnd = new(_end.Value.x, _end.Value.y, transform.position.z);
+            Vector2 requestedEnd = _end.Value;
+            float depth = transform.position.z;
+            Vector3 worldEnd = new(requestedEnd.x, requestedEnd.y, depth);
             Vector2 targetEnd = transform.InverseTransformPoint(worldEnd);
             float endpointFraction = AnimationFraction(_endAnimationTime);
             _currentEnd = _animateEnd
@@ -329,21 +348,28 @@ namespace WallstopStudios.UnityHelpers.Visuals
             double now = Time.timeAsDouble;
             if (_animateEnd)
             {
-                _endAnimationTime = now - Math.Max(0d, _animationPausedAt - _endAnimationTime);
+                double elapsed = _animationPausedAt - _endAnimationTime;
+                double boundedElapsed = Math.Max(MinimumElapsedSeconds, elapsed);
+                _endAnimationTime = now - boundedElapsed;
             }
             if (_animateProgress)
             {
-                _progressAnimationTime =
-                    now - Math.Max(0d, _animationPausedAt - _progressAnimationTime);
+                double elapsed = _animationPausedAt - _progressAnimationTime;
+                double boundedElapsed = Math.Max(MinimumElapsedSeconds, elapsed);
+                _progressAnimationTime = now - boundedElapsed;
             }
             _animationsPaused = false;
         }
 
         private float AnimationFraction(double startTime)
         {
-            return 0f < _animationDuration
-                ? Mathf.Clamp01((float)((Time.timeAsDouble - startTime) / _animationDuration))
-                : 1f;
+            if (!(Zero < _animationDuration))
+            {
+                return 1f;
+            }
+            double elapsed = Time.timeAsDouble - startTime;
+            float fraction = (float)(elapsed / _animationDuration);
+            return Mathf.Clamp01(fraction);
         }
 
         private bool EnsureResources()
@@ -394,21 +420,17 @@ namespace WallstopStudios.UnityHelpers.Visuals
             {
                 Rect rectangle = _sprite.rect;
                 Texture2D texture = _sprite.texture;
-                _uvOrigin = new Vector2(
-                    rectangle.xMin / texture.width,
-                    rectangle.yMin / texture.height
-                );
-                _uvRight = new Vector2(rectangle.width / texture.width, 0f);
-                _uvUp = new Vector2(0f, rectangle.height / texture.height);
-                _material.SetVector(
-                    UvBoundsId,
-                    new Vector4(
-                        _uvOrigin.x,
-                        _uvOrigin.y,
-                        _uvOrigin.x + _uvRight.x,
-                        _uvOrigin.y + _uvUp.y
-                    )
-                );
+                float originX = rectangle.xMin / texture.width;
+                float originY = rectangle.yMin / texture.height;
+                float uvWidth = rectangle.width / texture.width;
+                float uvHeight = rectangle.height / texture.height;
+                _uvOrigin = new Vector2(originX, originY);
+                _uvRight = new Vector2(uvWidth, Zero);
+                _uvUp = new Vector2(Zero, uvHeight);
+                float maximumX = originX + uvWidth;
+                float maximumY = originY + uvHeight;
+                Vector4 uvBounds = new(originX, originY, maximumX, maximumY);
+                _material.SetVector(UvBoundsId, uvBounds);
                 return true;
             }
             if (_sprite.packingMode != SpritePackingMode.Rectangle)
@@ -438,7 +460,8 @@ namespace WallstopStudios.UnityHelpers.Visuals
             for (int index = 0; index < 4; ++index)
             {
                 Vector2 vertex = vertices[index];
-                if (!IsFinite(vertex) || !IsFinite(uv[index]))
+                Vector2 coordinate = uv[index];
+                if (!WallMath.IsFinite(vertex) || !WallMath.IsFinite(coordinate))
                 {
                     return false;
                 }
@@ -475,10 +498,8 @@ namespace WallstopStudios.UnityHelpers.Visuals
                 uvMinimum = Vector2.Min(uvMinimum, coordinate);
                 uvMaximum = Vector2.Max(uvMaximum, coordinate);
             }
-            _material.SetVector(
-                UvBoundsId,
-                new Vector4(uvMinimum.x, uvMinimum.y, uvMaximum.x, uvMaximum.y)
-            );
+            Vector4 bounds = new(uvMinimum.x, uvMinimum.y, uvMaximum.x, uvMaximum.y);
+            _material.SetVector(UvBoundsId, bounds);
             float unitsPerPixel = 1f / _sprite.pixelsPerUnit;
             Vector2 fullMinimum = -_sprite.pivot * unitsPerPixel;
             Vector2 fullSize = _sprite.rect.size * unitsPerPixel;
@@ -488,12 +509,14 @@ namespace WallstopStudios.UnityHelpers.Visuals
                 + (fullMinimum.y - minimum.y) / meshSize.y * _uvUp;
             _uvRight *= fullSize.x / meshSize.x;
             _uvUp *= fullSize.y / meshSize.y;
-            return IsFinite(_uvOrigin) && IsFinite(_uvRight) && IsFinite(_uvUp);
+            return WallMath.IsFinite(_uvOrigin)
+                && WallMath.IsFinite(_uvRight)
+                && WallMath.IsFinite(_uvUp);
         }
 
         private bool RebuildMesh()
         {
-            int segments = Mathf.Clamp(_segments, 1, MaximumSegments);
+            int segments = Mathf.Clamp(_segments, MinimumSegments, MaximumSegments);
             int vertexCount = (segments + 1) * 2;
             if (_vertices == null || _vertices.Length != vertexCount)
             {
@@ -512,8 +535,9 @@ namespace WallstopStudios.UnityHelpers.Visuals
                     _triangles[triangle + 5] = vertex + 3;
                 }
             }
-            Vector2 control = Vector2.LerpUnclamped(_currentEnd * 0.5f, _control, _curveIntensity);
-            if (!IsFinite(control) || !IsFinite(_currentEnd))
+            Vector2 midpoint = _currentEnd * 0.5f;
+            Vector2 control = Vector2.LerpUnclamped(midpoint, _control, _curveIntensity);
+            if (!WallMath.IsFinite(control) || !WallMath.IsFinite(_currentEnd))
             {
                 return false;
             }
@@ -529,20 +553,20 @@ namespace WallstopStudios.UnityHelpers.Visuals
                 {
                     tangent = _currentEnd;
                 }
-                double length = Math.Sqrt(
-                    (double)tangent.x * tangent.x + (double)tangent.y * tangent.y
-                );
+                double lengthSquared =
+                    (double)tangent.x * tangent.x + (double)tangent.y * tangent.y;
+                double length = Math.Sqrt(lengthSquared);
                 double halfWidth = _thickness * 0.5;
-                Vector2 normal =
-                    length == 0
-                        ? Vector2.zero
-                        : new Vector2(
-                            (float)(-tangent.y / length * halfWidth),
-                            (float)(tangent.x / length * halfWidth)
-                        );
+                Vector2 normal = Vector2.zero;
+                if (length != 0)
+                {
+                    float normalX = (float)(-tangent.y / length * halfWidth);
+                    float normalY = (float)(tangent.x / length * halfWidth);
+                    normal = new Vector2(normalX, normalY);
+                }
                 Vector2 left = position - normal;
                 Vector2 right = position + normal;
-                if (!IsFinite(left) || !IsFinite(right))
+                if (!WallMath.IsFinite(left) || !WallMath.IsFinite(right))
                 {
                     return false;
                 }
@@ -551,8 +575,10 @@ namespace WallstopStudios.UnityHelpers.Visuals
                 _vertices[vertex + 1] = right;
                 _uv[vertex] = _uvOrigin + t * _uvUp;
                 _uv[vertex + 1] = _uvOrigin + _uvRight + t * _uvUp;
-                minimum = Vector2.Min(minimum, Vector2.Min(left, right));
-                maximum = Vector2.Max(maximum, Vector2.Max(left, right));
+                Vector2 edgeMinimum = Vector2.Min(left, right);
+                Vector2 edgeMaximum = Vector2.Max(left, right);
+                minimum = Vector2.Min(minimum, edgeMinimum);
+                maximum = Vector2.Max(maximum, edgeMaximum);
             }
             double width = (double)maximum.x - minimum.x;
             double height = (double)maximum.y - minimum.y;
@@ -564,13 +590,13 @@ namespace WallstopStudios.UnityHelpers.Visuals
             _mesh.vertices = _vertices;
             _mesh.uv = _uv;
             _mesh.triangles = _triangles;
-            _mesh.bounds = new Bounds(
-                new Vector3(
-                    (float)(((double)maximum.x + minimum.x) * 0.5),
-                    (float)(((double)maximum.y + minimum.y) * 0.5)
-                ),
-                new Vector3((float)width, (float)height)
-            );
+            float centerX = (float)(((double)maximum.x + minimum.x) * 0.5);
+            float centerY = (float)(((double)maximum.y + minimum.y) * 0.5);
+            float boundsWidth = (float)width;
+            float boundsHeight = (float)height;
+            Vector3 boundsCenter = new(centerX, centerY);
+            Vector3 boundsSize = new(boundsWidth, boundsHeight);
+            _mesh.bounds = new Bounds(boundsCenter, boundsSize);
             return true;
         }
 

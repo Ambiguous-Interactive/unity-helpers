@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 {
     using System;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     /// <summary>Measures the bounds of drawn sprite pixels and their transformed corners.</summary>
     public static class SpriteArtBounds
@@ -61,10 +62,10 @@ namespace WallstopStudios.UnityHelpers.Utils
                 || width <= 0
                 || height <= 0
                 || (long)width * height != pixels.Length
-                || !IsFinite(pivot.x)
-                || !IsFinite(pivot.y)
-                || !IsFinite(units.x)
-                || !IsFinite(units.y)
+                || !WallMath.IsFinite(pivot.x)
+                || !WallMath.IsFinite(pivot.y)
+                || !WallMath.IsFinite(units.x)
+                || !WallMath.IsFinite(units.y)
                 || units.x <= 0
                 || units.y <= 0
             )
@@ -159,14 +160,14 @@ namespace WallstopStudios.UnityHelpers.Utils
             Vector3 minimum = result.min;
             Vector3 maximum = result.max;
             if (
-                !IsFinite(center.x)
-                || !IsFinite(center.y)
-                || !IsFinite(size.x)
-                || !IsFinite(size.y)
-                || !IsFinite(minimum.x)
-                || !IsFinite(minimum.y)
-                || !IsFinite(maximum.x)
-                || !IsFinite(maximum.y)
+                !WallMath.IsFinite(center.x)
+                || !WallMath.IsFinite(center.y)
+                || !WallMath.IsFinite(size.x)
+                || !WallMath.IsFinite(size.y)
+                || !WallMath.IsFinite(minimum.x)
+                || !WallMath.IsFinite(minimum.y)
+                || !WallMath.IsFinite(maximum.x)
+                || !WallMath.IsFinite(maximum.y)
                 || maximum.x <= minimum.x
                 || maximum.y <= minimum.y
             )
@@ -268,8 +269,8 @@ namespace WallstopStudios.UnityHelpers.Utils
                     double x = origin.x + ((double)uv[index].x - textureOrigin.x) * scaleX;
                     double y = origin.y + ((double)uv[index].y - textureOrigin.y) * scaleY;
                     if (
-                        !IsFinite(vertices[index].x)
-                        || !IsFinite(vertices[index].y)
+                        !WallMath.IsFinite(vertices[index].x)
+                        || !WallMath.IsFinite(vertices[index].y)
                         || double.IsNaN(x)
                         || double.IsNaN(y)
                         || 0.0001 * Math.Max(1, Math.Abs(vertices[index].x))
@@ -331,11 +332,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 bounds = default;
                 return false;
             }
-        }
-
-        private static bool IsFinite(float value)
-        {
-            return !float.IsNaN(value) && !float.IsInfinity(value);
         }
     }
 }

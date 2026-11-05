@@ -186,6 +186,156 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             AssertPivot(visited[visited.Count - 1], Vector2.zero);
         }
 
+        [TestCase(true, 5000)]
+        [TestCase(true, 20000)]
+        [TestCase(false, 100)]
+        [TestCase(false, 500)]
+        [Category("Performance")]
+        public void CopyValidationMeasurements(bool invalidTarget, int iterations)
+        {
+            Sprite source = CreateSprite("measurement", Vector2.zero);
+            Sprite target = invalidTarget ? Track(UnityEngine.Object.Instantiate(source)) : source;
+            string targetPath = AssetDatabase.GetAssetPath(target);
+            Assert.AreEqual(invalidTarget, string.IsNullOrEmpty(targetPath));
+            Sprite transientSource = Track(UnityEngine.Object.Instantiate(source));
+            bool probeSucceeded = SpritePivotCopierAPI.TryCopyPivot(
+                transientSource,
+                source,
+                out bool probeChanged,
+                out string probeError
+            );
+            Assert.IsFalse(probeSucceeded);
+            Assert.IsFalse(probeChanged);
+            string expectedVariant =
+                Environment.GetEnvironmentVariable("UH_COPIER_MEASURE_VARIANT") ?? "candidate";
+            bool candidateExpected = string.Equals(
+                expectedVariant,
+                "candidate",
+                StringComparison.Ordinal
+            );
+            bool knownVariant =
+                candidateExpected
+                || string.Equals(expectedVariant, "baseline", StringComparison.Ordinal);
+            Assert.IsTrue(knownVariant);
+            string expectedError = candidateExpected
+                ? "The source must belong to a Single-mode sprite importer."
+                : "Both sprites must belong to Single-mode texture importers.";
+            Assert.AreEqual(expectedError, probeError);
+            TestContext.WriteLine($"COPY_VARIANT expected={expectedVariant} error={probeError}");
+            bool expectedSuccess = !invalidTarget;
+            for (int warmup = 0; warmup < 32; ++warmup)
+            {
+                bool succeeded = SpritePivotCopierAPI.TryCopyPivot(
+                    source,
+                    target,
+                    out bool changed,
+                    out string error
+                );
+                Assert.AreEqual(expectedSuccess, succeeded, error);
+                Assert.IsFalse(changed);
+            }
+            byte[] retained = null;
+            byte[] preallocated = new byte[4096];
+            Action allocate = () => retained = new byte[4096];
+            Action reuse = () => retained = preallocated;
+            long positive = CountProfilerAllocations(allocate, 16);
+            Assert.AreEqual(16, positive);
+            long negative = CountProfilerAllocations(reuse, 16);
+            Assert.AreEqual(0, negative);
+            Action copy = () =>
+            {
+                bool succeeded = SpritePivotCopierAPI.TryCopyPivot(
+                    source,
+                    target,
+                    out bool changed,
+                    out string error
+                );
+                if (succeeded != expectedSuccess || changed)
+                {
+                    Assert.Fail(error);
+                }
+            };
+            long allocations = CountProfilerAllocations(copy, iterations);
+            TestContext.WriteLine(
+                $"COPY_ALLOCATION invalid={invalidTarget} iterations={iterations} count={allocations} control={positive}"
+            );
+            System.Diagnostics.Stopwatch timer = new();
+            for (int sample = 0; sample < 5; ++sample)
+            {
+                timer.Restart();
+                for (int iteration = 0; iteration < iterations; ++iteration)
+                {
+                    copy();
+                }
+                timer.Stop();
+                TestContext.WriteLine(
+                    $"COPY_VALIDATION invalid={invalidTarget} iterations={iterations} sample={sample} ms={timer.Elapsed.TotalMilliseconds:R}"
+                );
+            }
+            GC.KeepAlive(retained);
+        }
+
+        private static long CountProfilerAllocations(Action action, int iterations)
+        {
+            const int capacity = 131072;
+            const int warmup = 32;
+            return ProfilerAllocationCounter.Measure(action, iterations, capacity, warmup);
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void PendingUnsupportedAlignmentsRefuseWrites(bool batch)
+        {
+            Sprite source = CreateSprite("alignment_pivot_frame", new Vector2(0.25f, 0.75f));
+            Sprite target = CreateSprite("alignment_frame", Vector2.zero);
+            string targetPath = AssetDatabase.GetAssetPath(target);
+            string metadataPath = targetPath + ".meta";
+            byte[] before = File.ReadAllBytes(metadataPath);
+            TextureImporter importer = AssetImporter.GetAtPath(targetPath) as TextureImporter;
+            Assert.IsTrue(importer != null);
+            TextureImporterSettings original = new();
+            importer.ReadTextureSettings(original);
+            TextureImporterSettings unsupported = new();
+            importer.ReadTextureSettings(unsupported);
+            unsupported.spriteAlignment = int.MaxValue;
+            try
+            {
+                importer.SetTextureSettings(unsupported);
+                TextureImporterSettings observed = new();
+                importer.ReadTextureSettings(observed);
+                Assert.AreEqual(int.MaxValue, observed.spriteAlignment);
+                bool succeeded;
+                int changed;
+                string error;
+                if (batch)
+                {
+                    succeeded = SpritePivotCopierAPI.TryCopyPivotsInDirectory(
+                        _folder,
+                        out changed,
+                        out error
+                    );
+                }
+                else
+                {
+                    succeeded = SpritePivotCopierAPI.TryCopyPivot(
+                        source,
+                        target,
+                        out bool singleChanged,
+                        out error
+                    );
+                    changed = singleChanged ? 1 : 0;
+                }
+                Assert.IsFalse(succeeded);
+                Assert.AreEqual(0, changed);
+                Assert.That(error, Does.Contain("alignment"));
+                CollectionAssert.AreEqual(before, File.ReadAllBytes(metadataPath));
+            }
+            finally
+            {
+                importer.SetTextureSettings(original);
+            }
+        }
+
         [TestCase(false)]
         [TestCase(true)]
         public void ReadOnlyMetadataRefusesCopiesBeforeAnyWrites(bool batch)

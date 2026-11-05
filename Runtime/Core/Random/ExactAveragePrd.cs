@@ -5,6 +5,7 @@
 namespace WallstopStudios.UnityHelpers.Core.Random
 {
     using System;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     /// <summary>
     /// Stateful pseudo-random distribution that preserves an exact long-run average chance.
@@ -93,7 +94,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         )
         {
             if (
-                !IsFinite(targetChance)
+                !WallMath.IsFinite(targetChance)
                 || targetChance < 0f
                 || 1f < targetChance
                 || failuresSinceSuccess < 0
@@ -193,11 +194,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             }
 
             return Math.Max(1, (int)attempt);
-        }
-
-        private static bool IsFinite(float value)
-        {
-            return !float.IsNaN(value) && !float.IsInfinity(value);
         }
 
         /// <summary>

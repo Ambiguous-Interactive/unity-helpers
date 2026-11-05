@@ -61,8 +61,8 @@ folder is searched recursively.
 
 Both sprites must use Single import mode. The target texture and metadata must be open for
 editing, and read-only metadata is refused. Editability uses fresh version-control status during
-planning and again before each copy. Texture type and Single mode are also rechecked before
-applying each pivot. The copier reads the source's effective normalized
+planning and again before each batch copy. Single copies check editability immediately before applying their pivot.
+Texture type, Single mode, and supported alignment values are also rechecked before applying each pivot. The copier reads the source's effective normalized
 pivot, including built-in alignment presets, then gives the target Custom alignment with that
 pivot. Different texture dimensions are supported. Other texture settings and source importers
 are preserved, and textures do not need Read/Write enabled.
@@ -74,7 +74,7 @@ entry count, and next target path; returning true cancels before that target cha
 shows cancelable progress. Cancellation preserves earlier completed copies and reports their
 change count. Names use ordinal matching. A null replacement removes the marker. Duplicate names,
 missing counterparts, conflicting sources, and invalid importers refuse the plan before writes.
-All source pivots are captured first, so a sprite that is both source and target cannot propagate
+Unknown target alignment integers are refused. All source pivots are captured first, so a sprite that is both source and target cannot propagate
 a newly copied pivot through a chain.
 
 Importer changes are Undo-recorded. Reimport and filesystem effects are outside the full Undo
