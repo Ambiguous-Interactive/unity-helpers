@@ -112,7 +112,7 @@
   {
     "id": "unity-file-naming-test",
     "name": "Unity file-naming linter self-test",
-    "run": "pwsh -NoProfile -File scripts/tests/test-lint-unity-file-naming.ps1 -VerboseOutput"
+    "run": "npm run test:lint-unity-file-naming"
   },
   {
     "id": "unity-file-naming",

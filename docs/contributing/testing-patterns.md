@@ -27,6 +27,14 @@ inconclusive cases. Missing or blank durations fail reporting before fixture bud
 evaluated. Explicit zero durations remain valid; skipped and older result records without
 an outcome retain the zero-duration fallback.
 
+`npm run lint:unity-file-naming` and `npm run test:lint-unity-file-naming` run the typed Python
+checker and its retained fixture corpus directly. The PowerShell entry points remain compatible;
+the linter wrapper defaults to the caller's working directory and accepts `-RepoRoot` and
+`-StagedOnly`. Direct Python calls default to this checkout and accept `--repo-root` and
+`--staged-only`. Staged selection is anchored to the requested Git root and includes renames.
+Comments and literal text do not declare types or suppress findings. The check recognizes the
+listed direct Unity base classes; it does not resolve arbitrary user-defined inheritance chains.
+
 ## Isolated migration compiler tests
 
 The Odin compiler fixture rewrites a small runtime consumer asset rather than the shared test
@@ -90,6 +98,10 @@ This removes the released test APIs `AttributeMetadataCache.ForceRebuildForTests
 The production-hook gate checks forbidden identifiers and explicit test-only markers with positive controls. Review still checks suffix-free injection and instrumentation. Legitimate discovery of test assemblies and UI suppression during automated editor runs remain supported. The `ValidationRun` loader overload also remains: automatic validation uses it to resolve live prefab-stage roots before falling back to asset loading. Tests use real asset targets and implementation phases.
 
 ## Preserve editor assets during fixtures
+
+Known-folder cleanup opens an asset-editing batch only when it finds a matching, unprotected
+folder to remove. An empty cleanup leaves unrelated pending imports untouched. Real deletions
+retain their final refresh; cleanup inside an existing batch preserves that batch's ownership.
 
 Use a unique directory for generated fixture assets. Register only paths the fixture owns,
 then explicitly call `CleanupTrackedFoldersAndAssets`. Batched fixtures must transfer their

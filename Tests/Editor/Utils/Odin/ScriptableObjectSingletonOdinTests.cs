@@ -7,7 +7,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils.Odin
     using NUnit.Framework;
     using Sirenix.OdinInspector;
     using UnityEngine;
-    using WallstopStudios.UnityHelpers.Core.Attributes;
     using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Utils;
 
@@ -28,10 +27,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils.Odin
             Assert.That(instance, Is.InstanceOf<SerializedScriptableObject>());
 #endif
         }
-
-        [ExcludeFromSingletonCreation]
-        private sealed class OdinScriptableObjectSingletonTestTarget
-            : ScriptableObjectSingleton<OdinScriptableObjectSingletonTestTarget> { }
     }
 }
 #endif
