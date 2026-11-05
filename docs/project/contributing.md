@@ -25,6 +25,8 @@ The easiest way to contribute is using the included dev container, which has all
 
 Run `bash scripts/validate-devcontainer-urls.sh` to check the Dockerfile's download URLs.
 If HEAD probes fail, the validator confirms reachability with a GET limited to one byte.
+This fallback requires [curl 8.4.0 or newer](https://curl.se/docs/manpage.html#--max-filesize);
+older or unrecognized versions retain the failed HEAD result.
 A successful 200 or 206 response also permits curl's size-limit stop when a server ignores the range.
 Missing resources, HTTP errors, and other transfer failures still fail validation.
 Run `npm run test:validate-devcontainer-urls` for the offline HTTP and parser controls.

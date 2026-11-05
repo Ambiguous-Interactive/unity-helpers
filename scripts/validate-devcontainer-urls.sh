@@ -206,6 +206,22 @@ extract_tools() {
     done < "$DOCKERFILE_PATH"
 }
 
+curl_supports_bounded_get() {
+    local version_output
+    if ! version_output=$(curl --version); then
+        return 1
+    fi
+    if [[ ! "$version_output" =~ ^curl[[:space:]]+([0-9]+)\.([0-9]+)\. ]]; then
+        return 1
+    fi
+    local major="${BASH_REMATCH[1]}"
+    local minor="${BASH_REMATCH[2]}"
+    if ((10#$major > 8 || (10#$major == 8 && 10#$minor >= 4))); then
+        return 0
+    fi
+    return 1
+}
+
 check_url() {
     local arch_label="$1"
     local url="$2"
@@ -237,7 +253,7 @@ check_url() {
         fi
     done
 
-    if [ "$status" != "200" ]; then
+    if [ "$status" != "200" ] && curl_supports_bounded_get; then
         local get_status=""
         local get_exit=0
         # Confirm the download method when HEAD fails, without fetching an entire release asset.
@@ -253,6 +269,8 @@ check_url() {
             && { [ "$get_status" = "200" ] || [ "$get_status" = "206" ]; }; then
             status="200"
         fi
+    elif [ "$status" != "200" ]; then
+        printf '  Bounded GET fallback requires curl 8.4.0 or newer; retaining the failed HEAD result.\n'
     fi
 
     if [ "$status" = "200" ]; then

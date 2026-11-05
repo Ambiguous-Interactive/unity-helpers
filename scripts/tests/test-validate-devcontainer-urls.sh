@@ -260,6 +260,17 @@ mkdir -p "$probe_bin"
 cat > "$probe_bin/curl" <<'EOT'
 #!/usr/bin/env bash
 set -euo pipefail
+if [[ "${1:-}" == --version ]]; then
+    case "$URL_PROBE_MODE" in
+        old-curl|head-old-ok) printf 'curl 7.88.1 example\n' ;;
+        curl-8.3) printf 'curl 8.3.99 example\n' ;;
+        new-curl) printf 'curl 9.0.0 example\n' ;;
+        bad-version) printf 'unknown curl version\n' ;;
+        version-error) exit 7 ;;
+        *) printf 'curl 8.4.0 example\n' ;;
+    esac
+    exit 0
+fi
 is_head=0
 range=""
 limit=""
@@ -273,7 +284,7 @@ while [[ $# -gt 0 ]]; do
 done
 if [[ "$is_head" -eq 1 ]]; then
     case "$URL_PROBE_MODE" in
-        head-ok) printf '200' ;;
+        head-ok|head-old-ok) printf '200' ;;
         head-transport) printf '302'; exit 7 ;;
         missing) printf '404' ;;
         *) printf '504' ;;
@@ -283,7 +294,7 @@ fi
 [[ "$range" == 0-0 && "$limit" == 1 ]] || exit 99
 printf 'GET\n' >> "$URL_PROBE_LOG"
 case "$URL_PROBE_MODE" in
-    range-ok) printf '206' ;;
+    range-ok|old-curl|curl-8.3|new-curl|bad-version|version-error) printf '206' ;;
     range-ignored) printf '200' ;;
     size-limited) printf '200'; exit 63 ;;
     missing) printf '404' ;;
@@ -308,11 +319,17 @@ while IFS='|' read -r probe_mode expected_rc; do
     else
         fail "HTTP probe $probe_mode preserves exit $expected_rc" "$probe_output"
     fi
-    if [[ "$probe_mode" == head-ok ]]; then
+    if [[ "$probe_mode" == head-ok || "$probe_mode" == head-old-ok ]]; then
         if [[ ! -s "$probe_log" ]]; then
             pass "Healthy HEAD avoids a GET"
         else
             fail "Healthy HEAD avoids a GET"
+        fi
+    elif [[ "$probe_mode" == old-curl || "$probe_mode" == curl-8.3 || "$probe_mode" == bad-version || "$probe_mode" == version-error ]]; then
+        if [[ ! -s "$probe_log" ]]; then
+            pass "HTTP probe $probe_mode refuses an unbounded GET"
+        else
+            fail "HTTP probe $probe_mode refuses an unbounded GET"
         fi
     elif [[ -s "$probe_log" ]]; then
         pass "HTTP probe $probe_mode confirms through a bounded GET"
@@ -330,6 +347,12 @@ redirect|1
 transport|1
 head-transport|1
 size-limited-missing|1
+old-curl|1
+curl-8.3|1
+new-curl|0
+bad-version|1
+version-error|1
+head-old-ok|0
 EOT
 
 echo -e "${BLUE}── Summary ──${NC}"
