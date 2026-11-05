@@ -291,8 +291,8 @@ if [[ "$is_head" -eq 1 ]]; then
     esac
     exit 0
 fi
-[[ "$range" == 0-0 && "$limit" == 1 ]] || exit 99
 printf 'GET\n' >> "$URL_PROBE_LOG"
+[[ "$range" == 0-0 && "$limit" == 1 ]] || exit 99
 case "$URL_PROBE_MODE" in
     range-ok|old-curl|curl-8.3|new-curl|bad-version|version-error) printf '206' ;;
     range-ignored) printf '200' ;;
@@ -307,6 +307,18 @@ esac
 EOT
 printf '#!/bin/sh\nexit 0\n' > "$probe_bin/sleep"
 chmod +x "$probe_bin/curl" "$probe_bin/sleep"
+
+rejected_log="$TMP_DIR/rejected-get.log"
+: > "$rejected_log"
+rejected_rc=0
+URL_PROBE_MODE=range-ok URL_PROBE_LOG="$rejected_log" "$probe_bin/curl" \
+    --range 1-1 --max-filesize 1 https://example.invalid/asset \
+    > "$TMP_DIR/rejected-get-output" || rejected_rc=$?
+if [[ "$rejected_rc" -eq 99 && "$(cat "$rejected_log")" == GET ]]; then
+    pass "Rejected GET attempts remain visible to refusal assertions"
+else
+    fail "Rejected GET attempts remain visible to refusal assertions"
+fi
 
 while IFS='|' read -r probe_mode expected_rc; do
     probe_log="$TMP_DIR/$probe_mode.log"
