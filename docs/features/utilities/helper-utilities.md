@@ -365,6 +365,18 @@ Helpers.ExecuteFunctionNextFrame(
 
 Uses coroutines under the hood.
 
+Use `TrackedDelayExtensions` when an owner has several one-shot callbacks pending. Keep one
+`List<Coroutine>` per owner, schedule through `ExecuteTrackedAfterDelay` or
+`TryExecuteTrackedAfterDelay`, and call `StopTrackedDelays` from that owner's `OnDisable` or
+`OnDestroy`. A callback removes its handle before it runs, including when it throws or schedules
+more work. Nonpositive, NaN and infinite delays resume after scaled time advances, like a zero-second delay.
+
+`TryExecuteTrackedAfterDelay` returns false for a missing owner, inactive GameObject, missing list
+or missing callback. `ExecuteTrackedAfterDelay` ignores those inputs. Stopping forgets the current
+handles before cancellation, so callbacks that schedule more work during cancellation retain their
+new handles. A destroyed owner still clears the list. These APIs run on Unity's main thread;
+stopping a coroutine through another API does not remove its tracked handle.
+
 ---
 
 ### Repeating Execution with Jitter
@@ -397,6 +409,8 @@ uses the coroutine host.
 Pass an `exceptionHandler` to program against failures instead of logging them. It receives every
 failed invocation's zero-based index, resolved context, and exception. The coroutine continues when
 the action or handler throws; a handler failure is logged once.
+If an exception cannot be formatted, the helper attempts one plain diagnostic. A failing custom
+log handler cannot stop the job. The same protection applies to `ExecuteOverTime` callbacks.
 
 ```csharp
 Helpers.StartFunctionAsCoroutine(
@@ -1547,6 +1561,57 @@ Debug.Log($"Texture changed: {changed}");
 ---
 
 ### Texture and Sprite Pixel Helpers
+
+`SpriteArtBounds.TryGetLocalArtBounds` measures drawn pixel cells instead of the full sprite
+rectangle or its extruded mesh. It excludes transparent borders and uses the sprite pivot and
+pixels per unit. The Editor reads source PNG pixels and honors the importer's alpha source
+without changing import settings. Grayscale alpha uses the mean RGB value; disabling alpha
+treats every source pixel as opaque. Players require readable texture pixels. Readable rectangular, unrotated atlas sprites are supported,
+including trimmed rectangles and off-center pivots. Tight or rotated atlas fallbacks are refused;
+measure their original PNG sprites in the Editor instead. Fully transparent sprites and unavailable
+pixels return false, empty bounds, and a reason.
+
+The sprite overload and `SpriteMaskReader` refuse separate alpha textures when original source
+pixels are unavailable, so an opaque color texture cannot hide transparency stored elsewhere.
+Read an exact `SpriteAlphaMask`, for example from the original PNG in the Editor, and use the
+mask overload for those sprites.
+
+Read bounds when the sprite or its source changes. If you already hold a `SpriteAlphaMask`, use
+the mask overload to avoid reading the texture again. The mask overload checks dimensions and
+coordinates, borrows the pixel array, and allocates no result storage.
+
+Apply `AsDrawn` for renderer flips, then `LowestCornerY` for world position, rotation and scale.
+Flips mirror around the renderer origin. The lowest corner can differ from the transformed
+local bottom edge when the renderer is rotated.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using UnityEngine;
+using WallstopStudios.UnityHelpers.Utils;
+
+public static class SpriteFrontEdge
+{
+    public static bool TryMeasure(SpriteRenderer renderer, out float worldY, out string error)
+    {
+        if (renderer == null)
+        {
+            error = "A renderer is required.";
+            worldY = 0f;
+            return false;
+        }
+        if (!SpriteArtBounds.TryGetLocalArtBounds(renderer.sprite, out Bounds local, out error))
+        {
+            worldY = 0f;
+            return false;
+        }
+        Bounds drawn = SpriteArtBounds.AsDrawn(local, renderer.flipX, renderer.flipY);
+        error = null;
+        worldY = SpriteArtBounds.LowestCornerY(renderer.localToWorldMatrix, drawn);
+        return true;
+    }
+}
+```
 
 `SpriteHelpers.RotateTexture90`, `RotateTexture180` and `ExtractSpriteRect` produce a new texture
 and leave the source untouched. They preserve writable source formats and use RGBA32 for readable

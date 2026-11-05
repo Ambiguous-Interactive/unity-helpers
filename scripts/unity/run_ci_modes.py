@@ -247,14 +247,11 @@ def launch(
     ]
     if sys.platform == "win32":
         command = [
+            sys.executable,
+            str(Path(__file__).with_name("desktop_worker.py")),
+            "--shell",
             shell,
-            "-NoProfile",
-            "-NonInteractive",
-            "-OutputFormat",
-            "Text",
-            "-File",
-            str(Path(__file__).with_name("desktop-worker.ps1")),
-            "-EncodedWorker",
+            "--encoded-worker",
             base64.b64encode(WORKER.encode("utf-16-le")).decode("ascii"),
         ]
     started = time.monotonic()

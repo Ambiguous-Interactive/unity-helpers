@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add grow-only scratch arrays, tracked one-shot delays, and sprite pixel bounds with flip and transformed-corner helpers ([#1113](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1113)).
 - Add test report source-freshness diagnostics across transitive assembly references, with named stale sources and missing-input reports ([#1112](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1112)).
 - Add nonempty collection and nondefault value checks to `AuthoredRequirementValidator`, with explicit requirement kinds and project-owned annotations ([#1112](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1112)).
 - Add `Objects.StableHash64V1` for standard 64-bit FNV-1a byte hashes with a frozen algorithm and optional seed ([#1112](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1112)).
@@ -63,6 +64,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix Editor sprite masks to honor generated or discarded texture alpha without changing import settings ([#1117](https://github.com/Ambiguous-Interactive/unity-helpers/pull/1117)).
+- Fix sprite pixel masks treating separate alpha textures as opaque color data; unavailable alpha pixels now fail with a reason.
+- Fix empty and undefined relational tag filters emitting engine errors for optional fields while other fields bind ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
+- Fix repeating and spread-out callbacks stopping when exception formatting or a custom log handler throws.
 - Fix stale-key scans invoking `Reset` through temporary objects; inspect authored instances and include native components ([#1112](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1112)).
 - Fix concurrent semaphore leases losing permits and corrupting shared disposal slots in `SINGLE_THREADED` builds ([guide](./docs/features/utilities/helper-utilities.md#semaphore-leases), [#1106](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1106)).
 - Fix WProto custom formatters publishing incomplete fields or switching to a newly constructed writer. Reject invalid length tokens without changing the output, and preserve valid wire bytes ([guide](./docs/features/serialization/serialization.md)).

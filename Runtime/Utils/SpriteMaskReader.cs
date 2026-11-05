@@ -20,7 +20,11 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// <param name="error">The reason reading failed, or null on success.</param>
         /// <param name="alphaThreshold">The minimum nonzero alpha byte considered opaque.</param>
         /// <returns>Whether the sprite's exact pixel mask could be read.</returns>
-        /// <remarks>Alpha zero is always transparent; other pixels are opaque at or above the threshold.</remarks>
+        /// <remarks>
+        /// Alpha zero is always transparent; other pixels are opaque at or above the threshold.
+        /// Editor PNG masks honor the texture importer's alpha source.
+        /// Separate alpha textures require original PNG pixels in the Editor.
+        /// </remarks>
         public static bool TryRead(
             Sprite sprite,
             out SpriteAlphaMask mask,
@@ -85,7 +89,9 @@ namespace WallstopStudios.UnityHelpers.Utils
                         );
                     }
                     Texture2D imported = AssetDatabase.LoadAssetAtPath<Texture2D>(assetPath);
-                    if (imported == null)
+                    TextureImporter importer =
+                        AssetImporter.GetAtPath(assetPath) as TextureImporter;
+                    if (imported == null || importer == null)
                     {
                         error = "The sprite's source texture could not be located.";
                         mask = default;
@@ -111,10 +117,19 @@ namespace WallstopStudios.UnityHelpers.Utils
                         imported.height,
                         alphaThreshold,
                         out mask,
-                        out error
+                        out error,
+                        importer.alphaSource == TextureImporterAlphaSource.None,
+                        importer.alphaSource == TextureImporterAlphaSource.FromGrayScale
                     );
                 }
 #endif
+                if (sprite.associatedAlphaSplitTexture != null)
+                {
+                    error =
+                        "Sprites with a separate alpha texture require source PNG pixels or an explicit alpha mask.";
+                    mask = default;
+                    return false;
+                }
                 Texture2D texture = sprite.texture;
                 if (texture == null || !texture.isReadable || sprite.packed)
                 {
@@ -148,7 +163,9 @@ namespace WallstopStudios.UnityHelpers.Utils
             int importedHeight,
             byte alphaThreshold,
             out SpriteAlphaMask mask,
-            out string error
+            out string error,
+            bool ignoreSourceAlpha = false,
+            bool alphaFromGrayscale = false
         )
         {
             Rect rectangle = sprite.rect;
@@ -217,7 +234,11 @@ namespace WallstopStudios.UnityHelpers.Utils
             {
                 for (int x = 0; x < width; ++x)
                 {
-                    byte alpha = pixels[(yStart + y) * texture.width + xStart + x].a;
+                    Color32 pixel = pixels[(yStart + y) * texture.width + xStart + x];
+                    byte alpha =
+                        ignoreSourceAlpha ? byte.MaxValue
+                        : alphaFromGrayscale ? (byte)((pixel.r + pixel.g + pixel.b) / 3)
+                        : pixel.a;
                     opaque[y * width + x] = alpha != 0 && alphaThreshold <= alpha;
                 }
             }

@@ -963,7 +963,8 @@
         "PDB",
         "clis",
         "pyproject",
-        "noextension"
+        "noextension",
+        "unrotated"
       ]
     }
   ],
