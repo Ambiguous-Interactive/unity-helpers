@@ -27,7 +27,9 @@ line.Progress = 1f;
 ```
 
 `Start` and `End` are world XY coordinates; `Control` and `Thickness` use the line's local space.
-Use transforms that stay in the XY plane, including Z rotation and nonuniform or mirrored XY scale.
+Use transforms that stay in the XY plane, including Z rotation, half turns about X/Y, and nonuniform
+or mirrored XY scale. The plane check permits relative basis-vector depth up to one millionth for
+floating-point rotation error; larger tilts clear the geometry.
 A null start keeps the current transform position; a null end clears the geometry.
 `CurveIntensity` blends from a straight line at zero to the authored control point at one, and
 accepts values through five. `Segments` is clamped from one through 4,096.

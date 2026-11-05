@@ -40,6 +40,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 Marker,
                 capacity,
                 ProfilerRecorderOptions.CollectOnlyOnCurrentThread
+                    | ProfilerRecorderOptions.WrapAroundWhenCapacityReached
             );
             if (!recorder.Valid)
             {

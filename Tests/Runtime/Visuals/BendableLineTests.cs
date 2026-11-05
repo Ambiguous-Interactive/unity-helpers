@@ -264,14 +264,43 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             Assert.IsTrue(line.TryRefresh());
         }
 
-        [Test]
-        public void TiltedTransformsRefuseGeometryInsteadOfProjectingEndpoints()
+        [TestCase(45f, 0f, false)]
+        [TestCase(0f, 45f, false)]
+        [TestCase(0.01f, 0f, false)]
+        [TestCase(0f, 0.01f, false)]
+        [TestCase(180f, 0f, true)]
+        [TestCase(0f, 180f, true)]
+        [TestCase(0f, 0f, true)]
+        public void TransformPlaneValidationAcceptsHalfTurnsAndRefusesTilts(
+            float xRotation,
+            float yRotation,
+            bool expected
+        )
         {
             BendableLine line = CreateLine();
-            line.transform.rotation = Quaternion.Euler(45f, 0f, 0f);
-            Assert.IsFalse(line.TryRefresh());
-            Assert.AreEqual(0, line.GetComponent<MeshFilter>().sharedMesh.vertexCount);
-            line.transform.rotation = Quaternion.identity;
+            GameObject parent = Track(
+                new GameObject(nameof(TransformPlaneValidationAcceptsHalfTurnsAndRefusesTilts))
+            );
+            line.transform.SetParent(parent.transform, false);
+            parent.transform.rotation = Quaternion.Euler(xRotation, yRotation, 0f);
+            parent.transform.localScale = new Vector3(2f, 3f, 1f);
+            Assert.AreEqual(expected, line.TryRefresh());
+            Mesh mesh = line.GetComponent<MeshFilter>().sharedMesh;
+            if (expected)
+            {
+                Assert.That(mesh.vertexCount, Is.GreaterThan(0));
+                Vector3[] vertices = mesh.vertices;
+                Vector3 localEnd =
+                    (vertices[vertices.Length - 2] + vertices[vertices.Length - 1]) * 0.5f;
+                Vector3 worldEnd = line.transform.TransformPoint(localEnd);
+                Assert.That(worldEnd.x, Is.EqualTo(line.End.Value.x).Within(0.0001f));
+                Assert.That(worldEnd.y, Is.EqualTo(line.End.Value.y).Within(0.0001f));
+            }
+            else
+            {
+                Assert.AreEqual(0, mesh.vertexCount);
+            }
+            parent.transform.rotation = Quaternion.identity;
             Assert.IsTrue(line.TryRefresh());
         }
 

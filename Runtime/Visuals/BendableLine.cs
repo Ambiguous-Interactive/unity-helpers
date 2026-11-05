@@ -17,6 +17,7 @@ namespace WallstopStudios.UnityHelpers.Visuals
         /// <summary>The largest accepted number of curve segments.</summary>
         public const int MaximumSegments = 4096;
 
+        private const double PlaneSlopeSquaredTolerance = 1e-12;
         private const float Zero = 0f;
         private const int MinimumSegments = 1;
         private const float MaximumCurveIntensity = 5f;
@@ -286,6 +287,16 @@ namespace WallstopStudios.UnityHelpers.Visuals
             }
             _previousTransform = transform.localToWorldMatrix;
             float determinant = _previousTransform.determinant;
+            double rightDepthSquared = (double)_previousTransform.m20 * _previousTransform.m20;
+            double upDepthSquared = (double)_previousTransform.m21 * _previousTransform.m21;
+            double rightLengthSquared =
+                (double)_previousTransform.m00 * _previousTransform.m00
+                + (double)_previousTransform.m10 * _previousTransform.m10
+                + rightDepthSquared;
+            double upLengthSquared =
+                (double)_previousTransform.m01 * _previousTransform.m01
+                + (double)_previousTransform.m11 * _previousTransform.m11
+                + upDepthSquared;
             if (
                 !_end.HasValue
                 || !_hasSpriteMapping
@@ -293,8 +304,8 @@ namespace WallstopStudios.UnityHelpers.Visuals
                 || _sprite.texture == null
                 || determinant == 0f
                 || !float.IsFinite(determinant)
-                || _previousTransform.m20 != 0f
-                || _previousTransform.m21 != 0f
+                || PlaneSlopeSquaredTolerance * rightLengthSquared < rightDepthSquared
+                || PlaneSlopeSquaredTolerance * upLengthSquared < upDepthSquared
             )
             {
                 _mesh.Clear();
@@ -454,8 +465,6 @@ namespace WallstopStudios.UnityHelpers.Visuals
             {
                 return false;
             }
-            Vector2 right = default;
-            Vector2 up = default;
             int corners = 0;
             for (int index = 0; index < 4; ++index)
             {
@@ -472,12 +481,12 @@ namespace WallstopStudios.UnityHelpers.Visuals
                 }
                 else if (vertex.x == maximum.x && vertex.y == minimum.y)
                 {
-                    right = uv[index];
+                    _uvRight = uv[index];
                     corners |= 2;
                 }
                 else if (vertex.x == minimum.x && vertex.y == maximum.y)
                 {
-                    up = uv[index];
+                    _uvUp = uv[index];
                     corners |= 4;
                 }
                 else if (vertex.x == maximum.x && vertex.y == maximum.y)
@@ -485,12 +494,12 @@ namespace WallstopStudios.UnityHelpers.Visuals
                     corners |= 8;
                 }
             }
-            _uvRight = right - _uvOrigin;
-            _uvUp = up - _uvOrigin;
             if (corners != 15)
             {
                 return false;
             }
+            _uvRight -= _uvOrigin;
+            _uvUp -= _uvOrigin;
             Vector2 uvMinimum = uv[0];
             Vector2 uvMaximum = uvMinimum;
             foreach (Vector2 coordinate in uv)

@@ -35,6 +35,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             );
         }
 
+        private static long CountProfilerAllocations(Action action, int iterations)
+        {
+            const int capacity = 131072;
+            const int warmup = 32;
+            return ProfilerAllocationCounter.Measure(action, iterations, capacity, warmup);
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -206,22 +213,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             );
             Assert.IsFalse(probeSucceeded);
             Assert.IsFalse(probeChanged);
-            string expectedVariant =
-                Environment.GetEnvironmentVariable("UH_COPIER_MEASURE_VARIANT") ?? "candidate";
-            bool candidateExpected = string.Equals(
-                expectedVariant,
-                "candidate",
-                StringComparison.Ordinal
-            );
-            bool knownVariant =
-                candidateExpected
-                || string.Equals(expectedVariant, "baseline", StringComparison.Ordinal);
-            Assert.IsTrue(knownVariant);
-            string expectedError = candidateExpected
-                ? "The source must belong to a Single-mode sprite importer."
-                : "Both sprites must belong to Single-mode texture importers.";
+            const string expectedError = "The source must belong to a Single-mode sprite importer.";
             Assert.AreEqual(expectedError, probeError);
-            TestContext.WriteLine($"COPY_VARIANT expected={expectedVariant} error={probeError}");
             bool expectedSuccess = !invalidTarget;
             for (int warmup = 0; warmup < 32; ++warmup)
             {
@@ -273,13 +266,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 );
             }
             GC.KeepAlive(retained);
-        }
-
-        private static long CountProfilerAllocations(Action action, int iterations)
-        {
-            const int capacity = 131072;
-            const int warmup = 32;
-            return ProfilerAllocationCounter.Measure(action, iterations, capacity, warmup);
         }
 
         [TestCase(false)]

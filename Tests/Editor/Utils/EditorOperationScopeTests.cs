@@ -24,6 +24,43 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         private static readonly Action ManualOperation = RunManualOperation;
         private static readonly Action ScopedOperation = RunScopedOperation;
 
+        private static void RunManualOperation()
+        {
+            Undo.IncrementCurrentGroup();
+            int group = Undo.GetCurrentGroup();
+            Undo.SetCurrentGroupName(OperationName);
+            EditorUi.ClearProgress();
+            Undo.CollapseUndoOperations(group);
+            Undo.IncrementCurrentGroup();
+        }
+
+        private static void RunScopedOperation()
+        {
+            using UndoGroupScope undo = UndoGroupScope.Begin(OperationName);
+            using DisposableScope progress = EditorUi.BeginProgressScope();
+        }
+
+        [Test]
+        [Category("Performance")]
+        public void ProfilerAllocationCounterRefusesTruncatedSamples()
+        {
+            object[] retained = new object[1];
+            Action allocate = () => retained[0] = new byte[64];
+            const int iterations = 16;
+            const int fullCapacity = 128;
+            const int truncatedCapacity = 2;
+            long control = ProfilerAllocationCounter.Measure(allocate, iterations, fullCapacity);
+            if (control == 0)
+            {
+                Assert.Ignore("The allocation marker did not observe retained arrays.");
+            }
+            Assert.AreEqual(iterations, control);
+            Assert.Throws<AssertionException>(() =>
+                ProfilerAllocationCounter.Measure(allocate, iterations, truncatedCapacity)
+            );
+            GC.KeepAlive(retained);
+        }
+
         [Test]
         public void DefaultAndCopiedUndoScopesReleaseTheirGroupOnlyOnce()
         {
@@ -177,22 +214,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             );
             Assert.AreEqual(baseline, candidate);
             GC.KeepAlive(retained);
-        }
-
-        private static void RunManualOperation()
-        {
-            Undo.IncrementCurrentGroup();
-            int group = Undo.GetCurrentGroup();
-            Undo.SetCurrentGroupName(OperationName);
-            EditorUi.ClearProgress();
-            Undo.CollapseUndoOperations(group);
-            Undo.IncrementCurrentGroup();
-        }
-
-        private static void RunScopedOperation()
-        {
-            using UndoGroupScope undo = UndoGroupScope.Begin(OperationName);
-            using DisposableScope progress = EditorUi.BeginProgressScope();
         }
     }
 #endif

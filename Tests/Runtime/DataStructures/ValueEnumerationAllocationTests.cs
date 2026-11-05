@@ -7,10 +7,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     using System.Collections.Generic;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Extension;
-    using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Tests.TestUtils;
 #if UNITY_5_3_OR_NEWER
-    using Unity.Profiling;
+    using WallstopStudios.UnityHelpers.Tests.Core;
 #endif
 
     [TestFixture]
