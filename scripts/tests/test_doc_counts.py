@@ -184,10 +184,14 @@ def test_later_invalid_document_does_not_partially_rewrite_earlier_targets(
     assert (tmp_path / "README.md").read_bytes() == original
 
 
-def test_linked_parent_cannot_redirect_a_documentation_write(tmp_path: Path) -> None:
+@pytest.mark.parametrize("within_repository", [False, True])
+@pytest.mark.parametrize("mode", ["check", "sync"])
+def test_linked_parent_cannot_redirect_a_documentation_write(
+    tmp_path: Path, within_repository: bool, mode: str, capsys: pytest.CaptureFixture[str]
+) -> None:
     root = tmp_path / "repository"
     corpus(root)
-    outside = tmp_path / "outside"
+    outside = (root if within_repository else tmp_path) / "outside"
     outside.mkdir()
     target = outside / "readme.md"
     target.write_text("99,000+ tests", encoding="utf-8")
@@ -196,6 +200,22 @@ def test_linked_parent_cannot_redirect_a_documentation_write(tmp_path: Path) -> 
     except OSError:
         pytest.skip("This host cannot create directory symlinks.")
     original = (root / "README.md").read_bytes()
-    assert main(["sync", "--repo-root", str(root)]) == 1
+    assert main([mode, "--repo-root", str(root)]) == 1
+    assert "linked" in capsys.readouterr().err
     assert target.read_text(encoding="utf-8") == "99,000+ tests"
     assert (root / "README.md").read_bytes() == original
+
+
+@pytest.mark.parametrize(
+    "noise",
+    [
+        '// [MenuItem("Tools/Ghost")]\n/*\n[Test]\nclass Ghost : IRandom {}\n*/',
+        'string example = @"\n[Test]\n[MenuItem(""Tools/Ghost"")]\nclass Ghost : IRandom {}\n";',
+        'string example = """\n[Test]\n[MenuItem("Tools/Ghost")]\nclass Ghost : IRandom {}\n""";',
+    ],
+)
+def test_comments_and_literals_do_not_change_source_counts(tmp_path: Path, noise: str) -> None:
+    corpus(tmp_path)
+    for folder in ("Tests", "Runtime/Core/Random", "Editor"):
+        (tmp_path / folder / "Noise.cs").write_text(noise, encoding="utf-8")
+    assert collect(tmp_path) == Counts(4, 1, 2)

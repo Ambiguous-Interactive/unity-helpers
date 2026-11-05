@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Remove per-interval wait iterator allocations from repeating coroutine jobs while preserving scaled-time scheduling.
+- Reduce garbage collection pressure from repeating coroutine jobs while preserving scaled-time scheduling.
 
 ### Fixed
 

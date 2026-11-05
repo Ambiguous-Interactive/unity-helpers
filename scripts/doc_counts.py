@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from cli_encoding import configure_output
-from csharp_sources import source_files
+from csharp_sources import is_link, mask_noise, source_files
 
 ROOT = Path(__file__).resolve().parents[1]
 TARGETS = (
@@ -127,9 +127,9 @@ def collect(repository: Path) -> Counts:
     totals = [0, 0, 0]
     for path in source_files(repository, roots):
         relative = path.relative_to(repository).as_posix()
-        text = read_text(path)
+        text = mask_noise(read_text(path).replace("\r\n", "\n").replace("\r", "\n"))
         if relative.startswith("Tests/"):
-            totals[0] += len(TEST.findall(text.replace("\r\n", "\n").replace("\r", "\n")))
+            totals[0] += len(TEST.findall(text))
         elif relative.startswith("Runtime/Core/Random/"):
             totals[1] += int(
                 path.stem.casefold() not in EXCLUDED_RANDOM_TYPES
@@ -161,8 +161,12 @@ def sync(repository: Path, counts: Counts, *, check: bool) -> int:
     updates: list[tuple[str, Path, str]] = []
     root = repository.resolve()
     for relative in TARGETS:
-        path = repository / relative
-        if path.is_symlink() or not path.resolve().is_relative_to(root):
+        path = repository
+        for part in Path(relative).parts:
+            path = path / part
+            if (path.exists() or path.is_symlink()) and is_link(path):
+                raise ValueError(f"Documentation target has a linked path component: {relative}")
+        if not path.resolve().is_relative_to(root):
             raise ValueError(f"Documentation target is linked outside its allowed path: {relative}")
         if not path.exists():
             continue

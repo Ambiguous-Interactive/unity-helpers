@@ -64,6 +64,7 @@ missing durations on skipped tests count as zero. A step summary appends UTF-8 M
 
 Documentation counts use `scripts/doc_counts.py` through locked uv. `npm run lint:doc-counts`
 checks without writing; `npm run sync:doc-counts` updates only the documented target files.
+Counts ignore C# comments and literal contents. Linked target files and parent directories are rejected.
 For metadata JSON, run `uv run --project scripts/python~ --locked --no-dev python scripts/doc_counts.py generate`.
 The three PowerShell commands remain compatibility entry points. Run `npm run test:lint-doc-counts`
 for count, encoding, newline, read-only, and wrapper exit-code controls.
