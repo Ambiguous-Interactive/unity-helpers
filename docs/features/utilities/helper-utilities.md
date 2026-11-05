@@ -1564,8 +1564,9 @@ Debug.Log($"Texture changed: {changed}");
 
 `SpriteArtBounds.TryGetLocalArtBounds` measures drawn pixel cells instead of the full sprite
 rectangle or its extruded mesh. It excludes transparent borders and uses the sprite pivot and
-pixels per unit. The Editor reads source PNG pixels without changing the texture importer;
-players require readable texture pixels. Readable rectangular, unrotated atlas sprites are supported,
+pixels per unit. The Editor reads source PNG pixels and honors the importer's alpha source
+without changing import settings. Grayscale alpha uses the mean RGB value; disabling alpha
+treats every source pixel as opaque. Players require readable texture pixels. Readable rectangular, unrotated atlas sprites are supported,
 including trimmed rectangles and off-center pivots. Tight or rotated atlas fallbacks are refused;
 measure their original PNG sprites in the Editor instead. Fully transparent sprites and unavailable
 pixels return false, empty bounds, and a reason.

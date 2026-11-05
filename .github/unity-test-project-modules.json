@@ -4,6 +4,7 @@
   "_note_adding": "When shipped (Runtime/Editor) or test code starts using a new UnityEngine module, add the package id here and BOTH generators pick it up automatically. The compile error and run-ci-tests.ps1's missing-module diagnostic name the module assembly; map UnityEngine.<X>Module -> com.unity.modules.<x> (lowercased), and UnityEngine.UI -> com.unity.ugui. EXCEPTIONS to that lowercase rule: some module assemblies have NO matching com.unity.modules.<x> package id. Most notably UnityEngine.GridModule (Grid/GridLayout) has NO 'com.unity.modules.grid' package -- declare 'com.unity.modules.tilemap' (the built-in module package for Grid/Tilemap functionality, which a default Unity project ships) instead. Declaring a non-existent id makes UPM fail resolution ('Package [id] cannot be found') BEFORE compilation, producing no results.xml. Every id below MUST be a real built-in package id from https://docs.unity3d.com/Manual/pack-build.html (plus com.unity.ugui); scripts/lint-unity-test-modules.ps1 enforces this.",
   "modules": {
     "com.unity.modules.animation": "1.0.0",
+    "com.unity.modules.assetbundle": "1.0.0",
     "com.unity.modules.audio": "1.0.0",
     "com.unity.modules.imageconversion": "1.0.0",
     "com.unity.modules.imgui": "1.0.0",
@@ -18,6 +19,7 @@
   },
   "_evidence": {
     "com.unity.modules.animation": "Runtime/Core/Extension/AnimatorExtensions.cs, Runtime/Utils/AnimatorEnumStateMachine.cs (Animator, AnimationClip, AnimationEvent)",
+    "com.unity.modules.assetbundle": "TEST-ONLY: Tests/Editor/Sprites/SpriteMaskReaderEditorTests.cs builds and loads packed atlas AssetBundles on Unity 2021.",
     "com.unity.modules.audio": "TEST-ONLY: Tests/Editor/CustomDrawers/TestTypes/*.cs fixtures (AudioSource/AudioClip [WNotNull] fields). Not used by shipped code.",
     "com.unity.modules.tilemap": "Runtime/Core/Extension/Partials/GridConvexHull.cs (Grid grid parameter). Grid/GridLayout live in UnityEngine.GridModule; there is NO standalone 'com.unity.modules.grid' package, so the test project declares com.unity.modules.tilemap (the built-in Grid/Tilemap module package a default Unity project ships) to cover Grid usage.",
     "com.unity.modules.imageconversion": "Editor/Sprites/SpriteCropper.cs (Texture2D.EncodeToPNG)",

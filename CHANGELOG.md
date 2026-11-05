@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add grow-only scratch arrays, tracked one-shot delays, and sprite pixel bounds with flip and transformed-corner helpers ([#1113](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1113)).
+- Add grow-only scratch arrays, tracked one-shot delays, and sprite pixel bounds that honor imported alpha, with flip and transformed-corner helpers ([#1113](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1113)).
 - Add test report source-freshness diagnostics across transitive assembly references, with named stale sources and missing-input reports ([#1112](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1112)).
 - Add nonempty collection and nondefault value checks to `AuthoredRequirementValidator`, with explicit requirement kinds and project-owned annotations ([#1112](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1112)).
 - Add `Objects.StableHash64V1` for standard 64-bit FNV-1a byte hashes with a frozen algorithm and optional seed ([#1112](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1112)).

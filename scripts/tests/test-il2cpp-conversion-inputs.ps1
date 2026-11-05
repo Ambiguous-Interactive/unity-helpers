@@ -27,8 +27,8 @@ try {
     $latestManifest = New-NullableConsumerManifest -TemplateJson $templateJson -ConfigurationJson $configurationJson -Repository $repositoryInput -UnityVersion '6000.6.0f1'
     $floorDependencies = (ConvertFrom-Json -InputObject $floorManifest -AsHashtable)['dependencies']
     $latestDependencies = (ConvertFrom-Json -InputObject $latestManifest -AsHashtable)['dependencies']
-    Require ($floorDependencies['com.unity.toolchain.win-x86_64-linux-x86_64'] -ceq '2.0.11' -and $floorDependencies.Count -eq 14) 'dependency-floor-authors-exact-toolchain-before-preparation'
-    Require (-not $latestDependencies.Contains('com.unity.toolchain.win-x86_64-linux-x86_64') -and $latestDependencies.Count -eq 13) 'dependency-latest-retains-no-toolchain'
+    Require ($floorDependencies['com.unity.toolchain.win-x86_64-linux-x86_64'] -ceq '2.0.11' -and $floorDependencies.Count -eq 15) 'dependency-floor-authors-exact-toolchain-before-preparation'
+    Require (-not $latestDependencies.Contains('com.unity.toolchain.win-x86_64-linux-x86_64') -and $latestDependencies.Count -eq 14) 'dependency-latest-retains-no-toolchain'
     $observedFloorManifest = @'
 {
   "dependencies": {
@@ -49,7 +49,11 @@ try {
   }
 }
 '@
-    Require (Test-NullableConsumerManifest -ExpectedJson $floorManifest -ActualJson $observedFloorManifest) 'dependency-observed-floor-reordered-manifest-matches-complete-recipe'
+    Require (-not (Test-NullableConsumerManifest -ExpectedJson $floorManifest -ActualJson $observedFloorManifest)) 'dependency-observed-floor-without-required-atlas-module-is-rejected'
+    $authoredFloor = ConvertFrom-Json -InputObject $observedFloorManifest -AsHashtable
+    $authoredFloor['dependencies']['com.unity.modules.assetbundle'] = '1.0.0'
+    $authoredFloorManifest = ConvertTo-Json -InputObject $authoredFloor -Depth 10
+    Require (Test-NullableConsumerManifest -ExpectedJson $floorManifest -ActualJson $authoredFloorManifest) 'dependency-floor-with-required-atlas-module-matches-complete-recipe'
     $orderedLatest = ConvertFrom-Json -InputObject $latestManifest -AsHashtable
     $reversedLatest = [ordered]@{ dependencies = [ordered]@{} }
     $keys = @($orderedLatest['dependencies'].Keys)
@@ -81,7 +85,7 @@ try {
     foreach ($control in $jsonNegativeControls) {
         Require (-not (Test-NullableConsumerManifest -ExpectedJson $control[1] -ActualJson $control[2])) ('dependency-rejects-' + $control[0])
     }
-    Require (-not (Test-NullableConsumerManifest -ExpectedJson $floorManifest -ActualJson $observedFloorManifest.Replace($repositoryInput, 'D:/different/package')) ) 'dependency-rejects-changed-package-uri'
+    Require (-not (Test-NullableConsumerManifest -ExpectedJson $floorManifest -ActualJson $authoredFloorManifest.Replace($repositoryInput, 'D:/different/package')) ) 'dependency-rejects-changed-package-uri'
     $malformedRejected = $false
     try { Test-NullableConsumerManifest -ExpectedJson '{}' -ActualJson '{' | Out-Null } catch { $malformedRejected = $true }
     Require $malformedRejected 'dependency-malformed-json-fails-closed'
@@ -377,8 +381,8 @@ try {
     }
 
     $results | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $root 'parser-results.json')
-    if ($results.Count -ne (105 + $optionalControls)) { throw 'Parser controls silently omitted cases' }
-    "Original parser10, player provenance28, inline/archive26, lifecycle12, dependency29, optional filesystem/process$optionalControls controls passed; synthetic files are not Unity evidence."
+    if ($results.Count -ne (106 + $optionalControls)) { throw 'Parser controls silently omitted cases' }
+    "Original parser10, player provenance28, inline/archive26, lifecycle12, dependency30, optional filesystem/process$optionalControls controls passed; synthetic files are not Unity evidence."
 
 } finally {
     if ($usesTemporaryDirectory) {

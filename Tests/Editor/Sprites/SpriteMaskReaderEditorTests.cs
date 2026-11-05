@@ -203,6 +203,134 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             Assert.IsFalse(importer.isReadable);
         }
 
+        [TestCase(TextureImporterAlphaSource.FromInput, false)]
+        [TestCase(TextureImporterAlphaSource.FromInput, true)]
+        [TestCase(TextureImporterAlphaSource.FromGrayScale, false)]
+        [TestCase(TextureImporterAlphaSource.FromGrayScale, true)]
+        [TestCase(TextureImporterAlphaSource.None, false)]
+        [TestCase(TextureImporterAlphaSource.None, true)]
+        public void ReadsImportedAlphaSourceWithoutChangingImporter(
+            TextureImporterAlphaSource alphaSource,
+            bool readable
+        )
+        {
+            string path = CreatePng();
+            if (alphaSource == TextureImporterAlphaSource.FromGrayScale)
+            {
+                Texture2D source = Track(new Texture2D(64, 64, TextureFormat.RGBA32, false));
+                Color32[] pixels = new Color32[64 * 64];
+                for (int index = 0; index < pixels.Length; ++index)
+                {
+                    pixels[index] = new Color32(0, 0, 0, 255);
+                }
+                pixels[17 * 64 + 19] = new Color32(255, 255, 255, 255);
+                source.SetPixels32(pixels);
+                source.Apply();
+                File.WriteAllBytes(path, source.EncodeToPNG());
+                AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
+            }
+            TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
+            Assert.IsTrue(importer != null);
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            importer.textureCompression = TextureImporterCompression.Uncompressed;
+            importer.spritePixelsPerUnit = 16;
+            importer.alphaSource = alphaSource;
+            importer.isReadable = readable;
+            importer.SaveAndReimport();
+            Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+            Assert.IsTrue(sprite != null);
+            string before = EditorJsonUtility.ToJson(importer);
+            Assert.IsTrue(
+                SpriteMaskReader.TryRead(sprite, out SpriteAlphaMask mask, out string error),
+                error
+            );
+            bool fullRectangle = alphaSource == TextureImporterAlphaSource.None;
+            Assert.AreEqual(fullRectangle, mask.Pixels[0]);
+            Assert.IsTrue(mask.Pixels[17 * 64 + 19]);
+            if (readable)
+            {
+                Color32[] imported = sprite.texture.GetPixels32();
+                Assert.AreEqual(fullRectangle ? 255 : 0, imported[0].a);
+                Assert.AreEqual(255, imported[17 * 64 + 19].a);
+            }
+            Assert.IsTrue(
+                SpriteArtBounds.TryGetLocalArtBounds(sprite, out Bounds actual, out error),
+                error
+            );
+            Bounds expected = fullRectangle
+                ? new Bounds(Vector3.zero, new Vector3(4, 4, 0))
+                : new Bounds(
+                    new Vector3(-0.78125f, -0.90625f, 0),
+                    new Vector3(0.0625f, 0.0625f, 0)
+                );
+            Assert.That(Vector3.Distance(expected.center, actual.center), Is.LessThan(0.0001f));
+            Assert.That(Vector3.Distance(expected.size, actual.size), Is.LessThan(0.0001f));
+            Assert.AreEqual(before, EditorJsonUtility.ToJson(importer));
+            Assert.AreEqual(readable, importer.isReadable);
+        }
+
+        [TestCase((byte)1)]
+        [TestCase((byte)85)]
+        [TestCase((byte)86)]
+        [TestCase((byte)254)]
+        [TestCase((byte)255)]
+        public void GrayscaleMaskThresholdsMatchImportedPixels(byte threshold)
+        {
+            string path = CreatePng();
+            Texture2D source = Track(new Texture2D(64, 64, TextureFormat.RGBA32, false));
+            Color32[] colors = new Color32[64 * 64];
+            colors[17 * 64 + 1] = new Color32(0, 0, 1, 255);
+            colors[17 * 64 + 2] = new Color32(0, 0, 2, 255);
+            colors[17 * 64 + 3] = new Color32(0, 0, 3, 255);
+            colors[17 * 64 + 4] = new Color32(255, 0, 0, 255);
+            colors[17 * 64 + 5] = new Color32(255, 255, 254, 255);
+            colors[17 * 64 + 6] = new Color32(255, 255, 255, 255);
+            source.SetPixels32(colors);
+            source.Apply();
+            File.WriteAllBytes(path, source.EncodeToPNG());
+            AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
+            TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
+            Assert.IsTrue(importer != null);
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            importer.textureCompression = TextureImporterCompression.Uncompressed;
+            importer.mipmapEnabled = false;
+            importer.alphaIsTransparency = false;
+            importer.alphaSource = TextureImporterAlphaSource.FromGrayScale;
+            importer.isReadable = true;
+            importer.SaveAndReimport();
+            Texture2D imported = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+            Assert.IsTrue(imported != null);
+            Color32[] expected = imported.GetPixels32();
+            importer.isReadable = false;
+            importer.SaveAndReimport();
+            Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+            Assert.IsTrue(sprite != null);
+            string before = EditorJsonUtility.ToJson(importer);
+            Assert.IsTrue(
+                SpriteMaskReader.TryRead(
+                    sprite,
+                    out SpriteAlphaMask mask,
+                    out string error,
+                    threshold
+                ),
+                error
+            );
+            Assert.AreEqual(expected.Length, mask.Pixels.Length);
+            for (int index = 0; index < expected.Length; ++index)
+            {
+                byte alpha = expected[index].a;
+                Assert.AreEqual(
+                    0 < alpha && threshold <= alpha,
+                    mask.Pixels[index],
+                    $"Pixel {index}, imported alpha {alpha}"
+                );
+            }
+            Assert.AreEqual(before, EditorJsonUtility.ToJson(importer));
+            Assert.IsFalse(importer.isReadable);
+        }
+
         [TestCase(false)]
         [TestCase(true)]
         public void AtlasReadsKeepSourceImportSettingsAndReportUnavailablePixels(bool tight)
@@ -260,39 +388,76 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
 #endif
             SpriteAtlas atlas = AssetDatabase.LoadAssetAtPath<SpriteAtlas>(atlasPath);
             Assert.IsTrue(atlas != null);
+            string bundleFolder = Path.Combine(
+                Application.temporaryCachePath,
+                nameof(SpriteMaskReaderEditorTests) + System.Guid.NewGuid().ToString("N")
+            );
+            AssetBundle bundle = null;
+            try
+            {
 #if !UNITY_2022_1_OR_NEWER
-            SpriteAtlasUtility.PackAtlases(
-                new[] { atlas },
-                EditorUserBuildSettings.activeBuildTarget,
-                false
-            );
+                Directory.CreateDirectory(bundleFolder);
+                string bundleName = Path.GetFileNameWithoutExtension(atlasPath).ToLowerInvariant();
+                AssetBundleBuild build = new()
+                {
+                    assetBundleName = bundleName,
+                    assetNames = new[] { atlasPath },
+                };
+                AssetBundleManifest manifest = Track(
+                    BuildPipeline.BuildAssetBundles(
+                        bundleFolder,
+                        new[] { build },
+                        BuildAssetBundleOptions.UncompressedAssetBundle,
+                        EditorUserBuildSettings.activeBuildTarget
+                    )
+                );
+                Assert.IsTrue(manifest != null);
+                bundle = AssetBundle.LoadFromFile(Path.Combine(bundleFolder, bundleName));
+                Assert.IsTrue(bundle != null);
+                atlas = bundle.LoadAsset<SpriteAtlas>(atlasPath);
+                Assert.IsTrue(atlas != null);
 #endif
-            Assert.IsTrue(atlas.CanBindTo(original));
-            Sprite packed = Track(atlas.GetSprite(original.name));
-            Assert.IsTrue(packed != null);
-            Texture2D atlasTexture = UnityEditor.Sprites.SpriteUtility.GetSpriteTexture(
-                packed,
-                true
-            );
-            Assert.IsTrue(atlasTexture != null);
-            Assert.IsFalse(atlasTexture.isReadable);
-            bool measured = SpriteArtBounds.TryGetLocalArtBounds(
-                packed,
-                out Bounds actual,
-                out error
-            );
-            if (measured)
-            {
-                Assert.That(Vector3.Distance(expected.center, actual.center), Is.LessThan(0.0001f));
-                Assert.That(Vector3.Distance(expected.size, actual.size), Is.LessThan(0.0001f));
+                Assert.IsTrue(atlas.CanBindTo(original));
+                Sprite packed = Track(atlas.GetSprite(original.name));
+                Assert.IsTrue(packed != null);
+                Texture2D atlasTexture = UnityEditor.Sprites.SpriteUtility.GetSpriteTexture(
+                    packed,
+                    true
+                );
+                Assert.IsTrue(atlasTexture != null);
+                Assert.IsFalse(atlasTexture.isReadable);
+                bool measured = SpriteArtBounds.TryGetLocalArtBounds(
+                    packed,
+                    out Bounds actual,
+                    out error
+                );
+                if (measured)
+                {
+                    Assert.That(
+                        Vector3.Distance(expected.center, actual.center),
+                        Is.LessThan(0.0001f)
+                    );
+                    Assert.That(Vector3.Distance(expected.size, actual.size), Is.LessThan(0.0001f));
+                }
+                else
+                {
+                    Assert.AreEqual(default(Bounds), actual);
+                    Assert.IsFalse(string.IsNullOrWhiteSpace(error));
+                }
+                Assert.AreEqual(before, EditorJsonUtility.ToJson(importer));
+                Assert.IsFalse(importer.isReadable);
             }
-            else
+            finally
             {
-                Assert.AreEqual(default(Bounds), actual);
-                Assert.IsFalse(string.IsNullOrWhiteSpace(error));
+                if (bundle != null)
+                {
+                    bundle.Unload(true);
+                }
+                if (Directory.Exists(bundleFolder))
+                {
+                    Directory.Delete(bundleFolder, true);
+                }
             }
-            Assert.AreEqual(before, EditorJsonUtility.ToJson(importer));
-            Assert.IsFalse(importer.isReadable);
         }
 
         private string CreatePng()
