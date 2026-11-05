@@ -26,7 +26,8 @@ const {
   scriptPathsIn,
   leafCommands,
   filesInvoking,
-  csharpControlsInvoke
+  csharpControlsInvoke,
+  registeredControlsInvoke
 } = require(path.join(repoRoot, "scripts", "tests", "test-run-repo-lint.js"));
 const packageScripts = JSON.parse(
   fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")
@@ -366,6 +367,7 @@ runTest("no contract test in scripts/tests/ has been left unreachable", () => {
   // suite that still exists and no longer runs). The excuse is a PREDICATE, not prose.
   const runElsewhere = new Map([
     ["scripts/tests/test-lint-odin-undo-safety.ps1", "csharp-controls"],
+    ["scripts/tests/test-lint-unity-file-naming.ps1", "naming-controls"],
     ["scripts/tests/test-lint-skill-sizes.ps1", "workflow"],
     ["scripts/tests/test-llm-instructions-lint.ps1", "workflow"],
     ["scripts/tests/test-protobuf-candidate.py", "workflow"],
@@ -378,6 +380,10 @@ runTest("no contract test in scripts/tests/ has been left unreachable", () => {
   ]);
   const owners = new Map([
     ["csharp-controls", csharpControlsInvoke],
+    [
+      "naming-controls",
+      (file) => registeredControlsInvoke(file, "scripts/tests/test_unity_file_naming.py")
+    ],
     ["workflow", (file) => filesInvoking(".github/workflows", file).length > 0]
   ]);
 

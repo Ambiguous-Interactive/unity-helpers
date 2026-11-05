@@ -137,10 +137,21 @@ def test_staged_selection_is_anchored_and_includes_renames(
     git(tmp_path, "init", "-q")
     git(tmp_path, "config", "user.name", "Naming Fixture")
     git(tmp_path, "config", "user.email", "fixture@example.invalid")
+    git(tmp_path, "config", "commit.gpgsign", "true")
+    git(tmp_path, "config", "gpg.program", "naming-fixture-missing-signing-program")
     source = tmp_path / "A.cs"
     source.write_text("class A : MonoBehaviour { }", encoding="utf-8")
     git(tmp_path, "add", "A.cs")
-    git(tmp_path, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "fixture")
+    git(
+        tmp_path,
+        "-c",
+        "core.hooksPath=/dev/null",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "-qm",
+        "fixture",
+    )
     git(tmp_path, "mv", "A.cs", "Wrong.cs")
     other = tmp_path / "other"
     other.mkdir()
@@ -225,7 +236,79 @@ def test_staged_unicode_paths_are_utf8(tmp_path: Path) -> None:
     git(repository, "add", "Étoile.cs")
     assert naming.main(["--repo-root", str(repository), "--staged-only"]) == 0
     (repository / "Étoile.cs").write_text("class Autre : MonoBehaviour { }", encoding="utf-8")
+    assert naming.main(["--repo-root", str(repository), "--staged-only"]) == 0
+    git(repository, "add", "Étoile.cs")
     assert naming.main(["--repo-root", str(repository), "--staged-only"]) == 1
+
+
+@pytest.mark.parametrize("staged_valid", [False, True])
+def test_staged_check_reads_index_instead_of_unstaged_corrections(
+    tmp_path: Path, staged_valid: bool
+) -> None:
+    git(tmp_path, "init", "-q")
+    source = tmp_path / "A.cs"
+    valid = "class A : MonoBehaviour { }"
+    invalid = "class Wrong : MonoBehaviour { }"
+    source.write_text(valid if staged_valid else invalid, encoding="utf-8-sig")
+    git(tmp_path, "add", "A.cs")
+    source.write_text(invalid if staged_valid else valid, encoding="utf-8")
+    assert naming.main(["--repo-root", str(tmp_path), "--staged-only"]) == (
+        0 if staged_valid else 1
+    )
+
+
+@pytest.mark.parametrize("valid", [False, True])
+def test_direct_cli_checks_physical_sources_and_returns_status(tmp_path: Path, valid: bool) -> None:
+    runtime = tmp_path / "Runtime"
+    runtime.mkdir()
+    (runtime / "A.cs").write_text(
+        "class A : MonoBehaviour { }" if valid else "class Wrong : MonoBehaviour { }",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts/lint_unity_file_naming.py"),
+            "--repo-root",
+            str(tmp_path),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == (0 if valid else 1), result.stdout + result.stderr
+    assert ("UNH006" in result.stdout) is not valid
+
+
+@pytest.mark.parametrize(
+    ("test_filter", "expected_exit", "expected_output"),
+    [
+        ("test_fixture_catalog_has_positive_and_negative_controls", 0, "1 passed"),
+        ("fixture_that_does_not_exist", 5, "deselected"),
+    ],
+    ids=["selected", "empty"],
+)
+def test_compatibility_test_launcher_preserves_selected_results(
+    test_filter: str, expected_exit: int, expected_output: str
+) -> None:
+    powershell = shutil.which("pwsh")
+    assert powershell is not None
+    result = subprocess.run(
+        [
+            powershell,
+            "-NoProfile",
+            "-File",
+            str(ROOT / "scripts/tests/test-lint-unity-file-naming.ps1"),
+            "-TestFilter",
+            test_filter,
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == expected_exit, result.stdout + result.stderr
+    assert expected_output in result.stdout
 
 
 def test_compatibility_launcher_from_another_directory(tmp_path: Path) -> None:

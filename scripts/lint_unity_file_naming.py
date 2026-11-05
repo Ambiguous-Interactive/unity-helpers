@@ -139,6 +139,24 @@ def files_to_check(repository: Path, *, staged_only: bool) -> list[Path]:
     return source_files(repository, roots)
 
 
+def read_source(repository: Path, path: Path, *, staged_only: bool) -> str:
+    """Read the index blob for staged checks and the physical file for ordinary scans."""
+    if not staged_only:
+        return path.read_text(encoding="utf-8-sig")
+    git = shutil.which("git")
+    if git is None:
+        raise ValueError("Git is required to read staged C# contents.")
+    relative = path.relative_to(repository).as_posix()
+    result = subprocess.run(  # noqa: S603 - fixed read-only Git operation.
+        [git, "-C", str(repository), "show", "--no-ext-diff", "--no-textconv", f":{relative}"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8-sig",
+        check=True,
+    )
+    return result.stdout
+
+
 def main(argv: list[str] | None = None) -> int:
     configure_output()
     parser = argparse.ArgumentParser(description=__doc__)
@@ -152,7 +170,8 @@ def main(argv: list[str] | None = None) -> int:
         failed = False
         for path in files:
             relative = path.relative_to(repository).as_posix()
-            for line, message in analyze(path.read_text(encoding="utf-8-sig"), path.name):
+            source = read_source(repository, path, staged_only=args.staged_only)
+            for line, message in analyze(source, path.name):
                 print(f"::error file={relative},line={line}::{message}")
                 failed = True
         if args.verbose or not args.staged_only:

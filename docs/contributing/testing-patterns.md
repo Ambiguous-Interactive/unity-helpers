@@ -31,9 +31,12 @@ an outcome retain the zero-duration fallback.
 checker and its retained fixture corpus directly. The PowerShell entry points remain compatible;
 the linter wrapper defaults to the caller's working directory and accepts `-RepoRoot` and
 `-StagedOnly`. Direct Python calls default to this checkout and accept `--repo-root` and
-`--staged-only`. Staged selection is anchored to the requested Git root and includes renames.
+`--staged-only`. Staged selection is anchored to the requested Git root and includes renames. It reads Git index
+blobs, so unstaged corrections cannot hide a committed naming violation.
 Comments and literal text do not declare types or suppress findings. The check recognizes the
 listed direct Unity base classes; it does not resolve arbitrary user-defined inheritance chains.
+The compatibility test launcher accepts `-TestFilter` for a pytest name expression; it preserves
+the pytest exit status, including an empty selection.
 
 ## Isolated migration compiler tests
 

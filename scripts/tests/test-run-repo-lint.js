@@ -176,7 +176,10 @@ function registeredControlsInvoke(file, suite) {
   const contractChecks = require(path.join(repoRoot, "scripts", "run-contract-tests.js")).checksFor(
     true
   );
-  return scriptPathsIn(leafCommands(contractChecks)).has(suite) && fileInvokes(suite, file);
+  return (
+    scriptPathsIn([...leafCommands(contractChecks), ...leafCommands(CHECKS)]).has(suite) &&
+    fileInvokes(suite, file)
+  );
 }
 
 /**
@@ -557,6 +560,7 @@ runTest("no linter in scripts/ has been left unreachable", () => {
   // #445, one level up: the thing named still exists, so nothing goes red.
   const runElsewhere = new Map([
     ["scripts/lint-doc-counts.ps1", "doc-count-controls"],
+    ["scripts/lint-unity-file-naming.ps1", "naming-controls"],
     ["scripts/lint-license-headers.ps1", "csharp-controls"],
     ["scripts/lint-conditional-call-chains.ps1", "csharp-controls"],
     ["scripts/lint-odin-undo-safety.ps1", "csharp-controls"],
@@ -572,6 +576,10 @@ runTest("no linter in scripts/ has been left unreachable", () => {
   // inside the one test whose whole point is that a claim has to be executable.
   const owners = new Map([
     ["csharp-controls", csharpControlsInvoke],
+    [
+      "naming-controls",
+      (file) => registeredControlsInvoke(file, "scripts/tests/test_unity_file_naming.py")
+    ],
     [
       "doc-count-controls",
       (file) => registeredControlsInvoke(file, "scripts/tests/test-lint-doc-counts.ps1")
@@ -809,7 +817,8 @@ module.exports = {
   leafCommands,
   fileInvokes,
   filesInvoking,
-  csharpControlsInvoke
+  csharpControlsInvoke,
+  registeredControlsInvoke
 };
 
 if (require.main === module) {

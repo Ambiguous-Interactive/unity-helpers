@@ -1,5 +1,8 @@
 [CmdletBinding()]
-param([switch]$VerboseOutput)
+param(
+    [switch]$VerboseOutput,
+    [string]$TestFilter
+)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -9,5 +12,6 @@ $arguments = @(
     'pytest', (Join-Path $PSScriptRoot 'test_unity_file_naming.py')
 )
 if ($VerboseOutput) { $arguments += '-v' } else { $arguments += '-q' }
+if (-not [string]::IsNullOrWhiteSpace($TestFilter)) { $arguments += @('-k', $TestFilter) }
 & uv @arguments
 exit $LASTEXITCODE
