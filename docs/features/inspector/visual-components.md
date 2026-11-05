@@ -60,8 +60,8 @@ for `door_open`. The source marker and its replacement are editable, and the sel
 folder is searched recursively.
 
 Both sprites must use Single import mode. The target texture and metadata must be open for
-editing, and read-only metadata is refused. Editability is checked during planning and again
-before each copy. The copier reads the source's effective normalized
+editing, and read-only metadata is refused. Editability uses fresh version-control status during
+planning and again before each copy. The copier reads the source's effective normalized
 pivot, including built-in alignment presets, then gives the target Custom alignment with that
 pivot. Different texture dimensions are supported. Other texture settings and source importers
 are preserved, and textures do not need Read/Write enabled.

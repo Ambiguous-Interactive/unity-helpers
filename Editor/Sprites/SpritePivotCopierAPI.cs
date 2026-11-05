@@ -299,7 +299,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 pivot = default;
                 return false;
             }
-            if (!AssetDatabase.IsOpenForEdit(targetPath) || !IsMetadataEditable(targetMetadata))
+            if (
+                !AssetDatabase.IsOpenForEdit(targetPath, StatusQueryOptions.ForceUpdate)
+                || !IsMetadataEditable(targetMetadata)
+            )
             {
                 error = "The target texture or metadata is not open for editing: " + targetPath;
                 targetImporter = null;
@@ -314,7 +317,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         private static bool IsMetadataEditable(TextureImporter importer)
         {
-            if (!AssetDatabase.IsMetaFileOpenForEdit(importer))
+            if (!AssetDatabase.IsMetaFileOpenForEdit(importer, StatusQueryOptions.ForceUpdate))
             {
                 return false;
             }
@@ -342,7 +345,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
             if (
                 !importer.assetPath.StartsWith("Assets/", StringComparison.Ordinal)
-                || !AssetDatabase.IsOpenForEdit(importer.assetPath)
+                || !AssetDatabase.IsOpenForEdit(importer.assetPath, StatusQueryOptions.ForceUpdate)
                 || !IsMetadataEditable(importer)
             )
             {

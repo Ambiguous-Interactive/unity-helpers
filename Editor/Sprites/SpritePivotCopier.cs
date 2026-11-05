@@ -43,7 +43,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             return EditorUi.CancelableProgress(
                 "Copy Sprite Pivots",
                 path,
-                total > 0 ? (float)processed / total : 0f
+                0 < total ? (float)processed / total : 0f
             );
         }
 
