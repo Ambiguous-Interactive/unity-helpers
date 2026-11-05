@@ -437,6 +437,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             );
             _atlasPlayModeRequested = true;
             yield return new EnterPlayMode(false);
+            // Without a domain reload, the runner does not restore its reload lock.
+            EditorApplication.LockReloadAssemblies();
 #endif
             SpriteAtlas atlas = AssetDatabase.LoadAssetAtPath<SpriteAtlas>(atlasPath);
             Assert.IsTrue(atlas != null);
