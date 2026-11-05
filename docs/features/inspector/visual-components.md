@@ -10,6 +10,59 @@ These components solve the problem of creating complex, multi-layer sprite anima
 
 ---
 
+## Sprite Masks
+
+Add `MatchSpriteMaskToSpriteRenderer` from `WallstopStudios.UnityHelpers.Visuals` to an
+animated sprite object. It requires a `SpriteRenderer` and `SpriteMask` on that object and copies
+the renderer's current sprite on enable and in `LateUpdate`, including a null frame. Call
+`Synchronize()` after changing a frame when the mask must update immediately.
+
+The component copies only the sprite. Set the mask range, renderer mask interaction, and any
+transform or flip policy for your scene. Disabling the component stops automatic updates;
+enabling it synchronizes the current frame immediately.
+
+The helpers in `WallstopStudios.UnityHelpers.Core.Extension` can keep an art mask from affecting
+unrelated sorting layers:
+
+```csharp
+mask.RangeToItsOwnLayer();
+mask.RangeTo(targetLayerId);
+bool affectsLayer = mask.Reaches(targetLayerId);
+```
+
+`RangeTo` enables a custom range with both bounds on the selected layer and the full serialized
+sorting-order range, from `short.MinValue` through `short.MaxValue`. Missing masks and unknown
+layer IDs leave settings unchanged. Assign the mask's own sorting layer before calling
+`RangeToItsOwnLayer`.
+
+`Reaches` compares layer order values, because IDs do not encode draw order. An unrestricted mask
+reaches every valid layer; an unknown target or invalid custom bound returns false. The overload
+on `SpriteMaskExtensions` accepts saved range identifiers without needing a live mask. These
+queries answer layer coverage only: sorting-order bounds, SortingGroup isolation, sprite alpha,
+and renderer mask interaction can still prevent a particular pixel from being affected.
+
+### Collecting Animated Frames in Editor Tools
+
+Use `AnimatedSpriteFrames` from `WallstopStudios.UnityHelpers.Editor.Sprites` when an editor tool
+must inspect more than a renderer's currently assigned sprite:
+
+- `AddFramesOf(clip, rendererPath, into)` collects frames bound to the exact `SpriteRenderer`
+  path. An empty path selects the animated root; null selects all renderer paths. Other component
+  types and other properties do not contribute frames.
+- `AddEverythingDrawnBy(renderer, into)` adds the assigned sprite and root-bound frames from
+  clips directly referenced by visible serialized fields on that renderer's own GameObject.
+- `AddEveryFrameNamedBy(asset, into)` adds direct sprite references and all frames of direct clip
+  references in an object's visible serialized properties. This walk includes arrays and nested
+  serialized fields, but does not recurse through referenced objects or animator controllers.
+
+The methods append to a caller-owned `ICollection<Sprite>` without clearing it. A list retains
+keyframe order and duplicate references within each clip; a `HashSet<Sprite>` can deduplicate.
+Null frames, missing or destroyed inputs, and read-only destinations are ignored. The walk does not change assets or
+sample animations. These APIs use Unity Editor serialization on the main thread, allocate the
+binding/keyframe arrays requested by Unity, and do not infer clips from parent animators.
+
+---
+
 ## UI Toolkit Progress Controls
 
 The Styles assembly provides seven UXML-ready progress controls:

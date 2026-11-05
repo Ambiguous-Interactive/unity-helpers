@@ -160,10 +160,11 @@ function Run-SyncScriptContractTests {
 
   $repoRoot = Get-RepoRoot
 
-  Assert-NoNewlineWriteHasFinalLfNormalization `
-    -ScriptPath (Join-Path $repoRoot 'scripts/sync-doc-counts.ps1') `
-    -ValueVariable 'content' `
-    -TestName 'sync-doc-counts.ps1 normalizes content before -NoNewline write'
+  & uv run --quiet --project (Join-Path $repoRoot 'scripts/python~') --locked pytest `
+    (Join-Path $repoRoot 'scripts/tests/test_doc_counts.py') -q `
+    -k check_is_read_only_and_sync_has_exactly_one_final_lf
+  Write-TestResult -TestName 'Documentation synchronization preserves read-only checks and final LF' `
+    -Passed ($LASTEXITCODE -eq 0)
 
   Assert-NoNewlineWriteHasFinalLfNormalization `
     -ScriptPath (Join-Path $repoRoot 'scripts/sync-banner-version.ps1') `

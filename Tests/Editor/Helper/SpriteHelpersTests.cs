@@ -120,11 +120,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
             Assert.IsFalse(_testTexture.isReadable, "Texture should not be readable initially");
 
-            ExecuteWithImmediateImport(() =>
-            {
-                _testTexture.MakeReadable();
-                _testTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(_testTexturePath);
-            });
+            ExecuteWithImmediateImport(
+                () =>
+                {
+                    _testTexture.MakeReadable();
+                    _testTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(_testTexturePath);
+                },
+                refreshBefore: false
+            );
 
             Assert.IsTrue(
                 _testTexture.isReadable,
@@ -179,10 +182,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 _testTexture.MakeReadable();
             });
 
-            ExecuteWithImmediateImport(() =>
-            {
-                _testTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(_testTexturePath);
-            });
+            ExecuteWithImmediateImport(
+                () =>
+                {
+                    _testTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(_testTexturePath);
+                },
+                refreshBefore: false
+            );
             Assert.IsTrue(
                 _testTexture.isReadable,
                 "Texture should be readable after multiple calls"
@@ -202,11 +208,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             int originalHeight = _testTexture.height;
             TextureFormat originalFormat = _testTexture.format;
 
-            ExecuteWithImmediateImport(() =>
-            {
-                _testTexture.MakeReadable();
-                _testTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(_testTexturePath);
-            });
+            ExecuteWithImmediateImport(
+                () =>
+                {
+                    _testTexture.MakeReadable();
+                    _testTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(_testTexturePath);
+                },
+                refreshBefore: false
+            );
 
             Assert.AreEqual(originalWidth, _testTexture.width, "Width should be preserved");
             Assert.AreEqual(originalHeight, _testTexture.height, "Height should be preserved");
@@ -223,11 +232,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
             CreateTestTexture(readable: false, width: size, height: size);
 
-            ExecuteWithImmediateImport(() =>
-            {
-                _testTexture.MakeReadable();
-                _testTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(_testTexturePath);
-            });
+            ExecuteWithImmediateImport(
+                () =>
+                {
+                    _testTexture.MakeReadable();
+                    _testTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(_testTexturePath);
+                },
+                refreshBefore: false
+            );
 
             Assert.IsTrue(
                 _testTexture.isReadable,
@@ -248,11 +260,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
             CreateTestTexture(readable: false, width: 64, height: 128);
 
-            ExecuteWithImmediateImport(() =>
-            {
-                _testTexture.MakeReadable();
-                _testTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(_testTexturePath);
-            });
+            ExecuteWithImmediateImport(
+                () =>
+                {
+                    _testTexture.MakeReadable();
+                    _testTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(_testTexturePath);
+                },
+                refreshBefore: false
+            );
 
             Assert.IsTrue(_testTexture.isReadable, "Non-square texture should be readable");
             Assert.AreEqual(64, _testTexture.width);
@@ -269,11 +284,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
             CreateTestTexture(readable: false, width: 1, height: 1);
 
-            ExecuteWithImmediateImport(() =>
-            {
-                _testTexture.MakeReadable();
-                _testTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(_testTexturePath);
-            });
+            ExecuteWithImmediateImport(
+                () =>
+                {
+                    _testTexture.MakeReadable();
+                    _testTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(_testTexturePath);
+                },
+                refreshBefore: false
+            );
 
             Assert.IsTrue(_testTexture.isReadable, "1x1 texture should be readable");
         }
@@ -340,21 +358,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
             File.WriteAllBytes(_testTexturePath, pngData);
 
-            ExecuteWithImmediateImport(() =>
-            {
-                AssetDatabase.ImportAsset(_testTexturePath);
-
-                TextureImporter importer =
-                    AssetImporter.GetAtPath(_testTexturePath) as TextureImporter;
-                if (importer != null)
+            ExecuteWithImmediateImport(
+                () =>
                 {
-                    importer.isReadable = readable;
-                    importer.textureCompression = TextureImporterCompression.Uncompressed;
-                    importer.SaveAndReimport();
-                }
+                    AssetDatabase.ImportAsset(_testTexturePath);
 
-                _testTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(_testTexturePath);
-            });
+                    TextureImporter importer =
+                        AssetImporter.GetAtPath(_testTexturePath) as TextureImporter;
+                    if (importer != null)
+                    {
+                        importer.isReadable = readable;
+                        importer.textureCompression = TextureImporterCompression.Uncompressed;
+                        importer.SaveAndReimport();
+                    }
+
+                    _testTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(_testTexturePath);
+                },
+                refreshBefore: false
+            );
         }
     }
 }

@@ -72,18 +72,18 @@ def mask_noise(source: str, *, preserve_strings: bool = False) -> str:
         elif source[index] in ('"', "'"):
             literal = True
             quote = source[index]
+            verbatim = (
+                quote == '"'
+                and index > 0
+                and (source[index - 1] == "@" or source[max(0, index - 2) : index] == "@$")
+            )
             raw = 0
             while quote == '"' and index + raw < length and source[index + raw] == quote:
                 raw += 1
-            if raw >= 3:
+            if raw >= 3 and not verbatim:
                 end = source.find('"' * raw, index + raw)
                 index = length if end < 0 else end + raw
             else:
-                verbatim = (
-                    quote == '"'
-                    and index > 0
-                    and (source[index - 1] == "@" or source[max(0, index - 2) : index] == "@$")
-                )
                 index += 1
                 while index < length:
                     if not verbatim and source[index] in "\r\n":

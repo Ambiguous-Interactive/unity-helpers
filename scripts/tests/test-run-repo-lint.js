@@ -166,9 +166,13 @@ function fileInvokes(containerRelativePath, file) {
   return false;
 }
 
-/** True when the registered typed suite executes a retained compatibility launcher. */
+/** True when the typed C# controls execute a retained compatibility launcher. */
 function csharpControlsInvoke(file) {
-  const suite = "scripts/tests/test_csharp_lints.py";
+  return registeredControlsInvoke(file, "scripts/tests/test_csharp_lints.py");
+}
+
+/** True when a registered suite executes a retained compatibility launcher. */
+function registeredControlsInvoke(file, suite) {
   const contractChecks = require(path.join(repoRoot, "scripts", "run-contract-tests.js")).checksFor(
     true
   );
@@ -552,6 +556,7 @@ runTest("no linter in scripts/ has been left unreachable", () => {
   // (#453). An allowlist whose entries are prose excuses whatever is put in it -- the quiet half of
   // #445, one level up: the thing named still exists, so nothing goes red.
   const runElsewhere = new Map([
+    ["scripts/lint-doc-counts.ps1", "doc-count-controls"],
     ["scripts/lint-license-headers.ps1", "csharp-controls"],
     ["scripts/lint-conditional-call-chains.ps1", "csharp-controls"],
     ["scripts/lint-odin-undo-safety.ps1", "csharp-controls"],
@@ -567,6 +572,10 @@ runTest("no linter in scripts/ has been left unreachable", () => {
   // inside the one test whose whole point is that a claim has to be executable.
   const owners = new Map([
     ["csharp-controls", csharpControlsInvoke],
+    [
+      "doc-count-controls",
+      (file) => registeredControlsInvoke(file, "scripts/tests/test-lint-doc-counts.ps1")
+    ],
     ["workflow", (file) => filesInvoking(".github/workflows", file).length > 0],
     ["preflight", (file) => fileInvokes("scripts/agent-preflight.ps1", file)],
     ["prepush", (file) => scriptPathsIn(expandNpmScript("validate:prepush")).has(file)]

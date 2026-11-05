@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Validates that all versioned download URLs in the devcontainer Dockerfile
-# are reachable (HTTP 200). This catches broken URLs (wrong version, wrong arch
+# are reachable (HEAD 200 or bounded GET 200/206). This catches broken URLs (wrong version, wrong arch
 # suffix like gnu vs musl, yanked releases) before they break the container build.
 #
 # Usage:
@@ -206,6 +206,22 @@ extract_tools() {
     done < "$DOCKERFILE_PATH"
 }
 
+curl_supports_bounded_get() {
+    local version_output
+    if ! version_output=$(curl --version); then
+        return 1
+    fi
+    if [[ ! "$version_output" =~ ^curl[[:space:]]+([0-9]+)\.([0-9]+)\. ]]; then
+        return 1
+    fi
+    local major="${BASH_REMATCH[1]}"
+    local minor="${BASH_REMATCH[2]}"
+    if ((10#$major > 8 || (10#$major == 8 && 10#$minor >= 4))); then
+        return 0
+    fi
+    return 1
+}
+
 check_url() {
     local arch_label="$1"
     local url="$2"
@@ -236,6 +252,26 @@ check_url() {
             sleep $((attempt * 2))
         fi
     done
+
+    if [ "$status" != "200" ] && curl_supports_bounded_get; then
+        local get_status=""
+        local get_exit=0
+        # Confirm the download method when HEAD fails, without fetching an entire release asset.
+        if get_status=$(curl -s -o /dev/null -w "%{http_code}" -L \
+            --range 0-0 --max-filesize 1 --max-time 30 "$url"); then
+            get_exit=0
+        else
+            get_exit=$?
+        fi
+        printf '  HEAD HTTP %s; bounded GET HTTP %s (curl exit %s)\n' "$status" "$get_status" "$get_exit"
+        # Exit 63 is the intentional size limit when a server ignores the range request.
+        if { [ "$get_exit" -eq 0 ] || [ "$get_exit" -eq 63 ]; } \
+            && { [ "$get_status" = "200" ] || [ "$get_status" = "206" ]; }; then
+            status="200"
+        fi
+    elif [ "$status" != "200" ]; then
+        printf '  Bounded GET fallback requires curl 8.4.0 or newer; retaining the failed HEAD result.\n'
+    fi
 
     if [ "$status" = "200" ]; then
         printf "  ${GREEN}✓${NC} %-8s %s\n" "[$arch_label]" "$url"

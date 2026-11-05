@@ -9,6 +9,7 @@
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="ZLinqCoexistenceTests.cs" />
     <Compile
       Include="../WallstopStudios.UnityHelpers.Proto.Generator.Tests/ObjectsHashCodeStub.cs"
       Link="ObjectsHashCodeStub.cs"
@@ -79,5 +80,14 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
     <PackageReference Include="NUnit" Version="3.14.0" />
     <PackageReference Include="NUnit3TestAdapter" Version="6.3.1" />
+    <PackageReference
+      Include="ZLinq"
+      Version="1.6.1"
+      GeneratePathProperty="true"
+      ExcludeAssets="compile;runtime"
+    />
+    <Reference Include="ZLinq">
+      <HintPath>$(PkgZLinq)/lib/netstandard2.1/ZLinq.dll</HintPath>
+    </Reference>
   </ItemGroup>
 </Project>

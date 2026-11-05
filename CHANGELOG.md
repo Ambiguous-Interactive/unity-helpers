@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.7.1] - 2026-11-05
+
+### Added
+
+- Add `StartPeriodicJob` for named profiler ticks, optional initial jitter, and failure-safe repeating callbacks ([#1113](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1113)).
+- Add sprite-mask layer ranges, layer-coverage queries, and `MatchSpriteMaskToSpriteRenderer` for keeping animated masks matched to their renderer ([#1113](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1113)).
+- Add `AnimatedSpriteFrames` to collect assigned sprites and animation frames for a specific renderer path in editor tools ([#1113](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1113)).
+
+### Changed
+
+- Reduce garbage collection pressure from repeating coroutine jobs while preserving scaled-time scheduling.
+
+### Fixed
+
+- Fix ZLinq extension-call collisions with `WAsValueEnumerable` and `WAsValueDictionaryEnumerable`. The original names remain available as static methods ([#1122](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1122)).
+
 ## [3.7.0] - 2026-11-05
 
 ### Added

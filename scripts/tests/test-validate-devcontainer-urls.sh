@@ -253,6 +253,120 @@ for fixture_arch in amd64 arm64; do
 done
 
 echo ""
+echo -e "${BLUE}── HTTP method and transfer controls ──${NC}"
+
+probe_bin="$TMP_DIR/probe-bin"
+mkdir -p "$probe_bin"
+cat > "$probe_bin/curl" <<'EOT'
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ "${1:-}" == --version ]]; then
+    case "$URL_PROBE_MODE" in
+        old-curl|head-old-ok) printf 'curl 7.88.1 example\n' ;;
+        curl-8.3) printf 'curl 8.3.99 example\n' ;;
+        new-curl) printf 'curl 9.0.0 example\n' ;;
+        bad-version) printf 'unknown curl version\n' ;;
+        version-error) exit 7 ;;
+        *) printf 'curl 8.4.0 example\n' ;;
+    esac
+    exit 0
+fi
+is_head=0
+range=""
+limit=""
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -sI) is_head=1 ;;
+        --range) shift; range="$1" ;;
+        --max-filesize) shift; limit="$1" ;;
+    esac
+    shift
+done
+if [[ "$is_head" -eq 1 ]]; then
+    case "$URL_PROBE_MODE" in
+        head-ok|head-old-ok) printf '200' ;;
+        head-transport) printf '302'; exit 7 ;;
+        missing) printf '404' ;;
+        *) printf '504' ;;
+    esac
+    exit 0
+fi
+printf 'GET\n' >> "$URL_PROBE_LOG"
+[[ "$range" == 0-0 && "$limit" == 1 ]] || exit 99
+case "$URL_PROBE_MODE" in
+    range-ok|old-curl|curl-8.3|new-curl|bad-version|version-error) printf '206' ;;
+    range-ignored) printf '200' ;;
+    size-limited) printf '200'; exit 63 ;;
+    missing) printf '404' ;;
+    gateway) printf '504' ;;
+    redirect) printf '302' ;;
+    transport|head-transport) printf '206'; exit 7 ;;
+    size-limited-missing) printf '404'; exit 63 ;;
+    head-ok) exit 99 ;;
+esac
+EOT
+printf '#!/bin/sh\nexit 0\n' > "$probe_bin/sleep"
+chmod +x "$probe_bin/curl" "$probe_bin/sleep"
+
+rejected_log="$TMP_DIR/rejected-get.log"
+: > "$rejected_log"
+rejected_rc=0
+URL_PROBE_MODE=range-ok URL_PROBE_LOG="$rejected_log" "$probe_bin/curl" \
+    --range 1-1 --max-filesize 1 https://example.invalid/asset \
+    > "$TMP_DIR/rejected-get-output" || rejected_rc=$?
+if [[ "$rejected_rc" -eq 99 && "$(cat "$rejected_log")" == GET ]]; then
+    pass "Rejected GET attempts remain visible to refusal assertions"
+else
+    fail "Rejected GET attempts remain visible to refusal assertions"
+fi
+
+while IFS='|' read -r probe_mode expected_rc; do
+    probe_log="$TMP_DIR/$probe_mode.log"
+    : > "$probe_log"
+    probe_rc=0
+    probe_output="$(PATH="$probe_bin:$PATH" URL_PROBE_MODE="$probe_mode" URL_PROBE_LOG="$probe_log" \
+        bash "$VALIDATOR" --dockerfile "$DOCKERFILE" 2>&1)" || probe_rc=$?
+    if [[ "$probe_rc" -eq "$expected_rc" ]]; then
+        pass "HTTP probe $probe_mode preserves exit $expected_rc"
+    else
+        fail "HTTP probe $probe_mode preserves exit $expected_rc" "$probe_output"
+    fi
+    if [[ "$probe_mode" == head-ok || "$probe_mode" == head-old-ok ]]; then
+        if [[ ! -s "$probe_log" ]]; then
+            pass "Healthy HEAD avoids a GET"
+        else
+            fail "Healthy HEAD avoids a GET"
+        fi
+    elif [[ "$probe_mode" == old-curl || "$probe_mode" == curl-8.3 || "$probe_mode" == bad-version || "$probe_mode" == version-error ]]; then
+        if [[ ! -s "$probe_log" ]]; then
+            pass "HTTP probe $probe_mode refuses an unbounded GET"
+        else
+            fail "HTTP probe $probe_mode refuses an unbounded GET"
+        fi
+    elif [[ -s "$probe_log" ]]; then
+        pass "HTTP probe $probe_mode confirms through a bounded GET"
+    else
+        fail "HTTP probe $probe_mode confirms through a bounded GET"
+    fi
+done <<'EOT'
+head-ok|0
+range-ok|0
+range-ignored|0
+size-limited|0
+missing|1
+gateway|1
+redirect|1
+transport|1
+head-transport|1
+size-limited-missing|1
+old-curl|1
+curl-8.3|1
+new-curl|0
+bad-version|1
+version-error|1
+head-old-ok|0
+EOT
+
 echo -e "${BLUE}── Summary ──${NC}"
 echo "  Tests run:    $tests_run"
 echo -e "  ${GREEN}Passed${NC}:      $tests_passed"

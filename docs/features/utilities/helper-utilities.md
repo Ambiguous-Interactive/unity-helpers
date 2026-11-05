@@ -381,6 +381,21 @@ stopping a coroutine through another API does not remove its tracked handle.
 
 ### Repeating Execution with Jitter
 
+Use `owner.StartPeriodicJob(tick, updateRate)` from
+`WallstopStudios.UnityHelpers.Core.Extension` to name each tick in the Unity Profiler.
+The marker is `PeriodicJob.<context type>.<callback method>`. Pass `context` when the work
+belongs to another object; the coroutine still stops with its host. A missing or destroyed host,
+inactive GameObject, or missing callback returns null. A disabled behaviour on an active GameObject
+can host work, like an ordinary Unity coroutine.
+
+The first tick runs during startup unless `waitBefore` or `useJitter` delays it. Jobs use scaled
+time, run at most once per frame, and start each interval after the previous callback finishes.
+Late frames do not produce catch-up ticks. Nonpositive, NaN, and infinite intervals run once per
+frame. Startup allocates a coroutine and a callback wrapper. Scheduling and waits reuse that
+storage; callback allocations are separate. Callback failures are reported once and do not stop the job, even
+if exception formatting or the log handler fails. Keep the returned `Coroutine` to stop it early
+with `owner.StopCoroutine(job)`.
+
 **Run a function repeatedly with an optional randomized initial delay:**
 
 ```csharp

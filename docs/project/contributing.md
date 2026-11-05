@@ -23,6 +23,14 @@ The easiest way to contribute is using the included dev container, which has all
 2. Click "Reopen in Container" when prompted
 3. Run `npm run verify:tools` to confirm all tools are available
 
+Run `bash scripts/validate-devcontainer-urls.sh` to check the Dockerfile's download URLs.
+If HEAD probes fail, the validator confirms reachability with a GET limited to one byte.
+This fallback requires [curl 8.4.0 or newer](https://curl.se/docs/manpage.html#--max-filesize);
+older or unrecognized versions retain the failed HEAD result.
+A successful 200 or 206 response also permits curl's size-limit stop when a server ignores the range.
+Missing resources, HTTP errors, and other transfer failures still fail validation.
+Run `npm run test:validate-devcontainer-urls` for the offline HTTP and parser controls.
+
 ### Fast C# Feedback
 
 Use fixture-scoped builds while editing runtime or Editor tests:
@@ -61,6 +69,13 @@ missing durations on skipped tests count as zero. A step summary appends UTF-8 M
 `GITHUB_STEP_SUMMARY` is set. The existing PowerShell command retains its parameter names.
 
 ### Typed Python scripts
+
+Documentation counts use `scripts/doc_counts.py` through locked uv. `npm run lint:doc-counts`
+checks without writing; `npm run sync:doc-counts` updates only the documented target files.
+Counts ignore C# comments and literal contents. Linked target files and parent directories are rejected.
+For metadata JSON, run `uv run --project scripts/python~ --locked --no-dev python scripts/doc_counts.py generate`.
+The three PowerShell commands remain compatibility entry points. Run `npm run test:lint-doc-counts`
+for count, encoding, newline, read-only, and wrapper exit-code controls.
 
 Release payload staging, archive creation, and Unity metadata generation run through uv. Install uv 0.13.6, then use:
 

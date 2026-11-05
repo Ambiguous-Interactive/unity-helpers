@@ -1,7 +1,7 @@
 # Avoid Enumerator Boxing
 
-Use `AsValueEnumerable()` when a hot path receives an `IEnumerable<T>` backed by an array,
-`List<T>` or `HashSet<T>`. Use `AsValueDictionaryEnumerable()` for a dictionary received through
+Use `WAsValueEnumerable()` when a hot path receives an `IEnumerable<T>` backed by an array,
+`List<T>` or `HashSet<T>`. Use `WAsValueDictionaryEnumerable()` for a dictionary received through
 an enumerable interface. These views avoid boxing the supported collections' enumerators.
 They keep the source collection and read it when the loop runs; they do not make a snapshot.
 
@@ -10,13 +10,17 @@ Keeping the concrete type usually gives the compiler the value enumerator direct
 
 <a id="coverage"></a>
 
+The `W`-prefixed extension names start with version 3.7.1 to avoid ZLinq collisions.
+The retained audit rows and their source hashes describe the original captured sources, including
+the earlier method names. The enumeration behavior is unchanged.
+
 ## Choose a traversal
 
 | Source held by your code                                                | Recommended traversal                        | Limit                                                                              |
 | ----------------------------------------------------------------------- | -------------------------------------------- | ---------------------------------------------------------------------------------- |
 | `T[]`, `List<T>`, `HashSet<T>` or `Dictionary<TKey, TValue>`            | Ordinary `foreach`                           | Element conversions and the loop body can still allocate.                          |
-| `IEnumerable<T>` backed by an array, exact list or exact hash set       | `source.AsValueEnumerable()`                 | Derived lists and hash sets use their original enumeration protocol.               |
-| `IEnumerable<KeyValuePair<TKey, TValue>>` backed by an exact dictionary | `source.AsValueDictionaryEnumerable()`       | Other sources, including derived dictionaries, use their original protocol.        |
+| `IEnumerable<T>` backed by an array, exact list or exact hash set       | `source.WAsValueEnumerable()`                | Derived lists and hash sets use their original enumeration protocol.               |
+| `IEnumerable<KeyValuePair<TKey, TValue>>` backed by an exact dictionary | `source.WAsValueDictionaryEnumerable()`      | Other sources, including derived dictionaries, use their original protocol.        |
 | Lazy query, iterator, custom collection or sorted collection            | Keep its protocol; profile the complete loop | A view cannot remove allocation inside the source iterator or its backing storage. |
 
 An _exact_ list, hash set or dictionary means an instance of that type itself, rather than a
@@ -40,7 +44,7 @@ public static class ScoreTotals
     public static long Sum(IEnumerable<int> scores)
     {
         long total = 0;
-        foreach (int score in scores.AsValueEnumerable())
+        foreach (int score in scores.WAsValueEnumerable())
         {
             total += score;
         }
@@ -49,7 +53,7 @@ public static class ScoreTotals
 }
 ```
 
-`AsValueEnumerable()` treats a null source as empty, so `ScoreTotals.Sum(null)` returns zero.
+`WAsValueEnumerable()` treats a null source as empty, so `ScoreTotals.Sum(null)` returns zero.
 A default `ValueEnumerable<T>` is also empty. If a missing source is an error in your API,
 validate it before the loop, or use `ValueEnumerable<T>.RequireSource(source)` from
 `WallstopStudios.UnityHelpers.Core.DataStructure`. That factory preserves a null-source failure
@@ -58,7 +62,7 @@ when enumeration starts. Neither form acquires an enumerator when the view is cr
 ## Traverse dictionary entries
 
 Use the dictionary-specific view when the source exposes key/value pairs. The general
-`AsValueEnumerable()` view does not specialize dictionary enumeration.
+`WAsValueEnumerable()` view does not specialize dictionary enumeration.
 
 <!-- doc-sample: compiles -->
 
@@ -71,7 +75,7 @@ public static class InventoryTotals
     public static long CountItems(IEnumerable<KeyValuePair<string, int>> inventory)
     {
         long total = 0;
-        foreach (KeyValuePair<string, int> entry in inventory.AsValueDictionaryEnumerable())
+        foreach (KeyValuePair<string, int> entry in inventory.WAsValueDictionaryEnumerable())
         {
             total += entry.Value;
         }

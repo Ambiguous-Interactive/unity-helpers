@@ -44,7 +44,7 @@ namespace Samples.UnityHelpers.UIToolkit.Editor
                 throw new System.NullReferenceException();
             }
             string first = "<none>";
-            foreach (string file in files.AsValueEnumerable())
+            foreach (string file in files.WAsValueEnumerable())
             {
                 first = file ?? "<none>";
                 break;
