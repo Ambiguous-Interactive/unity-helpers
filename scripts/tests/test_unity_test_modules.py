@@ -113,6 +113,17 @@ def test_real_manifest_and_missing_input(tmp_path: Path) -> None:
     assert lint.main(["--path", str(path)]) == 0
 
 
+def test_manifest_data_cannot_inject_workflow_commands(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    path = tmp_path / "modules.json"
+    path.write_text(json.dumps({"modules": {"bad%0A\r\n::error::injected": "1"}}), encoding="utf-8")
+    assert lint.main(["--path", str(path)]) == 1
+    output = capsys.readouterr().out
+    assert "%250A%0D%0A::error::injected" in output
+    assert len([line for line in output.splitlines() if line.startswith("::error::")]) == 1
+
+
 @pytest.mark.parametrize("python", [True, False])
 def test_cli_from_other_directory(python: bool, tmp_path: Path) -> None:
     if python:

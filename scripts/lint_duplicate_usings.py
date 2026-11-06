@@ -8,12 +8,13 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from cli_encoding import configure_output
+from cli_encoding import configure_output, escape_command_data, escape_command_property
 from csharp_sources import is_link, mask_noise
 from lint_unity_file_naming import files_to_check, read_source
 
 ROOT = Path(__file__).resolve().parents[1]
 DIRECTIVE = re.compile(r"\b(?:global\s+)?using\s+([^;{}]+);")
+RAW_BOUNDARIES = re.compile(r"\b(?:global|using)\b|[;{}]|/[/*]")
 TOKENS = re.compile(
     r"^[ \t]*\x01[ \t]*(?P<conditional>if|elif|else|endif)\b[^\r\n]*"
     r"|\bnamespace\s+(?P<namespace>[\w.@\s]+?)\s*(?P<terminator>[{;])"
@@ -79,10 +80,25 @@ def can_coexist(first: ConditionPath, second: ConditionPath) -> bool:
     )
 
 
+def has_import_comment(source: str) -> bool:
+    """Send comment-bearing import candidates to full masking in one linear scan."""
+    in_import = False
+    for token in RAW_BOUNDARIES.finditer(source):
+        value = token.group()
+        if value in ("global", "using"):
+            in_import = True
+        elif value in ("/*", "//"):
+            if in_import:
+                return True
+        else:
+            in_import = False
+    return False
+
+
 def analyze(source: str) -> list[tuple[int, str]]:
     """Report duplicate imports after removing comments and literal contents."""
     candidates: set[str] = set()
-    uncertain = re.search(r"\b(?:global|using)\s*/[/*]", source) is not None
+    uncertain = has_import_comment(source)
     for match in DIRECTIVE.finditer(source):
         key = normalized(match.group())
         if key is None:
@@ -202,7 +218,10 @@ def main(argv: list[str] | None = None) -> int:
             try:
                 source = read_source(repository, path, staged_only=staged)
                 for line, message in analyze(source):
-                    print(f"::error file={path},line={line}::{message}")
+                    print(
+                        f"::error file={escape_command_property(str(path))},line={line}"
+                        f"::{escape_command_data(message)}"
+                    )
                     failures += 1
             except (
                 OSError,
@@ -210,13 +229,13 @@ def main(argv: list[str] | None = None) -> int:
                 ValueError,
                 subprocess.SubprocessError,
             ) as error:
-                print(f"[lint-duplicate-usings] {path}: {error}")
+                print(escape_command_data(f"[lint-duplicate-usings] {path}: {error}"))
                 failures += 1
         if args.verbose or failures or (not paths and not staged):
             print(f"[lint-duplicate-usings] Checked {len(files)} files; {failures} findings.")
         return int(bool(failures))
     except (OSError, UnicodeError, ValueError, subprocess.SubprocessError) as error:
-        print(f"[lint-duplicate-usings] {error}")
+        print(escape_command_data(f"[lint-duplicate-usings] {error}"))
         return 1
 
 

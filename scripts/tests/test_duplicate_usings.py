@@ -38,6 +38,12 @@ ROOT = Path(__file__).resolve().parents[2]
         ("using System . IO; using System.IO;", 1),
         ("using System.\nIO; using System.IO;", 1),
         ("using System /* comment */ . IO; using System.IO;", 1),
+        ("using System /* { } */ .IO; using System.IO;", 1),
+        ("using static System /*c*/ .Math; using static System.Math;", 1),
+        ("using A = System /*c*/ .IO; using A = System.IO;", 1),
+        ("using A = System /* ;{} */ .IO; using A = System.IO;", 1),
+        ("using static System //c\n.Math; using static System.Math;", 1),
+        ("using A = System //c\n.IO; using A = System.IO;", 1),
         ("using/*a*/System; using/*b*/System;", 1),
         ("using/*a*/System; using System;", 1),
         ("using/*a*/static/*b*/System.Math; using static System.Math;", 1),
@@ -277,3 +283,21 @@ def test_python_cli_reports_and_clears_a_real_finding(tmp_path: Path) -> None:
         )
         assert result.returncode == expected, result.stdout + result.stderr
         assert ("UNH007" in result.stdout) == bool(expected)
+
+
+def test_diagnostic_filename_cannot_inject_workflow_commands(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def selected(_paths: list[Path], _repository: Path) -> list[Path]:
+        return [Path("A,%0A\n::add-mask::hidden.cs")]
+
+    def source(_repository: Path, _path: Path, *, staged_only: bool) -> str:
+        assert not staged_only
+        return "using X; using X;"
+
+    monkeypatch.setattr(lint, "explicit_files", selected)
+    monkeypatch.setattr(lint, "read_source", source)
+    assert lint.main(["--paths", "unused.cs"]) == 1
+    output = capsys.readouterr().out
+    assert "file=A%2C%250A%0A%3A%3Aadd-mask%3A%3Ahidden.cs,line=1::UNH007" in output
+    assert len([line for line in output.splitlines() if line.startswith("::")]) == 1

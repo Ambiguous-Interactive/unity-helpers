@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 from check_runner import mapping
-from cli_encoding import configure_output
+from cli_encoding import configure_output, escape_command_data
 
 ROOT = Path(__file__).resolve().parents[1]
 BUILTINS = frozenset(
@@ -118,9 +118,13 @@ def main(argv: list[str] | None = None) -> int:
     except (OSError, UnicodeError, ValueError) as error:
         errors = [f"{path}: {error}"]
     for message in errors:
-        print(f"::error::{message}")
+        print(f"::error::{escape_command_data(message)}")
     if args.verbose or errors:
-        print(f"[lint-unity-test-modules] {'FAILED' if errors else 'PASS'}: {path}")
+        print(
+            escape_command_data(
+                f"[lint-unity-test-modules] {'FAILED' if errors else 'PASS'}: {path}"
+            )
+        )
     return int(bool(errors))
 
 
