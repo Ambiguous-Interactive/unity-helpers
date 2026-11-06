@@ -44,9 +44,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         {
             BrowserStorage store = OwnStore(_scope, nameof(value));
             Assert.That(store.IsConfigured, Is.True);
+            Assert.That(store.TryHasKey(nameof(value), out bool exists), Is.True);
+            Assert.That(exists, Is.False);
             Assert.That(store.TryGetString(nameof(value), out string missing), Is.False);
             Assert.That(missing, Is.Null);
             Assert.That(store.TrySetString(nameof(value), value), Is.True);
+            Assert.That(store.TryHasKey(nameof(value), out exists), Is.True);
+            Assert.That(exists, Is.True);
             Assert.That(store.TryGetString(nameof(value), out string actual), Is.True);
             Assert.That(actual, Is.EqualTo(value));
             BrowserStorage sameScope = new(_scope);
@@ -57,6 +61,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.That(replacement, Is.EqualTo("replacement"));
             Assert.That(store.TryDeleteKey(nameof(value)), Is.True);
             Assert.That(store.TryDeleteKey(nameof(value)), Is.True);
+            Assert.That(store.TryHasKey(nameof(value), out exists), Is.True);
+            Assert.That(exists, Is.False);
             Assert.That(store.TryGetString(nameof(value), out string deleted), Is.False);
             Assert.That(deleted, Is.Null);
         }
@@ -80,6 +86,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         {
             BrowserStorage store = new(scope);
             Assert.That(store.IsConfigured, Is.False);
+            Assert.That(store.TryHasKey(nameof(scope), out bool exists), Is.False);
+            Assert.That(exists, Is.False);
             Assert.That(store.TrySetString(nameof(scope), "value"), Is.False);
             Assert.That(store.TryDeleteKey(nameof(scope)), Is.False);
             Assert.That(store.TryGetString(nameof(scope), out string value), Is.False);
@@ -92,6 +100,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         public void InvalidKeysRejectEveryOperation(string key)
         {
             BrowserStorage store = new(_scope);
+            Assert.That(store.TryHasKey(key, out bool exists), Is.False);
+            Assert.That(exists, Is.False);
             Assert.That(store.TrySetString(key, "value"), Is.False);
             Assert.That(store.TryDeleteKey(key), Is.False);
             Assert.That(store.TryGetString(key, out string value), Is.False);
@@ -137,6 +147,29 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 
 #if !UNITY_WEBGL || UNITY_EDITOR
+        [TestCase("")]
+        [TestCase("retained")]
+        [TestCase("Unicode: café 雪 😀")]
+        public void UnscopedStoreReadsExistingPlayerPrefsKeysWithoutRewritingThem(string original)
+        {
+            string key = _scope + nameof(original);
+            BrowserStorage raw = BrowserStorage.Unscoped;
+            Assert.That(raw.IsConfigured, Is.True);
+            _ownedKeys.Add((raw, key));
+            PlayerPrefs.SetString(key, original);
+            Assert.That(raw.TryHasKey(key, out bool exists), Is.True);
+            Assert.That(exists, Is.True);
+            Assert.That(raw.TryGetString(key, out string actual), Is.True);
+            Assert.That(actual, Is.EqualTo(original));
+            BrowserStorage scoped = new(_scope);
+            Assert.That(scoped.TryHasKey(key, out bool scopedExists), Is.True);
+            Assert.That(scopedExists, Is.False);
+            Assert.That(raw.TrySetString(key, "replacement"), Is.True);
+            Assert.That(PlayerPrefs.GetString(key), Is.EqualTo("replacement"));
+            Assert.That(raw.TryDeleteKey(key), Is.True);
+            Assert.That(PlayerPrefs.HasKey(key), Is.False);
+        }
+
         [TestCase(9)]
         [TestCase(10)]
         [TestCase(99)]

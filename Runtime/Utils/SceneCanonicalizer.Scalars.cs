@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Editor.Utils
 {
+#if UNITY_EDITOR
     public static partial class SceneCanonicalizer
     {
         private static bool[] FindScalarCharacters(string text)
@@ -181,4 +182,5 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             return start;
         }
     }
+#endif
 }

@@ -1,4 +1,12 @@
 mergeInto(LibraryManager.library, {
+  WUHBrowserStorageHasKey__deps: ["$UTF8ToString"],
+  WUHBrowserStorageHasKey: function (key) {
+    try {
+      return window.localStorage.getItem(UTF8ToString(key)) === null ? 0 : 1;
+    } catch (error) {
+      return -1;
+    }
+  },
   WUHBrowserStorageGetString__deps: [
     "$UTF8ToString",
     "$lengthBytesUTF8",

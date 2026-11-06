@@ -12,6 +12,82 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     [Category("Fast")]
     public sealed class SpriteMaskReaderTests : CommonTestBase
     {
+        [Test]
+        public void InkQueryUsesTheSelectedSpriteRectangleAndItsLocalMapping()
+        {
+            Texture2D texture = Track(new Texture2D(4, 2, TextureFormat.RGBA32, false));
+            Color32[] pixels =
+            {
+                new(0, 0, 0, 255),
+                new(255, 255, 255, 255),
+                new(255, 255, 255, 255),
+                new(0, 0, 0, 255),
+                new(0, 0, 0, 255),
+                new(255, 255, 255, 255),
+                new(255, 255, 255, 255),
+                new(0, 0, 0, 255),
+            };
+            texture.SetPixels32(pixels);
+            texture.Apply();
+            Sprite sprite = Track(
+                Sprite.Create(texture, new Rect(1, 0, 2, 2), new Vector2(0.25f, 0.75f), 2)
+            );
+            Assert.That(
+                SpriteArtBounds.TryGetCentreOfLargestDarkestInkRegion(
+                    sprite,
+                    1f,
+                    out Vector2 centre,
+                    out string error
+                ),
+                Is.True,
+                error
+            );
+            Assert.That(centre, Is.EqualTo(new Vector2(0.25f, -0.25f)));
+            Assert.That(error, Is.Null);
+            Assert.That(texture.isReadable, Is.True);
+        }
+
+        [Test]
+        public void InkQueryRefusesMissingDestroyedAndUnreadableInputs()
+        {
+            Assert.That(
+                SpriteArtBounds.TryGetCentreOfLargestDarkestInkRegion(
+                    null,
+                    0f,
+                    out Vector2 centre,
+                    out string error
+                ),
+                Is.False
+            );
+            Assert.That(centre, Is.EqualTo(Vector2.zero));
+            Assert.That(string.IsNullOrWhiteSpace(error), Is.False);
+            Texture2D texture = Track(new Texture2D(2, 2));
+            Sprite sprite = Track(Sprite.Create(texture, new Rect(0, 0, 2, 2), Vector2.zero));
+            texture.Apply(false, true);
+            Assert.That(
+                SpriteArtBounds.TryGetCentreOfLargestDarkestInkRegion(
+                    sprite,
+                    0f,
+                    out centre,
+                    out error
+                ),
+                Is.False
+            );
+            Assert.That(error, Does.Contain("readable"));
+            Assert.That(texture.isReadable, Is.False);
+            UnityEngine.Object.DestroyImmediate(sprite); // UNH-SUPPRESS UNH001: Destroyed sprite behavior is under test; tracked for teardown.
+            Assert.That(
+                SpriteArtBounds.TryGetCentreOfLargestDarkestInkRegion(
+                    sprite,
+                    0f,
+                    out centre,
+                    out error
+                ),
+                Is.False
+            );
+            Assert.That(centre, Is.EqualTo(Vector2.zero));
+        }
+
         [TestCase(0, true, true)]
         [TestCase(1, true, true)]
         [TestCase(128, true, false)]

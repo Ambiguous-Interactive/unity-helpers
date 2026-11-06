@@ -171,6 +171,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             );
             Assert.That(art.size.x, Is.EqualTo(unitX).Within(0.0001f));
             Assert.That(art.size.y, Is.EqualTo(unitY).Within(0.0001f));
+            Assert.That(
+                SpriteArtBounds.TryGetCentreOfLargestDarkestInkRegion(
+                    sprite,
+                    1f,
+                    out Vector2 ink,
+                    out error
+                ),
+                Is.True,
+                error
+            );
+            Assert.That(
+                ink.x,
+                Is.EqualTo(19.5f * unitX - sprite.pivot.x / sprite.pixelsPerUnit).Within(0.0001f)
+            );
+            Assert.That(
+                ink.y,
+                Is.EqualTo(17.5f * unitY - sprite.pivot.y / sprite.pixelsPerUnit).Within(0.0001f)
+            );
             Assert.AreEqual(before, EditorJsonUtility.ToJson(importer));
             Assert.AreEqual(readable, importer.isReadable);
         }
@@ -301,6 +319,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 );
             Assert.That(Vector3.Distance(expected.center, actual.center), Is.LessThan(0.0001f));
             Assert.That(Vector3.Distance(expected.size, actual.size), Is.LessThan(0.0001f));
+            Assert.That(
+                SpriteArtBounds.TryGetCentreOfLargestDarkestInkRegion(
+                    sprite,
+                    0f,
+                    out Vector2 ink,
+                    out error
+                ),
+                Is.True,
+                error
+            );
+            double centrePixelX = fullRectangle ? (4096 * 31.5 - 19) / 4095 + 0.5 : 19.5;
+            double centrePixelY = fullRectangle ? (4096 * 31.5 - 17) / 4095 + 0.5 : 17.5;
+            float expectedX = (float)((centrePixelX - mask.Pivot.x) * mask.UnitsPerPixel.x);
+            float expectedY = (float)((centrePixelY - mask.Pivot.y) * mask.UnitsPerPixel.y);
+            Assert.That(ink.x, Is.EqualTo(expectedX).Within(0.000001f));
+            Assert.That(ink.y, Is.EqualTo(expectedY).Within(0.000001f));
             Assert.AreEqual(before, EditorJsonUtility.ToJson(importer));
             Assert.AreEqual(readable, importer.isReadable);
         }

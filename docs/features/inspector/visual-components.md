@@ -118,7 +118,12 @@ and renderer mask interaction can still prevent a particular pixel from being af
 ### Collecting Animated Frames in Editor Tools
 
 Use `AnimatedSpriteFrames` from `WallstopStudios.UnityHelpers.Editor.Sprites` when an editor tool
-must inspect more than a renderer's currently assigned sprite:
+must inspect more than a renderer's currently assigned sprite. The type is in the runtime
+assembly behind `#if UNITY_EDITOR`, so runtime asmdefs can call it inside that guard
+without an editor-assembly reference. Player builds omit it. The editor assembly
+forwards existing compiled references.
+
+Available queries:
 
 - `AddFramesOf(clip, rendererPath, into)` collects frames bound to the exact `SpriteRenderer`
   path. An empty path selects the animated root; null selects all renderer paths. Other component

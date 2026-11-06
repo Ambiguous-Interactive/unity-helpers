@@ -4,7 +4,10 @@
 stable document order. Two saves with the same hierarchy, component order and
 serialized values produce the same bytes. Use it after your generator saves its output.
 
-The editor API lives in `WallstopStudios.UnityHelpers.Editor.Utils`.
+The editor API lives in `WallstopStudios.UnityHelpers.Editor.Utils`, in the runtime
+assembly. Runtime asmdefs can call it inside `#if UNITY_EDITOR` without referencing
+the editor assembly. The type is absent from player builds. Existing compiled
+editor callers resolve through a type forwarder; the namespace and methods are unchanged.
 
 ```csharp
 using System;

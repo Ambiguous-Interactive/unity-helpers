@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Editor.Utils
 {
+#if UNITY_EDITOR
     using System;
     using System.Collections.Generic;
     using System.Globalization;
@@ -11,7 +12,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
     using WallstopStudios.UnityHelpers.Core.Helper;
 
     /// <summary>Canonicalizes Unity text scenes and prefabs using structural object identities.</summary>
-    /// <remarks>Generated IDs preserve legacy prefab sibling order, skip Unity-reserved values and leave external references unchanged.</remarks>
+    /// <remarks>Generated IDs preserve legacy prefab sibling order, skip Unity-reserved values and leave external references unchanged. Available in the runtime assembly only while UNITY_EDITOR is defined.</remarks>
     public static partial class SceneCanonicalizer
     {
         private const string DocumentMarker = "--- !u!";
@@ -864,4 +865,5 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 || ('A' <= value && value <= 'F');
         }
     }
+#endif
 }

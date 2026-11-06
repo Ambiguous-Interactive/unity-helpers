@@ -99,7 +99,9 @@ for (const value of ["", " ", "plain", "café 雪 😀", 'line\n\t"quoted"\\']) 
     const bridge = createBridge();
     const key = bridge.input("scoped:key");
     assert.equal(bridge.library.WUHBrowserStorageGetString(key), 0);
+    assert.equal(bridge.library.WUHBrowserStorageHasKey(key), 0);
     assert.equal(bridge.library.WUHBrowserStorageSetString(key, bridge.input(value)), 1);
+    assert.equal(bridge.library.WUHBrowserStorageHasKey(key), 1);
     const pointer = bridge.library.WUHBrowserStorageGetString(key);
     assert.ok(pointer);
     assert.equal(bridge.read(pointer), value);
@@ -107,6 +109,7 @@ for (const value of ["", " ", "plain", "café 雪 😀", 'line\n\t"quoted"\\']) 
     assert.equal(bridge.library.WUHBrowserStorageDeleteKey(key), 1);
     assert.equal(bridge.library.WUHBrowserStorageDeleteKey(key), 1);
     assert.equal(bridge.library.WUHBrowserStorageGetString(key), 0);
+    assert.equal(bridge.library.WUHBrowserStorageHasKey(key), 0);
   });
 }
 
@@ -118,6 +121,9 @@ for (const failure of ["accessFailure", "readFailure", "writeFailure", "deleteFa
     const key = bridge.input("existing");
     if (failure === "accessFailure" || failure === "readFailure") {
       assert.equal(bridge.library.WUHBrowserStorageGetString(key), 0);
+      assert.equal(bridge.library.WUHBrowserStorageHasKey(key), -1);
+    } else {
+      assert.equal(bridge.library.WUHBrowserStorageHasKey(key), 1);
     }
     if (failure === "accessFailure" || failure === "writeFailure") {
       assert.equal(bridge.library.WUHBrowserStorageSetString(key, bridge.input("new")), 0);
@@ -136,6 +142,7 @@ for (const value of ["head\0tail", "head\uD800tail", "head\uDC00tail"]) {
   test(`invalid external text ${JSON.stringify(value)} is rejected without truncation`, () => {
     const bridge = createBridge();
     bridge.values.set("external", value);
+    assert.equal(bridge.library.WUHBrowserStorageHasKey(bridge.input("external")), 1);
     assert.equal(bridge.library.WUHBrowserStorageGetString(bridge.input("external")), 0);
     assert.deepEqual(bridge.calls.allocated, []);
     assert.equal(bridge.values.get("external"), value);

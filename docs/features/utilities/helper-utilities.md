@@ -1595,6 +1595,32 @@ Read bounds when the sprite or its source changes. If you already hold a `Sprite
 the mask overload to avoid reading the texture again. The mask overload checks dimensions and
 coordinates, borrows the pixel array, and allocates no result storage.
 
+Mask bounds subtract the stored float pivot from pixel corners in double precision,
+then multiply by the stored float `UnitsPerPixel`. Bounds centres and sizes round to float
+at the end. This can differ by a bit from float subtraction followed by division by
+pixels per unit. Plan one deliberate re-bake when migrating a byte-compared scene bake.
+`AsDrawn` preserves `center.z`; `LowestCornerY` transforms corners in that same local Z plane.
+
+`SpriteArtBounds.TryGetCentreOfLargestDarkestInkRegion(sprite, minimumShare, out Vector2 centre,
+out string error)` finds a colour region's centroid for sprite analysis. It reads source PNG
+pixels in the Editor, including unreadable imports, or readable unpacked textures at runtime.
+Atlas-only pixels and separate alpha textures without a source PNG are refused.
+It does not change import settings.
+
+- Only fully opaque pixels count, using the importer's effective alpha policy in the Editor.
+- A colour must cover at least `minimumShare` of those pixels. The share must be finite and
+  between zero and one; zero permits any present colour.
+- Darkness uses Rec. 601 weights `299 * R + 587 * G + 114 * B`. Equal luma chooses the lower
+  packed RGB value, so dictionary order cannot change the result.
+- Regions join only exact RGB matches across horizontal or vertical neighbors. Diagonal
+  contact stays separate. The largest region wins; equal sizes choose the first bottom-left
+  row-major seed.
+- The result averages pixel centres in double precision, then applies the same pivot and pixel
+  size mapping as the alpha reader. It is a centroid, which can differ from a bounding-box centre.
+- Missing pixels, no fully opaque colour, no qualifying colour, and unrepresentable local
+  coordinates return false, a zero centre, and a reason. Scratch arrays and colour counts are pooled;
+  the texture pixel read still allocates its colour array.
+
 Apply `AsDrawn` for renderer flips, then `LowestCornerY` for world position, rotation and scale.
 Flips mirror around the renderer origin. The lowest corner can differ from the transformed
 local bottom edge when the renderer is rotated.
@@ -2019,12 +2045,23 @@ values unchanged. Reads return false with a null result when a key is missing or
 Present empty strings return true. Browser values containing invalid text written by another
 application are rejected rather than silently truncated by the native string bridge.
 
+Use `BrowserStorage.Unscoped` to read saves already stored under raw keys by another
+browser bridge or by `PlayerPrefs`. Its keys pass through unchanged. The ordinary scoped
+constructor still isolates its keys; passing a blank scope does not enable raw mode.
+Raw mode shares the backend's key namespace with other callers. It does not copy, migrate,
+or delete existing saves when created.
+
+`TryHasKey(key, out bool exists)` distinguishes absence from backend failure. It returns
+true with `exists == true` for a present key, including an empty value, and true with
+`exists == false` for an absent key. Invalid keys, invalid scoped stores, and blocked storage
+return false with `exists == false`. Existence does not validate the stored value's text or type.
+
 Writes and deletes are synchronous browser operations. The PlayerPrefs backend calls `Save` after
 each mutation. Success means the backend accepted the operation; it does not guarantee disk flush,
 future availability, cross-tab transactions or protection from browser eviction. If PlayerPrefs saving
 fails, its in-memory mutation may already have happened. Use an application-specific scope on shared
 origins. Stored strings are not encrypted. Private browsing, denied storage access and quotas can cause
-failure. Each operation constructs a scoped key, and reads allocate their returned string.
+failure. Scoped operations construct a prefixed key; raw operations reuse the supplied key. Reads allocate their returned string.
 
 See Unity's [browser scripting guide](https://docs.unity3d.com/2021.3/Documentation/Manual/webgl-interactingwithbrowserscripting.html)
 and [PlayerPrefs documentation](https://docs.unity3d.com/2021.3/Documentation/ScriptReference/PlayerPrefs.html)

@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Editor.Utils
 {
+#if UNITY_EDITOR
     using System;
     using System.Collections.Generic;
     using System.Globalization;
@@ -374,4 +375,5 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             }
         }
     }
+#endif
 }

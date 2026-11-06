@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Editor.Sprites
 {
+#if UNITY_EDITOR
     using System.Collections.Generic;
     using UnityEditor;
     using UnityEngine;
@@ -11,6 +12,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     using Object = UnityEngine.Object;
 
     /// <summary>Collects assigned and animated sprites without changing serialized assets.</summary>
+    /// <remarks>Available in the runtime assembly only while UNITY_EDITOR is defined.</remarks>
     public static class AnimatedSpriteFrames
     {
         /// <summary>Adds the nonnull sprite frames bound to one SpriteRenderer path in a clip.</summary>
@@ -123,4 +125,5 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
         }
     }
+#endif
 }

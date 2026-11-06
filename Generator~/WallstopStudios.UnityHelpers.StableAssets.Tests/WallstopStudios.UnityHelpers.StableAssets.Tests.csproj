@@ -2,6 +2,7 @@
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <LangVersion>9</LangVersion>
+    <DefineConstants>$(DefineConstants);UNITY_EDITOR</DefineConstants>
     <Nullable>disable</Nullable>
     <EnableNETAnalyzers>false</EnableNETAnalyzers>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
@@ -17,17 +18,17 @@
       Include="../WallstopStudios.UnityHelpers.DurableFile.Tests/MathDependency.cs"
       Link="MathDependency.cs"
     />
-    <Compile Include="../../Editor/Utils/SceneCanonicalizer.cs" Link="SceneCanonicalizer.cs" />
+    <Compile Include="../../Runtime/Utils/SceneCanonicalizer.cs" Link="SceneCanonicalizer.cs" />
     <Compile
-      Include="../../Editor/Utils/SceneCanonicalizer.Document.cs"
+      Include="../../Runtime/Utils/SceneCanonicalizer.Document.cs"
       Link="SceneCanonicalizer.Document.cs"
     />
     <Compile
-      Include="../../Editor/Utils/SceneCanonicalizer.Model.cs"
+      Include="../../Runtime/Utils/SceneCanonicalizer.Model.cs"
       Link="SceneCanonicalizer.Model.cs"
     />
     <Compile
-      Include="../../Editor/Utils/SceneCanonicalizer.Scalars.cs"
+      Include="../../Runtime/Utils/SceneCanonicalizer.Scalars.cs"
       Link="SceneCanonicalizer.Scalars.cs"
     />
     <Compile Include="../../Runtime/Core/Helper/DurableFile.cs" Link="DurableFile.cs" />

@@ -456,9 +456,12 @@ jobs:
       # hosted-runner check turns that whole class into an instant, self-
       # describing red on the PR. run-ci-tests.ps1's catastrophic-pattern scan is
       # the in-Unity backstop for the same failure.
+      - name: Setup Python tooling for module validation
+        uses: ./.github/actions/setup-python-tools
+
       - name: Validate Unity test-project module manifest
         shell: pwsh
-        run: ./scripts/lint-unity-test-modules.ps1 -VerboseOutput
+        run: uv run --project scripts/python~ --locked --no-dev python scripts/lint_unity_test_modules.py --verbose
 
       # NOTE: DxMessaging had a "ci-owned docs-only PR" detection here that
       # skipped the licensed matrix when a PR touched ONLY its perf-numbers doc
