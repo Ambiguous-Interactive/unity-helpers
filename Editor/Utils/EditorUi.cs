@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
     using UnityEditor;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Helper;
+    using WallstopStudios.UnityHelpers.Utils;
 
     public static class EditorUi
     {
@@ -16,6 +17,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             get => _suppressManual || _suppressAuto;
             set => _suppressManual = value;
         }
+
+        private static readonly Action ClearProgressAction = ClearProgress;
 
         private static bool _suppressManual;
         private static bool _suppressAuto;
@@ -77,6 +80,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 return false;
             }
             return EditorUtility.DisplayCancelableProgressBar(title, info, progress);
+        }
+
+        /// <summary>Arranges once-only progress cleanup when the returned value-type scope ends.</summary>
+        public static DisposableScope BeginProgressScope()
+        {
+            return DisposableScope.Create(ClearProgressAction);
         }
 
         public static void ClearProgress()

@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
     using System;
     using System.Collections;
     using System.Collections.Generic;
+    using System.Diagnostics;
     using System.IO;
     using NUnit.Framework;
     using UnityEditor;
@@ -106,6 +107,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
             AssetDatabase.DeleteAsset(folderPath);
         }
 
+        private static void RunEmptyCleanupLoop(int iterations)
+        {
+            for (int index = 0; index < iterations; ++index)
+            {
+                CleanupAllKnownTestFolders();
+            }
+        }
+
         public override void CommonOneTimeSetUp()
         {
             base.CommonOneTimeSetUp();
@@ -136,6 +145,62 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
             */
             RemoveResourcesRootIfCreatedByThisFixture();
             base.OneTimeTearDown();
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void EmptyCleanupLeavesUnrelatedPendingImportsUntouched(bool insideBatch)
+        {
+            CleanupAllKnownTestFolders();
+            string path = "Assets/UnrelatedCleanupProbe" + Guid.NewGuid().ToString("N") + ".txt";
+            TrackAssetPath(path);
+            try
+            {
+                File.WriteAllText(path, nameof(EmptyCleanupLeavesUnrelatedPendingImportsUntouched));
+                Assert.IsTrue(File.Exists(path));
+                Assert.IsTrue(string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID(path)));
+                AssetDatabaseBatchScope? outer = insideBatch
+                    ? AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false)
+                    : null;
+                int depth = AssetDatabaseBatchHelper.CurrentBatchDepth;
+                try
+                {
+                    CleanupAllKnownTestFolders();
+                    Assert.AreEqual(depth, AssetDatabaseBatchHelper.CurrentBatchDepth);
+                    Assert.IsTrue(
+                        string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID(path)),
+                        "Empty cleanup imported unrelated work."
+                    );
+                }
+                finally
+                {
+                    outer?.Dispose();
+                }
+                AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
+                Assert.IsFalse(string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID(path)));
+            }
+            finally
+            {
+                CleanupTrackedFoldersAndAssets();
+            }
+        }
+
+        [Test]
+        [Category("Performance")]
+        [Timeout(120000)]
+        public void RepeatedEmptyCleanupPreservesTheAssetInventory()
+        {
+            const int Iterations = 100;
+            RunEmptyCleanupLoop(Iterations);
+            string[] before = AssetDatabase.GetAllAssetPaths();
+            Stopwatch timer = Stopwatch.StartNew();
+            RunEmptyCleanupLoop(Iterations);
+            timer.Stop();
+            string[] after = AssetDatabase.GetAllAssetPaths();
+            CollectionAssert.AreEquivalent(before, after);
+            TestContext.WriteLine(
+                $"Empty cleanup iterations={Iterations}, milliseconds={timer.Elapsed.TotalMilliseconds:R}"
+            );
         }
 
         [UnityTest]

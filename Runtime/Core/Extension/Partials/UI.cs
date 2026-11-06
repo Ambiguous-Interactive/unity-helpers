@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     using UnityEngine;
     using UnityEngine.EventSystems;
     using UnityEngine.UI;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     public static partial class UnityExtensions
     {
@@ -76,8 +77,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             Rect rect = rectangle.rect;
             if (
-                !IsFinite(rect.center)
-                || !IsFinite(rect.size)
+                !WallMath.IsFinite(rect.center)
+                || !WallMath.IsFinite(rect.size)
                 || !(0f <= rect.size.x)
                 || !(0f <= rect.size.y)
             )
@@ -200,7 +201,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 useRaycast
                 && currentRaycast.isValid
                 && currentRaycast.gameObject == rectangle.gameObject
-                && IsFinite(currentRaycast.worldPosition)
+                && WallMath.IsFinite(currentRaycast.worldPosition)
             )
             {
                 worldPoint = currentRaycast.worldPosition;
@@ -212,7 +213,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 useRaycast
                 && pressRaycast.isValid
                 && pressRaycast.gameObject == rectangle.gameObject
-                && IsFinite(pressRaycast.worldPosition)
+                && WallMath.IsFinite(pressRaycast.worldPosition)
             )
             {
                 worldPoint = pressRaycast.worldPosition;
@@ -232,7 +233,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     screenPoint,
                     eventCamera,
                     out Vector3 resolved
-                ) || !IsFinite(resolved)
+                ) || !WallMath.IsFinite(resolved)
             )
             {
                 worldPoint = default;
@@ -273,7 +274,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             Vector3 local = rectangle.InverseTransformPoint(worldPoint);
             Vector2 resolved = new(local.x, local.y);
-            if (!IsFinite(resolved))
+            if (!WallMath.IsFinite(resolved))
             {
                 localPoint = default;
                 return false;
@@ -334,16 +335,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             float x = float.IsNaN(point.x) ? 0f : Mathf.Clamp(point.x, 0f, Screen.width);
             float y = float.IsNaN(point.y) ? 0f : Mathf.Clamp(point.y, 0f, Screen.height);
             return new Vector2(x, y);
-        }
-
-        private static bool IsFinite(Vector2 point)
-        {
-            return float.IsFinite(point.x) && float.IsFinite(point.y);
-        }
-
-        private static bool IsFinite(Vector3 point)
-        {
-            return float.IsFinite(point.x) && float.IsFinite(point.y) && float.IsFinite(point.z);
         }
     }
 }

@@ -181,12 +181,9 @@ namespace WallstopStudios.UnityHelpers.Core.Math
         public bool TryGetIntersectionPoint(Circle circle, out Vector2 intersection)
         {
             if (
-                !float.IsFinite(from.x)
-                || !float.IsFinite(from.y)
-                || !float.IsFinite(to.x)
-                || !float.IsFinite(to.y)
-                || !float.IsFinite(circle.center.x)
-                || !float.IsFinite(circle.center.y)
+                !WallMath.IsFinite(from)
+                || !WallMath.IsFinite(to)
+                || !WallMath.IsFinite(circle.center)
                 || !float.IsFinite(circle.radius)
                 || circle.radius < 0f
             )

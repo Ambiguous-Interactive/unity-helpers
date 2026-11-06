@@ -34,10 +34,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             if (
                 pointCount <= 0
                 || !IsFinitePositive(radius)
-                || !IsFinite(center.x)
-                || !IsFinite(center.y)
-                || !IsFinite(startAngle)
-                || !IsFinite(endAngle)
+                || !WallMath.IsFinite(center)
+                || !WallMath.IsFinite(startAngle)
+                || !WallMath.IsFinite(endAngle)
             )
             {
                 buffer ??= new List<Vector2>();
@@ -125,7 +124,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             List<Vector2> buffer = null
         )
         {
-            if (!IsValidFraction(fraction) || !IsFinite(centerAngle))
+            if (!IsValidFraction(fraction) || !WallMath.IsFinite(centerAngle))
             {
                 buffer ??= new List<Vector2>();
                 buffer.Clear();
@@ -143,19 +142,14 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             );
         }
 
-        private static bool IsFinite(float value)
-        {
-            return !float.IsNaN(value) && !float.IsInfinity(value);
-        }
-
         private static bool IsFinitePositive(float value)
         {
-            return 0 < value && IsFinite(value);
+            return 0 < value && WallMath.IsFinite(value);
         }
 
         private static bool IsValidFraction(float fraction)
         {
-            return 0 < fraction && fraction <= 1 && IsFinite(fraction);
+            return 0 < fraction && fraction <= 1 && WallMath.IsFinite(fraction);
         }
     }
 }

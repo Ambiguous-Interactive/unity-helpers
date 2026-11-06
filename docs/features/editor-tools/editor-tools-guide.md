@@ -9,6 +9,24 @@ Most asset operations also have public C# APIs for editor scripts and batch jobs
 below records the callable operations and the remaining scope of
 [#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821).
 
+## Scoped editor operations
+
+`UndoGroupScope.Begin(name)` returns a readonly disposable value that groups editor mutations
+into one Undo step. Check `IsHeld` before modifying assets: blank names or a failed creation return
+an inactive scope. Disposal collapses the group and isolates following operations. Nested groups
+are included in the outer group, and copied scopes share one cleanup claim.
+
+`EditorUi.BeginProgressScope()` reuses `DisposableScope` to clear progress when a `using` block or
+declaration ends, including when the body throws. It arranges cleanup without displaying a bar;
+use the existing progress methods while the scope is active. Declare the Undo scope first and the
+progress scope second so progress clears before Undo cleanup. Both reuse disposal leases without
+per-use managed allocations after warmup. Use them on the editor thread. Importer Undo still does
+not reverse filesystem or reimport side effects.
+
+Explicit component menu entries use `Wallstop Studios > Unity Helpers`, including Polygon Collider
+Optimizer and the relational integration installers. Spaces are display names. Resource keys remain
+filesystem paths and must match their resource folders.
+
 ## Programmatic window operations
 
 This inventory covers the 21 `EditorWindow` and `ScriptableWizard` types in the package. It records

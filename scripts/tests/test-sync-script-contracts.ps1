@@ -832,6 +832,12 @@ function Run-OptionalOdinIntegrationContractTests {
   } else {
     ''
   }
+  $odinEditorUtilsTargetPath = Join-Path $repoRoot 'Tests/Editor/Utils/Odin/OdinScriptableObjectSingletonTestTarget.cs'
+  $odinEditorUtilsTargetContent = if (Test-Path $odinEditorUtilsTargetPath) {
+    Get-Content -Path $odinEditorUtilsTargetPath -Raw
+  } else {
+    ''
+  }
   $odinEditorUtilsTestKeepsSingletonBaseCoverage = (
     $odinEditorUtilsTestContent -match '#\s*if\s+UNITY_EDITOR\s+&&\s+WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR' -and
     $odinEditorUtilsTestContent.Contains('using Sirenix.OdinInspector;') -and
@@ -839,7 +845,8 @@ function Run-OptionalOdinIntegrationContractTests {
     $odinEditorUtilsTestContent.Contains('Track(') -and
     $odinEditorUtilsTestContent.Contains('ScriptableObject.CreateInstance<OdinScriptableObjectSingletonTestTarget>()') -and
     $odinEditorUtilsTestContent.Contains('Is.InstanceOf<SerializedScriptableObject>()') -and
-    $odinEditorUtilsTestContent -match 'OdinScriptableObjectSingletonTestTarget\s*:\s*ScriptableObjectSingleton<\s*OdinScriptableObjectSingletonTestTarget\s*>'
+    $odinEditorUtilsTargetContent -match '#\s*if\s+UNITY_EDITOR\s+&&\s+WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR' -and
+    $odinEditorUtilsTargetContent -match 'OdinScriptableObjectSingletonTestTarget\s*:\s*ScriptableObjectSingleton<\s*OdinScriptableObjectSingletonTestTarget\s*>'
   )
   $runtimeAssemblyInfoContent = Get-Content -Path (Join-Path $repoRoot 'Runtime/AssemblyInfo.cs') -Raw
   $editorAssemblyInfoContent = Get-Content -Path (Join-Path $repoRoot 'Editor/AssemblyInfo.cs') -Raw

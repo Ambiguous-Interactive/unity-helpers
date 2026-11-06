@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Core.Random
 {
     using System;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     /// <summary>
     /// Stateful pity-timer helper that increases success chance after consecutive failures.
@@ -118,8 +119,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         )
         {
             if (
-                !IsFinite(baseChance)
-                || !IsFinite(chanceIncreasePerFailure)
+                !WallMath.IsFinite(baseChance)
+                || !WallMath.IsFinite(chanceIncreasePerFailure)
                 || baseChance < 0f
                 || 1f < baseChance
                 || chanceIncreasePerFailure < 0f
@@ -139,11 +140,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             created.FailuresSinceSuccess = failuresSinceSuccess;
             protection = created;
             return true;
-        }
-
-        private static bool IsFinite(float value)
-        {
-            return !float.IsNaN(value) && !float.IsInfinity(value);
         }
 
         /// <summary>

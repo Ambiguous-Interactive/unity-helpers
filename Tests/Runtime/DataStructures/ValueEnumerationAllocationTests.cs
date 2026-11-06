@@ -9,7 +9,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Tests.TestUtils;
 #if UNITY_5_3_OR_NEWER
-    using Unity.Profiling;
+    using WallstopStudios.UnityHelpers.Tests.Core;
 #endif
 
     [TestFixture]
@@ -25,35 +25,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 #if UNITY_5_3_OR_NEWER
         internal static long MeasureProfilerAllocationCount(Action action)
         {
-            for (int index = 0; index < 64; ++index)
-            {
-                action();
-            }
-            using ProfilerRecorder recorder = ProfilerRecorder.StartNew(
-                ProfilerCategory.Memory,
-                "GC.Alloc",
-                ProfilerCapacity,
-                ProfilerRecorderOptions.CollectOnlyOnCurrentThread
-            );
-            if (!recorder.Valid)
-            {
-                Assert.Ignore("This runtime does not expose the GC.Alloc marker.");
-            }
-            for (int index = 0; index < ProfilerCalls; ++index)
-            {
-                action();
-            }
-            recorder.Stop();
-            Assert.IsFalse(
-                recorder.WrappedAround,
-                "Allocation samples exceeded recorder capacity."
-            );
-            long count = 0;
-            for (int index = 0; index < recorder.Count; ++index)
-            {
-                count += recorder.GetSample(index).Count;
-            }
-            return count;
+            return ProfilerAllocationCounter.Measure(action, ProfilerCalls, ProfilerCapacity);
         }
 #endif
 

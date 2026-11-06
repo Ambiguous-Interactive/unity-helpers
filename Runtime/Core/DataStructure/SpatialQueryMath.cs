@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     using System;
     using System.Runtime.CompilerServices;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     /// <summary>
     /// Overflow-safe bounds, distance, and grid arithmetic shared by spatial trees and hashes.
@@ -71,13 +72,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static bool IsFinite(Vector2 value)
         {
-            return float.IsFinite(value.x) && float.IsFinite(value.y);
+            return WallMath.IsFinite(value);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static bool IsFinite(Vector3 value)
         {
-            return float.IsFinite(value.x) && float.IsFinite(value.y) && float.IsFinite(value.z);
+            return WallMath.IsFinite(value);
         }
 
         /// <summary>

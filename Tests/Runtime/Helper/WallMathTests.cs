@@ -93,6 +93,59 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             );
         }
 
+        [TestCase(0d, true)]
+        [TestCase(double.Epsilon, true)]
+        [TestCase(double.MinValue, true)]
+        [TestCase(double.MaxValue, true)]
+        [TestCase(double.NaN, false)]
+        [TestCase(double.PositiveInfinity, false)]
+        [TestCase(double.NegativeInfinity, false)]
+        public void FiniteDoubleChecksPreserveTheFullFiniteRange(double value, bool expected)
+        {
+            bool actual = value.IsFinite();
+            Assert.AreEqual(expected, actual);
+        }
+
+        [TestCase(0f, true)]
+        [TestCase(float.Epsilon, true)]
+        [TestCase(float.MinValue, true)]
+        [TestCase(float.MaxValue, true)]
+        [TestCase(float.NaN, false)]
+        [TestCase(float.PositiveInfinity, false)]
+        [TestCase(float.NegativeInfinity, false)]
+        public void FiniteChecksInspectEveryVectorAndColorComponent(float component, bool expected)
+        {
+            bool scalar = WallMath.IsFinite(component);
+            Assert.AreEqual(expected, scalar);
+            for (int axis = 0; axis < 4; ++axis)
+            {
+                Vector4 vector4 = Vector4.one;
+                vector4[axis] = component;
+                bool actual4 = vector4.IsFinite();
+                Assert.AreEqual(expected, actual4);
+                if (axis < 3)
+                {
+                    Vector3 vector3 = Vector3.one;
+                    vector3[axis] = component;
+                    bool actual3 = WallMath.IsFinite(vector3);
+                    Assert.AreEqual(expected, actual3);
+                }
+                if (axis < 2)
+                {
+                    Vector2 vector2 = Vector2.one;
+                    vector2[axis] = component;
+                    bool actual2 = WallMath.IsFinite(vector2);
+                    Assert.AreEqual(expected, actual2);
+                }
+                Color color = Color.white;
+                color[axis] = component;
+                bool withAlpha = WallMath.IsFinite(color);
+                bool withoutAlpha = WallMath.IsFinite(color, includeAlpha: false);
+                Assert.AreEqual(expected, withAlpha);
+                Assert.AreEqual(axis == 3 || expected, withoutAlpha);
+            }
+        }
+
         [Test]
         public void BoundedDoubleAtMaxReturnsTheNextRepresentableValueDown()
         {

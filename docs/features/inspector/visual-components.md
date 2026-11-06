@@ -10,6 +10,80 @@ These components solve the problem of creating complex, multi-layer sprite anima
 
 ---
 
+## Bendable Lines
+
+`BendableLine` in `WallstopStudios.UnityHelpers.Visuals` stretches a sprite along a quadratic
+curve using its own `MeshFilter` and `MeshRenderer`. Adding the component adds those dependencies.
+Given a GameObject named `host` and a Sprite named `ribbonSprite`:
+
+```csharp
+BendableLine line = host.AddComponent<BendableLine>();
+line.Sprite = ribbonSprite;
+line.Start = new Vector2(0f, 0f);
+line.End = new Vector2(4f, 0f);
+line.Control = new Vector2(2f, 3f);
+line.Thickness = 0.1f;
+line.Progress = 1f;
+```
+
+`Start` and `End` are world XY coordinates; `Control` and `Thickness` use the line's local space.
+Use transforms that stay in the XY plane, including Z rotation, half turns about X/Y, and nonuniform
+or mirrored XY scale. The plane check permits relative basis-vector depth up to one millionth for
+floating-point rotation error; larger tilts clear the geometry.
+A null start keeps the current transform position; a null end clears the geometry.
+`CurveIntensity` blends from a straight line at zero to the authored control point at one, and
+accepts values through five. `Segments` is clamped from one through 4,096.
+
+New lines start with zero `Progress`. Set it directly or call `AnimateLine(forward: true,
+resetProgress: true)` to draw the line. `AnimateLine(false)` retracts it from the current fraction.
+Changing `End` after the first successful draw animates the endpoint over `AnimationDuration`.
+Both animations use scaled time and pause while the line cannot be drawn, preserving elapsed
+progress across temporary invalid states. A nonpositive or nonfinite duration settles immediately.
+Disabling the component stops animation and clears its visible progress. `LateUpdate` applies
+changes; `TryRefresh()` updates immediately and returns whether usable geometry was built.
+
+Sprites use their own UV coordinates without copying pixels or changing importers. Unpacked
+sprite sheets and readable or unreadable rectangular atlases are supported. Tight atlas packing
+and separate alpha textures are refused rather than drawing neighboring art or an opaque mask.
+Packed sprite padding is preserved as transparent space. Reassign `Sprite` after overriding a
+sprite's geometry; atlas texture changes are detected automatically.
+
+The component creates and releases its own mesh and material and retains segment buffers between
+updates. Sprite textures remain caller-owned. Changing the segment count allocates new buffers;
+changing sprites reads Unity's UV/vertex arrays for packed sprites. The bundled resource shader
+is included in players, so no Shader.Find setup or tween package is required. Sorting uses
+`SortingLayerId` and `SortingOrder`; unknown layer IDs leave the current selection unchanged.
+
+## Copying Sprite Pivots
+
+Open **Tools → Wallstop Studios → Unity Helpers → Sprite Pivot Copier** to copy pivots from
+reference sprites to their named counterparts. By default, `door_pivot_open` supplies the pivot
+for `door_open`. The source marker and its replacement are editable, and the selected Assets
+folder is searched recursively.
+
+Both sprites must use Single import mode. The target texture and metadata must be open for
+editing, and read-only metadata is refused. Editability uses fresh version-control status during
+planning and again before each batch copy. Single copies check editability immediately before applying their pivot.
+Texture type, Single mode, and supported alignment values are also rechecked before applying each pivot. The copier reads the source's effective normalized
+pivot, including built-in alignment presets, then gives the target Custom alignment with that
+pivot. Different texture dimensions are supported. Other texture settings and source importers
+are preserved, and textures do not need Read/Write enabled.
+
+`SpritePivotCopierAPI.TryCopyPivot(source, target, out changed, out error)` performs one copy.
+`TryCopyPivotsInDirectory(folder, out changedCount, out error, marker, replacement)` performs
+the named batch. Its optional `cancelRequested` callback receives the processed-entry count, total
+entry count, and next target path; returning true cancels before that target changes. The window
+shows cancelable progress. Cancellation preserves earlier completed copies and reports their
+change count. Names use ordinal matching. A null replacement removes the marker. Duplicate names,
+missing counterparts, conflicting sources, and invalid importers refuse the plan before writes.
+Unknown target alignment integers are refused. All source pivots are captured first, so a sprite that is both source and target cannot propagate
+a newly copied pivot through a chain.
+
+Importer changes are Undo-recorded. Reimport and filesystem effects are outside the full Undo
+guarantee; completed copies remain if a later import fails. The returned count includes completed
+changes, and an already matching Custom pivot is a successful no-op. The API pauses and restores
+`AssetDatabaseBatchHelper` scopes around synchronous reimports.
+
 ## Sprite Masks
 
 Add `MatchSpriteMaskToSpriteRenderer` from `WallstopStudios.UnityHelpers.Visuals` to an

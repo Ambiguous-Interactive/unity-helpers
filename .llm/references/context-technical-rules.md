@@ -2,6 +2,19 @@
 
 ## Additional Technical Rules
 
+- **Pass named constants or variables to methods.** Compute nested method calls, constructors, and
+  other argument expressions on their own lines, so a failing operation has a distinct stack location.
+  Sweep the surrounding modified production class instead of fixing only the reviewed call site.
+- **Use shared finite checks.** `WallMath.IsFinite` and its extensions cover numeric scalars and
+  Unity vectors/colors. Reuse them instead of adding private per-component copies.
+- **Scope editor cleanup.** `EditorUi.BeginProgressScope()` returns the existing readonly
+  `DisposableScope`; `UndoGroupScope.Begin(name)` owns a grouped Undo operation. Declare progress
+  after Undo so it clears first. Check the Undo scope's `IsHeld` before mutations. Reused leases avoid
+  per-use managed allocations; copied/default scopes have once-only/inactive cleanup behavior.
+- **Keep explicit package menus uniform.** Editor commands use `Tools/Wallstop Studios/Unity Helpers/`;
+  component entries use `Wallstop Studios/Unity Helpers/`. Spaces are display names, while Resources
+  keys must match their filesystem paths.
+
 - **Run the control FIRST, and let it decide whether the platform can be measured.** An allocation
   assertion needs an instrument that can see one; on an IL2CPP standalone player it cannot, so
   `Is.Not.AllocatingGCMemory()` there is the absence of a measurement, not a pass. Assert the

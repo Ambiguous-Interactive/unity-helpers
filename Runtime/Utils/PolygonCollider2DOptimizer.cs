@@ -16,7 +16,7 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// Polygon collider optimizer. Removes points from the collider polygon with
     /// the given reduction Tolerance
     /// </summary>
-    [AddComponentMenu("2D Collider Optimization/ Polygon Collider Optimizer")]
+    [AddComponentMenu("Wallstop Studios/Unity Helpers/Polygon Collider Optimizer")]
     [RequireComponent(typeof(PolygonCollider2D))]
     public sealed class PolygonCollider2DOptimizer : MonoBehaviour
     {
