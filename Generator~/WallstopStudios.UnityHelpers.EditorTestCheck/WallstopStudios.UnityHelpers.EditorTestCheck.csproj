@@ -351,6 +351,8 @@
          cascade block further down can name the file each fixture is waiting on. EditorCheck
          remains the gate that JUDGES this tree; its header carries the full reasoning. -->
     <Compile Include="$(RepoRoot)/Editor/**/*.cs" />
+    <!-- Type forwarding requires separate Runtime and Editor assemblies; this check combines them. -->
+    <Compile Remove="$(RepoRoot)/Editor/EditorUtilityTypeForwards.cs" />
     <!-- PERMANENT. Binds `Visuals.UGUI.EnhancedImage` and `UnityEditor.UI.ImageEditor`; uGUI
          (com.unity.ugui) ships as a Unity package with no NuGet equivalent on either side. -->
     <Compile Remove="$(RepoRoot)/Editor/Visuals/EnhancedImageEditor.cs" />

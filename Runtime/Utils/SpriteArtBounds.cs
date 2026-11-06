@@ -8,13 +8,14 @@ namespace WallstopStudios.UnityHelpers.Utils
     using WallstopStudios.UnityHelpers.Core.Helper;
 
     /// <summary>Measures the bounds of drawn sprite pixels and their transformed corners.</summary>
-    public static class SpriteArtBounds
+    public static partial class SpriteArtBounds
     {
         /// <summary>Reads the local bounds of nontransparent sprite pixels without changing import settings.</summary>
         /// <remarks>
         /// Uses original PNG pixels in the Editor or readable texture pixels. Packed atlas fallbacks
         /// require rectangular, unrotated packing; tight and rotated atlas data are refused.
         /// Separate alpha textures require source PNG pixels or the mask overload.
+        /// Mask bounds multiply double pixel offsets by stored float units per pixel before rounding to float.
         /// </remarks>
         public static bool TryGetLocalArtBounds(
             Sprite sprite,

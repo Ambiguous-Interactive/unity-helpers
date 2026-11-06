@@ -559,6 +559,7 @@ runTest("no linter in scripts/ has been left unreachable", () => {
   // (#453). An allowlist whose entries are prose excuses whatever is put in it -- the quiet half of
   // #445, one level up: the thing named still exists, so nothing goes red.
   const runElsewhere = new Map([
+    ["scripts/lint-duplicate-usings.ps1", "duplicate-using-controls"],
     ["scripts/lint-doc-counts.ps1", "doc-count-controls"],
     ["scripts/lint-unity-file-naming.ps1", "naming-controls"],
     ["scripts/lint-license-headers.ps1", "csharp-controls"],
@@ -566,7 +567,8 @@ runTest("no linter in scripts/ has been left unreachable", () => {
     ["scripts/lint-odin-undo-safety.ps1", "csharp-controls"],
     ["scripts/lint-llm-instructions.ps1", "workflow"],
     ["scripts/lint-skill-sizes.ps1", "workflow"],
-    ["scripts/lint-unity-test-modules.ps1", "workflow"],
+    ["scripts/lint-unity-test-modules.ps1", "module-controls"],
+    ["scripts/lint_unity_test_modules.py", "workflow"],
     ["scripts/lint-csharp-format.ps1", "preflight"],
     ["scripts/lint_meta_files.py", "preflight"],
     ["scripts/validate-git-push-config.ps1", "prepush"]
@@ -575,6 +577,14 @@ runTest("no linter in scripts/ has been left unreachable", () => {
   // Only the kinds something actually claims. A registered predicate nothing uses is a dead branch
   // inside the one test whose whole point is that a claim has to be executable.
   const owners = new Map([
+    [
+      "module-controls",
+      (file) => registeredControlsInvoke(file, "scripts/tests/test_unity_test_modules.py")
+    ],
+    [
+      "duplicate-using-controls",
+      (file) => registeredControlsInvoke(file, "scripts/tests/test_duplicate_usings.py")
+    ],
     ["csharp-controls", csharpControlsInvoke],
     [
       "naming-controls",

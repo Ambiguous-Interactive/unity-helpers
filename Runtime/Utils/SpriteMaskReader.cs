@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 {
     using System;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 #if UNITY_EDITOR
     using System.IO;
     using UnityEditor;
@@ -32,10 +33,55 @@ namespace WallstopStudios.UnityHelpers.Utils
             byte alphaThreshold = 1
         )
         {
+            try
+            {
+                if (!TryReadPixels(sprite, out SpritePixelRegion region, out string failure))
+                {
+                    error = failure;
+                    mask = default;
+                    return false;
+                }
+                int width = region.Region.width;
+                int height = region.Region.height;
+                int count = width * height;
+                bool[] opaque = new bool[count];
+                for (int y = 0; y < height; ++y)
+                {
+                    int offset = y * width;
+                    for (int x = 0; x < width; ++x)
+                    {
+                        byte alpha = region.GetPixel(x, y).a;
+                        opaque[offset + x] = alpha != 0 && alphaThreshold <= alpha;
+                    }
+                }
+                mask = new SpriteAlphaMask(
+                    opaque,
+                    width,
+                    height,
+                    region.Pivot,
+                    region.UnitsPerPixel
+                );
+                error = null;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                error = exception.Message;
+                mask = default;
+                return false;
+            }
+        }
+
+        internal static bool TryReadPixels(
+            Sprite sprite,
+            out SpritePixelRegion region,
+            out string error
+        )
+        {
             if (sprite == null)
             {
                 error = "A live sprite is required.";
-                mask = default;
+                region = default;
                 return false;
             }
             try
@@ -44,15 +90,12 @@ namespace WallstopStudios.UnityHelpers.Utils
                 Vector2 pivot = sprite.pivot;
                 if (
                     !(0 < pixelsPerUnit)
-                    || float.IsInfinity(pixelsPerUnit)
-                    || float.IsNaN(pivot.x)
-                    || float.IsInfinity(pivot.x)
-                    || float.IsNaN(pivot.y)
-                    || float.IsInfinity(pivot.y)
+                    || !WallMath.IsFinite(pixelsPerUnit)
+                    || !WallMath.IsFinite(pivot)
                 )
                 {
                     error = "The sprite needs a finite pivot and positive finite pixels per unit.";
-                    mask = default;
+                    region = default;
                     return false;
                 }
 #if UNITY_EDITOR
@@ -73,7 +116,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                         if (package == null)
                         {
                             error = "The sprite's package source could not be located.";
-                            mask = default;
+                            region = default;
                             return false;
                         }
                         physicalPath = Path.Combine(
@@ -83,10 +126,8 @@ namespace WallstopStudios.UnityHelpers.Utils
                     }
                     else
                     {
-                        physicalPath = Path.Combine(
-                            Path.GetDirectoryName(Application.dataPath),
-                            assetPath
-                        );
+                        string projectRoot = Path.GetDirectoryName(Application.dataPath);
+                        physicalPath = Path.Combine(projectRoot, assetPath);
                     }
                     Texture2D imported = AssetDatabase.LoadAssetAtPath<Texture2D>(assetPath);
                     TextureImporter importer =
@@ -94,20 +135,15 @@ namespace WallstopStudios.UnityHelpers.Utils
                     if (imported == null || importer == null)
                     {
                         error = "The sprite's source texture could not be located.";
-                        mask = default;
+                        region = default;
                         return false;
                     }
                     using ScratchTexture scratch = new(true);
-                    if (
-                        !ImageConversion.LoadImage(
-                            scratch.Texture,
-                            File.ReadAllBytes(physicalPath),
-                            false
-                        )
-                    )
+                    byte[] encoded = File.ReadAllBytes(physicalPath);
+                    if (!ImageConversion.LoadImage(scratch.Texture, encoded, false))
                     {
                         error = "The sprite's source PNG could not be decoded.";
-                        mask = default;
+                        region = default;
                         return false;
                     }
                     return TryReadPixels(
@@ -115,8 +151,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                         scratch.Texture,
                         imported.width,
                         imported.height,
-                        alphaThreshold,
-                        out mask,
+                        out region,
                         out error,
                         importer.alphaSource == TextureImporterAlphaSource.None,
                         importer.alphaSource == TextureImporterAlphaSource.FromGrayScale
@@ -127,7 +162,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 {
                     error =
                         "Sprites with a separate alpha texture require source PNG pixels or an explicit alpha mask.";
-                    mask = default;
+                    region = default;
                     return false;
                 }
                 Texture2D texture = sprite.texture;
@@ -135,7 +170,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 {
                     error =
                         "Exact sprite art needs a source PNG in the Editor or a readable, unpacked texture at runtime. Bake the collider in the Editor and disable this component for unreadable player textures.";
-                    mask = default;
+                    region = default;
                     return false;
                 }
                 return TryReadPixels(
@@ -143,15 +178,14 @@ namespace WallstopStudios.UnityHelpers.Utils
                     texture,
                     texture.width,
                     texture.height,
-                    alphaThreshold,
-                    out mask,
+                    out region,
                     out error
                 );
             }
             catch (Exception exception)
             {
                 error = exception.Message;
-                mask = default;
+                region = default;
                 return false;
             }
         }
@@ -161,8 +195,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             Texture2D texture,
             int importedWidth,
             int importedHeight,
-            byte alphaThreshold,
-            out SpriteAlphaMask mask,
+            out SpritePixelRegion region,
             out string error,
             bool ignoreSourceAlpha = false,
             bool alphaFromGrayscale = false
@@ -184,7 +217,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             {
                 error =
                     "The sprite rectangle does not align with source pixel corners; use an unscaled texture import for exact tracing.";
-                mask = default;
+                region = default;
                 return false;
             }
             int xStart = (int)Math.Round(left);
@@ -202,7 +235,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             )
             {
                 error = "The sprite rectangle is outside its source texture.";
-                mask = default;
+                region = default;
                 return false;
             }
             Vector2 maskPivot = new(
@@ -214,35 +247,34 @@ namespace WallstopStudios.UnityHelpers.Utils
                 (float)(1 / (sprite.pixelsPerUnit * scaleY))
             );
             if (
-                float.IsNaN(maskPivot.x)
-                || float.IsInfinity(maskPivot.x)
-                || float.IsNaN(maskPivot.y)
-                || float.IsInfinity(maskPivot.y)
+                !WallMath.IsFinite(maskPivot)
                 || !(0 < unitsPerPixel.x)
-                || float.IsInfinity(unitsPerPixel.x)
+                || !WallMath.IsFinite(unitsPerPixel.x)
                 || !(0 < unitsPerPixel.y)
-                || float.IsInfinity(unitsPerPixel.y)
+                || !WallMath.IsFinite(unitsPerPixel.y)
             )
             {
                 error = "The sprite's source coordinates cannot be represented in local units.";
-                mask = default;
+                region = default;
                 return false;
             }
             Color32[] pixels = texture.GetPixels32();
-            bool[] opaque = new bool[width * height];
-            for (int y = 0; y < height; ++y)
+            if ((long)texture.width * texture.height != pixels.Length)
             {
-                for (int x = 0; x < width; ++x)
-                {
-                    Color32 pixel = pixels[(yStart + y) * texture.width + xStart + x];
-                    byte alpha =
-                        ignoreSourceAlpha ? byte.MaxValue
-                        : alphaFromGrayscale ? (byte)((pixel.r + pixel.g + pixel.b) / 3)
-                        : pixel.a;
-                    opaque[y * width + x] = alpha != 0 && alphaThreshold <= alpha;
-                }
+                error = "The texture pixels do not match its dimensions.";
+                region = default;
+                return false;
             }
-            mask = new SpriteAlphaMask(opaque, width, height, maskPivot, unitsPerPixel);
+            RectInt sourceRegion = new(xStart, yStart, width, height);
+            region = new SpritePixelRegion(
+                pixels,
+                texture.width,
+                sourceRegion,
+                maskPivot,
+                unitsPerPixel,
+                ignoreSourceAlpha,
+                alphaFromGrayscale
+            );
             error = null;
             return true;
         }

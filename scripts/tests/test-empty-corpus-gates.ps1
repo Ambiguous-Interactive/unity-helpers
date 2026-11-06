@@ -118,7 +118,7 @@ try {
     }
 
     $result = Invoke-Gate -ScriptPath $scriptPath -Root $scratchRoot
-    $message = if ($gate.Name -eq 'lint-duplicate-usings') { 'scan found no C# files' } else { 'root not found' }
+    $message = if ($gate.Name -eq 'lint-duplicate-usings') { 'No Unity source roots were found' } else { 'root not found' }
     Write-TestResult "$($gate.Name) fails when its corpus is absent" `
       ($result.ExitCode -eq 1 -and $result.Output.Contains($message)) `
       "Expected exit 1 and '$message' with no Runtime/Editor/Tests present. Exit: $($result.ExitCode). Output: $($result.Output)"

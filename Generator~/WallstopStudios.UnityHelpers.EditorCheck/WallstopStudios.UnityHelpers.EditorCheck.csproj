@@ -273,6 +273,8 @@
       The remaining set drawer is a cascade of the missing managed-reference getter.
     -->
     <Compile Include="$(RepoRoot)/Editor/**/*.cs" />
+    <!-- Type forwarding requires separate Runtime and Editor assemblies; this check combines them. -->
+    <Compile Remove="$(RepoRoot)/Editor/EditorUtilityTypeForwards.cs" />
     <!-- PERMANENT. Binds `Visuals.UGUI.EnhancedImage` and `UnityEditor.UI.ImageEditor`; uGUI
          (com.unity.ugui) ships as a Unity package with no NuGet equivalent on either side. -->
     <Compile Remove="$(RepoRoot)/Editor/Visuals/EnhancedImageEditor.cs" />

@@ -83,6 +83,7 @@ namespace NestedOnlyConsumer
                 CheckWidths(random.NextUlong());
             }
             CheckSpatialTrees();
+            BrowserStorageCases.Run();
         }
 
         private static void CheckWidths(ulong bits)

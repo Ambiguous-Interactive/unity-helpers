@@ -277,8 +277,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             _previousEditorUiSuppress = EditorUi.Suppress;
             EditorUi.Suppress = true;
 
-            // Batching cuts the per-test Refresh calls from 5+ to one.
-            using (AssetDatabaseBatchHelper.BeginBatch())
+            using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
             {
                 // Before each test: a data-driven case would otherwise inherit the previous one's folders.
                 TryDeleteFolderAndDuplicates("Assets/Resources", "CaseTest");
@@ -301,7 +300,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 || type == typeof(NoRetrySingleton)
                 || type == typeof(AssetDatabaseRaceSingleton);
 
-            using (AssetDatabaseBatchHelper.BeginBatch())
+            using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
             {
                 EnsureFolder("Assets/Resources");
                 EnsureFolder(TestRoot);
@@ -322,8 +321,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 yield return baseEnumerator.Current;
             }
 
-            // Batching consolidates 20+ delete and cleanup operations into one Refresh.
-            using (AssetDatabaseBatchHelper.BeginBatch())
+            using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
             {
                 string[] guids = AssetDatabase.FindAssets("t:Object", new[] { TestRoot });
                 foreach (string guid in guids)
