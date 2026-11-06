@@ -12,6 +12,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Animation;
     using WallstopStudios.UnityHelpers.Core.Serialization;
+    using WallstopStudios.UnityHelpers.Utils;
     using WallstopStudios.UnityHelpers.Editor.Sprites;
     using WallstopStudios.UnityHelpers.Tests.Core;
 
@@ -406,7 +407,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 nameof(AnimationCreatorConfigTests) + Guid.NewGuid().ToString("N");
             string temporaryFolder = Path.Combine(temporaryRoot, directoryName);
             Directory.CreateDirectory(temporaryFolder);
-            try
+            using (DisposableScope.Create(() => Directory.Delete(temporaryFolder, true)))
             {
                 string configPath = AnimationCreatorConfig.GetConfigPath(temporaryFolder);
                 string fullPath = Path.GetFullPath(configPath);
@@ -427,10 +428,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 Assert.AreEqual(1, loaded.animationEntries.Count);
                 Assert.AreEqual("Attack", loaded.animationEntries[0].animationName);
             }
-            finally
-            {
-                Directory.Delete(temporaryFolder, true);
-            }
+            Assert.IsFalse(Directory.Exists(temporaryFolder));
         }
 
         [Test]
