@@ -14,7 +14,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     using System.Collections.Generic;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.DataStructure;
-    using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Tests.TestUtils;
 
     [TestFixture]
@@ -314,6 +313,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.IsTrue(map.IsEmpty);
         }
 
+#if UNITY_5_3_OR_NEWER
         [Test]
         public void TypedViewsReplacementRemovalAndClearHaveNoProfilerAllocationEvents()
         {
@@ -323,13 +323,25 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Action reuse = () => retained[0] = existing;
             const int iterations = 128;
             const int capacity = 512;
-            long positive = ProfilerAllocationCounter.Measure(allocate, iterations, capacity);
+            long positive =
+                global::WallstopStudios.UnityHelpers.Tests.Core.ProfilerAllocationCounter.Measure(
+                    allocate,
+                    iterations,
+                    capacity
+                );
             if (positive == 0)
             {
                 Assert.Ignore("The GC.Alloc recorder cannot observe fresh retained objects.");
             }
             Assert.That(positive, Is.EqualTo(iterations));
-            Assert.That(ProfilerAllocationCounter.Measure(reuse, iterations, capacity), Is.Zero);
+            Assert.That(
+                global::WallstopStudios.UnityHelpers.Tests.Core.ProfilerAllocationCounter.Measure(
+                    reuse,
+                    iterations,
+                    capacity
+                ),
+                Is.Zero
+            );
             IntMap<int> map = new();
             for (int key = 0; key < 16; ++key)
             {
@@ -360,12 +372,17 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 }
             };
             Assert.That(
-                ProfilerAllocationCounter.Measure(operations, iterations, capacity),
+                global::WallstopStudios.UnityHelpers.Tests.Core.ProfilerAllocationCounter.Measure(
+                    operations,
+                    iterations,
+                    capacity
+                ),
                 Is.Zero
             );
             Assert.That(sum, Is.EqualTo((iterations + 64) * 360));
             Assert.That(map.Capacity, Is.EqualTo(64));
         }
+#endif
 
         [TestCase(0, 0)]
         [TestCase(0, 1)]
