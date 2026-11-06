@@ -70,6 +70,83 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             );
         }
 
+        private static Coroutine StartByVariant(MonoBehaviour owner, Action action, int variant)
+        {
+            switch (variant)
+            {
+                case 0:
+                    return owner.StartFunctionAsCoroutine(action, 0f);
+                case 1:
+                    return owner.StartFunctionAsCoroutine(action, 0f, false, false, null);
+                case 2:
+                    return owner.StartFunctionAsCoroutine(action, 0f, false, false, null, null);
+                case 3:
+                    return owner.ExecuteFunctionAfterDelay(action, 0f);
+                case 4:
+                    return owner.ExecuteFunctionNextFrame(action);
+                default:
+                    return owner.ExecuteFunctionAfterFrame(action);
+            }
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(3)]
+        [TestCase(4)]
+        [TestCase(5)]
+        public void CoroutineEntrypointsRejectMissingOwners(int variant)
+        {
+            Assert.Throws<ArgumentNullException>(() =>
+                Assert.That(StartByVariant(null, () => { }, variant), Is.Null)
+            );
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(3)]
+        [TestCase(4)]
+        [TestCase(5)]
+        public void CoroutineEntrypointsRejectMissingActions(int variant)
+        {
+            CoroutineHost host = CreateHost();
+            Assert.Throws<ArgumentNullException>(() =>
+                Assert.That(StartByVariant(host, null, variant), Is.Null)
+            );
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(3)]
+        [TestCase(4)]
+        [TestCase(5)]
+        public void CoroutineEntrypointsDoNotStartWorkOnInactiveOwners(int variant)
+        {
+            CoroutineHost host = CreateHost();
+            host.gameObject.SetActive(false);
+            int calls = 0;
+            Assert.That(StartByVariant(host, () => ++calls, variant), Is.Null);
+            Assert.That(calls, Is.Zero);
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(3)]
+        [TestCase(4)]
+        [TestCase(5)]
+        public void CoroutineEntrypointsRejectDestroyedOwners(int variant)
+        {
+            CoroutineHost host = CreateHost();
+            DestroyTrackedObjects();
+            Assert.Throws<ArgumentNullException>(() =>
+                Assert.That(StartByVariant(host, () => { }, variant), Is.Null)
+            );
+        }
+
         [Test]
         public void IsRunningInBatchModeReflectsApplication()
         {

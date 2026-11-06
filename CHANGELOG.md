@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Speed up `IntMap` iteration with O(Count) live-entry walks. Extra indexing uses more memory and can slow fresh construction; see [measurements and costs](./docs/features/utilities/data-structures.md#iteration-measurements-and-costs) ([#1131](https://github.com/wallstop/unity-helpers/issues/1131)).
+- Standardize coroutine helpers: missing required arguments throw `ArgumentNullException`, inactive GameObjects start no work, and `TryExecuteTrackedAfterDelay` still returns false ([#1125](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1125)).
 - Allow runtime assemblies to call `AnimatedSpriteFrames` and `SceneCanonicalizer` inside `UNITY_EDITOR` guards, preserving existing namespaces and compiled editor references ([#1126](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1126)).
 - Group Polygon Collider Optimizer and relational installers under the Wallstop Studios/Unity Helpers component menu.
 

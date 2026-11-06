@@ -28,9 +28,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// Removal closes probe-chain gaps in place without allocating replacement storage.
     /// </para>
     /// <para>
-    /// The table stores keys verbatim beside their values, and the two lowest key values remain
-    /// reserved; see <see cref="MinimumAllowedKey"/>. Include miss-heavy
-    /// workloads when benchmarking against <see cref="Dictionary{TKey, TValue}"/>.
+    /// A dense list of occupied slots supports O(Count) enumeration, including after removals.
+    /// Slot positions share one ushort or int index array according to the table's capacity.
+    /// The extra indexing storage trades memory for iteration speed. Removal may change order.
+    /// The two lowest key values remain reserved; see <see cref="MinimumAllowedKey"/>.
     /// </para>
     /// </remarks>
     public sealed class IntMap<TValue>
@@ -48,13 +49,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         // Fibonacci hashing uses the high product bits so shared low key bits do not form a cluster.
         private const uint KeyMultiplier = 0x9E37_79B9u;
 
-        private const int EmptySlot = int.MinValue;
+        private const int EmptySlot = 0;
 
         /// <summary>Gets how many live entries the map holds.</summary>
-        public int Count => _count;
+        public int Count => _count + (_hasZeroKey ? 1 : 0);
 
         /// <summary>Gets whether the map holds no entries.</summary>
-        public bool IsEmpty => _count == 0;
+        public bool IsEmpty => _count == 0 && !_hasZeroKey;
 
         /// <summary>Gets the number of slots in the underlying table.</summary>
         public int Capacity => _keys.Length;
@@ -72,10 +73,20 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             get
             {
                 Validate(key);
-                int slot = FindSlot(key);
-                if (_keys[slot] == key)
+                if (key == 0)
                 {
-                    return _values[slot];
+                    if (_hasZeroKey)
+                    {
+                        return _zeroValue;
+                    }
+                }
+                else
+                {
+                    int slot = FindSlot(key);
+                    if (_keys[slot] != EmptySlot)
+                    {
+                        return _values[slot];
+                    }
                 }
 
                 throw new KeyNotFoundException($"No value is stored under {key}.");
@@ -83,7 +94,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             set => SetInternal(Validate(key), value);
         }
 
-        /// <summary>Gets the stored keys, in table order.</summary>
+        /// <summary>Gets the stored keys, in unspecified order.</summary>
         /// <remarks>
         /// Returns the concrete <see cref="KeyView"/> rather than <see cref="IEnumerable{T}"/> so
         /// typed <c>foreach</c> binds the struct enumerator directly and allocates nothing; the
@@ -92,7 +103,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// </remarks>
         public KeyView Keys => new KeyView(this);
 
-        /// <summary>Gets the stored values, in table order.</summary>
+        /// <summary>Gets the stored values, in unspecified order.</summary>
         /// <remarks>
         /// Returns the concrete <see cref="ValueView"/> for the same reason <see cref="Keys"/>
         /// does: typed <c>foreach</c> must reach the struct enumerator without boxing.
@@ -105,6 +116,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         private int[] _keys;
         private TValue[] _values;
+        private ushort[] _compactIndices;
+        private int[] _indices;
+        private bool _hasZeroKey;
+        private TValue _zeroValue;
         private int _mask;
         private int _shift;
         private int _count;
@@ -209,6 +224,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryGet(int key, out TValue value)
         {
+            if (key == 0)
+            {
+                bool present = _hasZeroKey;
+                TValue result = present ? _zeroValue : default;
+                value = result;
+                return present;
+            }
             if (key < MinimumAllowedKey || _count == 0)
             {
                 value = default(TValue);
@@ -249,6 +271,20 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// </remarks>
         public bool Remove(int key, out TValue value)
         {
+            if (key == 0)
+            {
+                if (!_hasZeroKey)
+                {
+                    value = default;
+                    return false;
+                }
+                TValue removedZero = _zeroValue;
+                _zeroValue = default;
+                _hasZeroKey = false;
+                ++_version;
+                value = removedZero;
+                return true;
+            }
             if (key < MinimumAllowedKey || _count == 0)
             {
                 value = default(TValue);
@@ -256,13 +292,17 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             int slot = FindSlot(key);
-            if (_keys[slot] != key)
+            if (_keys[slot] == EmptySlot)
             {
                 value = default(TValue);
                 return false;
             }
 
             TValue removed = _values[slot];
+            int position = PositionAt(slot);
+            int lastSlot = OccupiedSlotAt(_count - 1);
+            SetOccupiedSlot(position, lastSlot);
+            SetPosition(lastSlot, position);
             CloseGap(slot);
             --_count;
             ++_version;
@@ -282,23 +322,18 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         /// <summary>Drops every entry, keeping the current table.</summary>
         /// <remarks>
-        /// The keys array holds slot-state markers even while idle, so an array-wide zero fill would
-        /// read back as tens of thousands of live key-zero entries. Every slot goes back to
-        /// <see cref="EmptySlot"/> explicitly.
+        /// Releases stored values and retains the table and occupied-slot indexing arrays.
         /// </remarks>
         public void Clear()
         {
             if (_count != 0)
             {
-                int keysLength = _keys.Length;
-                for (int index = 0; index < keysLength; ++index)
-                {
-                    _keys[index] = EmptySlot;
-                }
-
+                Array.Clear(_keys, 0, _keys.Length);
                 Array.Clear(_values, 0, _values.Length);
             }
 
+            _zeroValue = default;
+            _hasZeroKey = false;
             _count = 0;
             ++_version;
         }
@@ -311,6 +346,17 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         private void SetInternal(int key, TValue value)
         {
+            if (key == 0)
+            {
+                if (!_hasZeroKey && _keys.Length <= Count * LoadFactorDivisor)
+                {
+                    Resize();
+                }
+                _zeroValue = value;
+                _hasZeroKey = true;
+                ++_version;
+                return;
+            }
             int slot = SlotFor(Mix(key));
             while (true)
             {
@@ -324,7 +370,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
                 if (stored == EmptySlot)
                 {
-                    if (_keys.Length <= _count * LoadFactorDivisor)
+                    if (_keys.Length <= Count * LoadFactorDivisor)
                     {
                         Resize();
                         SetInternal(key, value);
@@ -333,6 +379,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
                     _keys[slot] = key;
                     _values[slot] = value;
+                    SetOccupiedSlot(_count, slot);
+                    SetPosition(slot, _count);
                     ++_count;
                     ++_version;
                     return;
@@ -352,6 +400,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 {
                     _keys[gap] = _keys[slot];
                     _values[gap] = _values[slot];
+                    int position = PositionAt(slot);
+                    SetPosition(gap, position);
+                    SetOccupiedSlot(position, gap);
                     gap = slot;
                 }
                 slot = NextSlot(slot);
@@ -359,6 +410,46 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             _keys[gap] = EmptySlot;
             _values[gap] = default(TValue);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private int PositionAt(int slot)
+        {
+            return _compactIndices != null ? _compactIndices[slot] : _indices[slot];
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void SetPosition(int slot, int position)
+        {
+            if (_compactIndices != null)
+            {
+                _compactIndices[slot] = (ushort)position;
+            }
+            else
+            {
+                _indices[slot] = position;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private int OccupiedSlotAt(int position)
+        {
+            int index = _keys.Length + position;
+            return _compactIndices != null ? _compactIndices[index] : _indices[index];
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void SetOccupiedSlot(int position, int slot)
+        {
+            int index = _keys.Length + position;
+            if (_compactIndices != null)
+            {
+                _compactIndices[index] = (ushort)slot;
+            }
+            else
+            {
+                _indices[index] = slot;
+            }
         }
 
         private int FindSlot(int key)
@@ -394,39 +485,41 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             int capacity = 1 << power;
             int[] oldKeys = _keys;
             TValue[] oldValues = _values;
-
             _keys = new int[capacity];
             _values = new TValue[capacity];
+            int indexCapacity = capacity + capacity / LoadFactorDivisor;
+            if (capacity <= ushort.MaxValue + 1)
+            {
+                _compactIndices = new ushort[indexCapacity];
+                _indices = null;
+            }
+            else
+            {
+                _indices = new int[indexCapacity];
+                _compactIndices = null;
+            }
             _mask = capacity - 1;
             _shift = 32 - power;
             _count = 0;
             ++_version;
-            for (int index = 0; index < capacity; ++index)
-            {
-                _keys[index] = EmptySlot;
-            }
-
             if (oldKeys == null)
             {
                 return;
             }
-
             int oldKeysLength = oldKeys.Length;
             for (int index = 0; index < oldKeysLength; ++index)
             {
                 int stored = oldKeys[index];
-                if (MinimumAllowedKey <= stored)
+                if (stored == EmptySlot)
                 {
-                    int slot = SlotFor(Mix(stored));
-                    while (_keys[slot] != EmptySlot)
-                    {
-                        slot = NextSlot(slot);
-                    }
-
-                    _keys[slot] = stored;
-                    _values[slot] = oldValues[index];
-                    ++_count;
+                    continue;
                 }
+                int slot = FindSlot(stored);
+                _keys[slot] = stored;
+                _values[slot] = oldValues[index];
+                SetPosition(slot, _count);
+                SetOccupiedSlot(_count, slot);
+                ++_count;
             }
         }
 
@@ -470,7 +563,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return GetEnumerator();
         }
 
-        /// <summary>Enumerates live key-value pairs in table order.</summary>
+        /// <summary>Enumerates live key-value pairs in unspecified order.</summary>
         public struct Enumerator
             : IEnumerator<KeyValuePair<int, TValue>>,
                 global::System.IEquatable<Enumerator>
@@ -482,6 +575,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             private readonly IntMap<TValue> _map;
             private readonly ulong _version;
+            private readonly ushort[] _compactIndices;
+            private readonly int[] _indices;
+            private readonly int _entryOffset;
+            private readonly int _end;
+            private readonly bool _hasZeroKey;
+            private readonly int[] _keys;
             private int _slot;
             private KeyValuePair<int, TValue> _current;
 
@@ -489,11 +588,18 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             {
                 _map = map;
                 _version = map._version;
-                _slot = 0;
+                _compactIndices = map._compactIndices;
+                _indices = map._indices;
+                _entryOffset = map._keys.Length;
+                _end = _entryOffset + map._count;
+                _hasZeroKey = map._hasZeroKey;
+                _keys = map._keys;
+                _slot = _entryOffset;
                 _current = default(KeyValuePair<int, TValue>);
             }
 
             /// <inheritdoc />
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public bool MoveNext()
             {
                 if (_version != _map._version)
@@ -501,16 +607,18 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     throw new InvalidOperationException("The map changed during enumeration.");
                 }
 
-                int keysLength = _map._keys.Length;
-                while (_slot < keysLength)
+                if (_slot < _end)
                 {
-                    int stored = _map._keys[_slot];
+                    int slot = _compactIndices != null ? _compactIndices[_slot] : _indices[_slot];
                     ++_slot;
-                    if (MinimumAllowedKey <= stored)
-                    {
-                        _current = new KeyValuePair<int, TValue>(stored, _map._values[_slot - 1]);
-                        return true;
-                    }
+                    _current = new KeyValuePair<int, TValue>(_keys[slot], _map._values[slot]);
+                    return true;
+                }
+                if (_slot == _end && _hasZeroKey)
+                {
+                    ++_slot;
+                    _current = new KeyValuePair<int, TValue>(0, _map._zeroValue);
+                    return true;
                 }
 
                 return false;
@@ -524,7 +632,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     throw new InvalidOperationException("The map changed during enumeration.");
                 }
 
-                _slot = 0;
+                _slot = _entryOffset;
                 _current = default(KeyValuePair<int, TValue>);
             }
 
@@ -669,6 +777,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             private readonly IntMap<TValue> _map;
             private readonly ulong _version;
+            private readonly ushort[] _compactIndices;
+            private readonly int[] _indices;
+            private readonly int _entryOffset;
+            private readonly int _end;
+            private readonly bool _hasZeroKey;
+            private readonly int[] _keys;
             private int _slot;
             private int _current;
 
@@ -676,11 +790,18 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             {
                 _map = map;
                 _version = map._version;
-                _slot = 0;
+                _compactIndices = map._compactIndices;
+                _indices = map._indices;
+                _entryOffset = map._keys.Length;
+                _end = _entryOffset + map._count;
+                _hasZeroKey = map._hasZeroKey;
+                _keys = map._keys;
+                _slot = _entryOffset;
                 _current = 0;
             }
 
             /// <inheritdoc />
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public bool MoveNext()
             {
                 if (_version != _map._version)
@@ -688,16 +809,18 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     throw new InvalidOperationException("The map changed during enumeration.");
                 }
 
-                int keysLength = _map._keys.Length;
-                while (_slot < keysLength)
+                if (_slot < _end)
                 {
-                    int stored = _map._keys[_slot];
+                    int slot = _compactIndices != null ? _compactIndices[_slot] : _indices[_slot];
                     ++_slot;
-                    if (MinimumAllowedKey <= stored)
-                    {
-                        _current = stored;
-                        return true;
-                    }
+                    _current = _keys[slot];
+                    return true;
+                }
+                if (_slot == _end && _hasZeroKey)
+                {
+                    ++_slot;
+                    _current = 0;
+                    return true;
                 }
 
                 return false;
@@ -711,7 +834,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     throw new InvalidOperationException("The map changed during enumeration.");
                 }
 
-                _slot = 0;
+                _slot = _entryOffset;
                 _current = 0;
             }
 
@@ -757,6 +880,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             private readonly IntMap<TValue> _map;
             private readonly ulong _version;
+            private readonly ushort[] _compactIndices;
+            private readonly int[] _indices;
+            private readonly int _entryOffset;
+            private readonly int _end;
+            private readonly bool _hasZeroKey;
             private int _slot;
             private TValue _current;
 
@@ -764,11 +892,17 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             {
                 _map = map;
                 _version = map._version;
-                _slot = 0;
+                _compactIndices = map._compactIndices;
+                _indices = map._indices;
+                _entryOffset = map._keys.Length;
+                _end = _entryOffset + map._count;
+                _hasZeroKey = map._hasZeroKey;
+                _slot = _entryOffset;
                 _current = default(TValue);
             }
 
             /// <inheritdoc />
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public bool MoveNext()
             {
                 if (_version != _map._version)
@@ -776,16 +910,18 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     throw new InvalidOperationException("The map changed during enumeration.");
                 }
 
-                int keysLength = _map._keys.Length;
-                while (_slot < keysLength)
+                if (_slot < _end)
                 {
-                    int stored = _map._keys[_slot];
+                    int slot = _compactIndices != null ? _compactIndices[_slot] : _indices[_slot];
                     ++_slot;
-                    if (MinimumAllowedKey <= stored)
-                    {
-                        _current = _map._values[_slot - 1];
-                        return true;
-                    }
+                    _current = _map._values[slot];
+                    return true;
+                }
+                if (_slot == _end && _hasZeroKey)
+                {
+                    ++_slot;
+                    _current = _map._zeroValue;
+                    return true;
                 }
 
                 return false;
@@ -799,7 +935,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     throw new InvalidOperationException("The map changed during enumeration.");
                 }
 
-                _slot = 0;
+                _slot = _entryOffset;
                 _current = default(TValue);
             }
 

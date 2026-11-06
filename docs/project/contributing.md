@@ -77,10 +77,10 @@ For metadata JSON, run `uv run --project scripts/python~ --locked --no-dev pytho
 The three PowerShell commands remain compatibility entry points. Run `npm run test:lint-doc-counts`
 for count, encoding, newline, read-only, and wrapper exit-code controls.
 
-Release payload staging, archive creation, and Unity metadata generation run through uv. Install uv 0.13.6, then use:
+Release payload staging, archive creation, and Unity metadata generation run through uv. Install uv 0.13.7, then use:
 
 ```bash
-python -m pip install --disable-pip-version-check uv==0.13.6
+python -m pip install --disable-pip-version-check uv==0.13.7
 uv sync --project scripts/python~ --locked
 npm run lint:python
 npm run test:create-unitypackage
@@ -176,6 +176,13 @@ not string literals. Its remaining nearby-filter recognition is a source heurist
 every Undo target is valid. `npm run lint:odin-undo-safety` checks drawers and
 `npm run test:odin-undo-safety` runs its focused tests.
 Run `npm run test:csharp-lints` for discovery, parser and direct/PowerShell CLI controls.
+
+The concurrent-cache checker also runs in typed Python through `npm run lint:concurrent-cache-fill`.
+It requires Runtime, Editor and Styles source roots, ignores comments and literal text, and preserves
+explicit overwrite reasons. Only a plain `SINGLE_THREADED` guard exempts writes; compound conditions
+remain checked because another symbol may enable that branch in a concurrent build. Use
+`npm run test:lint-concurrent-cache-fill` for the original fixtures, parser boundaries and both CLI routes.
+The PowerShell entry points remain compatibility launchers.
 
 The lockfile pins Ruff, mypy, Pyright, pytest, and their dependencies. `lint:python` checks Ruff
 formatting and correctness rules plus both type checkers in strict mode. Function signatures must
@@ -391,7 +398,7 @@ write failures fail validation; an execution failure cannot be mistaken for a cl
 
 ## Python Tooling
 
-Use Python 3.11 for the repository's Python checks. The dev container pins `uv==0.13.6` and
+Use Python 3.11 for the repository's Python checks. The dev container pins `uv==0.13.7` and
 exposes it as `uv`. Documentation CI installs that same version with pip, then installs the
 fully pinned `requirements-docs.lock` with uv. `requirements-docs.txt` lists the direct
 constraints; the lock records their transitive versions. Run locally with:

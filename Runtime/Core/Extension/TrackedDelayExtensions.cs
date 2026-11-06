@@ -13,7 +13,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     public static class TrackedDelayExtensions
     {
         /// <summary>Schedules an action and tracks its pending handle in the supplied owner list.</summary>
-        /// <remarks>Invalid inputs do nothing. Nonpositive and nonfinite delays resume after time advances.</remarks>
+        /// <remarks>Inactive GameObjects do nothing. Nonpositive and nonfinite delays resume after time advances.</remarks>
+        /// <exception cref="ArgumentNullException">The owner is missing or destroyed, or the pending list or action is null.</exception>
         public static void ExecuteTrackedAfterDelay(
             this MonoBehaviour owner,
             List<Coroutine> pending,
@@ -21,6 +22,18 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             float delay
         )
         {
+            if (owner == null)
+            {
+                throw new ArgumentNullException(nameof(owner));
+            }
+            if (pending == null)
+            {
+                throw new ArgumentNullException(nameof(pending));
+            }
+            if (action == null)
+            {
+                throw new ArgumentNullException(nameof(action));
+            }
             owner.TryExecuteTrackedAfterDelay(pending, action, delay);
         }
 

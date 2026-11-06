@@ -50,6 +50,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.That(_pending, Is.Empty);
         }
 
+        [Test]
+        public void RequiredTrackedArgumentsThrowWhileTryRemainsNonthrowing()
+        {
+            Assert.Throws<ArgumentNullException>(() =>
+                ((MonoBehaviour)null).ExecuteTrackedAfterDelay(_pending, _host.Increment, 0f)
+            );
+            Assert.Throws<ArgumentNullException>(() =>
+                _host.ExecuteTrackedAfterDelay(null, _host.Increment, 0f)
+            );
+            Assert.Throws<ArgumentNullException>(() =>
+                _host.ExecuteTrackedAfterDelay(_pending, null, 0f)
+            );
+            Assert.That(_host.TryExecuteTrackedAfterDelay(null, _host.Increment, 0f), Is.False);
+            Assert.That(_host.TryExecuteTrackedAfterDelay(_pending, null, 0f), Is.False);
+            Assert.That(_pending, Is.Empty);
+            Assert.That(_host.InvocationCount, Is.Zero);
+        }
+
         [UnityTest]
         public IEnumerator NonpositiveAndNonfiniteDelaysCompleteWithoutRetainingHandles()
         {
