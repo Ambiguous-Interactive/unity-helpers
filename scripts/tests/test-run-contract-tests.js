@@ -366,6 +366,7 @@ runTest("no contract test in scripts/tests/ has been left unreachable", () => {
   // consolidation trades a loud failure (a chain that visibly lost an entry) for a quiet one (a
   // suite that still exists and no longer runs). The excuse is a PREDICATE, not prose.
   const runElsewhere = new Map([
+    ["scripts/tests/test-lint-concurrent-cache-fill.ps1", "cache-controls"],
     ["scripts/tests/test-lint-unity-test-modules.ps1", "module-controls"],
     ["scripts/tests/test-lint-duplicate-usings.ps1", "duplicate-using-controls"],
     ["scripts/tests/test-lint-odin-undo-safety.ps1", "csharp-controls"],
@@ -381,6 +382,10 @@ runTest("no contract test in scripts/tests/ has been left unreachable", () => {
     ["scripts/tests/test-sync-issue-template-versions.ps1", "workflow"]
   ]);
   const owners = new Map([
+    [
+      "cache-controls",
+      (file) => registeredControlsInvoke(file, "scripts/tests/test_concurrent_cache_fill.py")
+    ],
     [
       "module-controls",
       (file) => registeredControlsInvoke(file, "scripts/tests/test_unity_test_modules.py")

@@ -14,6 +14,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     using System.Collections.Generic;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.DataStructure;
+    using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Tests.TestUtils;
 
     [TestFixture]
@@ -33,6 +34,30 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int.MaxValue - 1,
             int.MaxValue,
         };
+
+        private static void AssertViewsMatch(IntMap<int> map, Dictionary<int, int> oracle)
+        {
+            HashSet<int> seen = new();
+            foreach (KeyValuePair<int, int> entry in map)
+            {
+                Assert.IsTrue(seen.Add(entry.Key), "An entry must be yielded once.");
+                Assert.IsTrue(oracle.TryGetValue(entry.Key, out int expected));
+                Assert.AreEqual(expected, entry.Value);
+            }
+            Assert.AreEqual(oracle.Count, seen.Count);
+            List<int> actualKeys = new();
+            foreach (int key in map.Keys)
+            {
+                actualKeys.Add(key);
+            }
+            List<int> actualValues = new();
+            foreach (int value in map.Values)
+            {
+                actualValues.Add(value);
+            }
+            CollectionAssert.AreEquivalent(oracle.Keys, actualKeys);
+            CollectionAssert.AreEquivalent(oracle.Values, actualValues);
+        }
 
         private static bool IsPowerOfTwo(int value)
         {
@@ -173,6 +198,228 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
 
             Assert.AreEqual(oracle.Count, map.Count);
+        }
+
+        [TestCase(255)]
+        [TestCase(256)]
+        [TestCase(257)]
+        [TestCase(16383)]
+        [TestCase(16384)]
+        [TestCase(16385)]
+        [TestCase(65535)]
+        [TestCase(65536)]
+        [TestCase(65537)]
+        public void EnumerationStaysCompleteAcrossGrowthAndRemovalBoundaries(int count)
+        {
+            IntMap<int> map = new(0);
+            for (int key = 0; key < count; ++key)
+            {
+                if (!map.TrySet(key, key))
+                {
+                    Assert.Fail($"Could not add {key}.");
+                }
+            }
+            Assert.That(map.Remove(count - 1, out int last), Is.True);
+            Assert.That(last, Is.EqualTo(count - 1));
+            Assert.That(map.Remove(0, out int first), Is.True);
+            Assert.That(first, Is.Zero);
+            HashSet<int> seen = new();
+            foreach (KeyValuePair<int, int> pair in map)
+            {
+                if (
+                    pair.Key != pair.Value
+                    || pair.Key < 1
+                    || count - 1 <= pair.Key
+                    || !seen.Add(pair.Key)
+                )
+                {
+                    Assert.Fail($"Invalid or repeated entry {pair.Key}.");
+                }
+            }
+            Assert.That(seen.Count, Is.EqualTo(count - 2));
+            int keyCount = 0;
+            foreach (int key in map.Keys)
+            {
+                if (!seen.Contains(key))
+                {
+                    Assert.Fail($"Unexpected key {key}.");
+                }
+                ++keyCount;
+            }
+            int valueCount = 0;
+            foreach (int value in map.Values)
+            {
+                if (!seen.Contains(value))
+                {
+                    Assert.Fail($"Unexpected value {value}.");
+                }
+                ++valueCount;
+            }
+            Assert.That(keyCount, Is.EqualTo(seen.Count));
+            Assert.That(valueCount, Is.EqualTo(seen.Count));
+            map.Clear();
+            Assert.That(map.Count, Is.Zero);
+            Assert.That(map.TrySet(int.MaxValue, 7), Is.True);
+            Dictionary<int, int> expected = new() { { int.MaxValue, 7 } };
+            AssertViewsMatch(map, expected);
+        }
+
+        [Test]
+        public void ZeroKeyKeepsPresenceAndValueAcrossGrowthRemovalAndClear()
+        {
+            IntMap<string> map = new(0);
+            Assert.IsTrue(map.TrySet(0, null));
+            Assert.IsFalse(map.IsEmpty);
+            Assert.That(map.Count, Is.EqualTo(1));
+            Assert.IsTrue(map.TryGet(0, out string initial));
+            Assert.That(initial, Is.Null);
+            Assert.IsTrue(map.ContainsKey(0));
+            Assert.IsFalse(map.ContainsKey(1));
+            Assert.That(map[0], Is.Null);
+            IntMap<string>.Enumerator snapshot = map.GetEnumerator();
+            map[0] = "zero";
+            Assert.Throws<InvalidOperationException>(() => snapshot.MoveNext());
+            for (int key = 1; key < 66; ++key)
+            {
+                map.TrySet(key, "other");
+            }
+            Assert.That(map.Count, Is.EqualTo(66));
+            Assert.IsTrue(map.TryGet(0, out string grown));
+            Assert.That(grown, Is.EqualTo("zero"));
+            int zeros = 0;
+            foreach (KeyValuePair<int, string> pair in map)
+            {
+                if (pair.Key == 0)
+                {
+                    ++zeros;
+                    Assert.That(pair.Value, Is.EqualTo("zero"));
+                }
+            }
+            Assert.That(zeros, Is.EqualTo(1));
+            Assert.IsTrue(map.Remove(0, out string removed));
+            Assert.That(removed, Is.EqualTo("zero"));
+            Assert.IsFalse(map.TryGet(0, out string absent));
+            Assert.That(absent, Is.Null);
+            Assert.IsFalse(map.Remove(0, out _));
+            Assert.Throws<KeyNotFoundException>(() =>
+            {
+                _ = map[0];
+            });
+            map.Clear();
+            Assert.IsTrue(map.IsEmpty);
+            Assert.IsTrue(map.TrySet(0, "again"));
+            Assert.That(map.Count, Is.EqualTo(1));
+            Assert.That(map[0], Is.EqualTo("again"));
+            Assert.IsTrue(map.Remove(0, out _));
+            Assert.IsTrue(map.IsEmpty);
+        }
+
+        [Test]
+        public void TypedViewsReplacementRemovalAndClearHaveNoProfilerAllocationEvents()
+        {
+            object[] retained = new object[1];
+            object existing = new();
+            Action allocate = () => retained[0] = new object();
+            Action reuse = () => retained[0] = existing;
+            const int iterations = 128;
+            const int capacity = 512;
+            long positive = ProfilerAllocationCounter.Measure(allocate, iterations, capacity);
+            if (positive == 0)
+            {
+                Assert.Ignore("The GC.Alloc recorder cannot observe fresh retained objects.");
+            }
+            Assert.That(positive, Is.EqualTo(iterations));
+            Assert.That(ProfilerAllocationCounter.Measure(reuse, iterations, capacity), Is.Zero);
+            IntMap<int> map = new();
+            for (int key = 0; key < 16; ++key)
+            {
+                map.TrySet(key, key);
+            }
+            int sum = 0;
+            Action operations = () =>
+            {
+                map.TrySet(7, 7);
+                map.Remove(11, out _);
+                map.TrySet(11, 11);
+                foreach (KeyValuePair<int, int> pair in map)
+                {
+                    sum += pair.Value;
+                }
+                foreach (int key in map.Keys)
+                {
+                    sum += key;
+                }
+                foreach (int value in map.Values)
+                {
+                    sum += value;
+                }
+                map.Clear();
+                for (int key = 0; key < 16; ++key)
+                {
+                    map.TrySet(key, key);
+                }
+            };
+            Assert.That(
+                ProfilerAllocationCounter.Measure(operations, iterations, capacity),
+                Is.Zero
+            );
+            Assert.That(sum, Is.EqualTo((iterations + 64) * 360));
+            Assert.That(map.Capacity, Is.EqualTo(64));
+        }
+
+        [TestCase(0, 0)]
+        [TestCase(0, 1)]
+        [TestCase(0, 2)]
+        [TestCase(4096, 0)]
+        [TestCase(4096, 1)]
+        [TestCase(4096, 2)]
+        public void EveryViewMatchesTheOracleAfterEachRemovalAndRefill(
+            int capacityHint,
+            int keyShape
+        )
+        {
+            IntMap<int> map = new(capacityHint);
+            Dictionary<int, int> oracle = new();
+            Random random = new(7391);
+            List<int> keys = new();
+            for (int index = 0; index < 129; ++index)
+            {
+                int key =
+                    keyShape == 0 ? index
+                    : keyShape == 1 ? index * 1024
+                    : random.Next();
+                if (oracle.ContainsKey(key))
+                {
+                    --index;
+                    continue;
+                }
+                keys.Add(key);
+                oracle.Add(key, index);
+                Assert.IsTrue(map.TrySet(key, index));
+            }
+            for (int remaining = keys.Count; 0 < remaining; --remaining)
+            {
+                int index = random.Next(remaining);
+                int key = keys[index];
+                keys[index] = keys[remaining - 1];
+                Assert.IsTrue(oracle.Remove(key, out int expected));
+                Assert.IsTrue(map.Remove(key, out int actual));
+                Assert.AreEqual(expected, actual);
+                AssertViewsMatch(map, oracle);
+            }
+            Assert.AreEqual(0, map.Count);
+            foreach (int key in BoundaryKeys)
+            {
+                Assert.IsTrue(map.TrySet(key, key));
+                oracle.Add(key, key);
+            }
+            AssertViewsMatch(map, oracle);
+            map.Clear();
+            oracle.Clear();
+            AssertViewsMatch(map, oracle);
+            Assert.IsTrue(map.TrySet(0, 42));
+            oracle.Add(0, 42);
+            AssertViewsMatch(map, oracle);
         }
 
         [Test]

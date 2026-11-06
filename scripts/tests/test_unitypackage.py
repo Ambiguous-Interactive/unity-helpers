@@ -515,5 +515,5 @@ def test_python_bootstrap_uses_native_powershell() -> None:
         "pip",
         "install",
         "--disable-pip-version-check",
-        "uv==0.13.6",
+        "uv==0.13.7",
     ]

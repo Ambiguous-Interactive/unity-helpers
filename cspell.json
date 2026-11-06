@@ -964,7 +964,11 @@
         "clis",
         "pyproject",
         "noextension",
-        "unrotated"
+        "unrotated",
+        "WSL",
+        "sgen",
+        "mscorlib",
+        "libc"
       ]
     }
   ],

@@ -372,7 +372,8 @@ Use `TrackedDelayExtensions` when an owner has several one-shot callbacks pendin
 more work. Nonpositive, NaN and infinite delays resume after scaled time advances, like a zero-second delay.
 
 `TryExecuteTrackedAfterDelay` returns false for a missing owner, inactive GameObject, missing list
-or missing callback. `ExecuteTrackedAfterDelay` ignores those inputs. Stopping forgets the current
+or missing callback. `ExecuteTrackedAfterDelay` throws `ArgumentNullException` for a missing or
+destroyed owner, missing list or missing callback; an inactive GameObject schedules nothing. Stopping forgets the current
 handles before cancellation, so callbacks that schedule more work during cancellation retain their
 new handles. A destroyed owner still clears the list. These APIs run on Unity's main thread;
 stopping a coroutine through another API does not remove its tracked handle.
@@ -385,8 +386,12 @@ Use `owner.StartPeriodicJob(tick, updateRate)` from
 `WallstopStudios.UnityHelpers.Core.Extension` to name each tick in the Unity Profiler.
 The marker is `PeriodicJob.<context type>.<callback method>`. Pass `context` when the work
 belongs to another object; the coroutine still stops with its host. A missing or destroyed host,
-inactive GameObject, or missing callback returns null. A disabled behaviour on an active GameObject
-can host work, like an ordinary Unity coroutine.
+or a missing callback, throws `ArgumentNullException`. An inactive GameObject returns null. A disabled
+behaviour on an active GameObject can host work, like an ordinary Unity coroutine.
+
+`StartFunctionAsCoroutine`, `ExecuteFunctionAfterDelay`, `ExecuteFunctionNextFrame` and
+`ExecuteFunctionAfterFrame` use the same required-owner and required-action contract. Validate optional
+inputs before calling these methods, or use `TryExecuteTrackedAfterDelay` when scheduling may fail.
 
 The first tick runs during startup unless `waitBefore` or `useJitter` delays it. Jobs use scaled
 time, run at most once per frame, and start each interval after the previous callback finishes.

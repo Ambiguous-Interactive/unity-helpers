@@ -21,13 +21,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         public void InvalidOwnersAndCallbacksDoNotStartWork()
         {
             int calls = 0;
-            Assert.That(((MonoBehaviour)null).StartPeriodicJob(() => ++calls, 0f), Is.Null);
+            Assert.Throws<ArgumentNullException>(() =>
+                Assert.That(((MonoBehaviour)null).StartPeriodicJob(() => ++calls, 0f), Is.Null)
+            );
             CoroutineHost host = CreateHost();
-            Assert.That(host.StartPeriodicJob(null, 0f), Is.Null);
+            Assert.Throws<ArgumentNullException>(() =>
+                Assert.That(host.StartPeriodicJob(null, 0f), Is.Null)
+            );
             host.gameObject.SetActive(false);
             Assert.That(host.StartPeriodicJob(() => ++calls, 0f), Is.Null);
             DestroyTrackedObjects();
-            Assert.That(host.StartPeriodicJob(() => ++calls, 0f), Is.Null);
+            Assert.Throws<ArgumentNullException>(() =>
+                Assert.That(host.StartPeriodicJob(() => ++calls, 0f), Is.Null)
+            );
             Assert.That(calls, Is.Zero);
         }
 

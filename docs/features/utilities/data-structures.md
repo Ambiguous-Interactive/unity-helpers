@@ -378,6 +378,45 @@ used an Intel Core Ultra 9 285K with fixed CPU affinity, elevated priority and H
 establish the same benefit for ordinary scheduling, IL2CPP or a different device. Earlier Editor
 measurements used a previous hash layout and do not describe the current implementation.
 
+### Enumeration storage
+
+Pairs, keys and values walk a dense list of occupied slots in O(Count), including after removals
+from a large table. Typed iteration uses struct enumerators and allocates no iterator. Changing any
+entry invalidates existing enumerators. Removal may move the final occupied slot into the removed
+entry's position, so enumeration order is unspecified.
+
+The map keeps its parallel key/value lookup arrays. One additional array stores reverse positions
+and the dense slot list: `ushort` elements through 65,536 slots, and `int` elements above that. The zero key has separate
+storage. `Clear` releases stored references while retaining all arrays. Scope enumerators to the
+walk, since they cache references to the integer indexing arrays.
+
+### Iteration measurements and costs
+
+An independent integer-valued benchmark compared release 3.7.1, this map, and
+`Dictionary<int,int>` on an Intel Core Ultra 9 285K. Each cell used three fresh processes,
+64 warm-up passes, calibrated intervals of at least 25 ms, and 21 rotating-order rounds.
+The table shows ratios of median process medians; lower is faster. Dense, seeded sparse,
+and shared-low-bit keys each used 64 and 1,024 entries.
+
+| Runtime                   | Pair iteration / Dictionary | Pair iteration / 3.7.1 | Hits / 3.7.1 | Misses / 3.7.1 | Clear and refill / 3.7.1 | Fresh construction and fill / 3.7.1 |
+| ------------------------- | --------------------------- | ---------------------- | ------------ | -------------- | ------------------------ | ----------------------------------- |
+| .NET 10.0.14 x64, Windows | 1.09–1.36                   | 0.20–0.22              | 1.00–1.07    | 0.63–0.79      | 0.64–0.81                | 0.79–0.92                           |
+| Mono 6.14.1 x64, Linux    | 1.07–1.27                   | 0.18–0.24              | 1.00–1.06    | 1.01–1.12      | 0.85–1.03                | 1.01–1.31                           |
+
+The extra index array improves iteration while increasing memory and construction costs.
+At 1,024 entries, fresh construction and fill on Mono took 24–31% longer; the shared-low-bit
+miss case took about 12% longer. This does not meet every target in
+[#1131](https://github.com/wallstop/unity-helpers/issues/1131), which remains open.
+Choose this map for repeated lookup and iteration only after measuring your workload.
+These measurements do not qualify IL2CPP, Unity editor timings, arbitrary value sizes, or
+large-table cache behavior. Runtime results used different operating systems and must not
+be compared as a cross-runtime speed claim.
+
+The [raw samples, source identities, and replay program](../../performance/intmap-iteration-evidence.json)
+retain all six completed processes. The hash-code shim is outside the measured operations.
+Native Unity correctness tests also cover index-width transitions, zero-key storage, mutation
+checks, removal and refill, and allocation events with positive and negative controls.
+
 ### Capacity and key limits
 
 - Keys below `IntMap<TValue>.MinimumAllowedKey` are reserved. `TrySet` refuses them; the indexer

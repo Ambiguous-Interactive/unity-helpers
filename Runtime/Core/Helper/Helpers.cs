@@ -627,7 +627,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <param name="updateRate">Interval in seconds; nonpositive or nonfinite values invoke once per frame.</param>
         /// <param name="useJitter">If true, applies a single randomized initial delay up to <paramref name="updateRate"/>.</param>
         /// <param name="waitBefore">If true, waits one interval before the first invocation.</param>
-        /// <returns>The started coroutine.</returns>
+        /// <returns>The started coroutine, or null when its GameObject is inactive.</returns>
+        /// <exception cref="ArgumentNullException">The owner is missing or destroyed, or the action is null.</exception>
         /// <remarks>
         /// An exception out of <paramref name="action"/> does not stop the job. The first failure is
         /// reported once as an error against <paramref name="monoBehaviour"/>, subsequent failures are
@@ -667,7 +668,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <param name="useJitter">If true, applies a single randomized initial delay up to <paramref name="updateRate"/>.</param>
         /// <param name="waitBefore">If true, waits one interval before the first invocation.</param>
         /// <param name="context">The object that owns the work for error reporting, or the coroutine host when null.</param>
-        /// <returns>The started coroutine.</returns>
+        /// <returns>The started coroutine, or null when its GameObject is inactive.</returns>
+        /// <exception cref="ArgumentNullException">The owner is missing or destroyed, or the action is null.</exception>
         public static Coroutine StartFunctionAsCoroutine(
             this MonoBehaviour monoBehaviour,
             Action action,
@@ -698,7 +700,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <param name="waitBefore">If true, waits one interval before the first invocation.</param>
         /// <param name="context">The object that owns the work, or the coroutine host when null.</param>
         /// <param name="exceptionHandler">Receives the zero-based invocation index, context, and exception for each failure.</param>
-        /// <returns>The started coroutine.</returns>
+        /// <returns>The started coroutine, or null when its GameObject is inactive.</returns>
+        /// <exception cref="ArgumentNullException">The owner is missing or destroyed, or the action is null.</exception>
         /// <remarks>
         /// The job continues when either the action or handler throws. A handler failure is reported
         /// once through Unity, while later action failures still reach the handler.
@@ -714,61 +717,67 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             Action<ulong, Object, Exception> exceptionHandler
         )
         {
-            if (action == null)
+            if (!CanHostCoroutine(monoBehaviour, action))
             {
-                throw new ArgumentNullException(nameof(action));
+                return null;
             }
 
-            return monoBehaviour.StartCoroutine(
-                FunctionAsCoroutine(
-                    context != null ? context : monoBehaviour,
-                    action,
-                    updateRate,
-                    useJitter,
-                    waitBefore,
-                    exceptionHandler
-                )
+            Object reportingContext = context != null ? context : monoBehaviour;
+            IEnumerator routine = FunctionAsCoroutine(
+                reportingContext,
+                action,
+                updateRate,
+                useJitter,
+                waitBefore,
+                exceptionHandler
             );
+            return monoBehaviour.StartCoroutine(routine);
         }
 
+        /// <summary>Schedules one action after the requested delay.</summary>
+        /// <remarks>Inactive GameObjects return null; disabled components on active GameObjects can host work.</remarks>
+        /// <exception cref="ArgumentNullException">The owner is missing or destroyed, or the action is null.</exception>
         public static Coroutine ExecuteFunctionAfterDelay(
             this MonoBehaviour monoBehaviour,
             Action action,
             float delay
         )
         {
-            if (action == null)
+            if (!CanHostCoroutine(monoBehaviour, action))
             {
-                throw new ArgumentNullException(nameof(action));
+                return null;
             }
 
-            return monoBehaviour.StartCoroutine(FunctionDelayAsCoroutine(action, delay));
+            IEnumerator routine = FunctionDelayAsCoroutine(action, delay);
+            return monoBehaviour.StartCoroutine(routine);
         }
 
+        /// <summary>Schedules one action after time advances.</summary>
+        /// <remarks>Inactive GameObjects return null; disabled components on active GameObjects can host work.</remarks>
+        /// <exception cref="ArgumentNullException">The owner is missing or destroyed, or the action is null.</exception>
         public static Coroutine ExecuteFunctionNextFrame(
             this MonoBehaviour monoBehaviour,
             Action action
         )
         {
-            if (action == null)
-            {
-                throw new ArgumentNullException(nameof(action));
-            }
-
             return monoBehaviour.ExecuteFunctionAfterDelay(action, 0f);
         }
 
+        /// <summary>Schedules one action on the next frame.</summary>
+        /// <remarks>Inactive GameObjects return null; disabled components on active GameObjects can host work.</remarks>
+        /// <exception cref="ArgumentNullException">The owner is missing or destroyed, or the action is null.</exception>
         public static Coroutine ExecuteFunctionAfterFrame(
             this MonoBehaviour monoBehaviour,
             Action action
         )
         {
-            if (action == null)
+            if (!CanHostCoroutine(monoBehaviour, action))
             {
-                throw new ArgumentNullException(nameof(action));
+                return null;
             }
 
-            return monoBehaviour.StartCoroutine(FunctionAfterFrame(action));
+            IEnumerator routine = FunctionAfterFrame(action);
+            return monoBehaviour.StartCoroutine(routine);
         }
 
         /// <summary>
@@ -1310,6 +1319,19 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     yield return null;
                 } while (!HasEnoughTimePassed(startTime, interval));
             }
+        }
+
+        private static bool CanHostCoroutine(MonoBehaviour monoBehaviour, Action action)
+        {
+            if (monoBehaviour == null)
+            {
+                throw new ArgumentNullException(nameof(monoBehaviour));
+            }
+            if (action == null)
+            {
+                throw new ArgumentNullException(nameof(action));
+            }
+            return monoBehaviour.gameObject.activeInHierarchy;
         }
 
         private static void ReportRepeatingJobFailure(

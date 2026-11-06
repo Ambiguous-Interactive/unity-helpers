@@ -9,7 +9,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
     using System.IO;
     using System.Text;
     using NUnit.Framework;
-    using UnityEditor;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Animation;
     using WallstopStudios.UnityHelpers.Core.Serialization;
@@ -25,9 +24,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
     [Category("Integration")]
     public sealed class AnimationCreatorConfigTests : CommonTestBase
     {
-        private string _tempFolder;
-        private string _tempFolderAbsolute;
-
         private static IEnumerable<TestCaseData> ConfigPathTestCases()
         {
             yield return new TestCaseData(
@@ -59,40 +55,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 "Assets/My Sprites",
                 "Assets/My Sprites/.animation-creator.json"
             ).SetName("ConfigPath.Normal.InternalSpaces");
-        }
-
-        [SetUp]
-        public override void BaseSetUp()
-        {
-            base.BaseSetUp();
-            _tempFolder = "Assets/TestAnimationCreatorConfig_" + Guid.NewGuid().ToString("N")[..8];
-            _tempFolderAbsolute = Path.GetFullPath(_tempFolder);
-            if (!Directory.Exists(_tempFolderAbsolute))
-            {
-                Directory.CreateDirectory(_tempFolderAbsolute);
-                AssetDatabase.Refresh();
-            }
-            _trackedFolders.Add(_tempFolder);
-        }
-
-        [TearDown]
-        public override void TearDown()
-        {
-            base.TearDown();
-            if (Directory.Exists(_tempFolderAbsolute))
-            {
-                try
-                {
-                    Directory.Delete(_tempFolderAbsolute, true);
-                    string metaPath = _tempFolderAbsolute + ".meta";
-                    if (File.Exists(metaPath))
-                    {
-                        File.Delete(metaPath);
-                    }
-                    AssetDatabase.Refresh();
-                }
-                catch { }
-            }
         }
 
         [TestCaseSource(nameof(ConfigPathTestCases))]
@@ -439,24 +401,36 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 },
             };
 
-            string configPath = AnimationCreatorConfig.GetConfigPath(_tempFolder);
-            string fullPath = Path.GetFullPath(configPath);
+            string temporaryRoot = Path.GetTempPath();
+            string directoryName =
+                nameof(AnimationCreatorConfigTests) + Guid.NewGuid().ToString("N");
+            string temporaryFolder = Path.Combine(temporaryRoot, directoryName);
+            Directory.CreateDirectory(temporaryFolder);
+            try
+            {
+                string configPath = AnimationCreatorConfig.GetConfigPath(temporaryFolder);
+                string fullPath = Path.GetFullPath(configPath);
 
-            string json = Serializer.JsonStringify(original, pretty: true);
-            File.WriteAllText(fullPath, json, Encoding.UTF8);
+                string json = Serializer.JsonStringify(original, pretty: true);
+                File.WriteAllText(fullPath, json, Encoding.UTF8);
 
-            Assert.IsTrue(File.Exists(fullPath));
+                Assert.IsTrue(File.Exists(fullPath));
 
-            string loadedJson = File.ReadAllText(fullPath, Encoding.UTF8);
-            AnimationCreatorConfig loaded = Serializer.JsonDeserialize<AnimationCreatorConfig>(
-                loadedJson
-            );
+                string loadedJson = File.ReadAllText(fullPath, Encoding.UTF8);
+                AnimationCreatorConfig loaded = Serializer.JsonDeserialize<AnimationCreatorConfig>(
+                    loadedJson
+                );
 
-            Assert.IsTrue(loaded != null);
-            Assert.AreEqual("^Enemy_.*$", loaded.spriteNameRegex);
-            Assert.AreEqual("AI_", loaded.autoParseNamePrefix);
-            Assert.AreEqual(1, loaded.animationEntries.Count);
-            Assert.AreEqual("Attack", loaded.animationEntries[0].animationName);
+                Assert.IsTrue(loaded != null);
+                Assert.AreEqual("^Enemy_.*$", loaded.spriteNameRegex);
+                Assert.AreEqual("AI_", loaded.autoParseNamePrefix);
+                Assert.AreEqual(1, loaded.animationEntries.Count);
+                Assert.AreEqual("Attack", loaded.animationEntries[0].animationName);
+            }
+            finally
+            {
+                Directory.Delete(temporaryFolder, true);
+            }
         }
 
         [Test]

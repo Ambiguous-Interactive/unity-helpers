@@ -126,7 +126,7 @@ jobs:
           fi
 
       - name: Install uv
-        run: python -m pip install --disable-pip-version-check uv==0.13.6
+        run: python -m pip install --disable-pip-version-check uv==0.13.7
 
       - name: Validate migrated Python scripts
         working-directory: unity-helpers
@@ -273,7 +273,8 @@ jobs:
           scripts/tests/test_browser_consumer.py scripts/tests/test_fixture_assets.py
           scripts/tests/test_slow_tests.py scripts/tests/test_production_test_hooks.py scripts/tests/test_ci_modes.py
           scripts/tests/test_frozen_files.py scripts/tests/test_doc_counts.py
-          scripts/tests/test_duplicate_usings.py scripts/tests/test_unity_test_modules.py -q
+          scripts/tests/test_duplicate_usings.py scripts/tests/test_unity_test_modules.py
+          scripts/tests/test_concurrent_cache_fill.py -q
 
       - name: Verify compiler payload publication on Windows
         shell: pwsh

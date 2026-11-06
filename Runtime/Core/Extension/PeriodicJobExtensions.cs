@@ -15,10 +15,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <summary>Starts periodic work with a profiler marker and resilient failure reporting.</summary>
         /// <remarks>
         /// Uses scaled time and invokes at most once per frame, without catch-up ticks.
-        /// Nonpositive and nonfinite intervals run once per frame. Invalid inputs return null.
+        /// Nonpositive and nonfinite intervals run once per frame. Inactive GameObjects return null.
         /// The optional context names the work and receives its first failure report; the host owns its lifetime.
         /// Each job allocates on startup; scheduling and waits reuse that storage. Callback allocations are separate.
         /// </remarks>
+        /// <exception cref="ArgumentNullException">The owner is missing or destroyed, or the tick is null.</exception>
         public static Coroutine StartPeriodicJob(
             this MonoBehaviour owner,
             Action tick,
@@ -28,7 +29,15 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             Object context = null
         )
         {
-            if (owner == null || tick == null || !owner.gameObject.activeInHierarchy)
+            if (owner == null)
+            {
+                throw new ArgumentNullException(nameof(owner));
+            }
+            if (tick == null)
+            {
+                throw new ArgumentNullException(nameof(tick));
+            }
+            if (!owner.gameObject.activeInHierarchy)
             {
                 return null;
             }
