@@ -214,12 +214,35 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.That(map.GetOrAdd(null, _ => (++calls).ToString()), Is.Null);
             Assert.That(map.GetOrAdd(key, null), Is.Null);
             Assert.That(map.GetOrAdd<int>(key, null, 1), Is.Null);
-            Assert.That(map.GetOrAdd(key, static (_, state) => state, (string)null), Is.Null);
-            Assert.That(map.ContainsKey(key), Is.True);
-            Assert.That(map.GetOrAdd(key, _ => (++calls).ToString()), Is.Null);
+            Assert.That(map.ContainsKey(key), Is.False);
             map.Dispose();
             Assert.That(map.GetOrAdd(key, _ => (++calls).ToString()), Is.Null);
             Assert.That(calls, Is.Zero);
+        }
+
+        [Test]
+        public void NullStateCreatesAStoredNullValueAndLaterHitsDoNotInvokeTheFactory()
+        {
+            using UnityObjectMap<GameObject, string> map = new();
+            GameObject key = Track(new GameObject(nameof(key)));
+            int calls = 0;
+            Assert.That(
+                map.GetOrAdd(
+                    key,
+                    (_, state) =>
+                    {
+                        ++calls;
+                        return state;
+                    },
+                    (string)null
+                ),
+                Is.Null
+            );
+            Assert.That(calls, Is.EqualTo(1));
+            Assert.That(map.TryGetValue(key, out string stored), Is.True);
+            Assert.That(stored, Is.Null);
+            Assert.That(map.GetOrAdd(key, _ => (++calls).ToString()), Is.Null);
+            Assert.That(calls, Is.EqualTo(1));
         }
 
         [Test]

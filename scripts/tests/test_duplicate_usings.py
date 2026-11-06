@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
@@ -37,6 +38,10 @@ ROOT = Path(__file__).resolve().parents[2]
         ("using System . IO; using System.IO;", 1),
         ("using System.\nIO; using System.IO;", 1),
         ("using System /* comment */ . IO; using System.IO;", 1),
+        ("using/*a*/System; using/*b*/System;", 1),
+        ("using/*a*/System; using System;", 1),
+        ("using/*a*/static/*b*/System.Math; using static System.Math;", 1),
+        ("global/*a*/using X; global using X;", 1),
         ("using A = System.\nIO; using A=System.IO;", 1),
         ("global using System; global using System;", 1),
         ("extern alias Lib; using X; using X;", 1),
@@ -57,6 +62,16 @@ ROOT = Path(__file__).resolve().parents[2]
         ),
         ("namespace A { class C {} } namespace B { using X; using X; }", 1),
         ("#if SYMBOL\nnamespace A { using X; using X; }\n#endif", 1),
+        ("#if A\nusing X;\n#else\nusing X;\n#endif", 0),
+        ("#if A\nusing X;\n#elif B\nusing X;\n#else\nusing X;\n#endif", 0),
+        ("using X;\n#if A\nusing X;\n#else\nusing X;\n#endif", 2),
+        ("#if A\nusing X;\n#else\nusing X;\n#endif\nusing X;", 1),
+        ("#if A\nusing X; using X;\n#else\nusing X;\n#endif", 1),
+        ("#if A\nusing X;\n#endif\n#if B\nusing X;\n#endif", 1),
+        ("#if A\n#if B\nusing X;\n#else\nusing X;\n#endif\n#else\nusing X;\n#endif", 0),
+        ("#if A\nclass C {}\n#else\nusing X; using X;\n#endif", 1),
+        ("/*\n#if A\n*/\nusing X;\n/*\n#else\n*/\nusing X;", 1),
+        ("# if A\nusing X;\n# else\nusing X;\n# endif", 0),
         ("using X; /* a */ using X; using X;", 2),
         ("using X; using x;", 0),
     ],
@@ -112,6 +127,60 @@ def test_read_failure_does_not_hide_sibling_finding(
     sibling.write_text("using X; using X;", encoding="utf-8")
     assert lint.main(["--paths", str(broken), str(sibling)]) == 1
     assert "UNH007" in capsys.readouterr().out
+
+
+def directory_redirect(link: Path, target: Path) -> None:
+    """Exercise directory redirects without requiring Windows file-symlink privileges."""
+    if os.name == "nt":
+        executable = shutil.which("cmd")
+        assert executable is not None
+        subprocess.run(
+            [executable, "/c", "mklink", "/J", str(link), str(target)],
+            capture_output=True,
+            check=True,
+            timeout=30,
+        )
+    else:
+        link.symlink_to(target, target_is_directory=True)
+
+
+def test_explicit_paths_allow_checkout_ancestors_but_refuse_internal_redirects(
+    tmp_path: Path,
+) -> None:
+    physical = tmp_path / "physical"
+    repository = physical / "checkout"
+    runtime = repository / "Runtime"
+    runtime.mkdir(parents=True)
+    (runtime / "Input.cs").write_text("using X;", encoding="utf-8")
+    alias = tmp_path / "alias"
+    directory_redirect(alias, physical)
+    logical = alias / "checkout"
+    assert (
+        lint.main(["--repo-root", str(repository), "--paths", str(logical / "Runtime/Input.cs")])
+        == 0
+    )
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "Input.cs").write_text("using X;", encoding="utf-8")
+    directory_redirect(runtime / "redirect", outside)
+    for root in (repository, logical):
+        assert (
+            lint.main(
+                ["--repo-root", str(repository), "--paths", str(root / "Runtime/redirect/Input.cs")]
+            )
+            == 1
+        )
+
+
+def test_explicit_linked_file_is_refused(tmp_path: Path) -> None:
+    source = tmp_path / "Input.cs"
+    source.write_text("using X;", encoding="utf-8")
+    link = tmp_path / "Alias.cs"
+    try:
+        link.symlink_to(source)
+    except (OSError, NotImplementedError) as error:
+        pytest.skip(f"File symlinks unavailable: {error}")
+    assert lint.main(["--repo-root", str(tmp_path), "--paths", str(link)]) == 1
 
 
 def git(repository: Path, *arguments: str) -> None:

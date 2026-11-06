@@ -49,6 +49,7 @@ PREFIX = "com.unity.modules."
 
 
 def unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    """Reject repeated keys before JSON normalization can erase them."""
     result: dict[str, object] = {}
     for key, value in pairs:
         if key in result:
@@ -96,6 +97,7 @@ def validate(value: object) -> list[str]:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Validate the manifest before a Unity test project starts."""
     configure_output()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(

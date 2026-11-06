@@ -92,6 +92,9 @@ function New-TestRepo {
     Copy-Item (Join-Path $repoRoot 'scripts/run-prettier.js') (Join-Path $scriptsDir 'run-prettier.js') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/fix-markdown-fence-languages.ps1') (Join-Path $scriptsDir 'fix-markdown-fence-languages.ps1') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/lint-duplicate-usings.ps1') (Join-Path $scriptsDir 'lint-duplicate-usings.ps1') -Force
+    foreach ($name in @('lint_duplicate_usings.py', 'lint_unity_file_naming.py', 'csharp_sources.py')) {
+        Copy-Item (Join-Path $repoRoot 'scripts' $name) (Join-Path $scriptsDir $name) -Force
+    }
     Copy-Item (Join-Path $repoRoot 'scripts/lint-tests.ps1') (Join-Path $scriptsDir 'lint-tests.ps1') -Force
     # No .config/dotnet-tools.json is copied on purpose: these fixtures are synthetic repositories
     # whose C# is written to exercise .meta and staging behavior, not formatting. agent-preflight
