@@ -298,17 +298,23 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         internal static bool IsSupportedAlignment(int alignment)
         {
-            return alignment
-                is (int)SpriteAlignment.Center
-                    or (int)SpriteAlignment.TopLeft
-                    or (int)SpriteAlignment.TopCenter
-                    or (int)SpriteAlignment.TopRight
-                    or (int)SpriteAlignment.LeftCenter
-                    or (int)SpriteAlignment.RightCenter
-                    or (int)SpriteAlignment.BottomLeft
-                    or (int)SpriteAlignment.BottomCenter
-                    or (int)SpriteAlignment.BottomRight
-                    or (int)SpriteAlignment.Custom;
+            SpriteAlignment spriteAlignment = (SpriteAlignment)alignment;
+            switch (spriteAlignment)
+            {
+                case SpriteAlignment.Center:
+                case SpriteAlignment.TopLeft:
+                case SpriteAlignment.TopCenter:
+                case SpriteAlignment.TopRight:
+                case SpriteAlignment.LeftCenter:
+                case SpriteAlignment.RightCenter:
+                case SpriteAlignment.BottomLeft:
+                case SpriteAlignment.BottomCenter:
+                case SpriteAlignment.BottomRight:
+                case SpriteAlignment.Custom:
+                    return true;
+                default:
+                    return false;
+            }
         }
 
         private static TextureImporterSettings CreateTextureSettings()

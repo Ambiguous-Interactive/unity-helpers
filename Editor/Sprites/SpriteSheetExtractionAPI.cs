@@ -424,11 +424,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             Rect rect = request.SourceRect;
+            Vector2 position = rect.position;
+            Vector2 size = rect.size;
             if (
-                !float.IsFinite(rect.x)
-                || !float.IsFinite(rect.y)
-                || !float.IsFinite(rect.width)
-                || !float.IsFinite(rect.height)
+                !WallMath.IsFinite(position)
+                || !WallMath.IsFinite(size)
                 || rect.width <= 0f
                 || rect.height <= 0f
             )

@@ -1331,7 +1331,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 throw new ArgumentException(nameof(octaveOffsetRange));
             }
 
-            if (!float.IsFinite(baseOffset.x) || !float.IsFinite(baseOffset.y))
+            if (!WallMath.IsFinite(baseOffset))
             {
                 throw new ArgumentException(nameof(baseOffset));
             }

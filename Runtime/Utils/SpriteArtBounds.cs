@@ -62,10 +62,8 @@ namespace WallstopStudios.UnityHelpers.Utils
                 || width <= 0
                 || height <= 0
                 || (long)width * height != pixels.Length
-                || !WallMath.IsFinite(pivot.x)
-                || !WallMath.IsFinite(pivot.y)
-                || !WallMath.IsFinite(units.x)
-                || !WallMath.IsFinite(units.y)
+                || !WallMath.IsFinite(pivot)
+                || !WallMath.IsFinite(units)
                 || units.x <= 0
                 || units.y <= 0
             )
@@ -160,14 +158,10 @@ namespace WallstopStudios.UnityHelpers.Utils
             Vector3 minimum = result.min;
             Vector3 maximum = result.max;
             if (
-                !WallMath.IsFinite(center.x)
-                || !WallMath.IsFinite(center.y)
-                || !WallMath.IsFinite(size.x)
-                || !WallMath.IsFinite(size.y)
-                || !WallMath.IsFinite(minimum.x)
-                || !WallMath.IsFinite(minimum.y)
-                || !WallMath.IsFinite(maximum.x)
-                || !WallMath.IsFinite(maximum.y)
+                !WallMath.IsFinite(center)
+                || !WallMath.IsFinite(size)
+                || !WallMath.IsFinite(minimum)
+                || !WallMath.IsFinite(maximum)
                 || maximum.x <= minimum.x
                 || maximum.y <= minimum.y
             )
@@ -266,17 +260,15 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
                 for (int index = 0; index < vertexCount; ++index)
                 {
+                    Vector2 vertex = vertices[index];
                     double x = origin.x + ((double)uv[index].x - textureOrigin.x) * scaleX;
                     double y = origin.y + ((double)uv[index].y - textureOrigin.y) * scaleY;
                     if (
-                        !WallMath.IsFinite(vertices[index].x)
-                        || !WallMath.IsFinite(vertices[index].y)
+                        !WallMath.IsFinite(vertex)
                         || double.IsNaN(x)
                         || double.IsNaN(y)
-                        || 0.0001 * Math.Max(1, Math.Abs(vertices[index].x))
-                            < Math.Abs(x - vertices[index].x)
-                        || 0.0001 * Math.Max(1, Math.Abs(vertices[index].y))
-                            < Math.Abs(y - vertices[index].y)
+                        || 0.0001 * Math.Max(1, Math.Abs(vertex.x)) < Math.Abs(x - vertex.x)
+                        || 0.0001 * Math.Max(1, Math.Abs(vertex.y)) < Math.Abs(y - vertex.y)
                     )
                     {
                         error = "The packed sprite does not have an axis-aligned atlas mapping.";

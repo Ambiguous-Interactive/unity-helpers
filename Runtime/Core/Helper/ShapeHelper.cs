@@ -34,8 +34,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             if (
                 pointCount <= 0
                 || !IsFinitePositive(radius)
-                || !WallMath.IsFinite(center.x)
-                || !WallMath.IsFinite(center.y)
+                || !WallMath.IsFinite(center)
                 || !WallMath.IsFinite(startAngle)
                 || !WallMath.IsFinite(endAngle)
             )

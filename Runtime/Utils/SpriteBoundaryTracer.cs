@@ -29,10 +29,8 @@ namespace WallstopStudios.UnityHelpers.Utils
                 || mask.Width <= 0
                 || mask.Height <= 0
                 || (long)mask.Width * mask.Height != mask.Pixels.Length
-                || !WallMath.IsFinite(mask.Pivot.x)
-                || !WallMath.IsFinite(mask.Pivot.y)
-                || !WallMath.IsFinite(mask.UnitsPerPixel.x)
-                || !WallMath.IsFinite(mask.UnitsPerPixel.y)
+                || !WallMath.IsFinite(mask.Pivot)
+                || !WallMath.IsFinite(mask.UnitsPerPixel)
                 || mask.UnitsPerPixel.x <= 0
                 || mask.UnitsPerPixel.y <= 0
                 || !WallMath.IsFinite(minimumArea)
@@ -153,7 +151,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                         (corner.x - mask.Pivot.x) * mask.UnitsPerPixel.x,
                         (corner.y - mask.Pivot.y) * mask.UnitsPerPixel.y
                     );
-                    if (!WallMath.IsFinite(point.x) || !WallMath.IsFinite(point.y))
+                    if (!WallMath.IsFinite(point))
                     {
                         tracedPaths.Clear();
                         paths = tracedPaths;
