@@ -226,3 +226,32 @@ def test_linked_action_directory_cannot_hide_an_input(tmp_path: Path) -> None:
     except OSError:
         pytest.skip("Creating directory symlinks requires host permission")
     assert lint.main(["--repo-root", str(tmp_path)]) == 1
+
+
+@pytest.mark.parametrize("kind", ["workflow", "job", "input"])
+def test_non_command_run_mappings_are_allowed(tmp_path: Path, kind: str) -> None:
+    text = workflow("          echo fine")
+    if kind == "workflow":
+        text = "defaults:\n  run: {shell: bash}\n" + text
+    elif kind == "job":
+        text = text.replace("    steps:", "    defaults:\n      run: {shell: bash}\n    steps:")
+    else:
+        text = (
+            "inputs:\n  run: {description: command, required: false}\n"
+            "runs:\n  using: composite\n  steps:\n    - run: echo fine\n      shell: bash\n"
+        )
+    write(tmp_path, text)
+    assert lint.check(tmp_path) == 0
+
+
+@pytest.mark.parametrize("command", ["{command: echo}", "[echo, hello]"])
+def test_non_scalar_step_run_is_rejected(tmp_path: Path, command: str) -> None:
+    write(tmp_path, "jobs: {test: {steps: [{run: " + command + "}]}}")
+    assert lint.check(tmp_path) == 1
+
+
+def test_shared_step_alias_is_checked_in_step_context(tmp_path: Path) -> None:
+    text = "prototype: &command {run: '${{ x }}" + "x" * 20000 + "'}\n"
+    text += "jobs: {test: {steps: [*command]}}\n"
+    write(tmp_path, text)
+    assert lint.check(tmp_path) == 1

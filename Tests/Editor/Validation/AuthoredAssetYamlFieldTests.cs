@@ -255,6 +255,105 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             Assert.That(AuthoredAssetYaml.ValueWithDirectChildren(document, null), Is.Empty);
         }
 
+        [TestCase(false, TestName = "DirectChildren.SequenceMapping.ExcludesElementKeys")]
+        [TestCase(true, TestName = "DirectChildren.BareSequence.ExcludesElementKeys")]
+        public void SequenceElementKeysAreNotDirectMappingChildren(bool bareMarker)
+        {
+            AuthoredAssetDocument document = bareMarker
+                ? Document(
+                    "  parent:",
+                    "  -",
+                    "    value: element",
+                    "# comment does not end the sequence",
+                    "    other: secondary",
+                    "  sibling: root"
+                )
+                : Document(
+                    "  parent:",
+                    "  - value: element",
+                    "# comment does not end the sequence",
+                    "    other: secondary",
+                    "  sibling: root"
+                );
+            Assert.That(document.TryGetEntry("parent", out AuthoredAssetEntry parent), Is.True);
+            foreach (string field in new[] { "value", "other" })
+            {
+                Assert.That(
+                    AuthoredAssetYaml.TryDescend(
+                        document,
+                        parent,
+                        field,
+                        out AuthoredAssetEntry child
+                    ),
+                    Is.False
+                );
+                Assert.That(child, Is.EqualTo(default(AuthoredAssetEntry)));
+            }
+            Assert.That(AuthoredAssetYaml.ValueWithDirectChildren(document, "parent"), Is.Empty);
+        }
+
+        [Test]
+        public void MappingChildrenAfterNestedSequenceRemainDirectChildren()
+        {
+            AuthoredAssetDocument document = Document(
+                "  parent:",
+                "    items:",
+                "    - value: element",
+                "      other: secondary",
+                "    direct: kept"
+            );
+            Assert.That(document.TryGetEntry("parent", out AuthoredAssetEntry parent), Is.True);
+            Assert.That(document.TryGetEntry("items", out AuthoredAssetEntry items), Is.True);
+            Assert.That(
+                AuthoredAssetYaml.TryDescend(
+                    document,
+                    items,
+                    "value",
+                    out AuthoredAssetEntry child
+                ),
+                Is.False
+            );
+            Assert.That(
+                AuthoredAssetYaml.TryDescend(document, parent, "direct", out child),
+                Is.True
+            );
+            Assert.That(child.InlineValue, Is.EqualTo("kept"));
+            Assert.That(
+                AuthoredAssetYaml.ValueWithDirectChildren(document, "parent"),
+                Is.EqualTo("kept")
+            );
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void MappingInsideSequenceRetainsItsOwnDirectChildren(bool reconstructParent)
+        {
+            AuthoredAssetDocument document = Document(
+                "  items:",
+                "  - nested:",
+                "      x: 3",
+                "    peer: 4"
+            );
+            Assert.That(document.TryGetEntry("nested", out AuthoredAssetEntry nested), Is.True);
+            if (reconstructParent)
+            {
+                AuthoredAssetEntry equivalent = new AuthoredAssetEntry(
+                    nested.Key,
+                    nested.InlineValue,
+                    nested.Indent,
+                    nested.LineNumber,
+                    nested.EndLineNumber
+                );
+                Assert.That(equivalent, Is.EqualTo(nested));
+                nested = equivalent;
+            }
+            Assert.That(
+                AuthoredAssetYaml.TryDescend(document, nested, "x", out AuthoredAssetEntry child),
+                Is.True
+            );
+            Assert.That(child.InlineValue, Is.EqualTo("3"));
+        }
+
         [Test]
         public void SerializedNamesPreserveExactSpellingBeforeLegacyForm()
         {

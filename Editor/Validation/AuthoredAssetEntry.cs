@@ -36,6 +36,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         /// <summary>Whether the value continues onto the lines that follow the key.</summary>
         public bool HasBlockValue => LineNumber + 1 < EndLineNumber;
 
+        /// <summary>The number of enclosing block sequences when parsed.</summary>
+        internal int SequenceDepth { get; }
+
         /// <summary>Initializes a new instance of the <see cref="AuthoredAssetEntry"/> struct.</summary>
         /// <param name="key">The key with any surrounding quotes removed.</param>
         /// <param name="inlineValue">The value on the same line, trimmed; empty when the value is a block.</param>
@@ -55,6 +58,20 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             Indent = indent;
             LineNumber = lineNumber;
             EndLineNumber = endLineNumber;
+            SequenceDepth = 0;
+        }
+
+        internal AuthoredAssetEntry(
+            string key,
+            string inlineValue,
+            int indent,
+            int lineNumber,
+            int endLineNumber,
+            int sequenceDepth
+        )
+            : this(key, inlineValue, indent, lineNumber, endLineNumber)
+        {
+            SequenceDepth = sequenceDepth;
         }
 
         /// <summary>Renders the entry as the location a reader can open.</summary>

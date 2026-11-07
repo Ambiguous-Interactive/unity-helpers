@@ -286,3 +286,6 @@ Field helpers accept a trailing colon, such as `"m_Name:"`, and use ordinal case
 matching. Null documents and missing names return empty or default outputs. These helpers read
 Unity's parsed serialized form; they are not general YAML object deserialization. Component-tree
 queries and script-type discovery remain separate from this field API.
+
+Direct mapping children exclude keys inside sequence elements, including bare sequence markers.
+Descent within a mapping contained in an element still reads that mapping’s own children.

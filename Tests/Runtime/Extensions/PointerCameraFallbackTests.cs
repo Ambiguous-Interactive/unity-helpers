@@ -68,6 +68,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.That(oldLocal, Is.EqualTo(Vector2.zero));
         }
 
+        [Test]
+        public void ExplicitFallbackPrecedesMainCamera()
+        {
+            CreatePointer(out PointerEventData pointer, out RectTransform rectangle, out Canvas _);
+            Camera main = CreateCamera(-8f);
+            main.tag = "MainCamera";
+            Assert.That(Camera.main, Is.EqualTo(main));
+            Camera fallback = CreateCamera(5f);
+            AssertProjection(pointer, rectangle, fallback, fallback);
+        }
+
         [TestCase(0, TestName = "CameraPrecedence.Canvas.BeforeEvents")]
         [TestCase(1, TestName = "CameraPrecedence.TargetPress.BeforeTargetCurrent")]
         [TestCase(2, TestName = "CameraPrecedence.TargetCurrent.BeforeForeignPress")]

@@ -333,7 +333,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             {
                 foreach (AuthoredAssetEntry entry in document.Entries)
                 {
-                    if (entry.Indent == FieldIndent && MatchesFieldName(entry.Key, field))
+                    if (
+                        entry.SequenceDepth == 0
+                        && entry.Indent == FieldIndent
+                        && MatchesFieldName(entry.Key, field)
+                    )
                     {
                         value = entry.InlineValue;
                         return true;
@@ -406,15 +410,24 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 return false;
             }
             bool ownsParent = false;
-            bool found = false;
-            AuthoredAssetEntry selected = default;
             foreach (AuthoredAssetEntry entry in document.Entries)
             {
                 if (entry.Equals(parent))
                 {
+                    parent = entry;
                     ownsParent = true;
-                    continue;
+                    break;
                 }
+            }
+            if (!ownsParent)
+            {
+                child = default;
+                return false;
+            }
+            bool found = false;
+            AuthoredAssetEntry selected = default;
+            foreach (AuthoredAssetEntry entry in document.Entries)
+            {
                 if (!IsDirectChild(entry, parent) || !MatchesFieldName(entry.Key, field))
                 {
                     continue;
@@ -427,9 +440,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 selected = entry;
                 found = true;
             }
-            bool matched = ownsParent && found;
-            child = matched ? selected : default;
-            return matched;
+            child = found ? selected : default;
+            return found;
         }
 
         /// <summary>Returns a serialized name and its legacy form without a leading underscore.</summary>
@@ -464,7 +476,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             bool found = false;
             foreach (AuthoredAssetEntry entry in document.Entries)
             {
-                if (entry.Indent == FieldIndent && MatchesFieldName(entry.Key, field))
+                if (
+                    entry.SequenceDepth == 0
+                    && entry.Indent == FieldIndent
+                    && MatchesFieldName(entry.Key, field)
+                )
                 {
                     parent = entry;
                     found = true;
@@ -616,7 +632,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
         private static bool IsDirectChild(AuthoredAssetEntry entry, AuthoredAssetEntry parent)
         {
-            return entry.Indent == parent.Indent + FieldIndent
+            return entry.SequenceDepth == parent.SequenceDepth
+                && entry.Indent == parent.Indent + FieldIndent
                 && parent.LineNumber < entry.LineNumber
                 && entry.LineNumber < parent.EndLineNumber;
         }
@@ -765,6 +782,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             string rootKey = null;
             List<AuthoredAssetEntry> entries = new();
             int blockScalarIndent = -1;
+            using PooledResource<List<int>> sequenceLease = Buffers<int>.List.Get(
+                out List<int> sequenceIndents
+            );
 
             for (int index = headerIndex + 1; index < bodyEnd; ++index)
             {
@@ -786,6 +806,32 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 }
 
                 string content = line.Substring(indent);
+                if (content.StartsWith("#", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+                bool sequenceItem =
+                    content.StartsWith("- ", StringComparison.Ordinal)
+                    || string.Equals(content, "-", StringComparison.Ordinal);
+                while (0 < sequenceIndents.Count)
+                {
+                    int sequenceIndex = sequenceIndents.Count - 1;
+                    int sequenceIndent = sequenceIndents[sequenceIndex];
+                    if (sequenceIndent < indent || (sequenceIndent == indent && sequenceItem))
+                    {
+                        break;
+                    }
+                    sequenceIndents.RemoveAt(sequenceIndex);
+                }
+                int sequenceDepth = sequenceIndents.Count;
+                if (
+                    sequenceItem
+                    && (sequenceDepth == 0 || sequenceIndents[sequenceDepth - 1] < indent)
+                )
+                {
+                    sequenceIndents.Add(indent);
+                    ++sequenceDepth;
+                }
                 if (content.StartsWith("- ", StringComparison.Ordinal))
                 {
                     indent += 2;
@@ -813,7 +859,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                         inlineValue,
                         indent,
                         index + 1,
-                        FindEntryEnd(lines, index, bodyEnd, indent) + 1
+                        FindEntryEnd(lines, index, bodyEnd, indent) + 1,
+                        sequenceDepth
                     )
                 );
 

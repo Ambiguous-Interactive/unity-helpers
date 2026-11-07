@@ -34,18 +34,19 @@ def run_blocks(text: str) -> list[RunBlock]:
         return []
     lines = text.splitlines()
     blocks: list[RunBlock] = []
-    pending: list[Node] = [root]
-    visited: set[int] = set()
+    pending: list[tuple[Node, bool]] = [(root, True)]
+    visited: set[tuple[int, bool]] = set()
     while pending:
-        node = pending.pop()
-        if id(node) in visited:
+        node, command_context = pending.pop()
+        identity = (id(node), command_context)
+        if identity in visited:
             continue
-        visited.add(id(node))
+        visited.add(identity)
         if isinstance(node, SequenceNode):
-            pending.extend(reversed(node.value))
+            pending.extend((child, False) for child in reversed(node.value))
         elif isinstance(node, MappingNode):
             for key, value in node.value:
-                if isinstance(key, ScalarNode) and key.value == "run":
+                if command_context and isinstance(key, ScalarNode) and key.value == "run":
                     if not isinstance(value, ScalarNode):
                         raise ValueError(f"line {key.start_mark.line + 1}: run must be a scalar")
                     if value.style in {"|", ">"}:
@@ -57,8 +58,14 @@ def run_blocks(text: str) -> list[RunBlock]:
                     else:
                         body = text[value.start_mark.index : value.end_mark.index].strip()
                     blocks.append(RunBlock(key.start_mark.line + 1, body))
+                elif (
+                    isinstance(key, ScalarNode)
+                    and key.value == "steps"
+                    and isinstance(value, SequenceNode)
+                ):
+                    pending.extend((step, True) for step in reversed(value.value))
                 else:
-                    pending.append(value)
+                    pending.append((value, False))
     return sorted(blocks, key=lambda block: block.line)
 
 

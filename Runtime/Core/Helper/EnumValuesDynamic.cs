@@ -35,7 +35,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <param name="enumType">The enum type to read.</param>
         /// <param name="values">The shared array, or null when the type is unsupported.</param>
         /// <returns>Whether the enum values could be read.</returns>
-        /// <remarks>Never modify the returned array. Memory exhaustion is not converted to a false result.</remarks>
+        /// <remarks>Never modify the returned array. ArgumentException, InvalidOperationException and NotSupportedException produce false; other exceptions propagate.</remarks>
         public static bool TryGetValues(Type enumType, out Array values)
         {
             try
@@ -53,8 +53,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     || exception is NotSupportedException
                 )
             {
-                values = null;
-                return false;
+                // Unsupported metadata uses the common failure result below.
             }
             values = null;
             return false;

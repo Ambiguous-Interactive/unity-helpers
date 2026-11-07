@@ -9,11 +9,22 @@ namespace WallstopStudios.UnityHelpers.IntMap.Tests
 
     internal static class IntMapRecoveryProcess
     {
+        internal const string ZeroKeyKind = "zero";
+        internal const string NonzeroKeyKind = "nonzero";
+        internal const string IndicesKeyKind = "indices";
+        internal const string PassMarker = "PASS: forced allocation failure";
+
         private static void Main(string[] arguments)
         {
-            bool insertZero =
-                arguments.Length == 1
-                && string.Equals(arguments[0], "zero", StringComparison.Ordinal);
+            Require(arguments.Length == 1, "Exactly one recovery scenario is required.");
+            string keyKind = arguments[0];
+            Require(
+                string.Equals(keyKind, ZeroKeyKind, StringComparison.Ordinal)
+                    || string.Equals(keyKind, NonzeroKeyKind, StringComparison.Ordinal)
+                    || string.Equals(keyKind, IndicesKeyKind, StringComparison.Ordinal),
+                "The recovery scenario must be recognized."
+            );
+            bool insertZero = string.Equals(keyKind, ZeroKeyKind, StringComparison.Ordinal);
             bool controlFailed = false;
             try
             {
@@ -28,7 +39,7 @@ namespace WallstopStudios.UnityHelpers.IntMap.Tests
 
             if (
                 arguments.Length == 1
-                && string.Equals(arguments[0], "indices", StringComparison.Ordinal)
+                && string.Equals(keyKind, IndicesKeyKind, StringComparison.Ordinal)
             )
             {
                 VerifyRecovery<byte>(262144, false, static key => (byte)(key % 251));
@@ -41,7 +52,7 @@ namespace WallstopStudios.UnityHelpers.IntMap.Tests
                     static key => new RecoveryValue { data = key + 17 }
                 );
             }
-            Console.WriteLine("PASS: forced allocation failure preserves the map and all views.");
+            Console.WriteLine(PassMarker + " preserves the map and all views.");
         }
 
         private static void VerifyRecovery<T>(

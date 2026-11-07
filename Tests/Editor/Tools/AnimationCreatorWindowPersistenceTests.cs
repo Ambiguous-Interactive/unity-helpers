@@ -522,14 +522,29 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
         {
             string folder =
                 "Assets/StreamingAssets/AnimationConfig_" + Guid.NewGuid().ToString("N");
-            EnsureFolder(folder);
-            string configPath = AnimationCreatorConfig.GetConfigPath(folder);
-            Assert.That(_window.SaveConfig(folder), Is.True);
-            Assert.That(File.Exists(Path.GetFullPath(configPath)), Is.True);
-            Assert.That(_window.LoadConfig(folder), Is.True);
-            Assert.That(_window.DeleteConfig(folder), Is.True);
-            Assert.That(File.Exists(Path.GetFullPath(configPath)), Is.False);
-            Assert.That(_window.LoadConfig(folder), Is.False);
+            bool preserveStreamingAssets = Directory.Exists(Application.streamingAssetsPath);
+            List<string> createdFolders;
+            using (DisposableScope cleanup = DisposableScope.Create(CleanupTrackedFoldersAndAssets))
+            {
+                createdFolders = EnsureFolder(folder);
+                string configPath = AnimationCreatorConfig.GetConfigPath(folder);
+                Assert.That(_window.SaveConfig(folder), Is.True);
+                Assert.That(File.Exists(Path.GetFullPath(configPath)), Is.True);
+                Assert.That(_window.LoadConfig(folder), Is.True);
+                Assert.That(_window.DeleteConfig(folder), Is.True);
+                Assert.That(File.Exists(Path.GetFullPath(configPath)), Is.False);
+                Assert.That(_window.LoadConfig(folder), Is.False);
+            }
+            for (int index = createdFolders.Count - 1; 0 <= index; --index)
+            {
+                string created = Path.GetFullPath(createdFolders[index]);
+                Assert.That(Directory.Exists(created), Is.False);
+                Assert.That(File.Exists(created + ".meta"), Is.False);
+            }
+            if (preserveStreamingAssets)
+            {
+                Assert.That(Directory.Exists(Application.streamingAssetsPath), Is.True);
+            }
         }
 
         [Test]

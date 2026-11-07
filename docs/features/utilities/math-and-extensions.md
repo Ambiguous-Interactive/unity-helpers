@@ -1506,9 +1506,10 @@ across threads, including the `SINGLE_THREADED` build profile. Concurrent first 
 may allocate discarded candidate arrays before one value is published.
 
 `Of(null)` throws `ArgumentNullException`; non-enum types throw `ArgumentException`.
-`TryGetValues` returns false and a null array for null, non-enum, or unsupported enum
-metadata. Memory exhaustion still propagates. Failed reads do not publish a cache
-entry. Prefer `EnumValues<T>.Values` when `T` is known at compile time.
+`TryGetValues` returns false and a null array for null or non-enum types and for
+`ArgumentException`, `InvalidOperationException`, or `NotSupportedException` while
+reading metadata or values. Other exceptions propagate. Failed reads do not publish
+a cache entry. Prefer `EnumValues<T>.Values` when `T` is known at compile time.
 
 ### Fast Enum-to-String Conversion
 

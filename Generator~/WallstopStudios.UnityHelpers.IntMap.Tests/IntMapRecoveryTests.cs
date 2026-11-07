@@ -11,9 +11,18 @@ namespace WallstopStudios.UnityHelpers.IntMap.Tests
     [TestFixture]
     public sealed class IntMapRecoveryTests
     {
-        [TestCase("zero", TestName = "FailedGrowth.ZeroKey.PreservesMap")]
-        [TestCase("nonzero", TestName = "FailedGrowth.NonzeroKey.PreservesMap")]
-        [TestCase("indices", TestName = "FailedGrowth.IndexStorage.PreservesMap")]
+        [TestCase(
+            IntMapRecoveryProcess.ZeroKeyKind,
+            TestName = "FailedGrowth.ZeroKey.PreservesMap"
+        )]
+        [TestCase(
+            IntMapRecoveryProcess.NonzeroKeyKind,
+            TestName = "FailedGrowth.NonzeroKey.PreservesMap"
+        )]
+        [TestCase(
+            IntMapRecoveryProcess.IndicesKeyKind,
+            TestName = "FailedGrowth.IndexStorage.PreservesMap"
+        )]
         public void FailedGrowthPreservesMap(string keyKind)
         {
             string host = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH");
@@ -31,7 +40,7 @@ namespace WallstopStudios.UnityHelpers.IntMap.Tests
             start.ArgumentList.Add(keyKind);
             start.Environment["DOTNET_GCHeapHardLimit"] = string.Equals(
                 keyKind,
-                "indices",
+                IntMapRecoveryProcess.IndicesKeyKind,
                 StringComparison.Ordinal
             )
                 ? "3000000"
@@ -58,7 +67,7 @@ namespace WallstopStudios.UnityHelpers.IntMap.Tests
             TestContext.WriteLine(diagnostic);
             Assert.That(exited, Is.True, diagnostic);
             Assert.That(child.ExitCode, Is.Zero, diagnostic);
-            Assert.That(diagnostic, Does.Contain("PASS: forced allocation failure"));
+            Assert.That(diagnostic, Does.Contain(IntMapRecoveryProcess.PassMarker));
         }
     }
 }
