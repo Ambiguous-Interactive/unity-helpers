@@ -179,6 +179,98 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             out Vector3 worldPoint
         )
         {
+            return TryGetWorldPointCore(pointerEventData, rectangle, null, false, out worldPoint);
+        }
+
+        /// <summary>Resolves a pointer position using a fallback camera when event cameras are absent.</summary>
+        /// <param name="pointerEventData">The pointer event to resolve.</param>
+        /// <param name="rectangle">The target rectangle.</param>
+        /// <param name="fallbackCamera">The camera to try before Camera.main.</param>
+        /// <param name="worldPoint">The resolved point, or default on failure.</param>
+        /// <returns>Whether the rectangle's plane could be reached.</returns>
+        /// <remarks>Overlay canvases use no camera. Canvas and event cameras take precedence over the fallback.</remarks>
+        public static bool TryGetWorldPoint(
+            this PointerEventData pointerEventData,
+            RectTransform rectangle,
+            Camera fallbackCamera,
+            out Vector3 worldPoint
+        )
+        {
+            return TryGetWorldPointCore(
+                pointerEventData,
+                rectangle,
+                fallbackCamera,
+                true,
+                out worldPoint
+            );
+        }
+
+        /// <summary>Tries to resolve a raycast hit or pointer position in a rectangle's local space.</summary>
+        /// <param name="pointerEventData">The pointer event to resolve.</param>
+        /// <param name="rectangle">The target rectangle.</param>
+        /// <param name="localPoint">The resolved local point, or the default vector on failure.</param>
+        /// <returns>
+        /// <see langword="true" /> when a valid raycast hit exists or the pointer reaches the
+        /// rectangle's plane.
+        /// </returns>
+        /// <example>
+        /// <code>
+        /// if (eventData.TryGetLocalPoint(panel, out Vector2 point))
+        /// {
+        ///     handle.anchoredPosition = point;
+        /// }
+        /// </code>
+        /// </example>
+        public static bool TryGetLocalPoint(
+            this PointerEventData pointerEventData,
+            RectTransform rectangle,
+            out Vector2 localPoint
+        )
+        {
+            if (!pointerEventData.TryGetWorldPoint(rectangle, out Vector3 worldPoint))
+            {
+                localPoint = default;
+                return false;
+            }
+
+            return TryConvertLocalPoint(rectangle, worldPoint, out localPoint);
+        }
+
+        /// <summary>Resolves a local pointer position using a fallback camera when event cameras are absent.</summary>
+        /// <param name="pointerEventData">The pointer event to resolve.</param>
+        /// <param name="rectangle">The target rectangle.</param>
+        /// <param name="fallbackCamera">The camera to try before Camera.main.</param>
+        /// <param name="localPoint">The resolved point, or default on failure.</param>
+        /// <returns>Whether the rectangle's plane could be reached.</returns>
+        public static bool TryGetLocalPoint(
+            this PointerEventData pointerEventData,
+            RectTransform rectangle,
+            Camera fallbackCamera,
+            out Vector2 localPoint
+        )
+        {
+            if (
+                !pointerEventData.TryGetWorldPoint(
+                    rectangle,
+                    fallbackCamera,
+                    out Vector3 worldPoint
+                )
+            )
+            {
+                localPoint = default;
+                return false;
+            }
+            return TryConvertLocalPoint(rectangle, worldPoint, out localPoint);
+        }
+
+        private static bool TryGetWorldPointCore(
+            PointerEventData pointerEventData,
+            RectTransform rectangle,
+            Camera fallbackCamera,
+            bool useFallback,
+            out Vector3 worldPoint
+        )
+        {
             if (pointerEventData == null || rectangle == null)
             {
                 worldPoint = default;
@@ -221,7 +313,16 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             Vector2 screenPoint = ClampToScreen(pointerEventData.position);
-            if (!TryResolveEventCamera(pointerEventData, rootCanvas, out Camera eventCamera))
+            if (
+                !TryResolveEventCamera(
+                    pointerEventData,
+                    rectangle,
+                    rootCanvas,
+                    fallbackCamera,
+                    useFallback,
+                    out Camera eventCamera
+                )
+            )
             {
                 worldPoint = default;
                 return false;
@@ -244,34 +345,12 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             return true;
         }
 
-        /// <summary>Tries to resolve a raycast hit or pointer position in a rectangle's local space.</summary>
-        /// <param name="pointerEventData">The pointer event to resolve.</param>
-        /// <param name="rectangle">The target rectangle.</param>
-        /// <param name="localPoint">The resolved local point, or the default vector on failure.</param>
-        /// <returns>
-        /// <see langword="true" /> when a valid raycast hit exists or the pointer reaches the
-        /// rectangle's plane.
-        /// </returns>
-        /// <example>
-        /// <code>
-        /// if (eventData.TryGetLocalPoint(panel, out Vector2 point))
-        /// {
-        ///     handle.anchoredPosition = point;
-        /// }
-        /// </code>
-        /// </example>
-        public static bool TryGetLocalPoint(
-            this PointerEventData pointerEventData,
+        private static bool TryConvertLocalPoint(
             RectTransform rectangle,
+            Vector3 worldPoint,
             out Vector2 localPoint
         )
         {
-            if (!pointerEventData.TryGetWorldPoint(rectangle, out Vector3 worldPoint))
-            {
-                localPoint = default;
-                return false;
-            }
-
             Vector3 local = rectangle.InverseTransformPoint(worldPoint);
             Vector2 resolved = new(local.x, local.y);
             if (!WallMath.IsFinite(resolved))
@@ -286,7 +365,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
         private static bool TryResolveEventCamera(
             PointerEventData pointerEventData,
+            RectTransform rectangle,
             Canvas rootCanvas,
+            Camera fallbackCamera,
+            bool useFallback,
             out Camera eventCamera
         )
         {
@@ -305,11 +387,40 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     return true;
                 }
 
-                if (rootCanvas.renderMode == RenderMode.ScreenSpaceCamera)
+                if (!useFallback && rootCanvas.renderMode == RenderMode.ScreenSpaceCamera)
                 {
                     eventCamera = null;
                     return true;
                 }
+            }
+
+            if (useFallback)
+            {
+                RaycastResult pressRaycast = pointerEventData.pointerPressRaycast;
+                RaycastResult currentRaycast = pointerEventData.pointerCurrentRaycast;
+                Camera resolved = TryGetTargetCamera(pressRaycast, rectangle);
+                if (resolved == null)
+                {
+                    resolved = TryGetTargetCamera(currentRaycast, rectangle);
+                }
+                if (resolved == null)
+                {
+                    resolved = pointerEventData.pressEventCamera;
+                }
+                if (resolved == null)
+                {
+                    resolved = pointerEventData.enterEventCamera;
+                }
+                if (resolved == null)
+                {
+                    resolved = fallbackCamera;
+                }
+                if (resolved == null)
+                {
+                    resolved = Camera.main;
+                }
+                eventCamera = resolved;
+                return resolved != null || rootCanvas == null;
             }
 
             Camera enterEventCamera = pointerEventData.enterEventCamera;
@@ -328,6 +439,15 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             eventCamera = null;
             return rootCanvas == null;
+        }
+
+        private static Camera TryGetTargetCamera(RaycastResult raycast, RectTransform rectangle)
+        {
+            if (raycast.gameObject != rectangle.gameObject || raycast.module == null)
+            {
+                return null;
+            }
+            return raycast.module.eventCamera;
         }
 
         private static Vector2 ClampToScreen(Vector2 point)

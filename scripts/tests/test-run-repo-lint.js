@@ -559,6 +559,8 @@ runTest("no linter in scripts/ has been left unreachable", () => {
   // (#453). An allowlist whose entries are prose excuses whatever is put in it -- the quiet half of
   // #445, one level up: the thing named still exists, so nothing goes red.
   const runElsewhere = new Map([
+    ["scripts/lint-gitignore-docs.ps1", "gitignore-controls"],
+    ["scripts/lint-workflow-run-expression-length.ps1", "workflow-expression-controls"],
     ["scripts/lint-concurrent-cache-fill.ps1", "cache-controls"],
     ["scripts/lint-duplicate-usings.ps1", "duplicate-using-controls"],
     ["scripts/lint-doc-counts.ps1", "doc-count-controls"],
@@ -578,6 +580,14 @@ runTest("no linter in scripts/ has been left unreachable", () => {
   // Only the kinds something actually claims. A registered predicate nothing uses is a dead branch
   // inside the one test whose whole point is that a claim has to be executable.
   const owners = new Map([
+    [
+      "gitignore-controls",
+      (file) => registeredControlsInvoke(file, "scripts/tests/test_gitignore_docs.py")
+    ],
+    [
+      "workflow-expression-controls",
+      (file) => registeredControlsInvoke(file, "scripts/tests/test_workflow_expression_length.py")
+    ],
     [
       "cache-controls",
       (file) => registeredControlsInvoke(file, "scripts/tests/test_concurrent_cache_fill.py")

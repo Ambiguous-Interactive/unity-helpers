@@ -250,3 +250,43 @@ paths. These helpers support inspection; they do not establish that a file is sa
 
 - [Asset Validation](./asset-validation.md): the continuous, time-sliced validation engine
 - [Analyzers](../../performance/analyzers.md): `WUH012` reports the code half of the same problem
+
+## Reading saved fields without loading assets
+
+`AuthoredAssetYaml` exposes field helpers for project-specific checks over an
+`AuthoredAssetDocument` returned by `ReadDocuments`:
+
+```csharp
+if (AuthoredAssetYaml.TryGetField(document, "m_Name", out string objectName))
+{
+    report.Add(objectName);
+}
+
+if (document.TryGetEntry("settings", out AuthoredAssetEntry settings)
+    && AuthoredAssetYaml.TryDescend(document, settings, "enabled", out AuthoredAssetEntry enabled))
+{
+    report.Add(enabled.InlineValue);
+}
+```
+
+- `TryGetField` and `Field` read direct document fields at Unity's two-space indentation.
+  Nested fields with the same name cannot satisfy a missing direct field. A duplicate direct
+  key returns the first value. `Field` returns an empty string for absence; use the Try method
+  to distinguish an absent field from a present empty value.
+- `TryGetOnlyField` searches every parsed depth and fails when the name occurs more than once.
+- `TryDescend` checks the supplied parent's document membership and line span, accepts only
+  children one indentation level below it, and refuses duplicate matching children.
+- `ValueWithDirectChildren` joins the inline value and nonempty direct child values, skipping
+  `serializedVersion`. It does not flatten deeper descendants or parse block-scalar text.
+- `SerializedNames` yields the exact key followed by the spelling without its first underscore.
+  Field reads do not apply this fallback automatically. A caller chooses whether legacy names
+  are acceptable.
+
+Field helpers accept a trailing colon, such as `"m_Name:"`, and use ordinal case-sensitive
+matching. Null documents and missing names return empty or default outputs. These helpers read
+Unity's parsed serialized form; they are not general YAML object deserialization. Component-tree
+queries and script-type discovery remain separate from this field API.
+
+Direct mapping children exclude keys inside sequence elements, including bare sequence markers.
+Descent within a mapping contained in an element still reads that mapping’s own children.
+Comment-only lines do not end a field or sequence block.

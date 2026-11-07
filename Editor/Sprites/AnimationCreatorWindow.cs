@@ -519,6 +519,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         /// </summary>
         /// <param name="folderPath">The nonblank folder path to save the config to.</param>
         /// <returns>True if the config was saved successfully, false otherwise.</returns>
+        /// <remarks>Hidden config writes do not refresh unrelated assets.</remarks>
         internal bool SaveConfig(string folderPath)
         {
             if (string.IsNullOrWhiteSpace(folderPath))
@@ -548,7 +549,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 _loadedConfigs[folderPath] = config;
                 this.Log($"Saved animation creator config to '{configPath}'.");
 
-                AssetDatabase.Refresh();
                 return true;
             }
             catch (Exception e)
@@ -767,6 +767,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         /// </summary>
         /// <param name="folderPath">The folder path whose config to delete.</param>
         /// <returns>True if the config was deleted, false otherwise.</returns>
+        /// <remarks>Hidden config deletion does not refresh unrelated assets.</remarks>
         internal bool DeleteConfig(string folderPath)
         {
             if (string.IsNullOrWhiteSpace(folderPath))
@@ -788,7 +789,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 _loadedConfigs.Remove(folderPath);
                 this.Log($"Deleted animation creator config at '{configPath}'.");
 
-                AssetDatabase.Refresh();
                 return true;
             }
             catch (Exception e)

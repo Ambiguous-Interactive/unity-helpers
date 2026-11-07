@@ -17,8 +17,8 @@
     WHAT IT DOES NOT COVER, deliberately:
 
       1. Everything `typecheck:unity` excludes, for the same reasons (uGUI, the DI integrations),
-         and the four fixtures that drive them: EnhancedImageTests, the two
-         MatchColliderToSprite fixtures and UnityExtensionsComprehensiveTests.
+         and the five fixtures that drive them: EnhancedImageTests, the two
+         MatchColliderToSprite fixtures, UnityExtensionsComprehensiveTests and PointerCameraFallbackTests.
       2. Editor tests. They need UnityEditor, which the reference assemblies do not carry.
       3. The test framework's BEHAVIOUR. `UnityEngine.TestTools` ships with Unity's test framework
          package and has no NuGet equivalent, so `Shims/` declares the handful of members these
@@ -173,7 +173,7 @@
     <Compile
       Condition="'$(WallstopIterationTestSources)' == ''"
       Include="$(RepoRoot)/Tests/Runtime/**/*.cs"
-      Exclude="$(RepoRoot)/Tests/Runtime/Integrations/**/*.cs;$(RepoRoot)/Tests/Runtime/Visuals/EnhancedImageTests.cs;$(RepoRoot)/Tests/Runtime/Utils/MatchColliderToSpriteTests.cs;$(RepoRoot)/Tests/Runtime/Utils/MatchColliderToSpriteAdditionalTests.cs;$(RepoRoot)/Tests/Runtime/Extensions/UnityExtensionsComprehensiveTests.cs"
+      Exclude="$(RepoRoot)/Tests/Runtime/Integrations/**/*.cs;$(RepoRoot)/Tests/Runtime/Visuals/EnhancedImageTests.cs;$(RepoRoot)/Tests/Runtime/Utils/MatchColliderToSpriteTests.cs;$(RepoRoot)/Tests/Runtime/Utils/MatchColliderToSpriteAdditionalTests.cs;$(RepoRoot)/Tests/Runtime/Extensions/UnityExtensionsComprehensiveTests.cs;$(RepoRoot)/Tests/Runtime/Extensions/PointerCameraFallbackTests.cs"
     />
   </ItemGroup>
   <!--

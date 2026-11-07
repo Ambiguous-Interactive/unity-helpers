@@ -808,7 +808,9 @@ caller can inspect or remove it.
   folder, so the next person to import that folder gets your settings. A staging failure keeps the
   previous config. Unsupported `File.Replace` also refuses replacement and preserves that config.
   Null, empty, and whitespace-only config folders are rejected before file access; folders with
-  spaces inside their names remain valid.
+  spaces inside their names remain valid. Saving or deleting configs writes the files immediately
+  without refreshing unrelated project assets. This also applies to `StreamingAssets` folders.
+  File changes are not reversed by Unity Undo.
 
 > **Visual Demo**
 >

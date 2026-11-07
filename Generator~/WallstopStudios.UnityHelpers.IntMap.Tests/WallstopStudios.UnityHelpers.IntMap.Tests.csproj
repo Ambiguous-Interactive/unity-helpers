@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <StartupObject>WallstopStudios.UnityHelpers.IntMap.Tests.IntMapRecoveryProcess</StartupObject>
     <LangVersion>9.0</LangVersion>
     <Nullable>disable</Nullable>
     <EnableNETAnalyzers>false</EnableNETAnalyzers>
@@ -14,6 +16,8 @@
       Link="ObjectsHashCodeStub.cs"
     />
     <Compile Include="../../Runtime/Core/DataStructure/IntMap.cs" Link="IntMap.cs" />
+    <Compile Include="IntMapRecoveryProcess.cs" />
+    <Compile Include="IntMapRecoveryTests.cs" />
     <Compile Include="../../Tests/Runtime/DataStructures/IntMapTests.cs" Link="IntMapTests.cs" />
     <Compile Include="../../Tests/Runtime/TestUtils/GCAssert.cs" Link="GCAssert.cs" />
   </ItemGroup>
