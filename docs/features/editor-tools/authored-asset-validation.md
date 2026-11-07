@@ -289,3 +289,4 @@ queries and script-type discovery remain separate from this field API.
 
 Direct mapping children exclude keys inside sequence elements, including bare sequence markers.
 Descent within a mapping contained in an element still reads that mapping’s own children.
+Comment-only lines do not end a field or sequence block.

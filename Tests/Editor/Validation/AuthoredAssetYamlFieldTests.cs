@@ -354,6 +354,83 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             Assert.That(child.InlineValue, Is.EqualTo("3"));
         }
 
+        [TestCase(0)]
+        [TestCase(2)]
+        public void DirectMappingChildrenContinueAfterComments(int commentIndent)
+        {
+            AuthoredAssetDocument document = Document(
+                "  parent:",
+                "    x: 1",
+                new string(' ', commentIndent) + "# comment",
+                "    y: 2",
+                "  sibling: root"
+            );
+            Assert.That(document.TryGetEntry("parent", out AuthoredAssetEntry parent), Is.True);
+            Assert.That(
+                AuthoredAssetYaml.TryDescend(document, parent, "y", out AuthoredAssetEntry child),
+                Is.True
+            );
+            Assert.That(child.InlineValue, Is.EqualTo("2"));
+            Assert.That(
+                AuthoredAssetYaml.ValueWithDirectChildren(document, "parent"),
+                Is.EqualTo("1 2")
+            );
+        }
+
+        [TestCase(0)]
+        [TestCase(2)]
+        [TestCase(4)]
+        public void SequenceMappingChildrenContinueAfterComments(int commentIndent)
+        {
+            AuthoredAssetDocument document = Document(
+                "  items:",
+                "  - nested:",
+                "      before: 1",
+                new string(' ', commentIndent) + "# comment",
+                "      after: 2",
+                "    peer: 4"
+            );
+            Assert.That(document.TryGetEntry("nested", out AuthoredAssetEntry parent), Is.True);
+            Assert.That(
+                AuthoredAssetYaml.TryDescend(
+                    document,
+                    parent,
+                    "after",
+                    out AuthoredAssetEntry child
+                ),
+                Is.True
+            );
+            Assert.That(child.InlineValue, Is.EqualTo("2"));
+        }
+
+        [Test]
+        public void SequenceEnumerationContinuesAfterColumnZeroComment()
+        {
+            string[] lines =
+            {
+                "--- !u!114 &7",
+                "MonoBehaviour:",
+                "  items:",
+                "  - value: first",
+                "# comment",
+                "  - value: second",
+                "  sibling: root",
+            };
+            IReadOnlyList<AuthoredAssetDocument> documents = AuthoredAssetYaml.ReadDocuments(lines);
+            Assert.That(documents[0].TryGetEntry("items", out AuthoredAssetEntry parent), Is.True);
+            int count = 0;
+            foreach (
+                AuthoredSequenceElement element in AuthoredAssetYaml.EnumerateSequenceElements(
+                    lines,
+                    parent
+                )
+            )
+            {
+                ++count;
+            }
+            Assert.That(count, Is.EqualTo(2));
+        }
+
         [Test]
         public void SerializedNamesPreserveExactSpellingBeforeLegacyForm()
         {

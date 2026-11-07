@@ -899,6 +899,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 }
 
                 int lineIndent = LeadingSpaces(line);
+                if (line[lineIndent] == '#')
+                {
+                    ++index;
+                    continue;
+                }
                 bool continues =
                     indent < lineIndent
                     || (

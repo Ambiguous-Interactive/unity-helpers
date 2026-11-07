@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix authored YAML sequence reads stopping at comments ([#1127](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1127)).
 - Fix `IntMap` contents and enumerators becoming invalid after a failed growth allocation ([#1131](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1131)).
 
 ## [3.7.1] - 2026-11-05
