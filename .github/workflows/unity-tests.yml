@@ -701,7 +701,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           ./scripts/unity/assert-no-active-unity-editor.ps1
-          uv run --project scripts/python~ --locked --no-dev python scripts/unity/run_ci_modes.py --version '${{ matrix.unity-version }}'
+          uv run --project scripts/python~ --locked --no-dev python scripts/unity/run_ci_modes.py --version '${{ matrix.unity-version }}' --editmode-shards 2 --max-workers 5
           if ($LASTEXITCODE -ne 0) { throw 'One or more concurrent Unity modes failed.' }
           ./scripts/unity/assert-no-active-unity-editor.ps1
 
@@ -1606,7 +1606,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           ./scripts/unity/assert-no-active-unity-editor.ps1
-          uv run --project scripts/python~ --locked --no-dev python scripts/unity/run_ci_modes.py --version '${{ matrix.unity-version }}' --single-threaded
+          uv run --project scripts/python~ --locked --no-dev python scripts/unity/run_ci_modes.py --version '${{ matrix.unity-version }}' --editmode-shards 2 --max-workers 5 --single-threaded
           if ($LASTEXITCODE -ne 0) { throw 'One or more concurrent Unity modes failed.' }
           ./scripts/unity/assert-no-active-unity-editor.ps1
 

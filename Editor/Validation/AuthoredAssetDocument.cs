@@ -52,7 +52,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
         /// <summary>
         /// The guid of the <c>MonoScript</c> this document's <c>m_Script</c> names, or <c>null</c>
-        /// when the document carries no script reference.
+        /// when the direct script reference is absent or ambiguous.
         /// </summary>
         public string ScriptGuid { get; }
 
@@ -83,12 +83,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             Entries = entries ?? Array.Empty<AuthoredAssetEntry>();
 
             if (
-                TryGetEntry(ScriptKey, out AuthoredAssetEntry script)
+                AuthoredAssetYaml.TryGetOnlyDirectField(this, ScriptKey, out string script)
                 && AuthoredAssetYaml.TryParseObjectReference(
-                    script.InlineValue,
-                    out _,
+                    script,
+                    out long scriptFileId,
                     out string guid
                 )
+                && scriptFileId != 0
             )
             {
                 ScriptGuid = guid;

@@ -968,7 +968,10 @@
         "WSL",
         "sgen",
         "mscorlib",
-        "libc"
+        "libc",
+        "capsys",
+        "cne",
+        "mkfifo"
       ]
     }
   ],
@@ -1261,7 +1264,8 @@
     "UUM",
     "FSIZE",
     "RLIMIT",
-    "SIGXFSZ"
+    "SIGXFSZ",
+    "PTH"
   ],
   "flagWords": [],
   "minWordLength": 3,

@@ -253,6 +253,53 @@ paths. These helpers support inspection; they do not establish that a file is sa
 
 ## Reading saved fields without loading assets
 
+### Component and hierarchy queries
+
+Build one `AuthoredAssetHierarchy` from the documents of one file. It indexes document anchors
+without loading Unity objects. `TryGetDocument` refuses zero and duplicate anchors, so a corrupt
+file cannot silently select one of two documents with the same ID.
+
+```csharp
+AuthoredAssetHierarchy hierarchy = new AuthoredAssetHierarchy(documents);
+if (hierarchy.TryGetDocument(componentId, out AuthoredAssetDocument component))
+{
+    string ownerName = hierarchy.OwnerName(component);
+    foreach (AuthoredAssetDocument sibling in hierarchy.SiblingComponents(component))
+    {
+        bool matches = AuthoredAssetYaml.IsScriptedBy(sibling, scriptGuid);
+    }
+    foreach (long ownerId in hierarchy.SelfAndAncestorObjectIds(component))
+    {
+        // Inspect the owner and each parent, nearest first.
+    }
+}
+```
+
+- `ComponentIdsOf` reads local, nonzero IDs from the GameObject's own `m_Component` list.
+  It keeps authored order, missing targets, and repeated entries. Nested and unrelated lists do
+  not contribute components. `ComponentsOf` resolves those IDs and omits absent or ambiguous targets.
+- `TryGetOwner` follows a component's direct `m_GameObject` reference. `SiblingComponents`
+  reads that owner's component list, including the supplied component when listed.
+  `OwnerName` returns the authored `m_Name` value, or a caller-selected fallback.
+- `SelfAndAncestorObjectIds` follows Transform or RectTransform parent references. Missing,
+  external, ambiguous, or multiple transform links stop the walk. Cycles never repeat an object.
+
+Queries accept only documents belonging to the index. A document from another file cannot use
+an identical anchor to borrow membership. External references never resolve through a local index.
+Duplicate direct owner or parent fields and duplicate component lists are refused. Inline reference
+maps with repeated `fileID` or `guid` keys are also refused by `TryParseObjectReference`.
+The index captures document membership at construction; rebuild it after reparsing a file.
+`OwnerName` returns YAML text as written, including any scalar quotes.
+
+`AuthoredAssetYaml.GameObjectField` and `ScriptField` expose the serialized reference keys.
+`IsScriptedBy` compares the direct script GUID exactly, ignoring GUID letter case. It requires a
+MonoBehaviour document and a nonzero script reference; a nested `m_Script` field cannot establish
+the document's identity. Duplicate direct script fields are ambiguous and cannot match.
+`AuthoredAssetDocument.ScriptGuid` also requires a unique direct script field.
+For a GUID resolved from a C# type, use `MonoScriptIndex.TryGetScriptGuid`.
+
+### Field reads
+
 `AuthoredAssetYaml` exposes field helpers for project-specific checks over an
 `AuthoredAssetDocument` returned by `ReadDocuments`:
 

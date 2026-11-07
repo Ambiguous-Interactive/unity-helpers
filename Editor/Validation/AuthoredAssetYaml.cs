@@ -27,6 +27,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         /// <summary>The <c>!u!</c> class id Unity writes for a <c>MonoBehaviour</c> document.</summary>
         public const int MonoBehaviourTypeId = 114;
 
+        /// <summary>The serialized key of a component's owning GameObject reference.</summary>
+        public const string GameObjectField = "m_GameObject";
+
+        /// <summary>The serialized key of a behaviour's script reference.</summary>
+        public const string ScriptField = AuthoredAssetDocument.ScriptKey;
+
         /// <summary>The value Unity writes for an object reference nobody assigned.</summary>
         public const string NullObjectReference = "{fileID: 0}";
 
@@ -201,7 +207,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         /// <param name="value">The inline value to parse.</param>
         /// <param name="fileId">Receives the <c>fileID</c>, or zero when it declared none.</param>
         /// <param name="guid">Receives the <c>guid</c>, or <c>null</c> when it declared none.</param>
-        /// <returns><c>false</c> when the value is not an inline mapping.</returns>
+        /// <returns><c>false</c> for non-mappings or repeated fileID or GUID keys.</returns>
         public static bool TryParseObjectReference(string value, out long fileId, out string guid)
         {
             return TryParseObjectReference(value, out fileId, out guid, out bool _);
@@ -391,6 +397,25 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             return TryGetField(document, field, out string value) ? value : string.Empty;
         }
 
+        /// <summary>Tests a MonoBehaviour's direct script GUID for an exact, case-insensitive match.</summary>
+        /// <remarks>Empty GUIDs, null references and duplicate direct script fields never match.</remarks>
+        public static bool IsScriptedBy(AuthoredAssetDocument document, string scriptGuid)
+        {
+            if (
+                document == null
+                || document.UnityTypeId != MonoBehaviourTypeId
+                || string.IsNullOrWhiteSpace(scriptGuid)
+                || !TryGetOnlyDirectField(document, ScriptField, out string reference)
+                || !TryParseObjectReference(reference, out long fileId, out string guid)
+                || fileId == 0
+                || string.IsNullOrEmpty(guid)
+            )
+            {
+                return false;
+            }
+            return string.Equals(guid, scriptGuid, StringComparison.OrdinalIgnoreCase);
+        }
+
         /// <summary>Finds one direct child of an entry, refusing duplicate child names.</summary>
         /// <param name="document">The document that owns the parent entry.</param>
         /// <param name="parent">The parent entry from the same document.</param>
@@ -512,6 +537,39 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 builder.Append(entry.InlineValue);
             }
             return builder.ToString();
+        }
+
+        internal static bool TryGetOnlyDirectField(
+            AuthoredAssetDocument document,
+            string field,
+            out string value
+        )
+        {
+            bool found = false;
+            string selected = string.Empty;
+            IReadOnlyList<AuthoredAssetEntry> entries = document.Entries;
+            int count = entries.Count;
+            for (int index = 0; index < count; ++index)
+            {
+                AuthoredAssetEntry entry = entries[index];
+                if (
+                    entry.SequenceDepth != 0
+                    || entry.Indent != FieldIndent
+                    || !MatchesFieldName(entry.Key, field)
+                )
+                {
+                    continue;
+                }
+                if (found)
+                {
+                    value = string.Empty;
+                    return false;
+                }
+                selected = entry.InlineValue;
+                found = true;
+            }
+            value = selected;
+            return found;
         }
 
         internal static bool TrySplitEntry(string content, out string key, out string inlineValue)
@@ -682,6 +740,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             long readFileId = 0;
             string readGuid = null;
             bool readHasFileId = false;
+            bool sawFileId = false;
+            bool sawGuid = false;
             string body = trimmed.Substring(1, trimmed.Length - 2);
             foreach (string part in body.Split(','))
             {
@@ -695,6 +755,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 string entry = part.Substring(separator + 1).Trim();
                 if (string.Equals(key, "fileID", StringComparison.Ordinal))
                 {
+                    if (sawFileId)
+                    {
+                        fileId = 0;
+                        guid = null;
+                        hasFileId = false;
+                        return false;
+                    }
+                    sawFileId = true;
                     if (
                         long.TryParse(
                             entry,
@@ -710,6 +778,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 }
                 else if (string.Equals(key, "guid", StringComparison.Ordinal))
                 {
+                    if (sawGuid)
+                    {
+                        fileId = 0;
+                        guid = null;
+                        hasFileId = false;
+                        return false;
+                    }
+                    sawGuid = true;
                     readGuid = entry;
                 }
             }

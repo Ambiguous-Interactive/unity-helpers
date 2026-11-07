@@ -135,7 +135,24 @@ It preserves unrelated sibling assets. Clear the tool's cached singleton referen
 Inspect full NUnit results as well as leaf counts. A fixture teardown failure can leave all
 individual test cases passing while the run itself fails.
 
-PR and push version jobs activate once, then run the selected modes concurrently in separate persistent projects and owned source worktrees. Compiler fixtures can rewrite their own sources without changing another mode's inputs. The coordinator verifies cache ownership and repository identity before restoring a worktree; unknown paths are preserved. The main EditMode suite retains its shared editor cache. Its compiler and migration phases run in a separate project at the same time; both workers must pass. PlayMode uses its own project. Windows workers use private desktops so concurrent editors do not share menu and window resources. Worker output uses plain text; raw Unity logs remain available. Cache pruning runs once during preparation. All projects retire legacy collectors before any parallel worker starts; workers do not prune sibling projects. Each worker verifies the session's version, editor path, job identity and live owner before reusing activation. At most four workers run at once, so both EditMode groups, Standalone and PlayMode can start together. The WProto-only worker waits for a free slot. The coordinator waits for every worker and kills timed-out worker trees before central license return. Mode receipts record elapsed time and all outcomes. The existing per-mode NUnit, redaction and artifact gates still apply. Manual diagnostic dispatches keep the serial path.
+PR and push version jobs activate once, then run the selected modes concurrently in separate persistent projects and owned source worktrees. Compiler fixtures can rewrite their own sources without changing another mode's inputs. The coordinator verifies cache ownership and repository identity before restoring a worktree; unknown paths are preserved. The two main EditMode shards retain separate editor caches. Their compiler and migration phases run in another project at the same time; all three workers must pass. PlayMode uses its own project. Windows workers use private desktops so concurrent editors do not share menu and window resources. Worker output uses plain text; raw Unity logs remain available. Cache pruning runs once during preparation. All projects retire legacy collectors before any parallel worker starts; workers do not prune sibling projects. Each worker verifies the session's version, editor path, job identity and live owner before reusing activation. At most five workers run at once, so both main EditMode shards, the isolated compiler phases, Standalone and PlayMode can start together. The WProto-only worker waits for a free slot. The coordinator waits for every worker and kills timed-out worker trees before central license return. Mode receipts record elapsed time and all outcomes. The existing per-mode NUnit, redaction and artifact gates still apply. Manual diagnostic dispatches keep the serial path.
+
+The coordinator accepts `--editmode-shards 2` to divide the selected EditMode assembly profile
+into two deterministic groups. Each group uses its own project and source worktree. Fixtures stay
+within their assembly, and compiler and migration phases retain the complete original profile.
+Use `--max-workers 5` when the runner has capacity for the extra editor; the default remains four.
+One EditMode shard remains the default for other callers. `--artifacts-root` can select a short
+local capture directory when the checkout path approaches Windows file API limits.
+
+The second shard captures evidence in a short sibling directory, then the coordinator moves it
+under the primary artifact's `shards/1` directory after its worker closes. The primary raw XML is
+retained as `shards/main-results.xml`. Combined publication requires both workers to finish
+successfully, positive passing cases, consistent root and leaf counts, known outcomes, no failed
+suites, disjoint assembly sets, and no assemblies outside the selection. Every selected assembly
+is assigned once; Unity can omit assemblies disabled by package or define constraints, such as
+Odin tests in a core project. Failed shards fail EditMode. Combined duration sums test execution across workers; use the mode receipt's
+elapsed time for wall time. Compare complete case identities, skips, native process health and
+cold versus warm caches before drawing a timing conclusion.
 
 The isolated migration contract phase runs the API, backup recovery, import verification and apply-record fixtures in one editor invocation. The compiler fixture and domain-reloading apply fixture retain separate invocations. Each group requires every named fixture, rejects skipped or missing cases, and checks root and suite failures.
 

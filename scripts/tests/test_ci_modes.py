@@ -45,6 +45,95 @@ def test_private_desktop_accepts_utf16_payload_as_data() -> None:
 
 
 @pytest.mark.parametrize("single", [False, True])
+def test_editmode_shards_partition_every_assembly_and_keep_isolation_complete(
+    tmp_path: Path, single: bool
+) -> None:
+    profiles = {**PROFILES, "editmode": "Subject.D;Subject.B;Subject.A;Subject.C"}
+    modes = build_modes(
+        "6000.6.0f1",
+        list(PROFILES),
+        profiles,
+        repository=ROOT,
+        workspace=tmp_path / "workspace",
+        artifacts=tmp_path / "artifacts",
+        session=tmp_path / "session",
+        single_threaded=single,
+        editmode_shards=2,
+    )
+    indexed = {mode.name: mode.parameters for mode in modes}
+    assert indexed["editmode"]["AssemblyNames"] == "Subject.A;Subject.C"
+    assert indexed["editmode_shard"]["AssemblyNames"] == "Subject.B;Subject.D"
+    assert indexed["editmode_isolated"]["AssemblyNames"] == profiles["editmode"]
+    assert indexed["editmode_shard"]["EditorPhaseGroup"] == "Main"
+    assert indexed["editmode_shard"]["ProjectScope"] == (
+        "single-threaded-shard-1" if single else "shard-1"
+    )
+    primary_capture = Path(str(indexed["editmode"]["ArtifactsPath"]))
+    shard_capture = Path(str(indexed["editmode_shard"]["ArtifactsPath"]))
+    assert shard_capture.parent == primary_capture.parent
+    assert len(str(shard_capture)) < len(str(primary_capture))
+    assert len({str(mode.parameters["ArtifactsPath"]) for mode in modes}) == len(modes)
+
+
+@pytest.mark.parametrize("failed", [False, True])
+def test_real_shard_worker_is_required_for_editmode_outcome(tmp_path: Path, failed: bool) -> None:
+    modes, preparation, environment, shell = make_control(tmp_path)
+    runner = Path(environment["UH_MODE_RUNNER"])
+    script = runner.read_text(encoding="utf-8")
+    script = script.replace(
+        "$workerName = if ($EditorPhaseGroup -eq 'Isolated')",
+        "$workerName = if ($ProjectScope -eq 'shard-1') { 'editmode_shard' } elseif ($EditorPhaseGroup -eq 'Isolated')",
+    )
+    marker = "        [IO.File]::WriteAllText((Join-Path $ArtifactsPath 'fixture-options.json')"
+    assert marker in script
+    xml = '<test-run result="Passed" total="1" passed="1" failed="0" skipped="0" inconclusive="0" duration="1"><test-suite type="Assembly" name="ASSEMBLY" result="Passed"><test-case fullname="ASSEMBLY.Case" result="Passed" /></test-suite></test-run>'
+    injection = f"""
+        if ($env:CONTROL_FAIL_WORKER -eq $workerName) {{ throw 'Controlled shard failure.' }}
+        if ($TestMode -eq 'editmode') {{
+            $assembly = if ($ProjectScope -eq 'shard-1') {{ 'Shard.dll' }} else {{ 'Main.dll' }}
+            $xml = '{xml}'.Replace('ASSEMBLY', $assembly)
+            [IO.File]::WriteAllText((Join-Path $ArtifactsPath 'results.xml'), $xml)
+        }}
+"""
+    script = script.replace(marker, injection + marker)
+    runner.write_text(script, encoding="utf-8")
+    primary = modes[0]
+    modes[0] = Mode(primary.name, {**primary.parameters, "AssemblyNames": "Main"})
+    shard = Mode(
+        "editmode_shard",
+        {
+            **primary.parameters,
+            "ProjectScope": "shard-1",
+            "AssemblyNames": "Shard",
+            "ArtifactsPath": str(tmp_path / "editmode-shard"),
+        },
+    )
+    environment["CONTROL_MODE_COUNT"] = "4"
+    environment["CONTROL_FAIL_WORKER"] = "editmode_shard" if failed else ""
+    success = run(
+        [*modes, shard],
+        preparation,
+        private=tmp_path,
+        shell=shell,
+        environment=environment,
+        timeout=30,
+        receipt=tmp_path / "receipt.json",
+        output=None,
+        max_workers=5,
+    )
+    assert success is not failed
+    receipt = json.loads((tmp_path / "receipt.json").read_text(encoding="utf-8"))
+    assert receipt["Outcomes"]["editmode"] == ("failure" if failed else "success")
+    assert "editmode_shard" not in receipt["Outcomes"]
+    if not failed:
+        import xml.etree.ElementTree as ET
+
+        root = ET.parse(tmp_path / "editmode/results.xml").getroot()  # noqa: S314 - local NUnit output or generated test fixtures.
+        assert root.get("passed") == "2"
+        assert (tmp_path / "editmode/shards/main-results.xml").is_file()
+
+
+@pytest.mark.parametrize("single", [False, True])
 def test_mode_configuration_retains_profiles_builds_and_independent_projects(
     tmp_path: Path, single: bool
 ) -> None:
