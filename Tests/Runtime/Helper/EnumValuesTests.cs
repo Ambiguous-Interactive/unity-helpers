@@ -20,6 +20,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Type[] types =
             {
                 typeof(DayOfWeek),
+                typeof(AttributeTargets),
                 typeof(EmptyEnum),
                 typeof(SingletonEnum),
                 typeof(AliasedEnum),
