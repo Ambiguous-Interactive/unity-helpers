@@ -8,7 +8,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
     using System.Collections.Generic;
     using System.Globalization;
     using System.IO;
+    using System.Text;
     using WallstopStudios.UnityHelpers.Core.Helper;
+    using WallstopStudios.UnityHelpers.Utils;
 
     /// <summary>
     /// Reads a committed <c>.unity</c>, <c>.prefab</c> or <c>.asset</c> as the sequence of documents
@@ -30,6 +32,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
         /// <summary>The value Unity writes for a sequence with no elements.</summary>
         public const string EmptySequence = "[]";
+
+        private const int FieldIndent = 2;
 
         /// <summary>The extensions Unity writes authored objects into.</summary>
         public static readonly IReadOnlyList<string> AuthoredExtensions = new[]
@@ -314,6 +318,186 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             }
         }
 
+        /// <summary>Reads the first direct field of a Unity document, without matching nested names.</summary>
+        /// <param name="document">The document to inspect.</param>
+        /// <param name="field">The exact serialized key, with an optional trailing colon.</param>
+        /// <param name="value">The inline value, or an empty string when absent.</param>
+        /// <returns>Whether the document declares the direct field.</returns>
+        public static bool TryGetField(
+            AuthoredAssetDocument document,
+            string field,
+            out string value
+        )
+        {
+            if (document != null && !string.IsNullOrEmpty(field))
+            {
+                foreach (AuthoredAssetEntry entry in document.Entries)
+                {
+                    if (entry.Indent == FieldIndent && MatchesFieldName(entry.Key, field))
+                    {
+                        value = entry.InlineValue;
+                        return true;
+                    }
+                }
+            }
+            value = string.Empty;
+            return false;
+        }
+
+        /// <summary>Reads a field only when exactly one entry at any depth declares its name.</summary>
+        /// <param name="document">The document to inspect.</param>
+        /// <param name="field">The exact serialized key, with an optional trailing colon.</param>
+        /// <param name="value">The unique inline value, or an empty string on absence or ambiguity.</param>
+        /// <returns>Whether exactly one entry matches.</returns>
+        public static bool TryGetOnlyField(
+            AuthoredAssetDocument document,
+            string field,
+            out string value
+        )
+        {
+            bool found = false;
+            string unique = string.Empty;
+            if (document != null && !string.IsNullOrEmpty(field))
+            {
+                foreach (AuthoredAssetEntry entry in document.Entries)
+                {
+                    if (!MatchesFieldName(entry.Key, field))
+                    {
+                        continue;
+                    }
+                    if (found)
+                    {
+                        value = string.Empty;
+                        return false;
+                    }
+                    unique = entry.InlineValue;
+                    found = true;
+                }
+            }
+            value = unique;
+            return found;
+        }
+
+        /// <summary>Reads a direct field's inline value, or an empty string when it is absent.</summary>
+        /// <param name="document">The document to inspect.</param>
+        /// <param name="field">The exact serialized key, with an optional trailing colon.</param>
+        /// <returns>The first matching direct field's inline value.</returns>
+        public static string Field(AuthoredAssetDocument document, string field)
+        {
+            return TryGetField(document, field, out string value) ? value : string.Empty;
+        }
+
+        /// <summary>Finds one direct child of an entry, refusing duplicate child names.</summary>
+        /// <param name="document">The document that owns the parent entry.</param>
+        /// <param name="parent">The parent entry from the same document.</param>
+        /// <param name="field">The exact child key, with an optional trailing colon.</param>
+        /// <param name="child">The unique direct child, or default on failure.</param>
+        /// <returns>Whether exactly one matching direct child exists.</returns>
+        public static bool TryDescend(
+            AuthoredAssetDocument document,
+            AuthoredAssetEntry parent,
+            string field,
+            out AuthoredAssetEntry child
+        )
+        {
+            if (document == null || string.IsNullOrEmpty(field))
+            {
+                child = default;
+                return false;
+            }
+            bool ownsParent = false;
+            bool found = false;
+            AuthoredAssetEntry selected = default;
+            foreach (AuthoredAssetEntry entry in document.Entries)
+            {
+                if (entry.Equals(parent))
+                {
+                    ownsParent = true;
+                    continue;
+                }
+                if (!IsDirectChild(entry, parent) || !MatchesFieldName(entry.Key, field))
+                {
+                    continue;
+                }
+                if (found)
+                {
+                    child = default;
+                    return false;
+                }
+                selected = entry;
+                found = true;
+            }
+            bool matched = ownsParent && found;
+            child = matched ? selected : default;
+            return matched;
+        }
+
+        /// <summary>Returns a serialized name and its legacy form without a leading underscore.</summary>
+        /// <param name="field">The serialized key to expand.</param>
+        /// <returns>The exact name first, then its legacy form when different.</returns>
+        /// <remarks>Field reads remain exact; callers choose whether to accept a legacy spelling.</remarks>
+        public static IEnumerable<string> SerializedNames(string field)
+        {
+            if (string.IsNullOrEmpty(field))
+            {
+                yield break;
+            }
+            yield return field;
+            if (1 < field.Length && field[0] == '_')
+            {
+                yield return field.Substring(1);
+            }
+        }
+
+        /// <summary>Joins a direct field's value and direct child values, excluding serializedVersion.</summary>
+        /// <param name="document">The document to inspect.</param>
+        /// <param name="field">The exact serialized key, with an optional trailing colon.</param>
+        /// <returns>Space-separated values, or an empty string when the direct field is absent.</returns>
+        /// <remarks>Nested descendants and block-scalar text are not flattened.</remarks>
+        public static string ValueWithDirectChildren(AuthoredAssetDocument document, string field)
+        {
+            if (document == null || string.IsNullOrEmpty(field))
+            {
+                return string.Empty;
+            }
+            AuthoredAssetEntry parent = default;
+            bool found = false;
+            foreach (AuthoredAssetEntry entry in document.Entries)
+            {
+                if (entry.Indent == FieldIndent && MatchesFieldName(entry.Key, field))
+                {
+                    parent = entry;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found)
+            {
+                return string.Empty;
+            }
+            using PooledResource<StringBuilder> lease = Buffers.StringBuilder.Get(
+                out StringBuilder builder
+            );
+            builder.Append(parent.InlineValue);
+            foreach (AuthoredAssetEntry entry in document.Entries)
+            {
+                if (
+                    !IsDirectChild(entry, parent)
+                    || string.Equals(entry.Key, "serializedVersion", StringComparison.Ordinal)
+                    || string.IsNullOrEmpty(entry.InlineValue)
+                )
+                {
+                    continue;
+                }
+                if (0 < builder.Length)
+                {
+                    builder.Append(' ');
+                }
+                builder.Append(entry.InlineValue);
+            }
+            return builder.ToString();
+        }
+
         internal static bool TrySplitEntry(string content, out string key, out string inlineValue)
         {
             if (string.IsNullOrEmpty(content))
@@ -428,6 +612,29 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             }
 
             return index;
+        }
+
+        private static bool IsDirectChild(AuthoredAssetEntry entry, AuthoredAssetEntry parent)
+        {
+            return entry.Indent == parent.Indent + FieldIndent
+                && parent.LineNumber < entry.LineNumber
+                && entry.LineNumber < parent.EndLineNumber;
+        }
+
+        private static bool MatchesFieldName(string key, string field)
+        {
+            if (key == null || string.IsNullOrEmpty(field))
+            {
+                return false;
+            }
+            int length = field.Length;
+            if (field[length - 1] == ':')
+            {
+                --length;
+            }
+            return 0 < length
+                && key.Length == length
+                && string.CompareOrdinal(key, 0, field, 0, length) == 0;
         }
 
         private static bool TryParseObjectReference(

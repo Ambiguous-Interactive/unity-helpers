@@ -31,6 +31,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// A dense list of occupied slots supports O(Count) enumeration, including after removals.
     /// Slot positions share one ushort or int index array according to the table's capacity.
     /// The extra indexing storage trades memory for iteration speed. Removal may change order.
+    /// If a growth allocation fails, the existing contents and enumerators remain valid.
     /// The two lowest key values remain reserved; see <see cref="MinimumAllowedKey"/>.
     /// </para>
     /// </remarks>
@@ -485,19 +486,25 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             int capacity = 1 << power;
             int[] oldKeys = _keys;
             TValue[] oldValues = _values;
-            _keys = new int[capacity];
-            _values = new TValue[capacity];
+            int[] keys = new int[capacity];
+            TValue[] values = new TValue[capacity];
             int indexCapacity = capacity + capacity / LoadFactorDivisor;
+            ushort[] compactIndices;
+            int[] indices;
             if (capacity <= ushort.MaxValue + 1)
             {
-                _compactIndices = new ushort[indexCapacity];
-                _indices = null;
+                compactIndices = new ushort[indexCapacity];
+                indices = null;
             }
             else
             {
-                _indices = new int[indexCapacity];
-                _compactIndices = null;
+                indices = new int[indexCapacity];
+                compactIndices = null;
             }
+            _keys = keys;
+            _values = values;
+            _compactIndices = compactIndices;
+            _indices = indices;
             _mask = capacity - 1;
             _shift = 32 - power;
             _count = 0;

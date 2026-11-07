@@ -187,7 +187,7 @@
   {
     "id": "gitignore-docs",
     "name": "Gitignore safety docs",
-    "run": "pwsh -NoProfile -File scripts/lint-gitignore-docs.ps1 -VerboseOutput"
+    "run": "uv run --quiet --project scripts/python~ --locked --no-dev --group metadata python scripts/lint_gitignore_docs.py --verbose"
   },
   {
     "id": "github-pages-css",

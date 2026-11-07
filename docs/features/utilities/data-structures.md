@@ -400,20 +400,22 @@ and shared-low-bit keys each used 64 and 1,024 entries.
 
 | Runtime                   | Pair iteration / Dictionary | Pair iteration / 3.7.1 | Hits / 3.7.1 | Misses / 3.7.1 | Clear and refill / 3.7.1 | Fresh construction and fill / 3.7.1 |
 | ------------------------- | --------------------------- | ---------------------- | ------------ | -------------- | ------------------------ | ----------------------------------- |
-| .NET 10.0.14 x64, Windows | 1.09–1.36                   | 0.20–0.22              | 1.00–1.07    | 0.63–0.79      | 0.64–0.81                | 0.79–0.92                           |
-| Mono 6.14.1 x64, Linux    | 1.07–1.27                   | 0.18–0.24              | 1.00–1.06    | 1.01–1.12      | 0.85–1.03                | 1.01–1.31                           |
+| .NET 10.0.14 x64, Windows | 1.103–1.389                 | 0.198–0.238            | 1.018–1.076  | 0.636–0.855    | 0.643–0.815              | 0.893–1.047                         |
+| Mono 6.14.1 x64, Linux    | 1.005–1.255                 | 0.172–0.253            | 0.996–1.089  | 1.003–1.103    | 0.887–0.967              | 0.962–1.288                         |
 
 The extra index array improves iteration while increasing memory and construction costs.
-At 1,024 entries, fresh construction and fill on Mono took 24–31% longer; the shared-low-bit
-miss case took about 12% longer. This does not meet every target in
+At 1,024 entries, fresh construction and fill on Mono took 24–29% longer; the shared-low-bit
+miss case took 10.3% longer. This does not meet every target in
 [#1131](https://github.com/wallstop/unity-helpers/issues/1131), which remains open.
 Choose this map for repeated lookup and iteration only after measuring your workload.
 These measurements do not qualify IL2CPP, Unity editor timings, arbitrary value sizes, or
 large-table cache behavior. Runtime results used different operating systems and must not
 be compared as a cross-runtime speed claim.
 
-The [raw samples, source identities, and replay program](../../performance/intmap-iteration-evidence.json)
-retain all six completed processes. The hash-code shim is outside the measured operations.
+The [growth-hardening recheck](../../performance/intmap-growth-evidence.json) retains all six
+completed processes and their exact source identities. The
+[earlier iteration capture](../../performance/intmap-iteration-evidence.json) remains available
+with its original source identity. The hash-code shim is outside the measured operations.
 Native Unity correctness tests also cover index-width transitions, zero-key storage, mutation
 checks, removal and refill, and allocation events with positive and negative controls.
 
@@ -425,6 +427,9 @@ checks, removal and refill, and allocation events with positive and negative con
   The default table has 64 slots. Growth occurs when adding another live entry would exceed a
   0.25 load factor. This favors lookup spacing at the cost of more key and value storage.
 - Replacing an existing value does not grow the table, including at the occupancy limit.
+- If allocating storage for growth throws, the map keeps its prior capacity, count, contents,
+  and enumerator versions. The failed key stays absent. Replacement and removal remain usable;
+  this does not guarantee that another growth attempt can obtain memory.
 - Removal closes probe-chain gaps without tombstones or replacement arrays. Repeated
   remove-before-add operations do not require growth while live occupancy stays within the limit.
 - Keys sharing low bits, such as `i * 1024`, use high hash bits to select their initial slots.

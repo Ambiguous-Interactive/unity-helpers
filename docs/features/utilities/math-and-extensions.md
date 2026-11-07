@@ -605,6 +605,20 @@ to the visible display and projected onto the rectangle. A target canvas uses it
 ahead of any camera from a different pointer hit. Screen Space - Overlay canvases ignore raycast
 world positions and use Unity's camera-free conversion.
 
+For a world-space canvas without an assigned camera, pass a fallback camera:
+
+```csharp
+if (eventData.TryGetLocalPoint(panel, gameplayCamera, out Vector2 localPoint))
+{
+    handle.anchoredPosition = localPoint;
+}
+```
+
+The fallback overloads use the canvas camera, the target's press and current raycast module
+cameras, the press and enter event cameras, the supplied fallback, then `Camera.main`.
+An overlay canvas still uses no camera. Destroyed cameras are skipped. The original overloads
+keep their existing camera selection and do not search for `Camera.main`.
+
 ```csharp
 public void OnDrag(PointerEventData eventData)
 {
@@ -1483,6 +1497,18 @@ Array.Sort(days, EnumNameComparer<DayOfWeek>.Instance);
 `EnumNameComparer<T>` requires an unmanaged enum for cached name lookup. A span
 cannot be stored in a class field or kept across an `await` or coroutine yield;
 retrieve the view where you use it.
+
+When the enum is known only as a `Type`, use `EnumValues.Of(type)` or
+`EnumValues.TryGetValues(type, out Array values)`. Both return the same shared array
+for that type, in framework unsigned numeric order with aliases kept. **Never modify
+this array**; use `(Array)values.Clone()` for an owned copy. Cache publication is safe
+across threads, including the `SINGLE_THREADED` build profile. Concurrent first reads
+may allocate discarded candidate arrays before one value is published.
+
+`Of(null)` throws `ArgumentNullException`; non-enum types throw `ArgumentException`.
+`TryGetValues` returns false and a null array for null, non-enum, or unsupported enum
+metadata. Memory exhaustion still propagates. Failed reads do not publish a cache
+entry. Prefer `EnumValues<T>.Values` when `T` is known at compile time.
 
 ### Fast Enum-to-String Conversion
 

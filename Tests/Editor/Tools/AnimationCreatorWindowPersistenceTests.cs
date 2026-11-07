@@ -15,6 +15,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
     using WallstopStudios.UnityHelpers.Core.Animation;
     using WallstopStudios.UnityHelpers.Editor.Sprites;
     using WallstopStudios.UnityHelpers.Tests.Core;
+    using WallstopStudios.UnityHelpers.Utils;
 
     /// <summary>
     /// Tests for AnimationCreatorWindow save/load configuration functionality.
@@ -24,6 +25,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
     [Category("Integration")]
     public sealed class AnimationCreatorWindowPersistenceTests : CommonTestBase
     {
+        private DefaultAsset TempFolderAsset
+        {
+            get
+            {
+                if (_tempFolderAsset == null)
+                {
+                    AssetDatabase.ImportAsset(
+                        _tempFolder,
+                        ImportAssetOptions.ForceSynchronousImport
+                    );
+                    _tempFolderAsset = AssetDatabase.LoadAssetAtPath<DefaultAsset>(_tempFolder);
+                    Assert.That(_tempFolderAsset != null, Is.True);
+                }
+                return _tempFolderAsset;
+            }
+        }
+
         private AnimationCreatorWindow _window;
         private string _tempFolder;
         private string _tempFolderAbsolute;
@@ -35,13 +53,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             base.BaseSetUp();
             _tempFolder = "Assets/TestAnimCreatorPersist_" + Guid.NewGuid().ToString("N")[..8];
             _tempFolderAbsolute = Path.GetFullPath(_tempFolder);
-            if (!Directory.Exists(_tempFolderAbsolute))
-            {
-                Directory.CreateDirectory(_tempFolderAbsolute);
-                AssetDatabase.Refresh();
-            }
+            Directory.CreateDirectory(_tempFolderAbsolute);
             _trackedFolders.Add(_tempFolder);
-            _tempFolderAsset = AssetDatabase.LoadAssetAtPath<DefaultAsset>(_tempFolder);
+            _tempFolderAsset = null;
 
             _window = ScriptableObject.CreateInstance<AnimationCreatorWindow>();
             Track(_window);
@@ -51,20 +65,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
         public override void TearDown()
         {
             base.TearDown();
-            if (Directory.Exists(_tempFolderAbsolute))
+            if (AssetDatabase.IsValidFolder(_tempFolder))
             {
-                try
+                Assert.That(AssetDatabase.DeleteAsset(_tempFolder), Is.True);
+            }
+            else
+            {
+                if (Directory.Exists(_tempFolderAbsolute))
                 {
                     Directory.Delete(_tempFolderAbsolute, true);
-                    string metaPath = _tempFolderAbsolute + ".meta";
-                    if (File.Exists(metaPath))
-                    {
-                        File.Delete(metaPath);
-                    }
-                    AssetDatabase.Refresh();
                 }
-                catch { }
+                string metaPath = _tempFolderAbsolute + ".meta";
+                if (File.Exists(metaPath))
+                {
+                    File.Delete(metaPath);
+                }
             }
+            Assert.That(Directory.Exists(_tempFolderAbsolute), Is.False);
+            Assert.That(File.Exists(_tempFolderAbsolute + ".meta"), Is.False);
+            _trackedFolders.Remove(_tempFolder);
         }
 
         [Test]
@@ -313,7 +332,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
         [Test]
         public void HasAnyConfigReturnsTrueWhenConfigExists()
         {
-            _window.animationSources.Add(_tempFolderAsset);
+            _window.animationSources.Add(TempFolderAsset);
             _window.SaveConfig(_tempFolder);
 
             bool result = _window.HasAnyConfig();
@@ -324,7 +343,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
         [Test]
         public void GetFoldersWithConfigsReturnsEmptyWithNoConfigs()
         {
-            _window.animationSources.Add(_tempFolderAsset);
+            _window.animationSources.Add(TempFolderAsset);
 
             List<string> folders = _window.GetFoldersWithConfigs();
 
@@ -335,7 +354,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
         [Test]
         public void GetFoldersWithConfigsReturnsFoldersWithConfigs()
         {
-            _window.animationSources.Add(_tempFolderAsset);
+            _window.animationSources.Add(TempFolderAsset);
             _window.SaveConfig(_tempFolder);
 
             List<string> folders = _window.GetFoldersWithConfigs();
@@ -406,7 +425,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
         [Test]
         public void TryAutoLoadConfigsReturnsFalseWhenNoConfigExists()
         {
-            _window.animationSources.Add(_tempFolderAsset);
+            _window.animationSources.Add(TempFolderAsset);
 
             bool result = _window.TryAutoLoadConfigs();
 
@@ -425,7 +444,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             );
             File.WriteAllText(fullPath, json, System.Text.Encoding.UTF8);
 
-            _window.animationSources.Add(_tempFolderAsset);
+            _window.animationSources.Add(TempFolderAsset);
 
             bool result = _window.TryAutoLoadConfigs();
 
@@ -439,16 +458,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             string tempFolder2 =
                 "Assets/TestAnimCreatorPersist2_" + Guid.NewGuid().ToString("N")[..8];
             string tempFolder2Absolute = Path.GetFullPath(tempFolder2);
-            Directory.CreateDirectory(tempFolder2Absolute);
-            AssetDatabase.Refresh();
-            _trackedFolders.Add(tempFolder2);
+            EnsureFolder(tempFolder2);
 
             try
             {
                 DefaultAsset folder2Asset = AssetDatabase.LoadAssetAtPath<DefaultAsset>(
                     tempFolder2
                 );
-                _window.animationSources.Add(_tempFolderAsset);
+                _window.animationSources.Add(TempFolderAsset);
                 _window.animationSources.Add(folder2Asset);
 
                 int savedCount = _window.SaveAllConfigs();
@@ -469,15 +486,50 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             {
                 if (Directory.Exists(tempFolder2Absolute))
                 {
-                    Directory.Delete(tempFolder2Absolute, true);
-                    string metaPath = tempFolder2Absolute + ".meta";
-                    if (File.Exists(metaPath))
-                    {
-                        File.Delete(metaPath);
-                    }
-                    AssetDatabase.Refresh();
+                    Assert.That(AssetDatabase.DeleteAsset(tempFolder2), Is.True);
+                    Assert.That(Directory.Exists(tempFolder2Absolute), Is.False);
+                    Assert.That(File.Exists(tempFolder2Absolute + ".meta"), Is.False);
+                    _trackedFolders.Remove(tempFolder2);
                 }
             }
+        }
+
+        [TestCase(false, TestName = "ConfigWrite.Save.DoesNotRefreshUnrelatedAsset")]
+        [TestCase(true, TestName = "ConfigWrite.Delete.DoesNotRefreshUnrelatedAsset")]
+        public void ConfigWritesDoNotRefreshUnrelatedAssets(bool delete)
+        {
+            AssetDatabase.DisallowAutoRefresh();
+            using DisposableScope refresh = DisposableScope.Create(AssetDatabase.AllowAutoRefresh);
+            if (delete)
+            {
+                Assert.That(_window.SaveConfig(_tempFolder), Is.True);
+            }
+            string unrelatedPath = _tempFolder + "/unrelated.txt";
+            string unrelatedFullPath = Path.GetFullPath(unrelatedPath);
+            File.WriteAllText(unrelatedFullPath, "Unrelated pending import");
+            Assert.That(AssetDatabase.AssetPathToGUID(unrelatedPath), Is.Empty);
+
+            bool changed = delete
+                ? _window.DeleteConfig(_tempFolder)
+                : _window.SaveConfig(_tempFolder);
+
+            Assert.That(changed, Is.True);
+            Assert.That(AssetDatabase.AssetPathToGUID(unrelatedPath), Is.Empty);
+        }
+
+        [Test]
+        public void StreamingAssetsConfigSavesAndDeletesOnDisk()
+        {
+            string folder =
+                "Assets/StreamingAssets/AnimationConfig_" + Guid.NewGuid().ToString("N");
+            EnsureFolder(folder);
+            string configPath = AnimationCreatorConfig.GetConfigPath(folder);
+            Assert.That(_window.SaveConfig(folder), Is.True);
+            Assert.That(File.Exists(Path.GetFullPath(configPath)), Is.True);
+            Assert.That(_window.LoadConfig(folder), Is.True);
+            Assert.That(_window.DeleteConfig(folder), Is.True);
+            Assert.That(File.Exists(Path.GetFullPath(configPath)), Is.False);
+            Assert.That(_window.LoadConfig(folder), Is.False);
         }
 
         [Test]
