@@ -58,7 +58,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
         internal static string Format(string code, bool darkTheme)
         {
-            if (string.IsNullOrWhiteSpace(code))
+            if (string.IsNullOrEmpty(code))
             {
                 return string.Empty;
             }

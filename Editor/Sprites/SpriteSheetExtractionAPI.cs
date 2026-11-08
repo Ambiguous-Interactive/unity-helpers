@@ -91,7 +91,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         public string Error { get; internal set; }
 
         /// <summary>Gets whether discovery completed.</summary>
-        public bool Success => string.IsNullOrWhiteSpace(Error);
+        public bool Success => string.IsNullOrEmpty(Error);
 
         private readonly List<string> _assetPaths = new();
         private readonly List<string> _warnings = new();

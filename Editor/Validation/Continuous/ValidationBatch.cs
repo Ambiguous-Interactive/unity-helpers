@@ -93,7 +93,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
             List<string> problems = new List<string>();
             List<IValidationRule> rules = DiscoverRules(problems);
-            ValidationSuppressions suppressions = ReadSuppressions(suppressionsPath, problems);
+            ValidationSuppressions suppressions = ReadSuppressions(
+                suppressionsPath,
+                commandLine != null && Array.IndexOf(commandLine, SuppressionsArgument) >= 0,
+                problems
+            );
 
             ValidationRun run = new ValidationRun(
                 rules,
@@ -105,7 +109,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
             string json = ValidationReport.ToJson(run, suppressions);
             if (
-                !string.IsNullOrWhiteSpace(outputPath)
+                commandLine != null
+                && Array.IndexOf(commandLine, OutputArgument) >= 0
                 && !TryWrite(outputPath, json, out string failure)
             )
             {
@@ -389,9 +394,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             return references;
         }
 
-        private static ValidationSuppressions ReadSuppressions(string path, List<string> problems)
+        private static ValidationSuppressions ReadSuppressions(
+            string path,
+            bool supplied,
+            List<string> problems
+        )
         {
-            if (string.IsNullOrWhiteSpace(path))
+            if (!supplied)
             {
                 return ValidationSuppressions.Empty;
             }

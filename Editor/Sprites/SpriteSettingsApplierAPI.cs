@@ -208,9 +208,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 {
                     settings = s,
                     mode = s.matchBy,
-                    nameLower = string.IsNullOrWhiteSpace(s.name)
-                        ? null
-                        : s.name.ToLowerInvariant(),
+                    nameLower = string.IsNullOrEmpty(s.name) ? null : s.name.ToLowerInvariant(),
                     patternLower = string.IsNullOrEmpty(trimmedPattern)
                         ? null
                         : trimmedPattern.ToLowerInvariant(),

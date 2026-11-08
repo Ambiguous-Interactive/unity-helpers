@@ -328,8 +328,8 @@ When you use Attributes for frequently mutated "current" values:
 
 ## Using Tags WITHOUT Attributes
 
-Tag identifiers must contain a non-whitespace character. Applying a null, empty, or
-whitespace-only tag leaves tag state unchanged and emits no tag-added event.
+Applying a null or empty tag leaves tag state unchanged and emits no tag-added event.
+Serialized tag keys preserve literal whitespace, including whitespace-only tags.
 
 Even without any Attributes, the Effects System is useful for tag-based state management and cosmetic effects.
 

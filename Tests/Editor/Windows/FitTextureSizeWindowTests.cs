@@ -195,6 +195,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             Assert.That(result.Changed, Is.Zero);
         }
 
+        [TestCase("")]
+        [TestCase(" ")]
+        [TestCase("\t\r\n")]
+        public void ApiCallbackExceptionsCannotReportSuccess(string message)
+        {
+            FitTextureSizeAPI.Result result = FitTextureSizeAPI.Run(
+                new[] { string.Empty },
+                new FitTextureSizeAPI.Options(),
+                false,
+                (_, _, _) => throw new System.Exception(message)
+            );
+            Assert.IsFalse(result.Succeeded);
+            Assert.IsFalse(result.Cancelled);
+            Assert.AreEqual(message, result.Error);
+        }
+
         [Test]
         public void GrowOnlyRaisesToNextPowerOfTwo()
         {

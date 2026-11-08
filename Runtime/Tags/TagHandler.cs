@@ -101,10 +101,10 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// Checks whether the specified tag is currently active (has a count > 0).
         /// </summary>
         /// <param name="effectTag">The tag to check for.</param>
-        /// <returns><c>true</c> if the tag is active; otherwise, <c>false</c>. Returns <c>false</c> for null, empty or whitespace-only strings.</returns>
+        /// <returns><c>true</c> if the tag is active; otherwise, <c>false</c>. Returns <c>false</c> for null or empty strings; other keys retain literal whitespace.</returns>
         public bool HasTag(string effectTag)
         {
-            if (string.IsNullOrWhiteSpace(effectTag))
+            if (string.IsNullOrEmpty(effectTag))
             {
                 return false;
             }
@@ -130,7 +130,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                 {
                     foreach (string effectTag in hashSet)
                     {
-                        if (string.IsNullOrWhiteSpace(effectTag))
+                        if (string.IsNullOrEmpty(effectTag))
                         {
                             continue;
                         }
@@ -146,7 +146,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                 {
                     foreach (string effectTag in sortedSet)
                     {
-                        if (string.IsNullOrWhiteSpace(effectTag))
+                        if (string.IsNullOrEmpty(effectTag))
                         {
                             continue;
                         }
@@ -162,7 +162,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                 {
                     foreach (string effectTag in queue)
                     {
-                        if (string.IsNullOrWhiteSpace(effectTag))
+                        if (string.IsNullOrEmpty(effectTag))
                         {
                             continue;
                         }
@@ -178,7 +178,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                 {
                     foreach (string effectTag in stack)
                     {
-                        if (string.IsNullOrWhiteSpace(effectTag))
+                        if (string.IsNullOrEmpty(effectTag))
                         {
                             continue;
                         }
@@ -194,7 +194,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                 {
                     foreach (string effectTag in linkedList)
                     {
-                        if (string.IsNullOrWhiteSpace(effectTag))
+                        if (string.IsNullOrEmpty(effectTag))
                         {
                             continue;
                         }
@@ -210,7 +210,7 @@ namespace WallstopStudios.UnityHelpers.Tags
 
             foreach (string effectTag in effectTags.AsValueEnumerableRequired())
             {
-                if (string.IsNullOrWhiteSpace(effectTag))
+                if (string.IsNullOrEmpty(effectTag))
                 {
                     continue;
                 }
@@ -234,7 +234,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             for (int i = 0; i < effectTags.Count; ++i)
             {
                 string effectTag = effectTags[i];
-                if (string.IsNullOrWhiteSpace(effectTag))
+                if (string.IsNullOrEmpty(effectTag))
                 {
                     continue;
                 }
@@ -271,7 +271,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                 {
                     foreach (string effectTag in hashSet)
                     {
-                        if (string.IsNullOrWhiteSpace(effectTag))
+                        if (string.IsNullOrEmpty(effectTag))
                         {
                             continue;
                         }
@@ -287,7 +287,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                 {
                     foreach (string effectTag in sortedSet)
                     {
-                        if (string.IsNullOrWhiteSpace(effectTag))
+                        if (string.IsNullOrEmpty(effectTag))
                         {
                             continue;
                         }
@@ -303,7 +303,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                 {
                     foreach (string effectTag in queue)
                     {
-                        if (string.IsNullOrWhiteSpace(effectTag))
+                        if (string.IsNullOrEmpty(effectTag))
                         {
                             continue;
                         }
@@ -319,7 +319,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                 {
                     foreach (string effectTag in stack)
                     {
-                        if (string.IsNullOrWhiteSpace(effectTag))
+                        if (string.IsNullOrEmpty(effectTag))
                         {
                             continue;
                         }
@@ -335,7 +335,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                 {
                     foreach (string effectTag in linkedList)
                     {
-                        if (string.IsNullOrWhiteSpace(effectTag))
+                        if (string.IsNullOrEmpty(effectTag))
                         {
                             continue;
                         }
@@ -351,7 +351,7 @@ namespace WallstopStudios.UnityHelpers.Tags
 
             foreach (string effectTag in effectTags.AsValueEnumerableRequired())
             {
-                if (string.IsNullOrWhiteSpace(effectTag))
+                if (string.IsNullOrEmpty(effectTag))
                 {
                     continue;
                 }
@@ -380,7 +380,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             for (int i = 0; i < effectTags.Count; ++i)
             {
                 string effectTag = effectTags[i];
-                if (string.IsNullOrWhiteSpace(effectTag))
+                if (string.IsNullOrEmpty(effectTag))
                 {
                     continue;
                 }
@@ -454,7 +454,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// </example>
         public bool TryGetTagCount(string effectTag, out int count)
         {
-            if (string.IsNullOrWhiteSpace(effectTag))
+            if (string.IsNullOrEmpty(effectTag))
             {
                 count = default;
                 return false;
@@ -550,7 +550,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                 target.Clear();
             }
 
-            if (string.IsNullOrWhiteSpace(effectTag) || _effectHandles.Count == 0)
+            if (string.IsNullOrEmpty(effectTag) || _effectHandles.Count == 0)
             {
                 return target ?? new List<EffectHandle>(0);
             }
@@ -572,7 +572,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// Applies a tag, incrementing its count. If the tag is new, raises <see cref="OnTagAdded"/>.
         /// Otherwise, raises <see cref="OnTagCountChanged"/>.
         /// </summary>
-        /// <param name="effectTag">The tag to apply. Null, empty, and whitespace-only values are ignored.</param>
+        /// <param name="effectTag">The literal tag key to apply. Null and empty values are ignored.</param>
         public void ApplyTag(string effectTag)
         {
             InternalApplyTag(effectTag);
@@ -601,7 +601,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// </example>
         public List<EffectHandle> RemoveTag(string effectTag, List<EffectHandle> buffer = null)
         {
-            if (string.IsNullOrWhiteSpace(effectTag))
+            if (string.IsNullOrEmpty(effectTag))
             {
                 if (buffer != null)
                 {
@@ -719,7 +719,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// </remarks>
         public HandleEnumerable EnumerateHandlesWithTag(string effectTag)
         {
-            if (string.IsNullOrWhiteSpace(effectTag) || _effectHandles.Count == 0)
+            if (string.IsNullOrEmpty(effectTag) || _effectHandles.Count == 0)
             {
                 return HandleEnumerable.Empty;
             }
@@ -833,7 +833,7 @@ namespace WallstopStudios.UnityHelpers.Tags
 
         private void InternalApplyTag(string effectTag)
         {
-            if (string.IsNullOrWhiteSpace(effectTag))
+            if (string.IsNullOrEmpty(effectTag))
             {
                 return;
             }
@@ -947,7 +947,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                     return;
                 }
 
-                if (string.IsNullOrWhiteSpace(effectTag))
+                if (string.IsNullOrEmpty(effectTag))
                 {
                     continue;
                 }
@@ -1109,7 +1109,7 @@ namespace WallstopStudios.UnityHelpers.Tags
 
             public HandleEnumerator GetEnumerator()
             {
-                if (!_hasData || string.IsNullOrWhiteSpace(_effectTag))
+                if (!_hasData || string.IsNullOrEmpty(_effectTag))
                 {
                     return default;
                 }

@@ -27,9 +27,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
 
         [TestCase(null, TestName = "InvalidTag.Null.IsRejected")]
         [TestCase("", TestName = "InvalidTag.Empty.IsRejected")]
-        [TestCase(" ", TestName = "WhitespaceTag.Space.IsRejected")]
-        [TestCase("\t\r\n", TestName = "WhitespaceTag.Mixed.IsRejected")]
-        [TestCase("\u2003", TestName = "WhitespaceTag.Unicode.IsRejected")]
         public void InvalidTagsDoNotChangeState(string tag)
         {
             GameObject entity = CreateTrackedGameObject("BlankTag", typeof(TagHandler));
@@ -46,9 +43,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
 
         [TestCase(null, TestName = "InvalidTrackedTag.Null.IsRejected")]
         [TestCase("", TestName = "InvalidTrackedTag.Empty.IsRejected")]
-        [TestCase(" ", TestName = "InvalidTrackedTag.Space.IsRejected")]
-        [TestCase("\t\r\n", TestName = "InvalidTrackedTag.Mixed.IsRejected")]
-        [TestCase("\u2003", TestName = "InvalidTrackedTag.Unicode.IsRejected")]
         public void InvalidTrackedTagsDoNotHideValidTags(string tag)
         {
             GameObject entity = CreateTrackedGameObject("TrackedBlankTag", typeof(TagHandler));

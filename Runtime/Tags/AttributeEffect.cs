@@ -412,7 +412,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// <returns><c>true</c> if the tag is present; otherwise, <c>false</c>.</returns>
         public bool HasTag(string effectTag)
         {
-            if (effectTags == null || string.IsNullOrWhiteSpace(effectTag))
+            if (effectTags == null || string.IsNullOrEmpty(effectTag))
             {
                 return false;
             }
@@ -450,7 +450,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                 {
                     foreach (string candidate in hashSet)
                     {
-                        if (string.IsNullOrWhiteSpace(candidate))
+                        if (string.IsNullOrEmpty(candidate))
                         {
                             continue;
                         }
@@ -467,7 +467,7 @@ namespace WallstopStudios.UnityHelpers.Tags
 
             foreach (string candidate in effectTagsToCheck.AsValueEnumerableRequired())
             {
-                if (string.IsNullOrWhiteSpace(candidate))
+                if (string.IsNullOrEmpty(candidate))
                 {
                     continue;
                 }
@@ -497,7 +497,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             for (int i = 0; i < effectTagsToCheck.Count; ++i)
             {
                 string candidate = effectTagsToCheck[i];
-                if (string.IsNullOrWhiteSpace(candidate))
+                if (string.IsNullOrEmpty(candidate))
                 {
                     continue;
                 }

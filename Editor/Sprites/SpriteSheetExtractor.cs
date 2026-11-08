@@ -2880,7 +2880,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 string textureFullPath = Path.GetFullPath(entry._assetPath);
                 string currentHash = ComputeFileHash(textureFullPath);
                 bool isStale =
-                    !string.IsNullOrWhiteSpace(config.textureContentHash)
+                    !string.IsNullOrEmpty(config.textureContentHash)
                     && !string.Equals(
                         config.textureContentHash,
                         currentHash,

@@ -853,6 +853,9 @@ apart and moves only what matters.
 Dry runs leave destination files and folders untouched, including subfolders that a real copy would
 create for nested source clips.
 
+Texture fitting and animation copying report operation exceptions as failures even when the
+exception message is empty or whitespace. Cancellation remains a separate result state.
+
 Scripts and batch jobs can use `AnimationCopierAPI.TryAnalyze` with explicit source and destination
 folders to receive source entries and destination orphans. Pass selected source paths to `Run` for
 `CopyNew`, `CopyChanged`, `CopyAll`, or `DeleteUnchangedSource`; pass selected destination paths

@@ -31,7 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fix blank identifiers being accepted by tag, asset-path, and editor validation guards; whitespace remains valid in serialized text payloads.
+- Fix texture fitting and animation copying reporting success after an operation exception with an empty diagnostic.
+- Fix blank asset-path and editor validation inputs; serialized text and literal tag keys preserve whitespace.
 - Fix authored YAML script identity and refuse references with repeated file IDs or GUIDs, so ambiguous data cannot silently select a target ([#1141](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1141)).
 - Fix authored YAML sequence reads stopping at comments ([#1127](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1127)).
 - Fix `IntMap` contents and enumerators becoming invalid after a failed growth allocation ([#1131](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1131)).
