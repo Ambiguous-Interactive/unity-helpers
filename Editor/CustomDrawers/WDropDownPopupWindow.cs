@@ -789,7 +789,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         private string GetNormalizedLabel(int index)
         {
             string label = _data.DisplayLabels[index];
-            if (string.IsNullOrEmpty(label))
+            if (string.IsNullOrWhiteSpace(label))
             {
                 return DropDownShared.GetFallbackOptionLabel(index);
             }

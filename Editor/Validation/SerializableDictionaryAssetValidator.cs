@@ -77,7 +77,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             for (int index = 0; index < assetPaths.Count; ++index)
             {
                 string assetPath = assetPaths[index];
-                if (string.IsNullOrEmpty(assetPath))
+                if (string.IsNullOrWhiteSpace(assetPath))
                 {
                     continue;
                 }

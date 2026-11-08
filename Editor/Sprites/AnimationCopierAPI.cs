@@ -268,7 +268,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     {
                         ++failed;
                         diagnostics.Add(
-                            $"{selected ?? "<null>"}: {(string.IsNullOrEmpty(pathError) ? "A duplicate asset path was selected." : pathError)}"
+                            $"{selected ?? "<null>"}: {(string.IsNullOrWhiteSpace(pathError) ? "A duplicate asset path was selected." : pathError)}"
                         );
                         continue;
                     }
@@ -338,7 +338,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             return new Result(
-                failed == 0 && !cancelled && string.IsNullOrEmpty(error),
+                failed == 0 && !cancelled && string.IsNullOrWhiteSpace(error),
                 cancelled,
                 selectedAssetPaths.Count,
                 processed,

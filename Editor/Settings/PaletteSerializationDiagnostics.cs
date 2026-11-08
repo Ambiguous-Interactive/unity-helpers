@@ -231,7 +231,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
 
         internal static bool IsPaletteProperty(string propertyPath)
         {
-            if (string.IsNullOrEmpty(propertyPath))
+            if (string.IsNullOrWhiteSpace(propertyPath))
             {
                 return false;
             }

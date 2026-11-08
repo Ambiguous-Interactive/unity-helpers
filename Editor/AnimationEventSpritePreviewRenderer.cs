@@ -42,13 +42,13 @@ namespace WallstopStudios.UnityHelpers.Editor
                 return;
             }
 
-            if (!item.isTextureReadable && !string.IsNullOrEmpty(spriteName))
+            if (!item.isTextureReadable && !string.IsNullOrWhiteSpace(spriteName))
             {
                 DrawReadWriteFixButton(item, spriteName);
                 return;
             }
 
-            if (item.isInvalidTextureRect && !string.IsNullOrEmpty(spriteName))
+            if (item.isInvalidTextureRect && !string.IsNullOrWhiteSpace(spriteName))
             {
                 GUILayout.Label($"Sprite '{spriteName}' is packed too tightly inside its texture");
             }
@@ -248,7 +248,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                 }
 
                 string assetPath = AssetDatabase.GetAssetPath(item.sprite.texture);
-                if (string.IsNullOrEmpty(assetPath))
+                if (string.IsNullOrWhiteSpace(assetPath))
                 {
                     return;
                 }

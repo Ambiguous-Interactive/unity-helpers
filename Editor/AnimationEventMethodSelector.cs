@@ -156,7 +156,7 @@ namespace WallstopStudios.UnityHelpers.Editor
             item.isValid = true;
             item.validationMessage = string.Empty;
 
-            if (string.IsNullOrEmpty(item.animationEvent.functionName))
+            if (string.IsNullOrWhiteSpace(item.animationEvent.functionName))
             {
                 item.isValid = false;
                 item.validationMessage = "Function name is empty";

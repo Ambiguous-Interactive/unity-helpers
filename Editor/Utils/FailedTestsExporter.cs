@@ -287,7 +287,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             {
                 string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
                 string outputDirectory = UnityHelpersSettings.GetFailedTestsOutputDirectory();
-                string targetDirectory = string.IsNullOrEmpty(outputDirectory)
+                string targetDirectory = string.IsNullOrWhiteSpace(outputDirectory)
                     ? projectRoot
                     : Path.GetFullPath(Path.Combine(projectRoot, outputDirectory));
 
@@ -318,12 +318,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
                     builder.Append("Message: ");
                     builder.AppendLine(
-                        string.IsNullOrEmpty(failure.message) ? "(no message)" : failure.message
+                        string.IsNullOrWhiteSpace(failure.message)
+                            ? "(no message)"
+                            : failure.message
                     );
 
                     builder.AppendLine("Stack Trace:");
                     builder.AppendLine(
-                        string.IsNullOrEmpty(failure.stackTrace)
+                        string.IsNullOrWhiteSpace(failure.stackTrace)
                             ? "(no stack trace)"
                             : failure.stackTrace
                     );

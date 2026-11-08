@@ -91,7 +91,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         public string Error { get; internal set; }
 
         /// <summary>Gets whether discovery completed.</summary>
-        public bool Success => string.IsNullOrEmpty(Error);
+        public bool Success => string.IsNullOrWhiteSpace(Error);
 
         private readonly List<string> _assetPaths = new();
         private readonly List<string> _warnings = new();
@@ -180,7 +180,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     foreach (string guid in guids)
                     {
                         string assetPath = AssetDatabase.GUIDToAssetPath(guid);
-                        if (string.IsNullOrEmpty(assetPath) || !HasImageExtension(assetPath))
+                        if (string.IsNullOrWhiteSpace(assetPath) || !HasImageExtension(assetPath))
                         {
                             continue;
                         }

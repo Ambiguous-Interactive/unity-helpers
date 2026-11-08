@@ -217,7 +217,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                         string existingGuid = AssetDatabase.AssetPathToGUID(targetAssetPath);
                         bool fileExistsOnDisk = DoesAssetFileExistOnDisk(targetAssetPath);
                         if (
-                            !string.IsNullOrEmpty(existingGuid)
+                            !string.IsNullOrWhiteSpace(existingGuid)
                             && assetAtTarget == null
                             && !fileExistsOnDisk
                         )
@@ -259,7 +259,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
                         // A lingering GUID without an asset body does not occupy the path; recreate missing assets.
                         if (
-                            !string.IsNullOrEmpty(existingGuid)
+                            !string.IsNullOrWhiteSpace(existingGuid)
                             && DoesAssetBodyExistOnDisk(targetAssetPath)
                         )
                         {
@@ -280,7 +280,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                             continue;
                         }
 
-                        if (!string.IsNullOrEmpty(existingGuid))
+                        if (!string.IsNullOrWhiteSpace(existingGuid))
                         {
                             // Remove orphan metadata before recreation for consistent path remapping across Unity versions.
                             TryRemoveStaleAssetArtifacts(targetAssetPath);
@@ -425,8 +425,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         internal static bool IsNumberedDuplicate(string actualName, string desiredName)
         {
             if (
-                string.IsNullOrEmpty(actualName)
-                || string.IsNullOrEmpty(desiredName)
+                string.IsNullOrWhiteSpace(actualName)
+                || string.IsNullOrWhiteSpace(desiredName)
                 || actualName.Length <= desiredName.Length
             )
             {
@@ -849,7 +849,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 foreach (string guid in contents)
                 {
                     string path = AssetDatabase.GUIDToAssetPath(guid);
-                    if (string.IsNullOrEmpty(path))
+                    if (string.IsNullOrWhiteSpace(path))
                     {
                         continue;
                     }
@@ -978,7 +978,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 foreach (string guid in resourceGuids)
                 {
                     string path = AssetDatabase.GUIDToAssetPath(guid);
-                    if (string.IsNullOrEmpty(path))
+                    if (string.IsNullOrWhiteSpace(path))
                     {
                         continue;
                     }
@@ -1026,7 +1026,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 }
 
                 string moveResult = AssetDatabase.MoveAsset(alternatePath, normalizedTarget);
-                if (string.IsNullOrEmpty(moveResult))
+                if (string.IsNullOrWhiteSpace(moveResult))
                 {
                     LogVerbose(
                         $"Relocated singleton asset for type {type.Name} from {alternatePath} to {normalizedTarget}."
@@ -1053,7 +1053,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     {
                         string retry = AssetDatabase.MoveAsset(alternatePath, normalizedTarget);
                         retried = true;
-                        if (string.IsNullOrEmpty(retry))
+                        if (string.IsNullOrWhiteSpace(retry))
                         {
                             LogVerbose(
                                 $"Relocated singleton asset for type {type.Name} from {alternatePath} to {normalizedTarget} after refresh."
@@ -1096,7 +1096,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         private static bool UpdateSingletonMetadataEntry(Type type, string assetPath)
         {
             string loadPath = ToResourcesLoadPath(assetPath);
-            if (string.IsNullOrEmpty(loadPath))
+            if (string.IsNullOrWhiteSpace(loadPath))
             {
                 return false;
             }
@@ -1146,7 +1146,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             }
 
             string directory = Path.GetDirectoryName(loadPath);
-            if (string.IsNullOrEmpty(directory))
+            if (string.IsNullOrWhiteSpace(directory))
             {
                 return string.Empty;
             }
@@ -1156,7 +1156,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
         private static string CombinePaths(string left, string right)
         {
-            if (string.IsNullOrEmpty(right))
+            if (string.IsNullOrWhiteSpace(right))
             {
                 return NormalizePath(left);
             }
@@ -1405,7 +1405,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
                 string matchedExisting = FindMatchingSubfolder(current, desiredName);
 
-                if (string.IsNullOrEmpty(matchedExisting))
+                if (string.IsNullOrWhiteSpace(matchedExisting))
                 {
                     string intendedPath = current + "/" + desiredName;
 
@@ -1437,7 +1437,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     else
                     {
                         string renameError = AssetDatabase.MoveAsset(matchedExisting, intendedPath);
-                        if (string.IsNullOrEmpty(renameError))
+                        if (string.IsNullOrWhiteSpace(renameError))
                         {
                             LogVerbose(
                                 $"ScriptableObjectSingletonCreator: Renamed folder '{matchedExisting}' to '{intendedPath}' to correct casing."
@@ -1466,13 +1466,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                                     matchedExisting,
                                     tempPath
                                 );
-                                if (string.IsNullOrEmpty(toTempErr))
+                                if (string.IsNullOrWhiteSpace(toTempErr))
                                 {
                                     string toFinalErr = AssetDatabase.MoveAsset(
                                         tempPath,
                                         intendedPath
                                     );
-                                    if (string.IsNullOrEmpty(toFinalErr))
+                                    if (string.IsNullOrWhiteSpace(toFinalErr))
                                     {
                                         LogVerbose(
                                             $"ScriptableObjectSingletonCreator: Renamed folder '{matchedExisting}' to '{intendedPath}' via temporary '{tempPath}' to correct casing."
@@ -1519,7 +1519,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
             // Check disk before stale AssetDatabase listings so unindexed folders with different casing are found.
             string projectRoot = Path.GetDirectoryName(Application.dataPath);
-            if (!string.IsNullOrEmpty(projectRoot))
+            if (!string.IsNullOrWhiteSpace(projectRoot))
             {
                 string absoluteParent = Path.Combine(projectRoot, parent).SanitizePath();
                 if (Directory.Exists(absoluteParent))
@@ -1604,7 +1604,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             {
                 string desired = parts[i];
 
-                if (!string.IsNullOrEmpty(projectRoot))
+                if (!string.IsNullOrWhiteSpace(projectRoot))
                 {
                     string absoluteCurrent = Path.Combine(projectRoot, current).SanitizePath();
                     if (Directory.Exists(absoluteCurrent))

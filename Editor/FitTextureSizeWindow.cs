@@ -269,7 +269,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                         "Choose the nearest power-of-two to the source size (ties up).",
                     _ => string.Empty,
                 };
-                if (!string.IsNullOrEmpty(modeHelp))
+                if (!string.IsNullOrWhiteSpace(modeHelp))
                 {
                     EditorGUILayout.HelpBox(modeHelp, MessageType.None);
                 }

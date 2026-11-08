@@ -604,7 +604,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// </summary>
         internal static FieldInfo GetInstanceFieldIncludingBaseTypes(Type type, string name)
         {
-            if (type == null || string.IsNullOrEmpty(name))
+            if (type == null || string.IsNullOrWhiteSpace(name))
             {
                 return null;
             }

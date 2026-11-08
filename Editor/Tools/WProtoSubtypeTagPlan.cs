@@ -436,7 +436,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             );
             builder.Append("\r\n");
             builder.Append("// WallstopProto subtype tag manifest for ");
-            builder.Append(string.IsNullOrEmpty(assemblyName) ? "this assembly" : assemblyName);
+            builder.Append(
+                string.IsNullOrWhiteSpace(assemblyName) ? "this assembly" : assemblyName
+            );
             builder.Append(".\r\n");
             builder.Append(
                 "// Written by Tools > Wallstop Studios > Unity Helpers > Assign WallstopProto\r\n"
@@ -529,8 +531,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
             /// <summary>Whether both names are present and any stated number is in range.</summary>
             public bool IsUsable =>
-                !string.IsNullOrEmpty(SubTypeName)
-                && !string.IsNullOrEmpty(BaseTypeName)
+                !string.IsNullOrWhiteSpace(SubTypeName)
+                && !string.IsNullOrWhiteSpace(BaseTypeName)
                 && (!HasTag || (1 <= Tag && Tag <= MaxFieldNumber));
 
             /// <summary>
@@ -591,8 +593,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
             /// <summary>Whether the entry names both types and holds an in-range number.</summary>
             public bool IsUsable =>
-                !string.IsNullOrEmpty(SubTypeName)
-                && !string.IsNullOrEmpty(BaseTypeName)
+                !string.IsNullOrWhiteSpace(SubTypeName)
+                && !string.IsNullOrWhiteSpace(BaseTypeName)
                 && 1 <= Tag
                 && Tag <= MaxFieldNumber;
 

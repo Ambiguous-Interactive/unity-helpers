@@ -555,7 +555,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             {
                 string groupName = context.Metadata.GroupName ?? string.Empty;
 
-                if (string.IsNullOrEmpty(groupName))
+                if (string.IsNullOrWhiteSpace(groupName))
                 {
                     continue;
                 }
@@ -688,7 +688,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             foreach (WButtonMethodContext context in contexts)
             {
                 string groupName = context.Metadata.GroupName ?? string.Empty;
-                if (!string.IsNullOrEmpty(groupName))
+                if (!string.IsNullOrWhiteSpace(groupName))
                 {
                     continue;
                 }
@@ -718,7 +718,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 WButtonGroupPlacement groupPlacement;
 
                 if (
-                    !string.IsNullOrEmpty(groupName)
+                    !string.IsNullOrWhiteSpace(groupName)
                     && namedGroupInfo.TryGetValue(
                         groupName,
                         out (
@@ -983,7 +983,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
         private static void DrawConflictingDrawOrderWarning(WButtonGroupKey groupKey)
         {
             string groupName = groupKey._groupName;
-            if (string.IsNullOrEmpty(groupName))
+            if (string.IsNullOrWhiteSpace(groupName))
             {
                 return;
             }
@@ -1015,7 +1015,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
         private static void DrawConflictingGroupPriorityWarning(WButtonGroupKey groupKey)
         {
             string groupName = groupKey._groupName;
-            if (string.IsNullOrEmpty(groupName))
+            if (string.IsNullOrWhiteSpace(groupName))
             {
                 return;
             }
@@ -1061,7 +1061,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
         private static void DrawConflictingGroupPlacementWarning(WButtonGroupKey groupKey)
         {
             string groupName = groupKey._groupName;
-            if (string.IsNullOrEmpty(groupName))
+            if (string.IsNullOrWhiteSpace(groupName))
             {
                 return;
             }

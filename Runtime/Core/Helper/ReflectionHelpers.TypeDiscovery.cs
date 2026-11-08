@@ -408,7 +408,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 | BindingFlags.NonPublic
         )
         {
-            if (type == null || string.IsNullOrEmpty(name))
+            if (type == null || string.IsNullOrWhiteSpace(name))
             {
                 field = null;
                 return false;
@@ -445,7 +445,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 | BindingFlags.NonPublic
         )
         {
-            if (type == null || string.IsNullOrEmpty(name))
+            if (type == null || string.IsNullOrWhiteSpace(name))
             {
                 property = null;
                 return false;
@@ -552,7 +552,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 | BindingFlags.NonPublic
         )
         {
-            if (type == null || string.IsNullOrEmpty(name))
+            if (type == null || string.IsNullOrWhiteSpace(name))
             {
                 method = null;
                 return false;
@@ -601,7 +601,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         internal static Type ResolveUniqueLoadedType(string fullName, List<Assembly> assemblies)
         {
-            if (string.IsNullOrEmpty(fullName))
+            if (string.IsNullOrWhiteSpace(fullName))
             {
                 return null;
             }

@@ -44,7 +44,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             for (int index = 0; index < assetPaths.Count; ++index)
             {
                 string assetPath = assetPaths[index];
-                if (string.IsNullOrEmpty(assetPath))
+                if (string.IsNullOrWhiteSpace(assetPath))
                 {
                     continue;
                 }
@@ -62,7 +62,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         /// <returns>What happened.</returns>
         public static StaleSerializedKeyRepairOutcome RepairAsset(string assetPath)
         {
-            if (string.IsNullOrEmpty(assetPath))
+            if (string.IsNullOrWhiteSpace(assetPath))
             {
                 return StaleSerializedKeyRepairOutcome.RefusedUnreadable;
             }

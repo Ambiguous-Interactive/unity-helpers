@@ -206,7 +206,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                     foreach (string part in parts)
                     {
                         string label = part.Trim();
-                        if (!string.IsNullOrEmpty(label))
+                        if (!string.IsNullOrWhiteSpace(label))
                         {
                             labels.Add(
                                 options.CaseSensitiveNameFilter ? label : label.ToLowerInvariant()
@@ -334,13 +334,13 @@ namespace WallstopStudios.UnityHelpers.Editor
             }
             catch (Exception exception)
             {
-                error = string.IsNullOrEmpty(currentPath)
+                error = string.IsNullOrWhiteSpace(currentPath)
                     ? exception.Message
                     : $"{currentPath}: {exception.Message}";
             }
 
             return new Result(
-                string.IsNullOrEmpty(error) && !cancelled,
+                string.IsNullOrWhiteSpace(error) && !cancelled,
                 cancelled,
                 error,
                 textureGuids.Count,

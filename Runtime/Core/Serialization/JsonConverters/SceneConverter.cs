@@ -38,7 +38,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
             {
                 if (reader.TokenType == JsonTokenType.EndObject)
                 {
-                    if (!string.IsNullOrEmpty(path))
+                    if (!string.IsNullOrWhiteSpace(path))
                     {
                         Scene s = SceneManager.GetSceneByPath(path);
                         if (s.IsValid())
@@ -54,7 +54,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                             return s;
                         }
                     }
-                    if (!string.IsNullOrEmpty(name))
+                    if (!string.IsNullOrWhiteSpace(name))
                     {
                         Scene s = SceneManager.GetSceneByName(name);
                         if (s.IsValid())

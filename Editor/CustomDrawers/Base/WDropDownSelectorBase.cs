@@ -316,7 +316,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Base
         protected string GetNormalizedDisplayLabel(int optionIndex)
         {
             string label = GetDisplayLabel(optionIndex);
-            if (string.IsNullOrEmpty(label))
+            if (string.IsNullOrWhiteSpace(label))
             {
                 return DropDownShared.GetFallbackOptionLabel(optionIndex);
             }
@@ -389,7 +389,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Base
 
         internal void ApplySelection(int optionIndex)
         {
-            if (_boundObject == null || string.IsNullOrEmpty(_propertyPath))
+            if (_boundObject == null || string.IsNullOrWhiteSpace(_propertyPath))
             {
                 return;
             }
@@ -525,7 +525,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Base
         {
             EnsureBuffers();
 
-            if (_boundObject == null || string.IsNullOrEmpty(_propertyPath))
+            if (_boundObject == null || string.IsNullOrWhiteSpace(_propertyPath))
             {
                 return;
             }
@@ -915,7 +915,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Base
 
         private int ResolveOptionIndex(string optionLabel)
         {
-            if (string.IsNullOrEmpty(optionLabel))
+            if (string.IsNullOrWhiteSpace(optionLabel))
             {
                 return -1;
             }

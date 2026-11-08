@@ -173,7 +173,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 ScriptableObjectSingletonMetadata.Entry entry in entries.AsValueEnumerableRequired()
             )
             {
-                if (string.IsNullOrEmpty(entry.resourcesLoadPath))
+                if (string.IsNullOrWhiteSpace(entry.resourcesLoadPath))
                 {
                     continue;
                 }
@@ -182,10 +182,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 Object asset = AssetDatabase.LoadAssetAtPath<Object>(assetPath);
                 if (asset == null)
                 {
-                    if (!string.IsNullOrEmpty(entry.assetGuid))
+                    if (!string.IsNullOrWhiteSpace(entry.assetGuid))
                     {
                         string guidPath = AssetDatabase.GUIDToAssetPath(entry.assetGuid);
-                        if (!string.IsNullOrEmpty(guidPath))
+                        if (!string.IsNullOrWhiteSpace(guidPath))
                         {
                             asset = AssetDatabase.LoadAssetAtPath<Object>(guidPath);
                         }
@@ -246,7 +246,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 ScriptableObjectSingletonMetadata.Entry entry in existingEntries.AsValueEnumerableRequired()
             )
             {
-                if (!string.IsNullOrEmpty(entry.assemblyQualifiedTypeName))
+                if (!string.IsNullOrWhiteSpace(entry.assemblyQualifiedTypeName))
                 {
                     existingByTypeName[entry.assemblyQualifiedTypeName] = entry;
                 }
@@ -272,7 +272,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 }
 
                 string assemblyQualifiedName = derivedType.AssemblyQualifiedName;
-                if (string.IsNullOrEmpty(assemblyQualifiedName))
+                if (string.IsNullOrWhiteSpace(assemblyQualifiedName))
                 {
                     continue;
                 }
@@ -280,13 +280,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 foundTypeNames.Add(assemblyQualifiedName);
 
                 string assetPath = FindSingletonAssetPath(derivedType);
-                if (string.IsNullOrEmpty(assetPath))
+                if (string.IsNullOrWhiteSpace(assetPath))
                 {
                     continue;
                 }
 
                 string loadPath = ToResourcesLoadPath(assetPath);
-                if (string.IsNullOrEmpty(loadPath))
+                if (string.IsNullOrWhiteSpace(loadPath))
                 {
                     continue;
                 }
@@ -350,14 +350,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 if (!foundTypeNames.Contains(existingTypeName))
                 {
                     ScriptableObjectSingletonMetadata.Entry staleEntry = existing.Value;
-                    if (!string.IsNullOrEmpty(staleEntry.resourcesLoadPath))
+                    if (!string.IsNullOrWhiteSpace(staleEntry.resourcesLoadPath))
                     {
                         string assetPath = $"Assets/Resources/{staleEntry.resourcesLoadPath}.asset";
                         Object asset = AssetDatabase.LoadAssetAtPath<Object>(assetPath);
-                        if (asset == null && !string.IsNullOrEmpty(staleEntry.assetGuid))
+                        if (asset == null && !string.IsNullOrWhiteSpace(staleEntry.assetGuid))
                         {
                             string guidPath = AssetDatabase.GUIDToAssetPath(staleEntry.assetGuid);
-                            if (!string.IsNullOrEmpty(guidPath))
+                            if (!string.IsNullOrWhiteSpace(guidPath))
                             {
                                 asset = AssetDatabase.LoadAssetAtPath<Object>(guidPath);
                             }
@@ -412,7 +412,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 string targetPath = ScriptableObjectSingletonMetadata.AssetPath;
 
                 string moveResult = AssetDatabase.MoveAsset(legacyPath, targetPath);
-                if (string.IsNullOrEmpty(moveResult))
+                if (string.IsNullOrWhiteSpace(moveResult))
                 {
                     TryDeleteEmptyParentFolders(legacyPath);
                     AssetDatabase.SaveAssets();
@@ -516,7 +516,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         {
             string assetPath = ScriptableObjectSingletonMetadata.AssetPath;
             string directory = Path.GetDirectoryName(assetPath);
-            if (string.IsNullOrEmpty(directory))
+            if (string.IsNullOrWhiteSpace(directory))
             {
                 return false;
             }
@@ -555,7 +555,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 foreach (string guid in guids)
                 {
                     string path = AssetDatabase.GUIDToAssetPath(guid);
-                    if (string.IsNullOrEmpty(path))
+                    if (string.IsNullOrWhiteSpace(path))
                     {
                         continue;
                     }
@@ -579,7 +579,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     }
 
                     string path = AssetDatabase.GetAssetPath(instance);
-                    if (!string.IsNullOrEmpty(path))
+                    if (!string.IsNullOrWhiteSpace(path))
                     {
                         return path;
                     }

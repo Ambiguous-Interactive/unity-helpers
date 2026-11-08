@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Editor.Validation
 {
+    using WallstopStudios.UnityHelpers.Core.Extension;
 #if UNITY_EDITOR
     using System;
     using System.Collections.Generic;
@@ -95,7 +96,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                     {
                         string extension = accepted[index];
                         if (
-                            string.IsNullOrEmpty(extension)
+                            string.IsNullOrWhiteSpace(extension)
                             || !path.EndsWith(extension, StringComparison.OrdinalIgnoreCase)
                         )
                         {
@@ -236,12 +237,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 return false;
             }
 
-            if (fileId == 0 || !string.IsNullOrEmpty(guid))
+            if (fileId == 0 || !string.IsNullOrWhiteSpace(guid))
             {
                 return true;
             }
 
-            if (string.IsNullOrEmpty(owningAssetGuid))
+            if (string.IsNullOrWhiteSpace(owningAssetGuid))
             {
                 fileId = 0;
                 guid = null;
@@ -264,7 +265,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 return false;
             }
 
-            return fileId == 0 && (string.IsNullOrEmpty(guid) || IsZeroGuid(guid));
+            return fileId == 0 && (string.IsNullOrWhiteSpace(guid) || IsZeroGuid(guid));
         }
 
         /// <summary>Whether <paramref name="value"/> is the empty inline sequence.</summary>
@@ -335,9 +336,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             out string value
         )
         {
-            if (document != null && !string.IsNullOrEmpty(field))
+            if (document != null && !string.IsNullOrWhiteSpace(field))
             {
-                foreach (AuthoredAssetEntry entry in document.Entries)
+                foreach (AuthoredAssetEntry entry in document.Entries.AsValueEnumerableRequired())
                 {
                     if (
                         entry.SequenceDepth == 0
@@ -367,9 +368,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         {
             bool found = false;
             string unique = string.Empty;
-            if (document != null && !string.IsNullOrEmpty(field))
+            if (document != null && !string.IsNullOrWhiteSpace(field))
             {
-                foreach (AuthoredAssetEntry entry in document.Entries)
+                foreach (AuthoredAssetEntry entry in document.Entries.AsValueEnumerableRequired())
                 {
                     if (!MatchesFieldName(entry.Key, field))
                     {
@@ -408,7 +409,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 || !TryGetOnlyDirectField(document, ScriptField, out string reference)
                 || !TryParseObjectReference(reference, out long fileId, out string guid)
                 || fileId == 0
-                || string.IsNullOrEmpty(guid)
+                || string.IsNullOrWhiteSpace(guid)
             )
             {
                 return false;
@@ -429,13 +430,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             out AuthoredAssetEntry child
         )
         {
-            if (document == null || string.IsNullOrEmpty(field))
+            if (document == null || string.IsNullOrWhiteSpace(field))
             {
                 child = default;
                 return false;
             }
             bool ownsParent = false;
-            foreach (AuthoredAssetEntry entry in document.Entries)
+            foreach (AuthoredAssetEntry entry in document.Entries.AsValueEnumerableRequired())
             {
                 if (entry.Equals(parent))
                 {
@@ -451,7 +452,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             }
             bool found = false;
             AuthoredAssetEntry selected = default;
-            foreach (AuthoredAssetEntry entry in document.Entries)
+            foreach (AuthoredAssetEntry entry in document.Entries.AsValueEnumerableRequired())
             {
                 if (!IsDirectChild(entry, parent) || !MatchesFieldName(entry.Key, field))
                 {
@@ -475,7 +476,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         /// <remarks>Field reads remain exact; callers choose whether to accept a legacy spelling.</remarks>
         public static IEnumerable<string> SerializedNames(string field)
         {
-            if (string.IsNullOrEmpty(field))
+            if (string.IsNullOrWhiteSpace(field))
             {
                 yield break;
             }
@@ -493,13 +494,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         /// <remarks>Nested descendants and block-scalar text are not flattened.</remarks>
         public static string ValueWithDirectChildren(AuthoredAssetDocument document, string field)
         {
-            if (document == null || string.IsNullOrEmpty(field))
+            if (document == null || string.IsNullOrWhiteSpace(field))
             {
                 return string.Empty;
             }
             AuthoredAssetEntry parent = default;
             bool found = false;
-            foreach (AuthoredAssetEntry entry in document.Entries)
+            foreach (AuthoredAssetEntry entry in document.Entries.AsValueEnumerableRequired())
             {
                 if (
                     entry.SequenceDepth == 0
@@ -520,7 +521,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 out StringBuilder builder
             );
             builder.Append(parent.InlineValue);
-            foreach (AuthoredAssetEntry entry in document.Entries)
+            foreach (AuthoredAssetEntry entry in document.Entries.AsValueEnumerableRequired())
             {
                 if (
                     !IsDirectChild(entry, parent)
@@ -545,36 +546,52 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             out string value
         )
         {
+            if (TryGetOnlyDirectEntry(document, field, out AuthoredAssetEntry entry))
+            {
+                value = entry.InlineValue;
+                return true;
+            }
+            value = string.Empty;
+            return false;
+        }
+
+        internal static bool TryGetOnlyDirectEntry(
+            AuthoredAssetDocument document,
+            string field,
+            out AuthoredAssetEntry entry
+        )
+        {
             bool found = false;
-            string selected = string.Empty;
+            AuthoredAssetEntry selected = default;
             IReadOnlyList<AuthoredAssetEntry> entries = document.Entries;
             int count = entries.Count;
+            // The parser supplies a list; native measurements favor cached indexing for entries.
             for (int index = 0; index < count; ++index)
             {
-                AuthoredAssetEntry entry = entries[index];
+                AuthoredAssetEntry candidate = entries[index];
                 if (
-                    entry.SequenceDepth != 0
-                    || entry.Indent != FieldIndent
-                    || !MatchesFieldName(entry.Key, field)
+                    candidate.SequenceDepth != 0
+                    || candidate.Indent != FieldIndent
+                    || !MatchesFieldName(candidate.Key, field)
                 )
                 {
                     continue;
                 }
                 if (found)
                 {
-                    value = string.Empty;
+                    entry = default;
                     return false;
                 }
-                selected = entry.InlineValue;
+                selected = candidate;
                 found = true;
             }
-            value = selected;
+            entry = selected;
             return found;
         }
 
         internal static bool TrySplitEntry(string content, out string key, out string inlineValue)
         {
-            if (string.IsNullOrEmpty(content))
+            if (string.IsNullOrWhiteSpace(content))
             {
                 key = null;
                 inlineValue = string.Empty;
@@ -698,7 +715,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
         private static bool MatchesFieldName(string key, string field)
         {
-            if (key == null || string.IsNullOrEmpty(field))
+            if (key == null || string.IsNullOrWhiteSpace(field))
             {
                 return false;
             }
@@ -719,7 +736,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             out bool hasFileId
         )
         {
-            if (string.IsNullOrEmpty(value))
+            if (string.IsNullOrWhiteSpace(value))
             {
                 fileId = 0;
                 guid = null;
@@ -1000,7 +1017,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
         private static bool IsBlockScalarIndicator(string inlineValue)
         {
-            if (string.IsNullOrEmpty(inlineValue))
+            if (string.IsNullOrWhiteSpace(inlineValue))
             {
                 return false;
             }

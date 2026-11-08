@@ -294,7 +294,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 "validation",
                 junit ? "xml" : "json"
             );
-            if (string.IsNullOrEmpty(path))
+            if (string.IsNullOrWhiteSpace(path))
                 return;
             try
             {

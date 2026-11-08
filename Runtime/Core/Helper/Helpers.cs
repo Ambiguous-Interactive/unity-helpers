@@ -336,7 +336,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             for (int i = 0; i < 32; ++i)
             {
                 string name = LayerMask.LayerToName(i);
-                if (!string.IsNullOrEmpty(name))
+                if (!string.IsNullOrWhiteSpace(name))
                 {
                     layers.Add(name);
                 }
@@ -1739,7 +1739,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         private static string NormalizeCloneName(string name)
         {
-            if (string.IsNullOrEmpty(name))
+            if (string.IsNullOrWhiteSpace(name))
             {
                 return string.Empty;
             }

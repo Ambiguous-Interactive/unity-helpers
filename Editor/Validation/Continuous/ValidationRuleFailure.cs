@@ -28,7 +28,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         public string RuleId { get; }
 
         /// <summary>Whether loading the asset threw, rather than a rule.</summary>
-        public bool IsLoadFailure => string.IsNullOrEmpty(RuleId);
+        public bool IsLoadFailure => string.IsNullOrWhiteSpace(RuleId);
 
         /// <summary>The asset it was validating when it threw.</summary>
         public string AssetPath { get; }

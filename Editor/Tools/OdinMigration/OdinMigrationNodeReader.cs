@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
     using System.IO;
     using System.Text;
     using System.Text.Json;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Editor.Validation;
 
     internal static class OdinMigrationNodeReader
@@ -74,7 +75,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 }
                 List<OdinMigrationSerializedData> parsed = new List<OdinMigrationSerializedData>();
                 int remainingSourceCharacters = sourceLength;
-                foreach (AuthoredAssetDocument document in documents)
+                foreach (AuthoredAssetDocument document in documents.AsValueEnumerableRequired())
                 {
                     IReadOnlyList<AuthoredAssetEntry> entries = document.Entries;
                     int entryCount = entries.Count;

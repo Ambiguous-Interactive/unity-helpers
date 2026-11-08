@@ -57,7 +57,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                     {
                         string normalizedFolder = NormalizeFolder(folder);
                         if (
-                            !string.IsNullOrEmpty(normalizedFolder)
+                            !string.IsNullOrWhiteSpace(normalizedFolder)
                             && AssetDatabase.IsValidFolder(normalizedFolder)
                         )
                         {
@@ -86,13 +86,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             HashSet<string> seen = new HashSet<string>(StringComparer.Ordinal);
             foreach (string guid in guids)
             {
-                if (string.IsNullOrEmpty(guid) || !seen.Add(guid))
+                if (string.IsNullOrWhiteSpace(guid) || !seen.Add(guid))
                 {
                     continue;
                 }
 
                 string path = AssetDatabase.GUIDToAssetPath(guid);
-                if (string.IsNullOrEmpty(path) || AssetDatabase.IsValidFolder(path))
+                if (string.IsNullOrWhiteSpace(path) || AssetDatabase.IsValidFolder(path))
                 {
                     continue;
                 }

@@ -101,13 +101,13 @@
     },
     {
       "name": "defensive-programming",
-      "sha256": "450f75030aa58501a768ce92ed199b92bac11e6342b1506ac3d4b6c98929647f",
+      "sha256": "c0e12b9275b7b18d69334aea2e2a146bdd37fd6c6be11cc1ab196a19bb25c2b0",
       "parts": [
         "defensive-programming-part-1.md",
         "defensive-programming-part-2.md",
         "defensive-programming-part-3.md"
       ],
-      "routerSha256": "ee2597e27e447127731dd58ed6ede06dd654c4e79e28a56edaeec123c4204edd"
+      "routerSha256": "8b9dbc300a330257cb72c5d770bf35c4e201f1bc3f16e89b54fe6e7c8511b98c"
     },
     {
       "name": "documentation-consistency",

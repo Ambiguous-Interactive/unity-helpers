@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
     using NUnit.Framework;
     using UnityEditor;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Serialization.OdinMigration;
     using WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration;
     using WallstopStudios.UnityHelpers.Tests.Core;
@@ -48,7 +49,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             OdinMigrationExternalDerivedBindingAsset owner = Track(
                 ScriptableObject.CreateInstance<OdinMigrationExternalDerivedBindingAsset>()
             );
-            foreach (OdinMigrationCompiledField field in binding.Fields)
+            foreach (OdinMigrationCompiledField field in binding.Fields.AsValueEnumerableRequired())
             {
                 Assert.IsTrue(
                     field.TryCapture(
@@ -117,7 +118,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             );
             Assert.AreEqual(2, binding.Fields.Count);
             Dictionary<SpriteAlignment, List<Texture2D>> originalReadonly = owner.ReadonlyValues;
-            foreach (OdinMigrationCompiledField field in binding.Fields)
+            foreach (OdinMigrationCompiledField field in binding.Fields.AsValueEnumerableRequired())
             {
                 Assert.IsTrue(
                     field.TryRestore(

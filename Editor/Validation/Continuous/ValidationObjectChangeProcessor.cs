@@ -66,11 +66,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 ? component.gameObject
                 : subject as GameObject;
             string path = AssetDatabase.GetAssetPath(subject);
-            if (gameObject != null && string.IsNullOrEmpty(path))
+            if (gameObject != null && string.IsNullOrWhiteSpace(path))
             {
                 path = gameObject.scene.path;
                 if (
-                    string.IsNullOrEmpty(path)
+                    string.IsNullOrWhiteSpace(path)
                     || !path.EndsWith(".unity", System.StringComparison.OrdinalIgnoreCase)
                 )
                 {
@@ -83,7 +83,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                     }
                 }
             }
-            if (!string.IsNullOrEmpty(path))
+            if (!string.IsNullOrWhiteSpace(path))
                 ValidationAutoRun.Queue(new[] { AssetDatabase.AssetPathToGUID(path) }, false, 0);
         }
 
@@ -95,7 +95,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             for (int index = 0; index < SceneManager.sceneCount; ++index)
             {
                 Scene scene = SceneManager.GetSceneAt(index);
-                if (scene.isLoaded && scene.isDirty && !string.IsNullOrEmpty(scene.path))
+                if (scene.isLoaded && scene.isDirty && !string.IsNullOrWhiteSpace(scene.path))
                     guids.Add(AssetDatabase.AssetPathToGUID(scene.path));
             }
             ValidationAutoRun.Queue(guids, false, 0);

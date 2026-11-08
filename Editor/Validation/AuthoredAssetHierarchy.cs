@@ -72,31 +72,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             out AuthoredAssetEntry entry
         )
         {
-            IReadOnlyList<AuthoredAssetEntry> entries = document.Entries;
-            int count = entries.Count;
-            bool found = false;
-            AuthoredAssetEntry selected = default;
-            for (int index = 0; index < count; ++index)
-            {
-                AuthoredAssetEntry candidate = entries[index];
-                if (
-                    candidate.Indent != FieldIndent
-                    || candidate.SequenceDepth != 0
-                    || !string.Equals(candidate.Key, field, StringComparison.Ordinal)
-                )
-                {
-                    continue;
-                }
-                if (found)
-                {
-                    entry = default;
-                    return false;
-                }
-                selected = candidate;
-                found = true;
-            }
-            entry = selected;
-            return found;
+            return AuthoredAssetYaml.TryGetOnlyDirectEntry(document, field, out entry);
         }
 
         private static bool TryReadLocalReference(string value, out long fileId)
@@ -104,7 +80,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             if (
                 AuthoredAssetYaml.TryParseObjectReference(value, out long found, out string guid)
                 && found != 0
-                && string.IsNullOrEmpty(guid)
+                && string.IsNullOrWhiteSpace(guid)
             )
             {
                 fileId = found;

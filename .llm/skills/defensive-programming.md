@@ -24,6 +24,8 @@
 
 [Read section](../references/defensive-programming-part-1.md#defensive-patterns)
 
+### [String guards](../references/defensive-programming-part-1.md#string-guards)
+
 ### [1. Guard Clauses with Graceful Returns](../references/defensive-programming-part-1.md#1-guard-clauses-with-graceful-returns)
 
 ### [2. TryXxx Pattern for Failable Operations](../references/defensive-programming-part-1.md#2-tryxxx-pattern-for-failable-operations)

@@ -2269,7 +2269,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
 
             EditorGUILayout.BeginHorizontal();
 
-            string displayText = string.IsNullOrEmpty(currentDirectory)
+            string displayText = string.IsNullOrWhiteSpace(currentDirectory)
                 ? "(Project Root)"
                 : currentDirectory;
 
@@ -2283,7 +2283,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             if (GUILayout.Button(FailedTestsOutputDirectoryBrowseContent, GUILayout.Width(70f)))
             {
                 string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
-                string startDirectory = string.IsNullOrEmpty(currentDirectory)
+                string startDirectory = string.IsNullOrWhiteSpace(currentDirectory)
                     ? projectRoot
                     : Path.GetFullPath(Path.Combine(projectRoot, currentDirectory));
 
@@ -2298,7 +2298,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                     string.Empty
                 );
 
-                if (!string.IsNullOrEmpty(selectedPath))
+                if (!string.IsNullOrWhiteSpace(selectedPath))
                 {
                     selectedPath = selectedPath.SanitizePath();
                     projectRoot = projectRoot.SanitizePath();
@@ -2336,7 +2336,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 }
             }
 
-            using (new EditorGUI.DisabledScope(string.IsNullOrEmpty(currentDirectory)))
+            using (new EditorGUI.DisabledScope(string.IsNullOrWhiteSpace(currentDirectory)))
             {
                 if (GUILayout.Button(FailedTestsOutputDirectoryClearContent, GUILayout.Width(24f)))
                 {
@@ -2347,10 +2347,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
 
             EditorGUILayout.EndHorizontal();
 
-            if (!string.IsNullOrEmpty(currentDirectory))
+            if (!string.IsNullOrWhiteSpace(currentDirectory))
             {
                 string validated = GetFailedTestsOutputDirectory();
-                if (string.IsNullOrEmpty(validated))
+                if (string.IsNullOrWhiteSpace(validated))
                 {
                     EditorGUILayout.HelpBox(
                         $"The configured directory \"{currentDirectory}\" does not exist or is invalid. Files will be saved to the project root instead.",
@@ -3994,7 +3994,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 MaxDetectAssetChangeLoopWindowSeconds
             );
 
-            if (!string.IsNullOrEmpty(_failedTestsOutputDirectory))
+            if (!string.IsNullOrWhiteSpace(_failedTestsOutputDirectory))
             {
                 string validatedDirectory = ValidateFailedTestsOutputDirectory(
                     _failedTestsOutputDirectory

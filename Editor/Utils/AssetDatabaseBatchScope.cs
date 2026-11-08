@@ -983,11 +983,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             string createdGuid = AssetDatabase.CreateFolder(parentFolder, childName);
 
             // A creation race can produce a numbered duplicate; remove it if empty and adopt the intended folder.
-            if (!string.IsNullOrEmpty(createdGuid))
+            if (!string.IsNullOrWhiteSpace(createdGuid))
             {
                 string createdPath = AssetDatabase.GUIDToAssetPath(createdGuid)?.SanitizePath();
                 if (
-                    !string.IsNullOrEmpty(createdPath)
+                    !string.IsNullOrWhiteSpace(createdPath)
                     && !string.Equals(createdPath, childFolder, StringComparison.OrdinalIgnoreCase)
                 )
                 {
@@ -1012,13 +1012,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         /// </summary>
         private static bool DirectoryExistsOnDisk(string assetFolderPath)
         {
-            if (string.IsNullOrEmpty(assetFolderPath))
+            if (string.IsNullOrWhiteSpace(assetFolderPath))
             {
                 return false;
             }
 
             string projectRoot = Path.GetDirectoryName(Application.dataPath);
-            if (string.IsNullOrEmpty(projectRoot))
+            if (string.IsNullOrWhiteSpace(projectRoot))
             {
                 return false;
             }

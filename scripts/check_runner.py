@@ -148,10 +148,13 @@ def resolve_bash() -> str:
 
 def run_check(check: Check) -> Result:
     started = time.monotonic()
+    environment = dict(os.environ)
+    environment["PYTHONDONTWRITEBYTECODE"] = "1"
     try:
         process = subprocess.run(  # noqa: S603 - reviewed repository shell commands are intentional.
             [resolve_bash(), "-c", check.run],
             cwd=ROOT,
+            env=environment,
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,

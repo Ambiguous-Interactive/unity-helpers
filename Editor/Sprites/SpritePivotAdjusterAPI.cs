@@ -81,7 +81,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 {
                     string normalizedFolder = NormalizeAssetPath(folder);
                     if (
-                        string.IsNullOrEmpty(normalizedFolder)
+                        string.IsNullOrWhiteSpace(normalizedFolder)
                         || !AssetDatabase.IsValidFolder(normalizedFolder)
                     )
                     {
@@ -97,7 +97,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     {
                         string path = AssetDatabase.GUIDToAssetPath(guid);
                         if (
-                            string.IsNullOrEmpty(path)
+                            string.IsNullOrWhiteSpace(path)
                             || !SpriteFileExtensions.HasAny(path, ImageFileExtensions)
                             || !seen.Add(path)
                         )
@@ -172,7 +172,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 {
                     string path = NormalizeAssetPath(assetPaths[index]);
                     if (
-                        string.IsNullOrEmpty(path)
+                        string.IsNullOrWhiteSpace(path)
                         || !path.StartsWith("Assets/", StringComparison.Ordinal)
                     )
                     {

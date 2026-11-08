@@ -265,7 +265,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             Object source = GlobalObjectId.GlobalObjectIdentifierToObjectSlow(id);
             if (
                 source == null
-                || string.IsNullOrEmpty(finding.SourceFingerprint)
+                || string.IsNullOrWhiteSpace(finding.SourceFingerprint)
                 || !SameFingerprint(
                     ValidationProjectRule.Fingerprint(source, finding.AssetPath),
                     finding.SourceFingerprint,
@@ -299,7 +299,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                     "Enter a valid asset name pattern; {name} expands to its current name."
                 );
             string error = AssetDatabase.RenameAsset(finding.AssetPath, name);
-            if (!string.IsNullOrEmpty(error))
+            if (!string.IsNullOrWhiteSpace(error))
                 throw new IOException(error);
             string renamed = AssetDatabase.GUIDToAssetPath(finding.AssetGuid);
             return () =>
@@ -313,7 +313,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 )
                     throw new InvalidOperationException("The asset moved since this fix.");
                 string failure = AssetDatabase.RenameAsset(renamed, oldName);
-                if (!string.IsNullOrEmpty(failure))
+                if (!string.IsNullOrWhiteSpace(failure))
                     throw new IOException(failure);
             };
         }

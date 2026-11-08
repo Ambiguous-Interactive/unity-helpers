@@ -139,7 +139,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         internal static string UniqueFileName(string groupKey, HashSet<string> usedFileNames)
         {
             string baseName = PortableFileName(groupKey);
-            if (string.IsNullOrEmpty(baseName))
+            if (string.IsNullOrWhiteSpace(baseName))
             {
                 baseName = GlobalNamespaceGroup;
             }
@@ -169,7 +169,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
         private static string NamespaceGroupOf(Type contract)
         {
-            return string.IsNullOrEmpty(contract.Namespace)
+            return string.IsNullOrWhiteSpace(contract.Namespace)
                 ? GlobalNamespaceGroup
                 : contract.Namespace;
         }
@@ -184,7 +184,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         {
             string fullName = ContractDisplayName(contract);
             string namespaceName = contract.Namespace;
-            if (string.IsNullOrEmpty(namespaceName))
+            if (string.IsNullOrWhiteSpace(namespaceName))
             {
                 return fullName;
             }
@@ -343,7 +343,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
         internal bool ExportSchemaToPath(string outputPath)
         {
-            if (!string.IsNullOrEmpty(_surrogateDiscoveryError))
+            if (!string.IsNullOrWhiteSpace(_surrogateDiscoveryError))
             {
                 _lastDiagnostics.Clear();
                 ReportFailure(_surrogateDiscoveryError);
@@ -363,7 +363,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
         internal bool ExportSchemasToDirectory(string outputDirectory)
         {
-            if (!string.IsNullOrEmpty(_surrogateDiscoveryError))
+            if (!string.IsNullOrWhiteSpace(_surrogateDiscoveryError))
             {
                 _lastDiagnostics.Clear();
                 ReportFailure(_surrogateDiscoveryError);
@@ -753,7 +753,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 return;
             }
 
-            bool hasStatus = !string.IsNullOrEmpty(_lastStatus);
+            bool hasStatus = !string.IsNullOrWhiteSpace(_lastStatus);
             _statusBox.style.display = hasStatus ? DisplayStyle.Flex : DisplayStyle.None;
             if (hasStatus)
             {
@@ -878,7 +878,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             string chosen;
             if (_exportLayout == ExportLayout.SingleFile)
             {
-                string directory = string.IsNullOrEmpty(_outputPath)
+                string directory = string.IsNullOrWhiteSpace(_outputPath)
                     ? "Assets"
                     : Path.GetDirectoryName(_outputPath);
                 chosen = EditorUtility.SaveFilePanel(
@@ -897,7 +897,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 );
             }
 
-            if (string.IsNullOrEmpty(chosen))
+            if (string.IsNullOrWhiteSpace(chosen))
             {
                 return;
             }

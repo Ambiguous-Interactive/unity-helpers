@@ -17,7 +17,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             foreach (string path in paths)
             {
                 string guid = AssetDatabase.AssetPathToGUID(path);
-                if (!string.IsNullOrEmpty(guid))
+                if (!string.IsNullOrWhiteSpace(guid))
                     guids.Add(guid);
             }
             ValidationAutoRun.Queue(guids, false, 1);

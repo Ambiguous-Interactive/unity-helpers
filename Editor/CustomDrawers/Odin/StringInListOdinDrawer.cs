@@ -324,7 +324,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         private void ApplySerializableTypeSelection(string assemblyQualifiedName)
         {
             Type resolvedType = null;
-            if (!string.IsNullOrEmpty(assemblyQualifiedName))
+            if (!string.IsNullOrWhiteSpace(assemblyQualifiedName))
             {
                 resolvedType = Type.GetType(assemblyQualifiedName, throwOnError: false);
             }

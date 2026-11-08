@@ -402,7 +402,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
                 ? _currentDirectory.Substring(_projectRootPath.Length + 1)
                 : _currentDirectory;
             string dirKey = ScopedKey(PrefKey_LastDir);
-            if (!string.IsNullOrWhiteSpace(rel) && !string.IsNullOrEmpty(dirKey))
+            if (!string.IsNullOrWhiteSpace(rel) && !string.IsNullOrWhiteSpace(dirKey))
             {
                 PersistString(dirKey, rel.SanitizePath());
                 UpdateLastUsedNow();
@@ -780,7 +780,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
         public static void CleanupStalePersistenceEntries(TimeSpan maxAge)
         {
             string index = LoadString(PrefKey_ScopesIndex, string.Empty);
-            if (string.IsNullOrEmpty(index))
+            if (string.IsNullOrWhiteSpace(index))
             {
                 return;
             }
@@ -797,7 +797,8 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
                 string lastUsedStr = LoadString(PrefKey_LastUsed + "." + scope, string.Empty);
                 bool stale = true;
                 if (
-                    !string.IsNullOrEmpty(lastUsedStr) && long.TryParse(lastUsedStr, out long ticks)
+                    !string.IsNullOrWhiteSpace(lastUsedStr)
+                    && long.TryParse(lastUsedStr, out long ticks)
                 )
                 {
                     DateTime last = new(ticks, DateTimeKind.Utc);
@@ -866,7 +867,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
             }
 
             string index = LoadString(PrefKey_ScopesIndex, string.Empty);
-            if (string.IsNullOrEmpty(index))
+            if (string.IsNullOrWhiteSpace(index))
             {
                 PersistString(PrefKey_ScopesIndex, scope);
                 return;

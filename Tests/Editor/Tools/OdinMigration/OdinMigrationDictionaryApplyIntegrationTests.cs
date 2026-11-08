@@ -13,6 +13,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
     using UnityEditor;
     using UnityEngine;
     using UnityEngine.TestTools;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Serialization.OdinMigration;
     using WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration;
     using WallstopStudios.UnityHelpers.Tests.Core;
@@ -298,7 +299,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                             out OdinMigrationCompiledBinding liveBinding
                         )
                     );
-                    foreach (OdinMigrationCompiledField field in liveBinding.Fields)
+                    foreach (
+                        OdinMigrationCompiledField field in liveBinding.Fields.AsValueEnumerableRequired()
+                    )
                     {
                         int key = string.Equals(
                             field.Name,
@@ -478,7 +481,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                             out OdinMigrationCompiledBinding recoveredBinding
                         )
                     );
-                    foreach (OdinMigrationCompiledField field in recoveredBinding.Fields)
+                    foreach (
+                        OdinMigrationCompiledField field in recoveredBinding.Fields.AsValueEnumerableRequired()
+                    )
                     {
                         Assert.IsTrue(
                             field.TryCapture(

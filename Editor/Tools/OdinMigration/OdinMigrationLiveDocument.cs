@@ -282,11 +282,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                             }
                             string path = AssetDatabase.GUIDToAssetPath(guid);
                             foreach (
-                                Object candidate in OdinMigrationApplySceneScope.LoadObjects(
-                                    record,
-                                    root,
-                                    path
-                                )
+                                Object candidate in OdinMigrationApplySceneScope
+                                    .LoadObjects(record, root, path)
+                                    .AsValueEnumerableRequired()
                             )
                             {
                                 if (

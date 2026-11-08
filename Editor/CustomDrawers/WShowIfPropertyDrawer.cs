@@ -175,7 +175,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         private static bool IsArrayElement(SerializedProperty property)
         {
             string propertyPath = property?.propertyPath;
-            if (string.IsNullOrEmpty(propertyPath))
+            if (string.IsNullOrWhiteSpace(propertyPath))
             {
                 return false;
             }
@@ -226,7 +226,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         )
         {
             SerializedProperty resolved = serializedObject.FindProperty(path);
-            if (resolved != null || string.IsNullOrEmpty(path))
+            if (resolved != null || string.IsNullOrWhiteSpace(path))
             {
                 return resolved;
             }
@@ -298,7 +298,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return true;
             }
 
-            if (!string.IsNullOrEmpty(propertyPath))
+            if (!string.IsNullOrWhiteSpace(propertyPath))
             {
                 int separatorIndex = propertyPath.LastIndexOf('.');
                 string siblingPath =
@@ -363,7 +363,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private static Func<object, object> BuildAccessor(Type ownerType, string memberPath)
         {
-            if (string.IsNullOrEmpty(memberPath))
+            if (string.IsNullOrWhiteSpace(memberPath))
             {
                 return static _ => null;
             }
@@ -676,7 +676,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             segments.Clear();
 
-            if (string.IsNullOrEmpty(memberPath))
+            if (string.IsNullOrWhiteSpace(memberPath))
             {
                 return;
             }
@@ -690,7 +690,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             for (int index = 0; index < rawSegmentsLength; index += 1)
             {
                 string raw = rawSegments[index];
-                if (string.IsNullOrEmpty(raw))
+                if (string.IsNullOrWhiteSpace(raw))
                 {
                     continue;
                 }

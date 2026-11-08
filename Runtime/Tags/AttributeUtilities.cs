@@ -357,7 +357,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             string effectTag
         )
         {
-            if (target == null || string.IsNullOrEmpty(effectTag))
+            if (target == null || string.IsNullOrWhiteSpace(effectTag))
             {
                 return TagHandler.HandleEnumerable.Empty;
             }
@@ -394,7 +394,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             List<EffectHandle> targetBuffer = buffer ?? new List<EffectHandle>();
             targetBuffer.Clear();
             if (
-                string.IsNullOrEmpty(effectTag)
+                string.IsNullOrWhiteSpace(effectTag)
                 || target == null
                 || !target.TryGetComponent(out TagHandler tagHandler)
             )

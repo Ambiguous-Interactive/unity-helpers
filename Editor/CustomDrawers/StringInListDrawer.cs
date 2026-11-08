@@ -823,7 +823,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
                 string optionLabel = GetOptionLabel(_attribute, option, out _);
                 if (
-                    !string.IsNullOrEmpty(optionLabel)
+                    !string.IsNullOrWhiteSpace(optionLabel)
                     && optionLabel.StartsWith(searchTerm, StringComparison.OrdinalIgnoreCase)
                 )
                 {

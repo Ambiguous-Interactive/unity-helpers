@@ -213,7 +213,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
             {
                 PropertyMetadataEntry entry = entries[i];
                 if (
-                    !string.IsNullOrEmpty(scriptPropertyPath)
+                    !string.IsNullOrWhiteSpace(scriptPropertyPath)
                     && string.Equals(
                         entry.PropertyPath,
                         scriptPropertyPath,
@@ -313,7 +313,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                         // Nested group anchors have to be included in their parent groups.
                         foreach (WGroupAttribute attribute in descriptor.GroupAttributes)
                         {
-                            if (string.IsNullOrEmpty(attribute.ParentGroup))
+                            if (string.IsNullOrWhiteSpace(attribute.ParentGroup))
                             {
                                 continue;
                             }
@@ -412,7 +412,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
             HashSet<string> circularRefs = null;
             foreach (WGroupDefinition definition in definitions)
             {
-                if (string.IsNullOrEmpty(definition.ParentGroupName))
+                if (string.IsNullOrWhiteSpace(definition.ParentGroupName))
                 {
                     continue;
                 }
@@ -604,7 +604,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                 for (int nameIndex = 0; nameIndex < groupNames.Count; ++nameIndex)
                 {
                     string groupName = groupNames[nameIndex];
-                    if (string.IsNullOrEmpty(groupName))
+                    if (string.IsNullOrWhiteSpace(groupName))
                     {
                         continue;
                     }
@@ -734,7 +734,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
             HashSet<string> visited = new(StringComparer.OrdinalIgnoreCase) { definition.Name };
             string currentParentName = definition.ParentGroupName;
 
-            while (!string.IsNullOrEmpty(currentParentName))
+            while (!string.IsNullOrWhiteSpace(currentParentName))
             {
                 string normalizedName = NormalizeGroupName(currentParentName);
                 if (!visited.Add(normalizedName))
@@ -1080,7 +1080,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
         /// <summary>
         /// Returns true if this group has a parent group.
         /// </summary>
-        internal bool HasParent => !string.IsNullOrEmpty(ParentGroupName);
+        internal bool HasParent => !string.IsNullOrWhiteSpace(ParentGroupName);
 
         private List<WGroupDefinition> _childGroups;
         private IReadOnlyList<string> _directPropertyPaths;

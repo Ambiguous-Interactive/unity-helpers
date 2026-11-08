@@ -659,10 +659,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     assemblyName
                 );
 
-            if (!string.IsNullOrEmpty(definition))
+            if (!string.IsNullOrWhiteSpace(definition))
             {
                 string beside = Path.GetDirectoryName(definition);
-                if (string.IsNullOrEmpty(beside))
+                if (string.IsNullOrWhiteSpace(beside))
                 {
                     report.Failures.Add(
                         WProtoSubtypeTagManifestFile.DescribeUnplaceableAssembly(assemblyName)
@@ -713,13 +713,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             }
 
             string parent = Path.GetDirectoryName(predefined);
-            if (string.IsNullOrEmpty(parent) || !Directory.Exists(parent))
+            if (string.IsNullOrWhiteSpace(parent) || !Directory.Exists(parent))
             {
                 report.Failures.Add(
                     WProtoSubtypeTagManifestFile.DescribeMissingDirectory(
                         assemblyName,
                         predefined,
-                        string.IsNullOrEmpty(parent) ? predefined : parent
+                        string.IsNullOrWhiteSpace(parent) ? predefined : parent
                     )
                 );
                 return null;
@@ -752,9 +752,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         private static List<string> AssemblyDefinitionsAtOrAbove(string directory, string floor)
         {
             List<string> paths = new List<string>();
-            string stopAt = string.IsNullOrEmpty(floor) ? AssetsRoot : floor;
+            string stopAt = string.IsNullOrWhiteSpace(floor) ? AssetsRoot : floor;
             string current = directory;
-            while (!string.IsNullOrEmpty(current))
+            while (!string.IsNullOrWhiteSpace(current))
             {
                 try
                 {
@@ -787,7 +787,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 }
 
                 string parent = Path.GetDirectoryName(current);
-                current = string.IsNullOrEmpty(parent) ? null : parent.SanitizePath();
+                current = string.IsNullOrWhiteSpace(parent) ? null : parent.SanitizePath();
             }
 
             paths.Sort(StringComparer.Ordinal);

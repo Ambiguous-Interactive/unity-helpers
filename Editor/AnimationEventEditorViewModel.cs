@@ -135,7 +135,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                 foreach (string tokensElement in tokens)
                 {
                     string token = tokensElement;
-                    if (string.IsNullOrEmpty(token))
+                    if (string.IsNullOrWhiteSpace(token))
                     {
                         continue;
                     }

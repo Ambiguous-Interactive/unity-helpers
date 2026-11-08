@@ -6,6 +6,7 @@ import concurrent.futures
 import json
 import os
 import shlex
+import shutil
 import signal
 import subprocess
 import sys
@@ -315,3 +316,33 @@ def test_windows_shell_discovery_fails_closed(
     monkeypatch.setattr("check_runner.subprocess.run", discover)
     with pytest.raises(OSError, match="Git for Windows Bash"):
         resolve_bash()
+
+
+def test_checks_do_not_mutate_python_bytecode_cache(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = tmp_path / "cache_probe.py"
+    module.write_text("VALUE = 1\n", encoding="utf-8")
+    child = tmp_path / "child.py"
+    flag = tmp_path / "flag.txt"
+    child.write_text(
+        "import os, sys, cache_probe\nfrom pathlib import Path\n"
+        "assert cache_probe.VALUE == 1\n"
+        "Path(sys.argv[1]).write_text(os.environ.get('PYTHONDONTWRITEBYTECODE', ''))\n",
+        encoding="utf-8",
+    )
+    environment = dict(os.environ)
+    environment.pop("PYTHONDONTWRITEBYTECODE", None)
+    environment.pop("PYTHONPYCACHEPREFIX", None)
+    subprocess.run(
+        [sys.executable, str(child), str(flag)], env=environment, check=True, capture_output=True
+    )
+    cache = tmp_path / "__pycache__"
+    assert cache.is_dir(), "The control must produce bytecode before the check can qualify"
+    shutil.rmtree(cache)
+    monkeypatch.delenv("PYTHONDONTWRITEBYTECODE", raising=False)
+    monkeypatch.delenv("PYTHONPYCACHEPREFIX", raising=False)
+    command = " ".join(shlex.quote(item) for item in [sys.executable, str(child), str(flag)])
+    assert run_check(Check("cache", "Cache input stability", command)).ok
+    assert flag.read_text(encoding="utf-8") == "1"
+    assert not cache.exists()

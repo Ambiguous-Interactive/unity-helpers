@@ -119,7 +119,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
         {
             if (!string.IsNullOrEmpty(GroupNameFilter))
             {
-                if (string.IsNullOrEmpty(groupName))
+                if (string.IsNullOrWhiteSpace(groupName))
                 {
                     return false;
                 }
@@ -339,7 +339,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
 
         private static Rect DrawHeader(string displayName)
         {
-            if (string.IsNullOrEmpty(displayName))
+            if (string.IsNullOrWhiteSpace(displayName))
             {
                 return Rect.zero;
             }

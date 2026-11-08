@@ -116,7 +116,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             string propertyPath
         )
         {
-            if (serializedObject == null || string.IsNullOrEmpty(propertyPath))
+            if (serializedObject == null || string.IsNullOrWhiteSpace(propertyPath))
             {
                 return null;
             }

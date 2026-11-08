@@ -412,7 +412,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// <returns><c>true</c> if the tag is present; otherwise, <c>false</c>.</returns>
         public bool HasTag(string effectTag)
         {
-            if (effectTags == null || string.IsNullOrEmpty(effectTag))
+            if (effectTags == null || string.IsNullOrWhiteSpace(effectTag))
             {
                 return false;
             }
@@ -450,7 +450,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                 {
                     foreach (string candidate in hashSet)
                     {
-                        if (string.IsNullOrEmpty(candidate))
+                        if (string.IsNullOrWhiteSpace(candidate))
                         {
                             continue;
                         }
@@ -467,7 +467,7 @@ namespace WallstopStudios.UnityHelpers.Tags
 
             foreach (string candidate in effectTagsToCheck.AsValueEnumerableRequired())
             {
-                if (string.IsNullOrEmpty(candidate))
+                if (string.IsNullOrWhiteSpace(candidate))
                 {
                     continue;
                 }
@@ -497,7 +497,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             for (int i = 0; i < effectTagsToCheck.Count; ++i)
             {
                 string candidate = effectTagsToCheck[i];
-                if (string.IsNullOrEmpty(candidate))
+                if (string.IsNullOrWhiteSpace(candidate))
                 {
                     continue;
                 }
@@ -518,7 +518,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// <returns><c>true</c> if the effect modifies <paramref name="attributeName"/>; otherwise, <c>false</c>.</returns>
         public bool ModifiesAttribute(string attributeName)
         {
-            if (modifications == null || string.IsNullOrEmpty(attributeName))
+            if (modifications == null || string.IsNullOrWhiteSpace(attributeName))
             {
                 return false;
             }
@@ -547,7 +547,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         {
             buffer ??= new List<AttributeModification>();
             buffer.Clear();
-            if (modifications == null || string.IsNullOrEmpty(attributeName))
+            if (modifications == null || string.IsNullOrWhiteSpace(attributeName))
             {
                 return buffer;
             }
@@ -832,7 +832,10 @@ namespace WallstopStudios.UnityHelpers.Tags
 
         internal EffectStackKey GetStackKey()
         {
-            if (stackGroup == EffectStackGroup.CustomKey && !string.IsNullOrEmpty(stackGroupKey))
+            if (
+                stackGroup == EffectStackGroup.CustomKey
+                && !string.IsNullOrWhiteSpace(stackGroupKey)
+            )
             {
                 return EffectStackKey.CreateCustom(stackGroupKey);
             }

@@ -204,6 +204,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         [TestCase("", "0A00")]
+        [TestCase(" ", "0A0120")]
+        [TestCase("\t\r\n", "0A03090D0A")]
+        [TestCase("\u2003", "0A03E28083")]
         [TestCase("a", "0A0161")]
         [TestCase("hello", "0A0568656C6C6F")]
         [TestCase("héllo", "0A0668C3A96C6C6F")]

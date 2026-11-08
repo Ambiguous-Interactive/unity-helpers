@@ -54,6 +54,7 @@ def containing_method(lines: list[str], line_index: int) -> str | None:
 
 
 def nearby_check(lines: list[str], index: int, radius: int) -> bool:
+    """Report whether a mixed-value guard appears within the configured source radius."""
     return any(MIXED in line for line in lines[max(0, index - radius) : index + radius + 1])
 
 
@@ -114,6 +115,7 @@ def analyze(source: str) -> list[Finding]:
 
 
 def selected_files(repository: Path, paths: list[str] | None) -> list[Path]:
+    """Select nonlinked drawer inputs inside the supplied repository, refusing empty scans."""
     if not repository.is_dir() or is_link(repository):
         raise ValueError(f"Drawer repository root is missing or linked: {repository}")
     files: list[Path]
@@ -129,7 +131,7 @@ def selected_files(repository: Path, paths: list[str] | None) -> list[Path]:
             if not path.is_absolute():
                 path = repository / path
             path = path.absolute()
-            if not path.is_relative_to(repository) or ".." in path.parts:
+            if not path.is_relative_to(repository) or ".." in path.relative_to(repository).parts:
                 raise ValueError(f"Drawer input is outside the repository: {name}")
             if not path.is_file() or is_link(path):
                 raise ValueError(f"Drawer input is missing or linked: {name}")
@@ -146,6 +148,7 @@ def selected_files(repository: Path, paths: list[str] | None) -> list[Path]:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Parse arguments, print drawer advisories, and return a failing status for unsafe inputs."""
     configure_output()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", type=Path, default=ROOT)

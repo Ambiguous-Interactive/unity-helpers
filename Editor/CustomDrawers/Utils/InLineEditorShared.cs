@@ -198,7 +198,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         /// <returns>True if the foldout is expanded; false otherwise.</returns>
         public static bool GetFoldoutState(string foldoutKey, WInLineEditorMode resolvedMode)
         {
-            if (string.IsNullOrEmpty(foldoutKey))
+            if (string.IsNullOrWhiteSpace(foldoutKey))
             {
                 return true;
             }
@@ -242,7 +242,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         /// <param name="expanded">Whether the foldout should be expanded.</param>
         public static void SetFoldoutState(string foldoutKey, bool expanded)
         {
-            if (string.IsNullOrEmpty(foldoutKey))
+            if (string.IsNullOrWhiteSpace(foldoutKey))
             {
                 return;
             }
@@ -262,7 +262,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         /// <returns>The stored scroll position, or <see cref="Vector2.zero"/> if not found.</returns>
         public static Vector2 GetScrollPosition(string scrollKey)
         {
-            if (string.IsNullOrEmpty(scrollKey))
+            if (string.IsNullOrWhiteSpace(scrollKey))
             {
                 return Vector2.zero;
             }
@@ -288,7 +288,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         /// <param name="position">The scroll position to store.</param>
         public static void SetScrollPosition(string scrollKey, Vector2 position)
         {
-            if (string.IsNullOrEmpty(scrollKey))
+            if (string.IsNullOrWhiteSpace(scrollKey))
             {
                 return;
             }
@@ -446,7 +446,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
 
             GUIContent headerContent = EditorGUIUtility.ObjectContent(value, value.GetType());
 
-            if (headerContent == null || string.IsNullOrEmpty(headerContent.text))
+            if (headerContent == null || string.IsNullOrWhiteSpace(headerContent.text))
             {
                 ReusableHeaderContent.text = value.name;
 

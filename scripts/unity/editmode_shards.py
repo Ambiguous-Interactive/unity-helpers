@@ -27,6 +27,11 @@ def partition_assemblies(profile: str, count: int) -> list[str]:
     return [";".join(ordered[index::count]) for index in range(count)]
 
 
+def _outcome(node: ET.Element) -> str:
+    """Normalize NUnit outcome suffixes consistently for cases and suites."""
+    return node.get("result", "").split(":", 1)[0].split("(", 1)[0]
+
+
 def merge_results(
     inputs: list[Path], destination: Path, *, selected_assemblies: set[str] | None = None
 ) -> None:
@@ -53,7 +58,7 @@ def merge_results(
         shard_counts = {key: int(root.get(key, "0")) for key in counts}
         leaf_counts = dict.fromkeys(("Passed", "Failed", "Skipped", "Inconclusive"), 0)
         for case in cases:
-            state = case.get("result", "").split(":", 1)[0].split("(", 1)[0]
+            state = _outcome(case)
             if state not in leaf_counts:
                 raise ValueError(f"Shard has an unknown case outcome: {path}")
             leaf_counts[state] += 1
@@ -66,8 +71,7 @@ def merge_results(
             or sum(shard_counts[key] for key in ("passed", "failed", "skipped", "inconclusive"))
             != len(cases)
             or any(
-                node.get("result", "").split(":", 1)[0].split("(", 1)[0]
-                not in ("Passed", "Skipped", "Inconclusive")
+                _outcome(node) not in ("Passed", "Skipped", "Inconclusive")
                 for node in root.iter()
                 if node.tag in ("test-run", "test-suite", "test-case")
             )

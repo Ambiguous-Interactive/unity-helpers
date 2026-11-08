@@ -403,3 +403,17 @@ def test_legacy_test_launcher_runs_selected_control(tmp_path: Path) -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "1 passed" in result.stdout
+
+
+def test_explicit_paths_accept_parent_segments_in_repository_root(tmp_path: Path) -> None:
+    nested = tmp_path / "child"
+    nested.mkdir()
+    drawer = tmp_path / "Editor/CustomDrawers/ExampleDrawer.cs"
+    drawer.parent.mkdir(parents=True)
+    drawer.write_text("class ExampleDrawer {}", encoding="utf-8")
+    repository = nested / ".."
+    assert selected_files(repository, ["Editor/CustomDrawers/ExampleDrawer.cs"]) == [
+        repository / "Editor/CustomDrawers/ExampleDrawer.cs"
+    ]
+    with pytest.raises(ValueError, match="outside"):
+        selected_files(repository, ["../ExampleDrawer.cs"])

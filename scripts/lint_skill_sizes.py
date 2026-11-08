@@ -35,6 +35,7 @@ def line_count(path: Path) -> int:
 
 
 def classify(count: int) -> Severity:
+    """Classify a line count against the warning, critical, and hard size boundaries."""
     if count >= 200:
         return "ERROR"
     if count == 199:
@@ -43,6 +44,7 @@ def classify(count: int) -> Severity:
 
 
 def check_path(repository: Path, path: Path) -> None:
+    """Reject input paths outside the instruction tree or backed by links or special files."""
     if not path.is_file():
         raise ValueError(f"Instruction input is not a file: {path}")
     current = path
@@ -53,6 +55,7 @@ def check_path(repository: Path, path: Path) -> None:
 
 
 def files_to_check(repository: Path, paths: list[str] | None) -> tuple[list[Path], bool]:
+    """Select explicit instruction files or walk the complete supported instruction tree."""
     if not repository.is_dir() or is_link(repository):
         raise ValueError(f"Instruction repository root is missing or linked: {repository}")
     skills = repository / ".llm/skills"
@@ -99,7 +102,8 @@ def files_to_check(repository: Path, paths: list[str] | None) -> tuple[list[Path
     return sorted(selected), True
 
 
-def report(path: Path, name: str, prefix: str, *, verbose: bool) -> Severity:
+def report(path: Path, name: str, prefix: str, *, verbose: bool) -> tuple[Severity, int]:
+    """Print a file size and workflow diagnostic, returning its severity and observed count."""
     count = line_count(path)
     level = classify(count)
     name = escape_command_data(name)
@@ -111,10 +115,11 @@ def report(path: Path, name: str, prefix: str, *, verbose: bool) -> Severity:
     elif verbose:
         suffix = " (consider splitting)" if level == "WARNING" else ""
         print(f"{prefix} {level}: {name}: {count} lines{suffix}")
-    return level
+    return level, count
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run the size policy for explicit files or the repository and return its gate status."""
     configure_output()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", type=Path, default=ROOT)
@@ -127,17 +132,18 @@ def main(argv: list[str] | None = None) -> int:
         files, check_context = files_to_check(repository, args.paths)
         counts = dict.fromkeys(("OK", "WARNING", "CRITICAL", "ERROR"), 0)
         for path in files:
-            level = report(
+            level, _ = report(
                 path, path.relative_to(repository).as_posix(), "[skill-sizes]", verbose=args.verbose
             )
             counts[level] += 1
         checked = len(files)
         context_level: Severity | None = None
+        context_count = 0
         context = repository / CONTEXT
         if check_context:
             if context.exists() or context.is_symlink():
                 check_path(repository, context)
-                context_level = report(
+                context_level, context_count = report(
                     context, "context.md", "[context-size]", verbose=args.verbose
                 )
                 checked += 1
@@ -152,7 +158,7 @@ def main(argv: list[str] | None = None) -> int:
             )
         if check_context:
             print(
-                "[context-size] Summary: context.md checked"
+                f"[context-size] Summary: context.md checked ({context_count} lines)"
                 if context_level
                 else "[context-size] Summary: context.md not found"
             )

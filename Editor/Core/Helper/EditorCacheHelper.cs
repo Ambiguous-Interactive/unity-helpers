@@ -331,7 +331,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
         /// <returns>The cached or newly created GUIStyle, or null if factory is null and style is not cached.</returns>
         public static GUIStyle GetOrCreateStyle(string key, Func<GUIStyle> factory)
         {
-            if (string.IsNullOrEmpty(key))
+            if (string.IsNullOrWhiteSpace(key))
             {
                 if (factory == null)
                 {

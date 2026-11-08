@@ -112,13 +112,15 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// <summary>
         /// Gets a value indicating whether this instance does not reference a type.
         /// </summary>
-        public bool IsEmpty => string.IsNullOrEmpty(_assemblyQualifiedName);
+        public bool IsEmpty => string.IsNullOrWhiteSpace(_assemblyQualifiedName);
 
         /// <summary>
         /// Gets the stored assembly qualified type name.
         /// </summary>
         public string AssemblyQualifiedName =>
-            string.IsNullOrEmpty(_assemblyQualifiedName) ? string.Empty : _assemblyQualifiedName;
+            string.IsNullOrWhiteSpace(_assemblyQualifiedName)
+                ? string.Empty
+                : _assemblyQualifiedName;
 
         /// <summary>
         /// Gets a user-friendly display name for the wrapped type.
@@ -130,7 +132,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 Type resolved = GetResolvedType();
                 if (resolved == null)
                 {
-                    return string.IsNullOrEmpty(_assemblyQualifiedName)
+                    return string.IsNullOrWhiteSpace(_assemblyQualifiedName)
                         ? SerializableTypeCatalog.NoneDisplayName
                         : $"{SerializableTypeCatalog.NoneDisplayName}: {_assemblyQualifiedName}";
                 }
@@ -210,7 +212,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         internal static SerializableType FromSerializedName(string serialized)
         {
             SerializableType value = default;
-            value._assemblyQualifiedName = string.IsNullOrEmpty(serialized)
+            value._assemblyQualifiedName = string.IsNullOrWhiteSpace(serialized)
                 ? string.Empty
                 : serialized;
             value._cachedType = SerializableTypeCatalog.Resolve(value._assemblyQualifiedName);
@@ -226,17 +228,17 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             }
 
             string assemblyQualifiedName = ReflectionHelpers.GetAssemblyQualifiedName(type);
-            if (!string.IsNullOrEmpty(assemblyQualifiedName))
+            if (!string.IsNullOrWhiteSpace(assemblyQualifiedName))
             {
                 return assemblyQualifiedName;
             }
 
             string fullName = type.FullName;
-            if (!string.IsNullOrEmpty(fullName))
+            if (!string.IsNullOrWhiteSpace(fullName))
             {
                 Assembly assembly = type.Assembly;
                 string assemblyName = assembly.GetName().Name;
-                if (!string.IsNullOrEmpty(assemblyName))
+                if (!string.IsNullOrWhiteSpace(assemblyName))
                 {
                     return $"{fullName}, {assemblyName}";
                 }
@@ -245,11 +247,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             }
 
             string name = type.Name;
-            if (!string.IsNullOrEmpty(name))
+            if (!string.IsNullOrWhiteSpace(name))
             {
                 Assembly assembly = type.Assembly;
                 string assemblyName = assembly.GetName().Name;
-                if (!string.IsNullOrEmpty(assemblyName))
+                if (!string.IsNullOrWhiteSpace(assemblyName))
                 {
                     return $"{name}, {assemblyName}";
                 }
@@ -306,10 +308,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// <inheritdoc/>
         public bool Equals(SerializableType other)
         {
-            string leftName = string.IsNullOrEmpty(_assemblyQualifiedName)
+            string leftName = string.IsNullOrWhiteSpace(_assemblyQualifiedName)
                 ? string.Empty
                 : _assemblyQualifiedName;
-            string rightName = string.IsNullOrEmpty(other._assemblyQualifiedName)
+            string rightName = string.IsNullOrWhiteSpace(other._assemblyQualifiedName)
                 ? string.Empty
                 : other._assemblyQualifiedName;
             return string.Equals(leftName, rightName, StringComparison.Ordinal);
@@ -324,7 +326,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         {
             if (other == null)
             {
-                return string.IsNullOrEmpty(_assemblyQualifiedName);
+                return string.IsNullOrWhiteSpace(_assemblyQualifiedName);
             }
 
             string normalized = NormalizeTypeName(other);
@@ -334,7 +336,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// <inheritdoc/>
         public override int GetHashCode()
         {
-            if (string.IsNullOrEmpty(_assemblyQualifiedName))
+            if (string.IsNullOrWhiteSpace(_assemblyQualifiedName))
             {
                 return 0;
             }
@@ -349,7 +351,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 return _cachedType;
             }
 
-            if (string.IsNullOrEmpty(_assemblyQualifiedName))
+            if (string.IsNullOrWhiteSpace(_assemblyQualifiedName))
             {
                 _resolutionAttempted = true;
                 return null;
@@ -474,7 +476,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// <returns>The resolved type when found; otherwise, <c>null</c>.</returns>
         public static Type Resolve(string assemblyQualifiedName)
         {
-            if (string.IsNullOrEmpty(assemblyQualifiedName))
+            if (string.IsNullOrWhiteSpace(assemblyQualifiedName))
             {
                 return null;
             }
@@ -505,7 +507,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             }
 
             string fullName = ExtractFullName(assemblyQualifiedName);
-            if (string.IsNullOrEmpty(fullName))
+            if (string.IsNullOrWhiteSpace(fullName))
             {
                 return null;
             }
@@ -529,7 +531,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 
             string normalized = SerializableType.NormalizeTypeName(type);
             if (
-                !string.IsNullOrEmpty(normalized)
+                !string.IsNullOrWhiteSpace(normalized)
                 && _descriptorByName.TryGetValue(
                     normalized,
                     out SerializableTypeDescriptor descriptor
@@ -557,7 +559,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         {
             EnsureCache();
 
-            if (string.IsNullOrEmpty(assemblyQualifiedName))
+            if (string.IsNullOrWhiteSpace(assemblyQualifiedName))
             {
                 displayName = NoneDisplayName;
                 tooltip = string.Empty;
@@ -622,7 +624,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         {
             EnsureCache();
 
-            string key = string.IsNullOrWhiteSpace(search)
+            string key = string.IsNullOrEmpty(search)
                 ? string.Empty
                 : search.Trim().ToLowerInvariant();
             if (FilterCache.TryGet(key, out SerializableTypeDescriptor[] cached))
@@ -919,20 +921,21 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             }
 
             string fullName = type.FullName;
-            if (!string.IsNullOrEmpty(fullName) && regex.IsMatch(fullName))
+            if (!string.IsNullOrWhiteSpace(fullName) && regex.IsMatch(fullName))
             {
                 return true;
             }
 
             string name = type.Name;
-            if (!string.IsNullOrEmpty(name) && regex.IsMatch(name))
+            if (!string.IsNullOrWhiteSpace(name) && regex.IsMatch(name))
             {
                 return true;
             }
 
             string assemblyQualifiedName = type.AssemblyQualifiedName;
             if (
-                !string.IsNullOrEmpty(assemblyQualifiedName) && regex.IsMatch(assemblyQualifiedName)
+                !string.IsNullOrWhiteSpace(assemblyQualifiedName)
+                && regex.IsMatch(assemblyQualifiedName)
             )
             {
                 return true;
@@ -984,7 +987,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 
         private static string FormatTooltip(Type type, string assemblyQualifiedName)
         {
-            if (!string.IsNullOrEmpty(assemblyQualifiedName))
+            if (!string.IsNullOrWhiteSpace(assemblyQualifiedName))
             {
                 return assemblyQualifiedName;
             }
@@ -1051,7 +1054,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                                 }
 
                                 string normalized = SerializableType.NormalizeTypeName(type);
-                                if (string.IsNullOrEmpty(normalized))
+                                if (string.IsNullOrWhiteSpace(normalized))
                                 {
                                     continue;
                                 }
@@ -1086,7 +1089,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                     foreach (SerializableTypeDescriptor descriptor in descriptors)
                     {
                         string displayName = descriptor.DisplayName;
-                        if (string.IsNullOrEmpty(displayName))
+                        if (string.IsNullOrWhiteSpace(displayName))
                         {
                             continue;
                         }
@@ -1117,7 +1120,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                             SerializableTypeDescriptor descriptor = descriptors[i];
                             if (
                                 descriptor.Type == null
-                                || string.IsNullOrEmpty(descriptor.DisplayName)
+                                || string.IsNullOrWhiteSpace(descriptor.DisplayName)
                                 || !displayCounts.TryGetValue(
                                     descriptor.DisplayName,
                                     out int occurrences
@@ -1130,7 +1133,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 
                             string assemblyName =
                                 descriptor.Type?.Assembly?.GetName()?.Name ?? string.Empty;
-                            string disambiguated = string.IsNullOrEmpty(assemblyName)
+                            string disambiguated = string.IsNullOrWhiteSpace(assemblyName)
                                 ? descriptor.DisplayName
                                 : $"{descriptor.DisplayName} ({assemblyName})";
 
@@ -1210,7 +1213,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             if (type.IsGenericType)
             {
                 string fullName = type.FullName ?? type.Name;
-                if (string.IsNullOrEmpty(fullName))
+                if (string.IsNullOrWhiteSpace(fullName))
                 {
                     fullName = type.Name;
                 }
@@ -1247,7 +1250,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             }
 
             string name = type.FullName ?? type.Name;
-            if (string.IsNullOrEmpty(name))
+            if (string.IsNullOrWhiteSpace(name))
             {
                 name = type.Name;
             }
@@ -1262,18 +1265,18 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 return false;
             }
 
-            if (!string.IsNullOrEmpty(signature.FullName) && regex.IsMatch(signature.FullName))
+            if (!string.IsNullOrWhiteSpace(signature.FullName) && regex.IsMatch(signature.FullName))
             {
                 return true;
             }
 
-            if (!string.IsNullOrEmpty(signature.Name) && regex.IsMatch(signature.Name))
+            if (!string.IsNullOrWhiteSpace(signature.Name) && regex.IsMatch(signature.Name))
             {
                 return true;
             }
 
             if (
-                !string.IsNullOrEmpty(signature.AssemblyQualifiedName)
+                !string.IsNullOrWhiteSpace(signature.AssemblyQualifiedName)
                 && regex.IsMatch(signature.AssemblyQualifiedName)
             )
             {
@@ -1325,7 +1328,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 
                             string assemblyQualifiedName =
                                 type.AssemblyQualifiedName ?? string.Empty;
-                            string uniquenessKey = string.IsNullOrEmpty(assemblyQualifiedName)
+                            string uniquenessKey = string.IsNullOrWhiteSpace(assemblyQualifiedName)
                                 ? $"{type.FullName ?? type.Name}|{assembly.GetName()?.Name ?? string.Empty}"
                                 : assemblyQualifiedName;
                             if (!seenTypes.Add(uniquenessKey))
@@ -1498,7 +1501,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 }
 
                 if (
-                    !string.IsNullOrEmpty(Type.FullName)
+                    !string.IsNullOrWhiteSpace(Type.FullName)
                     && Type.FullName.StartsWith(search, StringComparison.OrdinalIgnoreCase)
                 )
                 {
@@ -1506,7 +1509,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 }
 
                 if (
-                    !string.IsNullOrEmpty(Type.Name)
+                    !string.IsNullOrWhiteSpace(Type.Name)
                     && Type.Name.StartsWith(search, StringComparison.OrdinalIgnoreCase)
                 )
                 {

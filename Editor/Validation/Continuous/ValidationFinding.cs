@@ -210,7 +210,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         public override string ToString()
         {
             string where = string.IsNullOrWhiteSpace(AssetPath) ? AssetGuid : AssetPath;
-            return string.IsNullOrEmpty(Discriminator)
+            return string.IsNullOrWhiteSpace(Discriminator)
                 ? $"[{Severity}] {RuleId}: {where} -- {Message}"
                 : $"[{Severity}] {RuleId}: {where} ({Discriminator}) -- {Message}";
         }

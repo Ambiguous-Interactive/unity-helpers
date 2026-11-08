@@ -713,7 +713,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 VisualElement row = Element(_settingsContent, "sentinel-rule-row", "dx-row");
                 AddLabel(
                     row,
-                    string.IsNullOrEmpty(finding.RuleId) ? id : finding.Message,
+                    string.IsNullOrWhiteSpace(finding.RuleId) ? id : finding.Message,
                     "dx-grow"
                 );
                 ValidationFinding chosen = finding;
@@ -721,7 +721,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                     new Button(() =>
                         ChangeSuppression(
                             id,
-                            string.IsNullOrEmpty(chosen.RuleId) ? (ValidationFinding?)null : chosen,
+                            string.IsNullOrWhiteSpace(chosen.RuleId)
+                                ? (ValidationFinding?)null
+                                : chosen,
                             false
                         )
                     )

@@ -210,7 +210,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
         private static bool Contains(string value, string query)
         {
-            return !string.IsNullOrEmpty(value)
+            return !string.IsNullOrWhiteSpace(value)
                 && 0 <= value.IndexOf(query, StringComparison.OrdinalIgnoreCase);
         }
 

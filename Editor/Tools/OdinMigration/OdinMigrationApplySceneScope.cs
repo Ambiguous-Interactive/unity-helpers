@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
     using UnityEditor.SceneManagement;
     using UnityEngine;
     using UnityEngine.SceneManagement;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using Object = UnityEngine.Object;
 
     internal static class OdinMigrationApplySceneScope
@@ -121,7 +122,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
         {
             OdinMigrationObjectReferenceValidator identity =
                 new OdinMigrationObjectReferenceValidator(document.owningGuid);
-            foreach (Object candidate in LoadObjects(record, backupRoot, document.assetPath))
+            foreach (
+                Object candidate in LoadObjects(record, backupRoot, document.assetPath)
+                    .AsValueEnumerableRequired()
+            )
             {
                 if (
                     candidate != null

@@ -179,7 +179,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             foreach (Object selected in Selection.objects)
             {
                 string path = AssetDatabase.GetAssetPath(selected);
-                if (string.IsNullOrEmpty(path) || paths.Contains(path))
+                if (string.IsNullOrWhiteSpace(path) || paths.Contains(path))
                 {
                     continue;
                 }

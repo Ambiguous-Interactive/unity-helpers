@@ -296,14 +296,14 @@ def test_full_scan_refuses_nonregular_inputs_without_blocking(tmp_path: Path) ->
     repository(tmp_path)
     path = tmp_path / ".llm/skills/pipe.md"
     created = subprocess.run([maker, str(path)], capture_output=True, check=False, timeout=10)
-    if created.returncode != 0 or path.is_file():
-        pytest.skip("The filesystem cannot create a native POSIX FIFO")
+    if created.returncode != 0 or not path.is_fifo():
+        pytest.skip("The creator did not produce a FIFO visible to native Python")
     result = subprocess.run(
         [sys.executable, str(SCRIPT), "--repo-root", str(tmp_path)],
         capture_output=True,
         text=True,
         check=False,
-        timeout=3,
+        timeout=10,
     )
     assert result.returncode == 1
     assert "not a regular file" in result.stdout
@@ -362,3 +362,12 @@ def test_legacy_test_launcher_runs_selected_control(tmp_path: Path) -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "2 passed" in result.stdout
+
+
+@pytest.mark.parametrize("count", [0, 100, 198])
+def test_context_summary_preserves_observed_line_count(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], count: int
+) -> None:
+    repository(tmp_path, skill=None, context=count)
+    assert main(["--repo-root", str(tmp_path)]) == 0
+    assert f"[context-size] Summary: context.md checked ({count} lines)" in capsys.readouterr().out

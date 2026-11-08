@@ -354,7 +354,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
 
                 string guid = AssetDatabase.AssetPathToGUID(candidate);
-                if (string.IsNullOrEmpty(guid))
+                if (string.IsNullOrWhiteSpace(guid))
                 {
                     continue;
                 }

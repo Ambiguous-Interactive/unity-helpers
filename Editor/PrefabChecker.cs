@@ -707,7 +707,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                 requestedPaths.Add(assetPath);
                 string normalizedPath = assetPath.SanitizePath();
                 if (
-                    !string.IsNullOrEmpty(normalizedPath)
+                    !string.IsNullOrWhiteSpace(normalizedPath)
                     && (
                         string.Equals(normalizedPath, "Assets", System.StringComparison.Ordinal)
                         || AssetDatabase.IsValidFolder(normalizedPath)

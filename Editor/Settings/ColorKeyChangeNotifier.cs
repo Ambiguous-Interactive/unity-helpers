@@ -165,7 +165,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 }
 
                 string key = keyProp.stringValue;
-                if (string.IsNullOrEmpty(key))
+                if (string.IsNullOrWhiteSpace(key))
                 {
                     continue;
                 }
@@ -259,7 +259,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 }
 
                 string key = keyProp.stringValue;
-                if (string.IsNullOrEmpty(key))
+                if (string.IsNullOrWhiteSpace(key))
                 {
                     continue;
                 }
@@ -382,7 +382,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 }
 
                 string key = keyProp.stringValue;
-                if (string.IsNullOrEmpty(key))
+                if (string.IsNullOrWhiteSpace(key))
                 {
                     continue;
                 }
@@ -446,7 +446,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 }
 
                 string key = keyProp.stringValue;
-                if (string.IsNullOrEmpty(key))
+                if (string.IsNullOrWhiteSpace(key))
                 {
                     continue;
                 }

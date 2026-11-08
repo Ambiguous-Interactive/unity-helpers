@@ -316,7 +316,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         {
             return
                 string.Equals(parameterName, "data", StringComparison.Ordinal)
-                || string.IsNullOrEmpty(parameterName)
+                || string.IsNullOrWhiteSpace(parameterName)
                 ? "null"
                 : "null " + parameterName;
         }
@@ -325,14 +325,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         {
             return
                 string.Equals(parameterName, "data", StringComparison.Ordinal)
-                || string.IsNullOrEmpty(parameterName)
+                || string.IsNullOrWhiteSpace(parameterName)
                 ? "empty"
                 : "empty " + parameterName;
         }
 
         internal static Type ResolveTypeOrNull(string assemblyQualifiedName)
         {
-            if (string.IsNullOrEmpty(assemblyQualifiedName))
+            if (string.IsNullOrWhiteSpace(assemblyQualifiedName))
             {
                 return null;
             }

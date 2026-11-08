@@ -159,7 +159,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                         matches.Add(finding);
                 }
                 else if (
-                    !string.IsNullOrEmpty(path)
+                    !string.IsNullOrWhiteSpace(path)
                     && string.Equals(finding.AssetPath, path, System.StringComparison.Ordinal)
                 )
                     matches.Add(finding);

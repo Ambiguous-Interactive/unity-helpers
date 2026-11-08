@@ -65,7 +65,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
             string path = AssetDatabase.GUIDToAssetPath(guid);
             assetPath = path;
-            return !string.IsNullOrEmpty(path);
+            return !string.IsNullOrWhiteSpace(path);
         }
 
         /// <summary>
@@ -76,7 +76,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         /// <returns><c>false</c> when the guid resolves to no script, or to a script binding nothing.</returns>
         public static bool TryGetScriptType(string guid, out Type type)
         {
-            if (string.IsNullOrEmpty(guid))
+            if (string.IsNullOrWhiteSpace(guid))
             {
                 type = null;
                 return false;
@@ -119,7 +119,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         private static string FindScriptGuidByName(Type type)
         {
             string searchName = SearchNameOf(type);
-            if (string.IsNullOrEmpty(searchName))
+            if (string.IsNullOrWhiteSpace(searchName))
             {
                 return null;
             }
@@ -186,7 +186,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         private static Type BoundTypeOf(string guid)
         {
             string path = AssetDatabase.GUIDToAssetPath(guid);
-            if (string.IsNullOrEmpty(path))
+            if (string.IsNullOrWhiteSpace(path))
             {
                 return null;
             }

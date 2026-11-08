@@ -109,7 +109,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         /// </remarks>
         public bool TryGetEntry(string key, out AuthoredAssetEntry entry)
         {
-            if (string.IsNullOrEmpty(key))
+            if (string.IsNullOrWhiteSpace(key))
             {
                 entry = default;
                 return false;

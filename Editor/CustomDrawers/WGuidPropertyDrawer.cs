@@ -59,7 +59,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             string trimmed = normalizedInput.Trim();
             state.displayText = normalizedInput;
 
-            if (string.IsNullOrEmpty(trimmed))
+            if (string.IsNullOrWhiteSpace(trimmed))
             {
                 WGuid empty = WGuid.EmptyGuid;
                 UpdateGuidValue(property, lowProperty, highProperty, empty, ClearUndoLabel);
@@ -240,12 +240,12 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return new GUIContent("New", tooltip);
             }
 
-            if (content.image == null && string.IsNullOrEmpty(content.text))
+            if (content.image == null && string.IsNullOrWhiteSpace(content.text))
             {
                 content.text = "New";
             }
 
-            if (string.IsNullOrEmpty(content.tooltip))
+            if (string.IsNullOrWhiteSpace(content.tooltip))
             {
                 content.tooltip = tooltip;
             }
@@ -269,7 +269,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         {
             DrawerState state = GetState(property);
             float lineHeight = EditorGUIUtility.singleLineHeight;
-            if (!state.hasPendingInvalid || string.IsNullOrEmpty(state.warningMessage))
+            if (!state.hasPendingInvalid || string.IsNullOrWhiteSpace(state.warningMessage))
             {
                 return lineHeight;
             }
@@ -323,7 +323,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             string serializedText = ConvertToString(lowValue, highValue);
-            if (!state.hasPendingInvalid || string.IsNullOrEmpty(state.displayText))
+            if (!state.hasPendingInvalid || string.IsNullOrWhiteSpace(state.displayText))
             {
                 if (!string.Equals(state.displayText, serializedText, StringComparison.Ordinal))
                 {
@@ -379,7 +379,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 GenerateNewGuid(property, lowProperty, highProperty, state);
             }
 
-            if (state.hasPendingInvalid && !string.IsNullOrEmpty(state.warningMessage))
+            if (state.hasPendingInvalid && !string.IsNullOrWhiteSpace(state.warningMessage))
             {
                 state.warningContent.text = state.warningMessage;
                 Rect helpRect = new(

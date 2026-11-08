@@ -224,7 +224,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                                 primaryPath,
                                 targetAssetPath
                             );
-                            if (string.IsNullOrEmpty(moveResult))
+                            if (string.IsNullOrWhiteSpace(moveResult))
                             {
                                 AssetDatabase.SaveAssets();
                                 AssetDatabase.Refresh();
@@ -554,7 +554,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                 foreach (string guid in assets)
                 {
                     string assetPath = AssetDatabase.GUIDToAssetPath(guid);
-                    if (string.IsNullOrEmpty(assetPath))
+                    if (string.IsNullOrWhiteSpace(assetPath))
                     {
                         continue;
                     }

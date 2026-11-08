@@ -717,7 +717,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper.Logging
 
             float now = GetTimestamp();
             string threadLabel = BuildThreadLabel();
-            bool hasThreadLabel = !string.IsNullOrEmpty(threadLabel);
+            bool hasThreadLabel = !string.IsNullOrWhiteSpace(threadLabel);
             string componentType;
             string gameObjectName;
             if (unityObject != null)

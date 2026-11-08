@@ -105,7 +105,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
             string json = ValidationReport.ToJson(run, suppressions);
             if (
-                !string.IsNullOrEmpty(outputPath) && !TryWrite(outputPath, json, out string failure)
+                !string.IsNullOrWhiteSpace(outputPath)
+                && !TryWrite(outputPath, json, out string failure)
             )
             {
                 problems.Add(failure);
@@ -129,7 +130,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             ValidationWorkspaceSettings settings = ValidationWorkspaceSettings.instance;
             foreach (ValidationWorkspaceSettings.RuleDefinition definition in settings.projectRules)
             {
-                if (definition != null && !string.IsNullOrEmpty(definition.id))
+                if (definition != null && !string.IsNullOrWhiteSpace(definition.id))
                 {
                     if (ValidationProjectRule.ValidateDefinition(definition, out string failure))
                         discovered.Add(new ValidationProjectRule(definition));
@@ -327,7 +328,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         /// </remarks>
         internal static ValidationSeverity ParseSeverity(string value, ValidationSeverity fallback)
         {
-            if (string.IsNullOrEmpty(value))
+            if (string.IsNullOrWhiteSpace(value))
             {
                 return fallback;
             }
@@ -390,7 +391,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
         private static ValidationSuppressions ReadSuppressions(string path, List<string> problems)
         {
-            if (string.IsNullOrEmpty(path))
+            if (string.IsNullOrWhiteSpace(path))
             {
                 return ValidationSuppressions.Empty;
             }

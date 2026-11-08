@@ -1091,7 +1091,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             }
 
             string guid = AssetDatabase.AssetPathToGUID(path);
-            return !string.IsNullOrEmpty(guid) && matchingGuids.Contains(guid);
+            return !string.IsNullOrWhiteSpace(guid) && matchingGuids.Contains(guid);
         }
 
         private static string[] CollectSearchFolders(

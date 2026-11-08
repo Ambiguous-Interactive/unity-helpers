@@ -46,13 +46,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
             foreach (string path in paths)
             {
-                if (string.IsNullOrEmpty(path))
+                if (string.IsNullOrWhiteSpace(path))
                 {
                     continue;
                 }
 
                 string guid = AssetDatabase.AssetPathToGUID(path);
-                if (!string.IsNullOrEmpty(guid))
+                if (!string.IsNullOrWhiteSpace(guid))
                 {
                     guids.Add(guid);
                 }

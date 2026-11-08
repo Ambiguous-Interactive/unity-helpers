@@ -101,7 +101,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Base
 
         private void OnGUIHandler()
         {
-            if (_serializedObject == null || string.IsNullOrEmpty(_propertyPath))
+            if (_serializedObject == null || string.IsNullOrWhiteSpace(_propertyPath))
             {
                 return;
             }

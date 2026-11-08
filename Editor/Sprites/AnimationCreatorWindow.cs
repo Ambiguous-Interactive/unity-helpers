@@ -1101,7 +1101,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             EditorGUILayout.LabelField("Custom Group Base:", b);
                             EditorGUILayout.LabelField(
                                 "Custom Group Index:",
-                                string.IsNullOrEmpty(idx) ? "(none)" : idx
+                                string.IsNullOrWhiteSpace(idx) ? "(none)" : idx
                             );
                         }
                         else
@@ -2577,7 +2577,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         {
             string finalNameCore = baseKey;
             string folderPrefix = GetFolderPrefix(directoryPath);
-            if (!string.IsNullOrEmpty(folderPrefix))
+            if (!string.IsNullOrWhiteSpace(folderPrefix))
             {
                 finalNameCore = folderPrefix + "_" + finalNameCore;
             }

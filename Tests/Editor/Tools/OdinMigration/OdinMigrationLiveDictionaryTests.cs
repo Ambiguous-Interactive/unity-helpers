@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
     using System.Collections.Generic;
     using NUnit.Framework;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Serialization.OdinMigration;
     using WallstopStudios.UnityHelpers.Tests.Core;
     using Object = UnityEngine.Object;
@@ -20,7 +21,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             string name
         )
         {
-            foreach (OdinMigrationCompiledField field in binding.Fields)
+            foreach (OdinMigrationCompiledField field in binding.Fields.AsValueEnumerableRequired())
             {
                 if (string.Equals(field.Name, name, StringComparison.Ordinal))
                 {

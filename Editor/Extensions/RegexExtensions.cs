@@ -38,7 +38,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Extensions
             out Group group
         )
         {
-            if (regex == null || match == null || string.IsNullOrEmpty(groupName))
+            if (regex == null || match == null || string.IsNullOrWhiteSpace(groupName))
             {
                 group = null;
                 return false;

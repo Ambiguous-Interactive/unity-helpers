@@ -149,7 +149,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                         initialBrowsePath,
                         ""
                     );
-                    if (!string.IsNullOrEmpty(selectedPathSys))
+                    if (!string.IsNullOrWhiteSpace(selectedPathSys))
                     {
                         string processedPath = selectedPathSys.SanitizePath();
                         if (processedPath.StartsWith(Application.dataPath.SanitizePath()))

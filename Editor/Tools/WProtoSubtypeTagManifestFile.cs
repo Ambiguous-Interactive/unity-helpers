@@ -252,7 +252,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         /// </remarks>
         public static string PredefinedAssemblyForDirectory(string directory)
         {
-            if (string.IsNullOrEmpty(directory))
+            if (string.IsNullOrWhiteSpace(directory))
             {
                 return null;
             }
@@ -468,7 +468,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 WProtoSubtypeTagAttribute entry in assembly.GetCustomAttributes<WProtoSubtypeTagAttribute>()
             )
             {
-                if (string.IsNullOrEmpty(entry.SubTypeName) || entry.BaseType == null)
+                if (string.IsNullOrWhiteSpace(entry.SubTypeName) || entry.BaseType == null)
                 {
                     continue;
                 }
@@ -502,7 +502,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 WProtoRetiredSubtypeTagAttribute entry in assembly.GetCustomAttributes<WProtoRetiredSubtypeTagAttribute>()
             )
             {
-                if (string.IsNullOrEmpty(entry.SubTypeName) || entry.BaseType == null)
+                if (string.IsNullOrWhiteSpace(entry.SubTypeName) || entry.BaseType == null)
                 {
                     continue;
                 }
@@ -538,7 +538,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             }
 
             string full = type.FullName;
-            return string.IsNullOrEmpty(full) ? type.Name : full.Replace('+', '.');
+            return string.IsNullOrWhiteSpace(full) ? type.Name : full.Replace('+', '.');
         }
 
         /// <summary>

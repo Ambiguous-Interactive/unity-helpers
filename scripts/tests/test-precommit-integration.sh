@@ -908,6 +908,9 @@ test_precommit_llm_size_routing() {
         cp "$REPO_ROOT/.githooks/pre-commit.ps1" "$sandbox/.githooks/pre-commit.ps1"
         cp "$REPO_ROOT/scripts/git-staging-helpers.ps1" "$sandbox/scripts/git-staging-helpers.ps1"
         cp "$REPO_ROOT/scripts/lint-skill-sizes.ps1" "$sandbox/scripts/lint-skill-sizes.ps1"
+        cp "$REPO_ROOT/scripts/"{lint_skill_sizes,cli_encoding,csharp_sources}.py "$sandbox/scripts/"
+        mkdir -p "$sandbox/scripts/python~"
+        cp "$REPO_ROOT/scripts/python~/"{pyproject.toml,uv.lock} "$sandbox/scripts/python~/"
         cp "$REPO_ROOT/scripts/git-path-helpers.ps1" "$sandbox/scripts/git-path-helpers.ps1"
         # Only unrelated consistency/version tools are neutralized; the size oracle is real.
         printf 'Param([switch]$Fix)\nexit 0\n' > "$sandbox/scripts/lint-llm-instructions.ps1"

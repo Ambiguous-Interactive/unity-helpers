@@ -158,7 +158,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 {
                     string name = platformOverridesElement?.platformName?.Trim();
                     if (
-                        !string.IsNullOrEmpty(name)
+                        !string.IsNullOrWhiteSpace(name)
                         && Array.IndexOf(knownNames, name) < 0
                         && !string.Equals(
                             name,
@@ -370,7 +370,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             for (int i = 0; i < platformOverrides.Count; ++i)
             {
                 string name = platformOverrides[i]?.platformName?.Trim();
-                if (!string.IsNullOrEmpty(name) && Array.IndexOf(knownNames, name) < 0)
+                if (!string.IsNullOrWhiteSpace(name) && Array.IndexOf(knownNames, name) < 0)
                 {
                     EditorGUILayout.HelpBox(
                         $"Unknown platform name '{name}'. It will be passed to Unity importer as-is.",
@@ -485,7 +485,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         private void AddPlatformIfMissing(string name)
         {
-            if (string.IsNullOrEmpty(name))
+            if (string.IsNullOrWhiteSpace(name))
             {
                 return;
             }
@@ -496,7 +496,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 PlatformOverrideEntry p = platformOverrides[i];
                 string existing = p?.platformName;
                 if (
-                    !string.IsNullOrEmpty(existing)
+                    !string.IsNullOrWhiteSpace(existing)
                     && string.Equals(existing.Trim(), name, StringComparison.Ordinal)
                 )
                 {

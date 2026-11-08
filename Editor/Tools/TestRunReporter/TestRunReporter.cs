@@ -354,7 +354,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         /// <param name="testsToRun">The test tree that will be executed.</param>
         void ICallbacks.RunStarted(ITestAdaptor testsToRun)
         {
-            if (string.IsNullOrEmpty(_owner))
+            if (string.IsNullOrWhiteSpace(_owner))
             {
                 return;
             }
@@ -390,7 +390,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         void ICallbacks.RunFinished(ITestResultAdaptor result)
         {
             DateTime finishedUtc = DateTime.UtcNow;
-            if (string.IsNullOrEmpty(_owner) || !_runStarted)
+            if (string.IsNullOrWhiteSpace(_owner) || !_runStarted)
             {
                 return;
             }
