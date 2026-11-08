@@ -255,10 +255,16 @@ jobs:
         with:
           node-version: "22"
           cache: npm
+          cache-dependency-path: package.json
 
-      - name: Install locked Node tools
+      - name: Install Node tools
         shell: pwsh
-        run: npm ci --ignore-scripts --no-audit --no-fund
+        run: |
+          if (Test-Path package-lock.json) {
+            npm ci --ignore-scripts --no-audit --no-fund
+          } else {
+            npm install --ignore-scripts --no-audit --no-fund
+          }
 
       - name: Setup Python tooling
         uses: ./.github/actions/setup-python-tools

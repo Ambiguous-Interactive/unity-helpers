@@ -258,7 +258,8 @@ def test_actual_cli_runs_from_foreign_directory(repository: Path, tmp_path: Path
     assert b"EOL issues: 1" in result.stdout
 
 
-def test_compatibility_launcher_binds_multiple_paths(repository: Path) -> None:
+@pytest.mark.parametrize("transport", ["file", "array"])
+def test_compatibility_launcher_binds_multiple_paths(repository: Path, transport: str) -> None:
     shell = shutil.which("pwsh")
     assert shell is not None, "PowerShell is required to qualify the retained launcher"
     add(repository, "first.cs", b"a\r\n")
@@ -272,24 +273,44 @@ def test_compatibility_launcher_binds_multiple_paths(repository: Path) -> None:
     project.mkdir()
     for name in ("pyproject.toml", "uv.lock"):
         shutil.copy2(ROOT / "scripts/python~" / name, project / name)
-    result = subprocess.run(
-        [
+    command = [
+        shell,
+        "-NoProfile",
+        "-File",
+        str(scripts / "check-eol.ps1"),
+        "-Paths",
+        "first.cs",
+        "last.cs",
+        "-VerboseOutput",
+    ]
+    expected_subjects = 2
+    if transport == "array":
+        add(repository, "-selected.cs", b"a\r\n")
+        invocation = scripts / "invoke-wrapper.ps1"
+        invocation.write_text(
+            "param([string]$Checker)\n"
+            "& $Checker -Paths @('first.cs', '-selected.cs', 'last.cs') -VerboseOutput\n"
+            "exit $LASTEXITCODE\n",
+            encoding="utf-8",
+        )
+        command = [
             shell,
             "-NoProfile",
             "-File",
+            str(invocation),
+            "-Checker",
             str(scripts / "check-eol.ps1"),
-            "-Paths",
-            "first.cs",
-            "last.cs",
-            "-VerboseOutput",
-        ],
+        ]
+        expected_subjects = 3
+    result = subprocess.run(
+        command,
         cwd=repository.parent,
         capture_output=True,
         check=False,
         timeout=60,
     )
     assert result.returncode == 3, result.stdout + result.stderr
-    assert b"Inspected text files: 2" in result.stdout
+    assert f"Inspected text files: {expected_subjects}".encode() in result.stdout
     assert b"last.cs" in result.stdout
 
 

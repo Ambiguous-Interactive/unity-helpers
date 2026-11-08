@@ -524,7 +524,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             for (int key = 0; key < count; ++key)
             {
                 object value = new object();
-                map.TrySet(key, value);
+                Assert.IsTrue(map.TrySet(key, value), $"Initial insertion failed for key {key}.");
                 expected.Add(key, value);
             }
             for (int key = 1; key < count; key += 3)
@@ -538,7 +538,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             while (map.Capacity == capacity)
             {
                 object value = new object();
-                map.TrySet(next, value);
+                Assert.IsTrue(map.TrySet(next, value), $"Growth insertion failed for key {next}.");
                 expected.Add(next, value);
                 ++next;
             }

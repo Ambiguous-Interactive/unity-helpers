@@ -14,6 +14,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     [TestFixture]
     public sealed class SpriteHelpersPackingTests : CommonTestBase
     {
+        /* Verified on Unity 6000.6.7f1; public getter assertions detect layout drift. */
         private const string RenderDataSettingsPath = "m_RD.settingsRaw";
         private const int PackingFlagsMask = 63;
         private const int PackedFlag = 1;

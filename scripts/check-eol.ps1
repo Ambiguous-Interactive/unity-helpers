@@ -15,6 +15,9 @@ $arguments = @(
 if ($VerboseOutput) { $arguments += '--verbose' }
 $selectedPaths = @($Paths) + @($AdditionalPaths)
 $selectedPaths = @($selectedPaths | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+$selectedPaths = @($selectedPaths | ForEach-Object {
+    if ($_.StartsWith('-', [StringComparison]::Ordinal)) { './' + $_ } else { $_ }
+})
 if ($selectedPaths.Count -gt 0) { $arguments += '--paths'; $arguments += $selectedPaths }
 & uv @arguments
 exit $LASTEXITCODE

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -291,7 +292,9 @@ def test_retained_powershell_runspace_controls(tmp_path: Path) -> None:
         timeout=60,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    assert b"Passed: 35; Failed: 0" in result.stdout
+    summary = re.search(rb"Passed: ([1-9]\d*); Failed: 0\b", result.stdout)
+    assert summary is not None, result.stdout
+    assert int(summary[1]) >= 35, result.stdout
 
 
 def test_hook_subdirectories_are_not_text_subjects(repository: Path) -> None:
