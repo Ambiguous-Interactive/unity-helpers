@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import json
+import ntpath
 import os
 import shutil
 import subprocess
 import sys
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import cast
 
 import pytest
@@ -17,6 +18,25 @@ import extract_code_samples as extractor
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts/extract_code_samples.py"
+
+
+@pytest.mark.parametrize(
+    ("source", "root", "expected"),
+    [
+        (r"D:\repo\docs\example.md", r"D:\repo", r"docs\example.md"),
+        (r"C:\samples\example.md", r"D:\repo", r"C:\samples\example.md"),
+        (r"C:\samples\example.md", r"c:\samples", "example.md"),
+        (r"\\host\share\example.md", r"D:\repo", r"\\host\share\example.md"),
+        (r"\\host\share\docs\example.md", r"\\host\share", r"docs\example.md"),
+    ],
+)
+def test_source_paths_preserve_identity_across_windows_volumes(
+    source: str, root: str, expected: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with monkeypatch.context() as patch:
+        patch.setattr(os.path, "relpath", ntpath.relpath)
+        actual = extractor.relative_or_absolute(PureWindowsPath(source), PureWindowsPath(root))
+    assert actual == expected
 
 
 @pytest.mark.parametrize("ending", ["\n", "\r\n", "\r"])
@@ -43,6 +63,36 @@ def test_multiple_blocks_report_actual_opening_lines(ending: str) -> None:
         ("cs", 11),
     ]
     assert samples[-1].code == "public struct Last { }\n"
+
+
+@pytest.mark.parametrize(
+    ("content", "expected"),
+    [
+        (
+            "````markdown\n```cs\npublic class Inner {}\n```\n````\nprose\n```cs\npublic class Last {}\n```",
+            [
+                ("markdown", 1, "```cs\npublic class Inner {}\n```\n"),
+                ("cs", 7, "public class Last {}\n"),
+            ],
+        ),
+        ("~~~cs\npublic class Example {}\n~~~~", [("cs", 1, "public class Example {}\n")]),
+        ("prose ```cs\nignored\n", []),
+        ("```cs\nvalue.Run();\n``` suffix\n```", [("cs", 1, "value.Run();\n``` suffix\n")]),
+        ("```cs\n~~~\n```", [("cs", 1, "~~~\n")]),
+        ("````cs\n```\n````", [("cs", 1, "```\n")]),
+        ("   ```cs\nvalue.Run();\n  ```  \t", [("cs", 1, "value.Run();\n")]),
+        ("    ```cs\nignored\n", []),
+        ("```cs metadata\nvalue.Run();\n```", [("cs", 1, "value.Run();\n")]),
+        ("```cs\nvalue.Run();", [("cs", 1, "value.Run();")]),
+    ],
+)
+def test_fences_preserve_marker_boundaries_and_source_content(
+    content: str, expected: list[tuple[str, int, str]]
+) -> None:
+    samples = extractor.extract_code_blocks(content, Path("examples.md"))
+    assert [(sample.language, sample.line_number, sample.code) for sample in samples] == expected
+    for sample in samples:
+        assert sample.raw in content
 
 
 @pytest.mark.parametrize(
@@ -229,7 +279,7 @@ def test_default_repository_scan_retains_real_csharp_subjects(tmp_path: Path) ->
     assert extractor.main(["--extract-only", "--output-dir", str(output)]) == 0
     report = cast(
         "extractor.ExtractionReport",
-        json.loads((output / "extraction-report.json").read_text()),
+        json.loads((output / "extraction-report.json").read_text(encoding="utf-8")),
     )
     assert report["totalFiles"] > 0
     assert report["totalSamples"] > 0

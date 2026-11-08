@@ -128,6 +128,20 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
             );
         }
 
+        [TestCase("Shifted(\"x\", nameof(Run), \"y\");", 0)]
+        [TestCase("Shifted(\"x\", nameof(Run), b: \"y\");", 1)]
+        [TestCase("Shifted(a: \"x\", caller: nameof(Run), b: \"y\");", 1)]
+        public void LaterArgumentsKeepTheirParameterBindings(string body, int expected)
+        {
+            Assert.That(
+                Analyze(
+                    body,
+                    "private void Shifted(string a = null, [CallerMemberName] string caller = null, string b = null) {}"
+                ).Length,
+                Is.EqualTo(expected)
+            );
+        }
+
         [Test]
         public void ForwardedCallerNamesRemainAllowed()
         {

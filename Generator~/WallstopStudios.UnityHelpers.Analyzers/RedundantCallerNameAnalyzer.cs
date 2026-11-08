@@ -60,6 +60,14 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             {
                 return;
             }
+            SeparatedSyntaxList<ArgumentSyntax> allArguments = arguments.Arguments;
+            for (int index = allArguments.IndexOf(syntax) + 1; index < allArguments.Count; ++index)
+            {
+                if (allArguments[index].NameColon == null)
+                {
+                    return;
+                }
+            }
             InvocationExpressionSyntax omitted = invocation.WithArgumentList(
                 arguments.WithArguments(arguments.Arguments.Remove(syntax))
             );

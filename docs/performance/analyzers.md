@@ -1232,7 +1232,8 @@ public class CallerExample
 matches an ordinary calling method and whose removal selects the same overload.
 It does not rewrite code. Generated sources, local functions, implicit arguments,
 forwarded caller variables, different labels, dependent caller-argument expressions,
-and changes to overload selection are excluded. Properties and constructors are outside this rule's scope. Keep explicit
+later positional arguments, and changes to overload selection are excluded. Later named
+arguments retain their parameter bindings. Properties and constructors are outside this rule's scope. Keep explicit
 operation labels and member names used as data; they serve a different contract.
 
 The diagnostic is a suppressible warning by default. The package promotes it to an

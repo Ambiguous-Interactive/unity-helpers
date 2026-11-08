@@ -11,7 +11,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import TypedDict
 
 from cli_encoding import configure_output
@@ -21,7 +21,8 @@ EXCLUDED_DIRECTORIES = frozenset(
     {"node_modules", ".git", "Library", "Temp", "obj", "artifacts", "Logs"}
 )
 PARTIAL_MARKERS = ("// ...", "/* ... */", "// (existing code)", "// (omitted)", "...")
-CODE_BLOCK = re.compile(r"`{3,}(\w+)?\n([\s\S]*?)`{3,}", re.ASCII)
+OPENING_FENCE = re.compile(r" {0,3}(`{3,}|~{3,})([^\n]*)", re.ASCII)
+CLOSING_FENCE = re.compile(r" {0,3}(`{3,}|~{3,})[ \t]*", re.ASCII)
 COMMON_USINGS = """using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -124,16 +125,35 @@ def raise_walk_error(error: OSError) -> None:
 
 
 def extract_code_blocks(content: str, path: Path) -> list[CodeSample]:
-    """Read fence positions once, normalizing CRLF and CR without double-counting blocks."""
+    """Read line-delimited matching fences, preserving normalized source content and positions."""
     normalized = content.replace("\r\n", "\n").replace("\r", "\n")
     samples: list[CodeSample] = []
-    previous_end = 0
-    line_number = 1
-    for match in CODE_BLOCK.finditer(normalized):
-        line_number += normalized.count("\n", previous_end, match.start())
-        samples.append(CodeSample((match[1] or "").lower(), match[2], path, line_number, match[0]))
-        line_number += match[0].count("\n")
-        previous_end = match.end()
+    lines = normalized.splitlines(keepends=True)
+    index = 0
+    while index < len(lines):
+        opening = OPENING_FENCE.fullmatch(lines[index].rstrip("\n"))
+        if opening is None or (opening[1][0] == "`" and "`" in opening[2]):
+            index += 1
+            continue
+        marker = opening[1]
+        info = opening[2].strip().split(maxsplit=1)
+        language = info[0].lower() if info else ""
+        end = index + 1
+        while end < len(lines):
+            closing = CLOSING_FENCE.fullmatch(lines[end].rstrip("\n"))
+            if (
+                closing is not None
+                and closing[1][0] == marker[0]
+                and len(closing[1]) >= len(marker)
+            ):
+                break
+            end += 1
+        code = "".join(lines[index + 1 : end])
+        raw = "".join(lines[index : min(end + 1, len(lines))])
+        if end < len(lines):
+            raw = raw.removesuffix("\n")
+        samples.append(CodeSample(language, code, path, index + 1, raw))
+        index = end + 1
     return samples
 
 
@@ -153,8 +173,16 @@ def is_standalone_snippet(code: str) -> bool:
     return has_statements and re.search(r"\bclass\s+\w+", code, re.ASCII) is None
 
 
+def relative_or_absolute(path: PurePath, root: PurePath) -> str:
+    """Keep relative source identities where possible, including cross-volume inputs."""
+    try:
+        return os.path.relpath(path, root)
+    except ValueError:
+        return str(path)
+
+
 def sample_name(path: Path, line: int) -> str:
-    relative = os.path.relpath(path, ROOT).replace("\\", "/")
+    relative = relative_or_absolute(path, ROOT).replace("\\", "/")
     base = re.sub(r"\.md$", "", relative.replace("/", "_"), flags=re.IGNORECASE)
     return f"{re.sub(r'[^a-zA-Z0-9_-]', '_', base)}_L{line}"
 
@@ -226,12 +254,12 @@ def generate_report(samples: list[CodeSample], output: Path) -> ExtractionReport
         "partialSamples": len(samples) - complete,
         "samples": [
             {
-                "file": os.path.relpath(sample.file_path, ROOT),
+                "file": relative_or_absolute(sample.file_path, ROOT),
                 "line": sample.line_number,
                 "language": sample.language,
                 "isComplete": sample.is_complete,
                 "generatedFile": (
-                    os.path.relpath(sample.generated_file, output)
+                    relative_or_absolute(sample.generated_file, output)
                     if sample.generated_file
                     else None
                 ),
@@ -288,7 +316,7 @@ def main(argv: list[str] | None = None) -> int:
                 selected = [sample for sample in samples if sample.file_path == path]
                 complete = sum(sample.is_complete for sample in selected)
                 print(
-                    f"{os.path.relpath(path, scan_root)}: {complete} complete, {len(selected) - complete} partial"
+                    f"{relative_or_absolute(path, scan_root)}: {complete} complete, {len(selected) - complete} partial"
                 )
         if not samples:
             print("No C# code samples found in documentation!", file=sys.stderr)
