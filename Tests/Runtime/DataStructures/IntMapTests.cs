@@ -515,6 +515,58 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
         }
 
+        [TestCase(64)]
+        [TestCase(16384)]
+        public void GrowthAfterDenseIndexMovesPreservesReferenceValuesAndEveryView(int count)
+        {
+            IntMap<object> map = new(0);
+            Dictionary<int, object> expected = new();
+            for (int key = 0; key < count; ++key)
+            {
+                object value = new object();
+                map.TrySet(key, value);
+                expected.Add(key, value);
+            }
+            for (int key = 1; key < count; key += 3)
+            {
+                Assert.IsTrue(map.Remove(key, out object removed));
+                Assert.AreSame(expected[key], removed);
+                expected.Remove(key);
+            }
+            int capacity = map.Capacity;
+            int next = count;
+            while (map.Capacity == capacity)
+            {
+                object value = new object();
+                map.TrySet(next, value);
+                expected.Add(next, value);
+                ++next;
+            }
+            Assert.That(map.Count, Is.EqualTo(expected.Count));
+            HashSet<int> keys = new();
+            HashSet<object> values = new();
+            foreach (KeyValuePair<int, object> pair in map)
+            {
+                Assert.IsTrue(expected.TryGetValue(pair.Key, out object value));
+                Assert.AreSame(value, pair.Value);
+                Assert.IsTrue(keys.Add(pair.Key));
+                Assert.IsTrue(values.Add(pair.Value));
+            }
+            Assert.That(keys.Count, Is.EqualTo(expected.Count));
+            foreach (int key in map.Keys)
+            {
+                Assert.IsTrue(keys.Remove(key));
+                Assert.IsTrue(map.TryGet(key, out object value));
+                Assert.AreSame(expected[key], value);
+            }
+            foreach (object value in map.Values)
+            {
+                Assert.IsTrue(values.Remove(value));
+            }
+            Assert.That(keys, Is.Empty);
+            Assert.That(values, Is.Empty);
+        }
+
         [Test]
         public void GrowthThroughEveryDoublingPreservesContents()
         {

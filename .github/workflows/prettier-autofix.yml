@@ -24,6 +24,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Setup Python tooling
+        uses: ./.github/actions/setup-python-tools
+
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
@@ -84,8 +87,7 @@ jobs:
         run: npm run lint:markdown
 
       - name: Enforce EOL (CRLF) and No BOM
-        shell: pwsh
-        run: ./scripts/check-eol.ps1 -VerboseOutput
+        run: uv run --project scripts/python~ --locked --no-dev python scripts/check_eol.py --verbose
 
   autofix_fork:
     name: Fork PR bot formatting PR (Dependabot only)

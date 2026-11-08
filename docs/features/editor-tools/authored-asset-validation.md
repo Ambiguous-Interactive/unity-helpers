@@ -337,3 +337,27 @@ queries and script-type discovery remain separate from this field API.
 Direct mapping children exclude keys inside sequence elements, including bare sequence markers.
 Descent within a mapping contained in an element still reads that mapping’s own children.
 Comment-only lines do not end a field or sequence block.
+
+### Block reads and source positions
+
+Use `ReadBlockItems(lines, entry)` to copy a field's direct block-sequence elements into a list.
+Each element keeps its one-based `LineNumber` and the text after its dash. `CountBlockItems`
+counts markers at every depth below the field, including serialized dictionary key/value sequences.
+Pass `includeNested: false` to count only direct elements. Blank lines, comments, nested sequences, inline values such as `[]`,
+and block-scalar text do not become direct elements. Invalid source spans return an empty result;
+spans extending past the supplied lines stop at the end of the source.
+
+`NestedBlockItems(lines, document, sequence, field)` collects a named direct sequence beneath a
+mapping field or from each mapping element of an outer sequence. It preserves source order and ignores fields nested more
+deeply. The outer entry must belong to the supplied document. Two matching fields in the same
+outer element make the whole read return an empty result. Pass the same lines used to parse the
+document; these helpers do not load or write assets.
+
+`IndentOf(line)` counts leading spaces. `KeyColumnOf(line)` gives the zero-based content column
+after an optional sequence marker. A bare marker advances by `ColumnStep`, Unity's two-space
+mapping step. `KeyOf(line)` trims the line and removes its optional sequence marker, retaining
+mapping values and quotes. These helpers match the consumer's entry-text convention; `KeyOf`
+does not parse out just the mapping name. Null lines return zero columns and empty text.
+
+These are Unity text helpers, not a general YAML parser. Inline collections are not expanded.
+Comments and literal block-scalar contents never contribute to block-item counts.

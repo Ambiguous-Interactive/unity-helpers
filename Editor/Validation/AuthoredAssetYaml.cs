@@ -40,7 +40,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         /// <summary>The value Unity writes for a sequence with no elements.</summary>
         public const string EmptySequence = "[]";
 
-        private const int FieldIndent = 2;
+        /// <summary>The number of spaces Unity uses for one mapping level.</summary>
+        public const int ColumnStep = 2;
 
         /// <summary>The extensions Unity writes authored objects into.</summary>
         public static readonly IReadOnlyList<string> AuthoredExtensions = new[]
@@ -293,36 +294,246 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             AuthoredAssetEntry entry
         )
         {
-            if (lines == null)
+            if (!CanReadBlock(lines, entry))
             {
                 yield break;
             }
 
-            for (int line = entry.LineNumber; line < entry.EndLineNumber - 1; ++line)
+            int end = Math.Min(entry.EndLineNumber - 1, lines.Count);
+            for (int line = entry.LineNumber; line < end; ++line)
             {
-                if (lines.Count <= line)
-                {
-                    yield break;
-                }
-
                 string text = lines[line];
-                int textLength = text.Length;
-                int indent = 0;
-                while (indent < textLength && text[indent] == ' ')
-                {
-                    ++indent;
-                }
-
-                if (indent != entry.Indent || textLength <= indent || text[indent] != '-')
+                if (string.IsNullOrWhiteSpace(text))
                 {
                     continue;
                 }
-
+                int indent = LeadingSpaces(text);
+                if (indent != entry.Indent || text.Length <= indent || text[indent] != '-')
+                {
+                    continue;
+                }
+                int valueStart = indent + 1;
+                if (valueStart < text.Length && text[valueStart] != ' ')
+                {
+                    continue;
+                }
                 yield return new AuthoredSequenceElement(
                     line + 1,
-                    text.Substring(indent + 1).Trim()
+                    text.Substring(valueStart).Trim()
                 );
             }
+        }
+
+        /// <summary>Copies direct block-sequence elements into an independent list.</summary>
+        /// <param name="lines">The same source lines used to parse the entry.</param>
+        /// <param name="entry">The sequence field, with a one-based source span.</param>
+        /// <returns>The direct elements in source order, or an empty list for an invalid span or inline value.</returns>
+        public static IReadOnlyList<AuthoredSequenceElement> ReadBlockItems(
+            IReadOnlyList<string> lines,
+            AuthoredAssetEntry entry
+        )
+        {
+            List<AuthoredSequenceElement> items = new();
+            foreach (AuthoredSequenceElement element in EnumerateSequenceElements(lines, entry))
+            {
+                items.Add(element);
+            }
+            return items;
+        }
+
+        /// <summary>Counts block-sequence markers beneath a field, including nested markers by default.</summary>
+        /// <param name="lines">The same source lines used to parse the entry.</param>
+        /// <param name="entry">The field whose source span to count.</param>
+        /// <param name="includeNested">Whether to include deeper sequences as well as direct elements.</param>
+        /// <returns>The marker count, excluding comments and literal block-scalar contents.</returns>
+        public static int CountBlockItems(
+            IReadOnlyList<string> lines,
+            AuthoredAssetEntry entry,
+            bool includeNested = true
+        )
+        {
+            if (!CanReadBlock(lines, entry))
+            {
+                return 0;
+            }
+            int end = Math.Min(entry.EndLineNumber - 1, lines.Count);
+            int count = 0;
+            int scalarIndent = -1;
+            for (int index = entry.LineNumber; index < end; ++index)
+            {
+                string line = lines[index];
+                if (string.IsNullOrWhiteSpace(line))
+                {
+                    continue;
+                }
+                int indent = LeadingSpaces(line);
+                if (line[indent] == '#')
+                {
+                    continue;
+                }
+                if (0 <= scalarIndent && scalarIndent < indent)
+                {
+                    continue;
+                }
+                scalarIndent = -1;
+                bool marker =
+                    line[indent] == '-' && (line.Length == indent + 1 || line[indent + 1] == ' ');
+                int contentColumn = indent;
+                if (marker)
+                {
+                    if (entry.Indent == indent || (includeNested && entry.Indent < indent))
+                    {
+                        ++count;
+                    }
+                    contentColumn = Math.Min(indent + ColumnStep, line.Length);
+                }
+                if (line.IndexOf('|') < 0 && line.IndexOf('>') < 0)
+                {
+                    continue;
+                }
+                string content = line.Substring(contentColumn).Trim();
+                if (marker && IsBlockScalarIndicator(content))
+                {
+                    scalarIndent = indent;
+                }
+                else if (
+                    TrySplitEntry(content, out _, out string value) && IsBlockScalarIndicator(value)
+                )
+                {
+                    scalarIndent = contentColumn;
+                }
+            }
+            return count;
+        }
+
+        /// <summary>Reads a named direct sequence beneath an owned mapping or each of its sequence elements.</summary>
+        /// <param name="lines">The same source lines used to parse the document.</param>
+        /// <param name="document">The document that owns the outer sequence.</param>
+        /// <param name="sequence">The outer sequence field from that document.</param>
+        /// <param name="field">The exact nested field name, with an optional trailing colon.</param>
+        /// <returns>The nested elements in source order, or an empty list for an unknown parent or ambiguous nested field.</returns>
+        public static IReadOnlyList<AuthoredSequenceElement> NestedBlockItems(
+            IReadOnlyList<string> lines,
+            AuthoredAssetDocument document,
+            AuthoredAssetEntry sequence,
+            string field
+        )
+        {
+            if (document == null || string.IsNullOrWhiteSpace(field))
+            {
+                return Array.Empty<AuthoredSequenceElement>();
+            }
+            bool owned = false;
+            foreach (AuthoredAssetEntry entry in document.Entries.AsValueEnumerableRequired())
+            {
+                if (entry.Equals(sequence))
+                {
+                    sequence = entry;
+                    owned = true;
+                    break;
+                }
+            }
+            if (!owned)
+            {
+                return Array.Empty<AuthoredSequenceElement>();
+            }
+            if (TryDescend(document, sequence, field, out AuthoredAssetEntry nested))
+            {
+                return ReadBlockItems(lines, nested);
+            }
+            IReadOnlyList<AuthoredSequenceElement> outer = ReadBlockItems(lines, sequence);
+            int outerCount = outer.Count;
+            if (outerCount == 0)
+            {
+                return Array.Empty<AuthoredSequenceElement>();
+            }
+            AuthoredAssetEntry[] selected = new AuthoredAssetEntry[outerCount];
+            foreach (AuthoredAssetEntry entry in document.Entries.AsValueEnumerableRequired())
+            {
+                if (
+                    entry.LineNumber < outer[0].LineNumber
+                    || sequence.EndLineNumber <= entry.LineNumber
+                    || entry.Indent != sequence.Indent + ColumnStep
+                    || entry.SequenceDepth != sequence.SequenceDepth + 1
+                    || !MatchesFieldName(entry.Key, field)
+                )
+                {
+                    continue;
+                }
+                int lower = 0;
+                int upper = outerCount;
+                while (lower < upper)
+                {
+                    int middle = lower + (upper - lower) / 2;
+                    if (outer[middle].LineNumber <= entry.LineNumber)
+                    {
+                        lower = middle + 1;
+                    }
+                    else
+                    {
+                        upper = middle;
+                    }
+                }
+                int position = lower - 1;
+                if (0 < selected[position].LineNumber)
+                {
+                    return Array.Empty<AuthoredSequenceElement>();
+                }
+                selected[position] = entry;
+            }
+            List<AuthoredSequenceElement> result = new();
+            foreach (AuthoredAssetEntry entry in selected)
+            {
+                foreach (AuthoredSequenceElement item in EnumerateSequenceElements(lines, entry))
+                {
+                    result.Add(item);
+                }
+            }
+            return result;
+        }
+
+        /// <summary>Counts the leading spaces of a source line, returning zero for null.</summary>
+        public static int IndentOf(string line)
+        {
+            return line == null ? 0 : LeadingSpaces(line);
+        }
+
+        /// <summary>Returns the zero-based content column after an optional sequence marker.</summary>
+        /// <remarks>A bare marker uses the next mapping column; null returns zero.</remarks>
+        public static int KeyColumnOf(string line)
+        {
+            if (line == null)
+            {
+                return 0;
+            }
+            int indent = LeadingSpaces(line);
+            if (
+                indent < line.Length
+                && line[indent] == '-'
+                && (line.Length == indent + 1 || line[indent + 1] == ' ')
+            )
+            {
+                return indent + ColumnStep;
+            }
+            return indent;
+        }
+
+        /// <summary>Returns a trimmed source entry, removing an optional leading sequence marker.</summary>
+        /// <remarks>The returned text retains mapping values and quotes; a bare marker returns an empty string.</remarks>
+        public static string KeyOf(string line)
+        {
+            if (line == null)
+            {
+                return string.Empty;
+            }
+            string content = line.Trim();
+            if (content.Length == 1 && content[0] == '-')
+            {
+                return string.Empty;
+            }
+            return content.StartsWith("- ", StringComparison.Ordinal)
+                ? content.Substring(ColumnStep).Trim()
+                : content;
         }
 
         /// <summary>Reads the first direct field of a Unity document, without matching nested names.</summary>
@@ -342,7 +553,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 {
                     if (
                         entry.SequenceDepth == 0
-                        && entry.Indent == FieldIndent
+                        && entry.Indent == ColumnStep
                         && MatchesFieldName(entry.Key, field)
                     )
                     {
@@ -504,7 +715,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             {
                 if (
                     entry.SequenceDepth == 0
-                    && entry.Indent == FieldIndent
+                    && entry.Indent == ColumnStep
                     && MatchesFieldName(entry.Key, field)
                 )
                 {
@@ -571,7 +782,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 AuthoredAssetEntry candidate = entries[index];
                 if (
                     candidate.SequenceDepth != 0
-                    || candidate.Indent != FieldIndent
+                    || candidate.Indent != ColumnStep
                     || !MatchesFieldName(candidate.Key, field)
                 )
                 {
@@ -705,10 +916,37 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             return index;
         }
 
+        private static bool CanReadBlock(IReadOnlyList<string> lines, AuthoredAssetEntry entry)
+        {
+            if (
+                lines == null
+                || entry.LineNumber < 1
+                || lines.Count < entry.LineNumber
+                || entry.EndLineNumber <= entry.LineNumber
+                || entry.Indent < 0
+            )
+            {
+                return false;
+            }
+            string value = entry.InlineValue;
+            if (value == null)
+            {
+                return true;
+            }
+            foreach (char character in value)
+            {
+                if (!char.IsWhiteSpace(character))
+                {
+                    return character == '#';
+                }
+            }
+            return true;
+        }
+
         private static bool IsDirectChild(AuthoredAssetEntry entry, AuthoredAssetEntry parent)
         {
             return entry.SequenceDepth == parent.SequenceDepth
-                && entry.Indent == parent.Indent + FieldIndent
+                && entry.Indent == parent.Indent + ColumnStep
                 && parent.LineNumber < entry.LineNumber
                 && entry.LineNumber < parent.EndLineNumber;
         }

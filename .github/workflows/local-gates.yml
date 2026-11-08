@@ -278,6 +278,7 @@ jobs:
           scripts/tests/test_concurrent_cache_fill.py
           scripts/tests/test_workflow_expression_length.py
           scripts/tests/test_gitignore_docs.py scripts/tests/test_drawer_multiobject.py
+          scripts/tests/test_check_eol.py scripts/tests/test_lint_error_codes.py
           scripts/tests/test_skill_sizes.py -q
 
       - name: Verify compiler payload publication on Windows

@@ -77,6 +77,19 @@ For metadata JSON, run `uv run --project scripts/python~ --locked --no-dev pytho
 The three PowerShell commands remain compatibility entry points. Run `npm run test:lint-doc-counts`
 for count, encoding, newline, read-only, and wrapper exit-code controls.
 
+`npm run eol:check` runs the typed Python line-ending checker. It checks worktree line endings
+and UTF-8 BOMs, plus committed text blobs whose CR bytes would make fresh clones appear dirty.
+Use `-- --paths <path> <path>` for literal file scopes. Missing selected text files, linked inputs,
+and failed Git reads fail explicitly. A full scan requires nonempty tracked text input.
+`npm run test:check-eol` runs the Git-blob, worktree, path-scope and compatibility-launcher controls.
+The two PowerShell entry points remain available for existing hooks and callers.
+
+`npm run validate:lint-error-codes` harvests error-code prefixes from lint scripts, their controls,
+and Git hooks, including typed Python names. It sends one batch through the repository's actual
+cspell configuration and prints source locations plus a root-word patch for rejected families.
+`npm run test:validate-lint-error-codes` also runs the retained PowerShell runspace controls, which
+continue to protect the fixture host while other PowerShell suites still use it.
+
 Release payload staging, archive creation, and Unity metadata generation run through uv. Install uv 0.13.7, then use:
 
 ```bash
