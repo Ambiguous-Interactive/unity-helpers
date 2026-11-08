@@ -258,7 +258,9 @@ def test_cli_reports_and_generates_csharp_only(tmp_path: Path, mode: str) -> Non
     assert len(files) == (0 if mode == "--extract-only" else 2)
     assert sum(sample["generatedFile"] is not None for sample in report["samples"]) == len(files)
     if mode == "--verbose":
-        assembly = json.loads(next((tmp_path / "artifacts").glob("*.asmdef")).read_text())
+        assembly = json.loads(
+            next((tmp_path / "artifacts").glob("*.asmdef")).read_text(encoding="utf-8")
+        )
         assert assembly["includePlatforms"] == ["Editor"]
         assert assembly["autoReferenced"] is False
 
@@ -270,6 +272,28 @@ def test_empty_csharp_corpus_fails_but_retains_report(tmp_path: Path, content: s
     assert result.returncode == 1
     assert "No C# code samples" in result.stderr
     assert read_report(tmp_path)["totalSamples"] == 0
+
+
+@pytest.mark.parametrize(
+    "failure", [OSError("blocked"), UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid")]
+)
+def test_unreadable_markdown_reports_source_path(
+    tmp_path: Path,
+    failure: OSError | UnicodeError,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    source = tmp_path / "README.md"
+    source.write_text("```cs\nvalue.Run();\n```\n", encoding="utf-8")
+
+    def fail_read(_path: Path, *_args: object, **_kwargs: object) -> str:
+        raise failure
+
+    monkeypatch.setattr(Path, "read_text", fail_read)
+    output = tmp_path / "artifacts"
+    assert extractor.main(["--scan-root", str(tmp_path), "--output-dir", str(output)]) == 1
+    assert str(source) in capsys.readouterr().err
+    assert not output.exists()
 
 
 def test_generation_refuses_colliding_names_before_writes(tmp_path: Path) -> None:

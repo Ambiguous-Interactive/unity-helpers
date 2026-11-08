@@ -271,7 +271,11 @@ def main(argv: list[str] | None = None) -> int:
         samples: list[CodeSample] = []
         total_blocks = 0
         for path in files:
-            blocks = extract_code_blocks(path.read_text(encoding="utf-8-sig"), path)
+            try:
+                text = path.read_text(encoding="utf-8-sig")
+            except (OSError, UnicodeError) as error:
+                raise ValueError(f"Cannot read {path}: {error}") from error
+            blocks = extract_code_blocks(text, path)
             total_blocks += len(blocks)
             for block in blocks:
                 if block.language not in {"csharp", "cs"}:

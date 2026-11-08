@@ -18,7 +18,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             map.Clear();
             for (int key = 1; key <= count; ++key)
             {
-                map.TrySet(key, key);
+                if (!map.TrySet(key, key))
+                {
+                    Assert.Fail($"Insertion failed for key {key}.");
+                }
             }
         }
 
