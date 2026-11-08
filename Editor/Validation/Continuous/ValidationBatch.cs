@@ -95,7 +95,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             List<IValidationRule> rules = DiscoverRules(problems);
             ValidationSuppressions suppressions = ReadSuppressions(
                 suppressionsPath,
-                commandLine != null && Array.IndexOf(commandLine, SuppressionsArgument) >= 0,
+                commandLine != null && 0 <= Array.IndexOf(commandLine, SuppressionsArgument),
                 problems
             );
 
@@ -110,7 +110,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             string json = ValidationReport.ToJson(run, suppressions);
             if (
                 commandLine != null
-                && Array.IndexOf(commandLine, OutputArgument) >= 0
+                && 0 <= Array.IndexOf(commandLine, OutputArgument)
                 && !TryWrite(outputPath, json, out string failure)
             )
             {
