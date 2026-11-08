@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     using UnityEngine;
     using UnityEngine.Rendering;
     using UnityEngine.UIElements;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Validation.Continuous;
     using WallstopStudios.UnityHelpers.Tests.Core;
 
@@ -109,6 +110,33 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             ValidationPreferences.Enabled = true;
             Assert.IsTrue(window != null);
             Assert.IsTrue(window.rootVisualElement.Q<Button>("validate-project") != null);
+        }
+
+        [TestCase(false, ValidationSeverity.Info)]
+        [TestCase(true, ValidationSeverity.Info)]
+        [TestCase(false, ValidationSeverity.Warning)]
+        [TestCase(true, ValidationSeverity.Warning)]
+        [TestCase(false, ValidationSeverity.Error)]
+        [TestCase(true, ValidationSeverity.Error)]
+        public void BuildGateCommandLinePreservesOptionalSuppressions(
+            bool hasSuppressions,
+            ValidationSeverity severity
+        )
+        {
+            string[] arguments = ValidationBuildGate.CreateCommandLine(severity, hasSuppressions);
+            Assert.AreEqual(
+                severity,
+                ValidationBatch.ParseSeverity(
+                    Helpers.GetCommandLineArgument(arguments, ValidationBatch.FailOnArgument),
+                    (ValidationSeverity)(-1)
+                )
+            );
+            string path = Helpers.GetCommandLineArgument(
+                arguments,
+                ValidationBatch.SuppressionsArgument
+            );
+            Assert.AreEqual(hasSuppressions ? ValidationBuildGate.SuppressionsFile : null, path);
+            Assert.That(arguments, Has.None.EqualTo(string.Empty));
         }
 
         [Test]
