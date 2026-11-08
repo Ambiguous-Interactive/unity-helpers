@@ -15,14 +15,13 @@ from pathlib import Path, PurePath
 from typing import TypedDict
 
 from cli_encoding import configure_output
+from markdown_it import MarkdownIt
 
 ROOT = Path(__file__).resolve().parents[1]
 EXCLUDED_DIRECTORIES = frozenset(
     {"node_modules", ".git", "Library", "Temp", "obj", "artifacts", "Logs"}
 )
 PARTIAL_MARKERS = ("// ...", "/* ... */", "// (existing code)", "// (omitted)", "...")
-OPENING_FENCE = re.compile(r" {0,3}(`{3,}|~{3,})([^\n]*)", re.ASCII)
-CLOSING_FENCE = re.compile(r" {0,3}(`{3,}|~{3,})[ \t]*", re.ASCII)
 COMMON_USINGS = """using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -125,35 +124,18 @@ def raise_walk_error(error: OSError) -> None:
 
 
 def extract_code_blocks(content: str, path: Path) -> list[CodeSample]:
-    """Read line-delimited matching fences, preserving normalized source content and positions."""
+    """Read CommonMark fences, retaining source spans and normalized container-free code."""
     normalized = content.replace("\r\n", "\n").replace("\r", "\n")
+    lines = normalized.split("\n")
     samples: list[CodeSample] = []
-    lines = normalized.splitlines(keepends=True)
-    index = 0
-    while index < len(lines):
-        opening = OPENING_FENCE.fullmatch(lines[index].rstrip("\n"))
-        if opening is None or (opening[1][0] == "`" and "`" in opening[2]):
-            index += 1
+    for token in MarkdownIt("commonmark").parse(normalized):
+        if token.type != "fence" or token.map is None:
             continue
-        marker = opening[1]
-        info = opening[2].strip().split(maxsplit=1)
+        start, end = token.map
+        info = token.info.strip().split(maxsplit=1)
         language = info[0].lower() if info else ""
-        end = index + 1
-        while end < len(lines):
-            closing = CLOSING_FENCE.fullmatch(lines[end].rstrip("\n"))
-            if (
-                closing is not None
-                and closing[1][0] == marker[0]
-                and len(closing[1]) >= len(marker)
-            ):
-                break
-            end += 1
-        code = "".join(lines[index + 1 : end])
-        raw = "".join(lines[index : min(end + 1, len(lines))])
-        if end < len(lines):
-            raw = raw.removesuffix("\n")
-        samples.append(CodeSample(language, code, path, index + 1, raw))
-        index = end + 1
+        raw = "\n".join(lines[start:end])
+        samples.append(CodeSample(language, token.content, path, start + 1, raw))
     return samples
 
 

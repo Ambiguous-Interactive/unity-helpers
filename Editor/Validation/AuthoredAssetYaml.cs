@@ -9,7 +9,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
     using System.Collections.Generic;
     using System.Globalization;
     using System.IO;
-    using System.Text;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Utils;
 
@@ -20,7 +19,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
     /// <remarks>
     /// Reading rather than loading, because opening a scene runs every <c>OnValidate</c> in it, so
     /// inspecting dirties it and closing prompts for a save -- and a gate must not mutate what it
-    /// measures. Nothing here touches <c>UnityEditor</c>. See
+    /// measures. <see cref="AssetName"/> uses AssetDatabase metadata and requires Unity's main thread;
+    /// parsing reads require no editor APIs. No helper loads assets. See
     /// <see href="https://github.com/Ambiguous-Interactive/unity-helpers/blob/main/docs/features/editor-tools/authored-asset-validation.md">Authored Asset Validation</see>.
     /// </remarks>
     public static partial class AuthoredAssetYaml
@@ -728,27 +728,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             {
                 return string.Empty;
             }
-            using PooledResource<StringBuilder> lease = Buffers.StringBuilder.Get(
-                out StringBuilder builder
-            );
-            builder.Append(parent.InlineValue);
-            foreach (AuthoredAssetEntry entry in document.Entries.AsValueEnumerableRequired())
-            {
-                if (
-                    !IsDirectChild(entry, parent)
-                    || string.Equals(entry.Key, "serializedVersion", StringComparison.Ordinal)
-                    || string.IsNullOrEmpty(entry.InlineValue)
-                )
-                {
-                    continue;
-                }
-                if (0 < builder.Length)
-                {
-                    builder.Append(' ');
-                }
-                builder.Append(entry.InlineValue);
-            }
-            return builder.ToString();
+            return JoinDirectChildValues(document.Entries, parent);
         }
 
         internal static bool TryGetOnlyDirectField(

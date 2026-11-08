@@ -406,6 +406,7 @@ field, or after a sequence marker. It validates the mapping and refuses quoted s
 multiple mappings, and trailing text other than a comment. A missing file ID is a failure.
 
 `AssetName(guid)` reads the asset filename from Unity's GUID metadata without loading the asset.
+Call it on Unity's main thread; the parsing helpers require no editor API calls.
 An unknown GUID remains the label; a blank input returns an empty string. `AssetsRoot`,
 `SceneExtensions`, `AssetExtensions`, and `AllExtensions` expose the authored file groups.
 `MonoBehaviourType`, `TransformType`, and `RectTransformType` name their serialized document roots.

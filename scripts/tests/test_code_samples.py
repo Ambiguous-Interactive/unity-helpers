@@ -95,6 +95,33 @@ def test_fences_preserve_marker_boundaries_and_source_content(
         assert sample.raw in content
 
 
+@pytest.mark.parametrize("separator", ["\v", "\f", "\x85", "\u2028", "\u2029"])
+def test_unicode_separators_preserve_markdown_line_positions(separator: str) -> None:
+    code = f"value.Run();{separator}other.Run();\n"
+    content = f"prose{separator}inline text\n```cs\n{code}```\n"
+    samples = extractor.extract_code_blocks(content, Path("examples.md"))
+    assert len(samples) == 1
+    assert samples[0].line_number == 2
+    assert samples[0].code == code
+    assert samples[0].raw == f"```cs\n{code}```"
+
+
+@pytest.mark.parametrize(
+    ("content", "line"),
+    [
+        ("> ```cs\n> public class Example {}\n> ```\n", 1),
+        ("- outer\n  - inner\n\n    ```cs\n    public class Example {}\n    ```\n", 4),
+    ],
+)
+def test_container_fences_keep_source_positions_and_unwrapped_code(content: str, line: int) -> None:
+    samples = extractor.extract_code_blocks(content, Path("examples.md"))
+    assert len(samples) == 1
+    assert samples[0].language == "cs"
+    assert samples[0].line_number == line
+    assert samples[0].code == "public class Example {}\n"
+    assert samples[0].raw in content
+
+
 @pytest.mark.parametrize(
     ("code", "complete", "snippet"),
     [

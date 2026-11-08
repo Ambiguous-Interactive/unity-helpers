@@ -144,19 +144,56 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             {
                 return string.Empty;
             }
+            return JoinDirectChildValues(region.Document.Entries, parent);
+        }
+
+        private static int FindFirstEntryAtOrAfter(
+            IReadOnlyList<AuthoredAssetEntry> entries,
+            int lineNumber
+        )
+        {
+            int lower = 0;
+            int upper = entries.Count;
+            while (lower < upper)
+            {
+                int middle = lower + (upper - lower) / 2;
+                if (entries[middle].LineNumber < lineNumber)
+                {
+                    lower = middle + 1;
+                }
+                else
+                {
+                    upper = middle;
+                }
+            }
+            return lower;
+        }
+
+        private static string JoinDirectChildValues(
+            IReadOnlyList<AuthoredAssetEntry> entries,
+            AuthoredAssetEntry parent
+        )
+        {
             using PooledResource<StringBuilder> lease = Buffers.StringBuilder.Get(
                 out StringBuilder builder
             );
             builder.Append(parent.InlineValue);
-            foreach (
-                AuthoredAssetEntry entry in region.Document.Entries.AsValueEnumerableRequired()
+            int count = entries.Count;
+            for (
+                int index = FindFirstEntryAtOrAfter(entries, parent.LineNumber + 1);
+                index < count;
+                ++index
             )
             {
+                AuthoredAssetEntry entry = entries[index];
+                if (parent.EndLineNumber <= entry.LineNumber)
+                {
+                    break;
+                }
                 if (
-                    region.EndLineNumber <= entry.LineNumber
-                    || !IsDirectChild(entry, parent)
+                    !IsDirectChild(entry, parent)
                     || string.Equals(entry.Key, "serializedVersion", StringComparison.Ordinal)
-                    || string.IsNullOrEmpty(entry.InlineValue)
+                    || string.IsNullOrWhiteSpace(entry.InlineValue)
                 )
                 {
                     continue;
@@ -189,14 +226,21 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             }
             bool found = false;
             AuthoredAssetEntry selected = default;
-            foreach (
-                AuthoredAssetEntry candidate in region.Document.Entries.AsValueEnumerableRequired()
+            IReadOnlyList<AuthoredAssetEntry> entries = region.Document.Entries;
+            int count = entries.Count;
+            for (
+                int index = FindFirstEntryAtOrAfter(entries, region.StartLineNumber);
+                index < count;
+                ++index
             )
             {
+                AuthoredAssetEntry candidate = entries[index];
+                if (region.EndLineNumber <= candidate.LineNumber)
+                {
+                    break;
+                }
                 if (
                     candidate.Key == null
-                    || candidate.LineNumber < region.StartLineNumber
-                    || region.EndLineNumber <= candidate.LineNumber
                     || candidate.Indent != region.FieldColumn
                     || candidate.SequenceDepth != region.SequenceDepth
                     || !MatchesFieldName(candidate.Key, field)

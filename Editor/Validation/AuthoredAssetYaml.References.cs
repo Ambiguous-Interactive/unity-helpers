@@ -115,6 +115,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         }
 
         /// <summary>Returns an asset's filename without loading it, or the GUID when no asset is known.</summary>
+        /// <remarks>Uses AssetDatabase metadata and must run on Unity's main thread.</remarks>
         public static string AssetName(string guid)
         {
             if (string.IsNullOrWhiteSpace(guid))

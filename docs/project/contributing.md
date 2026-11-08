@@ -92,7 +92,8 @@ continue to protect the fixture host while other PowerShell suites still use it.
 
 `npm run lint:code-samples` runs the typed Python documentation sample extractor. Its report
 keeps each C# fence's actual opening line across LF, CRLF, and CR input.
-Backtick and tilde fences close only on matching line markers of sufficient length.
+The CommonMark parser handles matching backtick/tilde markers, blockquotes and nested lists.
+Source maps retain the opening line; extracted code omits the Markdown container prefixes.
 The default scan uses Git's tracked and nonignored file inventory, so local evidence and dependency directories do not
 extend the walk. `CODE_SAMPLES_ROOT` or `--scan-root` selects an explicit fixture tree instead.
 The Node launcher and PowerShell test launcher remain compatible entry points.

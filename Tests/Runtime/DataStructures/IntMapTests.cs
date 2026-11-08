@@ -1432,6 +1432,8 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [TestCase(16384, 1, true)]
         [TestCase(16384, 1024, false)]
         [TestCase(16384, 1024, true)]
+        [TestCase(16384, 4096, false)]
+        [TestCase(16384, 4096, true)]
         public void ClearKeepsCapacityAndAllowsRefillAcrossSparseAndDenseStates(
             int hint,
             int count,

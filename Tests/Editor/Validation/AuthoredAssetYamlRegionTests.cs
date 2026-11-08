@@ -280,5 +280,43 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             }
             Assert.AreEqual(count, AuthoredAssetYaml.CountBlockItems(whole, "values"));
         }
+
+        [TestCase(1000)]
+        [TestCase(10000)]
+        public void ItemFieldReadsVisitOnlyTheirBoundedEntries(int count)
+        {
+            List<string> lines = new() { "--- !u!114 &7", "MonoBehaviour:", "  values:" };
+            for (int index = 0; index < count; ++index)
+            {
+                lines.Add("  - name: item" + index);
+                lines.Add("    offset:");
+                lines.Add("      x: 1");
+                lines.Add("      y: 2");
+                lines.Add("    children: []");
+            }
+            AuthoredAssetDocument parsed = AuthoredAssetYaml.ReadDocuments(lines)[0];
+            AuthoredEntryAccessProbe entries = new(parsed.Entries);
+            AuthoredAssetDocument document = new(
+                parsed.FileId,
+                parsed.UnityTypeId,
+                parsed.RootKey,
+                parsed.IsStripped,
+                parsed.StartLineNumber,
+                parsed.EndLineNumber,
+                entries
+            );
+            IReadOnlyList<AuthoredAssetRegion> items = AuthoredAssetYaml.Items(
+                AuthoredAssetYaml.Whole(lines, document),
+                new[] { "values" }
+            );
+            Assert.AreEqual(count, items.Count);
+            AuthoredAssetRegion last = items[count - 1];
+            entries.ReadCount = 0;
+            Assert.IsTrue(AuthoredAssetYaml.TryGetField(last, "name", out string name));
+            Assert.AreEqual("item" + (count - 1), name);
+            Assert.AreEqual("1 2", AuthoredAssetYaml.ValueWithDirectChildren(last, "offset"));
+            Assert.AreEqual(0, AuthoredAssetYaml.CountBlockItems(last, "children"));
+            Assert.Less(entries.ReadCount, 128, "Region reads must not rescan the document.");
+        }
     }
 }
