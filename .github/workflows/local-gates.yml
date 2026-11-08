@@ -132,6 +132,24 @@ jobs:
         working-directory: unity-helpers
         run: npm run lint:python
 
+      - name: Select GNU timeout for process-group controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout_version="$(timeout --version)"
+          if [[ "$timeout_version" != *"(GNU coreutils)"* ]]; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends gnu-coreutils
+            gnu_timeout="$(command -v gnutimeout)"
+            gnu_tools="$RUNNER_TEMP/unity-helpers-gnu-tools"
+            mkdir -p "$gnu_tools"
+            ln -s "$gnu_timeout" "$gnu_tools/timeout"
+            printf '%s\n' "$gnu_tools" >> "$GITHUB_PATH"
+            "$gnu_tools/timeout" --version
+          else
+            printf '%s\n' "$timeout_version"
+          fi
+
       - name: Run bounded-random arithmetic proof
         working-directory: unity-helpers
         run: |
