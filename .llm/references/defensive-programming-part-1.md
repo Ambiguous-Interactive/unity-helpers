@@ -57,7 +57,7 @@ format strings, arbitrary serialized strings and existing persisted keys. Empty-
 branches can also distinguish absent content from invalid nonempty payloads. Do not turn a
 whitespace payload into null, zero or an empty value by changing that branch. Explain the
 exception in the API contract or owned tests, and cover a whitespace value that must survive.
-Literal JSON property names, serialized effect tag keys and persisted project-rule identifiers
+Literal JSON property names, serialized effect tag and stack keys and persisted project-rule identifiers
 can contain whitespace; preserve their identity.
 Operation success must use explicit failure state, never diagnostic message emptiness.
 For example, `WProtoSizes.Utf8ByteCount(" ")` must remain one, not zero.

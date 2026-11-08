@@ -220,6 +220,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// <summary>
         /// Optional stack key used when <see cref="stackGroup"/> is set to <see cref="EffectStackGroup.CustomKey"/>.
         /// </summary>
+        /// <remarks>Nonempty keys preserve literal whitespace; null and empty keys use asset identity.</remarks>
         public string stackGroupKey;
 
         /// <summary>
@@ -832,10 +833,7 @@ namespace WallstopStudios.UnityHelpers.Tags
 
         internal EffectStackKey GetStackKey()
         {
-            if (
-                stackGroup == EffectStackGroup.CustomKey
-                && !string.IsNullOrWhiteSpace(stackGroupKey)
-            )
+            if (stackGroup == EffectStackGroup.CustomKey && !string.IsNullOrEmpty(stackGroupKey))
             {
                 return EffectStackKey.CreateCustom(stackGroupKey);
             }

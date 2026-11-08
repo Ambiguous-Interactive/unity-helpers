@@ -176,6 +176,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             Assert.IsEmpty(effect.HumanReadableDescription);
         }
 
+        [TestCase(null)]
+        [TestCase("")]
+        public void AbsentCustomStackKeysRetainDistinctAssetIdentity(string key)
+        {
+            AttributeEffect first = Track(ScriptableObject.CreateInstance<AttributeEffect>());
+            AttributeEffect second = Track(ScriptableObject.CreateInstance<AttributeEffect>());
+            first.stackGroup = EffectStackGroup.CustomKey;
+            second.stackGroup = EffectStackGroup.CustomKey;
+            first.stackGroupKey = key;
+            second.stackGroupKey = key;
+            Assert.IsFalse(first.GetStackKey().Equals(second.GetStackKey()));
+            Assert.IsTrue(first.GetStackKey().Equals(first.GetStackKey()));
+        }
+
         [TestCase(" ", TestName = "SerializedTag.Space.RemainsQueryable")]
         [TestCase("\t\r\n", TestName = "SerializedTag.ControlWhitespace.RemainsQueryable")]
         [TestCase("\u2003\u00a0", TestName = "SerializedTag.UnicodeWhitespace.RemainsQueryable")]
