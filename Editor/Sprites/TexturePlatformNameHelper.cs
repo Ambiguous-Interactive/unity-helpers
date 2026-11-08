@@ -68,7 +68,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 else
                 {
                     string n = g.ToString();
-                    if (!string.IsNullOrEmpty(n))
+                    if (!string.IsNullOrWhiteSpace(n))
                     {
                         _ = set.Add(n);
                     }

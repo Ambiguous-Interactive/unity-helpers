@@ -220,6 +220,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// <summary>
         /// Optional stack key used when <see cref="stackGroup"/> is set to <see cref="EffectStackGroup.CustomKey"/>.
         /// </summary>
+        /// <remarks>Nonempty keys preserve literal whitespace; null and empty keys use asset identity.</remarks>
         public string stackGroupKey;
 
         /// <summary>
@@ -518,7 +519,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// <returns><c>true</c> if the effect modifies <paramref name="attributeName"/>; otherwise, <c>false</c>.</returns>
         public bool ModifiesAttribute(string attributeName)
         {
-            if (modifications == null || string.IsNullOrEmpty(attributeName))
+            if (modifications == null || string.IsNullOrWhiteSpace(attributeName))
             {
                 return false;
             }
@@ -547,7 +548,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         {
             buffer ??= new List<AttributeModification>();
             buffer.Clear();
-            if (modifications == null || string.IsNullOrEmpty(attributeName))
+            if (modifications == null || string.IsNullOrWhiteSpace(attributeName))
             {
                 return buffer;
             }

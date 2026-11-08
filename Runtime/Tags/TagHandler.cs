@@ -101,7 +101,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// Checks whether the specified tag is currently active (has a count > 0).
         /// </summary>
         /// <param name="effectTag">The tag to check for.</param>
-        /// <returns><c>true</c> if the tag is active; otherwise, <c>false</c>. Returns <c>false</c> for null or empty strings.</returns>
+        /// <returns><c>true</c> if the tag is active; otherwise, <c>false</c>. Returns <c>false</c> for null or empty strings; other keys retain literal whitespace.</returns>
         public bool HasTag(string effectTag)
         {
             if (string.IsNullOrEmpty(effectTag))
@@ -572,7 +572,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// Applies a tag, incrementing its count. If the tag is new, raises <see cref="OnTagAdded"/>.
         /// Otherwise, raises <see cref="OnTagCountChanged"/>.
         /// </summary>
-        /// <param name="effectTag">The tag to apply.</param>
+        /// <param name="effectTag">The literal tag key to apply. Null and empty values are ignored.</param>
         public void ApplyTag(string effectTag)
         {
             InternalApplyTag(effectTag);
@@ -833,6 +833,10 @@ namespace WallstopStudios.UnityHelpers.Tags
 
         private void InternalApplyTag(string effectTag)
         {
+            if (string.IsNullOrEmpty(effectTag))
+            {
+                return;
+            }
             NotifyTagApplied(effectTag, RaiseTagCount(effectTag));
         }
 
@@ -943,6 +947,10 @@ namespace WallstopStudios.UnityHelpers.Tags
                     return;
                 }
 
+                if (string.IsNullOrEmpty(effectTag))
+                {
+                    continue;
+                }
                 uint currentCount = RaiseTagCount(effectTag);
                 applied.Add(effectTag);
                 NotifyTagApplied(effectTag, currentCount);

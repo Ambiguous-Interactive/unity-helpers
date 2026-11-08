@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
     using System.Text;
     using UnityEditor;
     using UnityEditor.Compilation;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using Object = UnityEngine.Object;
 
@@ -130,7 +131,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                     out List<OdinMigrationFilePlan> plans
                 );
                 HashSet<string> affected = new HashSet<string>(StringComparer.Ordinal);
-                foreach (OdinMigrationAffectedDocument document in inventory.Documents)
+                foreach (
+                    OdinMigrationAffectedDocument document in inventory.Documents.AsValueEnumerableRequired()
+                )
                 {
                     if (!document.Selected)
                     {

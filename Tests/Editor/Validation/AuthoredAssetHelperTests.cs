@@ -214,7 +214,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             );
             Assert.IsFalse(text.IsObjectReference);
             Assert.IsTrue(AuthoredRequirementValidator.IsEmptyValue(text, string.Empty));
-            Assert.IsFalse(AuthoredRequirementValidator.IsEmptyValue(text, "   "));
+            Assert.IsTrue(AuthoredRequirementValidator.IsEmptyValue(text, "   "));
             Assert.IsFalse(AuthoredRequirementValidator.IsEmptyValue(text, "filled"));
         }
 

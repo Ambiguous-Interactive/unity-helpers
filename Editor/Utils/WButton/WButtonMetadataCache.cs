@@ -187,12 +187,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             AsyncResultType = asyncResultType;
             ReturnsVoid = returnsVoid;
             CancellationTokenParameterIndex = cancellationTokenIndex;
-            DisplayName = string.IsNullOrEmpty(attribute.DisplayName)
+            DisplayName = string.IsNullOrWhiteSpace(attribute.DisplayName)
                 ? method.Name
                 : attribute.DisplayName;
             DrawOrder = attribute.DrawOrder;
             HistoryCapacity = attribute.HistoryCapacity;
-            ColorKey = string.IsNullOrEmpty(colorKey) ? null : colorKey;
+            ColorKey = string.IsNullOrWhiteSpace(colorKey) ? null : colorKey;
             GroupName = string.IsNullOrWhiteSpace(attribute.GroupName) ? null : attribute.GroupName;
             GroupPriority = attribute.GroupPriority;
             GroupPlacement = attribute.GroupPlacement;

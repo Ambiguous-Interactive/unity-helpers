@@ -658,7 +658,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         private static bool IsOpenGenericArgs(string argsSection)
         {
             string trimmed = argsSection.Trim();
-            if (string.IsNullOrEmpty(trimmed))
+            if (string.IsNullOrWhiteSpace(trimmed))
             {
                 return true;
             }
@@ -678,7 +678,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         private static int CountOpenGenericArgs(string argsSection)
         {
-            if (string.IsNullOrEmpty(argsSection.Trim()))
+            if (string.IsNullOrWhiteSpace(argsSection.Trim()))
             {
                 return 1;
             }
@@ -738,7 +738,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 else if (c == ',' && depth == 0)
                 {
                     string arg = argsSection.Substring(start, i - start).Trim();
-                    if (!string.IsNullOrEmpty(arg))
+                    if (!string.IsNullOrWhiteSpace(arg))
                     {
                         args.Add(arg);
                     }
@@ -750,7 +750,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             if (start < argsSection.Length)
             {
                 string arg = argsSection.Substring(start).Trim();
-                if (!string.IsNullOrEmpty(arg))
+                if (!string.IsNullOrWhiteSpace(arg))
                 {
                     args.Add(arg);
                 }

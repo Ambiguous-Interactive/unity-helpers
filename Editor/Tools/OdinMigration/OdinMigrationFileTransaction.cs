@@ -264,7 +264,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
         public void WriteBackup(string path, byte[] bytes)
         {
             string directory = Path.GetDirectoryName(path);
-            if (!string.IsNullOrEmpty(directory))
+            if (!string.IsNullOrWhiteSpace(directory))
             {
                 Directory.CreateDirectory(directory);
             }

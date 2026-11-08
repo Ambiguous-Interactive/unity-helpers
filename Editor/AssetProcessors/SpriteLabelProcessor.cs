@@ -20,7 +20,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
 
         internal static bool IsCandidatePath(string path)
         {
-            if (string.IsNullOrEmpty(path))
+            if (string.IsNullOrWhiteSpace(path))
             {
                 return false;
             }

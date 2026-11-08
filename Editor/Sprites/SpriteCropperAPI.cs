@@ -94,7 +94,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 {
                     string normalizedFolder = NormalizeAssetPath(folder);
                     if (
-                        string.IsNullOrEmpty(normalizedFolder)
+                        string.IsNullOrWhiteSpace(normalizedFolder)
                         || !AssetDatabase.IsValidFolder(normalizedFolder)
                     )
                     {
@@ -178,7 +178,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             assetPath = NormalizeAssetPath(assetPath);
             if (
-                string.IsNullOrEmpty(assetPath)
+                string.IsNullOrWhiteSpace(assetPath)
                 || string.Equals(assetPath, "Assets", StringComparison.Ordinal)
             )
             {
@@ -285,7 +285,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             if (!string.IsNullOrWhiteSpace(outputFolder))
             {
                 string normalizedOutputFolder = NormalizeAssetPath(outputFolder);
-                if (string.IsNullOrEmpty(normalizedOutputFolder))
+                if (string.IsNullOrWhiteSpace(normalizedOutputFolder))
                 {
                     error = $"Invalid output folder: '{outputFolder}'.";
                     return false;
@@ -409,7 +409,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             assetPath = NormalizeAssetPath(assetPath);
             if (
                 options == null
-                || string.IsNullOrEmpty(assetPath)
+                || string.IsNullOrWhiteSpace(assetPath)
                 || !assetPath.StartsWith("Assets/", StringComparison.Ordinal)
                 || options.LeftPadding < 0
                 || options.RightPadding < 0
@@ -440,7 +440,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 string normalizedOutputFolder = NormalizeAssetPath(options.OutputFolder);
                 if (
-                    string.IsNullOrEmpty(normalizedOutputFolder)
+                    string.IsNullOrWhiteSpace(normalizedOutputFolder)
                     || !AssetDatabase.IsValidFolder(normalizedOutputFolder)
                 )
                 {

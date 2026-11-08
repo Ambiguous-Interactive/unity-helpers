@@ -21,17 +21,17 @@
 
 ### Forbidden Hot Path Patterns
 
-| Pattern                              | Problem                         | Alternative                         |
-| ------------------------------------ | ------------------------------- | ----------------------------------- |
-| LINQ (`.Where`, `.Select`, `.Any`)   | Iterator + delegate allocation  | `foreach` over the concrete type    |
-| `string.Format()` / interpolation    | String allocation               | `StringBuilder` or cache            |
-| `new List<T>()`                      | Heap allocation                 | `Buffers<T>.List.Get()`             |
-| Lambda capturing locals              | Closure allocation              | Static lambda or explicit loop      |
-| Boxing (`object x = struct`)         | Heap allocation                 | Generic methods                     |
-| `foreach` through an INTERFACE       | Enumerator boxing (24 bytes)    | Iterate the concrete type           |
-| `params` methods                     | Array allocation per call       | Chain 2-arg overloads               |
-| Reflection                           | Slow, fragile, uncached         | Direct access, interfaces, generics |
-| Hand-rolled hash codes (`* 31`, XOR) | Inconsistent, non-deterministic | `Objects.HashCode()`                |
+| Pattern                              | Problem                         | Alternative                          |
+| ------------------------------------ | ------------------------------- | ------------------------------------ |
+| LINQ (`.Where`, `.Select`, `.Any`)   | Iterator + delegate allocation  | `foreach` over the concrete type     |
+| `string.Format()` / interpolation    | String allocation               | `StringBuilder` or cache             |
+| `new List<T>()`                      | Heap allocation                 | `Buffers<T>.List.Get()`              |
+| Lambda capturing locals              | Closure allocation              | Static lambda or explicit loop       |
+| Boxing (`object x = struct`)         | Heap allocation                 | Generic methods                      |
+| `foreach` through an INTERFACE       | Enumerator can box              | Concrete type or measured value view |
+| `params` methods                     | Array allocation per call       | Chain 2-arg overloads                |
+| Reflection                           | Slow, fragile, uncached         | Direct access, interfaces, generics  |
+| Hand-rolled hash codes (`* 31`, XOR) | Inconsistent, non-deterministic | `Objects.HashCode()`                 |
 
 ---
 
@@ -58,12 +58,24 @@ for (int index = 0; index < attributes.Count; ++index)
 A counting loop is the right shape in exactly four cases:
 
 1. **The body needs the index** — a message, arithmetic, indexing a second collection alongside.
-2. **The collection is an interface type** (`IReadOnlyList<T>`, `IList<T>`), whose enumerator boxes
-   — the row above in the forbidden-patterns table.
+2. **The collection is an interface type** (`IReadOnlyList<T>`, `IList<T>`) and indexing is
+   measured faster, avoids a fallback allocation, or preserves an indexed traversal contract.
 3. **The walk is not a simple forward pass** — reverse, a stride, or a bound that is not the
    collection's own count.
 4. **The body mutates the collection or writes back through the indexer.** `foreach` throws on the
    first and cannot do the second for a struct element.
+
+When foreach is needed for an interface sequence, use `WAsValueEnumerable()` for array, exact
+list and exact hash-set fast paths; package code uses `AsValueEnumerableRequired()` when null
+must retain its original failure. Audit eligible interface foreach sites across Runtime and
+Editor and test helpers, not only the reviewed line. Read-only views, custom sources and derived collections
+retain their original enumerator and may still allocate. Concrete collections keep ordinary
+foreach. Standalone source generators cannot reference runtime views; preserve their independent
+compiler dependency boundary rather than adding a runtime dependency. Do not replace indexed loops on theory: compare actual backing shapes and element
+sizes, including read-only views, and preserve callbacks, indices, cancellation and mutations.
+The native comparison in [the enumeration guide](../../docs/performance/enumeration-audit.md)
+found cached indexing faster for the parser's list-backed entries; foreach allocation savings
+are a separate question. Never claim zero allocation when its positive control does not move.
 
 When a counting loop reads a stable size, cache `Length`, `LongLength`, `Count`, `childCount`,
 `arraySize`, or a constant array dimension (`GetLength` / `GetLongLength`) in a named local before

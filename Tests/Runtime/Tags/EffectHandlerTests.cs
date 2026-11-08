@@ -17,6 +17,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
     public sealed class EffectHandlerTests : TagsTestBase
     {
         private const float RemainingDurationEpsilon = 1e-3f;
+        private static readonly string[] CustomStackKeys =
+        {
+            "shared",
+            " ",
+            "\t\r\n",
+            "\u2003",
+            " shared ",
+        };
 
         [SetUp]
         public void SetUp()
@@ -1332,7 +1340,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
         }
 
         [UnityTest]
-        public IEnumerator CustomStackGroupSharesAcrossEffects()
+        public IEnumerator CustomStackGroupSharesAcrossEffects(
+            [ValueSource(nameof(CustomStackKeys))] string stackKey
+        )
         {
             (
                 GameObject entity,
@@ -1348,7 +1358,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 {
                     e.durationType = ModifierDurationType.Infinite;
                     e.stackGroup = EffectStackGroup.CustomKey;
-                    e.stackGroupKey = "shared";
+                    e.stackGroupKey = stackKey;
                     e.stackingMode = EffectStackingMode.Replace;
                 }
             );
@@ -1358,7 +1368,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 {
                     e.durationType = ModifierDurationType.Infinite;
                     e.stackGroup = EffectStackGroup.CustomKey;
-                    e.stackGroupKey = "shared";
+                    e.stackGroupKey = stackKey;
                     e.stackingMode = EffectStackingMode.Replace;
                 }
             );

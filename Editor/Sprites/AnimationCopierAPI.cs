@@ -241,6 +241,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             int skipped = 0;
             int failed = 0;
             bool cancelled = false;
+            bool operationFailed = false;
             string error = string.Empty;
             HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
             AssetDatabaseBatchScope batch = default;
@@ -268,7 +269,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     {
                         ++failed;
                         diagnostics.Add(
-                            $"{selected ?? "<null>"}: {(string.IsNullOrEmpty(pathError) ? "A duplicate asset path was selected." : pathError)}"
+                            $"{selected ?? "<null>"}: {(string.IsNullOrWhiteSpace(pathError) ? "A duplicate asset path was selected." : pathError)}"
                         );
                         continue;
                     }
@@ -318,6 +319,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
             catch (Exception exception)
             {
+                operationFailed = true;
                 error = exception.Message;
             }
             finally
@@ -332,13 +334,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
                     catch (Exception exception)
                     {
+                        operationFailed = true;
                         error = exception.Message;
                     }
                 }
             }
 
             return new Result(
-                failed == 0 && !cancelled && string.IsNullOrEmpty(error),
+                failed == 0 && !cancelled && !operationFailed,
                 cancelled,
                 selectedAssetPaths.Count,
                 processed,

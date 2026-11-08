@@ -399,7 +399,7 @@
     "typecheck:unity:odin-bases-disabled": "dotnet build \"Generator~/WallstopStudios.UnityHelpers.TypeCheck/WallstopStudios.UnityHelpers.TypeCheck.csproj\" --nologo -v minimal -p:WallstopOdin=true -p:WallstopDisableOdinBases=true && dotnet build \"Generator~/WallstopStudios.UnityHelpers.TestCheck/WallstopStudios.UnityHelpers.TestCheck.csproj\" --nologo -v minimal -p:WallstopOdin=true -p:WallstopDisableOdinBases=true && dotnet build \"Generator~/WallstopStudios.UnityHelpers.EditorTestCheck/WallstopStudios.UnityHelpers.EditorTestCheck.csproj\" --nologo -v minimal -p:WallstopOdin=true -p:WallstopDisableOdinBases=true",
     "test:auto-publish-release": "node scripts/tests/test-auto-publish-release.js",
     "test:watchdog-cancellation": "uv run --project scripts/python~ --locked pytest scripts/tests/test-watchdog-cancellation.py -q",
-    "test:unity-modes": "uv run --project scripts/python~ --locked pytest scripts/tests/test_ci_modes.py -q",
+    "test:unity-modes": "uv run --project scripts/python~ --locked pytest scripts/tests/test_ci_modes.py scripts/tests/test_editmode_shards.py -q",
     "test:unity-framework": "pwsh -NoProfile -File scripts/tests/test-unity-framework-policy.ps1 && pwsh -NoProfile -File scripts/tests/test-unity-framework-workspace.ps1 && uv run --project scripts/python~ --locked pytest scripts/tests/test-unity-framework-evidence.py -q",
     "test:assembly-launchers": "pwsh -NoProfile -File scripts/lint-asmdef.ps1 && pwsh -NoProfile -File scripts/lint-bundled-assemblies.ps1 && pwsh -NoProfile -File scripts/tests/test-lint-bundled-assemblies.ps1",
     "test:asmdef": "uv run --project scripts/python~ --locked pytest scripts/tests/test_asmdef.py -q",
@@ -415,7 +415,11 @@
     "lint:license-headers": "uv run --project scripts/python~ --locked --no-dev python scripts/lint_license_headers.py --verbose",
     "test:csharp-lints": "uv run --project scripts/python~ --locked pytest scripts/tests/test_csharp_lints.py -q",
     "lint:odin-undo-safety": "uv run --project scripts/python~ --locked --no-dev python scripts/lint_odin_undo_safety.py --verbose",
-    "test:odin-undo-safety": "uv run --project scripts/python~ --locked pytest scripts/tests/test_csharp_lints.py -k odin -q"
+    "test:odin-undo-safety": "uv run --project scripts/python~ --locked pytest scripts/tests/test_csharp_lints.py -k odin -q",
+    "lint:drawer-multiobject": "uv run --project scripts/python~ --locked --no-dev python scripts/lint_drawer_multiobject.py --verbose",
+    "test:drawer-multiobject": "uv run --project scripts/python~ --locked pytest scripts/tests/test_drawer_multiobject.py -q",
+    "lint:skill-sizes": "uv run --project scripts/python~ --locked --no-dev python scripts/lint_skill_sizes.py --verbose",
+    "test:skill-sizes": "uv run --project scripts/python~ --locked pytest scripts/tests/test_skill_sizes.py -q"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",

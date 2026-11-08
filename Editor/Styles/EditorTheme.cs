@@ -44,7 +44,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Styles
         internal static StyleSheet Load(string fileName)
         {
             string path = DirectoryHelper.ResolvePackageAssetPath("Editor/Styles/" + fileName);
-            return string.IsNullOrEmpty(path)
+            return string.IsNullOrWhiteSpace(path)
                 ? null
                 : AssetDatabase.LoadAssetAtPath<StyleSheet>(path);
         }

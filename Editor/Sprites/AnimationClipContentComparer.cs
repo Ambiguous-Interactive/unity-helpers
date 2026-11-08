@@ -226,7 +226,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
             string pathA = AssetDatabase.GetAssetPath(a);
             string pathB = AssetDatabase.GetAssetPath(b);
-            if (!string.IsNullOrEmpty(pathA) && !string.IsNullOrEmpty(pathB))
+            if (!string.IsNullOrWhiteSpace(pathA) && !string.IsNullOrWhiteSpace(pathB))
             {
                 string nameA = Path.GetFileName(pathA);
                 string nameB = Path.GetFileName(pathB);

@@ -134,7 +134,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
         /// </summary>
         public static bool IsValidUnityLifecycleReturnType(string methodName, string returnType)
         {
-            if (string.IsNullOrEmpty(returnType))
+            if (string.IsNullOrWhiteSpace(returnType))
             {
                 return false;
             }

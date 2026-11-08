@@ -46,7 +46,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         internal static GUIStyle GetSolidButtonStyle(string action, bool enabled)
         {
-            if (string.IsNullOrEmpty(action))
+            if (string.IsNullOrWhiteSpace(action))
             {
                 action = "Default";
             }

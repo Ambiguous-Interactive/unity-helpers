@@ -697,6 +697,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             Assert.IsFalse(File.Exists(ToFull(destination)));
         }
 
+        [TestCase("")]
+        [TestCase(" ")]
+        [TestCase("\t\r\n")]
+        public void ApiCallbackExceptionsCannotReportSuccess(string message)
+        {
+            AnimationCopierAPI.Result result = AnimationCopierAPI.Run(
+                SrcRoot,
+                DstRoot,
+                new[] { Path.Combine(SrcRoot, "Clip.anim").SanitizePath() },
+                AnimationCopierAPI.Operation.CopyAll,
+                false,
+                cancelRequested: (_, _, _) => throw new System.Exception(message)
+            );
+            Assert.IsFalse(result.Succeeded);
+            Assert.IsFalse(result.Cancelled);
+            Assert.AreEqual(0, result.FailedCount);
+            Assert.AreEqual(message, result.Error);
+        }
+
         [Test]
         public void ApiRejectsOverlappingRoots()
         {

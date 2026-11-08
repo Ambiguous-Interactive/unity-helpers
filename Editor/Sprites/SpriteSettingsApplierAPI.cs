@@ -298,7 +298,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         break;
                     case SpriteSettings.MatchMode.Extension:
                         matches =
-                            !string.IsNullOrEmpty(p.extWithDot)
+                            !string.IsNullOrWhiteSpace(p.extWithDot)
                             && string.Equals(ext, p.extWithDot, StringComparison.OrdinalIgnoreCase);
                         break;
                     case SpriteSettings.MatchMode.Regex:
@@ -823,7 +823,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     existing != null ? existing.name : Path.GetFileNameWithoutExtension(path);
                 AssetDatabase.CreateAsset(target, writePath);
                 ownedGuid = AssetDatabase.AssetPathToGUID(writePath);
-                if (string.IsNullOrEmpty(ownedGuid))
+                if (string.IsNullOrWhiteSpace(ownedGuid))
                 {
                     throw new IOException($"Could not identify profiles asset at {writePath}.");
                 }
@@ -1101,7 +1101,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         private static string SanitizePath(string p)
         {
-            return string.IsNullOrEmpty(p) ? p : p.SanitizePath();
+            return string.IsNullOrWhiteSpace(p) ? p : p.SanitizePath();
         }
 
         public sealed class PreparedProfile

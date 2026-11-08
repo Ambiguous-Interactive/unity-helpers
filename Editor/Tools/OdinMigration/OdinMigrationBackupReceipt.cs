@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
     using System.Security.Cryptography;
     using System.Text;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Extension;
 
     internal static class OdinMigrationBackupReceipt
     {
@@ -48,7 +49,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                     OdinMigrationCompilationPlan.PathComparer
                 );
                 long bytes = 0;
-                foreach (OdinMigrationFilePlan plan in plans)
+                foreach (OdinMigrationFilePlan plan in plans.AsValueEnumerableRequired())
                 {
                     if (
                         plan == null
@@ -403,7 +404,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 .Append('\n')
                 .Append(Hash(Encoding.GetBytes(ProjectRoot())))
                 .Append('\n');
-            foreach (OdinMigrationFilePlan plan in plans)
+            foreach (OdinMigrationFilePlan plan in plans.AsValueEnumerableRequired())
             {
                 text.Append(plan.AssetPath)
                     .Append('\t')

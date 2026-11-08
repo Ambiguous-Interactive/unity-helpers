@@ -615,7 +615,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
         private static bool MatchesTag(GameObject candidate, string tag)
         {
-            if (string.IsNullOrEmpty(tag))
+            if (string.IsNullOrWhiteSpace(tag))
             {
                 return false;
             }

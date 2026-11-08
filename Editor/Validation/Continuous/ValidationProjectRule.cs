@@ -356,7 +356,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                     foreach (JsonProperty property in element.EnumerateObject())
                     {
                         writer.WritePropertyName(property.Name);
-                        string childPath = string.IsNullOrEmpty(path)
+                        string childPath = string.IsNullOrWhiteSpace(path)
                             ? property.Name
                             : path + "." + property.Name;
                         WriteNormalizedReferences(property.Value, childPath, references, writer);
@@ -651,7 +651,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         {
             if (!MatchesSubject(subject, target.AssetPath))
                 return;
-            if (string.IsNullOrEmpty(discriminator) && subject != null)
+            if (string.IsNullOrWhiteSpace(discriminator) && subject != null)
                 discriminator = GlobalObjectId.GetGlobalObjectIdSlow(subject).ToString();
             findings.Add(
                 new ValidationFinding(

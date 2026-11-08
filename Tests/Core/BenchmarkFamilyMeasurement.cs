@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 {
     using System;
     using System.Collections.Generic;
+    using WallstopStudios.UnityHelpers.Core.Extension;
 
     /// <summary>Combines complete workload families with equal family weights and batch bootstrap intervals.</summary>
     public sealed class BenchmarkFamilyMeasurement
@@ -45,11 +46,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             bool conclusive = true;
             bool nonInferior = true;
             double mean = 0;
-            foreach (IReadOnlyList<CalibratedBenchmarkMeasurement> family in families)
+            foreach (
+                IReadOnlyList<CalibratedBenchmarkMeasurement> family in families.AsValueEnumerableRequired()
+            )
             {
                 WorkloadCount += family.Count;
                 double familyMean = 0;
-                foreach (CalibratedBenchmarkMeasurement workload in family)
+                foreach (
+                    CalibratedBenchmarkMeasurement workload in family.AsValueEnumerableRequired()
+                )
                 {
                     bool workloadConclusive =
                         workload.SlotDiagnostics == null
@@ -75,10 +80,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             for (int repetition = 0; repetition < bootstrap.Length; ++repetition)
             {
                 double aggregate = 0;
-                foreach (IReadOnlyList<CalibratedBenchmarkMeasurement> family in families)
+                foreach (
+                    IReadOnlyList<CalibratedBenchmarkMeasurement> family in families.AsValueEnumerableRequired()
+                )
                 {
                     double familySum = 0;
-                    foreach (CalibratedBenchmarkMeasurement workload in family)
+                    foreach (
+                        CalibratedBenchmarkMeasurement workload in family.AsValueEnumerableRequired()
+                    )
                     {
                         double sum = 0;
                         int batchCount =
@@ -135,7 +144,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 {
                     return null;
                 }
-                foreach (CalibratedBenchmarkMeasurement workload in family)
+                foreach (
+                    CalibratedBenchmarkMeasurement workload in family.AsValueEnumerableRequired()
+                )
                 {
                     if (
                         workload == null

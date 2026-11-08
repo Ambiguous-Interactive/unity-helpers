@@ -478,7 +478,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 try
                 {
                     string parent = Path.GetDirectoryName(Path.GetFullPath(path));
-                    if (string.IsNullOrEmpty(parent))
+                    if (string.IsNullOrWhiteSpace(parent))
                     {
                         return false;
                     }
@@ -528,7 +528,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     string destinationPath = Path.GetFullPath(path);
                     string directory = Path.GetDirectoryName(destinationPath);
                     string filename = Path.GetFileName(destinationPath);
-                    if (string.IsNullOrEmpty(directory) || string.IsNullOrEmpty(filename))
+                    if (string.IsNullOrWhiteSpace(directory) || string.IsNullOrWhiteSpace(filename))
                     {
                         return false;
                     }
@@ -1459,7 +1459,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         private static void EnsureDirectory(string path)
         {
             string directory = Path.GetDirectoryName(path);
-            if (!string.IsNullOrEmpty(directory))
+            if (!string.IsNullOrWhiteSpace(directory))
             {
                 Directory.CreateDirectory(directory);
             }

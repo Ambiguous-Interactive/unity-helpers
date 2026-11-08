@@ -371,7 +371,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// Retrieves all effect handles that contributed a specific tag on the target.
         /// </summary>
         /// <param name="target">The Unity Object (GameObject or Component) to inspect.</param>
-        /// <param name="effectTag">The tag to query.</param>
+        /// <param name="effectTag">The literal tag key to query, preserving whitespace.</param>
         /// <param name="buffer">
         /// Optional buffer to populate. When <c>null</c>, a new list is created. The buffer is cleared before population.
         /// </param>

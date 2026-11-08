@@ -197,7 +197,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 foreach (RenderedFile renderedFile in renderedFiles)
                 {
                     string parent = Path.GetDirectoryName(renderedFile.Path);
-                    if (!string.IsNullOrEmpty(parent))
+                    if (!string.IsNullOrWhiteSpace(parent))
                     {
                         Directory.CreateDirectory(parent);
                     }
@@ -420,7 +420,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             IEnumerable<IGrouping<string, Type>> groups = layout switch
             {
                 ExportLayout.OneFilePerNamespace => selected.GroupBy(
-                    type => string.IsNullOrEmpty(type.Namespace) ? GlobalGroup : type.Namespace,
+                    type =>
+                        string.IsNullOrWhiteSpace(type.Namespace) ? GlobalGroup : type.Namespace,
                     StringComparer.Ordinal
                 ),
                 ExportLayout.OneFilePerContract => selected.GroupBy(

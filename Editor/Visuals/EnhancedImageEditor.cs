@@ -58,7 +58,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Visuals
                     "Shaders/Materials/BackgroundMask-Material.mat"
                 );
                 Material defaultMask = null;
-                if (!string.IsNullOrEmpty(materialRelativePath))
+                if (!string.IsNullOrWhiteSpace(materialRelativePath))
                 {
                     defaultMask = AssetDatabase.LoadAssetAtPath<Material>(materialRelativePath);
                 }

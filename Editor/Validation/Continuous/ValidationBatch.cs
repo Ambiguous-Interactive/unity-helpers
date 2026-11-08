@@ -93,7 +93,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
             List<string> problems = new List<string>();
             List<IValidationRule> rules = DiscoverRules(problems);
-            ValidationSuppressions suppressions = ReadSuppressions(suppressionsPath, problems);
+            ValidationSuppressions suppressions = ReadSuppressions(
+                suppressionsPath,
+                commandLine != null && 0 <= Array.IndexOf(commandLine, SuppressionsArgument),
+                problems
+            );
 
             ValidationRun run = new ValidationRun(
                 rules,
@@ -105,7 +109,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
             string json = ValidationReport.ToJson(run, suppressions);
             if (
-                !string.IsNullOrEmpty(outputPath) && !TryWrite(outputPath, json, out string failure)
+                commandLine != null
+                && 0 <= Array.IndexOf(commandLine, OutputArgument)
+                && !TryWrite(outputPath, json, out string failure)
             )
             {
                 problems.Add(failure);
@@ -122,6 +128,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         /// <returns>The rules, ordered by type name so two runs agree.</returns>
         /// <remarks>
         /// A rule declared in a test assembly is excluded. See the overload for why.
+        /// Persisted project rule identifiers retain literal whitespace; null and empty placeholders are skipped.
         /// </remarks>
         public static List<IValidationRule> DiscoverRules(List<string> problems)
         {
@@ -327,7 +334,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         /// </remarks>
         internal static ValidationSeverity ParseSeverity(string value, ValidationSeverity fallback)
         {
-            if (string.IsNullOrEmpty(value))
+            if (string.IsNullOrWhiteSpace(value))
             {
                 return fallback;
             }
@@ -388,9 +395,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             return references;
         }
 
-        private static ValidationSuppressions ReadSuppressions(string path, List<string> problems)
+        private static ValidationSuppressions ReadSuppressions(
+            string path,
+            bool supplied,
+            List<string> problems
+        )
         {
-            if (string.IsNullOrEmpty(path))
+            if (!supplied)
             {
                 return ValidationSuppressions.Empty;
             }

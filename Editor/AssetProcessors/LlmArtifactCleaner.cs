@@ -24,7 +24,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
 
         internal static bool ShouldDelete(string assetPath)
         {
-            if (string.IsNullOrEmpty(assetPath))
+            if (string.IsNullOrWhiteSpace(assetPath))
             {
                 return false;
             }
@@ -120,7 +120,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
 
         private static void DeleteAsset(string assetPath)
         {
-            if (string.IsNullOrEmpty(assetPath))
+            if (string.IsNullOrWhiteSpace(assetPath))
             {
                 return;
             }

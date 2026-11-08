@@ -328,6 +328,10 @@ When you use Attributes for frequently mutated "current" values:
 
 ## Using Tags WITHOUT Attributes
 
+Applying a null or empty tag leaves tag state unchanged and emits no tag-added event.
+Serialized tag keys preserve literal whitespace, including whitespace-only tags.
+Buffered handle queries and handle enumeration extensions use those same literal keys.
+
 Even without any Attributes, the Effects System is useful for tag-based state management and cosmetic effects.
 
 ### When to Use Tags Without Attributes
@@ -977,6 +981,7 @@ public sealed class PlayerHealth : AttributesComponent
   - `Replace` removes existing handles in the same group before adding a new one.
   - `Ignore` rejects duplicate applications.
 - Use `stackGroup = CustomKey` with a shared `stackGroupKey` when different assets should share a stack identity.
+  Nonempty keys preserve literal text, including whitespace-only keys; null and empty keys use each asset's identity.
 - Inspect active stacks with `EffectHandler.GetEffectStackCount(effect)` or tag counts for debugging and UI.
 - An `OnEffectRemoved` subscriber that re-applies the same effect can leave a `Stack` eviction no
   smaller than it started. `ApplyEffect` then returns `null` and logs a warning rather than

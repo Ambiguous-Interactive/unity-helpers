@@ -1020,7 +1020,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         if (
                             compiledRegexes != null
                             && 0 < compiledRegexes.Count
-                            && !string.IsNullOrEmpty(fileName)
+                            && !string.IsNullOrWhiteSpace(fileName)
                         )
                         {
                             foreach (Regex rx in compiledRegexes)
@@ -1106,7 +1106,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             !excluded
                             && hasExcludeRegexes
                             && compiledExcludeRegexes != null
-                            && !string.IsNullOrEmpty(fileName)
+                            && !string.IsNullOrWhiteSpace(fileName)
                         )
                         {
                             foreach (Regex rx in compiledExcludeRegexes)

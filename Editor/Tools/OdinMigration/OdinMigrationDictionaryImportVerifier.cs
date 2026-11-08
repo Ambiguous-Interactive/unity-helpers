@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
     using UnityEditor;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using Object = UnityEngine.Object;
 
@@ -202,7 +203,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
         {
             using SerializedObject serialized = new SerializedObject(importedOwner);
             serialized.Update();
-            foreach (OdinMigrationConvertedDictionary dictionary in dictionaries)
+            foreach (
+                OdinMigrationConvertedDictionary dictionary in dictionaries.AsValueEnumerableRequired()
+            )
             {
                 OdinMigrationDictionaryField field =
                     fields == null ? null : FindField(fields, dictionary.FieldName);
@@ -317,7 +320,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             string name
         )
         {
-            foreach (OdinMigrationDictionaryField field in fields)
+            foreach (OdinMigrationDictionaryField field in fields.AsValueEnumerableRequired())
             {
                 if (string.Equals(field.FieldName, name, StringComparison.Ordinal))
                 {

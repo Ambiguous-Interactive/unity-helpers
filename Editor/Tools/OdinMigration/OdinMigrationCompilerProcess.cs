@@ -12,6 +12,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
     using System.Threading;
     using UnityEditor;
     using UnityEditor.Compilation;
+    using WallstopStudios.UnityHelpers.Core.Extension;
 
     internal sealed class OdinMigrationCompilerProcess : IDisposable
     {
@@ -79,7 +80,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             result.AppendLine("/nologo").AppendLine("/target:library").AppendLine("/nostdlib+");
             result.Append("/out:").AppendLine(Quote(outputPath));
             result.Append("/define:").AppendLine(string.Join(";", assembly.defines));
-            foreach (string reference in references)
+            foreach (string reference in references.AsValueEnumerableRequired())
             {
                 result.Append("/reference:").AppendLine(Quote(reference));
             }
@@ -151,7 +152,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                         );
                 }
             }
-            foreach (string source in sources)
+            foreach (string source in sources.AsValueEnumerableRequired())
             {
                 result.AppendLine(Quote(source));
             }

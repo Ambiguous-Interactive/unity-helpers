@@ -116,6 +116,34 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             return run;
         }
 
+        [TestCase(ValidationBatch.OutputArgument, "")]
+        [TestCase(ValidationBatch.OutputArgument, " ")]
+        [TestCase(ValidationBatch.OutputArgument, "\t")]
+        [TestCase(ValidationBatch.SuppressionsArgument, "")]
+        [TestCase(ValidationBatch.SuppressionsArgument, " ")]
+        [TestCase(ValidationBatch.SuppressionsArgument, "\t")]
+        public void ExplicitBlankPathsProduceProblems(string option, string value)
+        {
+            ValidationBatch.Result result = ValidationBatch.Run(
+                new[]
+                {
+                    ValidationBatch.FolderArgument,
+                    "Assets/NonexistentValidationPathControl",
+                    option,
+                    value,
+                }
+            );
+            Assert.AreEqual(1, result.ExitCode);
+            Assert.That(
+                result.Problems,
+                Has.Some.Contains(
+                    string.Equals(option, ValidationBatch.OutputArgument, StringComparison.Ordinal)
+                        ? "could not be written"
+                        : "could not be read"
+                )
+            );
+        }
+
         [Test]
         public void ParsingIgnoresBlankLinesCommentsAndDuplicates()
         {
@@ -579,6 +607,46 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 ),
                 "this fixture's constructible rule has to be found, or the assertion is vacuous"
             );
+        }
+
+        [TestCase(" ")]
+        [TestCase("\t\r\n")]
+        [TestCase("\u2003")]
+        [TestCase("project.literal")]
+        public void ProjectRuleDiscoveryPreservesLiteralIdentifiers(string identifier)
+        {
+            ValidationWorkspaceSettings settings = ValidationWorkspaceSettings.instance;
+            List<ValidationWorkspaceSettings.RuleDefinition> originalRules = settings.projectRules;
+            List<ValidationWorkspaceSettings.RulePreference> originalPreferences =
+                settings.rulePreferences;
+            try
+            {
+                settings.projectRules = new List<ValidationWorkspaceSettings.RuleDefinition>
+                {
+                    null,
+                    new ValidationWorkspaceSettings.RuleDefinition { id = null },
+                    new ValidationWorkspaceSettings.RuleDefinition { id = string.Empty },
+                    new ValidationWorkspaceSettings.RuleDefinition { id = identifier },
+                };
+                settings.rulePreferences = new List<ValidationWorkspaceSettings.RulePreference>();
+                List<string> problems = new();
+                List<IValidationRule> rules = ValidationBatch.DiscoverRules(problems);
+                Assert.IsEmpty(problems);
+                Assert.AreEqual(
+                    1,
+                    rules
+                        .FindAll(rule =>
+                            string.Equals(rule.RuleId, identifier, StringComparison.Ordinal)
+                        )
+                        .Count
+                );
+                Assert.IsFalse(rules.Exists(rule => string.IsNullOrEmpty(rule.RuleId)));
+            }
+            finally
+            {
+                settings.projectRules = originalRules;
+                settings.rulePreferences = originalPreferences;
+            }
         }
 
         [Test]

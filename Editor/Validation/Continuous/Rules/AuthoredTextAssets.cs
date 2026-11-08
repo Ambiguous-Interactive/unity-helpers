@@ -36,7 +36,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous.Rules
         internal static bool CarriesAuthoredDocuments(in ValidationTarget target)
         {
             string assetPath = target.AssetPath;
-            if (string.IsNullOrEmpty(assetPath))
+            if (string.IsNullOrWhiteSpace(assetPath))
             {
                 return false;
             }

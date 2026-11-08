@@ -418,7 +418,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 if (0 < markers.Length)
                 {
                     string declared = ((WProtoContractAttribute)markers[0]).Name;
-                    if (!string.IsNullOrEmpty(declared))
+                    if (!string.IsNullOrWhiteSpace(declared))
                     {
                         return declared;
                     }
@@ -520,7 +520,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
             private static bool IsValidProtoIdentifier(string name)
             {
-                if (string.IsNullOrEmpty(name))
+                if (string.IsNullOrWhiteSpace(name))
                 {
                     return false;
                 }
@@ -743,7 +743,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
                     foreach (string name in reserved.MemberNames.AsValueEnumerableRequired())
                     {
-                        if (!string.IsNullOrEmpty(name) && IsValidProtoIdentifier(name))
+                        if (!string.IsNullOrWhiteSpace(name) && IsValidProtoIdentifier(name))
                         {
                             names.Add(name);
                             if (fieldNames != null)
@@ -1432,7 +1432,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                     memberType = ((PropertyInfo)member).PropertyType;
                 }
 
-                string schemaName = string.IsNullOrEmpty(marker.Name) ? member.Name : marker.Name;
+                string schemaName = string.IsNullOrWhiteSpace(marker.Name)
+                    ? member.Name
+                    : marker.Name;
                 if (!IsValidProtoIdentifier(schemaName))
                 {
                     _diagnostics.Add(

@@ -123,7 +123,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 for (int index = 0; index < assetGuids.Count; ++index)
                 {
                     string guid = assetGuids[index];
-                    if (!string.IsNullOrEmpty(guid))
+                    if (!string.IsNullOrWhiteSpace(guid))
                     {
                         Pending.Add(guid);
                         int flags = TriggerSources.TryGetValue(guid, out int previous)
@@ -214,7 +214,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             foreach (string guid in Pending)
             {
                 string path = AssetDatabase.GUIDToAssetPath(guid);
-                if (string.IsNullOrEmpty(path) || AssetDatabase.IsValidFolder(path))
+                if (string.IsNullOrWhiteSpace(path) || AssetDatabase.IsValidFolder(path))
                 {
                     continue;
                 }
@@ -280,7 +280,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             IReadOnlyList<string> recorded = ValidationResults.RecordedAssetGuids;
             for (int index = 0; index < recorded.Count; ++index)
             {
-                if (string.IsNullOrEmpty(AssetDatabase.GUIDToAssetPath(recorded[index])))
+                if (string.IsNullOrWhiteSpace(AssetDatabase.GUIDToAssetPath(recorded[index])))
                 {
                     gone ??= new List<string>();
                     gone.Add(recorded[index]);

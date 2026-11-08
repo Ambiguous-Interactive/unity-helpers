@@ -20,6 +20,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, BinaryIO, cast
 
+from editmode_shards import merge_results, partition_assemblies
+
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator
     from types import FrameType
@@ -27,7 +29,14 @@ if TYPE_CHECKING:
 ROOT = Path(__file__).resolve().parents[2]
 MODES = ("editmode", "playmode", "standalone")
 MAX_CONCURRENT_WORKERS = 4
-WORKER_PRIORITY = ("editmode", "editmode_isolated", "standalone", "playmode", "proto_only")
+WORKER_PRIORITY = (
+    "editmode",
+    "editmode_isolated",
+    "standalone",
+    "playmode",
+    "editmode_shard",
+    "proto_only",
+)
 WORKER = """
 $ErrorActionPreference = 'Stop'
 try {
@@ -91,15 +100,16 @@ def build_modes(
     artifacts: Path,
     session: Path,
     single_threaded: bool,
+    editmode_shards: int = 1,
 ) -> list[Mode]:
     """Keep each existing mode's assemblies, defines and build settings."""
     if re.fullmatch(r"[1-9][0-9]{3}\.[0-9]{1,2}\.[0-9]{1,3}f[1-9][0-9]{0,2}", version) is None:
         raise ValueError("Invalid Unity version")
     jobs: list[Mode] = []
+    suffix = "-single-threaded" if single_threaded else ""
     for name in MODES:
         if name not in selected:
             continue
-        suffix = "-single-threaded" if single_threaded else ""
         options: Parameters = {
             "UnityVersion": version,
             "TestMode": name,
@@ -143,6 +153,15 @@ def build_modes(
         options["ProjectScope"] = "single-threaded-isolated" if single_threaded else "isolated"
         options["ArtifactsPath"] = str(Path(str(options["ArtifactsPath"])) / "isolated")
         jobs.append(Mode("editmode_isolated", options))
+        partitions = partition_assemblies(profiles["editmode"], editmode_shards)
+        if len(partitions) == 2:
+            primary = jobs[0]
+            options = dict(primary.parameters)
+            jobs[0] = Mode(primary.name, {**primary.parameters, "AssemblyNames": partitions[0]})
+            options["AssemblyNames"] = partitions[1]
+            options["ProjectScope"] = "single-threaded-shard-1" if single_threaded else "shard-1"
+            options["ArtifactsPath"] = str(artifacts / f"{version}-e1{suffix}")
+            jobs.append(Mode("editmode_shard", options))
     return jobs
 
 
@@ -188,7 +207,7 @@ def isolate_sources(modes: list[Mode], repository: Path, cache: Path) -> list[Mo
     isolated: list[Mode] = []
     cache.mkdir(parents=True, exist_ok=True)
     for mode in modes:
-        if mode.name not in (*MODES, "proto_only", "editmode_isolated"):
+        if mode.name not in WORKER_PRIORITY:
             raise ValueError("Unknown Unity source worktree mode")
         destination = cache / mode.name
         marker = cache / f".{mode.name}.owner.json"
@@ -210,7 +229,15 @@ def isolate_sources(modes: list[Mode], repository: Path, cache: Path) -> list[Mo
         else:
             marker.write_text(json.dumps(identity), encoding="utf-8")
         if not destination.exists():
-            git(repository, "worktree", "add", "--force", "--detach", str(destination), commit)
+            git(
+                repository,
+                "worktree",
+                "add",
+                "--force",
+                "--detach",
+                str(destination),
+                commit,
+            )
         destination_common = Path(
             git(destination, "rev-parse", "--path-format=absolute", "--git-common-dir")
         ).resolve()
@@ -229,7 +256,11 @@ def isolate_sources(modes: list[Mode], repository: Path, cache: Path) -> list[Mo
 
 
 def launch(
-    mode: Mode, directory: Path, shell: str, environment: dict[str, str], stream: BinaryIO
+    mode: Mode,
+    directory: Path,
+    shell: str,
+    environment: dict[str, str],
+    stream: BinaryIO,
 ) -> Worker:
     config = directory / f"{mode.name}.json"
     config.write_text(json.dumps(mode.parameters), encoding="utf-8")
@@ -322,14 +353,18 @@ def run(
     receipt: Path,
     output: Path | None,
     started_at: float | None = None,
+    max_workers: int = MAX_CONCURRENT_WORKERS,
 ) -> bool:
     """Activate once, run independent projects together, and retain every outcome."""
     if not modes or not math.isfinite(timeout) or timeout <= 0:
         raise ValueError("Select at least one mode and a positive timeout")
+    if max_workers not in range(1, 6):
+        raise ValueError("Select between one and five concurrent Unity workers")
     started = time.monotonic() if started_at is None else started_at
     workers: list[Worker] = []
     preparation_worker: Worker | None = None
     initializers: list[Worker] = []
+    worker_logs: dict[str, BinaryIO] = {}
     completed = False
     try:
         with contextlib.ExitStack() as streams:
@@ -342,7 +377,8 @@ def run(
                 )
             session_path = Path(str(preparation.parameters["LicenseSessionPath"]))
             session = cast(
-                "dict[str, object]", json.loads(session_path.read_text(encoding="utf-8"))
+                "dict[str, object]",
+                json.loads(session_path.read_text(encoding="utf-8")),
             )
             if session.get("State") != "activated" or session.get("OwnerProcessId") != os.getpid():
                 raise RuntimeError("Unity license preparation did not publish its owned session")
@@ -377,7 +413,7 @@ def run(
                             active += 1
                         elif worker.ended is None:
                             worker.ended = time.monotonic()
-                    if active >= MAX_CONCURRENT_WORKERS:
+                    if active >= max_workers:
                         return
                     if started + timeout <= time.monotonic():
                         raise TimeoutError("Unity mode deadline expired before worker launch")
@@ -385,6 +421,7 @@ def run(
                     folder = Path(str(mode.parameters["ArtifactsPath"]))
                     folder.mkdir(parents=True, exist_ok=True)
                     stream = streams.enter_context((folder / "mode-controller.log").open("wb"))
+                    worker_logs[mode.name] = stream
                     workers.append(launch(mode, private, shell, environment, stream))
 
             wait(workers, started + timeout, fill_available_slots)
@@ -396,6 +433,43 @@ def run(
                         if destination.exists() or not (folder / name).is_dir():
                             raise RuntimeError("Isolated EditMode evidence is missing or conflicts")
                         shutil.move(str(folder / name), destination)
+            shard = next(
+                (worker for worker in workers if worker.mode.name == "editmode_shard"), None
+            )
+            if shard is not None:
+                primary = next(worker for worker in workers if worker.mode.name == "editmode")
+                folder = Path(str(primary.mode.parameters["ArtifactsPath"]))
+                secondary_folder = Path(str(shard.mode.parameters["ArtifactsPath"]))
+                retained_folder = folder / "shards/1"
+                if (
+                    retained_folder.exists()
+                    or linked_path(retained_folder)
+                    or linked_path(retained_folder.parent)
+                    or linked_path(secondary_folder)
+                    or not secondary_folder.is_dir()
+                ):
+                    raise RuntimeError("EditMode shard evidence is missing or conflicts")
+                retained_folder.parent.mkdir(parents=True, exist_ok=True)
+                worker_logs[shard.mode.name].close()
+                shutil.move(str(secondary_folder), retained_folder)
+                if all(
+                    worker.process.returncode == 0 and not worker.forced
+                    for worker in (primary, shard)
+                ):
+                    retained = folder / "shards/main-results.xml"
+                    retained.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copyfile(folder / "results.xml", retained)
+                    secondary = retained_folder / "results.xml"
+                    selected_assemblies = {
+                        name
+                        for worker in (primary, shard)
+                        for name in str(worker.mode.parameters["AssemblyNames"]).split(";")
+                    }
+                    merge_results(
+                        [retained, secondary],
+                        folder / "results.xml",
+                        selected_assemblies=selected_assemblies,
+                    )
             completed = True
     finally:
         cleanup_failed = False
@@ -411,7 +485,9 @@ def run(
             if worker.ended is None:
                 worker.ended = time.monotonic()
         outcomes = {
-            "editmode" if mode.name == "editmode_isolated" else mode.name: "failure"
+            "editmode"
+            if mode.name in ("editmode_isolated", "editmode_shard")
+            else mode.name: "failure"
             for mode in modes
         }
         if completed and not cleanup_failed:
@@ -419,7 +495,11 @@ def run(
                 required = [
                     worker
                     for worker in workers
-                    if ("editmode" if worker.mode.name == "editmode_isolated" else worker.mode.name)
+                    if (
+                        "editmode"
+                        if worker.mode.name in ("editmode_isolated", "editmode_shard")
+                        else worker.mode.name
+                    )
                     == name
                 ]
                 if required and all(
@@ -462,7 +542,10 @@ def run(
             if activation_log.exists():
                 retained_log = private.parent / f"{private.name}-activation.log"
                 shutil.copyfile(activation_log, retained_log)
-                print(f"Private activation diagnostics retained at {retained_log}", flush=True)
+                print(
+                    f"Private activation diagnostics retained at {retained_log}",
+                    flush=True,
+                )
         print(f"Unity mode outcomes: {json.dumps(outcomes, sort_keys=True)}", flush=True)
     return all(value == "success" for value in outcomes.values())
 
@@ -490,12 +573,18 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--version", required=True)
     parser.add_argument("--single-threaded", action="store_true")
+    parser.add_argument("--editmode-shards", type=int, choices=(1, 2), default=1)
+    parser.add_argument(
+        "--max-workers", type=int, choices=range(1, 6), default=MAX_CONCURRENT_WORKERS
+    )
     parser.add_argument("--timeout-seconds", type=float, default=1800)
+    parser.add_argument("--artifacts-root", type=Path, default=ROOT / ".artifacts/unity")
     args = parser.parse_args(argv)
     controller_started = time.monotonic()
     try:
         selected, profiles = read_selection(
-            os.environ["UH_PARALLEL_SELECTED_MODES"], os.environ["UH_PARALLEL_ASSEMBLY_PROFILES"]
+            os.environ["UH_PARALLEL_SELECTED_MODES"],
+            os.environ["UH_PARALLEL_ASSEMBLY_PROFILES"],
         )
         shell = shutil.which("pwsh")
         if shell is None:
@@ -519,13 +608,17 @@ def main(argv: list[str] | None = None) -> int:
                         "EditorPath": environment["UNITY_EDITOR_PATH"],
                         "Identity": {
                             key: environment.get(key)
-                            for key in ("GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT", "GITHUB_JOB")
+                            for key in (
+                                "GITHUB_RUN_ID",
+                                "GITHUB_RUN_ATTEMPT",
+                                "GITHUB_JOB",
+                            )
                         },
                     }
                 ),
                 encoding="utf-8",
             )
-            artifacts = ROOT / ".artifacts/unity"
+            artifacts: Path = args.artifacts_root.absolute()
             modes = build_modes(
                 args.version,
                 selected,
@@ -535,6 +628,7 @@ def main(argv: list[str] | None = None) -> int:
                 artifacts=artifacts,
                 session=session,
                 single_threaded=args.single_threaded,
+                editmode_shards=args.editmode_shards,
             )
             source_scope = args.version + ("-st" if args.single_threaded else "")
             modes = isolate_sources(
@@ -558,11 +652,21 @@ def main(argv: list[str] | None = None) -> int:
                 if environment.get("GITHUB_OUTPUT")
                 else None,
                 started_at=controller_started,
+                max_workers=args.max_workers,
             )
     except KeyboardInterrupt:
-        print("Unity mode coordinator cancelled after stopping its workers.", file=sys.stderr)
+        print(
+            "Unity mode coordinator cancelled after stopping its workers.",
+            file=sys.stderr,
+        )
         return 130
-    except (KeyError, OSError, RuntimeError, ValueError, subprocess.TimeoutExpired) as error:
+    except (
+        KeyError,
+        OSError,
+        RuntimeError,
+        ValueError,
+        subprocess.TimeoutExpired,
+    ) as error:
         print(f"Cannot run Unity modes: {error}", file=sys.stderr)
         return 1
     return int(not success)

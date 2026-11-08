@@ -35,7 +35,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             }
 
             string projectRoot = ProjectRoot();
-            return string.IsNullOrEmpty(projectRoot)
+            return string.IsNullOrWhiteSpace(projectRoot)
                 ? assetPath
                 : Path.Combine(projectRoot, assetPath);
         }
@@ -55,7 +55,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             }
 
             string projectRoot = ProjectRoot();
-            if (string.IsNullOrEmpty(projectRoot))
+            if (string.IsNullOrWhiteSpace(projectRoot))
             {
                 return filePath;
             }
@@ -89,7 +89,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         internal static string ProjectRoot()
         {
             string dataPath = Application.dataPath;
-            if (string.IsNullOrEmpty(dataPath))
+            if (string.IsNullOrWhiteSpace(dataPath))
             {
                 return null;
             }

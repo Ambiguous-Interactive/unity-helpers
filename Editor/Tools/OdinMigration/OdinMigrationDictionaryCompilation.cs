@@ -336,7 +336,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
         {
             string path = _compiler.OutputPath;
             bool failed = _compiler.ExitCode != 0;
-            foreach (string message in _compiler.Diagnostics)
+            foreach (string message in _compiler.Diagnostics.AsValueEnumerableRequired())
             {
                 if (_diagnostics.Count < MaximumDiagnostics)
                 {

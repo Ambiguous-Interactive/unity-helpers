@@ -74,7 +74,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             int delivered = 0;
             long recordBytes = 0;
             HashSet<object> originalLists = new(ReferenceIdentityComparer<object>.Instance);
-            foreach (OdinMigrationDictionaryTarget target in preview.Targets)
+            foreach (
+                OdinMigrationDictionaryTarget target in preview.Targets.AsValueEnumerableRequired()
+            )
             {
                 if (!ReferenceEquals(target.LiveOwner, null))
                 {
@@ -139,7 +141,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                     throw new IOException("A retained document has no complete original payload.");
                 }
                 OdinMigrationSerializedData selected = null;
-                foreach (OdinMigrationSerializedData payload in payloads)
+                foreach (
+                    OdinMigrationSerializedData payload in payloads.AsValueEnumerableRequired()
+                )
                 {
                     if (payload.FileId == target.FileId)
                     {
@@ -187,7 +191,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                     StringComparer.Ordinal
                 );
                 int referenceIndex = 0;
-                foreach (string address in selected.ReferencedUnityObjects)
+                foreach (
+                    string address in selected.ReferencedUnityObjects.AsValueEnumerableRequired()
+                )
                 {
                     Object reference = target.ReferencedObjects[referenceIndex];
                     string identity =
@@ -208,7 +214,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 }
                 List<OdinMigrationApplyRecord.Field> fields =
                     new List<OdinMigrationApplyRecord.Field>();
-                foreach (OdinMigrationConvertedDictionary dictionary in decoded)
+                foreach (
+                    OdinMigrationConvertedDictionary dictionary in decoded.AsValueEnumerableRequired()
+                )
                 {
                     OdinMigrationApplyRecord.RequireItem(ref delivered);
                     List<OdinMigrationApplyRecord.Entry> entries =
@@ -219,7 +227,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                         OdinMigrationApplyRecord.RequireItem(ref delivered);
                         List<OdinMigrationApplyRecord.Reference> values =
                             new List<OdinMigrationApplyRecord.Reference>();
-                        foreach (string address in dictionary.Values[entry])
+                        foreach (
+                            string address in dictionary.Values[entry].AsValueEnumerableRequired()
+                        )
                         {
                             OdinMigrationApplyRecord.RequireItem(ref delivered);
                             if (!identities.TryGetValue(address, out string identity))

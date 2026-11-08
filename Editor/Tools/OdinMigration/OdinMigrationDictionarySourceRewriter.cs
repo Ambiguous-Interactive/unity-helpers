@@ -215,7 +215,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 {
                     continue;
                 }
-                if (!string.IsNullOrEmpty(field.RewriteFailure) || field.SourceEdits.Count == 0)
+                if (
+                    !string.IsNullOrWhiteSpace(field.RewriteFailure)
+                    || field.SourceEdits.Count == 0
+                )
                 {
                     throw new InvalidDataException(
                         field.RewriteFailure

@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Editor.Validation
 {
+    using WallstopStudios.UnityHelpers.Core.Extension;
 #if UNITY_EDITOR
     using System;
     using System.Collections.Generic;
@@ -229,7 +230,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             for (int index = 0; index < assetPaths.Count; ++index)
             {
                 string assetPath = assetPaths[index];
-                if (string.IsNullOrEmpty(assetPath))
+                if (string.IsNullOrWhiteSpace(assetPath))
                 {
                     continue;
                 }
@@ -288,7 +289,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 AuthoredAssetDocument candidate = documents[document];
                 if (
                     candidate.IsStripped
-                    || string.IsNullOrEmpty(candidate.ScriptGuid)
+                    || string.IsNullOrWhiteSpace(candidate.ScriptGuid)
                     || !byScriptGuid.TryGetValue(
                         candidate.ScriptGuid,
                         out List<AuthoredRequirementField> required
@@ -324,7 +325,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                         && number == 0d;
             }
 
-            return string.IsNullOrEmpty(value)
+            return string.IsNullOrWhiteSpace(value)
                 || string.Equals(value, "\"\"", StringComparison.Ordinal)
                 || string.Equals(value, "''", StringComparison.Ordinal);
         }
@@ -726,7 +727,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         )
         {
             int fieldIndent = int.MaxValue;
-            foreach (AuthoredAssetEntry candidate in document.Entries)
+            foreach (AuthoredAssetEntry candidate in document.Entries.AsValueEnumerableRequired())
             {
                 fieldIndent = Math.Min(fieldIndent, candidate.Indent);
             }

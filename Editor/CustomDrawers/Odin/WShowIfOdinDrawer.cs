@@ -37,7 +37,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         internal static object GetConditionValue(object parent, string conditionField)
         {
-            if (parent == null || string.IsNullOrEmpty(conditionField))
+            if (parent == null || string.IsNullOrWhiteSpace(conditionField))
             {
                 return null;
             }

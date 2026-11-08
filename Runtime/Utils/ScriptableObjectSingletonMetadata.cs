@@ -56,7 +56,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
 
             string key = type.AssemblyQualifiedName;
-            if (string.IsNullOrEmpty(key) || _entries == null || _entries.Count == 0)
+            if (string.IsNullOrWhiteSpace(key) || _entries == null || _entries.Count == 0)
             {
                 entry = default;
                 return false;
@@ -146,7 +146,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// <returns>True if an entry was removed; false otherwise.</returns>
         public bool RemoveEntry(string assemblyQualifiedTypeName)
         {
-            if (string.IsNullOrEmpty(assemblyQualifiedTypeName) || _entries == null)
+            if (string.IsNullOrWhiteSpace(assemblyQualifiedTypeName) || _entries == null)
             {
                 return false;
             }

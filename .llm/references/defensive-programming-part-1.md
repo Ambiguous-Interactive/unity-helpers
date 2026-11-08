@@ -47,6 +47,21 @@ Exceptions should ONLY be thrown for:
 
 ## Defensive Patterns
 
+### String guards
+
+Default to `string.IsNullOrWhiteSpace` for validation: identifiers, GUIDs, paths, required
+names and user-facing labels must reject blank input. Audit the containing class and related
+entry points when review identifies an empty-only guard; do not fix only the highlighted line.
+Keep `IsNullOrEmpty` only where whitespace is meaningful data: literal search text, separators,
+format strings, arbitrary serialized strings and existing persisted keys. Empty-only decoding
+branches can also distinguish absent content from invalid nonempty payloads. Do not turn a
+whitespace payload into null, zero or an empty value by changing that branch. Explain the
+exception in the API contract or owned tests, and cover a whitespace value that must survive.
+Literal JSON property names, serialized effect tag and stack keys and persisted project-rule identifiers
+can contain whitespace; preserve their identity.
+Operation success must use explicit failure state, never diagnostic message emptiness.
+For example, `WProtoSizes.Utf8ByteCount(" ")` must remain one, not zero.
+
 ### 1. Guard Clauses with Graceful Returns
 
 ```csharp
@@ -95,7 +110,7 @@ public bool TryGetValue(string key, out TValue value)
 {
     value = default;
 
-    if (string.IsNullOrEmpty(key))
+    if (string.IsNullOrWhiteSpace(key))
     {
         return false;
     }
@@ -114,9 +129,9 @@ public bool TryParse(string json, out MyData result, out string error)
     result = default;
     error = null;
 
-    if (string.IsNullOrEmpty(json))
+    if (string.IsNullOrWhiteSpace(json))
     {
-        error = "JSON string is null or empty";
+        error = "JSON string is blank";
         return false;
     }
 

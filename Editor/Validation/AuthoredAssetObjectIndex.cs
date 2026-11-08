@@ -31,7 +31,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
             try
             {
-                IsImported = !string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID(assetPath));
+                IsImported = !string.IsNullOrWhiteSpace(AssetDatabase.AssetPathToGUID(assetPath));
                 if (!IsImported)
                 {
                     return;

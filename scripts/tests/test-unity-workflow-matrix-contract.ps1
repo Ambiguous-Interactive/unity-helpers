@@ -2205,6 +2205,37 @@ if (-not $defaultMatrixIsVersionGrouped) {
     Write-Info 'Checked the default Unity matrix creates exactly one job per supported version from the canonical source.'
 }
 
+function Test-ShardFailureEvidence {
+    param([string]$JobText, [string]$Suffix)
+    $title = if ($Suffix) { ' (SINGLE_THREADED)' } else { '' }
+    $redact = Get-UnityWorkflowStepText -JobText $JobText -StepName "Redact credentials from EditMode artifacts$title"
+    $upload = Get-UnityWorkflowStepText -JobText $JobText -StepName "Upload separate EditMode shard artifacts$title"
+    $capture = ".artifacts/unity/`${{ matrix.unity-version }}-e1$Suffix"
+    return (
+        $redact.Contains($capture) -and
+        $upload.Contains("path: $capture") -and
+        $upload.Contains("name: unity-`${{ matrix.unity-version }}-editmode-shard$Suffix") -and
+        $upload.Contains("steps.redact_editmode.outcome == 'success'") -and
+        $upload.Contains('always()') -and
+        $upload.Contains('retention-days: 14') -and
+        $upload.Contains('continue-on-error: true')
+    )
+}
+
+foreach ($jobCase in @(
+    @{ Text = $unityTestsMatrixJob; Suffix = '' },
+    @{ Text = $unityTestsSingleThreadedJob; Suffix = '-single-threaded' }
+)) {
+    $text = [string]$jobCase.Text
+    $suffix = [string]$jobCase.Suffix
+    if (-not (Test-ShardFailureEvidence $text $suffix) -or
+        (Test-ShardFailureEvidence ($text.Replace('-e1', '-missing')) $suffix) -or
+        (Test-ShardFailureEvidence ($text.Replace("steps.redact_editmode.outcome == 'success'", "steps.redact_editmode.outcome == 'failure'")) $suffix)) {
+        Write-Host '::error file=.github/workflows/unity-tests.yml::Early EditMode shard failures must retain separately uploaded diagnostics gated by successful redaction.'
+        $failed = $true
+    }
+}
+
 $groupedDefaultModesAreComplete = $true
 $previousRunIndex = -1
 $releaseIndex = $unityTestsMatrixJob.IndexOf('- name: Release organization Unity lock', [StringComparison]::Ordinal)
@@ -2254,7 +2285,11 @@ foreach ($mode in $defaultModeContracts) {
         $redactStep -match '(?m)^\s+continue-on-error:\s+true\s*$' -and
         -not $redactStep.Contains('matrix.test-mode') -and
         $redactStep.Contains($selection) -and
-        $redactStep.Contains("paths: $path") -and
+        ($redactStep.Contains("paths: $path") -or (
+            $key -eq 'editmode' -and
+            $redactStep.Contains('paths: |') -and
+            $redactStep -match ("(?m)^            " + [regex]::Escape($path) + "\r?$")
+        )) -and
         $uploadStep -match "(?m)^\s+id:\s+upload_$key\s*$" -and
         $uploadStep -match '(?m)^\s+continue-on-error:\s+true\s*$' -and
         -not $uploadStep.Contains('matrix.test-mode') -and
@@ -2360,7 +2395,11 @@ foreach ($mode in @(
         $verifyStep.Contains("results-dir: $path") -and
         $redactStep -match "(?m)^\s+id:\s+redact_$key\s*$" -and
         $redactStep -match '(?m)^\s+continue-on-error:\s+true\s*$' -and
-        $redactStep.Contains("paths: $path") -and
+        ($redactStep.Contains("paths: $path") -or (
+            $key -eq 'editmode' -and
+            $redactStep.Contains('paths: |') -and
+            $redactStep -match ("(?m)^            " + [regex]::Escape($path) + "\r?$")
+        )) -and
         $uploadStep -match "(?m)^\s+id:\s+upload_$key\s*$" -and
         $uploadStep -match '(?m)^\s+continue-on-error:\s+true\s*$' -and
         $uploadStep.Contains("steps.redact_$key.outcome == 'success'") -and

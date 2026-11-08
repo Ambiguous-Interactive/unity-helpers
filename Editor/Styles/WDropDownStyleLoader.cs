@@ -162,7 +162,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Styles
             string path = DirectoryHelper.ResolvePackageAssetPath(StylesRelativePath + fileName);
 
             StyleSheet styleSheet = null;
-            if (!string.IsNullOrEmpty(path))
+            if (!string.IsNullOrWhiteSpace(path))
             {
                 styleSheet = AssetDatabase.LoadAssetAtPath<StyleSheet>(path);
             }

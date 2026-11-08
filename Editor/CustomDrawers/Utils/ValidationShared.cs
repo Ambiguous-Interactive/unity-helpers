@@ -71,7 +71,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         /// <returns>The calculated height in pixels.</returns>
         public static float GetHelpBoxHeight(string message)
         {
-            if (string.IsNullOrEmpty(message))
+            if (string.IsNullOrWhiteSpace(message))
             {
                 return EditorGUIUtility.singleLineHeight * 2f;
             }

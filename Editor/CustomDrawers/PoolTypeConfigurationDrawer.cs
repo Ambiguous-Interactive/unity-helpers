@@ -224,7 +224,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             float totalHeight = lineHeight + (lineCount * (lineHeight + spacing));
 
             DrawerState state = GetState(property);
-            if (!state.isValid && !string.IsNullOrEmpty(state.statusMessage))
+            if (!state.isValid && !string.IsNullOrWhiteSpace(state.statusMessage))
             {
                 state.statusContent.text = state.statusMessage;
                 float statusWidth = GetStatusBoxWidth();
@@ -234,7 +234,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 );
                 totalHeight += statusHeight + spacing;
             }
-            else if (state.isValid && !string.IsNullOrEmpty(state.statusMessage))
+            else if (state.isValid && !string.IsNullOrWhiteSpace(state.statusMessage))
             {
                 state.statusContent.text = state.statusMessage;
                 float statusWidth = GetStatusBoxWidth();
@@ -333,7 +333,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             EditorGUI.PropertyField(typeNameRect, typeNameProp, TypeNameLabel);
             currentY += lineHeight + spacing;
 
-            if (!string.IsNullOrEmpty(state.statusMessage))
+            if (!string.IsNullOrWhiteSpace(state.statusMessage))
             {
                 state.statusContent.text = state.statusMessage;
                 float statusHeight = EditorStyles.helpBox.CalcHeight(

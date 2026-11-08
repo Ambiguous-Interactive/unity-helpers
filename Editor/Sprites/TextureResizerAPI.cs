@@ -167,7 +167,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 foreach (string guid in AssetDatabase.FindAssets("t:texture2D", sourceFolders))
                 {
                     string path = AssetDatabase.GUIDToAssetPath(guid);
-                    if (string.IsNullOrEmpty(path))
+                    if (string.IsNullOrWhiteSpace(path))
                     {
                         continue;
                     }
@@ -227,7 +227,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
                 string assetPath = AssetDatabase.GetAssetPath(texture);
                 if (
-                    string.IsNullOrEmpty(assetPath)
+                    string.IsNullOrWhiteSpace(assetPath)
                     || !string.Equals(
                         Path.GetExtension(assetPath),
                         ".png",
@@ -296,7 +296,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         }
 
                         string assetPath = AssetDatabase.GetAssetPath(texture);
-                        if (string.IsNullOrEmpty(assetPath))
+                        if (string.IsNullOrWhiteSpace(assetPath))
                         {
                             continue;
                         }

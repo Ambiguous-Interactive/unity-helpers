@@ -559,6 +559,7 @@ runTest("no linter in scripts/ has been left unreachable", () => {
   // (#453). An allowlist whose entries are prose excuses whatever is put in it -- the quiet half of
   // #445, one level up: the thing named still exists, so nothing goes red.
   const runElsewhere = new Map([
+    ["scripts/lint-drawer-multiobject.ps1", "drawer-controls"],
     ["scripts/lint-gitignore-docs.ps1", "gitignore-controls"],
     ["scripts/lint-workflow-run-expression-length.ps1", "workflow-expression-controls"],
     ["scripts/lint-concurrent-cache-fill.ps1", "cache-controls"],
@@ -569,7 +570,7 @@ runTest("no linter in scripts/ has been left unreachable", () => {
     ["scripts/lint-conditional-call-chains.ps1", "csharp-controls"],
     ["scripts/lint-odin-undo-safety.ps1", "csharp-controls"],
     ["scripts/lint-llm-instructions.ps1", "workflow"],
-    ["scripts/lint-skill-sizes.ps1", "workflow"],
+    ["scripts/lint-skill-sizes.ps1", "size-controls"],
     ["scripts/lint-unity-test-modules.ps1", "module-controls"],
     ["scripts/lint_unity_test_modules.py", "workflow"],
     ["scripts/lint-csharp-format.ps1", "preflight"],
@@ -580,6 +581,14 @@ runTest("no linter in scripts/ has been left unreachable", () => {
   // Only the kinds something actually claims. A registered predicate nothing uses is a dead branch
   // inside the one test whose whole point is that a claim has to be executable.
   const owners = new Map([
+    [
+      "size-controls",
+      (file) => registeredControlsInvoke(file, "scripts/tests/test_skill_sizes.py")
+    ],
+    [
+      "drawer-controls",
+      (file) => registeredControlsInvoke(file, "scripts/tests/test_drawer_multiobject.py")
+    ],
     [
       "gitignore-controls",
       (file) => registeredControlsInvoke(file, "scripts/tests/test_gitignore_docs.py")

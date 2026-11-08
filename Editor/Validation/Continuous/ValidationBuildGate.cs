@@ -10,8 +10,26 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
     internal sealed class ValidationBuildGate : IPreprocessBuildWithReport
     {
+        internal const string SuppressionsFile = "ValidationSuppressions.txt";
+
         /// <inheritdoc />
         public int callbackOrder => -1000;
+
+        internal static string[] CreateCommandLine(
+            ValidationSeverity severity,
+            bool hasSuppressions
+        )
+        {
+            return hasSuppressions
+                ? new[]
+                {
+                    ValidationBatch.FailOnArgument,
+                    severity.ToString(),
+                    ValidationBatch.SuppressionsArgument,
+                    SuppressionsFile,
+                }
+                : new[] { ValidationBatch.FailOnArgument, severity.ToString() };
+        }
 
         /// <inheritdoc />
         public void OnPreprocessBuild(BuildReport report)
@@ -24,15 +42,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             if (!profile.gateBuild)
                 return;
             ValidationBatch.Result result = ValidationBatch.Run(
-                new[]
-                {
-                    ValidationBatch.FailOnArgument,
-                    profile.failOn.ToString(),
-                    ValidationBatch.SuppressionsArgument,
-                    File.Exists("ValidationSuppressions.txt")
-                        ? "ValidationSuppressions.txt"
-                        : string.Empty,
-                }
+                CreateCommandLine(profile.failOn, File.Exists(SuppressionsFile))
             );
             if (result.Failed)
                 throw new BuildFailedException(

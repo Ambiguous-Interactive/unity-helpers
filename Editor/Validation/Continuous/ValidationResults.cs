@@ -230,7 +230,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             for (int index = 0; index < findings.Count; ++index)
             {
                 ValidationFinding finding = findings[index];
-                if (string.IsNullOrEmpty(finding.AssetGuid))
+                if (string.IsNullOrWhiteSpace(finding.AssetGuid))
                 {
                     continue;
                 }
@@ -281,7 +281,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         /// </param>
         public static void Replace(string assetGuid, IReadOnlyList<ValidationFinding> findings)
         {
-            if (string.IsNullOrEmpty(assetGuid))
+            if (string.IsNullOrWhiteSpace(assetGuid))
             {
                 return;
             }
@@ -307,7 +307,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         /// <returns><c>true</c> when the asset had a recorded result.</returns>
         public static bool Forget(string assetGuid)
         {
-            if (string.IsNullOrEmpty(assetGuid) || !ByAsset.Remove(assetGuid))
+            if (string.IsNullOrWhiteSpace(assetGuid) || !ByAsset.Remove(assetGuid))
             {
                 return false;
             }
@@ -339,7 +339,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             for (int index = 0; index < assetGuids.Count; ++index)
             {
                 string assetGuid = assetGuids[index];
-                if (string.IsNullOrEmpty(assetGuid) || !ByAsset.Remove(assetGuid))
+                if (string.IsNullOrWhiteSpace(assetGuid) || !ByAsset.Remove(assetGuid))
                 {
                     continue;
                 }
@@ -414,7 +414,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             for (int index = 0; index < findings.Count; ++index)
             {
                 string assetGuid = findings[index].AssetGuid;
-                if (string.IsNullOrEmpty(assetGuid) || !targetGuids.Contains(assetGuid))
+                if (string.IsNullOrWhiteSpace(assetGuid) || !targetGuids.Contains(assetGuid))
                 {
                     return false;
                 }

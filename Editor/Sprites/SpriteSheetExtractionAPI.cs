@@ -180,7 +180,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     foreach (string guid in guids)
                     {
                         string assetPath = AssetDatabase.GUIDToAssetPath(guid);
-                        if (string.IsNullOrEmpty(assetPath) || !HasImageExtension(assetPath))
+                        if (string.IsNullOrWhiteSpace(assetPath) || !HasImageExtension(assetPath))
                         {
                             continue;
                         }

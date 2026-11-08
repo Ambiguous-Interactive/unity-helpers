@@ -24,7 +24,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
 
             string name = assembly.GetName().Name;
-            if (!string.IsNullOrEmpty(name) && ContainsTestMarker(name))
+            if (!string.IsNullOrWhiteSpace(name) && ContainsTestMarker(name))
             {
                 return true;
             }
@@ -48,7 +48,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
 
             string ns = type.Namespace;
-            if (string.IsNullOrEmpty(ns))
+            if (string.IsNullOrWhiteSpace(ns))
             {
                 return ContainsTestMarker(type.Name) || IsTestAssembly(type.Assembly);
             }
@@ -66,7 +66,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// </summary>
         internal static bool ContainsTestMarker(string value)
         {
-            if (string.IsNullOrEmpty(value))
+            if (string.IsNullOrWhiteSpace(value))
             {
                 return false;
             }

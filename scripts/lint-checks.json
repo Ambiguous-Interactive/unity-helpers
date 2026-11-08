@@ -90,14 +90,24 @@
     "run": "npm run lint:license-headers"
   },
   {
+    "id": "skill-sizes-test",
+    "name": "Skill size linter self-test",
+    "run": "npm run test:skill-sizes"
+  },
+  {
+    "id": "skill-sizes",
+    "name": "Authored instruction sizes",
+    "run": "npm run lint:skill-sizes"
+  },
+  {
     "id": "drawer-multiobject-test",
     "name": "Drawer multiobject linter self-test",
-    "run": "pwsh -NoProfile -File scripts/tests/test-lint-drawer-multiobject.ps1 -VerboseOutput"
+    "run": "npm run test:drawer-multiobject"
   },
   {
     "id": "drawer-multiobject",
     "name": "Drawer multiobject",
-    "run": "pwsh -NoProfile -File scripts/lint-drawer-multiobject.ps1 -VerboseOutput"
+    "run": "npm run lint:drawer-multiobject"
   },
   {
     "id": "odin-undo-safety-test",
@@ -347,7 +357,7 @@
   {
     "id": "unity-mode-coordinator",
     "name": "Concurrent Unity mode controls",
-    "run": "uv run --project scripts/python~ --locked pytest scripts/tests/test_ci_modes.py -q"
+    "run": "npm run test:unity-modes"
   },
   {
     "id": "report-slow-tests",

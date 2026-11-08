@@ -4194,7 +4194,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             );
 
             ValidateRegex();
-            if (!string.IsNullOrEmpty(_regexError))
+            if (!string.IsNullOrWhiteSpace(_regexError))
             {
                 EditorGUILayout.HelpBox($"Invalid regex: {_regexError}", MessageType.Error);
             }
@@ -4549,7 +4549,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             if (GUILayout.Button("Find Sprite Sheets"))
             {
-                if (!string.IsNullOrEmpty(_regexError))
+                if (!string.IsNullOrWhiteSpace(_regexError))
                 {
                     ShowNotification(new GUIContent("Invalid regex. Fix it before searching."));
                     return;

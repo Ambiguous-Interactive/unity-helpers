@@ -95,7 +95,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             {
                 string assetPath = AssetDatabase.GUIDToAssetPath(guid);
                 if (
-                    string.IsNullOrEmpty(assetPath)
+                    string.IsNullOrWhiteSpace(assetPath)
                     || !AuthoredAssetYaml.IsUnderAnyPrefix(assetPath, assetPathPrefixes)
                 )
                 {

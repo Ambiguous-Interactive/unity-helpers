@@ -181,7 +181,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             }
             string path = definition.pathFilter;
             if (
-                !string.IsNullOrEmpty(path)
+                !string.IsNullOrWhiteSpace(path)
                 && (
                     path[0] == '/'
                     || path[0] == '\\'

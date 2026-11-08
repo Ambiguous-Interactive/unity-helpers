@@ -16,6 +16,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             Assert.IsEmpty(AnalyzerPolicyCodeHighlighting.Format(code));
         }
 
+        [TestCase(true)]
+        [TestCase(false)]
+        public void WhitespaceSourcePreservesItsLiteralLayout(bool darkTheme)
+        {
+            Assert.AreEqual(
+                "<noparse>\u00a0\u00a0\n\t\u2003</noparse>",
+                AnalyzerPolicyCodeHighlighting.Format("  \n\t\u2003", darkTheme)
+            );
+        }
+
         [Test]
         public void WarmSnippetsReuseTheFormattedStringInEachTheme()
         {

@@ -25,6 +25,49 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             ResetEffectHandleId();
         }
 
+        [TestCase(null, TestName = "InvalidTag.Null.IsRejected")]
+        [TestCase("", TestName = "InvalidTag.Empty.IsRejected")]
+        public void InvalidTagsDoNotChangeState(string tag)
+        {
+            GameObject entity = CreateTrackedGameObject("BlankTag", typeof(TagHandler));
+            TagHandler handler = entity.GetComponent<TagHandler>();
+            int events = 0;
+            handler.OnTagAdded += _ => ++events;
+            handler.ApplyTag(tag);
+            Assert.That(handler.GetActiveTags(), Is.Empty);
+            Assert.That(handler.HasTag(tag), Is.False);
+            Assert.That(handler.TryGetTagCount(tag, out int count), Is.False);
+            Assert.That(count, Is.EqualTo(0));
+            Assert.That(events, Is.EqualTo(0));
+        }
+
+        [TestCase(null, TestName = "InvalidTrackedTag.Null.IsRejected")]
+        [TestCase("", TestName = "InvalidTrackedTag.Empty.IsRejected")]
+        public void InvalidTrackedTagsDoNotHideValidTags(string tag)
+        {
+            GameObject entity = CreateTrackedGameObject("TrackedBlankTag", typeof(TagHandler));
+            TagHandler handler = entity.GetComponent<TagHandler>();
+            AttributeEffect effect = CreateEffect(
+                "BlankAndValidTags",
+                item =>
+                {
+                    item.effectTags.Add(tag);
+                    item.effectTags.Add(MarkedTag);
+                }
+            );
+            EffectHandle handle = EffectHandle.CreateInstance(effect);
+            int events = 0;
+            handler.OnTagAdded += _ => ++events;
+            handler.ForceApplyTags(handle);
+            Assert.That(handler.GetActiveTags(), Is.EqualTo(new[] { MarkedTag }));
+            Assert.That(handler.HasTag(tag), Is.False);
+            Assert.That(handler.TryGetTagCount(tag, out int count), Is.False);
+            Assert.That(count, Is.EqualTo(0));
+            Assert.That(events, Is.EqualTo(1));
+            Assert.That(handler.ForceRemoveTags(handle), Is.True);
+            Assert.That(handler.GetActiveTags(), Is.Empty);
+        }
+
         [UnityTest]
         public IEnumerator ApplyAndRemoveTagRaisesEvents()
         {

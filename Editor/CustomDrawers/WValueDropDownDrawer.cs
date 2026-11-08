@@ -802,7 +802,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private static object GetFieldValueFromPropertyPath(object target, string propertyPath)
         {
-            if (target == null || string.IsNullOrEmpty(propertyPath))
+            if (target == null || string.IsNullOrWhiteSpace(propertyPath))
             {
                 return null;
             }
@@ -1266,7 +1266,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             object value
         )
         {
-            if (target == null || string.IsNullOrEmpty(propertyPath))
+            if (target == null || string.IsNullOrWhiteSpace(propertyPath))
             {
                 return;
             }

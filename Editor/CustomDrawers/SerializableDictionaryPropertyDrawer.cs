@@ -348,7 +348,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             if (!string.IsNullOrEmpty(PropertyPathFilter))
             {
-                if (string.IsNullOrEmpty(propertyPath))
+                if (string.IsNullOrWhiteSpace(propertyPath))
                 {
                     return false;
                 }
@@ -550,7 +550,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             if (!string.IsNullOrEmpty(PropertyPathFilter))
             {
-                if (string.IsNullOrEmpty(propertyPath))
+                if (string.IsNullOrWhiteSpace(propertyPath))
                 {
                     return false;
                 }
@@ -1658,7 +1658,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     int enumNumeric = value != null ? Convert.ToInt32(value) : 0;
                     property.intValue = enumNumeric;
                     string enumName = value != null ? Enum.GetName(type, value) : null;
-                    if (!string.IsNullOrEmpty(enumName))
+                    if (!string.IsNullOrWhiteSpace(enumName))
                     {
                         int nameIndex = Array.IndexOf(property.enumNames, enumName);
                         property.enumValueIndex = 0 <= nameIndex ? nameIndex : enumNumeric;
@@ -2421,7 +2421,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private static void DrawDuplicateTooltip(Rect rect, string tooltip)
         {
-            if (string.IsNullOrEmpty(tooltip) || Event.current.type != EventType.Repaint)
+            if (string.IsNullOrWhiteSpace(tooltip) || Event.current.type != EventType.Repaint)
             {
                 return;
             }
@@ -2451,7 +2451,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private static void DrawNullTooltip(Rect rect, string tooltip)
         {
-            if (string.IsNullOrEmpty(tooltip) || Event.current.type != EventType.Repaint)
+            if (string.IsNullOrWhiteSpace(tooltip) || Event.current.type != EventType.Repaint)
             {
                 return;
             }
@@ -4650,7 +4650,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private static object GetParentObject(Object target, string propertyPath)
         {
-            if (target == null || string.IsNullOrEmpty(propertyPath))
+            if (target == null || string.IsNullOrWhiteSpace(propertyPath))
             {
                 return null;
             }
@@ -4675,7 +4675,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private static string GetFinalPathSegment(string propertyPath)
         {
-            if (string.IsNullOrEmpty(propertyPath))
+            if (string.IsNullOrWhiteSpace(propertyPath))
             {
                 return string.Empty;
             }
@@ -4688,7 +4688,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private static object GetPathComponentValue(object source, string path)
         {
-            if (source == null || string.IsNullOrEmpty(path))
+            if (source == null || string.IsNullOrWhiteSpace(path))
             {
                 return null;
             }
@@ -4717,7 +4717,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private static bool SetPathComponentValue(object source, string path, object value)
         {
-            if (source == null || string.IsNullOrEmpty(path))
+            if (source == null || string.IsNullOrWhiteSpace(path))
             {
                 return false;
             }
@@ -4759,7 +4759,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private static object GetMemberValue(object source, string memberName)
         {
-            if (source == null || string.IsNullOrEmpty(memberName))
+            if (source == null || string.IsNullOrWhiteSpace(memberName))
             {
                 return null;
             }
@@ -4783,7 +4783,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private static bool SetMemberValue(object source, string memberName, object value)
         {
-            if (source == null || string.IsNullOrEmpty(memberName))
+            if (source == null || string.IsNullOrWhiteSpace(memberName))
             {
                 return false;
             }
@@ -5337,7 +5337,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private static object GetTargetObjectOfProperty(object target, string propertyPath)
         {
-            if (target == null || string.IsNullOrEmpty(propertyPath))
+            if (target == null || string.IsNullOrWhiteSpace(propertyPath))
             {
                 return null;
             }
@@ -5378,7 +5378,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     element = element.Substring(0, bracketIndex);
                 }
 
-                if (!string.IsNullOrEmpty(element))
+                if (!string.IsNullOrWhiteSpace(element))
                 {
                     if (
                         ReflectionHelpers.TryGetField(
@@ -5595,7 +5595,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             bool hasNullKeys = nullKeyState is { HasNullKeys: true };
             bool hasDuplicates =
                 duplicateState is { HasDuplicates: true }
-                && !string.IsNullOrEmpty(duplicateState.SummaryTooltip);
+                && !string.IsNullOrWhiteSpace(duplicateState.SummaryTooltip);
 
             PendingEntry pending = GetOrCreatePendingEntry(
                 property,
@@ -6252,7 +6252,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             Type keyType
         )
         {
-            if (string.IsNullOrEmpty(cacheKey))
+            if (string.IsNullOrWhiteSpace(cacheKey))
             {
                 return null;
             }
@@ -6317,7 +6317,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             Type keyType
         )
         {
-            if (string.IsNullOrEmpty(cacheKey))
+            if (string.IsNullOrWhiteSpace(cacheKey))
             {
                 return null;
             }
@@ -6458,7 +6458,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         internal void MarkListCacheDirty(string cacheKey)
         {
-            if (string.IsNullOrEmpty(cacheKey))
+            if (string.IsNullOrWhiteSpace(cacheKey))
             {
                 return;
             }
@@ -6732,7 +6732,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     listKey = GetListKey(dictionaryProperty);
                     InvalidateKeyCache(listKey);
                     MarkListCacheDirty(listKey);
-                    if (!string.IsNullOrEmpty(listKey))
+                    if (!string.IsNullOrWhiteSpace(listKey))
                     {
                         _sortedOrderHashes[listKey] = ComputeKeyOrderHash(keysProperty, keyType);
                     }
@@ -6823,7 +6823,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         internal void InvalidatePendingDuplicateCache(string cacheKey)
         {
-            if (string.IsNullOrEmpty(cacheKey))
+            if (string.IsNullOrWhiteSpace(cacheKey))
             {
                 return;
             }
@@ -7038,7 +7038,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
                         if (
                             duplicateState is { HasDuplicates: true }
-                            && !string.IsNullOrEmpty(duplicateState.SummaryTooltip)
+                            && !string.IsNullOrWhiteSpace(duplicateState.SummaryTooltip)
                         )
                         {
                             Rect warningRect = new(position.x, y, position.width, warningHeight);
@@ -7141,7 +7141,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             out DuplicateKeyState state
         )
         {
-            if (string.IsNullOrEmpty(cacheKey))
+            if (string.IsNullOrWhiteSpace(cacheKey))
             {
                 info = null;
                 state = null;
@@ -7159,7 +7159,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private bool TryGetNullKeyInfo(string cacheKey, int arrayIndex, out NullKeyInfo info)
         {
-            if (string.IsNullOrEmpty(cacheKey))
+            if (string.IsNullOrWhiteSpace(cacheKey))
             {
                 info = null;
                 return false;
@@ -7328,7 +7328,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         )
         {
             if (
-                string.IsNullOrEmpty(cacheKey)
+                string.IsNullOrWhiteSpace(cacheKey)
                 || cache?.entries == null
                 || cache.entries.Count == 0
                 || valuesProperty == null
@@ -7744,7 +7744,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             string listKey = GetListKey(dictionaryProperty);
             bool canHashOrder =
-                keyType != null && keysProperty != null && !string.IsNullOrEmpty(listKey);
+                keyType != null && keysProperty != null && !string.IsNullOrWhiteSpace(listKey);
             int currentOrderHash = 0;
             if (canHashOrder)
             {
@@ -8444,7 +8444,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                         keyType,
                         valueType
                     );
-                    if (string.IsNullOrEmpty(infoMessage) && isBlankStringKey)
+                    if (string.IsNullOrWhiteSpace(infoMessage) && isBlankStringKey)
                     {
                         string descriptor = string.IsNullOrEmpty(pendingKeyString)
                             ? "empty"
@@ -8452,7 +8452,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                         infoMessage = $"Adding entry with {descriptor} string key.";
                     }
                 }
-                if (0f < availableInfoWidth && !string.IsNullOrEmpty(infoMessage))
+                if (0f < availableInfoWidth && !string.IsNullOrWhiteSpace(infoMessage))
                 {
                     Rect infoRect = new(infoX, buttonsRect.y, availableInfoWidth, rowHeight);
                     GUI.Label(infoRect, infoMessage, EditorStyles.miniLabel);
@@ -8873,7 +8873,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private void CacheValueType(string cacheKey, Type valueType)
         {
-            if (string.IsNullOrEmpty(cacheKey) || valueType == null)
+            if (string.IsNullOrWhiteSpace(cacheKey) || valueType == null)
             {
                 return;
             }
@@ -8889,7 +8889,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private Type EnsureValueTypeCached(string cacheKey, SerializedProperty dictionaryProperty)
         {
-            if (string.IsNullOrEmpty(cacheKey))
+            if (string.IsNullOrWhiteSpace(cacheKey))
             {
                 return null;
             }
@@ -8967,7 +8967,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private void MarkDuplicateStateDirty(string cacheKey)
         {
-            if (string.IsNullOrEmpty(cacheKey))
+            if (string.IsNullOrWhiteSpace(cacheKey))
             {
                 return;
             }
@@ -8980,7 +8980,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private void MarkNullKeyStateDirty(string cacheKey)
         {
-            if (string.IsNullOrEmpty(cacheKey))
+            if (string.IsNullOrWhiteSpace(cacheKey))
             {
                 return;
             }
@@ -9242,7 +9242,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             public int Index { get; }
 
-            public bool IsValid => !string.IsNullOrEmpty(CacheKey) && 0 <= Index;
+            public bool IsValid => !string.IsNullOrWhiteSpace(CacheKey) && 0 <= Index;
 
             public RowFoldoutKey(string cacheKey, int index)
             {

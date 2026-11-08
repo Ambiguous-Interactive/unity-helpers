@@ -522,7 +522,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
             // Create parent folders through AssetDatabase outside active batches before creating the cache asset.
             string directory = System.IO.Path.GetDirectoryName(assetPath);
             if (
-                !string.IsNullOrEmpty(directory)
+                !string.IsNullOrWhiteSpace(directory)
                 && !AssetDatabaseBatchHelper.EnsureAssetFolder(directory)
             )
             {
@@ -571,7 +571,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
         )
         {
             string guid = AssetDatabase.AssetPathToGUID(assetPath);
-            if (!string.IsNullOrEmpty(guid))
+            if (!string.IsNullOrWhiteSpace(guid))
             {
                 return ScriptableObjectSingletonMetadataUtility.UpdateEntry(
                     typeof(AttributeMetadataCache),

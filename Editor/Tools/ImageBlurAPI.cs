@@ -281,7 +281,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
             outputPath = producedPath;
             error = failure;
-            return wroteOutput && string.IsNullOrEmpty(failure);
+            return wroteOutput && string.IsNullOrWhiteSpace(failure);
         }
 
         /// <summary>
@@ -353,7 +353,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
         private static string AppendError(string existing, string additional)
         {
-            return string.IsNullOrEmpty(existing) ? additional : $"{existing} {additional}";
+            return string.IsNullOrWhiteSpace(existing) ? additional : $"{existing} {additional}";
         }
     }
 #endif

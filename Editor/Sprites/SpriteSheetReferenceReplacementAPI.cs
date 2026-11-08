@@ -79,8 +79,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 if (
                     pair.Key == null
                     || pair.Value == null
-                    || string.IsNullOrEmpty(AssetDatabase.GetAssetPath(pair.Key))
-                    || string.IsNullOrEmpty(AssetDatabase.GetAssetPath(pair.Value))
+                    || string.IsNullOrWhiteSpace(AssetDatabase.GetAssetPath(pair.Key))
+                    || string.IsNullOrWhiteSpace(AssetDatabase.GetAssetPath(pair.Value))
                 )
                 {
                     result.AddError(

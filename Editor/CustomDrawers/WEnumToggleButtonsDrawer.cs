@@ -913,7 +913,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 }
 
                 string name = Enum.GetName(enumType, value);
-                if (string.IsNullOrEmpty(name))
+                if (string.IsNullOrWhiteSpace(name))
                 {
                     continue;
                 }
@@ -1295,7 +1295,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             string fallback = value.ToString();
-            return string.IsNullOrEmpty(fallback) ? "(empty)" : fallback;
+            return string.IsNullOrWhiteSpace(fallback) ? "(empty)" : fallback;
         }
 
         private static ulong ReadEnumValue(SerializedProperty property)

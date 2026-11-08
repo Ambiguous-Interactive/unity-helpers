@@ -119,7 +119,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             try
             {
                 string declared = rule.RuleId;
-                return string.IsNullOrEmpty(declared) ? rule.GetType().FullName : declared;
+                return string.IsNullOrWhiteSpace(declared) ? rule.GetType().FullName : declared;
             }
             catch (Exception)
             {

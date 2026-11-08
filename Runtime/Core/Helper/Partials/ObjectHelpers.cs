@@ -329,7 +329,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             if (Application.isEditor && !Application.isPlaying)
             {
                 string assetPath = AssetDatabase.GetAssetPath(obj);
-                if (!string.IsNullOrEmpty(assetPath))
+                if (!string.IsNullOrWhiteSpace(assetPath))
                 {
                     Resources.UnloadAsset(obj);
                     return;

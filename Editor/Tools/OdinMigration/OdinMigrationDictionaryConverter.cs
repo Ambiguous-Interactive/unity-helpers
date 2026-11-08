@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
     using System.IO;
     using System.Text;
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Editor.Validation;
 
     internal static class OdinMigrationDictionaryConverter
@@ -137,7 +138,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 .Append(":\n    ")
                 .Append(SerializableDictionarySerializedPropertyNames.Keys)
                 .Append(": ");
-            foreach (int key in keys)
+            foreach (int key in keys.AsValueEnumerableRequired())
             {
                 uint bits = unchecked((uint)key);
                 for (int shift = 0; shift < 32; shift += 8)
@@ -157,7 +158,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 return result.ToString();
             }
             result.Append('\n');
-            foreach (IReadOnlyList<string> references in values)
+            foreach (IReadOnlyList<string> references in values.AsValueEnumerableRequired())
             {
                 result
                     .Append("    - ")
@@ -169,7 +170,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                     continue;
                 }
                 result.Append('\n');
-                foreach (string reference in references)
+                foreach (string reference in references.AsValueEnumerableRequired())
                 {
                     result.Append("      - ").Append(reference).Append('\n');
                 }
@@ -389,7 +390,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
 
         private static bool IsIdentifier(string name)
         {
-            if (string.IsNullOrEmpty(name))
+            if (string.IsNullOrWhiteSpace(name))
             {
                 return false;
             }
@@ -642,7 +643,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             IReadOnlyList<AuthoredAssetDocument> documents = AuthoredAssetYaml.ReadDocuments(lines);
             if (documents.Count == 1)
             {
-                foreach (AuthoredAssetEntry entry in documents[0].Entries)
+                foreach (
+                    AuthoredAssetEntry entry in documents[0].Entries.AsValueEnumerableRequired()
+                )
                 {
                     if (entry.Indent == 4 && !PayloadFields.Contains(entry.Key))
                     {
