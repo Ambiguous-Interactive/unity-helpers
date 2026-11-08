@@ -147,6 +147,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 "Boolean bitwise operators",
                 "Reports bitwise operators on bool and bool? operands. Preserve required evaluations and nullable truth tables when replacing them."
             ),
+            new(
+                "WUH027",
+                "Implicit caller names",
+                "Reports explicit current-method names passed to CallerMemberName parameters when omission preserves overload selection."
+            ),
         };
 
         /// <summary>Enables or disables every Unity Helpers analyzer in the default ruleset.</summary>

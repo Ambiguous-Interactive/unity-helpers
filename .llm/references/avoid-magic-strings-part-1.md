@@ -51,6 +51,13 @@ throw new ArgumentNullException(nameof(value));
 Debug.Log($"Error in {nameof(ProcessItems)} method");
 ```
 
+For diagnostic helpers that identify the calling member, use an optional
+`[CallerMemberName] string caller = null` parameter and omit it at call sites.
+Do not pass `nameof(CurrentMethod)` repeatedly. Forward an already captured caller
+through wrappers; keep explicit business labels, reflection targets, asset keys,
+and undo action names when those are the intended data. `WUH027` reports redundant
+explicit names on attributed parameters when omission preserves overload selection.
+
 ### 2. Use `typeof()` for Type Names
 
 Use `typeof().Name` or `typeof().FullName` for type name references:

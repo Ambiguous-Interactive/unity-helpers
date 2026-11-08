@@ -67,6 +67,7 @@ command after resolving the failure. Temporary directories are excluded from Uni
 | [`WUH024`](#wuh024-typed-enum-helpers-opt-in)                            | Enum operations with typed helpers (**off by default**)               |
 | [`WUH025`](#wuh025-unsupported-relational-field)                         | A relational field with an unsupported type                           |
 | [`WUH026`](#wuh026-boolean-bitwise-operators)                            | Bitwise operators on boolean operands                                 |
+| [`WUH027`](#wuh027-implicit-caller-names)                                | Explicit caller names the compiler can provide                        |
 
 These are a different family from the `WPROTO###` serialization diagnostics, and they follow a
 different policy on purpose:
@@ -1206,6 +1207,37 @@ Generic fields whose concrete element type is not yet known still require runtim
 All interface contracts remain supported, including interfaces that also implement enumeration;
 a component can implement these interfaces. The analyzer does not infer collection storage from
 an interface name. Runtime guards remain necessary for older compiled assemblies and reflection.
+
+## `WUH027`: implicit caller names
+
+A helper can capture its caller with an optional `[CallerMemberName] string caller = null`
+parameter. Omit that argument instead of repeating the calling method's name:
+
+```csharp
+public class CallerExample
+{
+    private void RefreshView()
+    {
+        ReportStatus();
+    }
+
+    private void ReportStatus([System.Runtime.CompilerServices.CallerMemberName] string caller = null)
+    {
+        UnityEngine.Debug.Log(caller);
+    }
+}
+```
+
+`WUH027` reports explicit constants, including `nameof(RefreshView)`, whose value
+matches an ordinary calling method and whose removal selects the same overload.
+It does not rewrite code. Generated sources, local functions, implicit arguments,
+forwarded caller variables, different labels, dependent caller-argument expressions,
+and changes to overload selection are excluded. Properties and constructors are outside this rule's scope. Keep explicit
+operation labels and member names used as data; they serve a different contract.
+
+The diagnostic is a suppressible warning by default. The package promotes it to an
+error in its own check projects. The Analyzer Policy window includes compiled
+before-and-after examples.
 
 ## `WUH026`: boolean bitwise operators
 

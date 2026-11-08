@@ -6,6 +6,42 @@ Numbers below are grouped by operating system. A section reading `pending` means
 
 Parent and child queries use pooled typed buffers. A buffer containing `Component` appends through `List<Component>.AddRange`; buffers containing derived components retain typed enumeration. A `List<DerivedComponent>` does not implement `ICollection<Component>`, so passing it to `AddRange` misses the bulk-copy path and boxes its enumerator. Both transfer paths preserve query order and existing destination entries. The benchmark tables below predate this transfer change.
 
+## Collection traversal comparison (2026-11-08)
+
+The [raw samples, source hashes and process receipts](./relational-collection-evidence.json)
+compare the previous implementation with the current collection path on Windows x64,
+Unity 6000.6.7f1. Each cell uses seven rounds in each of three independent processes.
+The table gives candidate time divided by baseline time, using the median of process
+medians. A value below 1 is faster; ranges cover shallow and deep hierarchies.
+
+| Candidates | Sealed fields, editor Mono | Sealed fields, Release IL2CPP |
+| ---------: | -------------------------: | ----------------------------: |
+|          0 |                  0.83–0.84 |                     0.89–0.92 |
+|          1 |                  0.77–0.86 |                     0.92–0.94 |
+|          4 |                  0.52–0.52 |                     0.45–0.46 |
+|         16 |                  0.47–0.47 |                     0.36–0.36 |
+|         64 |                  0.42–0.42 |                     0.30–0.31 |
+|        500 |                  0.41–0.43 |                     0.28–0.28 |
+
+These cells assign an array, list and set together, including the array allocation.
+They use `SpriteRenderer` for sealed fields. The corresponding `BoxCollider`
+fallback cells span 0.96–1.05 in editor Mono and 0.98–1.09 in IL2CPP; no universal
+fallback speedup is claimed. A broader fallback rewrite was rejected after a 1.20×
+regression in one deep nonsealed case; its negative example is in the evidence.
+
+The fast path retains the native query for zero or one match and traverses breadth
+first for larger results. Its fallback callbacks live in a separate method, so
+bypassing that method does not create their closures. Three editor profiler controls
+for warmed sealed list/set fields (0, 1 and 64 matches) observe zero allocation
+events after verifying positive allocation and negative reuse controls. Arrays and
+first-use storage are outside that allocation claim.
+
+These are latest-editor observations, not Unity 2021.3 floor, WebGL, cold-plan,
+retention or whole-audit qualification. Issue [#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)
+remains open. Both arms' editor build logs contain the same temporary-allocator
+teardown warning; the measured player logs do not. The historical tables below
+predate these collection changes and use a different harness.
+
 ## Windows (Editor/Player)
 
 <!-- RELATIONAL_COMPONENTS_WINDOWS_START -->
@@ -72,3 +108,43 @@ Pending: run the relational component benchmark suite on the target platform to 
 ## Refreshing these numbers
 
 Run `RelationalComponentBenchmarkTests.Benchmark` from Unity's Test Runner. It rewrites the section matching the operating system it ran on and leaves the others alone.
+
+## Replaying collection comparisons in a player
+
+The separate player compares complete child assignments (array, list, and set in
+one call) and IntMap clear/refill cycles. It has 24 child scenarios: 0, 1, 4, 16,
+64, or 500 candidates, shallow or deep, with sealed `SpriteRenderer` and nonsealed
+`BoxCollider` fields. Ten IntMap cases include sparse tables and both sides of
+the clearing threshold. It checks results and emits seven timing rounds per case.
+
+1. Create a separate Windows Unity project and install the package from the source
+   checkout to measure. Keep the project outside that checkout.
+2. Copy [the player](https://github.com/Ambiguous-Interactive/unity-helpers/blob/main/scripts/benchmarks~/RelationalCollectionPlayer.cs) into
+   `Assets`, and copy [the builder](https://github.com/Ambiguous-Interactive/unity-helpers/blob/main/scripts/benchmarks~/RelationalCollectionPlayerBuild.cs)
+   into `Assets/Editor`.
+3. Copy [the BoxCollider target](https://github.com/Ambiguous-Interactive/unity-helpers/blob/main/Tests/Core/TestTypes/RelationalChildCollectionTarget.cs)
+   and [the SpriteRenderer target](https://github.com/Ambiguous-Interactive/unity-helpers/blob/main/Tests/Core/TestTypes/RelationalChildSealedCollectionTarget.cs)
+   into `Assets`. Copy these two source files only; the player needs no test assembly.
+4. Run Unity in batch mode with `-projectPath` pointing to that project and
+   `-executeMethod WallstopStudios.UnityHelpers.Benchmarks.RelationalCollectionPlayerBuild.Build`.
+   The builder selects a non-development IL2CPP Release build and writes
+   `Build/CollectionBenchmark/CollectionBenchmark.exe` under the project.
+5. Run that executable with `-batchmode -nographics -logFile player.log
+-uhBenchmarkOutput samples.txt`. Require exit zero, the success message, and
+   exactly 238 samples plus the environment line. Keep the build and player logs.
+6. Freeze each arm's full player directory, record source and binary hashes, and
+   alternate three independent baseline and candidate processes with other builds
+   stopped. Compare process medians and the best process for each case. Never mix
+   editor and player absolute times or replace a failed process with leaf samples.
+
+The player warms each case 64 times, calibrates to at least 20 ms, and checks a
+sleep control against the high-resolution timer. It includes delegate overhead
+and array allocation in child assignments. This is a scoped workload, not a
+qualification of every relation, backend, Unity version, or consumer workload.
+
+The equivalent NUnit fixtures are
+[RelationalChildCollectionTimingTests](https://github.com/Ambiguous-Interactive/unity-helpers/blob/main/Tests/Runtime/Performance/RelationalChildCollectionTimingTests.cs)
+and [IntMapSparseClearTimingTests](https://github.com/Ambiguous-Interactive/unity-helpers/blob/main/Tests/Runtime/Performance/IntMapSparseClearTimingTests.cs).
+They belong to the Performance category and do not add timing loops to ordinary
+correctness CI. Their editor timings use a different harness; compare arms within
+one harness and runtime.

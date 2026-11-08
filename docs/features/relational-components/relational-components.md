@@ -329,6 +329,12 @@ Unbounded collections without filters or depth limits use a cached Unity query a
 - `MaxCount` (default: 0 = unlimited)
   - Applies to arrays, lists, and hash sets; ignored for single fields
 
+Unlimited, unfiltered child queries for sealed component types such as `SpriteRenderer`
+collect matches in breadth-first order before rebuilding the field's collection. Existing lists and sets are reused. Each query owns its temporary buffers,
+so a set comparer may perform another assignment without replacing the outer query's results.
+`MaxCount` applies after filtering and preserves the nearest-first prefix. Arrays still allocate
+the returned array; warmed list and set assignments reuse their storage.
+
 Relational fields support components, interfaces, and one-dimensional arrays, `List<T>`, or `HashSet<T>` of those values. Multidimensional arrays, nested collections, and unrelated value types are left unchanged with an authoring warning, so they cannot interrupt other bindings. Prewarming skips those fields too.
 
 - `TagFilter`

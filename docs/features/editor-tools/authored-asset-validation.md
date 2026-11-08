@@ -361,3 +361,53 @@ does not parse out just the mapping name. Null lines return zero columns and emp
 
 These are Unity text helpers, not a general YAML parser. Inline collections are not expanded.
 Comments and literal block-scalar contents never contribute to block-item counts.
+
+### Nested mapping and item regions
+
+`Whole(lines, document)` returns an `AuthoredAssetRegion` over one parsed document.
+A region borrows the document and its original source lines; keep both unchanged while reading.
+Its one-based `StartLineNumber` and exclusive `EndLineNumber` identify the exact source span.
+A default region is invalid and every reader returns an empty or false result for it.
+
+Use `TryDescend(region, names, out nested)` to enter a direct mapping, and
+`Items(region, names)` to get one region per direct block-sequence item. Candidate names are
+checked in order, with `SerializedNames` spellings for each candidate. An ambiguous exact name
+stops the read instead of falling through to another spelling. Scalar values, literal blocks,
+and sequences cannot be entered as mappings. Inline collections remain unexpanded.
+
+```csharp
+AuthoredAssetRegion whole = AuthoredAssetYaml.Whole(lines, document);
+if (AuthoredAssetYaml.TryDescend(whole, new[] { "_settings" }, out AuthoredAssetRegion settings))
+{
+    foreach (AuthoredAssetRegion item in AuthoredAssetYaml.Items(settings, new[] { "_entries" }))
+    {
+        if (AuthoredAssetYaml.TryGetField(item, "name", out string name))
+        {
+            // Read this item's name without matching a nested or neighboring item's name.
+        }
+    }
+}
+```
+
+The region overloads of `TryGetField`, `CountBlockItems`, and `ValueWithDirectChildren` retain
+that boundary. Region field reads are exact and refuse duplicate direct keys. They do not change
+the document overloads, whose first-match behavior remains available. Counts include nested
+markers by default; pass `includeNested: false` for direct items only.
+
+### Reference identities and asset names
+
+`FileId(reference)` returns an invariant signed anchor, including zero, or an empty string when
+the mapping is invalid or has no file ID. `ReferencedGuid(reference, owningAssetGuid)` resolves
+external and same-file references; invalid, null, or unresolved references return an empty string.
+Use `TryResolveObjectReference` when the caller must distinguish those failure states explicitly.
+
+`TryGetInlineReference(line, out reference)` accepts a mapping on its own, after a serialized
+field, or after a sequence marker. It validates the mapping and refuses quoted scalar values,
+multiple mappings, and trailing text other than a comment. A missing file ID is a failure.
+
+`AssetName(guid)` reads the asset filename from Unity's GUID metadata without loading the asset.
+An unknown GUID remains the label; a blank input returns an empty string. `AssetsRoot`,
+`SceneExtensions`, `AssetExtensions`, and `AllExtensions` expose the authored file groups.
+`MonoBehaviourType`, `TransformType`, and `RectTransformType` name their serialized document roots.
+For a type's script GUID, continue to use `MonoScriptIndex.TryGetScriptGuid`; production code
+should not depend on a test assertion to require that a script exists.

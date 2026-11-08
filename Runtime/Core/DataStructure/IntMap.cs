@@ -46,6 +46,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         private const int MinimumTablePower = 4;
         private const int MaximumTablePower = 30;
         private const int LoadFactorDivisor = 4;
+        private const int SparseClearDivisor = 64;
 
         // Fibonacci hashing uses the high product bits so shared low key bits do not form a cluster.
         private const uint KeyMultiplier = 0x9E37_79B9u;
@@ -324,13 +325,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <summary>Drops every entry, keeping the current table.</summary>
         /// <remarks>
         /// Releases stored values and retains the table and occupied-slot indexing arrays.
+        /// Sparse tables clear occupied slots; denser tables clear the backing arrays.
         /// </remarks>
         public void Clear()
         {
             if (_count != 0)
             {
-                Array.Clear(_keys, 0, _keys.Length);
-                Array.Clear(_values, 0, _values.Length);
+                ClearEntries();
             }
 
             _zeroValue = default;
@@ -343,6 +344,27 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         public Enumerator GetEnumerator()
         {
             return new Enumerator(this);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void ClearEntries()
+        {
+            int capacity = _keys.Length;
+            if (_count < capacity / SparseClearDivisor)
+            {
+                int count = _count;
+                for (int position = 0; position < count; ++position)
+                {
+                    int slot = OccupiedSlotAt(position);
+                    _keys[slot] = EmptySlot;
+                    _values[slot] = default;
+                }
+            }
+            else
+            {
+                Array.Clear(_keys, 0, capacity);
+                Array.Clear(_values, 0, capacity);
+            }
         }
 
         private void SetInternal(int key, TValue value)

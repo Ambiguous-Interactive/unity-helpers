@@ -90,6 +90,19 @@ cspell configuration and prints source locations plus a root-word patch for reje
 `npm run test:validate-lint-error-codes` also runs the retained PowerShell runspace controls, which
 continue to protect the fixture host while other PowerShell suites still use it.
 
+`npm run lint:code-samples` runs the typed Python documentation sample extractor. Its report
+keeps each C# fence's actual opening line across LF, CRLF, and CR input. The default scan uses
+Git's tracked and nonignored file inventory, so local evidence and dependency directories do not
+extend the walk. `CODE_SAMPLES_ROOT` or `--scan-root` selects an explicit fixture tree instead.
+The Node launcher and PowerShell test launcher remain compatible entry points.
+
+`npm run test:extract-code-samples` covers classification, source locations, generated files,
+name collisions, empty inputs, path ownership, and both launchers. The extractor retains the
+existing JSON report fields. Corrected source lines can change generated filenames. Complete
+struct and interface examples remain at type scope when compilation units are generated.
+Generation is a heuristic convenience; the standalone documentation compiler checks remain the
+separate compilation gate.
+
 Release payload staging, archive creation, and Unity metadata generation run through uv. Install uv 0.13.7, then use:
 
 ```bash

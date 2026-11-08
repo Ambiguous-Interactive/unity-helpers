@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
     using UnityEditor;
     using System.Collections.Generic;
     using System.IO;
+    using System.Runtime.CompilerServices;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Extensions;
     using Object = UnityEngine.Object;
@@ -360,7 +361,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
             if (property == null)
             {
                 EditorGUILayout.LabelField(
-                    $"Error: Property is null in {nameof(PathSelectorString)}.",
+                    $"Error: Property is null in {GetCallingMemberName()}.",
                     EditorStyles.miniBoldLabel
                 );
                 return;
@@ -399,7 +400,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
             if (property == null)
             {
                 EditorGUILayout.LabelField(
-                    $"Error: Property is null in {nameof(PathSelectorObject)}.",
+                    $"Error: Property is null in {GetCallingMemberName()}.",
                     EditorStyles.miniBoldLabel
                 );
                 return;
@@ -442,7 +443,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
             if (listProp == null)
             {
                 EditorGUILayout.LabelField(
-                    $"Error: Property is null in {nameof(PathSelectorStringArray)}.",
+                    $"Error: Property is null in {GetCallingMemberName()}.",
                     EditorStyles.miniBoldLabel
                 );
                 return;
@@ -507,7 +508,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
             if (listProp == null)
             {
                 EditorGUILayout.LabelField(
-                    $"Error: Property is null in {nameof(PathSelectorObjectArray)}.",
+                    $"Error: Property is null in {GetCallingMemberName()}.",
                     EditorStyles.miniBoldLabel
                 );
                 return;
@@ -818,6 +819,11 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                     }
                 }
             }
+        }
+
+        private static string GetCallingMemberName([CallerMemberName] string caller = null)
+        {
+            return caller;
         }
     }
 #endif

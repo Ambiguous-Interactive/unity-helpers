@@ -377,6 +377,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnityTest]
         public IEnumerator DoesNotCreateDuplicateSubfolderOnCaseMismatch()
         {
+            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = static type =>
+                type == typeof(CaseMismatch);
             EnsureFolder("Assets/Resources/cASEtest");
 
             // Without the refresh, GetSubFolders cannot see the case-mismatched folder.
@@ -509,6 +511,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnityTest]
         public IEnumerator EnsureSingletonAssetsIsIdempotent()
         {
+            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = static type =>
+                type == typeof(CaseMismatch);
             string targetPath = "Assets/Resources/CaseTest/CaseMismatch.asset";
             AssetDatabase.DeleteAsset(targetPath);
             yield return null;
@@ -737,6 +741,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnityTest]
         public IEnumerator DoesNotCreateAlternateFolderWhenFileConflicts()
         {
+            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = static type =>
+                type == typeof(FileBlockSingleton);
             string conflictFolder = TestRoot + "/FileBlock";
             string conflictAsset = conflictFolder + "/FileBlockSingleton.asset";
             string conflictFile = conflictFolder;
@@ -1065,6 +1071,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             [ValueSource(nameof(CaseMismatchFolderScenarios))] TestCaseData testCase
         )
         {
+            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = static type =>
+                type == typeof(CaseMismatch);
             string existingFolderName = (string)testCase.Arguments[0];
             string expectedFolderPath = (string)testCase.Arguments[1];
 

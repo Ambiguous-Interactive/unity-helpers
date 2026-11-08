@@ -23,7 +23,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
     /// measures. Nothing here touches <c>UnityEditor</c>. See
     /// <see href="https://github.com/Ambiguous-Interactive/unity-helpers/blob/main/docs/features/editor-tools/authored-asset-validation.md">Authored Asset Validation</see>.
     /// </remarks>
-    public static class AuthoredAssetYaml
+    public static partial class AuthoredAssetYaml
     {
         /// <summary>The <c>!u!</c> class id Unity writes for a <c>MonoBehaviour</c> document.</summary>
         public const int MonoBehaviourTypeId = 114;

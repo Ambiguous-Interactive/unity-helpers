@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Core.Helper
 {
     using System;
+    using System.Runtime.CompilerServices;
     using Extension;
     using UnityEngine;
     using UnityEngine.Experimental.Rendering;
@@ -94,13 +95,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
             }
 
-            return CreateTexture(
-                texture,
-                rotatedWidth,
-                rotatedHeight,
-                rotated,
-                nameof(RotateTexture90)
-            );
+            return CreateTexture(texture, rotatedWidth, rotatedHeight, rotated);
         }
 
         /// <summary>
@@ -135,13 +130,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 rotated[index] = source[last - index];
             }
 
-            return CreateTexture(
-                texture,
-                sourceWidth,
-                sourceHeight,
-                rotated,
-                nameof(RotateTexture180)
-            );
+            return CreateTexture(texture, sourceWidth, sourceHeight, rotated);
         }
 
         /// <summary>
@@ -264,7 +253,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return null;
             }
 
-            return CreateTexture(texture, width, height, region, nameof(ExtractSpriteRect));
+            return CreateTexture(texture, width, height, region);
         }
 
         private static Texture2D CreateTexture(
@@ -272,7 +261,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             int width,
             int height,
             Color32[] pixels,
-            string operation
+            [CallerMemberName] string operation = null
         )
         {
             Texture2D result = null;
