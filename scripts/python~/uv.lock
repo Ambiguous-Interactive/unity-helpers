@@ -689,15 +689,13 @@ wheels = [
 name = "unity-helpers-scripts"
 version = "0.0.0"
 source = { virtual = "." }
-dependencies = [
-    { name = "markdown-it-py" },
-]
 
 [package.dev-dependencies]
 browser = [
     { name = "playwright" },
 ]
 dev = [
+    { name = "markdown-it-py" },
     { name = "mypy" },
     { name = "pillow" },
     { name = "playwright" },
@@ -707,6 +705,9 @@ dev = [
     { name = "ruff" },
     { name = "types-pyyaml" },
     { name = "z3-solver" },
+]
+documentation = [
+    { name = "markdown-it-py" },
 ]
 fixtures = [
     { name = "pillow" },
@@ -719,11 +720,11 @@ proof = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "markdown-it-py", specifier = ">=4.2.0" }]
 
 [package.metadata.requires-dev]
 browser = [{ name = "playwright", specifier = ">=1.64.1" }]
 dev = [
+    { name = "markdown-it-py", specifier = ">=4.2.0" },
     { name = "mypy", specifier = ">=2.4.1" },
     { name = "pillow", specifier = ">=13.0.0" },
     { name = "playwright", specifier = ">=1.64.1" },
@@ -734,6 +735,7 @@ dev = [
     { name = "types-pyyaml", specifier = ">=6.0.12.20261030" },
     { name = "z3-solver", specifier = "==5.3.3.0" },
 ]
+documentation = [{ name = "markdown-it-py", specifier = ">=4.2.0" }]
 fixtures = [{ name = "pillow", specifier = ">=13.0.0" }]
 metadata = [{ name = "pyyaml", specifier = ">=6.0.3" }]
 proof = [{ name = "z3-solver", specifier = "==5.3.3.0" }]

@@ -11,6 +11,8 @@ const result = spawnSync(
     path.join(root, "scripts/python~"),
     "--locked",
     "--no-dev",
+    "--group",
+    "documentation",
     "python",
     path.join(root, "scripts/extract_code_samples.py"),
     ...process.argv.slice(2)

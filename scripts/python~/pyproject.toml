@@ -2,15 +2,14 @@
 name = "unity-helpers-scripts"
 version = "0.0.0"
 requires-python = ">=3.11.8"
-dependencies = [
-    "markdown-it-py>=4.2.0",
-]
+dependencies = []
 
 [dependency-groups]
 browser = [
     "playwright>=1.64.1",
 ]
 dev = [
+    { include-group = "documentation" },
     { include-group = "metadata" },
     { include-group = "fixtures" },
     { include-group = "proof" },
@@ -20,6 +19,9 @@ dev = [
     "pytest>=9.2.0",
     "ruff>=0.17.3",
     "types-pyyaml>=6.0.12.20261030",
+]
+documentation = [
+    "markdown-it-py>=4.2.0",
 ]
 fixtures = [
     "pillow>=13.0.0",
