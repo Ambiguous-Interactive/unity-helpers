@@ -330,6 +330,7 @@ When you use Attributes for frequently mutated "current" values:
 
 Applying a null or empty tag leaves tag state unchanged and emits no tag-added event.
 Serialized tag keys preserve literal whitespace, including whitespace-only tags.
+Buffered handle queries and handle enumeration extensions use those same literal keys.
 
 Even without any Attributes, the Effects System is useful for tag-based state management and cosmetic effects.
 

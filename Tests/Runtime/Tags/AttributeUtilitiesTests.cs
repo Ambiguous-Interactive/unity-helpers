@@ -161,6 +161,37 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             Assert.AreEqual(handle, reused[0]);
         }
 
+        [TestCase(" ")]
+        [TestCase("\t\r\n")]
+        [TestCase("\u2003")]
+        [TestCase(" Buff ")]
+        public void HandleQueryExtensionsPreserveLiteralTagKeys(string tag)
+        {
+            GameObject entity = CreateTrackedGameObject("LiteralTag", typeof(TagHandler));
+            TagHandler handler = entity.GetComponent<TagHandler>();
+            AttributeEffect effect = CreateEffect("LiteralTag", item => item.effectTags.Add(tag));
+            EffectHandle handle = EffectHandle.CreateInstance(effect);
+            handler.ForceApplyTags(handle);
+            Assert.IsTrue(entity.HasTag(tag));
+            List<EffectHandle> handles = new() { default };
+            Assert.AreSame(handles, entity.GetHandlesWithTag(tag, handles));
+            Assert.AreEqual(1, handles.Count);
+            Assert.AreEqual(handle, handles[0]);
+            int count = 0;
+            foreach (EffectHandle matching in entity.EnumerateHandlesWithTag(tag))
+            {
+                Assert.AreEqual(handle, matching);
+                ++count;
+            }
+            Assert.AreEqual(1, count);
+            handler.ForceRemoveTags(handle);
+            Assert.IsEmpty(entity.GetHandlesWithTag(tag, handles));
+            foreach (EffectHandle matching in entity.EnumerateHandlesWithTag(tag))
+            {
+                Assert.Fail("Removed tag ownership must not yield a handle.");
+            }
+        }
+
         [Test]
         public void AttributeEffectQueryHelpersReturnExpectedResults()
         {

@@ -357,7 +357,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             string effectTag
         )
         {
-            if (target == null || string.IsNullOrWhiteSpace(effectTag))
+            if (target == null || string.IsNullOrEmpty(effectTag))
             {
                 return TagHandler.HandleEnumerable.Empty;
             }
@@ -371,7 +371,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// Retrieves all effect handles that contributed a specific tag on the target.
         /// </summary>
         /// <param name="target">The Unity Object (GameObject or Component) to inspect.</param>
-        /// <param name="effectTag">The tag to query.</param>
+        /// <param name="effectTag">The literal tag key to query, preserving whitespace.</param>
         /// <param name="buffer">
         /// Optional buffer to populate. When <c>null</c>, a new list is created. The buffer is cleared before population.
         /// </param>
@@ -394,7 +394,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             List<EffectHandle> targetBuffer = buffer ?? new List<EffectHandle>();
             targetBuffer.Clear();
             if (
-                string.IsNullOrWhiteSpace(effectTag)
+                string.IsNullOrEmpty(effectTag)
                 || target == null
                 || !target.TryGetComponent(out TagHandler tagHandler)
             )
