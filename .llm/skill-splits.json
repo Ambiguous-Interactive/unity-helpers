@@ -101,7 +101,7 @@
     },
     {
       "name": "defensive-programming",
-      "sha256": "8a70f0f82a9643250195b5d0dbdb0024f80a4a97fee5c37c72c201a7cdcb1e37",
+      "sha256": "1bc58eb015880477bc9ca6018dc04da71066bcdf87566bbfa921424f92529b09",
       "parts": [
         "defensive-programming-part-1.md",
         "defensive-programming-part-2.md",

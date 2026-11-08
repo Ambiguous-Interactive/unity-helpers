@@ -609,6 +609,46 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             );
         }
 
+        [TestCase(" ")]
+        [TestCase("\t\r\n")]
+        [TestCase("\u2003")]
+        [TestCase("project.literal")]
+        public void ProjectRuleDiscoveryPreservesLiteralIdentifiers(string identifier)
+        {
+            ValidationWorkspaceSettings settings = ValidationWorkspaceSettings.instance;
+            List<ValidationWorkspaceSettings.RuleDefinition> originalRules = settings.projectRules;
+            List<ValidationWorkspaceSettings.RulePreference> originalPreferences =
+                settings.rulePreferences;
+            try
+            {
+                settings.projectRules = new List<ValidationWorkspaceSettings.RuleDefinition>
+                {
+                    null,
+                    new ValidationWorkspaceSettings.RuleDefinition { id = null },
+                    new ValidationWorkspaceSettings.RuleDefinition { id = string.Empty },
+                    new ValidationWorkspaceSettings.RuleDefinition { id = identifier },
+                };
+                settings.rulePreferences = new List<ValidationWorkspaceSettings.RulePreference>();
+                List<string> problems = new();
+                List<IValidationRule> rules = ValidationBatch.DiscoverRules(problems);
+                Assert.IsEmpty(problems);
+                Assert.AreEqual(
+                    1,
+                    rules
+                        .FindAll(rule =>
+                            string.Equals(rule.RuleId, identifier, StringComparison.Ordinal)
+                        )
+                        .Count
+                );
+                Assert.IsFalse(rules.Exists(rule => string.IsNullOrEmpty(rule.RuleId)));
+            }
+            finally
+            {
+                settings.projectRules = originalRules;
+                settings.rulePreferences = originalPreferences;
+            }
+        }
+
         [Test]
         public void ATestDoubleIsNotAProjectRule()
         {

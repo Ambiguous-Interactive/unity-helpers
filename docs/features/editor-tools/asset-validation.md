@@ -277,7 +277,8 @@ Unity -batchmode -quit -projectPath "$PWD" \
 
 The batch report and window exports stage the complete report before replacing an existing file.
 The batch run reports a write failure. Explicit blank output or suppression paths fail the run;
-omitting either option keeps its optional behavior.
+omitting either option keeps its optional behavior. Persisted project-rule identifiers retain
+literal whitespace and still participate in discovery; null and empty rule placeholders are skipped.
 
 Rules are found through `TypeCache` and built with their parameterless constructor, in a stable
 order so two machines produce the same report. A rule that cannot be constructed is reported and

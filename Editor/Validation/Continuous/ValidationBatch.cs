@@ -128,6 +128,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         /// <returns>The rules, ordered by type name so two runs agree.</returns>
         /// <remarks>
         /// A rule declared in a test assembly is excluded. See the overload for why.
+        /// Persisted project rule identifiers retain literal whitespace; null and empty placeholders are skipped.
         /// </remarks>
         public static List<IValidationRule> DiscoverRules(List<string> problems)
         {
@@ -135,7 +136,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             ValidationWorkspaceSettings settings = ValidationWorkspaceSettings.instance;
             foreach (ValidationWorkspaceSettings.RuleDefinition definition in settings.projectRules)
             {
-                if (definition != null && !string.IsNullOrWhiteSpace(definition.id))
+                if (definition != null && !string.IsNullOrEmpty(definition.id))
                 {
                     if (ValidationProjectRule.ValidateDefinition(definition, out string failure))
                         discovered.Add(new ValidationProjectRule(definition));
