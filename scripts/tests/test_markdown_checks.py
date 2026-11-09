@@ -5,8 +5,10 @@ from __future__ import annotations
 import subprocess
 import sys
 from pathlib import Path
+from typing import cast
 
 import pytest
+import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 CHECKS = (
@@ -14,6 +16,24 @@ CHECKS = (
     "check_markdown_url_encoding.py",
     "validate_markdown_links.py",
 )
+
+
+def test_mkdocs_output_is_unity_excluded_and_pages_uploads_that_output() -> None:
+    config = cast(
+        "dict[str, object]",
+        yaml.load(
+            (ROOT / "mkdocs.yml").read_text(encoding="utf-8"),
+            Loader=yaml.BaseLoader,  # noqa: S506 - BaseLoader constructs only basic nodes.
+        ),
+    )
+    output = Path(str(config.get("site_dir", "site")))
+    assert not output.is_absolute()
+    assert any(part.startswith(".") or part.endswith("~") for part in output.parts)
+    assert ".." not in output.parts
+    workflow = (ROOT / ".github/workflows/deploy-pages.yml").read_text(encoding="utf-8")
+    assert f"path: ./{output.as_posix()}\n" in workflow
+    assert f'"{output.as_posix()}/index.html"' in workflow
+    assert "mkdocs build --strict" in workflow
 
 
 def run(name: str, root: Path) -> subprocess.CompletedProcess[str]:

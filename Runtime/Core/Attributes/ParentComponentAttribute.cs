@@ -33,6 +33,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     /// Limit traversal with <see cref="MaxDepth"/> (depth 1 = immediate parent only). Combine with filters like
     /// <see cref="BaseRelationalComponentAttribute.TagFilter"/> and <see cref="BaseRelationalComponentAttribute.NameFilter"/>.
     /// Collection results exclude missing-script entries, including unfiltered MonoBehaviour and Behaviour searches.
+    /// Bounded queries stop after the requested depth or number of eligible matches, in nearest-first order.
+    /// Queries collect matches before rebuilding lists and sets, so comparer callbacks cannot change the current snapshot.
     /// Interfaces and base types are supported when <see cref="BaseRelationalComponentAttribute.AllowInterfaces"/> is true (default).
     ///
     /// IMPORTANT: This attribute populates fields at runtime, not during Unity serialization in Edit mode.
@@ -148,8 +150,9 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return;
             }
 
+            Type componentType = component.GetType();
             FieldMetadata<ParentComponentAttribute>[] fields = FieldsByType.GetOrAdd(
-                component.GetType(),
+                componentType,
                 static type => GetFieldMetadata<ParentComponentAttribute>(type)
             );
             AssignParentComponents(component, fields);
@@ -212,172 +215,29 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                     }
                     else
                     {
-                        switch (field.kind)
+                        if (
+                            TryAssignParentCollectionFast(
+                                component,
+                                root,
+                                field,
+                                filters,
+                                out bool assignedAny
+                            )
+                        )
                         {
-                            case FieldKind.Array:
-                            {
-                                if (
-                                    TryAssignParentCollectionFast(
-                                        component,
-                                        root,
-                                        field,
-                                        filters,
-                                        out bool assignedAny
-                                    )
-                                )
-                                {
-                                    foundParent = assignedAny;
-                                    break;
-                                }
-
-                                using PooledResource<List<Component>> parentComponentBuffer =
-                                    Buffers<Component>.List.Get(
-                                        out List<Component> parentComponents
-                                    );
-                                GetParentComponents(
-                                    root,
-                                    field.elementType,
-                                    field.attribute,
-                                    field.isInterface,
-                                    parentComponents
-                                );
-
-                                int filteredCount = FilterComponentsInPlace(
-                                    parentComponents,
-                                    filters,
-                                    field.attribute,
-                                    field.elementType,
-                                    field.isInterface,
-                                    filterDisabledComponents: false
-                                );
-
-                                field.SetValue(
-                                    component,
-                                    CreateTypedArray(
-                                        field.elementType,
-                                        parentComponents,
-                                        filteredCount
-                                    )
-                                );
-                                foundParent = 0 < filteredCount;
-                                break;
-                            }
-                            case FieldKind.List:
-                            {
-                                if (
-                                    TryAssignParentCollectionFast(
-                                        component,
-                                        root,
-                                        field,
-                                        filters,
-                                        out bool assignedAny
-                                    )
-                                )
-                                {
-                                    foundParent = assignedAny;
-                                    break;
-                                }
-
-                                using PooledResource<List<Component>> parentComponentBuffer =
-                                    Buffers<Component>.List.Get(
-                                        out List<Component> parentComponents
-                                    );
-                                GetParentComponents(
-                                    root,
-                                    field.elementType,
-                                    field.attribute,
-                                    field.isInterface,
-                                    parentComponents
-                                );
-
-                                int filteredCount = FilterComponentsInPlace(
-                                    parentComponents,
-                                    filters,
-                                    field.attribute,
-                                    field.elementType,
-                                    field.isInterface,
-                                    filterDisabledComponents: false
-                                );
-
-                                if (field.GetValue(component) is IList instance)
-                                {
-                                    instance.Clear();
-                                }
-                                else
-                                {
-                                    instance = field.listCreator(filteredCount);
-                                    field.SetValue(component, instance);
-                                }
-
-                                for (int i = 0; i < filteredCount; ++i)
-                                {
-                                    instance.Add(parentComponents[i]);
-                                }
-
-                                foundParent = 0 < filteredCount;
-                                break;
-                            }
-                            case FieldKind.HashSet:
-                            {
-                                if (
-                                    TryAssignParentCollectionFast(
-                                        component,
-                                        root,
-                                        field,
-                                        filters,
-                                        out bool assignedAny
-                                    )
-                                )
-                                {
-                                    foundParent = assignedAny;
-                                    break;
-                                }
-
-                                using PooledResource<List<Component>> parentComponentBuffer =
-                                    Buffers<Component>.List.Get(
-                                        out List<Component> parentComponents
-                                    );
-                                GetParentComponents(
-                                    root,
-                                    field.elementType,
-                                    field.attribute,
-                                    field.isInterface,
-                                    parentComponents
-                                );
-
-                                int filteredCount = FilterComponentsInPlace(
-                                    parentComponents,
-                                    filters,
-                                    field.attribute,
-                                    field.elementType,
-                                    field.isInterface,
-                                    filterDisabledComponents: false
-                                );
-
-                                object instance = field.GetValue(component);
-                                if (instance != null && field.hashSetClearer != null)
-                                {
-                                    field.hashSetClearer(instance);
-                                }
-                                else
-                                {
-                                    instance = field.hashSetCreator(filteredCount);
-                                    field.SetValue(component, instance);
-                                }
-
-                                for (int i = 0; i < filteredCount; ++i)
-                                {
-                                    field.hashSetAdder(instance, parentComponents[i]);
-                                }
-
-                                foundParent = 0 < filteredCount;
-                                break;
-                            }
-                            default:
-                            {
-                                foundParent = false;
-                                break;
-                            }
+                            foundParent = assignedAny;
+                        }
+                        else
+                        {
+                            using PooledResource<List<Component>> parentLease =
+                                Buffers<Component>.List.Get(out List<Component> parents);
+                            int count = CollectParentComponents(root, field, filters, parents);
+                            foundParent = AssignParentComponentsFromList(
+                                component,
+                                field,
+                                parents,
+                                count
+                            );
                         }
                     }
 
@@ -420,8 +280,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             if (
                 metadata.isInterface
                 || filters.RequiresPostProcessing
-                || 0 < attribute.MaxDepth
                 || root == null
+                || (0 < attribute.MaxDepth || 0 < attribute.MaxCount) && root.parent != null
             )
             {
 #if UNITY_EDITOR && UNITY_2020_2_OR_NEWER
@@ -490,10 +350,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             {
                 case FieldKind.Array:
                 {
-                    metadata.SetValue(
-                        component,
-                        CreateTypedArray(metadata.elementType, parents, count)
-                    );
+                    Array array = CreateTypedArray(metadata.elementType, parents, count);
+                    metadata.SetValue(component, array);
                     return 0 < count;
                 }
                 case FieldKind.List:
@@ -542,68 +400,93 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             }
         }
 
-        private static List<Component> GetParentComponents(
+        private static int CollectParentComponents(
             Transform root,
-            Type elementType,
-            ParentComponentAttribute attribute,
-            bool isInterface,
-            List<Component> buffer
+            FieldMetadata<ParentComponentAttribute> metadata,
+            FilterParameters filters,
+            List<Component> results
         )
         {
-            buffer.Clear();
-            if (isInterface)
+            ParentComponentAttribute attribute = metadata.attribute;
+            if (attribute.MaxCount == 1)
             {
-                Transform current = root;
-                int depth = 0;
-                int maxDepth = GetMaximumDepthFromSearchRoot(attribute);
-
-                using PooledResource<List<Component>> parentComponentBuffer =
-                    Buffers<Component>.List.Get(out List<Component> components);
-                while (current != null && depth <= maxDepth)
+                if (
+                    TryGetFirstParentComponent(
+                        root,
+                        filters,
+                        metadata.elementType,
+                        attribute,
+                        metadata.isInterface,
+                        out Component match
+                    )
+                )
                 {
-                    GetComponentsOfType(
-                        current,
-                        elementType,
-                        isInterface,
-                        attribute.AllowInterfaces,
-                        components
-                    );
-                    buffer.AddRange(components);
-
-                    current = current.parent;
-                    ++depth;
+                    results.Add(match);
+                    return 1;
                 }
-
-                return buffer;
+                return 0;
             }
-
-            Component[] allParents = root.GetComponentsInParent(
-                elementType,
-                includeInactive: attribute.IncludeInactive
+            int maximumDepth = GetMaximumDepthFromSearchRoot(attribute);
+            int maximumCount = 0 < attribute.MaxCount ? attribute.MaxCount : int.MaxValue;
+            bool limitMatches = maximumCount != int.MaxValue;
+            int count = 0;
+            int depth = 0;
+            Transform current = root;
+            using PooledResource<List<Component>> componentLease = Buffers<Component>.List.Get(
+                out List<Component> components
             );
-
-            if (0 < attribute.MaxDepth)
+            while (current != null && depth <= maximumDepth)
             {
-                int maxDepth = GetMaximumDepthFromSearchRoot(attribute);
-                foreach (Component comp in allParents)
+                GetComponentsOfType(
+                    current,
+                    metadata.elementType,
+                    metadata.isInterface,
+                    attribute.AllowInterfaces,
+                    components
+                );
+                if (limitMatches)
                 {
-                    if (comp == null)
+                    foreach (Component candidate in components)
                     {
-                        continue;
-                    }
-                    int depth = GetDepthFromTransform(root, comp.transform);
-                    if (depth <= maxDepth)
-                    {
-                        buffer.Add(comp);
+                        if (
+                            !PassesStateAndFilters(
+                                candidate,
+                                filters,
+                                filterDisabledComponents: false
+                            )
+                        )
+                        {
+                            continue;
+                        }
+                        results.Add(candidate);
+                        ++count;
+                        if (maximumCount <= count)
+                        {
+                            return count;
+                        }
                     }
                 }
+                else
+                {
+                    results.AddRange(components);
+                }
+                if (depth == maximumDepth)
+                {
+                    break;
+                }
+                current = current.parent;
+                ++depth;
             }
-            else
-            {
-                buffer.AddRange(allParents);
-            }
-
-            return buffer;
+            return limitMatches
+                ? count
+                : FilterComponentsInPlace(
+                    results,
+                    filters,
+                    attribute,
+                    metadata.elementType,
+                    metadata.isInterface,
+                    filterDisabledComponents: false
+                );
         }
 
         private static bool TryGetFirstParentComponent(
@@ -671,18 +554,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return int.MaxValue;
             }
             return attribute.MaxDepth - (attribute.OnlyAncestors ? 1 : 0);
-        }
-
-        private static int GetDepthFromTransform(Transform start, Transform target)
-        {
-            int depth = 0;
-            Transform current = start;
-            while (current != null && current != target)
-            {
-                current = current.parent;
-                ++depth;
-            }
-            return current == target ? depth : int.MaxValue;
         }
     }
 

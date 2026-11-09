@@ -42,6 +42,40 @@ remains open. Both arms' editor build logs contain the same temporary-allocator
 teardown warning; the measured player logs do not. The historical tables below
 predate these collection changes and use a different harness.
 
+## Bounded parent collections (2026-11-09)
+
+Bounded parent queries now stop their walk at the requested depth or match count.
+The [raw samples and source/process receipts](./parent-collection-evidence.json) compare
+main `99e54b1e` with the candidate on Windows x64, Unity 6000.6.7f1 Editor Mono with
+Release compilation. Each cell assigns an array, list and set together, uses 64 warm calls,
+calibrates batches to at least 20 ms, and records seven rounds in three fresh processes.
+Times below are medians of process medians in microseconds. The
+[source and native log archive](./parent-collection-captures.zip) preserves the captures.
+
+| Ancestors | Field type | Bound   |    Before | After |
+| --------: | :--------- | :------ | --------: | ----: |
+|         4 | Sealed     | Depth 2 |     3.602 | 4.263 |
+|        16 | Sealed     | Depth 2 |    12.862 | 4.315 |
+|       500 | Sealed     | Depth 2 | 7,448.150 | 4.230 |
+|       500 | Sealed     | Count 1 |    72.982 | 2.282 |
+|       500 | Base       | Count 1 |   225.540 | 3.421 |
+
+The four-ancestor sealed depth case is 18% slower. Unbounded base-type cases span
+1.02–1.08 times the baseline, while unbounded sealed cases span 0.97–1.02. Empty
+queries span 1.04 times the baseline. These controls limit the claim to bounded workloads;
+small queries do not receive a universal speedup. An earlier candidate with larger small-query
+regressions was rejected and remains in the evidence as `candidate`; the accepted arm is `refined`.
+
+Six native allocation checks cover warmed sealed list/set assignments with 0, 1 and 16
+ancestors under depth and count bounds. Positive allocation and negative reuse controls run
+first. All six observe zero allocation events; the original depth-only baseline observes
+256 events for the nonempty cases. Arrays, first use and arbitrary field types are outside
+this allocation claim. Independent hierarchy oracles cover interfaces, base and sealed fields,
+filters, inactive GameObjects, disabled components, reparenting and destroyed ancestors.
+
+This capture does not qualify Unity 2021.3, IL2CPP, WebGL, cold plans or retention.
+Issue [#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644) remains open.
+
 ## Windows (Editor/Player)
 
 <!-- RELATIONAL_COMPONENTS_WINDOWS_START -->

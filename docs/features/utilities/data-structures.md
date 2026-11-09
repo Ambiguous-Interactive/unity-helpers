@@ -454,7 +454,7 @@ checks, removal and refill, and allocation events with positive and negative con
 ### Original consumer harness replay
 
 The recovered DoxReloaded harness was replayed on Linux x64 with SDK 10.0.403 and Mono 6.14.1.
-It compares `Dictionary`, release 3.7.1, and the current map. Three fresh processes per runtime
+It compares `Dictionary`, release 3.7.1, and the map on main `99e54b1e`. Three fresh processes per runtime
 use the original one warm-up and 21 rotating rounds. Dense, seeded sparse, and `i * 1024` keys
 use 8, 64, and 1,024 entries. The following ranges cover 64 and 1,024 entries; ratios compare
 median process medians, and lower is faster.
@@ -476,6 +476,43 @@ contains all 666 replay summaries. Each process exits zero and reaches both stre
 unchanged inputs and payloads. The original harness retains minima and medians rather than raw
 round samples; its short intervals and one warm-up limit broader conclusions. These results
 qualify this consumer protocol, not Unity player performance or arbitrary value types.
+
+### Index-write comparison (2026-11-09)
+
+Insertion and rebuild now write the dense slot and reverse position together. Raw-key
+comparison, separate zero-key storage, lookup and iteration code retain their previous paths.
+A paired host comparison with main `99e54b1e` measures integer values on Linux x64,
+SDK 10.0.403/.NET 10.0.14 and Mono 6.14.1. Each insert and repeated-zero cell uses
+64 warm calls, at least 20 ms calibration, rotating arm order and 21 raw rounds in each
+of three fresh processes. The table gives candidate/baseline time, using medians of process
+medians across dense, sparse and shifted keys at 8, 64, 1,024 and 16,384 entries.
+
+| Runtime     |      Insert | Repeated zero-key reads |
+| :---------- | ----------: | ----------------------: |
+| .NET 10     | 0.918–1.004 |             0.955–1.019 |
+| Mono 6.14.1 | 0.936–1.041 |             0.997–1.004 |
+
+This is a modest insertion improvement with a 4% regression in one Mono cell; it does not
+establish a general lookup or iteration speedup. The fixed-work churn control retains 64 slots.
+Per-call checksums, Dictionary comparisons, timer controls and healthy process/stream completion
+are recorded with [source identities and summaries](../../performance/intmap-index-evidence.json).
+The [capture archive](../../performance/intmap-index-captures.zip) includes every raw round.
+These host measurements do not qualify Unity players, large values or arbitrary application work.
+
+The unchanged consumer protocol was also replayed against the source from release 3.7.1,
+verified after namespace and newline normalization. At 64, 1,024 and 16,384 entries, the
+candidate's hit/miss/insert ratios versus 3.7.1 span 0.987–1.093 / 1.031–1.314 / 1.014–1.195
+on .NET and 0.999–1.256 / 1.018–1.169 / 1.044–1.219 on Mono. Iteration versus Dictionary spans
+0.822–0.977 and 1.056–1.091 respectively. Iteration meets the target; lookup and insertion still
+exceed its 10% budget in some cells. The archive maps the original arm labels to actual source
+identities; its initial 3.6.2 control is preserved separately and excluded from this comparison.
+
+An earlier encoded-key candidate was rejected. Two complete calibrated .NET processes exposed
+lookup regressions up to 14%, iteration regressions up to 15% and repeated-zero costs of
+1.47–1.81 times main. Its third process was stopped after rejection and excluded from the results;
+the partial capture remains in the archive. Short consumer-protocol runs had hidden these costs.
+The accepted change keeps the existing key representation. Issue
+[#1131](https://github.com/wallstop/unity-helpers/issues/1131) remains open.
 
 ### Capacity and key limits
 

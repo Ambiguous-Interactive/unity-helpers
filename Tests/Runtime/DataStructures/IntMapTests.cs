@@ -44,18 +44,39 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 Assert.AreEqual(expected, entry.Value);
             }
             Assert.AreEqual(oracle.Count, seen.Count);
-            List<int> actualKeys = new();
+            seen.Clear();
             foreach (int key in map.Keys)
             {
-                actualKeys.Add(key);
+                Assert.IsTrue(seen.Add(key), "A key must be yielded once.");
+                Assert.IsTrue(oracle.ContainsKey(key));
             }
-            List<int> actualValues = new();
+            Assert.AreEqual(oracle.Count, seen.Count);
+            Dictionary<int, int> valueCounts = new();
+            foreach (int value in oracle.Values)
+            {
+                if (valueCounts.TryGetValue(value, out int count))
+                {
+                    valueCounts[value] = count + 1;
+                }
+                else
+                {
+                    valueCounts.Add(value, 1);
+                }
+            }
             foreach (int value in map.Values)
             {
-                actualValues.Add(value);
+                Assert.IsTrue(valueCounts.TryGetValue(value, out int count));
+                Assert.That(count, Is.Positive);
+                if (count == 1)
+                {
+                    valueCounts.Remove(value);
+                }
+                else
+                {
+                    valueCounts[value] = count - 1;
+                }
             }
-            CollectionAssert.AreEquivalent(oracle.Keys, actualKeys);
-            CollectionAssert.AreEquivalent(oracle.Values, actualValues);
+            Assert.AreEqual(0, valueCounts.Count);
         }
 
         private static bool IsPowerOfTwo(int value)
@@ -122,6 +143,61 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             return new WeakReference(new object());
         }
 #endif
+
+        [TestCase(8)]
+        [TestCase(64)]
+        [TestCase(1024)]
+        [TestCase(16385)]
+        public void OppositeSignKeysPreserveRawIdentityAcrossEveryMapOperation(int count)
+        {
+            IntMap<int> map = new();
+            Dictionary<int, int> oracle = new();
+            int[] keys = new int[count];
+            for (int index = 0; index < count; ++index)
+            {
+                int key = index % 2 == 0 ? index / 2 : int.MinValue + 2 + index / 2;
+                keys[index] = key;
+                map.TrySet(key, index);
+                oracle.Add(key, index);
+            }
+            map.TrySet(int.MaxValue, -1);
+            oracle.Add(int.MaxValue, -1);
+            AssertViewsMatch(map, oracle);
+            for (int index = 0; index < count; ++index)
+            {
+                int key = keys[index];
+                Assert.IsTrue(map.ContainsKey(key));
+                Assert.AreEqual(index, map[key]);
+                if (index % 3 == 0)
+                {
+                    Assert.IsTrue(map.Remove(key, out int removed));
+                    Assert.AreEqual(index, removed);
+                    oracle.Remove(key);
+                    Assert.IsFalse(map.TryGet(key, out int missing));
+                    Assert.AreEqual(0, missing);
+                }
+                else
+                {
+                    map[key] = -index;
+                    oracle[key] = -index;
+                }
+            }
+            AssertViewsMatch(map, oracle);
+            foreach (int key in keys)
+            {
+                Assert.IsTrue(map.TrySet(key, key));
+                oracle[key] = key;
+            }
+            AssertViewsMatch(map, oracle);
+            map.Clear();
+            oracle.Clear();
+            foreach (int key in keys)
+            {
+                map[key] = key;
+                oracle.Add(key, key);
+            }
+            AssertViewsMatch(map, oracle);
+        }
 
         [TestCase(-1)]
         public void ConstructorRefusesNegativeCapacityHints(int capacityHint)

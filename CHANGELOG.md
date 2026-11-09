@@ -25,9 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Stop bounded parent-component collection searches at the requested depth or match count, and reuse temporary lists ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
 - Reduce child-component collection ordering work for sealed types while preserving breadth-first results, filters, limits, and collection reuse ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
 - Avoid a full project refresh when Animation Creator saves or deletes hidden configs.
-- Speed up `IntMap` iteration and sparse clears. Extra indexing uses more memory and can slow fresh construction; see [measurements and costs](./docs/features/utilities/data-structures.md#iteration-measurements-and-costs) ([#1131](https://github.com/wallstop/unity-helpers/issues/1131)).
+- Speed up `IntMap` iteration and sparse clears, and reduce insertion work. Extra indexing uses more memory and can slow fresh construction; see [measurements and costs](./docs/features/utilities/data-structures.md#iteration-measurements-and-costs) ([#1131](https://github.com/wallstop/unity-helpers/issues/1131)).
 - Standardize coroutine helpers: missing required arguments throw `ArgumentNullException`, inactive GameObjects start no work, and `TryExecuteTrackedAfterDelay` still returns false ([#1125](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1125)).
 - Allow runtime assemblies to call `AnimatedSpriteFrames` and `SceneCanonicalizer` inside `UNITY_EDITOR` guards, preserving existing namespaces and compiled editor references ([#1126](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1126)).
 - Group Polygon Collider Optimizer and relational installers under the Wallstop Studios/Unity Helpers component menu.

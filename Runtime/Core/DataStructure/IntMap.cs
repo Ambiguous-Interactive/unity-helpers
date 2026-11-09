@@ -402,8 +402,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
                     _keys[slot] = key;
                     _values[slot] = value;
-                    SetOccupiedSlot(_count, slot);
-                    SetPosition(slot, _count);
+                    SetEntryIndex(slot, _count);
                     ++_count;
                     ++_version;
                     return;
@@ -433,6 +432,22 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             _keys[gap] = EmptySlot;
             _values[gap] = default(TValue);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void SetEntryIndex(int slot, int position)
+        {
+            int index = _keys.Length + position;
+            if (_compactIndices != null)
+            {
+                _compactIndices[slot] = (ushort)position;
+                _compactIndices[index] = (ushort)slot;
+            }
+            else
+            {
+                _indices[slot] = position;
+                _indices[index] = slot;
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -546,8 +561,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 int slot = FindSlot(stored);
                 _keys[slot] = stored;
                 _values[slot] = oldValues[index];
-                SetPosition(slot, _count);
-                SetOccupiedSlot(_count, slot);
+                SetEntryIndex(slot, _count);
                 ++_count;
             }
         }

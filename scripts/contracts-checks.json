@@ -1,5 +1,10 @@
 [
   {
+    "id": "yaml-controls",
+    "name": "YAML source and command boundary controls",
+    "run": "uv run --quiet --project scripts/python~ --locked pytest scripts/tests/test_yaml_lint.py -q"
+  },
+  {
     "id": "check-registries",
     "name": "Typed check registry contracts",
     "run": "npm run test:check-registries"

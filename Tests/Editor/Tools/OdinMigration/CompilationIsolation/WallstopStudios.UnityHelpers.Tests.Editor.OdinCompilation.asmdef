@@ -1,0 +1,22 @@
+{
+  "name": "WallstopStudios.UnityHelpers.Tests.Editor.OdinCompilation",
+  "rootNamespace": "WallstopStudios.UnityHelpers.Tests.Editor.OdinCompilation",
+  "references": [
+    "UnityEditor.TestRunner",
+    "UnityEngine.TestRunner",
+    "WallstopStudios.UnityHelpers",
+    "WallstopStudios.UnityHelpers.Editor",
+    "WallstopStudios.UnityHelpers.Tests.Core",
+    "WallstopStudios.UnityHelpers.Tests.OdinCompilerTargets",
+    "WallstopStudios.UnityHelpers.Tests.OdinCompilerCallers"
+  ],
+  "includePlatforms": ["Editor"],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": true,
+  "precompiledReferences": ["nunit.framework.dll"],
+  "autoReferenced": false,
+  "defineConstraints": ["UNITY_INCLUDE_TESTS", "!WALLSTOP_PROTO_ONLY"],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

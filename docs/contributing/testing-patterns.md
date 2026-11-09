@@ -46,10 +46,19 @@ with a graphics-enabled batch player as well.
 ## Isolated migration compiler tests
 
 The Odin compiler fixture rewrites a small runtime consumer asset rather than the shared test
-helpers. Its graph includes the asset assembly, a runtime caller assembly, and the editor tools
-test assembly. The fixture requires all three to compile and separately breaks runtime and editor
-member access. Keep the consumer targets out of shared test assembly references: migrating a
+helpers. Its graph includes the asset assembly, a runtime caller assembly, and the dedicated
+`WallstopStudios.UnityHelpers.Tests.Editor.OdinCompilation` test assembly. The fixture requires
+all three to compile and separately breaks runtime and editor member access. Keep the consumer targets out of shared test assembly references: migrating a
 shared helper recompiles its entire dependent test graph on every case.
+
+## Keep large unordered oracles linear
+
+NUnit 3.5 unordered equivalence checks can become quadratic for large shuffled collections.
+For map views, compare every pair with an independent Dictionary, check key uniqueness and
+membership with a HashSet, and verify the exact count. Compare values with a frequency table
+so duplicates retain their multiplicity. A value HashSet alone would lose that coverage.
+`IntMapTests.AssertViewsMatch` follows this pattern across removal, growth, clear and refill.
+Keep ordered assertions when order is part of the API contract.
 
 ## Configure Release before initial import
 
