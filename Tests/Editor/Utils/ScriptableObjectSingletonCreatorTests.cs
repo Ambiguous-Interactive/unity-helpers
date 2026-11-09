@@ -474,6 +474,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnityTest]
         public IEnumerator SkipsCreationWhenTargetPathOccupied()
         {
+            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = static type =>
+                type == typeof(Duplicate);
             string targetFolder = TestRoot;
             EnsureFolder(targetFolder);
             string occupiedPath = targetFolder + "/Duplicate.asset";
@@ -533,6 +535,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnityTest]
         public IEnumerator SkipsEnsureInsideAssetImportWorkerProcess()
         {
+            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = static type =>
+                type == typeof(CaseMismatch);
             string targetPath = "Assets/Resources/CaseTest/CaseMismatch.asset";
             AssetDatabase.DeleteAsset(targetPath);
             yield return null;
@@ -562,6 +566,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             [ValueSource(nameof(AssetImportWorkerEnvironmentScenarios))] string environmentVariable
         )
         {
+            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = static type =>
+                type == typeof(CaseMismatch);
             string targetPath = "Assets/Resources/CaseTest/CaseMismatch.asset";
             AssetDatabase.DeleteAsset(targetPath);
             yield return null;
@@ -596,6 +602,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnityTest]
         public IEnumerator DetectorExceptionsDoNotBlockEnsure()
         {
+            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = static type =>
+                type == typeof(CaseMismatch);
             string targetPath = "Assets/Resources/CaseTest/CaseMismatch.asset";
             AssetDatabase.DeleteAsset(targetPath);
             yield return null;
@@ -621,6 +629,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnityTest]
         public IEnumerator RetriesCreationAfterTemporaryFolderBlock()
         {
+            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = static type =>
+                type == typeof(RetrySingleton);
             string retryFolder = TestRoot + "/Retry";
             string retryAsset = retryFolder + "/RetrySingleton.asset";
             string blockerMeta = retryFolder + ".meta";
@@ -804,6 +814,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnityTest]
         public IEnumerator AutomaticRetriesCanBeDisabled()
         {
+            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = static type =>
+                type == typeof(NoRetrySingleton);
             string noRetryFolder = TestRoot + "/NoRetry";
             string noRetryAsset = noRetryFolder + "/NoRetrySingleton.asset";
             string noRetryVariant = noRetryFolder + " 1";
@@ -922,6 +934,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnityTest]
         public IEnumerator PartialSuccessResetsRetryCounter()
         {
+            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = static type =>
+                type == typeof(CaseMismatch) || type == typeof(RetrySingleton);
             string retryFolder = TestRoot + "/Retry";
             string retryAsset = retryFolder + "/RetrySingleton.asset";
             string caseTestFolder = "Assets/Resources/CaseTest";
@@ -1014,6 +1028,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnityTest]
         public IEnumerator AssetCreationDoesNotDeleteValidFilesOnDisk()
         {
+            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = static type =>
+                type == typeof(AssetDatabaseRaceSingleton);
             string raceFolder = TestRoot + "/Race";
             string raceAsset = raceFolder + "/AssetDatabaseRaceSingleton.asset";
 
@@ -1221,6 +1237,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnityTest]
         public IEnumerator CaseMismatchDiagnosticsAreHelpful()
         {
+            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = static type =>
+                type == typeof(CaseMismatch);
             string existingFolder = "Assets/Resources/cAsEtEsT";
             EnsureFolder(existingFolder);
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching(
@@ -1281,6 +1299,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnityTest]
         public IEnumerator DefersEnsureDuringCompilation()
         {
+            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = static type =>
+                type == typeof(CaseMismatch);
             string targetPath = "Assets/Resources/CaseTest/CaseMismatch.asset";
             AssetDatabase.DeleteAsset(targetPath);
             yield return null;
@@ -1458,6 +1478,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnityTest]
         public IEnumerator MultipleEnsureCallsAreRobust()
         {
+            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = static type =>
+                type == typeof(CaseMismatch);
             string targetPath = "Assets/Resources/CaseTest/CaseMismatch.asset";
             AssetDatabase.DeleteAsset(targetPath);
             yield return null;
