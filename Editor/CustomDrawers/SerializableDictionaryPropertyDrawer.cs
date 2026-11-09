@@ -2612,7 +2612,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 Math.Max(sorted.Count * 6 + 64, 64),
                 out StringBuilder summaryBuilder
             );
-            summaryBuilder.Clear();
 
             if (sorted.Count == 1)
             {
@@ -2685,7 +2684,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 64 + (formattedKey?.Length ?? 0) + (indices?.Count ?? 0) * 4,
                 out StringBuilder builder
             );
-            builder.Clear();
 
             if (indices == null || indices.Count == 0)
             {
@@ -2979,7 +2977,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 prefix.Length + (type?.Name?.Length ?? 0) + 8,
                 out StringBuilder builder
             );
-            builder.Clear();
             builder.Append(prefix);
             builder.Append(type?.Name ?? "Unknown");
             builder.Append(')');
@@ -3606,7 +3603,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     propertyPath.Length + 16,
                     out StringBuilder builder
                 );
-                builder.Clear();
                 builder.Append(instanceId);
                 builder.Append('_');
                 builder.Append(propertyPath);
@@ -5466,7 +5462,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 32,
                 out StringBuilder builder
             );
-            builder.Clear();
             builder.Append(start);
             builder.Append('-');
             builder.Append(end);
@@ -9523,7 +9518,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     64,
                     out StringBuilder builder
                 );
-                builder.Clear();
                 builder.Append("Null key detected at index ");
                 builder.Append(index);
                 builder.Append(". Entry will be ignored at runtime.");
@@ -9878,7 +9872,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                         128,
                         out StringBuilder countBuilder
                     );
-                    countBuilder.Clear();
                     countBuilder.Append(duplicateGroupCount);
                     countBuilder.Append(
                         " duplicate keys detected. Resolve conflicts to prevent silent overwrites. The last entry wins at runtime."

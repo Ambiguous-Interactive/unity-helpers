@@ -1412,7 +1412,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     propertyPath.Length + 16,
                     out StringBuilder builder
                 );
-                builder.Clear();
                 builder.Append(instanceId);
                 builder.Append('_');
                 builder.Append(propertyPath);
@@ -1571,7 +1570,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     32 + elementType.Name.Length,
                     out StringBuilder builder
                 );
-                builder.Clear();
                 builder.Append("Unsupported type (");
                 builder.Append(elementType.Name);
                 builder.Append(").");
@@ -2256,7 +2254,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 Math.Max(indices.Count * 6 + 64, 64),
                 out StringBuilder builder
             );
-            builder.Clear();
             builder.Append("Null entries detected at indices ");
 
             for (int i = 0; i < displayCount; ++i)
@@ -2286,7 +2283,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 64,
                 out StringBuilder builder
             );
-            builder.Clear();
             builder.Append("Null entry detected at index ");
             builder.Append(index);
             builder.Append(". Value will be ignored at runtime.");
@@ -3616,7 +3612,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 32,
                 out StringBuilder builder
             );
-            builder.Clear();
             builder.Append(start);
             builder.Append('-');
             builder.Append(end);
@@ -4571,7 +4566,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 Math.Max(count * 8, 64),
                 out StringBuilder summaryBuilder
             );
-            summaryBuilder.Clear();
 
             for (int index = 0; index < count; ++index)
             {
@@ -4763,7 +4757,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 out List<object> existingValues
             );
 
-            existingValues.Clear();
             if (hasSerializedArray)
             {
                 for (int index = 0; index < itemsProperty.arraySize; ++index)

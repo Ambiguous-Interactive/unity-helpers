@@ -168,7 +168,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 Mathf.Max(_maxWordLength, prefix?.Length ?? 0),
                 out StringBuilder builder
             );
-            builder.Clear();
             builder.Append(prefix);
             Collect(node, results, maxResults, builder);
             return results;

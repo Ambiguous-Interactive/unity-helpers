@@ -349,7 +349,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             using PooledResource<List<Component>> componentLease = Buffers<Component>.List.Get(
                 out List<Component> components
             );
-            components.Clear();
             int count = CollectChildComponents(component, metadata, childBuffer, components);
             return AssignChildComponentsFromList(component, metadata, components, count);
         }

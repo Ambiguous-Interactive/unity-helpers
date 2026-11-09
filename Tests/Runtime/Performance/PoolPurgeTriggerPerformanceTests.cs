@@ -323,7 +323,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 using PooledResource<List<int>> resource = Buffers<int>.List.Get(
                     out List<int> list
                 );
-                list.Clear();
             }
 
             Stopwatch stopwatch = Stopwatch.StartNew();
@@ -332,7 +331,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 using PooledResource<List<int>> resource = Buffers<int>.List.Get(
                     out List<int> list
                 );
-                list.Clear();
             }
             stopwatch.Stop();
 
@@ -358,7 +356,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 using PooledResource<HashSet<int>> resource = Buffers<int>.HashSet.Get(
                     out HashSet<int> set
                 );
-                set.Clear();
             }
 
             Stopwatch stopwatch = Stopwatch.StartNew();
@@ -367,7 +364,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 using PooledResource<HashSet<int>> resource = Buffers<int>.HashSet.Get(
                     out HashSet<int> set
                 );
-                set.Clear();
             }
             stopwatch.Stop();
 
@@ -394,7 +390,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                     int,
                     int
                 >.Dictionary.Get(out Dictionary<int, int> dict);
-                dict.Clear();
             }
 
             Stopwatch stopwatch = Stopwatch.StartNew();
@@ -404,7 +399,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                     int,
                     int
                 >.Dictionary.Get(out Dictionary<int, int> dict);
-                dict.Clear();
             }
             stopwatch.Stop();
 

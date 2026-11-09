@@ -87,7 +87,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random {
 
         private static IEnumerable<TestCaseData> Cases()
         {
-            for (int number = 1; number <= 27; ++number)
+            for (int number = 1; number <= 28; ++number)
             {
                 string id = $"WUH{number:000}";
                 yield return new TestCaseData(id).SetName(id + "ExamplesMatchTheActualDiagnostic");
@@ -144,6 +144,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random {
                     return new PublicStructEqualityAnalyzer();
                 case BooleanBitwiseDiagnosticId:
                     return new BooleanBitwiseAnalyzer();
+                case "WUH028":
+                    return new RedundantPooledClearAnalyzer();
                 case "WUH027":
                     return new RedundantCallerNameAnalyzer();
                 case "WUH025":
@@ -158,6 +160,13 @@ namespace WallstopStudios.UnityHelpers.Core.Random {
 
         private static string SourceFor(string id, string code)
         {
+            if (string.Equals(id, "WUH028", StringComparison.Ordinal))
+            {
+                return "using System.Collections.Generic; using WallstopStudios.UnityHelpers.Utils; public class Subject { public void Run() { "
+                    + code
+                    + " } } "
+                    + RedundantPooledClearAnalyzerTests.PoolDeclarations;
+            }
             if (string.Equals(id, "WUH027", StringComparison.Ordinal))
             {
                 return "using System.Runtime.CompilerServices; public class Subject { private void Log(int value, [CallerMemberName] string caller = null) {} public void Run() { "

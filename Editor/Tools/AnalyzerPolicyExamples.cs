@@ -193,6 +193,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     selectedExplanation =
                         "Implement typed equality and matching object equality and hashing. Ref structs are excluded on Unity's C# version. Stored collection references keep reference equality unless the type documents content equality.";
                     break;
+                case "WUH028":
+                    selectedBadCode =
+                        "using var lease = Buffers<int>.List.Get(out List<int> items);\nitems.Clear();";
+                    selectedGoodCode =
+                        "using var lease = Buffers<int>.List.Get(out List<int> items);";
+                    selectedExplanation =
+                        "Known Buffers rentals are already empty. Let the lease return and clear the collection. Keep intentional clears after use and cleanup for custom pools.";
+                    break;
                 case "WUH027":
                     selectedBadCode = "Log(1, nameof(Run));";
                     selectedGoodCode = "Log(1);";

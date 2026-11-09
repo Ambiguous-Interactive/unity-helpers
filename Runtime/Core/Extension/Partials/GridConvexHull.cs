@@ -547,7 +547,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 {
                     using PooledResource<List<FastVector3Int>> colinearRes =
                         Buffers<FastVector3Int>.List.Get(out List<FastVector3Int> colinear);
-                    colinear.Clear();
 
                     foreach (FastVector3Int p in points)
                     {

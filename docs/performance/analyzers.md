@@ -68,6 +68,7 @@ command after resolving the failure. Temporary directories are excluded from Uni
 | [`WUH025`](#wuh025-unsupported-relational-field)                         | A relational field with an unsupported type                           |
 | [`WUH026`](#wuh026-boolean-bitwise-operators)                            | Bitwise operators on boolean operands                                 |
 | [`WUH027`](#wuh027-implicit-caller-names)                                | Explicit caller names the compiler can provide                        |
+| [`WUH028`](#wuh028-fresh-pooled-collection-clears)                       | Redundant clears immediately after known Buffers rentals              |
 
 These are a different family from the `WPROTO###` serialization diagnostics, and they follow a
 different policy on purpose:
@@ -1207,6 +1208,41 @@ Generic fields whose concrete element type is not yet known still require runtim
 All interface contracts remain supported, including interfaces that also implement enumeration;
 a component can implement these interfaces. The analyzer does not infer collection storage from
 an interface name. Runtime guards remain necessary for older compiled assemblies and reflection.
+
+## `WUH028`: fresh pooled collection clears
+
+Known `Buffers` collections are empty when rented. The lease clears them on return, so an
+immediate `Clear()` adds work without removing any entries:
+
+```csharp
+using WallstopStudios.UnityHelpers.Utils;
+
+public class PooledListExample
+{
+    public void Process()
+    {
+        using var lease = Buffers<int>.List.Get(out var items);
+        items.Add(1);
+        items.Clear(); // This mid-use clear remains valid.
+        items.Add(2);
+    }
+}
+```
+
+The analyzer recognizes direct list, set, queue, stack, linked-list, dictionary and StringBuilder
+pools, the capacity helpers, and the comparer-specific set/dictionary pool factories. It uses
+bound symbols rather than matching a variable's spelling. Both an out local and an immediate
+`lease.Value.Clear()` are covered, with using declarations or using statements.
+
+Only a clear that immediately follows the rental in the same statement list, or starts its
+using body, is reported. The rule does not infer emptiness across intervening operations,
+alias assignments, helper calls or control flow. Keep clears that reset a collection after use,
+clear caller-owned collections, or implement the return callback of a custom pool.
+
+`WUH028` is a suppressible warning by default. Package compiler checks promote it to an error;
+the excluded-editor-source audit includes a reporting control. The Analyzer Policy window
+provides compiled examples and the usual severity controls. The warning makes no claim about
+performance margins for a caller's workload.
 
 ## `WUH027`: implicit caller names
 

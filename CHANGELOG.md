@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `WUH028` to flag redundant clears of freshly rented `Buffers` collections. See [the analyzer guide](./docs/performance/analyzers.md#wuh028-fresh-pooled-collection-clears).
 - Add `WUH027` warnings for redundant explicit caller names, with overload checks and Analyzer Policy examples.
 - Add `EnumValues.Of(Type)` and `TryGetValues` for shared enum arrays when the enum type is known at runtime ([#1129](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1129)).
 - Add fallback-camera overloads for pointer world and local projection; existing overloads keep their camera behavior ([#1132](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1132)).

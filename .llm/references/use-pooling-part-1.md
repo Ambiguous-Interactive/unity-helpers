@@ -24,6 +24,11 @@
 
 ## Collection Pooling with Buffers&lt;T&gt;
 
+Known `Buffers` collections are empty when rented and clear on return. Do not clear a fresh
+rental or clear it merely to prepare for disposal. Keep clears between uses within a lease and
+for custom pools whose cleanup contract requires them. `WUH028` rejects immediate fresh-rental
+clears in package compiler checks; see [the analyzer guide](../../docs/performance/analyzers.md#wuh028-fresh-pooled-collection-clears).
+
 ### List Pooling
 
 ```csharp
