@@ -12,6 +12,9 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 WRAPPER = ROOT / "scripts/unity/run-unity-docker.sh"
+pytestmark = pytest.mark.skipif(
+    sys.platform == "win32", reason="Docker wrapper qualification requires Unix process supervision"
+)
 
 
 def bash() -> str:
@@ -34,12 +37,11 @@ def fixture_repository(root: Path) -> Path:
 
 @pytest.mark.parametrize("kind", ["uutils", "missing", "failing"])
 def test_unsupported_timeout_is_refused_before_credentials(tmp_path: Path, kind: str) -> None:
-    if sys.platform == "win32":
-        pytest.skip("The Docker wrapper and Unix executable selection run on Linux hosts")
     wrapper = fixture_repository(tmp_path)
     secrets = tmp_path / ".unity-secrets"
     secrets.mkdir()
-    os.mkfifo(secrets / "credentials.env")
+    if sys.platform != "win32":
+        os.mkfifo(secrets / "credentials.env")
     unsupported = tmp_path / "unsupported timeout"
     body = "#!/bin/sh\nprintf 'timeout (uutils coreutils) 0.10.0\\n'\n"
     if kind == "failing":
@@ -78,8 +80,6 @@ def selector() -> str:
 
 @pytest.mark.parametrize("name", ["timeout", "gnutimeout", "gtimeout"])
 def test_selector_finds_gnu_fallback(tmp_path: Path, name: str) -> None:
-    if sys.platform == "win32":
-        pytest.skip("Unix executable discovery requires Unix mode bits")
     source = selector()
     selected = tmp_path / name
     selected.write_text("#!/bin/sh\nprintf 'timeout (GNU coreutils) 9.7\\n'\n", encoding="utf-8")
@@ -106,8 +106,6 @@ def test_selector_finds_gnu_fallback(tmp_path: Path, name: str) -> None:
 
 
 def test_qualified_timeout_escalates_term_resistant_pipe_child() -> None:
-    if sys.platform == "win32":
-        pytest.skip("GNU process-group supervision is a Unix contract")
     selected = subprocess.run(
         [bash(), "-c", selector() + "\nselect_gnu_timeout"],
         capture_output=True,
@@ -130,8 +128,6 @@ def test_qualified_timeout_escalates_term_resistant_pipe_child() -> None:
 
 
 def test_container_timeout_is_qualified_before_activation(tmp_path: Path) -> None:
-    if sys.platform == "win32":
-        pytest.skip("The Docker wrapper runs on Unix hosts")
     shell = bash()
     selected = subprocess.run(
         [shell, "-c", selector() + "\nselect_gnu_timeout"],
