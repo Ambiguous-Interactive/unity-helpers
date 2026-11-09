@@ -265,6 +265,48 @@ def test_cli_reports_and_generates_csharp_only(tmp_path: Path, mode: str) -> Non
         assert assembly["autoReferenced"] is False
 
 
+@pytest.mark.parametrize("configured", [None, "", " ", "\t\r\n"])
+def test_blank_environment_root_uses_repository_instead_of_working_directory(
+    tmp_path: Path, configured: str | None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "repository"
+    root.mkdir()
+    (root / "README.md").write_text("```cs\nvalue.Run();\n```\n", encoding="utf-8")
+    decoy = tmp_path / "decoy"
+    decoy.mkdir()
+    (decoy / "README.md").write_text("```cs\nother.Run();\n```\n", encoding="utf-8")
+    git = shutil.which("git")
+    assert git is not None
+    subprocess.run([git, "init", "--quiet", str(root)], check=True, capture_output=True, timeout=10)
+    monkeypatch.setattr(extractor, "ROOT", root)
+    monkeypatch.chdir(decoy)
+    if configured is None:
+        monkeypatch.delenv("CODE_SAMPLES_ROOT", raising=False)
+    else:
+        monkeypatch.setenv("CODE_SAMPLES_ROOT", configured)
+    assert extractor.main(["--extract-only", "--output-dir", str(tmp_path / "artifacts")]) == 0
+    assert read_report(tmp_path)["samples"][0]["file"] == "README.md"
+
+
+@pytest.mark.parametrize("directory_name", ["custom", " custom"])
+def test_nonblank_environment_root_preserves_path_spaces(
+    tmp_path: Path, directory_name: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "default"
+    root.mkdir()
+    configured = tmp_path / directory_name
+    configured.mkdir()
+    source = configured / "README.md"
+    source.write_text("```cs\nvalue.Run();\n```\n", encoding="utf-8")
+    monkeypatch.setattr(extractor, "ROOT", root)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("CODE_SAMPLES_ROOT", directory_name)
+    assert extractor.main(["--extract-only", "--output-dir", str(tmp_path / "artifacts")]) == 0
+    assert read_report(tmp_path)["samples"][0]["file"] == extractor.relative_or_absolute(
+        source, root
+    )
+
+
 @pytest.mark.parametrize("content", ["prose only", "```json\n{}\n```\n"])
 def test_empty_csharp_corpus_fails_but_retains_report(tmp_path: Path, content: str) -> None:
     (tmp_path / "README.md").write_text(content, encoding="utf-8")

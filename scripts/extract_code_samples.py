@@ -258,10 +258,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--include-partial", action="store_true")
     parser.add_argument("--verbose", action="store_true")
     parser.add_argument("--output-dir", type=Path, default=ROOT / "artifacts/code-samples")
+    configured_root = os.environ.get("CODE_SAMPLES_ROOT", "")
     parser.add_argument(
         "--scan-root",
         type=Path,
-        default=Path(os.environ.get("CODE_SAMPLES_ROOT", ROOT)),
+        default=Path(configured_root) if configured_root.strip() else ROOT,
     )
     args = parser.parse_args(argv)
     scan_root: Path = args.scan_root.resolve()
