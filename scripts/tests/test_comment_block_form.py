@@ -321,3 +321,38 @@ def test_git_discovery_rejects_dangling_links(tmp_path: Path) -> None:
     target.unlink()
     with pytest.raises(ValueError, match="linked"):
         files_to_check(tmp_path, None, fixture=False)
+
+
+@pytest.mark.parametrize("prefix", ["$@", "@$"])
+@pytest.mark.parametrize(
+    "expression",
+    [
+        'Pick("a")',
+        'Pick(@"a")',
+        'Pick($"{Pick("a")}")',
+        'Pick(/* } */ "a")',
+        'new { Value = Pick("a") }.Value',
+    ],
+)
+@pytest.mark.parametrize("newline", ["\n", "\r\n"])
+def test_interpolated_verbatim_literals_keep_comment_lookalikes(
+    prefix: str, expression: str, newline: str
+) -> None:
+    body = (
+        f'            string value = {prefix}"{{{{escaped}}}} {{{expression}}}\n'
+        "            // literal first\n"
+        "            // literal second\n"
+        '            ";\n'
+        "            // actual first\n"
+        "            // actual second"
+    )
+    source = in_type(body).replace("\n", newline)
+    found = analyze(source)
+    assert len(found) == 1
+    assert found[0].line == 11
+    fixed, declined = rewrite(source, found)
+    assert declined == 0
+    assert fixed.startswith(source[: source.index("            // actual first")])
+    assert "// literal first" + newline + "            // literal second" in fixed
+    assert "// actual first" not in fixed
+    assert analyze(fixed) == []

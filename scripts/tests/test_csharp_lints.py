@@ -334,7 +334,7 @@ def test_directive_text_cannot_hide_conditional_calls(directive: str) -> None:
     assert len(chains.violations(methods)) == 1
 
 
-@pytest.mark.parametrize("quote", ['"', "'"])
+@pytest.mark.parametrize("quote", ['"', "'", '$"{'])
 @pytest.mark.parametrize("newline", ["\n", "\r\n", "\r"])
 @pytest.mark.parametrize("escape", ["", "\\"])
 def test_an_unterminated_ordinary_literal_cannot_hide_later_lines(
