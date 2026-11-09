@@ -1,0 +1,6758 @@
+{
+  "schemaVersion": 1,
+  "scope": "Recovered consumer protocol replay; no IntMap production changes. Issue #1131 remains open.",
+  "baseCommit": "ef48a1a94489f7474d3a651de3d90d2d8fe1e12b",
+  "originalProgramSha256": "1cee6c46c3ba3e451b97447067beb5725d02302dc2a9b84998a9d9c7c54194eb",
+  "archiveSha256": "f94dc3b5c0f2892037b914da7dd31ebacf61c92b8ad5f72d2e88c9e8312da491",
+  "receipt": {
+    "sources": {
+      "src/Program.cs": "5f627e0291164df7ad42414a784df10fc9b16bbeea29b8e65e58587ee9e96b3e",
+      "src/ObjectsShim.cs": "2ff6c969484e2f22d262f5e0624dd6296c294426005638b1297488731beb6c27",
+      "src/IntMapNew.cs": "2dfa3cc0204bdc29f19fb4938a83a44d6e689b30342cc62010114ec333a5b3ae",
+      "src/IntMapOld.cs": "b5598172de7c36a4e0d0d96b5a9c581902284bdbd9445c0807637fa72b792530",
+      "IntMapAb.csproj": "ef5fd0c12d741b8b828c3c2b9f1b42f8a63d796f30d19555ab7d5fbb33d36e0f",
+      "global.json": "631dbe2198f7c5c5520edfc24d5891f569fb27f9a665169483d95979c36d89aa"
+    },
+    "payloads": {
+      "bin/Release/net10.0/IntMapAb.dll": "c6122c07a5676d623b48a58db3b4b123135ddc33780d542c7266562ce3f4f332",
+      "bin/Release/net48/IntMapAb.exe": "a4ba72339e03a51fadddcfbf4242e9fa29781616a6b91ca5235bfd7ca395b248"
+    },
+    "processes": [
+      {
+        "runtime": "net10",
+        "process": 1,
+        "exit": 0,
+        "stdout_eof": true,
+        "stderr_eof": true,
+        "seconds": 4.136410358012654,
+        "rows": 111,
+        "inputs_stable": true,
+        "payloads_stable": true
+      },
+      {
+        "runtime": "net10",
+        "process": 2,
+        "exit": 0,
+        "stdout_eof": true,
+        "stderr_eof": true,
+        "seconds": 3.987878507003188,
+        "rows": 111,
+        "inputs_stable": true,
+        "payloads_stable": true
+      },
+      {
+        "runtime": "net10",
+        "process": 3,
+        "exit": 0,
+        "stdout_eof": true,
+        "stderr_eof": true,
+        "seconds": 4.17738200398162,
+        "rows": 111,
+        "inputs_stable": true,
+        "payloads_stable": true
+      },
+      {
+        "runtime": "mono",
+        "process": 1,
+        "exit": 0,
+        "stdout_eof": true,
+        "stderr_eof": true,
+        "seconds": 11.71438862499781,
+        "rows": 111,
+        "inputs_stable": true,
+        "payloads_stable": true
+      },
+      {
+        "runtime": "mono",
+        "process": 2,
+        "exit": 0,
+        "stdout_eof": true,
+        "stderr_eof": true,
+        "seconds": 11.375588840979617,
+        "rows": 111,
+        "inputs_stable": true,
+        "payloads_stable": true
+      },
+      {
+        "runtime": "mono",
+        "process": 3,
+        "exit": 0,
+        "stdout_eof": true,
+        "stderr_eof": true,
+        "seconds": 11.300418820988853,
+        "rows": 111,
+        "inputs_stable": true,
+        "payloads_stable": true
+      }
+    ]
+  },
+  "summaries": [
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 8,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 4.673,
+      "median": 4.891,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 8,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 2.063,
+      "median": 2.178,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 8,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 2.353,
+      "median": 2.624,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 8,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 2.788,
+      "median": 3.09,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 8,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 2.465,
+      "median": 2.576,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 8,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 2.484,
+      "median": 2.58,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 8,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 18.625,
+      "median": 20.735,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 8,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 11.828,
+      "median": 12.413,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 8,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 11.706,
+      "median": 12.306,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 8,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 3.703,
+      "median": 4.006,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 8,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 12.801,
+      "median": 13.774,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 8,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 4.295,
+      "median": 4.657,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 64,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 4.707,
+      "median": 4.89,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 64,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 1.96,
+      "median": 1.988,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 64,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 2.015,
+      "median": 2.063,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 64,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 3.641,
+      "median": 3.684,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 64,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 1.496,
+      "median": 1.519,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 64,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 1.515,
+      "median": 1.566,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 64,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 11.444,
+      "median": 12.708,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 64,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 10.867,
+      "median": 12.28,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 64,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 12.147,
+      "median": 13.111,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 64,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 2.606,
+      "median": 2.739,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 64,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 6.989,
+      "median": 7.176,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 64,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 2.873,
+      "median": 2.915,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 1024,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 4.634,
+      "median": 4.761,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 1024,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 1.893,
+      "median": 1.912,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 1024,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 1.931,
+      "median": 1.956,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 1024,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 2.818,
+      "median": 2.934,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 1024,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 1.369,
+      "median": 1.426,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 1024,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 1.4,
+      "median": 1.425,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 1024,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 30.531,
+      "median": 34.926,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 1024,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 38.789,
+      "median": 41.749,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 1024,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 42.384,
+      "median": 48.89,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 2.432,
+      "median": 2.456,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 7.849,
+      "median": 7.914,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 2.574,
+      "median": 2.596,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 8,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 4.681,
+      "median": 4.761,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 8,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 2.066,
+      "median": 2.251,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 8,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 2.092,
+      "median": 2.741,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 8,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 3.182,
+      "median": 3.282,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 8,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 2.351,
+      "median": 2.567,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 8,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 2.41,
+      "median": 2.549,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 8,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 18.781,
+      "median": 19.682,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 8,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 11.836,
+      "median": 12.596,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 8,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 11.612,
+      "median": 12.438,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 8,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 3.685,
+      "median": 3.724,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 8,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 13.5,
+      "median": 13.904,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 8,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 4.43,
+      "median": 4.457,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 64,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 5.837,
+      "median": 5.946,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 64,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 2.156,
+      "median": 2.191,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 64,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 2.2,
+      "median": 2.221,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 64,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 3.24,
+      "median": 3.271,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 64,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 1.834,
+      "median": 1.848,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 64,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 2.047,
+      "median": 2.07,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 64,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 11.85,
+      "median": 12.652,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 64,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 11.285,
+      "median": 11.917,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 64,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 12.233,
+      "median": 12.933,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 64,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 2.588,
+      "median": 2.653,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 64,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 7.203,
+      "median": 7.289,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 64,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 2.867,
+      "median": 2.939,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 6.94,
+      "median": 7.449,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 2.18,
+      "median": 2.24,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 2.175,
+      "median": 2.265,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 4.226,
+      "median": 4.863,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 1.964,
+      "median": 2.237,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 2.161,
+      "median": 2.334,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 39.023,
+      "median": 42.108,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 42.428,
+      "median": 46.746,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 51.069,
+      "median": 58.026,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 2.443,
+      "median": 2.463,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 10.217,
+      "median": 11.863,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 2.584,
+      "median": 2.614,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 4.697,
+      "median": 4.833,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 2.068,
+      "median": 2.132,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 2.396,
+      "median": 2.453,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 2.801,
+      "median": 2.826,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 2.415,
+      "median": 2.52,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 2.508,
+      "median": 2.6,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 18.426,
+      "median": 21.91,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 12.013,
+      "median": 14.008,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 11.794,
+      "median": 13.099,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 3.695,
+      "median": 3.74,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 11.825,
+      "median": 13.463,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 4.282,
+      "median": 4.316,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 4.722,
+      "median": 5.805,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 2.496,
+      "median": 2.863,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 3.174,
+      "median": 3.432,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 3.782,
+      "median": 3.882,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 1.495,
+      "median": 1.539,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 1.523,
+      "median": 1.562,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 11.779,
+      "median": 12.934,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 12.298,
+      "median": 12.902,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 13.754,
+      "median": 14.399,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 2.603,
+      "median": 2.647,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 7.321,
+      "median": 7.66,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 2.864,
+      "median": 2.893,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 4.647,
+      "median": 4.743,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 1.916,
+      "median": 1.945,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 1.96,
+      "median": 2.018,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 2.832,
+      "median": 2.891,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 1.489,
+      "median": 1.506,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 1.521,
+      "median": 1.536,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 33.808,
+      "median": 36.548,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 36.382,
+      "median": 40.268,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 48.901,
+      "median": 50.559,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 2.427,
+      "median": 2.46,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 6.658,
+      "median": 7.303,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 2.575,
+      "median": 2.604,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "churn8",
+      "size": 8,
+      "op": "churn",
+      "arm": "Dictionary",
+      "min": 9.421,
+      "median": 9.633,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "churn8",
+      "size": 8,
+      "op": "churn",
+      "arm": "IntMap371Baseline",
+      "min": 5.525,
+      "median": 5.566,
+      "capacity": 64
+    },
+    {
+      "runtime": "mono",
+      "shape": "churn8",
+      "size": 8,
+      "op": "churn",
+      "arm": "IntMapCurrent",
+      "min": 10.657,
+      "median": 10.872,
+      "capacity": 64
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 8,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 4.684,
+      "median": 4.724,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 8,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 2.069,
+      "median": 2.121,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 8,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 2.382,
+      "median": 2.47,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 8,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 2.8,
+      "median": 2.883,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 8,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 2.339,
+      "median": 2.493,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 8,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 2.389,
+      "median": 2.605,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 8,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 18.702,
+      "median": 19.809,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 8,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 11.694,
+      "median": 12.194,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 8,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 11.121,
+      "median": 11.713,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 8,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 3.69,
+      "median": 3.73,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 8,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 12.455,
+      "median": 13.783,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 8,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 4.288,
+      "median": 4.348,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 64,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 4.696,
+      "median": 4.74,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 64,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 1.955,
+      "median": 1.977,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 64,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 2.009,
+      "median": 2.033,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 64,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 3.64,
+      "median": 3.704,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 64,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 1.493,
+      "median": 1.526,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 64,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 1.499,
+      "median": 1.563,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 64,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 11.552,
+      "median": 12.201,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 64,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 10.965,
+      "median": 11.717,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 64,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 12.048,
+      "median": 12.509,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 64,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 2.613,
+      "median": 2.633,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 64,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 7.065,
+      "median": 7.16,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 64,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 2.877,
+      "median": 2.893,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 1024,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 4.641,
+      "median": 4.751,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 1024,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 1.877,
+      "median": 1.974,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 1024,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 1.916,
+      "median": 2.026,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 1024,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 2.838,
+      "median": 2.875,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 1024,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 1.371,
+      "median": 1.403,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 1024,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 1.391,
+      "median": 1.458,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 1024,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 31.509,
+      "median": 35.937,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 1024,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 37.338,
+      "median": 40.907,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 1024,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 38.77,
+      "median": 49.604,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 2.42,
+      "median": 2.463,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 7.828,
+      "median": 7.902,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 2.58,
+      "median": 2.66,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 8,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 4.68,
+      "median": 4.745,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 8,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 2.06,
+      "median": 2.087,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 8,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 2.091,
+      "median": 2.826,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 8,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 3.166,
+      "median": 3.191,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 8,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 2.407,
+      "median": 2.543,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 8,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 2.502,
+      "median": 2.607,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 8,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 18.99,
+      "median": 20.133,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 8,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 11.652,
+      "median": 12.281,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 8,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 11.533,
+      "median": 11.945,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 8,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 3.696,
+      "median": 3.712,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 8,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 12.637,
+      "median": 13.843,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 8,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 4.427,
+      "median": 4.458,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 64,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 5.847,
+      "median": 5.89,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 64,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 2.167,
+      "median": 2.177,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 64,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 2.194,
+      "median": 2.224,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 64,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 3.248,
+      "median": 3.273,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 64,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 1.823,
+      "median": 1.847,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 64,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 2.052,
+      "median": 2.069,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 64,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 12.269,
+      "median": 13.184,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 64,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 11.246,
+      "median": 11.997,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 64,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 12.148,
+      "median": 13.517,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 64,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 2.589,
+      "median": 2.633,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 64,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 7.179,
+      "median": 7.239,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 64,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 2.875,
+      "median": 2.916,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 6.832,
+      "median": 6.968,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 2.16,
+      "median": 2.223,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 2.154,
+      "median": 2.214,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 3.762,
+      "median": 4.442,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 1.935,
+      "median": 2.031,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 2.155,
+      "median": 2.211,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 34.749,
+      "median": 41.37,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 38.795,
+      "median": 43.46,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 47.888,
+      "median": 51.483,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 2.444,
+      "median": 2.466,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 11.232,
+      "median": 12.861,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 2.595,
+      "median": 2.64,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 4.698,
+      "median": 4.752,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 2.07,
+      "median": 2.115,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 2.371,
+      "median": 2.452,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 2.802,
+      "median": 2.837,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 2.454,
+      "median": 2.546,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 2.529,
+      "median": 2.57,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 18.876,
+      "median": 20.077,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 11.743,
+      "median": 12.158,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 10.99,
+      "median": 11.678,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 3.698,
+      "median": 3.731,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 12.836,
+      "median": 13.778,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 4.286,
+      "median": 4.315,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 4.714,
+      "median": 4.769,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 2.475,
+      "median": 2.549,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 3.149,
+      "median": 3.197,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 3.799,
+      "median": 3.837,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 1.494,
+      "median": 1.525,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 1.523,
+      "median": 1.565,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 11.82,
+      "median": 12.549,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 11.931,
+      "median": 12.407,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 13.468,
+      "median": 14.093,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 2.611,
+      "median": 2.652,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 6.799,
+      "median": 7.637,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 2.848,
+      "median": 2.91,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 4.658,
+      "median": 4.713,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 1.945,
+      "median": 1.963,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 1.962,
+      "median": 1.983,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 2.834,
+      "median": 2.875,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 1.468,
+      "median": 1.513,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 1.52,
+      "median": 1.539,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 32.138,
+      "median": 34.461,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 35.815,
+      "median": 39.11,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 44.438,
+      "median": 49.76,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 2.421,
+      "median": 2.463,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 7.197,
+      "median": 7.347,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 2.559,
+      "median": 2.621,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "churn8",
+      "size": 8,
+      "op": "churn",
+      "arm": "Dictionary",
+      "min": 9.554,
+      "median": 9.713,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "churn8",
+      "size": 8,
+      "op": "churn",
+      "arm": "IntMap371Baseline",
+      "min": 5.588,
+      "median": 5.637,
+      "capacity": 64
+    },
+    {
+      "runtime": "mono",
+      "shape": "churn8",
+      "size": 8,
+      "op": "churn",
+      "arm": "IntMapCurrent",
+      "min": 10.848,
+      "median": 11.005,
+      "capacity": 64
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 8,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 4.695,
+      "median": 4.866,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 8,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 2.057,
+      "median": 2.135,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 8,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 2.386,
+      "median": 2.542,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 8,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 2.802,
+      "median": 3.114,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 8,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 2.393,
+      "median": 2.588,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 8,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 2.452,
+      "median": 2.63,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 8,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 19.79,
+      "median": 25.841,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 8,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 12.071,
+      "median": 15.69,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 8,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 12.243,
+      "median": 13.509,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 8,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 3.722,
+      "median": 3.82,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 8,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 11.805,
+      "median": 13.419,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 8,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 4.275,
+      "median": 4.411,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 64,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 4.696,
+      "median": 4.745,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 64,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 1.955,
+      "median": 1.969,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 64,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 2.016,
+      "median": 2.044,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 64,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 3.571,
+      "median": 3.651,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 64,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 1.49,
+      "median": 1.528,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 64,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 1.514,
+      "median": 1.562,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 64,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 11.523,
+      "median": 13.023,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 64,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 11.279,
+      "median": 12.367,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 64,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 12.22,
+      "median": 13.57,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 64,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 2.609,
+      "median": 2.672,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 64,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 6.743,
+      "median": 7.033,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 64,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 2.873,
+      "median": 2.911,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 1024,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 4.635,
+      "median": 4.673,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 1024,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 1.886,
+      "median": 1.904,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 1024,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 1.921,
+      "median": 1.945,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 1024,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 2.813,
+      "median": 2.832,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 1024,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 1.353,
+      "median": 1.393,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 1024,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 1.37,
+      "median": 1.418,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 1024,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 30.214,
+      "median": 34.259,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 1024,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 36.724,
+      "median": 40.065,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 1024,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 40.487,
+      "median": 46.812,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 2.421,
+      "median": 2.442,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 7.66,
+      "median": 7.886,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "dense",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 2.572,
+      "median": 2.607,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 8,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 4.669,
+      "median": 4.689,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 8,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 2.036,
+      "median": 2.078,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 8,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 2.098,
+      "median": 2.684,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 8,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 3.159,
+      "median": 3.175,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 8,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 2.424,
+      "median": 2.558,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 8,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 2.467,
+      "median": 2.613,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 8,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 18.922,
+      "median": 19.828,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 8,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 11.588,
+      "median": 12.066,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 8,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 11.574,
+      "median": 12.187,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 8,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 3.691,
+      "median": 3.741,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 8,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 13.226,
+      "median": 13.769,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 8,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 4.404,
+      "median": 4.431,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 64,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 5.808,
+      "median": 5.878,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 64,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 2.159,
+      "median": 2.185,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 64,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 2.19,
+      "median": 2.209,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 64,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 3.249,
+      "median": 3.276,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 64,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 1.833,
+      "median": 1.85,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 64,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 2.019,
+      "median": 2.077,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 64,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 12.025,
+      "median": 12.661,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 64,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 11.483,
+      "median": 12.276,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 64,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 12.407,
+      "median": 12.697,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 64,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 2.609,
+      "median": 2.648,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 64,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 6.606,
+      "median": 7.187,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 64,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 2.882,
+      "median": 2.931,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 6.761,
+      "median": 6.927,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 2.113,
+      "median": 2.18,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 2.141,
+      "median": 2.179,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 4.238,
+      "median": 4.516,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 1.907,
+      "median": 1.993,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 2.137,
+      "median": 2.186,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 36.43,
+      "median": 41.155,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 39.961,
+      "median": 44.886,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 47.633,
+      "median": 53.398,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 2.427,
+      "median": 2.483,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 10.132,
+      "median": 11.609,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 2.586,
+      "median": 2.648,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 4.681,
+      "median": 4.725,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 2.062,
+      "median": 2.085,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 2.391,
+      "median": 2.477,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 2.794,
+      "median": 2.808,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 2.43,
+      "median": 2.554,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 2.511,
+      "median": 2.615,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 18.794,
+      "median": 19.615,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 11.774,
+      "median": 12.495,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 11.1,
+      "median": 11.95,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 3.717,
+      "median": 3.74,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 12.548,
+      "median": 13.781,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 4.246,
+      "median": 4.305,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 4.71,
+      "median": 4.735,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 2.512,
+      "median": 2.611,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 3.171,
+      "median": 3.186,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 3.803,
+      "median": 3.826,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 1.509,
+      "median": 1.54,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 1.529,
+      "median": 1.568,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 11.487,
+      "median": 12.108,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 12.011,
+      "median": 12.429,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 13.575,
+      "median": 13.98,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 2.61,
+      "median": 2.635,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 7.054,
+      "median": 7.616,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 2.874,
+      "median": 2.917,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 4.638,
+      "median": 4.679,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 1.903,
+      "median": 1.939,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 1.955,
+      "median": 1.981,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 2.823,
+      "median": 2.853,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 1.486,
+      "median": 1.497,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 1.511,
+      "median": 1.531,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 31.167,
+      "median": 33.971,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 33.53,
+      "median": 37.192,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 43.504,
+      "median": 46.414,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 2.418,
+      "median": 2.456,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 6.958,
+      "median": 7.275,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 2.561,
+      "median": 2.599,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "churn8",
+      "size": 8,
+      "op": "churn",
+      "arm": "Dictionary",
+      "min": 9.489,
+      "median": 9.596,
+      "capacity": -1
+    },
+    {
+      "runtime": "mono",
+      "shape": "churn8",
+      "size": 8,
+      "op": "churn",
+      "arm": "IntMap371Baseline",
+      "min": 5.565,
+      "median": 5.626,
+      "capacity": 64
+    },
+    {
+      "runtime": "mono",
+      "shape": "churn8",
+      "size": 8,
+      "op": "churn",
+      "arm": "IntMapCurrent",
+      "min": 10.848,
+      "median": 11.118,
+      "capacity": 64
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 8,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 1.386,
+      "median": 1.46,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 8,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 0.687,
+      "median": 0.759,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 8,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 0.706,
+      "median": 0.76,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 8,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 0.835,
+      "median": 0.916,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 8,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 0.526,
+      "median": 0.559,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 8,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 1.057,
+      "median": 1.088,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 8,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 14.502,
+      "median": 16.107,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 8,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 10.461,
+      "median": 13.153,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 8,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 11.415,
+      "median": 15.435,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 8,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 0.518,
+      "median": 0.548,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 8,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 2.448,
+      "median": 2.917,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 8,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 0.505,
+      "median": 0.535,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 64,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 1.422,
+      "median": 1.44,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 64,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 0.754,
+      "median": 0.793,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 64,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 0.823,
+      "median": 0.889,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 64,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 1.337,
+      "median": 1.671,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 64,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 0.651,
+      "median": 0.949,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 64,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 0.806,
+      "median": 0.961,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 64,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 6.781,
+      "median": 8.994,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 64,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 7.924,
+      "median": 10.628,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 64,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 9.475,
+      "median": 11.996,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 64,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 0.5,
+      "median": 0.56,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 64,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 1.381,
+      "median": 1.444,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 64,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 0.549,
+      "median": 0.557,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 1024,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 1.458,
+      "median": 1.473,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 1024,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 0.679,
+      "median": 0.723,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 1024,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 0.743,
+      "median": 0.762,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 1024,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 0.914,
+      "median": 0.928,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 1024,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 0.492,
+      "median": 0.507,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 1024,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 0.544,
+      "median": 0.554,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 1024,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 7.753,
+      "median": 9.271,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 1024,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 8.111,
+      "median": 9.432,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 1024,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 9.301,
+      "median": 10.891,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 0.485,
+      "median": 0.499,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 1.389,
+      "median": 1.439,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 0.468,
+      "median": 0.489,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 8,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 1.447,
+      "median": 1.471,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 8,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 0.926,
+      "median": 0.973,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 8,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 0.85,
+      "median": 0.868,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 8,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 1.034,
+      "median": 1.051,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 8,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 0.655,
+      "median": 0.662,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 8,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 0.652,
+      "median": 0.689,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 8,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 16.108,
+      "median": 17.738,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 8,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 9.344,
+      "median": 10.327,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 8,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 10.921,
+      "median": 12.202,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 8,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 0.516,
+      "median": 0.553,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 8,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 2.418,
+      "median": 2.52,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 8,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 0.539,
+      "median": 0.57,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 64,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 1.638,
+      "median": 1.654,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 64,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 0.889,
+      "median": 0.94,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 64,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 0.93,
+      "median": 0.961,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 64,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 1.12,
+      "median": 1.139,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 64,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 0.743,
+      "median": 0.984,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 64,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 0.977,
+      "median": 1.035,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 64,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 8.439,
+      "median": 9.689,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 64,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 8.825,
+      "median": 9.767,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 64,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 8.655,
+      "median": 10.325,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 64,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 0.529,
+      "median": 0.576,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 64,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 1.219,
+      "median": 1.292,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 64,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 0.49,
+      "median": 0.52,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 1.58,
+      "median": 1.611,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 0.893,
+      "median": 0.909,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 0.944,
+      "median": 0.975,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 1.126,
+      "median": 1.144,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 0.944,
+      "median": 1.022,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 0.924,
+      "median": 1.008,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 8.321,
+      "median": 9.887,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 8.577,
+      "median": 9.862,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 9.651,
+      "median": 11.314,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 0.487,
+      "median": 0.494,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 1.225,
+      "median": 1.273,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 0.402,
+      "median": 0.411,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 1.447,
+      "median": 1.472,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 0.86,
+      "median": 0.953,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 0.802,
+      "median": 0.834,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 0.899,
+      "median": 0.922,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 0.657,
+      "median": 0.67,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 0.654,
+      "median": 0.702,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 13.02,
+      "median": 15.46,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 7.803,
+      "median": 9.573,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 8.01,
+      "median": 10.834,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 0.471,
+      "median": 0.486,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 3.093,
+      "median": 3.556,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 0.485,
+      "median": 0.497,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 1.472,
+      "median": 1.49,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 0.994,
+      "median": 1.023,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 0.982,
+      "median": 1.006,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 1.092,
+      "median": 1.107,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 0.726,
+      "median": 0.739,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 0.729,
+      "median": 1.068,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 8.791,
+      "median": 9.459,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 9.081,
+      "median": 10.273,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 9.583,
+      "median": 11.069,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 0.528,
+      "median": 0.574,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 1.199,
+      "median": 1.435,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 0.484,
+      "median": 0.522,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 1.402,
+      "median": 1.433,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 0.86,
+      "median": 0.912,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 0.865,
+      "median": 0.902,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 0.942,
+      "median": 0.96,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 0.785,
+      "median": 0.828,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 0.676,
+      "median": 0.893,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 8.562,
+      "median": 9.558,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 8.345,
+      "median": 10.029,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 10.016,
+      "median": 11.256,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 0.484,
+      "median": 0.499,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 1.53,
+      "median": 1.567,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 0.4,
+      "median": 0.41,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "churn8",
+      "size": 8,
+      "op": "churn",
+      "arm": "Dictionary",
+      "min": 3.63,
+      "median": 3.661,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "churn8",
+      "size": 8,
+      "op": "churn",
+      "arm": "IntMap371Baseline",
+      "min": 2.038,
+      "median": 4.88,
+      "capacity": 64
+    },
+    {
+      "runtime": "net10",
+      "shape": "churn8",
+      "size": 8,
+      "op": "churn",
+      "arm": "IntMapCurrent",
+      "min": 3.168,
+      "median": 6.051,
+      "capacity": 64
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 8,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 1.378,
+      "median": 1.404,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 8,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 0.666,
+      "median": 0.713,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 8,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 0.693,
+      "median": 0.726,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 8,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 0.829,
+      "median": 0.867,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 8,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 0.525,
+      "median": 0.536,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 8,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 1.05,
+      "median": 1.07,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 8,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 12.074,
+      "median": 15.687,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 8,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 9.166,
+      "median": 11.327,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 8,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 10.695,
+      "median": 12.397,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 8,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 0.513,
+      "median": 0.526,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 8,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 2.382,
+      "median": 2.437,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 8,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 0.507,
+      "median": 0.519,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 64,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 1.416,
+      "median": 1.433,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 64,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 0.753,
+      "median": 0.788,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 64,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 0.825,
+      "median": 0.854,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 64,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 1.123,
+      "median": 1.362,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 64,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 0.595,
+      "median": 0.661,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 64,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 0.638,
+      "median": 0.815,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 64,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 7.5,
+      "median": 8.749,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 64,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 8.503,
+      "median": 10.575,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 64,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 9.53,
+      "median": 12.722,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 64,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 0.571,
+      "median": 0.586,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 64,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 1.384,
+      "median": 1.409,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 64,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 0.542,
+      "median": 0.555,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 1024,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 1.404,
+      "median": 1.432,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 1024,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 0.682,
+      "median": 0.715,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 1024,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 0.746,
+      "median": 0.766,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 1024,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 0.909,
+      "median": 0.925,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 1024,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 0.492,
+      "median": 0.543,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 1024,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 0.545,
+      "median": 0.58,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 1024,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 8.033,
+      "median": 9.838,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 1024,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 8.766,
+      "median": 9.822,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 1024,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 10.428,
+      "median": 11.382,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 0.48,
+      "median": 0.495,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 1.39,
+      "median": 1.425,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 0.467,
+      "median": 0.482,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 8,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 1.445,
+      "median": 1.476,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 8,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 0.85,
+      "median": 0.872,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 8,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 0.851,
+      "median": 0.882,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 8,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 1.032,
+      "median": 1.053,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 8,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 0.657,
+      "median": 0.663,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 8,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 0.654,
+      "median": 0.668,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 8,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 15.186,
+      "median": 17.051,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 8,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 7.904,
+      "median": 10.403,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 8,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 9.345,
+      "median": 11.187,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 8,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 0.519,
+      "median": 0.527,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 8,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 2.411,
+      "median": 2.435,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 8,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 0.539,
+      "median": 0.559,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 64,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 1.641,
+      "median": 1.677,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 64,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 0.875,
+      "median": 0.919,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 64,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 0.895,
+      "median": 0.933,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 64,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 1.108,
+      "median": 1.126,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 64,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 0.736,
+      "median": 0.76,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 64,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 0.837,
+      "median": 0.964,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 64,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 8.825,
+      "median": 10.113,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 64,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 8.507,
+      "median": 10.122,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 64,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 8.817,
+      "median": 11.021,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 64,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 0.489,
+      "median": 0.5,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 64,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 1.26,
+      "median": 1.338,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 64,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 0.487,
+      "median": 0.495,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 1.573,
+      "median": 1.613,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 0.879,
+      "median": 0.897,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 0.898,
+      "median": 0.962,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 1.115,
+      "median": 1.13,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 0.73,
+      "median": 0.753,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 0.816,
+      "median": 0.901,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 7.399,
+      "median": 9.547,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 7.69,
+      "median": 10.188,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 8.667,
+      "median": 10.817,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 0.489,
+      "median": 0.491,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 1.259,
+      "median": 1.306,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 0.393,
+      "median": 0.408,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 1.441,
+      "median": 1.996,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 0.848,
+      "median": 0.927,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 0.792,
+      "median": 0.917,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 0.899,
+      "median": 0.917,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 0.655,
+      "median": 0.667,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 0.655,
+      "median": 0.679,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 13.752,
+      "median": 15.061,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 6.961,
+      "median": 9.156,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 7.966,
+      "median": 10.257,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 0.465,
+      "median": 0.486,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 3.103,
+      "median": 3.648,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 0.483,
+      "median": 0.496,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 1.483,
+      "median": 1.496,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 0.996,
+      "median": 1.033,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 0.978,
+      "median": 1.012,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 1.095,
+      "median": 1.107,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 0.729,
+      "median": 0.743,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 0.726,
+      "median": 0.743,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 7.415,
+      "median": 9.283,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 8.096,
+      "median": 9.7,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 8.536,
+      "median": 10.429,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 0.49,
+      "median": 0.502,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 1.297,
+      "median": 1.401,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 0.487,
+      "median": 0.502,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 1.393,
+      "median": 1.436,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 0.855,
+      "median": 0.89,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 0.855,
+      "median": 0.888,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 0.926,
+      "median": 0.938,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 0.784,
+      "median": 0.806,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 0.83,
+      "median": 0.855,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 6.607,
+      "median": 8.53,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 7.365,
+      "median": 9.035,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 8.001,
+      "median": 9.373,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 0.48,
+      "median": 0.49,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 1.496,
+      "median": 1.575,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 0.4,
+      "median": 0.402,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "churn8",
+      "size": 8,
+      "op": "churn",
+      "arm": "Dictionary",
+      "min": 3.648,
+      "median": 3.708,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "churn8",
+      "size": 8,
+      "op": "churn",
+      "arm": "IntMap371Baseline",
+      "min": 2.036,
+      "median": 4.959,
+      "capacity": 64
+    },
+    {
+      "runtime": "net10",
+      "shape": "churn8",
+      "size": 8,
+      "op": "churn",
+      "arm": "IntMapCurrent",
+      "min": 3.179,
+      "median": 6.047,
+      "capacity": 64
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 8,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 1.366,
+      "median": 1.395,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 8,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 0.678,
+      "median": 0.705,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 8,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 0.688,
+      "median": 0.733,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 8,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 0.836,
+      "median": 0.861,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 8,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 0.523,
+      "median": 0.536,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 8,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 1.046,
+      "median": 1.054,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 8,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 11.039,
+      "median": 13.324,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 8,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 6.985,
+      "median": 10.35,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 8,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 7.237,
+      "median": 11.565,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 8,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 0.515,
+      "median": 0.531,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 8,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 2.378,
+      "median": 2.396,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 8,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 0.504,
+      "median": 0.512,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 64,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 1.399,
+      "median": 1.425,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 64,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 0.747,
+      "median": 0.778,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 64,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 0.81,
+      "median": 0.847,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 64,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 1.313,
+      "median": 1.356,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 64,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 0.636,
+      "median": 0.658,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 64,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 0.805,
+      "median": 0.811,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 64,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 5.586,
+      "median": 7.328,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 64,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 7.164,
+      "median": 8.881,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 64,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 8.148,
+      "median": 11.818,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 64,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 0.575,
+      "median": 0.583,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 64,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 1.386,
+      "median": 1.405,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 64,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 0.541,
+      "median": 0.549,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 1024,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 1.404,
+      "median": 1.416,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 1024,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 0.674,
+      "median": 0.7,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 1024,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 0.741,
+      "median": 0.757,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 1024,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 0.896,
+      "median": 0.917,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 1024,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 0.497,
+      "median": 0.531,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 1024,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 0.534,
+      "median": 0.578,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 1024,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 6.504,
+      "median": 8.582,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 1024,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 6.845,
+      "median": 8.892,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 1024,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 7.788,
+      "median": 9.762,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 0.479,
+      "median": 0.492,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 1.397,
+      "median": 1.421,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "dense",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 0.468,
+      "median": 0.481,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 8,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 1.445,
+      "median": 1.467,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 8,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 0.845,
+      "median": 0.857,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 8,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 0.851,
+      "median": 0.866,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 8,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 1.035,
+      "median": 1.054,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 8,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 0.655,
+      "median": 0.668,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 8,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 0.646,
+      "median": 0.725,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 8,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 14.201,
+      "median": 17.771,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 8,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 6.822,
+      "median": 10.406,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 8,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 9.526,
+      "median": 11.766,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 8,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 0.512,
+      "median": 0.527,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 8,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 2.42,
+      "median": 2.486,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 8,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 0.538,
+      "median": 0.558,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 64,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 1.623,
+      "median": 1.662,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 64,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 0.892,
+      "median": 0.91,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 64,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 0.894,
+      "median": 0.988,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 64,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 1.108,
+      "median": 1.136,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 64,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 0.719,
+      "median": 0.753,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 64,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 0.747,
+      "median": 1.025,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 64,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 9.343,
+      "median": 10.434,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 64,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 9.087,
+      "median": 10.629,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 64,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 9.842,
+      "median": 11.531,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 64,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 0.489,
+      "median": 0.533,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 64,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 1.268,
+      "median": 1.324,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 64,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 0.488,
+      "median": 0.511,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 1.586,
+      "median": 1.68,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 0.885,
+      "median": 0.916,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 0.92,
+      "median": 0.989,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 1.112,
+      "median": 1.149,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 0.739,
+      "median": 0.777,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 0.884,
+      "median": 1.035,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 9.286,
+      "median": 11.446,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 8.915,
+      "median": 10.851,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 10.257,
+      "median": 12.427,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 0.489,
+      "median": 0.499,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 1.287,
+      "median": 1.509,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "sparse",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 0.401,
+      "median": 0.406,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 1.448,
+      "median": 1.498,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 0.849,
+      "median": 0.891,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 0.805,
+      "median": 0.879,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 0.902,
+      "median": 0.941,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 0.655,
+      "median": 0.704,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 0.653,
+      "median": 0.745,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 15.321,
+      "median": 18.522,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 9.722,
+      "median": 11.786,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 11.422,
+      "median": 13.369,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 0.471,
+      "median": 0.522,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 2.981,
+      "median": 3.584,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 8,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 0.488,
+      "median": 0.519,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 1.491,
+      "median": 1.657,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 0.997,
+      "median": 1.06,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 0.989,
+      "median": 1.043,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 1.091,
+      "median": 1.137,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 0.737,
+      "median": 0.755,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 0.756,
+      "median": 1.067,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 8.841,
+      "median": 10.86,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 9.69,
+      "median": 10.698,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 10.735,
+      "median": 12.434,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 0.486,
+      "median": 0.527,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 1.242,
+      "median": 1.464,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 64,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 0.492,
+      "median": 0.516,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "hit",
+      "arm": "Dictionary",
+      "min": 1.422,
+      "median": 1.474,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "hit",
+      "arm": "IntMap371Baseline",
+      "min": 0.857,
+      "median": 0.891,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "hit",
+      "arm": "IntMapCurrent",
+      "min": 0.866,
+      "median": 0.914,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "miss",
+      "arm": "Dictionary",
+      "min": 0.938,
+      "median": 0.992,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "miss",
+      "arm": "IntMap371Baseline",
+      "min": 0.792,
+      "median": 0.814,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "miss",
+      "arm": "IntMapCurrent",
+      "min": 0.757,
+      "median": 0.942,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "insert",
+      "arm": "Dictionary",
+      "min": 9.657,
+      "median": 11.644,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "insert",
+      "arm": "IntMap371Baseline",
+      "min": 9.977,
+      "median": 12.181,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "insert",
+      "arm": "IntMapCurrent",
+      "min": 11.059,
+      "median": 13.142,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "Dictionary",
+      "min": 0.488,
+      "median": 0.497,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "IntMap371Baseline",
+      "min": 1.508,
+      "median": 1.576,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "shift1024",
+      "size": 1024,
+      "op": "iterate",
+      "arm": "IntMapCurrent",
+      "min": 0.401,
+      "median": 0.408,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "churn8",
+      "size": 8,
+      "op": "churn",
+      "arm": "Dictionary",
+      "min": 3.662,
+      "median": 4.094,
+      "capacity": -1
+    },
+    {
+      "runtime": "net10",
+      "shape": "churn8",
+      "size": 8,
+      "op": "churn",
+      "arm": "IntMap371Baseline",
+      "min": 2.055,
+      "median": 3.9,
+      "capacity": 64
+    },
+    {
+      "runtime": "net10",
+      "shape": "churn8",
+      "size": 8,
+      "op": "churn",
+      "arm": "IntMapCurrent",
+      "min": 3.186,
+      "median": 4.486,
+      "capacity": 64
+    }
+  ],
+  "limits": [
+    "Original harness retains per-process minima and medians, not per-round raw samples.",
+    "Default .NET runtime settings; no explicit PGO override.",
+    "Six historical original captures lack parent exit/EOF receipts.",
+    "Sink equality is not an independent correctness oracle.",
+    "No Unity or IL2CPP qualification."
+  ]
+}
