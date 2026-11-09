@@ -84,7 +84,12 @@ def sources(repository: Path, paths: list[str] | None, *, staged: bool) -> list[
             "*.yml",
             "*.yaml",
         )
-        names = payload.decode("utf-8").split("\0")
+        deleted = (
+            git(repository, "ls-files", "--deleted", "-z", "--", "*.yml", "*.yaml")
+            .decode("utf-8")
+            .split("\0")
+        )
+        names = list(set(payload.decode("utf-8").split("\0")) - set(deleted))
     found: list[tuple[str, bytes]] = []
     for name in sorted(set(names) - {""}):
         path, relative = yaml_path(repository, name, staged=staged)

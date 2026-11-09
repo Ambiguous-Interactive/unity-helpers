@@ -74,6 +74,27 @@ def test_inventory_checks_tracked_and_untracked_without_ignored_trees(
     assert main(["--repo-root", str(repository)]) == 0
 
 
+@pytest.mark.parametrize("rename", [False, True])
+def test_inventory_ignores_unstaged_deletions_but_preserves_explicit_and_index_checks(
+    repository: Path, rename: bool
+) -> None:
+    retained = repository / "retained.yml"
+    retained.write_bytes(b"key: value\n")
+    removed = repository / "removed café.yml"
+    removed.write_bytes(b"key: [\n")
+    git(repository, "add", "--", retained.name, removed.name)
+    if rename:
+        renamed = repository / "renamed.yaml"
+        removed.rename(renamed)
+        assert main(["--repo-root", str(repository)]) == 1
+        renamed.write_bytes(b"key: value\n")
+    else:
+        removed.unlink()
+    assert main(["--repo-root", str(repository)]) == 0
+    assert main(["--repo-root", str(repository), "--paths", removed.name]) == 1
+    assert main(["--repo-root", str(repository), "--staged-only"]) == 1
+
+
 @pytest.mark.parametrize("indexed_bad", [False, True])
 @pytest.mark.parametrize("deleted", [False, True])
 def test_staged_mode_lints_index_even_when_worktree_differs_or_is_absent(

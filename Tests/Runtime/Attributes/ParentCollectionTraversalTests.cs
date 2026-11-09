@@ -149,6 +149,36 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
         [TestCase(false)]
         [TestCase(true)]
+        public void ParentlessSearchRootCapsMultipleMatches(bool onlyAncestors)
+        {
+            GameObject owner = Track(new GameObject("ParentlessOwner"));
+            ParentDepthBoundaryTarget target = owner.AddComponent<ParentDepthBoundaryTarget>();
+            GameObject root = onlyAncestors ? Track(new GameObject("ParentlessRoot")) : owner;
+            if (onlyAncestors)
+            {
+                owner.transform.SetParent(root.transform);
+            }
+            TestInterfaceComponent first = root.AddComponent<TestInterfaceComponent>();
+            root.AddComponent<TestInterfaceComponent>();
+            root.AddComponent<TestInterfaceComponent>();
+            Assert.IsTrue(root.transform.parent == null);
+            FieldMetadata<ParentComponentAttribute>[] fields = ParentCollectionQuery.Create(
+                typeof(ParentDepthBoundaryTarget),
+                typeof(TestInterfaceComponent),
+                onlyAncestors,
+                maxDepth: 1,
+                maxCount: 1
+            );
+            Assert.AreEqual(3, fields.Length);
+            ParentComponentExtensions.AssignParentComponents(target, fields);
+            TestInterfaceComponent[] expected = { first };
+            CollectionAssert.AreEqual(expected, target.sealedArray);
+            CollectionAssert.AreEqual(expected, target.sealedList);
+            CollectionAssert.AreEquivalent(expected, target.sealedSet);
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
         public void BoundedQueriesCollectBeforeInvokingSetComparers(bool limitCount)
         {
             GameObject owner = Track(new GameObject("ParentCollectionSnapshot"));

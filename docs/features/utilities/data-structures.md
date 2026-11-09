@@ -438,7 +438,7 @@ and shared-low-bit keys each used 64 and 1,024 entries.
 The extra index array improves iteration while increasing memory and construction costs.
 At 1,024 entries, fresh construction and fill on Mono took 24–29% longer; the shared-low-bit
 miss case took 10.3% longer. This does not meet every target in
-[#1131](https://github.com/wallstop/unity-helpers/issues/1131), which remains open.
+[#1131](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1131), which remains open.
 Choose this map for repeated lookup and iteration only after measuring your workload.
 These measurements do not qualify IL2CPP, Unity editor timings, arbitrary value sizes, or
 large-table cache behavior. Runtime results used different operating systems and must not
@@ -466,7 +466,7 @@ median process medians, and lower is faster.
 
 Iteration meets the consumer's 1.5x target in every tested shape at these sizes. Process minima
 also meet that bound. Lookup and insert costs exceed the allowed 10% increase in several cells,
-so [#1131](https://github.com/wallstop/unity-helpers/issues/1131) remains open. At eight dense keys,
+so [#1131](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1131) remains open. At eight dense keys,
 .NET misses take about twice 3.7.1's time. Churn keeps the current map at 64 slots in every process.
 
 The [source and result archive](../../performance/intmap-consumer-harness.zip) preserves the
@@ -495,7 +495,7 @@ medians across dense, sparse and shifted keys at 8, 64, 1,024 and 16,384 entries
 This is a modest insertion improvement with a 4% regression in one Mono cell; it does not
 establish a general lookup or iteration speedup. The fixed-work churn control retains 64 slots.
 Per-call checksums, Dictionary comparisons, timer controls and healthy process/stream completion
-are recorded in [#1131](https://github.com/wallstop/unity-helpers/issues/1131).
+are recorded in [#1131](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1131).
 Raw captures, summaries and source/process receipts remain in ignored local storage. The measured
 candidate source SHA256 is `5913fe429dc86bef53d200cbbb4d365d4c8ad424eeb336a7db66ae341bc2d819`.
 These host measurements do not qualify Unity players, large values or arbitrary application work.
@@ -513,7 +513,7 @@ lookup regressions up to 14%, iteration regressions up to 15% and repeated-zero 
 1.47–1.81 times main. Its third process was stopped after rejection and excluded from the results;
 the partial capture remains local. Short consumer-protocol runs had hidden these costs.
 The accepted change keeps the existing key representation. Issue
-[#1131](https://github.com/wallstop/unity-helpers/issues/1131) remains open.
+[#1131](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1131) remains open.
 
 ### Capacity and key limits
 
