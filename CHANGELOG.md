@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `BrowserStorage.Unscoped` for existing raw-key saves and `TryHasKey` to distinguish absent keys from unavailable storage ([#1134](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1134)).
 - Add `SpriteArtBounds.TryGetCentreOfLargestDarkestInkRegion` for colour-share filtering and connected-region centroids without changing import settings ([#1124](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1124)).
 - Add allocation-free live-entry iteration and stateful `GetOrAdd` to `UnityObjectMap`, with mutation checks and destroyed-key replacement ([#1133](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1133)).
-- Add `BendableLine` for animated sprite curves with bounded segments, sorting controls, XY-plane transforms, and unreadable sprite-sheet support without a tween dependency ([#1113](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1113)).
+- Add `BendableLine` for animated sprite curves with bounded segments, sorting controls, XY-plane transforms, and isolated sprite-sheet sampling without a tween dependency ([#1113](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1113)).
 - Add Sprite Pivot Copier with configurable name matching, effective-pivot copying across texture sizes, and rejection of ambiguous batches ([#1113](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1113)).
 - Add reusable editor scopes for grouped Undo and progress cleanup, plus finite checks for numeric and Unity value types.
 
@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix bounded and filtered child-component collections changing their selected matches when a set comparer modifies the hierarchy ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
 - Fix `ExtractSpriteRect` returning atlas-oriented pixels for packed rotation metadata; tight and rotated packing now return null with a clear error ([#1135](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1135)).
 - Fix texture fitting and animation copying reporting success after an operation exception with an empty diagnostic.
 - Fix blank asset-path and editor validation inputs; serialized text and literal keys preserve whitespace.

@@ -1,0 +1,558 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-09",
+  "environment": {
+    "unity": "6000.6.7f1",
+    "graphics": "Direct3D11",
+    "mode": "PlayMode",
+    "optimization": "Release"
+  },
+  "protocol": {
+    "textureSize": 16,
+    "outputSize": 64,
+    "regionOrigin": [4, 4],
+    "regionSizes": [1, 4],
+    "inside": "opaque red",
+    "outside": "opaque green",
+    "padding": [0, 1],
+    "filters": ["Point", "Bilinear", "Trilinear"],
+    "mipBiases": [0, 4, 16],
+    "pixelAssertions": "Every pixel center in the region: red > 0.98, green < 0.02. Adjacent exterior pixel alpha < 0.02.",
+    "sampleCoordinates": {
+      "regionFirstUnityBottomLeft": [16, 16],
+      "outsideUnityBottomLeft": [15, 16],
+      "pngCoordinates": "PNG rows use the opposite Y direction: y = outputSize - 1 - UnityY."
+    }
+  },
+  "source": {
+    "baselineShaderGit": "ef48a1a94489f7474d3a651de3d90d2d8fe1e12b",
+    "baselineShaderCanonicalSha256": "a6cd287efd4b211408e50bfd9f6576acef3d828d082073a221be88dfc0db8a77",
+    "finalCanonicalSha256": {
+      "Runtime/Resources/WallstopStudios/UnityHelpers/BendableLine.shader": "89efcbb82b320fdc6c8105e29b9a1c10bb601d5195ad59749d71e482268424dd",
+      "Runtime/Visuals/BendableLine.cs": "9f0c2392783b03e1a3c5fc69f77667eda9e620e8f9cf31716002ad93da7cc6b9",
+      "Tests/Runtime/Visuals/BendableLineTests.cs": "7b1c88c9c98529f7bbc95a5ea2ee56ff0bb4cfd8c51e847fde73485829b324ec"
+    },
+    "baselineFixtureQualification": "The initial fixture source was not separately sealed. Its 16 case identities, pixel failures, raw results digest, process receipt and rendered examples are retained."
+  },
+  "before": {
+    "result": {
+      "id": "2",
+      "testcasecount": "16",
+      "result": "Failed(Child)",
+      "total": "16",
+      "passed": "8",
+      "failed": "8",
+      "inconclusive": "0",
+      "skipped": "0",
+      "asserts": "0",
+      "engine-version": "3.5.0.0",
+      "clr-version": "4.0.30319.42000",
+      "start-time": "2026-11-09 05:18:22Z",
+      "end-time": "2026-11-09 05:18:23Z",
+      "duration": "1.4191775"
+    },
+    "resultSha256": "c59a014fdef8306ddf963559b4ae32ee41b31d8ba245cd3f4d132ce656223bb1",
+    "rawExitCode": 2,
+    "outputDrained": true,
+    "samplingCases": [
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Point,1,False,False)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Point,1,False,True)",
+        "result": "Failed",
+        "message": "  red at (16,16) on Direct3D11\n  Expected: greater than 0.980000019f\n  But was:  0.0588235296f\n"
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Point,1,True,False)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Point,1,True,True)",
+        "result": "Failed",
+        "message": "  red at (16,16) on Direct3D11\n  Expected: greater than 0.980000019f\n  But was:  0.247058824f\n"
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Point,4,False,False)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Point,4,False,True)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Point,4,True,False)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Point,4,True,True)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Bilinear,1,False,False)",
+        "result": "Failed",
+        "message": "  red at (16,16) on Direct3D11\n  Expected: greater than 0.980000019f\n  But was:  0.392156869f\n"
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Bilinear,1,False,True)",
+        "result": "Failed",
+        "message": "  red at (16,16) on Direct3D11\n  Expected: greater than 0.980000019f\n  But was:  0.0156862754f\n"
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Bilinear,1,True,False)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Bilinear,1,True,True)",
+        "result": "Failed",
+        "message": "  red at (16,16) on Direct3D11\n  Expected: greater than 0.980000019f\n  But was:  0.141176477f\n"
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Bilinear,4,False,False)",
+        "result": "Failed",
+        "message": "  red at (16,16) on Direct3D11\n  Expected: greater than 0.980000019f\n  But was:  0.392156869f\n"
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Bilinear,4,False,True)",
+        "result": "Failed",
+        "message": "  red at (16,16) on Direct3D11\n  Expected: greater than 0.980000019f\n  But was:  0.282352954f\n"
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Bilinear,4,True,False)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Bilinear,4,True,True)",
+        "result": "Failed",
+        "message": "  red at (16,16) on Direct3D11\n  Expected: greater than 0.980000019f\n  But was:  0.41568628f\n"
+      }
+    ]
+  },
+  "after": {
+    "result": {
+      "id": "2",
+      "testcasecount": "107",
+      "result": "Passed",
+      "total": "107",
+      "passed": "107",
+      "failed": "0",
+      "inconclusive": "0",
+      "skipped": "0",
+      "asserts": "0",
+      "engine-version": "3.5.0.0",
+      "clr-version": "4.0.30319.42000",
+      "start-time": "2026-11-09 05:26:51Z",
+      "end-time": "2026-11-09 05:26:52Z",
+      "duration": "1.651755"
+    },
+    "resultSha256": "977b78b907df1b95c9283cd29f59f764827f01181cd34756c176294070574017",
+    "rawExitCode": 0,
+    "outputDrained": true,
+    "samplingCases": [
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Point,1,False,False,0.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Point,1,False,False,4.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Point,1,False,False,16.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Point,1,False,True,0.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Point,1,False,True,4.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Point,1,False,True,16.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Point,1,True,False,0.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Point,1,True,False,4.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Point,1,True,False,16.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Point,1,True,True,0.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Point,1,True,True,4.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Point,1,True,True,16.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Point,4,False,False,0.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Point,4,False,False,4.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Point,4,False,False,16.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Point,4,False,True,0.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Point,4,False,True,4.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Point,4,False,True,16.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Point,4,True,False,0.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Point,4,True,False,4.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Point,4,True,False,16.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Point,4,True,True,0.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Point,4,True,True,4.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Point,4,True,True,16.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Bilinear,1,False,False,0.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Bilinear,1,False,False,4.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Bilinear,1,False,False,16.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Bilinear,1,False,True,0.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Bilinear,1,False,True,4.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Bilinear,1,False,True,16.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Bilinear,1,True,False,0.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Bilinear,1,True,False,4.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Bilinear,1,True,False,16.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Bilinear,1,True,True,0.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Bilinear,1,True,True,4.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Bilinear,1,True,True,16.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Bilinear,4,False,False,0.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Bilinear,4,False,False,4.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Bilinear,4,False,False,16.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Bilinear,4,False,True,0.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Bilinear,4,False,True,4.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Bilinear,4,False,True,16.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Bilinear,4,True,False,0.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Bilinear,4,True,False,4.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Bilinear,4,True,False,16.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Bilinear,4,True,True,0.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Bilinear,4,True,True,4.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Bilinear,4,True,True,16.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Trilinear,1,False,False,0.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Trilinear,1,False,False,4.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Trilinear,1,False,False,16.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Trilinear,1,False,True,0.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Trilinear,1,False,True,4.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Trilinear,1,False,True,16.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Trilinear,1,True,False,0.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Trilinear,1,True,False,4.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Trilinear,1,True,False,16.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Trilinear,1,True,True,0.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Trilinear,1,True,True,4.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Trilinear,1,True,True,16.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Trilinear,4,False,False,0.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Trilinear,4,False,False,4.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Trilinear,4,False,False,16.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Trilinear,4,False,True,0.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Trilinear,4,False,True,4.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Trilinear,4,False,True,16.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Trilinear,4,True,False,0.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Trilinear,4,True,False,4.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Trilinear,4,True,False,16.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Trilinear,4,True,True,0.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Trilinear,4,True,True,4.0f)",
+        "result": "Passed",
+        "message": null
+      },
+      {
+        "name": "SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(Trilinear,4,True,True,16.0f)",
+        "result": "Passed",
+        "message": null
+      }
+    ]
+  },
+  "images": [
+    {
+      "file": "bendable-line-mipmapped-after.png",
+      "sha256": "c98d8af07755271f388f84a79e08381f0e58d990bd311ad5bb5f9bb0e55b3df5",
+      "size": [64, 64],
+      "firstRegionPixelRgba": [255, 0, 0, 255],
+      "outsideRegionPixelRgba": [0, 0, 0, 0]
+    },
+    {
+      "file": "bendable-line-mipmapped-before.png",
+      "sha256": "6ffd8ab1bd18d6a5143f04afd32ac2a4d3245f3be6fb3d6b13789eea3cb8fab4",
+      "size": [64, 64],
+      "firstRegionPixelRgba": [106, 148, 0, 255],
+      "outsideRegionPixelRgba": [0, 0, 0, 0]
+    },
+    {
+      "file": "bendable-line-unpadded-after.png",
+      "sha256": "c98d8af07755271f388f84a79e08381f0e58d990bd311ad5bb5f9bb0e55b3df5",
+      "size": [64, 64],
+      "firstRegionPixelRgba": [255, 0, 0, 255],
+      "outsideRegionPixelRgba": [0, 0, 0, 0]
+    },
+    {
+      "file": "bendable-line-unpadded-before.png",
+      "sha256": "1789b5fe265b6e1d1a1b51401ce52fb3d89e2c9121759dcc3f2ede90312e2ab7",
+      "size": [64, 64],
+      "firstRegionPixelRgba": [100, 155, 0, 255],
+      "outsideRegionPixelRgba": [0, 0, 0, 0]
+    }
+  ],
+  "limits": [
+    "D3D11 Editor PlayMode evidence; no other GPU backend or player rendering qualification.",
+    "Sampling uses the finest resident mip; removed or streamed-out base detail cannot be recovered.",
+    "No rendering performance claim."
+  ]
+}

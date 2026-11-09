@@ -306,9 +306,11 @@ Examples:
 
 Single fields select the nearest eligible match by hierarchy level. Arrays and lists preserve breadth-first order; `MaxCount` takes the first eligible matches in that order. Hash sets select the same matches but do not promise enumeration order. Within a level, sibling order and component order determine which match comes first.
 
-`MaxCount` limits results without reserving that many entries. New child lists and sets grow as
-matches are found, so a large limit on an empty or small hierarchy does not reserve a large buffer.
-Existing lists and sets are reused and retain their existing capacity.
+`MaxCount` limits results without reserving that many entries. New child lists and sets reserve
+space for the collected matches, so a large limit on an empty or small hierarchy does not reserve a large buffer.
+Existing lists and sets are reused and retain their existing capacity. Child collection queries
+capture their matches before clearing or filling the destination. Changes made by a custom set
+comparer affect later queries, including nested queries, rather than the current result.
 
 Unbounded collections without filters or depth limits use a cached Unity query and restore breadth-first order. Single fields and bounded or filtered collections traverse the hierarchy directly.
 
