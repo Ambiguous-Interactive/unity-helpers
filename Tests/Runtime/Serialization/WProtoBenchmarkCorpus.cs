@@ -133,6 +133,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             );
         }
 
+        internal static void AssertBytesEqual(
+            ReadOnlySpan<byte> expected,
+            ReadOnlySpan<byte> actual
+        )
+        {
+            Assert.IsTrue(
+                expected.SequenceEqual(actual),
+                "Frozen payload bytes must match in order."
+            );
+        }
+
         private static IReadOnlyList<IReadOnlyList<CalibratedBenchmarkMeasurement>> RunFrozenCorpus(
             string operation
         )
@@ -305,7 +316,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                                 Value = MakeBytes(size * 1024, BenchmarkSeed),
                             },
                             (expected, actual) =>
-                                CollectionAssert.AreEqual(
+                                AssertBytesEqual(
                                     expected.Value,
                                     actual.Value ?? Array.Empty<byte>()
                                 )
@@ -392,7 +403,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 Assert.IsTrue(formatter.Write(ref writer, in value));
                 Assert.IsFalse(writer.Faulted);
                 Assert.AreEqual(generatedPayload.Length, writer.Position);
-                CollectionAssert.AreEqual(generatedPayload, writer.Written.ToArray());
+                AssertBytesEqual(generatedPayload, writer.Written);
                 assertEqual(value, PublicSerializer.ProtoDeserialize<T>(input));
                 byte[] publicPayload = PublicSerializer.ProtoSerialize(value);
                 Assert.IsTrue(WProtoFacade.TryDeserialize(publicPayload, out T publicRoundtrip));

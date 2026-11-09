@@ -60,6 +60,12 @@ so duplicates retain their multiplicity. A value HashSet alone would lose that c
 `IntMapTests.AssertViewsMatch` follows this pattern across removal, growth, clear and refill.
 Keep ordered assertions when order is part of the API contract.
 
+Use typed byte-span equality for large frozen payloads. NUnit's object-based byte comparisons
+can dominate an IL2CPP correctness case. `WProtoBenchmarkCorpus.AssertBytesEqual` compares every
+byte in order, including the exact length, without copying the writer's span. Keep independent
+controls for different lengths and first, middle, and last byte mutations. Preserve the frozen
+workloads and timeout when reducing assertion cost.
+
 ## Configure Release before initial import
 
 Configure invocations request Release code optimization at editor startup, matching the test and
