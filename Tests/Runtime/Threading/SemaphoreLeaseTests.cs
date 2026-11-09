@@ -268,38 +268,55 @@ namespace WallstopStudios.UnityHelpers.Tests.Threading
         public void ConcurrentIndependentSemaphoresPreserveLeaseOwnership(int workerCount)
         {
             const int iterations = 5000;
+            const int acquisitionsPerRound = 100;
             using CountdownEvent ready = new(workerCount);
             using ManualResetEventSlim start = new(false);
+            using Barrier rendezvous = new(workerCount);
             int lost = 0;
+            int roundTimeouts = 0;
             int completed = 0;
+            Exception workerFailure = null;
             Thread[] workers = new Thread[workerCount];
             for (int worker = 0; worker < workerCount; ++worker)
             {
                 workers[worker] = new Thread(() =>
                 {
-                    using SemaphoreSlim semaphore = new(1, 1);
-                    ready.Signal();
-                    if (!start.Wait(5000))
+                    try
                     {
-                        Interlocked.Increment(ref lost);
-                        return;
+                        using SemaphoreSlim semaphore = new(1, 1);
+                        ready.Signal();
+                        if (!start.Wait(5000))
+                        {
+                            Interlocked.Increment(ref lost);
+                            return;
+                        }
+                        for (int i = 0; i < iterations; ++i)
+                        {
+                            if (!semaphore.TryAcquire(NoWait, out SemaphoreLease lease))
+                            {
+                                Interlocked.Increment(ref lost);
+                                break;
+                            }
+                            // Hold one lease per worker together at each round boundary.
+                            if (i % acquisitionsPerRound == 0 && !rendezvous.SignalAndWait(5000))
+                            {
+                                lease.Dispose();
+                                Interlocked.Increment(ref roundTimeouts);
+                                break;
+                            }
+                            bool held = lease.IsHeld;
+                            lease.Dispose();
+                            if (!held || semaphore.CurrentCount != 1)
+                            {
+                                Interlocked.Increment(ref lost);
+                                break;
+                            }
+                            Interlocked.Increment(ref completed);
+                        }
                     }
-                    for (int i = 0; i < iterations; ++i)
+                    catch (Exception exception)
                     {
-                        if (!semaphore.TryAcquire(NoWait, out SemaphoreLease lease))
-                        {
-                            Interlocked.Increment(ref lost);
-                            break;
-                        }
-                        Thread.Yield();
-                        bool held = lease.IsHeld;
-                        lease.Dispose();
-                        if (!held || semaphore.CurrentCount != 1)
-                        {
-                            Interlocked.Increment(ref lost);
-                            break;
-                        }
-                        Interlocked.Increment(ref completed);
+                        Interlocked.CompareExchange(ref workerFailure, exception, null);
                     }
                 });
                 workers[worker].IsBackground = true;
@@ -315,13 +332,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Threading
                     allJoined = false;
                 }
             }
-            Assert.That(allJoined, Is.True);
-            Assert.That(allReady, Is.True);
+            Assert.That(
+                allJoined,
+                Is.True,
+                $"Workers did not finish: ready={allReady}, completed={completed}, lost={lost}, roundTimeouts={roundTimeouts}."
+            );
+            Assert.That(workerFailure, Is.Null, "A semaphore worker threw.");
+            Assert.That(allReady, Is.True, "Workers did not reach the start barrier.");
             Assert.That(
                 lost,
                 Is.Zero,
                 "Independent semaphores lost ownership in the shared lease store."
             );
+            Assert.That(roundTimeouts, Is.Zero, "Workers did not rendezvous while holding leases.");
             Assert.That(completed, Is.EqualTo(workerCount * iterations));
         }
 

@@ -132,6 +132,24 @@ jobs:
         working-directory: unity-helpers
         run: npm run lint:python
 
+      - name: Select GNU timeout for process-group controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout_version="$(timeout --version)"
+          if [[ "$timeout_version" != *"(GNU coreutils)"* ]]; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends gnu-coreutils
+            gnu_timeout="$(command -v gnutimeout)"
+            gnu_tools="$RUNNER_TEMP/unity-helpers-gnu-tools"
+            mkdir -p "$gnu_tools"
+            ln -s "$gnu_timeout" "$gnu_tools/timeout"
+            printf '%s\n' "$gnu_tools" >> "$GITHUB_PATH"
+            "$gnu_tools/timeout" --version
+          else
+            printf '%s\n' "$timeout_version"
+          fi
+
       - name: Run bounded-random arithmetic proof
         working-directory: unity-helpers
         run: |
@@ -250,6 +268,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: package.json
+
+      - name: Install Node tools
+        shell: pwsh
+        run: |
+          if (Test-Path package-lock.json) {
+            npm ci --ignore-scripts --no-audit --no-fund
+          } else {
+            npm install --ignore-scripts --no-audit --no-fund
+          }
+
       - name: Setup Python tooling
         uses: ./.github/actions/setup-python-tools
 
@@ -278,6 +312,8 @@ jobs:
           scripts/tests/test_concurrent_cache_fill.py
           scripts/tests/test_workflow_expression_length.py
           scripts/tests/test_gitignore_docs.py scripts/tests/test_drawer_multiobject.py
+          scripts/tests/test_check_eol.py scripts/tests/test_lint_error_codes.py
+          scripts/tests/test_code_samples.py
           scripts/tests/test_skill_sizes.py -q
 
       - name: Verify compiler payload publication on Windows

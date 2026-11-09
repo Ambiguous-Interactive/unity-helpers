@@ -19,7 +19,7 @@
     },
     {
       "name": "avoid-magic-strings",
-      "sha256": "a30f9f6a12ea2978a38070afbf14571bc2b24e57c9f271f3681804976af56172",
+      "sha256": "da4d708ed2991e923dbba3ff48ea4221969282aec9d609dffe0a3f6f90904edd",
       "parts": [
         "avoid-magic-strings-part-1.md",
         "avoid-magic-strings-part-2.md",

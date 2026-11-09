@@ -330,6 +330,16 @@ function Run-PowerShellPathBindingContractTests {
       $content -match '\$AdditionalPaths'
     $usesEffectivePaths = $content -match '\$effectivePaths'
     $coversGitignore = $content -match '\^\\\.gitignore\$'
+    if ($scriptInfo.Name -eq 'check-eol.ps1') {
+      $usesEffectivePaths = $content -match '\$selectedPaths\s*=\s*@\(\$Paths\)\s*\+\s*@\(\$AdditionalPaths\)' -and
+        $content -match '\$arguments\s*\+=\s*\$selectedPaths'
+      $pythonChecker = Join-Path $repoRoot 'scripts/check_eol.py'
+      $coversGitignore = (Test-Path $pythonChecker) -and $content -match 'check_eol\.py'
+      if ($coversGitignore) {
+        $pythonContent = Get-Content -Path $pythonChecker -Raw
+        $coversGitignore = $pythonContent -match 'path\.casefold\(\)\s*==\s*"\.gitignore"'
+      }
+    }
 
     Write-TestResult `
       -TestName "$($scriptInfo.Name) captures trailing -Paths arguments under pwsh -File" `
@@ -339,7 +349,7 @@ function Run-PowerShellPathBindingContractTests {
     Write-TestResult `
       -TestName "$($scriptInfo.Name) covers extensionless .gitignore EOL policy" `
       -Passed $coversGitignore `
-      -Message 'Expected .gitignore in trackedTextPathPatterns so extensionless git config files are checked.'
+      -Message 'Expected the delegated EOL policy to include extensionless .gitignore files.'
   }
 
   $normalizePath = Join-Path $repoRoot 'scripts/normalize-eol.ps1'

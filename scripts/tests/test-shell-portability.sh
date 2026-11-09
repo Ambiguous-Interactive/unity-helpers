@@ -1108,6 +1108,7 @@ done
 rm -f "$h1_return_count_file" "$h1_container_name_file" "$h1_container_pid_file"
 : > "$h1_unity_log"
 
+# Keep container startup outside the one-second Unity watchdog under test.
 h1_exit=0
 PATH="$h1_bin:$PATH" \
 UNITY_TEST_PROJECT_DIR="$h1_project" \
@@ -1119,7 +1120,7 @@ UNITY_TIMEOUT=1 \
 UNITY_LICENSE_ACTIVATION_TIMEOUT=2 \
 UNITY_LICENSE_RETURN_TIMEOUT=2 \
 UNITY_TERMINATION_GRACE_SECONDS=1 \
-UNITY_CONTAINER_WRAPPER_SECONDS=1 \
+UNITY_CONTAINER_WRAPPER_SECONDS=10 \
 UNITY_DOCKER_CLIENT_TIMEOUT=1 \
 UNITY_DOCKER_CLIENT_KILL_GRACE=1 \
     "$REPO_ROOT/scripts/unity/run-unity-docker.sh" -batchmode -quit > "$h1_output" 2>&1 || h1_exit=$?
@@ -1294,6 +1295,9 @@ unset FAKE_BIN FAKE_DOCKER_LOG FAKE_UNITY_LOG FAKE_UNITY_PID_FILE \
     FAKE_RETURN_READY_FILE FAKE_RETURN_COUNT_FILE FAKE_CONTAINER_STOPPING_FILE \
     FAKE_PROJECT_DIR \
     FAKE_WORKSPACE_DIR FAKE_SIGNAL_PHASE
+if [[ -n "$h1_failure" ]]; then
+    h1_failure="${h1_failure}; wrapper exit=${h1_exit}; output: $(tail -n 60 "$h1_output" | tr '\n' '|'); events: $(awk '/^(fake |unity |docker (registration|client|inspect|stop|rm))/ { print }' "$h1_events" | tail -n 60 | tr '\n' '|')"
+fi
 rm -rf "$h1_tempdir"
 
 if [[ -z "$h1_failure" ]]; then

@@ -94,6 +94,35 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             return count;
         }
 
+#if !UNITY_5_3_OR_NEWER
+        [System.Runtime.CompilerServices.MethodImpl(
+            System.Runtime.CompilerServices.MethodImplOptions.NoInlining
+        )]
+        private static (IntMap<object> map, WeakReference[] references) CreateReferenceMap(
+            int hint,
+            int count
+        )
+        {
+            IntMap<object> map = new(hint);
+            WeakReference[] references = new WeakReference[count + 1];
+            for (int index = 0; index <= count; ++index)
+            {
+                object value = new();
+                references[index] = new WeakReference(value);
+                Assert.IsTrue(map.TrySet(index, value));
+            }
+            return (map, references);
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(
+            System.Runtime.CompilerServices.MethodImplOptions.NoInlining
+        )]
+        private static WeakReference CreateUnrootedReference()
+        {
+            return new WeakReference(new object());
+        }
+#endif
+
         [TestCase(-1)]
         public void ConstructorRefusesNegativeCapacityHints(int capacityHint)
         {
@@ -513,6 +542,58 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
                 Assert.AreEqual(oracle.Count, enumerated);
             }
+        }
+
+        [TestCase(64)]
+        [TestCase(16384)]
+        public void GrowthAfterDenseIndexMovesPreservesReferenceValuesAndEveryView(int count)
+        {
+            IntMap<object> map = new(0);
+            Dictionary<int, object> expected = new();
+            for (int key = 0; key < count; ++key)
+            {
+                object value = new object();
+                Assert.IsTrue(map.TrySet(key, value), $"Initial insertion failed for key {key}.");
+                expected.Add(key, value);
+            }
+            for (int key = 1; key < count; key += 3)
+            {
+                Assert.IsTrue(map.Remove(key, out object removed));
+                Assert.AreSame(expected[key], removed);
+                expected.Remove(key);
+            }
+            int capacity = map.Capacity;
+            int next = count;
+            while (map.Capacity == capacity)
+            {
+                object value = new object();
+                Assert.IsTrue(map.TrySet(next, value), $"Growth insertion failed for key {next}.");
+                expected.Add(next, value);
+                ++next;
+            }
+            Assert.That(map.Count, Is.EqualTo(expected.Count));
+            HashSet<int> keys = new();
+            HashSet<object> values = new();
+            foreach (KeyValuePair<int, object> pair in map)
+            {
+                Assert.IsTrue(expected.TryGetValue(pair.Key, out object value));
+                Assert.AreSame(value, pair.Value);
+                Assert.IsTrue(keys.Add(pair.Key));
+                Assert.IsTrue(values.Add(pair.Value));
+            }
+            Assert.That(keys.Count, Is.EqualTo(expected.Count));
+            foreach (int key in map.Keys)
+            {
+                Assert.IsTrue(keys.Remove(key));
+                Assert.IsTrue(map.TryGet(key, out object value));
+                Assert.AreSame(expected[key], value);
+            }
+            foreach (object value in map.Values)
+            {
+                Assert.IsTrue(values.Remove(value));
+            }
+            Assert.That(keys, Is.Empty);
+            Assert.That(values, Is.Empty);
         }
 
         [Test]
@@ -1334,6 +1415,102 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.Throws<InvalidOperationException>(() => frozenKeys.MoveNext());
             Assert.Throws<InvalidOperationException>(() => typedReset.Reset());
         }
+
+        [TestCase(64, 0, false)]
+        [TestCase(64, 0, true)]
+        [TestCase(64, 1, false)]
+        [TestCase(64, 1, true)]
+        [TestCase(64, 7, false)]
+        [TestCase(64, 7, true)]
+        [TestCase(64, 8, false)]
+        [TestCase(64, 8, true)]
+        [TestCase(64, 64, false)]
+        [TestCase(64, 64, true)]
+        [TestCase(1024, 1, false)]
+        [TestCase(1024, 1, true)]
+        [TestCase(16384, 1, false)]
+        [TestCase(16384, 1, true)]
+        [TestCase(16384, 1024, false)]
+        [TestCase(16384, 1024, true)]
+        [TestCase(16384, 4096, false)]
+        [TestCase(16384, 4096, true)]
+        public void ClearKeepsCapacityAndAllowsRefillAcrossSparseAndDenseStates(
+            int hint,
+            int count,
+            bool includeZero
+        )
+        {
+            IntMap<object> map = new(hint);
+            Dictionary<int, object> expected = new();
+            for (int index = 0; index < count; ++index)
+            {
+                int key = index % 2 == 0 ? index + 1 : -index - 1;
+                object value = new();
+                Assert.IsTrue(map.TrySet(key, value));
+                expected.Add(key, value);
+            }
+            if (includeZero)
+            {
+                object value = new();
+                Assert.IsTrue(map.TrySet(0, value));
+                expected.Add(0, value);
+            }
+            int capacity = map.Capacity;
+            IntMap<object>.KeyView keys = map.Keys;
+            IntMap<object>.ValueView values = map.Values;
+            IntMap<object>.Enumerator iterator = map.GetEnumerator();
+            map.Clear();
+            Assert.AreEqual(capacity, map.Capacity);
+            Assert.IsTrue(map.IsEmpty);
+            Assert.IsEmpty(keys);
+            Assert.IsEmpty(values);
+            Assert.Throws<InvalidOperationException>(() => iterator.MoveNext());
+            foreach (KeyValuePair<int, object> pair in expected)
+            {
+                Assert.IsFalse(map.TryGet(pair.Key, out object removed));
+                Assert.IsTrue(removed == null);
+                Assert.IsTrue(map.TrySet(pair.Key, pair.Value));
+            }
+            Assert.AreEqual(expected.Count, map.Count);
+            foreach (KeyValuePair<int, object> pair in map)
+            {
+                Assert.AreSame(expected[pair.Key], pair.Value);
+            }
+            foreach (KeyValuePair<int, object> pair in expected)
+            {
+                Assert.IsTrue(map.Remove(pair.Key, out object removed));
+                Assert.AreSame(pair.Value, removed);
+            }
+            Assert.IsTrue(map.IsEmpty);
+            Assert.AreEqual(capacity, map.Capacity);
+            Assert.IsTrue(map.TrySet(17, null));
+            Assert.IsTrue(map.TryGet(17, out object empty));
+            Assert.IsTrue(empty == null);
+        }
+
+#if !UNITY_5_3_OR_NEWER
+        [TestCase(64, 1)]
+        [TestCase(64, 7)]
+        [TestCase(16384, 1)]
+        [TestCase(16384, 1024)]
+        public void ClearReleasesStoredReferencesOnAnObservableManagedCollector(int hint, int count)
+        {
+            WeakReference control = CreateUnrootedReference();
+            GC.Collect();
+            if (control.IsAlive)
+            {
+                Assert.Ignore("The collector retains the unrooted reference control.");
+            }
+            (IntMap<object> map, WeakReference[] references) = CreateReferenceMap(hint, count);
+            map.Clear();
+            GC.Collect();
+            foreach (WeakReference reference in references)
+            {
+                Assert.IsFalse(reference.IsAlive, "Clearing the map must release its values.");
+            }
+            GC.KeepAlive(map);
+        }
+#endif
 
         private sealed class GuidHolder
         {

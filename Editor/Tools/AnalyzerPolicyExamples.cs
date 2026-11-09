@@ -193,6 +193,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     selectedExplanation =
                         "Implement typed equality and matching object equality and hashing. Ref structs are excluded on Unity's C# version. Stored collection references keep reference equality unless the type documents content equality.";
                     break;
+                case "WUH027":
+                    selectedBadCode = "Log(1, nameof(Run));";
+                    selectedGoodCode = "Log(1);";
+                    selectedExplanation =
+                        "Let CallerMemberName supply the current method name. Preserve forwarding, intentional labels, and overload selection.";
+                    break;
                 case "WUH026":
                     selectedBadCode = "bool changed = false;\nchanged |= Touch();";
                     selectedGoodCode =

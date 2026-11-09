@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 #if UNITY_EDITOR
     using System;
     using System.IO;
+    using System.Runtime.CompilerServices;
     using UnityEditor;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Helper;
@@ -451,7 +452,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     )
                     {
                         Debug.LogWarning(
-                            $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(EnsureAssetFolder)} failed to create folder '{next}'."
+                            $"[{nameof(AssetDatabaseBatchHelper)}] {GetCallingMemberName()} failed to create folder '{next}'."
                         );
                         return false;
                     }
@@ -652,7 +653,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 {
                     allowAutoRefreshFailed = true;
                     Debug.LogError(
-                        $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(AssetDatabase.AllowAutoRefresh)} threw during {nameof(PauseBatch)}: {allowAutoRefreshException}"
+                        $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(AssetDatabase.AllowAutoRefresh)} threw during {GetCallingMemberName()}: {allowAutoRefreshException}"
                     );
                 }
 
@@ -663,13 +664,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 catch (Exception stopAssetEditingException)
                 {
                     Debug.LogError(
-                        $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(AssetDatabase.StopAssetEditing)} threw during {nameof(PauseBatch)}: {stopAssetEditingException}"
+                        $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(AssetDatabase.StopAssetEditing)} threw during {GetCallingMemberName()}: {stopAssetEditingException}"
                     );
 
                     if (allowAutoRefreshFailed)
                     {
                         Debug.LogWarning(
-                            $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(PauseBatch)} completed with multiple errors. Unity AssetDatabase state may be inconsistent."
+                            $"[{nameof(AssetDatabaseBatchHelper)}] {GetCallingMemberName()} completed with multiple errors. Unity AssetDatabase state may be inconsistent."
                         );
                     }
                 }
@@ -783,7 +784,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 {
                     ++allowAutoRefreshFailures;
                     Debug.LogError(
-                        $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(AssetDatabase.AllowAutoRefresh)} threw during {nameof(ResetBatchDepth)} (iteration {i + 1}/{depthToCleanup}): {allowAutoRefreshException}"
+                        $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(AssetDatabase.AllowAutoRefresh)} threw during {GetCallingMemberName()} (iteration {i + 1}/{depthToCleanup}): {allowAutoRefreshException}"
                     );
                 }
 
@@ -795,7 +796,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 {
                     ++stopAssetEditingFailures;
                     Debug.LogError(
-                        $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(AssetDatabase.StopAssetEditing)} threw during {nameof(ResetBatchDepth)} (iteration {i + 1}/{depthToCleanup}): {stopAssetEditingException}"
+                        $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(AssetDatabase.StopAssetEditing)} threw during {GetCallingMemberName()} (iteration {i + 1}/{depthToCleanup}): {stopAssetEditingException}"
                     );
                 }
             }
@@ -803,7 +804,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             if (0 < allowAutoRefreshFailures || 0 < stopAssetEditingFailures)
             {
                 Debug.LogWarning(
-                    $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(ResetBatchDepth)} completed with {allowAutoRefreshFailures + stopAssetEditingFailures} errors out of {depthToCleanup * 2} calls. Unity AssetDatabase state may be inconsistent."
+                    $"[{nameof(AssetDatabaseBatchHelper)}] {GetCallingMemberName()} completed with {allowAutoRefreshFailures + stopAssetEditingFailures} errors out of {depthToCleanup * 2} calls. Unity AssetDatabase state may be inconsistent."
                 );
             }
         }
@@ -914,7 +915,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             catch (Exception startAssetEditingException)
             {
                 Debug.LogError(
-                    $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(AssetDatabase.StartAssetEditing)} threw during {nameof(ResumeBatch)}: {startAssetEditingException}"
+                    $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(AssetDatabase.StartAssetEditing)} threw during {GetCallingMemberName()}: {startAssetEditingException}"
                 );
             }
 
@@ -926,14 +927,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             catch (Exception disallowAutoRefreshException)
             {
                 Debug.LogError(
-                    $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(AssetDatabase.DisallowAutoRefresh)} threw during {nameof(ResumeBatch)}: {disallowAutoRefreshException}"
+                    $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(AssetDatabase.DisallowAutoRefresh)} threw during {GetCallingMemberName()}: {disallowAutoRefreshException}"
                 );
             }
 
             if (!startAssetEditingSucceeded && !disallowAutoRefreshSucceeded)
             {
                 Debug.LogWarning(
-                    $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(ResumeBatch)} failed completely. Unity AssetDatabase state may be inconsistent."
+                    $"[{nameof(AssetDatabaseBatchHelper)}] {GetCallingMemberName()} failed completely. Unity AssetDatabase state may be inconsistent."
                 );
                 return;
             }
@@ -946,9 +947,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             if (!startAssetEditingSucceeded || !disallowAutoRefreshSucceeded)
             {
                 Debug.LogWarning(
-                    $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(ResumeBatch)} completed with partial success. StartAssetEditing: {startAssetEditingSucceeded}, DisallowAutoRefresh: {disallowAutoRefreshSucceeded}"
+                    $"[{nameof(AssetDatabaseBatchHelper)}] {GetCallingMemberName()} completed with partial success. StartAssetEditing: {startAssetEditingSucceeded}, DisallowAutoRefresh: {disallowAutoRefreshSucceeded}"
                 );
             }
+        }
+
+        private static string GetCallingMemberName([CallerMemberName] string caller = null)
+        {
+            return caller;
         }
 
         /// <summary>

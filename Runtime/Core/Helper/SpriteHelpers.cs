@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Core.Helper
 {
     using System;
+    using System.Runtime.CompilerServices;
     using Extension;
     using UnityEngine;
     using UnityEngine.Experimental.Rendering;
@@ -94,7 +95,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
             }
 
-            return CreateTexture(texture, rotatedWidth, rotatedHeight, rotated, "RotateTexture90");
+            return CreateTexture(texture, rotatedWidth, rotatedHeight, rotated);
         }
 
         /// <summary>
@@ -129,7 +130,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 rotated[index] = source[last - index];
             }
 
-            return CreateTexture(texture, sourceWidth, sourceHeight, rotated, "RotateTexture180");
+            return CreateTexture(texture, sourceWidth, sourceHeight, rotated);
         }
 
         /// <summary>
@@ -140,7 +141,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <returns>
         /// The extracted texture in the source's format, or RGBA32 for compressed sources. Returns
         /// null when <paramref name="sprite"/> is null, its texture is not readable, its rect lies
-        /// outside the texture, or pixel conversion fails. The caller owns the returned texture.
+        /// outside the texture, packing is tight or rotated, or pixel conversion fails.
+        /// The caller owns the returned texture.
         /// </returns>
         public static Texture2D ExtractSpriteRect(this Sprite sprite)
         {
@@ -158,6 +160,20 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             if (!texture.isReadable)
             {
                 texture.LogError($"ExtractSpriteRect requires a readable texture.");
+                return null;
+            }
+
+            if (
+                sprite.packed
+                && (
+                    sprite.packingMode != SpritePackingMode.Rectangle
+                    || sprite.packingRotation != SpritePackingRotation.None
+                )
+            )
+            {
+                sprite.LogError(
+                    $"ExtractSpriteRect requires an unrotated rectangular packed sprite."
+                );
                 return null;
             }
 
@@ -237,7 +253,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return null;
             }
 
-            return CreateTexture(texture, width, height, region, "ExtractSpriteRect");
+            return CreateTexture(texture, width, height, region);
         }
 
         private static Texture2D CreateTexture(
@@ -245,7 +261,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             int width,
             int height,
             Color32[] pixels,
-            string operation
+            [CallerMemberName] string operation = null
         )
         {
             Texture2D result = null;
@@ -256,7 +272,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 )
                     ? TextureFormat.RGBA32
                     : source.format;
-                result = new Texture2D(width, height, format, 1 < source.mipmapCount);
+                bool generateMipmaps = 1 < source.mipmapCount;
+                result = new Texture2D(width, height, format, generateMipmaps);
                 result.SetPixels32(pixels);
                 result.Apply();
                 return result;

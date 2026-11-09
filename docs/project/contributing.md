@@ -77,6 +77,36 @@ For metadata JSON, run `uv run --project scripts/python~ --locked --no-dev pytho
 The three PowerShell commands remain compatibility entry points. Run `npm run test:lint-doc-counts`
 for count, encoding, newline, read-only, and wrapper exit-code controls.
 
+`npm run eol:check` runs the typed Python line-ending checker. It checks worktree line endings
+and UTF-8 BOMs, plus committed text blobs whose CR bytes would make fresh clones appear dirty.
+Use `-- --paths <path> <path>` for literal file scopes. Missing selected text files, linked inputs,
+and failed Git reads fail explicitly. A full scan requires nonempty tracked text input.
+`npm run test:check-eol` runs the Git-blob, worktree, path-scope and compatibility-launcher controls.
+The two PowerShell entry points remain available for existing hooks and callers.
+
+`npm run validate:lint-error-codes` harvests error-code prefixes from lint scripts, their controls,
+and Git hooks, including typed Python names. It sends one batch through the repository's actual
+cspell configuration and prints source locations plus a root-word patch for rejected families.
+`npm run test:validate-lint-error-codes` also runs the retained PowerShell runspace controls, which
+continue to protect the fixture host while other PowerShell suites still use it.
+
+`npm run lint:code-samples` runs the typed Python documentation sample extractor. Its report
+keeps each C# fence's actual opening line across LF, CRLF, and CR input.
+The CommonMark parser handles matching backtick/tilde markers, blockquotes and nested lists.
+Source maps retain the opening line; extracted code omits the Markdown container prefixes.
+The sample commands select the documentation dependency group; metadata-only tools keep an empty base environment.
+The default scan uses Git's tracked and nonignored file inventory, so local evidence and dependency directories do not
+extend the walk. `CODE_SAMPLES_ROOT` or `--scan-root` selects an explicit fixture tree instead.
+The Node launcher and PowerShell test launcher remain compatible entry points.
+
+`npm run test:extract-code-samples` covers classification, source locations, generated files,
+name collisions, empty inputs, path ownership, and both launchers. The extractor retains the
+existing JSON report fields. Corrected source lines can change generated filenames.
+Source paths on another Windows volume remain absolute in reports and generated identities.
+Complete struct and interface examples remain at type scope when compilation units are generated.
+Generation is a heuristic convenience; the standalone documentation compiler checks remain the
+separate compilation gate.
+
 Release payload staging, archive creation, and Unity metadata generation run through uv. Install uv 0.13.7, then use:
 
 ```bash

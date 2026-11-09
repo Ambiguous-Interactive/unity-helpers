@@ -74,7 +74,7 @@ function New-TestRepo {
     $repoRoot = Split-Path -Parent $PSScriptRoot | Split-Path -Parent
     Copy-Item (Join-Path $repoRoot 'scripts/agent-preflight.ps1') (Join-Path $scriptsDir 'agent-preflight.ps1') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/lint_meta_files.py') (Join-Path $scriptsDir 'lint_meta_files.py') -Force
-    foreach ($module in @('lint_skill_sizes.py', 'cli_encoding.py', 'csharp_sources.py')) {
+    foreach ($module in @('lint_skill_sizes.py', 'cli_encoding.py', 'csharp_sources.py', 'check_eol.py', 'validate_lint_error_codes.py', 'doc_counts.py')) {
         Copy-Item (Join-Path $repoRoot "scripts/$module") (Join-Path $scriptsDir $module) -Force
     }
     $pythonProject = Join-Path $scriptsDir 'python~'
@@ -128,6 +128,7 @@ function New-TestRepo {
     Push-Location $tempRoot
     try {
         git init -q
+        [IO.File]::AppendAllText((Join-Path $tempRoot ".git/info/exclude"), "`n/scripts/__pycache__/`n")
         git add .
         git -c user.email=test@example.com -c user.name=test commit -q -m 'init'
         if ($ConfigurePushDefaults) {
@@ -568,6 +569,8 @@ function Get-AdmissionSnapshot {
 function New-AdmissionRepo {
     param([switch]$UnsafeConfig)
     $repo = New-TestRepo -ConfigurePushDefaults:(!$UnsafeConfig) -GitIgnorePatterns @('node_modules/', 'pre-commit.log')
+    & uv run --quiet --project (Join-Path $repo 'scripts/python~') --locked --no-dev python -c 'import sys; sys.path.insert(0, sys.argv[1]); import check_eol, validate_lint_error_codes' (Join-Path $repo 'scripts')
+    if ($LASTEXITCODE -ne 0) { throw 'The admission fixture requires its Python tools to be installed before taking byte snapshots.' }
     [void][IO.Directory]::CreateDirectory((Join-Path $repo 'Runtime'))
     foreach ($name in @('Selected', 'Additional', 'User')) {
         [IO.File]::WriteAllText((Join-Path $repo "Runtime/$name.png.meta"), ("fileFormatVersion: 2`r`n" + "guid: 0123456789abcdef0123456789abcdef`r`n"))
@@ -2146,6 +2149,7 @@ finally {
 Write-Host "`nTest group: lint-error-code preflight contract" -ForegroundColor Magenta
 $repo10c = New-TestRepo -ConfigurePushDefaults
 try {
+    Set-Content -Path (Join-Path $repo10c 'cspell.json') -Value '{"version":"0.2","words":["UNH"]}' -Encoding UTF8
     $hooksDir = Join-Path $repo10c '.githooks'
     New-Item -ItemType Directory -Path $hooksDir -Force | Out-Null
     Set-Content -Path (Join-Path $hooksDir 'pre-push') -Value '#!/usr/bin/env bash

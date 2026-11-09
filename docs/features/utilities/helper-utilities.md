@@ -1696,6 +1696,11 @@ Sprite sprite = Sprite.Create(sheet, new Rect(0, 0, 32, 32), new Vector2(0.5f, 0
 Texture2D extracted = sprite.ExtractSpriteRect();
 ```
 
+Packed sprites must use rectangular packing with `packingRotation == None`. Tight packing,
+horizontal or vertical flips, half turns, and other rotation metadata return null with an error
+before the helper reads `textureRect` or copies pixels. Disable rotation and tight packing on an
+atlas used for extraction. Unrotated rectangular atlas regions keep their existing pixel behavior.
+
 `ExtractSpriteRect` copies the sprite's `textureRect` region from its source sheet, so it reads a
 sprite out of a larger sheet without touching the sheet itself. The sheet must be readable, and a
 rect that leaves the sheet is reported as a logged null rather than an out-of-range read.

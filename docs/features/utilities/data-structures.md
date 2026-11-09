@@ -387,8 +387,40 @@ entry's position, so enumeration order is unspecified.
 
 The map keeps its parallel key/value lookup arrays. One additional array stores reverse positions
 and the dense slot list: `ushort` elements through 65,536 slots, and `int` elements above that. The zero key has separate
-storage. `Clear` releases stored references while retaining all arrays. Scope enumerators to the
+storage. `Clear` releases stored references while retaining all arrays. Below one occupied slot per 64 table slots, it clears only the occupied slots; denser tables use bulk array clearing. The separate zero-key value is released in either case. Scope enumerators to the
 walk, since they cache references to the integer indexing arrays.
+
+### Sparse clear measurements
+
+On Unity 6000.6.7f1 Windows x64, the following full clear/refill cycles compare the
+previous bulk clear with the adaptive clear. Times are nanoseconds per cycle:
+median of seven rounds per process, then median of three processes. Each pair is
+baseline → current; compare arms within one runtime. The player uses IL2CPP
+Release, with development mode disabled. The editor uses Mono.
+
+| Capacity hint | Live keys | Actual slots |   Editor Mono ns | Release IL2CPP ns |
+| ------------: | --------: | -----------: | ---------------: | ----------------: |
+|            64 |         1 |          512 |       78.2 → 8.0 |        20.7 → 6.3 |
+|            64 |         7 |          512 |     102.1 → 36.9 |       43.0 → 31.0 |
+|            64 |         8 |          512 |    105.0 → 106.4 |       45.4 → 44.2 |
+|            64 |        64 |          512 |    322.9 → 331.4 |     216.7 → 214.3 |
+|         1,024 |         1 |        8,192 |     1270.3 → 8.2 |       689.9 → 6.3 |
+|         1,024 |        64 |        8,192 |   1579.3 → 323.7 |    1012.1 → 256.3 |
+|         1,024 |     1,024 |        8,192 |  6461.6 → 6338.9 |   4986.2 → 4927.2 |
+|        16,384 |         1 |      131,072 |    18583.0 → 7.9 |     11750.8 → 6.1 |
+|        16,384 |        64 |      131,072 |  19129.9 → 342.2 |   11835.8 → 271.6 |
+|        16,384 |     1,024 |      131,072 | 25833.7 → 9102.4 |  18010.9 → 7558.3 |
+
+Sparse clears avoid touching unused slots; the dense boundary and full-map cases
+retain bulk clearing. The table measures fixed integer-key clear/refill cycles,
+not arbitrary application work or reference-valued clearing. Correctness tests
+separately check released references, zero keys, capacity, cached views, mutation
+invalidation and refill after clear.
+
+[Raw samples and process/source identities](../../performance/relational-collection-evidence.json)
+and [player replay instructions](../../performance/relational-components-performance.md#replaying-collection-comparisons-in-a-player)
+are available. These results do not replace the original consumer harness or
+establish its remaining iteration/lookup margins; #1131 remains open.
 
 ### Iteration measurements and costs
 

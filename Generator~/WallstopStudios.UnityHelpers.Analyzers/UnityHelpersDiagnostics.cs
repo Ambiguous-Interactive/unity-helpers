@@ -581,5 +581,16 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 DiagnosticSeverity.Warning,
                 isEnabledByDefault: true
             );
+
+        /// <summary>An explicit caller name that the compiler can provide.</summary>
+        internal static readonly DiagnosticDescriptor RedundantCallerName =
+            new DiagnosticDescriptor(
+                "WUH027",
+                "Let the compiler provide the caller name",
+                "Omit '{0}' and let CallerMemberName supply the caller name. The explicit value is the current method name and omitting it selects the same overload. Preserve forwarded names and intentional diagnostic labels.",
+                "Maintainability",
+                DiagnosticSeverity.Warning,
+                isEnabledByDefault: true
+            );
     }
 }

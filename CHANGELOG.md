@@ -11,9 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `WUH027` warnings for redundant explicit caller names, with overload checks and Analyzer Policy examples.
 - Add `EnumValues.Of(Type)` and `TryGetValues` for shared enum arrays when the enum type is known at runtime ([#1129](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1129)).
 - Add fallback-camera overloads for pointer world and local projection; existing overloads keep their camera behavior ([#1132](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1132)).
-- Add YAML field reads, exact script matching, and component and ancestor queries for asset checks without loading scenes ([#1127](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1127)).
+- Add YAML mapping and item regions, reference and name reads, field and block helpers, exact script matching, and component and ancestor queries without loading scenes ([#1127](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1127)).
 - Add `BrowserStorage.Unscoped` for existing raw-key saves and `TryHasKey` to distinguish absent keys from unavailable storage ([#1134](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1134)).
 - Add `SpriteArtBounds.TryGetCentreOfLargestDarkestInkRegion` for colour-share filtering and connected-region centroids without changing import settings ([#1124](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1124)).
 - Add allocation-free live-entry iteration and stateful `GetOrAdd` to `UnityObjectMap`, with mutation checks and destroyed-key replacement ([#1133](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1133)).
@@ -23,18 +24,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Reduce child-component collection ordering work for sealed types while preserving breadth-first results, filters, limits, and collection reuse ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
 - Avoid a full project refresh when Animation Creator saves or deletes hidden configs.
-- Speed up `IntMap` iteration with O(Count) live-entry walks. Extra indexing uses more memory and can slow fresh construction; see [measurements and costs](./docs/features/utilities/data-structures.md#iteration-measurements-and-costs) ([#1131](https://github.com/wallstop/unity-helpers/issues/1131)).
+- Speed up `IntMap` iteration and sparse clears. Extra indexing uses more memory and can slow fresh construction; see [measurements and costs](./docs/features/utilities/data-structures.md#iteration-measurements-and-costs) ([#1131](https://github.com/wallstop/unity-helpers/issues/1131)).
 - Standardize coroutine helpers: missing required arguments throw `ArgumentNullException`, inactive GameObjects start no work, and `TryExecuteTrackedAfterDelay` still returns false ([#1125](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1125)).
 - Allow runtime assemblies to call `AnimatedSpriteFrames` and `SceneCanonicalizer` inside `UNITY_EDITOR` guards, preserving existing namespaces and compiled editor references ([#1126](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1126)).
 - Group Polygon Collider Optimizer and relational installers under the Wallstop Studios/Unity Helpers component menu.
 
 ### Fixed
 
+- Fix `ExtractSpriteRect` returning atlas-oriented pixels for packed rotation metadata; tight and rotated packing now return null with a clear error ([#1135](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1135)).
 - Fix texture fitting and animation copying reporting success after an operation exception with an empty diagnostic.
 - Fix blank asset-path and editor validation inputs; serialized text and literal keys preserve whitespace.
 - Fix authored YAML script identity and refuse references with repeated file IDs or GUIDs, so ambiguous data cannot silently select a target ([#1141](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1141)).
-- Fix authored YAML sequence reads stopping at comments ([#1127](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1127)).
+- Fix authored YAML sequence spans around comments, invalid markers and literal block text ([#1127](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1127)).
 - Fix `IntMap` contents and enumerators becoming invalid after a failed growth allocation ([#1131](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1131)).
 
 ## [3.7.1] - 2026-11-05
