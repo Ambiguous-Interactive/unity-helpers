@@ -135,7 +135,7 @@ namespace WallstopStudios.UnityHelpers.Tests
         [Test]
         public void MyTest()
         {
-            var go = Track(new GameObject("test"));
+            var go = new GameObject("test");
             Object.DestroyImmediate(go);
         }
     }
@@ -1047,6 +1047,75 @@ function Invoke-LintOnFixture {
     Pop-Location
     return [pscustomobject]@{ ExitCode = -1; Output = "Exception: $_" }
   }
+}
+
+foreach ($expression in @('root.transform.GetChild(0).gameObject', 'items[index]', 'Select(items[0], other)', 'Select<GameObject, Transform>(items[0], other)', '(GameObject)items[index]')) {
+  foreach ($tracked in @($false, $true)) {
+    $track = if ($tracked) { "Track($expression);" } else { '' }
+    $fixture = @"
+namespace WallstopStudios.UnityHelpers.Tests
+{
+    using NUnit.Framework;
+    public sealed class NestedDestroyTests : CommonTestBase
+    {
+        [Test]
+        public void NestedDestroy()
+        {
+            $track
+            UnityEngine.Object.DestroyImmediate($expression);
+        }
+    }
+}
+"@
+    $r = Invoke-LintOnFixture -FixtureRelativePath 'NestedDestroyTests.cs' -FixtureContent $fixture
+    $normalResult = $r.ExitCode -eq $(if ($tracked) { 0 } else { 1 })
+    $diagnostic = if ($tracked) { $r.Output -notmatch 'UNH001' } else { $r.Output -match 'UNH001' }
+    Write-TestResult "UNH001.NestedExpression.$expression.Tracked=$tracked" ($normalResult -and $diagnostic) "Exit: $($r.ExitCode), Output: $($r.Output)"
+  }
+}
+
+foreach ($shape in @(
+  @{ Name = 'DifferentStringLiterals'; Body = 'Track(GameObject.Find("Foo")); Object.DestroyImmediate(GameObject.Find("Bar"));'; Expected = 1 },
+  @{ Name = 'SameStringLiteral'; Body = 'Track(GameObject.Find("Foo")); Object.DestroyImmediate(GameObject.Find("Foo"));'; Expected = 0 },
+  @{ Name = 'DifferentCharacterLiterals'; Body = "Track(items['a']); Object.DestroyImmediate(items['b']);"; Expected = 1 },
+  @{ Name = 'SameCharacterLiteral'; Body = "Track(items['a']); Object.DestroyImmediate(items['a']);"; Expected = 0 },
+  @{ Name = 'LiteralDelimiters'; Body = 'Track(Find(")](")); Object.DestroyImmediate(Find(")]("));'; Expected = 0 },
+  @{ Name = 'DifferentVerbatimLiterals'; Body = 'Track(Find(@"a)")); Object.DestroyImmediate(Find(@"b)"));'; Expected = 1 },
+  @{ Name = 'CommentsInsideExpression'; Body = 'Track(Find(/* a */value)); Object.DestroyImmediate(Find(/* b */value));'; Expected = 0 },
+  @{ Name = 'TrackedFactoryAssignment'; Body = 'GameObject value = Track(new GameObject()); Object.DestroyImmediate(value);'; Expected = 0 },
+  @{ Name = 'TrackedAssignmentAcrossLines'; Body = "Editor editor =`n                Track(Editor.CreateEditor(target)); Object.DestroyImmediate(editor);"; Expected = 0 },
+  @{ Name = 'TrackedAssignmentHasExactName'; Body = 'var value = Track(Create()); Object.DestroyImmediate(Value);'; Expected = 1 },
+  @{ Name = 'TrackedAssignmentIsNotAnotherVariable'; Body = 'var tracked = Track(Create()); Object.DestroyImmediate(other);'; Expected = 1 },
+  @{ Name = 'ComparisonDoesNotAssign'; Body = 'var ok = value == Track(Create()); Object.DestroyImmediate(value);'; Expected = 1 },
+  @{ Name = 'WrapperDoesNotAssignTrackResult'; Body = 'var value = Wrap(Track(Create())); Object.DestroyImmediate(value);'; Expected = 1 },
+  @{ Name = 'TrackedVerbatimIdentifier'; Body = 'var @object = Track(Create()); Object.DestroyImmediate(@object);'; Expected = 0 },
+  @{ Name = 'TrackingMustPrecedeDestroy'; Body = 'Object.DestroyImmediate(value); Track(value);'; Expected = 1 },
+  @{ Name = 'CaseSensitiveExpression'; Body = 'Track(value); Object.DestroyImmediate(Value);'; Expected = 1 },
+  @{ Name = 'GenericArgumentsWithDestroyFlag'; Body = 'Track(Select<GameObject, Transform>(items[0], other)); Object.DestroyImmediate(Select<GameObject, Transform>(items[0], other), true);'; Expected = 0 },
+  @{ Name = 'GenericArgumentsAreNotPrefixes'; Body = 'Track(Select<GameObject, Transform>(items[0], other)); Object.DestroyImmediate(Select<GameObject, Renderer>(items[0], other));'; Expected = 1 },
+  @{ Name = 'EveryCallOnOneLine'; Body = 'Track(first); Object.DestroyImmediate(first); Object.DestroyImmediate(second);'; Expected = 1 },
+  @{ Name = 'ExactIndexedExpression'; Body = 'Track(items[0]); Object.DestroyImmediate(items[1]);'; Expected = 1 },
+  @{ Name = 'CommentCannotTrack'; Body = "// Track(value);`n            Object.DestroyImmediate(value);"; Expected = 1 },
+  @{ Name = 'MultilineArgument'; Body = "Track(items[index]);`n            Object.DestroyImmediate(`n                items[index],`n                true);"; Expected = 0 },
+  @{ Name = 'MultidimensionalIndex'; Body = 'Track(items[x, y]); Object.DestroyImmediate(items[x, y]);'; Expected = 0 }
+)) {
+  $fixture = @"
+namespace Fixture
+{
+    using NUnit.Framework;
+    public sealed class DestroyExpressionTests : CommonTestBase
+    {
+        [Test]
+        public void DestroyExpression()
+        {
+            $($shape.Body)
+        }
+    }
+}
+"@
+  $r = Invoke-LintOnFixture -FixtureRelativePath 'DestroyExpressionTests.cs' -FixtureContent $fixture
+  $diagnostic = if ($shape.Expected -eq 0) { $r.Output -notmatch 'UNH001' } else { $r.Output -match 'UNH001' }
+  Write-TestResult "UNH001.$($shape.Name)" ($r.ExitCode -eq $shape.Expected -and $diagnostic) "Exit: $($r.ExitCode), Output: $($r.Output)"
 }
 
 # Case 1: Underscore in [Test] method name

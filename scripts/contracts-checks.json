@@ -615,5 +615,10 @@
     "id": "csharp-lints",
     "name": "Typed C# license and Conditional checks",
     "run": "npm run test:csharp-lints"
+  },
+  {
+    "id": "unity-timeout",
+    "name": "GNU timeout selection and early refusal",
+    "run": "npm run test:unity-timeout"
   }
 ]

@@ -99,7 +99,7 @@ runTest("production opt-in diagnostics apply to production and stay disabled in 
 runTest("the excluded-source audit independently requires every enabled diagnostic", () => {
   const excluded = CONTROLS.find((control) => control.id === "excluded-loops");
   const editor = CHECK_PROJECTS.find((entry) => entry.id === "editor");
-  const ids = ["WUH013", "WUH019", "WUH021", "WUH023", "WUH026"];
+  const ids = ["WUH013", "WUH019", "WUH021", "WUH023", "WUH026", "WUH028"];
   assert.deepEqual(excluded.expected, ids);
   assert.equal(classify(editor, excluded, attempt(ids)), null);
   for (const id of ids) {
@@ -114,6 +114,8 @@ runTest("the excluded-source audit independently requires every enabled diagnost
   );
   assert.match(excluded.render(editor.anchor), /if \(values\.Count > 0\)/);
   assert.match(excluded.render(editor.anchor), /return values\.Count;/);
+  assert.match(excluded.render(editor.anchor), /Buffers<int>\.List\.Get\(out var items\)/);
+  assert.match(excluded.render(editor.anchor), /items\.Clear\(\);/);
 });
 
 runTest("a build that succeeds with a control defect in it is the finding", () => {

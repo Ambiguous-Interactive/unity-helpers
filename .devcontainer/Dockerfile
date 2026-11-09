@@ -80,7 +80,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install fd-find (faster alternative to find) from GitHub releases
 # fd respects .gitignore by default and has intuitive syntax
-RUN FD_VERSION="10.5.0" \
+RUN FD_VERSION="10.5.2" \
     && case "${TARGETARCH}" in \
         amd64) FD_ARCH="x86_64-unknown-linux-gnu" ;; \
         arm64) FD_ARCH="aarch64-unknown-linux-gnu" ;; \
@@ -102,7 +102,7 @@ RUN BAT_VERSION="0.26.1" \
     && chmod +x /usr/local/bin/bat
 
 # Install fzf (fuzzy finder) from GitHub releases
-RUN FZF_VERSION="0.74.5" \
+RUN FZF_VERSION="0.75.0" \
     && case "${TARGETARCH}" in \
         amd64) FZF_ARCH="linux_amd64" ;; \
         arm64) FZF_ARCH="linux_arm64" ;; \
@@ -146,7 +146,7 @@ RUN ZOXIDE_VERSION="0.10.0" \
     && chmod +x /usr/local/bin/zoxide
 
 # Install yq (YAML processor, like jq for YAML) from GitHub releases
-RUN YQ_VERSION="4.54.1" \
+RUN YQ_VERSION="4.54.3" \
     && case "${TARGETARCH}" in \
         amd64) YQ_ARCH="linux_amd64" ;; \
         arm64) YQ_ARCH="linux_arm64" ;; \
@@ -179,7 +179,7 @@ RUN SD_VERSION="1.1.0" \
     && chmod +x /usr/local/bin/sd
 
 # Install dust (intuitive disk usage, better du) from GitHub releases
-RUN DUST_VERSION="1.2.6" \
+RUN DUST_VERSION="1.2.7" \
     && case "${TARGETARCH}" in \
         amd64) DUST_ARCH="x86_64-unknown-linux-gnu" ;; \
         arm64) DUST_ARCH="aarch64-unknown-linux-gnu" ;; \

@@ -311,7 +311,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     using PooledResource<List<Vector2>> colinearRes = Buffers<Vector2>.List.Get(
                         out List<Vector2> colinear
                     );
-                    colinear.Clear();
                     foreach (Vector2 p in points)
                     {
                         if (p == current || p == candidate)

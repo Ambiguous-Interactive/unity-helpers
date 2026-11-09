@@ -152,6 +152,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 "Implicit caller names",
                 "Reports explicit current-method names passed to CallerMemberName parameters when omission preserves overload selection."
             ),
+            new(
+                "WUH028",
+                "Fresh pooled collection clears",
+                "Reports an immediate Clear after a known Buffers rental. Collections are already empty; retain clears after use and custom-pool cleanup."
+            ),
         };
 
         /// <summary>Enables or disables every Unity Helpers analyzer in the default ruleset.</summary>

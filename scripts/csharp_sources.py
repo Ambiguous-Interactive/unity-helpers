@@ -6,7 +6,10 @@ import os
 import stat
 import sys
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 EXCLUDED = frozenset(("node_modules", ".git", "obj", "bin", "Library", "Temp"))
 
@@ -53,59 +56,101 @@ def source_files(repository: Path, roots: tuple[str, ...]) -> list[Path]:
     return sorted(files)
 
 
-def mask_noise(source: str, *, preserve_strings: bool = False) -> str:
-    """Keep offsets and line breaks while removing comments and literal contents."""
-    result = list(source)
-    index = 0
+def interpolation_end(source: str, index: int, *, multiline: bool) -> int:
+    depth = 1
     length = len(source)
-    while index < length:
-        start = index
-        literal = False
-        if source.startswith("//", index) or (
-            source[index] == "#" and not source[source.rfind("\n", 0, index) + 1 : index].strip()
-        ):
-            end = source.find("\n", index)
+    if not multiline:
+        for newline in ("\r", "\n"):
+            end = source.find(newline, index)
+            if end >= 0:
+                length = min(length, end)
+    while index < length and depth:
+        if source.startswith("//", index):
+            end = source.find("\n", index + 2)
             index = length if end < 0 else end
         elif source.startswith("/*", index):
             end = source.find("*/", index + 2)
             index = length if end < 0 else end + 2
         elif source[index] in ('"', "'"):
-            literal = True
-            quote = source[index]
-            verbatim = (
-                quote == '"'
-                and index > 0
-                and (source[index - 1] == "@" or source[max(0, index - 2) : index] == "@$")
-            )
-            raw = 0
-            while quote == '"' and index + raw < length and source[index + raw] == quote:
-                raw += 1
-            if raw >= 3 and not verbatim:
-                end = source.find('"' * raw, index + raw)
-                index = length if end < 0 else end + raw
-            else:
+            index = literal_end(source, index)
+        else:
+            if source[index] == "{":
+                depth += 1
+            elif source[index] == "}":
+                depth -= 1
+            index += 1
+    return min(index, length)
+
+
+def literal_end(source: str, index: int) -> int:
+    quote = source[index]
+    length = len(source)
+    prefix = source[max(0, index - 2) : index]
+    verbatim = quote == '"' and (prefix.endswith("@") or prefix == "@$")
+    interpolated = quote == '"' and (prefix.endswith("$") or prefix == "$@")
+    raw = 0
+    while quote == '"' and index + raw < length and source[index + raw] == quote:
+        raw += 1
+    if raw >= 3 and not verbatim:
+        end = source.find('"' * raw, index + raw)
+        return length if end < 0 else end + raw
+    index += 1
+    while index < length:
+        if not verbatim and source[index] in "\r\n":
+            break
+        if source[index] == quote:
+            index += 1
+            if verbatim and index < length and source[index] == quote:
                 index += 1
-                while index < length:
-                    if not verbatim and source[index] in "\r\n":
-                        break
-                    if source[index] == quote:
-                        index += 1
-                        if verbatim and index < length and source[index] == quote:
-                            index += 1
-                            continue
-                        break
-                    if not verbatim and source[index] == "\\":
-                        if index + 1 < length and source[index + 1] in "\r\n":
-                            index += 1
-                            break
-                        index += 1
-                    index += 1
+                continue
+            break
+        if interpolated and source.startswith("{{", index):
+            index += 2
+            continue
+        if interpolated and source[index] == "{":
+            index = interpolation_end(source, index + 1, multiline=verbatim)
+            continue
+        if not verbatim and source[index] == "\\":
+            if index + 1 < length and source[index + 1] in "\r\n":
+                return index + 1
+            index += 1
+        index += 1
+    return min(index, length)
+
+
+def source_tokens(source: str) -> Iterator[tuple[int, int, str]]:
+    """Yield literal, comment and directive spans without changing source offsets."""
+    index = 0
+    length = len(source)
+    while index < length:
+        start = index
+        kind = "line"
+        if source.startswith("//", index) or (
+            source[index] == "#" and not source[source.rfind("\n", 0, index) + 1 : index].strip()
+        ):
+            kind = "directive" if source[index] == "#" else "line"
+            end = source.find("\n", index)
+            index = length if end < 0 else end
+        elif source.startswith("/*", index):
+            kind = "block"
+            end = source.find("*/", index + 2)
+            index = length if end < 0 else end + 2
+        elif source[index] in ('"', "'"):
+            kind = "literal"
+            index = literal_end(source, index)
         else:
             index += 1
             continue
-        if literal and preserve_strings:
+        yield start, min(index, length), kind
+
+
+def mask_noise(source: str, *, preserve_strings: bool = False) -> str:
+    """Keep offsets and line breaks while removing comments and literal contents."""
+    result = list(source)
+    for start, end, kind in source_tokens(source):
+        if kind == "literal" and preserve_strings:
             continue
-        for position in range(start, min(index, length)):
+        for position in range(start, end):
             if source[position] not in "\r\n":
                 result[position] = " "
     return "".join(result)

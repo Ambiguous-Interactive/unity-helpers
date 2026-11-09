@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Tests.Visuals
 {
     using System.Collections;
+    using System.IO;
     using NUnit.Framework;
     using UnityEngine;
     using UnityEngine.Rendering;
@@ -462,6 +463,114 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             yield return null;
             Assert.AreEqual(0, mesh.vertexCount);
             Assert.IsFalse(line.TryRefresh());
+        }
+
+        [Test]
+        public void SpriteSamplingKeepsNeighborColorsOutsideTheAuthoredRegion(
+            [Values(FilterMode.Point, FilterMode.Bilinear, FilterMode.Trilinear)] FilterMode filter,
+            [Values(1, 4)] int width,
+            [Values(false, true)] bool padded,
+            [Values(false, true)] bool mipmaps,
+            [Values(0f, 4f, 16f)] float mipBias
+        )
+        {
+            if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null)
+            {
+                Assert.Ignore("Rendered sprite-edge checks require an active graphics device.");
+            }
+            const int textureSize = 16;
+            const int outputSize = 64;
+            const int origin = 4;
+            Texture2D texture = Track(
+                new Texture2D(textureSize, textureSize, TextureFormat.RGBA32, mipmaps)
+            );
+            texture.filterMode = filter;
+            texture.wrapMode = TextureWrapMode.Clamp;
+            texture.mipMapBias = mipBias;
+            Color[] pixels = new Color[textureSize * textureSize];
+            int padding = padded ? 1 : 0;
+            for (int y = 0; y < textureSize; ++y)
+            {
+                for (int x = 0; x < textureSize; ++x)
+                {
+                    bool inside =
+                        origin - padding <= x
+                        && x < origin + width + padding
+                        && origin - padding <= y
+                        && y < origin + width + padding;
+                    pixels[y * textureSize + x] = inside ? Color.red : Color.green;
+                }
+            }
+            texture.SetPixels(pixels);
+            texture.Apply(mipmaps);
+            BendableLine line = CreateLine();
+            line.Sprite = Track(
+                Sprite.Create(
+                    texture,
+                    new Rect(origin, origin, width, width),
+                    Vector2.zero,
+                    1f,
+                    0,
+                    SpriteMeshType.FullRect
+                )
+            );
+            Assert.IsTrue(line.TryRefresh());
+            Material material = line.GetComponent<MeshRenderer>().sharedMaterial;
+            Assert.IsTrue(material.shader.isSupported);
+            RenderTexture output = Track(
+                new RenderTexture(outputSize, outputSize, 0, RenderTextureFormat.ARGB32)
+            );
+            Texture2D capture = Track(
+                new Texture2D(outputSize, outputSize, TextureFormat.RGBA32, false)
+            );
+            RenderTexture previous = RenderTexture.active;
+            try
+            {
+                RenderTexture.active = output;
+                GL.Clear(true, true, Color.clear);
+                Graphics.Blit(texture, output, material);
+                RenderTexture.active = output;
+                capture.ReadPixels(new Rect(0, 0, outputSize, outputSize), 0, 0);
+                capture.Apply();
+                string captureDirectory = System.Environment.GetEnvironmentVariable(
+                    "UH_SPRITE_CAPTURE_DIRECTORY"
+                );
+                if (!string.IsNullOrWhiteSpace(captureDirectory))
+                {
+                    Directory.CreateDirectory(captureDirectory);
+                    string capturePath = Path.Combine(
+                        captureDirectory,
+                        $"{filter}-{width}-{padded}-{mipmaps}-{mipBias}.png"
+                    );
+                    File.WriteAllBytes(capturePath, capture.EncodeToPNG());
+                }
+                int first = origin * outputSize / textureSize;
+                int end = (origin + width) * outputSize / textureSize;
+                for (int y = first; y < end; ++y)
+                {
+                    for (int x = first; x < end; ++x)
+                    {
+                        Color pixel = capture.GetPixel(x, y);
+                        Assert.That(
+                            pixel.r,
+                            Is.GreaterThan(0.98f),
+                            $"red at ({x},{y}) on {SystemInfo.graphicsDeviceType}"
+                        );
+                        Assert.That(
+                            pixel.g,
+                            Is.LessThan(0.02f),
+                            $"neighbor green at ({x},{y}) on {SystemInfo.graphicsDeviceType}"
+                        );
+                    }
+                }
+                Assert.That(capture.GetPixel(first - 1, first).a, Is.LessThan(0.02f));
+                Assert.That(capture.GetPixel(end, first).a, Is.LessThan(0.02f));
+            }
+            finally
+            {
+                RenderTexture.active = previous;
+                output.Release();
+            }
         }
 
         private BendableLine CreateLine()

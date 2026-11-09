@@ -169,6 +169,12 @@ function excludedLoopControl(anchor) {
     internal static class ControlExcludedCountingLoop
     {
         internal static readonly System.Type Anchor = typeof(${anchor});
+        internal static void FreshPool()
+        {
+            using var lease = global::WallstopStudios.UnityHelpers.Utils.Buffers<int>.List.Get(out var items);
+            items.Clear();
+        }
+
         internal static int Snapshot(System.Collections.Generic.ICollection<int> values)
         {
             if (values.Count > 0)
@@ -246,7 +252,7 @@ const CONTROLS = Object.freeze([
     id: "excluded-loops",
     fileName: "WallstopCheckControlExcludedLoops.cs",
     render: excludedLoopControl,
-    expected: ["WUH013", "WUH019", "WUH021", "WUH023", "WUH026"],
+    expected: ["WUH013", "WUH019", "WUH021", "WUH023", "WUH026", "WUH028"],
     projectIds: ["editor"],
     property: "WallstopCountingLoopAuditControl",
     meaning:

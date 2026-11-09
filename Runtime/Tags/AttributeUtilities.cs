@@ -81,7 +81,6 @@ namespace WallstopStudios.UnityHelpers.Tags
             using PooledResource<HashSet<string>> uniqueNamesLease = Buffers<string>.HashSet.Get(
                 out HashSet<string> uniqueNames
             );
-            uniqueNames.Clear();
 
             IEnumerable<Type> loadedTypes = ReflectionHelpers.GetAllLoadedTypes();
             foreach (Type type in loadedTypes.AsValueEnumerableRequired())
@@ -115,7 +114,6 @@ namespace WallstopStudios.UnityHelpers.Tags
                 uniqueNames.Count,
                 out List<string> orderedNames
             );
-            orderedNames.Clear();
             orderedNames.AddRange(uniqueNames);
             orderedNames.Sort(StringComparer.Ordinal);
             AllAttributeNames = orderedNames.ToArray();

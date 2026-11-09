@@ -274,7 +274,29 @@ function Test-CodeSpecificSuppressionInLineRange {
   return $false
 }
 
-$destroyPattern = [regex]'\b(?:UnityEngine\.)?Object\.(?:DestroyImmediate|Destroy)\s*\((?<arg>[^)]*)\)'
+function Get-InvocationArgumentText {
+  Param([string]$Text, [int]$Start, [string]$OriginalText)
+
+  $depth = 0
+  for ($position = $Start; $position -lt $Text.Length; $position++) {
+    $character = $Text[$position]
+    if ($character -eq ')' -and $depth -eq 0) {
+      if ($OriginalText.Length -eq $Text.Length) {
+        return $OriginalText.Substring($Start, $position - $Start).Trim()
+      }
+      return ''
+    }
+    if ($character -eq '(' -or $character -eq '[' -or $character -eq '{') {
+      $depth++
+    } elseif ($character -eq ')' -or $character -eq ']' -or $character -eq '}') {
+      $depth--
+      if ($depth -lt 0) { return '' }
+    }
+  }
+  return ''
+}
+
+$destroyPattern = [regex]'\b(?:UnityEngine\.)?Object\.(?:DestroyImmediate|Destroy)\s*\('
 $createAssignObjectPattern = [regex]'(?<var>\b\w+)\s*=\s*new\s+(?<type>GameObject|Texture2D|Material|Mesh|Camera)\s*\('
 $createInlineTrackPattern = [regex]'\bTrack\s*\(\s*new\s+(?:GameObject|Texture2D|Material|Mesh|Camera)\s*\('
 $createSoAssignPattern = [regex]'(?<var>\b\w+)\s*=\s*ScriptableObject\.CreateInstance\s*<'
@@ -1404,31 +1426,39 @@ foreach ($file in $filesToScan) {
   $scrubbedContent = @($scrubbedContent)
   if ($scrubbedContent.Count -ne $content.Count) { $scrubbedContent = $content }
 
-  # Check destroy calls; allow if argument var was tracked earlier in file
-  $lineIndex = 0
-  foreach ($line in $content) {
-    $lineIndex++
-    # Skip lines with UNH-SUPPRESS comment
-    if ($line -match 'UNH-SUPPRESS') { continue }
-    $scrubbedLine = $scrubbedContent[$lineIndex - 1]
-    if ($destroyPattern.IsMatch($scrubbedLine)) {
-      $m = $destroyPattern.Match($scrubbedLine)
-      $arg = ($m.Groups['arg'].Value).Trim()
-      # Extract variable token before any commas or closing paren
-      $varName = $arg -replace ',.*','' -replace '\)',''
-      $allowed = $false
-      if (-not [string]::IsNullOrWhiteSpace($varName)) {
-        # Search up to 100 lines above for Track(varName)
-        $searchStart = [Math]::Max(0, $lineIndex - 100)
-        for ($i = $searchStart; $i -lt $lineIndex; $i++) {
-          if ($content[$i] -match "Track\s*\(\s*$varName\b") { $allowed = $true; break }
+  foreach ($destroy in $destroyPattern.Matches($scrubbedText)) {
+    $lineIndex = Get-LineNumberAtIndex -Text $scrubbedText -Index $destroy.Index
+    if ($content[$lineIndex - 1] -match 'UNH-SUPPRESS') { continue }
+    $argument = if ($scrubbedText.Length -eq $commentMaskedText.Length -and $scrubbedText.Length -eq $text.Length) {
+      Get-InvocationArgumentText -Text $scrubbedText -OriginalText $commentMaskedText -Start ($destroy.Index + $destroy.Length)
+    } else { '' }
+    $allowed = $false
+    if (-not [string]::IsNullOrWhiteSpace($argument)) {
+      $searchStart = [Math]::Max(0, $lineIndex - 100)
+      $precedingLines = @($scrubbedContent[$searchStart..($lineIndex - 1)])
+      $column = $destroy.Index - ($scrubbedText.LastIndexOf("`n", $destroy.Index) + 1)
+      $precedingLines[-1] = $precedingLines[-1].Substring(0, $column)
+      $precedingCode = $precedingLines -join "`n"
+      $precedingOriginalCode = $commentMaskedText.Substring($destroy.Index - $precedingCode.Length, $precedingCode.Length)
+      foreach ($track in [regex]::Matches($precedingCode, '\bTrack\s*\(')) {
+        $tracked = Get-InvocationArgumentText -Text $precedingCode -OriginalText $precedingOriginalCode -Start ($track.Index + $track.Length)
+        if ([string]::IsNullOrWhiteSpace($tracked)) { continue }
+        $trackedExpressions = @($tracked)
+        $assignment = [regex]::Match($precedingCode.Substring(0, $track.Index), '(?<![\w.@])(?<variable>@?[A-Za-z_]\w*)\s*=\s*$')
+        if ($assignment.Success) { $trackedExpressions += $assignment.Groups['variable'].Value }
+        foreach ($expression in $trackedExpressions) {
+          if ($argument.StartsWith($expression, [StringComparison]::Ordinal)) {
+            $remaining = $argument.Substring($expression.Length).TrimStart()
+            if ($remaining.Length -eq 0 -or $remaining.StartsWith(',')) { $allowed = $true; break }
+          }
         }
+        if ($allowed) { break }
       }
-      if (-not $allowed) {
-        $violations += (@{
-          Path=$rel; Line=$lineIndex; Message="UNH001: Avoid direct destroy in tests; track object and let teardown clean up (or add // UNH-SUPPRESS)"
-        })
-      }
+    }
+    if (-not $allowed) {
+      $violations += (@{
+        Path=$rel; Line=$lineIndex; Message="UNH001: Avoid direct destroy in tests; track object and let teardown clean up (or add // UNH-SUPPRESS)"
+      })
     }
   }
 

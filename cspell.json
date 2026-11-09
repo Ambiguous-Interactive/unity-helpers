@@ -971,7 +971,10 @@
         "libc",
         "capsys",
         "cne",
-        "mkfifo"
+        "mkfifo",
+        "gtimeout",
+        "unpadded",
+        "PGO"
       ]
     }
   ],

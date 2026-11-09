@@ -315,63 +315,78 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnityTearDown]
         public override IEnumerator UnityTearDown()
         {
-            IEnumerator baseEnumerator = base.UnityTearDown();
-            while (baseEnumerator.MoveNext())
+            try
             {
-                yield return baseEnumerator.Current;
-            }
-
-            using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
-            {
-                string[] guids = AssetDatabase.FindAssets("t:Object", new[] { TestRoot });
-                foreach (string guid in guids)
+                IEnumerator baseEnumerator = base.UnityTearDown();
+                while (baseEnumerator.MoveNext())
                 {
-                    string path = AssetDatabase.GUIDToAssetPath(guid);
-                    AssetDatabase.DeleteAsset(path);
+                    yield return baseEnumerator.Current;
                 }
 
-                DeleteFileIfExists(TestRoot + "/FileBlock");
-                DeleteFileIfExists(TestRoot + "/NoRetry");
-                DeleteFileIfExists(TestRoot + "/Retry");
+                using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
+                {
+                    string[] guids = AssetDatabase.FindAssets("t:Object", new[] { TestRoot });
+                    foreach (string guid in guids)
+                    {
+                        string path = AssetDatabase.GUIDToAssetPath(guid);
+                        AssetDatabase.DeleteAsset(path);
+                    }
 
-                TryDeleteFolder(TestRoot + "/Collision");
-                TryDeleteFolder(TestRoot + "/Retry");
-                TryDeleteFolder(TestRoot + "/Retry 1");
-                TryDeleteFolder(TestRoot + "/FileBlock");
-                TryDeleteFolder(TestRoot + "/FileBlock 1");
-                TryDeleteFolder(TestRoot + "/NoRetry");
-                TryDeleteFolder(TestRoot + "/NoRetry 1");
-                TryDeleteFolder(TestRoot + "/Race");
-                TryDeleteFolder(TestRoot + "/Race 1");
-                TryDeleteFolder(TestRoot);
+                    DeleteFileIfExists(TestRoot + "/FileBlock");
+                    DeleteFileIfExists(TestRoot + "/NoRetry");
+                    DeleteFileIfExists(TestRoot + "/Retry");
 
-                TryDeleteFolderAndDuplicates("Assets/Resources", "CreatorTests");
+                    TryDeleteFolder(TestRoot + "/Collision");
+                    TryDeleteFolder(TestRoot + "/Retry");
+                    TryDeleteFolder(TestRoot + "/Retry 1");
+                    TryDeleteFolder(TestRoot + "/FileBlock");
+                    TryDeleteFolder(TestRoot + "/FileBlock 1");
+                    TryDeleteFolder(TestRoot + "/NoRetry");
+                    TryDeleteFolder(TestRoot + "/NoRetry 1");
+                    TryDeleteFolder(TestRoot + "/Race");
+                    TryDeleteFolder(TestRoot + "/Race 1");
+                    TryDeleteFolder(TestRoot);
 
-                TryDeleteFolderAndDuplicates("Assets/Resources", "CaseTest");
+                    TryDeleteFolderAndDuplicates("Assets/Resources", "CreatorTests");
 
-                TryDeleteFolder("Assets/Resources");
+                    TryDeleteFolderAndDuplicates("Assets/Resources", "CaseTest");
 
-                AssetDatabase.SaveAssets();
+                    TryDeleteFolder("Assets/Resources");
+
+                    AssetDatabase.SaveAssets();
+                }
             }
+            finally
+            {
+                ScriptableObjectSingletonCreatorTestAccess.TypeFilter = null;
+                ScriptableObjectSingletonCreatorTestAccess.IncludeTestAssemblies = false;
+                ScriptableObjectSingletonCreatorTestAccess.DisableAutomaticRetries = false;
+                ScriptableObjectSingletonCreatorTestAccess.AllowAssetCreationDuringSuppression =
+                    false;
 
-            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = null;
-            ScriptableObjectSingletonCreatorTestAccess.IncludeTestAssemblies = false;
-            ScriptableObjectSingletonCreatorTestAccess.DisableAutomaticRetries = false;
-            ScriptableObjectSingletonCreatorTestAccess.AllowAssetCreationDuringSuppression = false;
-
-            ScriptableObjectSingletonCreatorTestAccess.ResetRetryState();
-            EditorUi.Suppress = _previousEditorUiSuppress;
-
-            // CleanupAllKnownTestFolders already batches its operations internally.
-            CleanupAllKnownTestFolders();
-            AssetPostprocessorDeferralTestAccess.Flush();
+                ScriptableObjectSingletonCreatorTestAccess.ResetRetryState();
+                EditorUi.Suppress = _previousEditorUiSuppress;
+                try
+                {
+                    CleanupAllKnownTestFolders();
+                }
+                finally
+                {
+                    AssetPostprocessorDeferralTestAccess.Flush();
+                }
+            }
         }
 
         public override void OneTimeTearDown()
         {
-            base.OneTimeTearDown();
-
-            CleanupAllKnownTestFolders();
+            try
+            {
+                base.OneTimeTearDown();
+            }
+            finally
+            {
+                CleanupAllKnownTestFolders();
+            }
         }
 
         [UnityTest]
@@ -474,6 +489,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnityTest]
         public IEnumerator SkipsCreationWhenTargetPathOccupied()
         {
+            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = static type =>
+                type == typeof(Duplicate);
             string targetFolder = TestRoot;
             EnsureFolder(targetFolder);
             string occupiedPath = targetFolder + "/Duplicate.asset";
@@ -533,6 +550,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnityTest]
         public IEnumerator SkipsEnsureInsideAssetImportWorkerProcess()
         {
+            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = static type =>
+                type == typeof(CaseMismatch);
             string targetPath = "Assets/Resources/CaseTest/CaseMismatch.asset";
             AssetDatabase.DeleteAsset(targetPath);
             yield return null;
@@ -562,6 +581,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             [ValueSource(nameof(AssetImportWorkerEnvironmentScenarios))] string environmentVariable
         )
         {
+            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = static type =>
+                type == typeof(CaseMismatch);
             string targetPath = "Assets/Resources/CaseTest/CaseMismatch.asset";
             AssetDatabase.DeleteAsset(targetPath);
             yield return null;
@@ -596,6 +617,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnityTest]
         public IEnumerator DetectorExceptionsDoNotBlockEnsure()
         {
+            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = static type =>
+                type == typeof(CaseMismatch);
             string targetPath = "Assets/Resources/CaseTest/CaseMismatch.asset";
             AssetDatabase.DeleteAsset(targetPath);
             yield return null;
@@ -621,6 +644,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnityTest]
         public IEnumerator RetriesCreationAfterTemporaryFolderBlock()
         {
+            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = static type =>
+                type == typeof(RetrySingleton);
             string retryFolder = TestRoot + "/Retry";
             string retryAsset = retryFolder + "/RetrySingleton.asset";
             string blockerMeta = retryFolder + ".meta";
@@ -804,6 +829,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnityTest]
         public IEnumerator AutomaticRetriesCanBeDisabled()
         {
+            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = static type =>
+                type == typeof(NoRetrySingleton);
             string noRetryFolder = TestRoot + "/NoRetry";
             string noRetryAsset = noRetryFolder + "/NoRetrySingleton.asset";
             string noRetryVariant = noRetryFolder + " 1";
@@ -922,6 +949,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnityTest]
         public IEnumerator PartialSuccessResetsRetryCounter()
         {
+            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = static type =>
+                type == typeof(CaseMismatch) || type == typeof(RetrySingleton);
             string retryFolder = TestRoot + "/Retry";
             string retryAsset = retryFolder + "/RetrySingleton.asset";
             string caseTestFolder = "Assets/Resources/CaseTest";
@@ -1014,6 +1043,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnityTest]
         public IEnumerator AssetCreationDoesNotDeleteValidFilesOnDisk()
         {
+            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = static type =>
+                type == typeof(AssetDatabaseRaceSingleton);
             string raceFolder = TestRoot + "/Race";
             string raceAsset = raceFolder + "/AssetDatabaseRaceSingleton.asset";
 
@@ -1221,6 +1252,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnityTest]
         public IEnumerator CaseMismatchDiagnosticsAreHelpful()
         {
+            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = static type =>
+                type == typeof(CaseMismatch);
             string existingFolder = "Assets/Resources/cAsEtEsT";
             EnsureFolder(existingFolder);
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching(
@@ -1281,6 +1314,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnityTest]
         public IEnumerator DefersEnsureDuringCompilation()
         {
+            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = static type =>
+                type == typeof(CaseMismatch);
             string targetPath = "Assets/Resources/CaseTest/CaseMismatch.asset";
             AssetDatabase.DeleteAsset(targetPath);
             yield return null;
@@ -1458,6 +1493,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnityTest]
         public IEnumerator MultipleEnsureCallsAreRobust()
         {
+            ScriptableObjectSingletonCreatorTestAccess.TypeFilter = static type =>
+                type == typeof(CaseMismatch);
             string targetPath = "Assets/Resources/CaseTest/CaseMismatch.asset";
             AssetDatabase.DeleteAsset(targetPath);
             yield return null;

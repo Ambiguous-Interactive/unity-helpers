@@ -16,6 +16,7 @@ Shader "Wallstop Studios/Unity Helpers/Bendable Line"
             CGPROGRAM
             #pragma vertex vert
             #pragma fragment frag
+            #pragma target 3.0
             #include "UnityCG.cginc"
 
             struct appdata
@@ -31,7 +32,9 @@ Shader "Wallstop Studios/Unity Helpers/Bendable Line"
             };
 
             sampler2D _MainTex;
+            float4 _MainTex_TexelSize;
             float4 _UvBounds;
+            static const float MinimumSampleLod = -16.0;
 
             v2f vert(appdata input)
             {
@@ -45,7 +48,12 @@ Shader "Wallstop Studios/Unity Helpers/Bendable Line"
             {
                 clip(input.uv - _UvBounds.xy);
                 clip(_UvBounds.zw - input.uv);
-                return tex2D(_MainTex, input.uv);
+                float2 halfTexel = abs(_MainTex_TexelSize.xy) * 0.5;
+                float2 center = (_UvBounds.xy + _UvBounds.zw) * 0.5;
+                float2 minimum = min(_UvBounds.xy + halfTexel, center);
+                float2 maximum = max(_UvBounds.zw - halfTexel, center);
+                float2 sampleUv = clamp(input.uv, minimum, maximum);
+                return tex2Dlod(_MainTex, float4(sampleUv, 0, MinimumSampleLod));
             }
             ENDCG
         }

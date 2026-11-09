@@ -8,7 +8,7 @@ namespace WallstopStudios.UnityHelpers.Visuals
     using WallstopStudios.UnityHelpers.Core.Helper;
 
     /// <summary>Draws and animates a sprite along a quadratic curve without a tween dependency.</summary>
-    /// <remarks>Endpoints are world XY positions; Control is local. Use transforms in the XY plane. The component owns its mesh and material.</remarks>
+    /// <remarks>Endpoints are world XY positions; Control is local. Sprite sampling uses base-level texels to isolate neighboring atlas regions. The component owns its mesh and material.</remarks>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
     [AddComponentMenu("Wallstop Studios/Unity Helpers/Bendable Line")]

@@ -592,5 +592,16 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 DiagnosticSeverity.Warning,
                 isEnabledByDefault: true
             );
+
+        /// <summary>An immediate clear of an already empty pooled collection.</summary>
+        internal static readonly DiagnosticDescriptor RedundantPooledClear =
+            new DiagnosticDescriptor(
+                "WUH028",
+                "Use the empty collection returned by Buffers",
+                "Remove this immediate Clear. Known Buffers collections are empty when rented and clear on return. Retain clears after actual use and the cleanup of custom pools.",
+                "Performance",
+                DiagnosticSeverity.Warning,
+                isEnabledByDefault: true
+            );
     }
 }

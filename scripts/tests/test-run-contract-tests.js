@@ -370,6 +370,7 @@ runTest("no contract test in scripts/tests/ has been left unreachable", () => {
     ["scripts/tests/test-fixture-runspace.ps1", "lint-code-controls"],
     ["scripts/tests/test-check-eol.ps1", "eol-controls"],
     ["scripts/tests/test-extract-code-samples.ps1", "sample-controls"],
+    ["scripts/tests/test-lint-comment-block-form.js", "comment-controls"],
     ["scripts/tests/test-lint-drawer-multiobject.ps1", "drawer-controls"],
     ["scripts/tests/test-gitignore-docs.ps1", "gitignore-controls"],
     ["scripts/tests/test-lint-workflow-run-expression-length.ps1", "workflow-expression-controls"],
@@ -389,6 +390,10 @@ runTest("no contract test in scripts/tests/ has been left unreachable", () => {
     ["scripts/tests/test-sync-issue-template-versions.ps1", "workflow"]
   ]);
   const owners = new Map([
+    [
+      "comment-controls",
+      (file) => registeredControlsInvoke(file, "scripts/tests/test_comment_block_form.py")
+    ],
     [
       "lint-code-controls",
       (file) => registeredControlsInvoke(file, "scripts/tests/test_lint_error_codes.py")

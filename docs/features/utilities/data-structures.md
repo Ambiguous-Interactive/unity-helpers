@@ -451,6 +451,32 @@ with its original source identity. The hash-code shim is outside the measured op
 Native Unity correctness tests also cover index-width transitions, zero-key storage, mutation
 checks, removal and refill, and allocation events with positive and negative controls.
 
+### Original consumer harness replay
+
+The recovered DoxReloaded harness was replayed on Linux x64 with SDK 10.0.403 and Mono 6.14.1.
+It compares `Dictionary`, release 3.7.1, and the current map. Three fresh processes per runtime
+use the original one warm-up and 21 rotating rounds. Dense, seeded sparse, and `i * 1024` keys
+use 8, 64, and 1,024 entries. The following ranges cover 64 and 1,024 entries; ratios compare
+median process medians, and lower is faster.
+
+| Runtime     | Pair iteration / Dictionary | Hits / 3.7.1 | Misses / 3.7.1 | Fresh insert / 3.7.1 |
+| ----------- | --------------------------- | ------------ | -------------- | -------------------- |
+| .NET 10     | 0.821–0.979                 | 0.980–1.084  | 1.089–1.436    | 1.077–1.155          |
+| Mono 6.14.1 | 1.059–1.107                 | 0.996–1.224  | 1.016–1.120    | 1.068–1.272          |
+
+Iteration meets the consumer's 1.5x target in every tested shape at these sizes. Process minima
+also meet that bound. Lookup and insert costs exceed the allowed 10% increase in several cells,
+so [#1131](https://github.com/wallstop/unity-helpers/issues/1131) remains open. At eight dense keys,
+.NET misses take about twice 3.7.1's time. Churn keeps the current map at 64 slots in every process.
+
+The [source and result archive](../../performance/intmap-consumer-harness.zip) preserves the
+original harness and historical outputs, plus the separately built replay, stream captures,
+source hashes, and process receipts. The [evidence record](../../performance/intmap-consumer-evidence.json)
+contains all 666 replay summaries. Each process exits zero and reaches both stream ends with
+unchanged inputs and payloads. The original harness retains minima and medians rather than raw
+round samples; its short intervals and one warm-up limit broader conclusions. These results
+qualify this consumer protocol, not Unity player performance or arbitrary value types.
+
 ### Capacity and key limits
 
 - Keys below `IntMap<TValue>.MinimumAllowedKey` are reserved. `TrySet` refuses them; the indexer

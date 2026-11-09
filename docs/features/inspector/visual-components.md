@@ -48,6 +48,15 @@ and separate alpha textures are refused rather than drawing neighboring art or a
 Packed sprite padding is preserved as transparent space. Reassign `Sprite` after overriding a
 sprite's geometry; atlas texture changes are detected automatically.
 
+Point, bilinear, and trilinear filtering keep samples within the sprite's base-level texel centers,
+including one-pixel regions on unpadded sheets. The shader uses the finest available mip rather
+than smoothing across the sheet's mip levels, so small curves can alias. Keep the base mip resident
+and disable mip-limit reduction for these textures: discarded or streamed-out detail cannot be
+recovered by the shader. Existing texture filtering and importer settings are left unchanged.
+The bundled shader requires shader model 3.0; OpenGL ES 2.0 is unsupported.
+See the [rendered regression captures](../../performance/bendable-line-sampling.md) for the
+D3D11 filtering and mip-bias controls.
+
 The component creates and releases its own mesh and material and retains segment buffers between
 updates. Sprite textures remain caller-owned. Changing the segment count allocates new buffers;
 changing sprites reads Unity's UV/vertex arrays for packed sprites. The bundled resource shader

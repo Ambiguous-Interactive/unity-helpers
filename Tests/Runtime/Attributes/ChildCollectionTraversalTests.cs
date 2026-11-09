@@ -132,7 +132,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 #if UNITY_5_3_OR_NEWER
         [Test]
         public void ReusedSealedListsAndSetsHaveNoProfilerAllocationEvents(
-            [Values(0, 1, 64)] int count
+            [Values(0, 1, 64)] int count,
+            [Values(false, true)] bool bounded
         )
         {
             object[] retained = new object[1];
@@ -172,10 +173,34 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             Assert.AreEqual(2, selected.Count);
             RelationalComponentProcessor.FieldMetadata<ChildComponentAttribute>[] fields =
                 selected.ToArray();
-            Action assign = () => ChildComponentExtensions.AssignChildComponents(owner, fields);
-            Assert.That(ProfilerAllocationCounter.Measure(assign, iterations, capacity), Is.Zero);
-            Assert.AreEqual(count, owner.list.Count);
-            Assert.AreEqual(count, owner.set.Count);
+            int[] originalDepths = new int[fields.Length];
+            for (int index = 0; index < fields.Length; ++index)
+            {
+                originalDepths[index] = fields[index].attribute.MaxDepth;
+            }
+            try
+            {
+                foreach (
+                    RelationalComponentProcessor.FieldMetadata<ChildComponentAttribute> field in fields
+                )
+                {
+                    field.attribute.MaxDepth = bounded ? 1 : 0;
+                }
+                Action assign = () => ChildComponentExtensions.AssignChildComponents(owner, fields);
+                Assert.That(
+                    ProfilerAllocationCounter.Measure(assign, iterations, capacity),
+                    Is.Zero
+                );
+                Assert.AreEqual(count, owner.list.Count);
+                Assert.AreEqual(count, owner.set.Count);
+            }
+            finally
+            {
+                for (int index = 0; index < fields.Length; ++index)
+                {
+                    fields[index].attribute.MaxDepth = originalDepths[index];
+                }
+            }
         }
 #endif
 
@@ -197,6 +222,65 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                 }
             }
             return results;
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void BoundedQueriesCollectBeforeInvokingSetComparers(bool limitCount)
+        {
+            GameObject root = Track(new GameObject("BoundedCollectionSnapshot"));
+            RelationalChildCollectionTarget target =
+                root.AddComponent<RelationalChildCollectionTarget>();
+            List<BoxCollider> expected = new();
+            for (int index = 0; index < 4; ++index)
+            {
+                GameObject child = Track(new GameObject($"Child{index}"));
+                child.transform.SetParent(root.transform);
+                expected.Add(child.AddComponent<BoxCollider>());
+            }
+            GameObject changedChild = expected[1].gameObject;
+            bool changed = false;
+            target.set = new HashSet<BoxCollider>(
+                new RelationalCollectionCallbackComparer<BoxCollider>(() =>
+                {
+                    if (!changed)
+                    {
+                        changed = true;
+                        changedChild.AddComponent<BoxCollider>();
+                    }
+                })
+            );
+            RelationalComponentProcessor.FieldMetadata<ChildComponentAttribute>[] fields =
+                ChildComponentExtensions.GetOrCreateFields(typeof(RelationalChildCollectionTarget));
+            if (limitCount)
+            {
+                expected.RemoveAt(3);
+            }
+            foreach (
+                RelationalComponentProcessor.FieldMetadata<ChildComponentAttribute> field in fields
+            )
+            {
+                if (field.kind != RelationalComponentProcessor.FieldKind.HashSet)
+                {
+                    continue;
+                }
+                int originalMaxCount = field.attribute.MaxCount;
+                int originalMaxDepth = field.attribute.MaxDepth;
+                try
+                {
+                    field.attribute.MaxCount = limitCount ? 3 : 0;
+                    field.attribute.MaxDepth = limitCount ? 0 : 1;
+                    ChildComponentExtensions.AssignChildComponents(target, new[] { field });
+                    CollectionAssert.AreEquivalent(expected, target.set);
+                    Assert.AreEqual(2, changedChild.GetComponents<BoxCollider>().Length);
+                }
+                finally
+                {
+                    field.attribute.MaxCount = originalMaxCount;
+                    field.attribute.MaxDepth = originalMaxDepth;
+                }
+            }
+            Assert.IsTrue(changed);
         }
 
         [Test]

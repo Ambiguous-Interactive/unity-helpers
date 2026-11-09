@@ -55,7 +55,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 int start,
                 int length
             )>.List.Get(out List<(int start, int length)> runStack);
-            runStack.Clear();
 
             int index = 0;
             while (index < count)

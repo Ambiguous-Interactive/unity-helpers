@@ -504,7 +504,7 @@
     },
     {
       "name": "use-pooling",
-      "sha256": "11ffb58cfac839c5310371f76ed9560c669f8ff23da7c51114318558e4d9f879",
+      "sha256": "a298254dc5bfea4480ff0acbba6b16ac9a8ac7f8676efa616761ca4916aba13e",
       "parts": ["use-pooling-part-1.md", "use-pooling-part-2.md", "use-pooling-part-3.md"],
       "routerSha256": "7e9ecdfacd23a6098c4aa910e5a8041cc2224098892a777329d3b79d36476295"
     },
