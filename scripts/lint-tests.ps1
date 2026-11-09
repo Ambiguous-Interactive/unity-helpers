@@ -275,13 +275,16 @@ function Test-CodeSpecificSuppressionInLineRange {
 }
 
 function Get-InvocationArgumentText {
-  Param([string]$Text, [int]$Start)
+  Param([string]$Text, [int]$Start, [string]$OriginalText)
 
   $depth = 0
   for ($position = $Start; $position -lt $Text.Length; $position++) {
     $character = $Text[$position]
     if ($character -eq ')' -and $depth -eq 0) {
-      return $Text.Substring($Start, $position - $Start).Trim()
+      if ($OriginalText.Length -eq $Text.Length) {
+        return $OriginalText.Substring($Start, $position - $Start).Trim()
+      }
+      return ''
     }
     if ($character -eq '(' -or $character -eq '[' -or $character -eq '{') {
       $depth++
@@ -1426,7 +1429,9 @@ foreach ($file in $filesToScan) {
   foreach ($destroy in $destroyPattern.Matches($scrubbedText)) {
     $lineIndex = Get-LineNumberAtIndex -Text $scrubbedText -Index $destroy.Index
     if ($content[$lineIndex - 1] -match 'UNH-SUPPRESS') { continue }
-    $argument = Get-InvocationArgumentText -Text $scrubbedText -Start ($destroy.Index + $destroy.Length)
+    $argument = if ($scrubbedText.Length -eq $commentMaskedText.Length -and $scrubbedText.Length -eq $text.Length) {
+      Get-InvocationArgumentText -Text $scrubbedText -OriginalText $commentMaskedText -Start ($destroy.Index + $destroy.Length)
+    } else { '' }
     $allowed = $false
     if (-not [string]::IsNullOrWhiteSpace($argument)) {
       $searchStart = [Math]::Max(0, $lineIndex - 100)
@@ -1434,13 +1439,20 @@ foreach ($file in $filesToScan) {
       $column = $destroy.Index - ($scrubbedText.LastIndexOf("`n", $destroy.Index) + 1)
       $precedingLines[-1] = $precedingLines[-1].Substring(0, $column)
       $precedingCode = $precedingLines -join "`n"
+      $precedingOriginalCode = $commentMaskedText.Substring($destroy.Index - $precedingCode.Length, $precedingCode.Length)
       foreach ($track in [regex]::Matches($precedingCode, '\bTrack\s*\(')) {
-        $tracked = Get-InvocationArgumentText -Text $precedingCode -Start ($track.Index + $track.Length)
+        $tracked = Get-InvocationArgumentText -Text $precedingCode -OriginalText $precedingOriginalCode -Start ($track.Index + $track.Length)
         if ([string]::IsNullOrWhiteSpace($tracked)) { continue }
-        if ($argument.StartsWith($tracked, [StringComparison]::Ordinal)) {
-          $remaining = $argument.Substring($tracked.Length).TrimStart()
-          if ($remaining.Length -eq 0 -or $remaining.StartsWith(',')) { $allowed = $true; break }
+        $trackedExpressions = @($tracked)
+        $assignment = [regex]::Match($precedingCode.Substring(0, $track.Index), '(?<![\w.@])(?<variable>@?[A-Za-z_]\w*)\s*=\s*$')
+        if ($assignment.Success) { $trackedExpressions += $assignment.Groups['variable'].Value }
+        foreach ($expression in $trackedExpressions) {
+          if ($argument.StartsWith($expression, [StringComparison]::Ordinal)) {
+            $remaining = $argument.Substring($expression.Length).TrimStart()
+            if ($remaining.Length -eq 0 -or $remaining.StartsWith(',')) { $allowed = $true; break }
+          }
         }
+        if ($allowed) { break }
       }
     }
     if (-not $allowed) {

@@ -564,6 +564,7 @@ runTest("no linter in scripts/ has been left unreachable", () => {
     ["scripts/lint-gitignore-docs.ps1", "gitignore-controls"],
     ["scripts/lint-workflow-run-expression-length.ps1", "workflow-expression-controls"],
     ["scripts/lint-concurrent-cache-fill.ps1", "cache-controls"],
+    ["scripts/lint-comment-block-form.ps1", "comment-controls"],
     ["scripts/lint-duplicate-usings.ps1", "duplicate-using-controls"],
     ["scripts/lint-doc-counts.ps1", "doc-count-controls"],
     ["scripts/lint-unity-file-naming.ps1", "naming-controls"],
@@ -613,6 +614,10 @@ runTest("no linter in scripts/ has been left unreachable", () => {
     [
       "duplicate-using-controls",
       (file) => registeredControlsInvoke(file, "scripts/tests/test_duplicate_usings.py")
+    ],
+    [
+      "comment-controls",
+      (file) => registeredControlsInvoke(file, "scripts/tests/test_comment_block_form.py")
     ],
     ["csharp-controls", csharpControlsInvoke],
     [

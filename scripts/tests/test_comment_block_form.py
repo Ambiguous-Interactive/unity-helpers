@@ -270,3 +270,54 @@ def test_unknown_arguments_are_rejected() -> None:
     with pytest.raises(SystemExit) as result:
         main(["--unknown-option"])
     assert result.value.code == 2
+
+
+def test_git_discovery_skips_unstaged_deletions(tmp_path: Path) -> None:
+    populated(tmp_path)
+    git = shutil.which("git")
+    assert git is not None
+    subprocess.run([git, "init", "-q", str(tmp_path)], check=True, capture_output=True, timeout=15)
+    subprocess.run(
+        [git, "-C", str(tmp_path), "add", *ROOTS], check=True, capture_output=True, timeout=15
+    )
+    deleted = tmp_path / "Runtime/Clean.cs"
+    deleted.unlink()
+    paths = files_to_check(tmp_path, None, fixture=False)
+    assert deleted not in paths
+    assert len(paths) == 3
+    with pytest.raises((OSError, ValueError)):
+        files_to_check(tmp_path, ["Runtime/Clean.cs"], fixture=False)
+
+
+@pytest.mark.parametrize("bom", [b"", b"\xef\xbb\xbf"])
+@pytest.mark.parametrize("newline", ["\n", "\r\n"])
+def test_conversion_retains_encoding_marker(tmp_path: Path, bom: bytes, newline: str) -> None:
+    populated(tmp_path)
+    source = tmp_path / "Runtime/Clean.cs"
+    original = in_type("            // first\n            // second").replace("\n", newline)
+    source.write_bytes(bom + original.encode("utf-8"))
+    assert main(["--repo-root", str(tmp_path), "--paths", "Runtime/Clean.cs", "--fix"]) == 0
+    expected = in_type(
+        "            /*\n                first\n                second\n            */"
+    )
+    assert source.read_bytes() == bom + expected.replace("\n", newline).encode("utf-8")
+
+
+def test_git_discovery_rejects_dangling_links(tmp_path: Path) -> None:
+    populated(tmp_path)
+    target = tmp_path / "outside.cs"
+    target.write_text("content", encoding="utf-8")
+    link = tmp_path / "Runtime/Link.cs"
+    try:
+        link.symlink_to(target)
+    except OSError:
+        pytest.skip("Links are unavailable")
+    git = shutil.which("git")
+    assert git is not None
+    subprocess.run([git, "init", "-q", str(tmp_path)], check=True, capture_output=True, timeout=15)
+    subprocess.run(
+        [git, "-C", str(tmp_path), "add", *ROOTS], check=True, capture_output=True, timeout=15
+    )
+    target.unlink()
+    with pytest.raises(ValueError, match="linked"):
+        files_to_check(tmp_path, None, fixture=False)

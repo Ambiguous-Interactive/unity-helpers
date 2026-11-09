@@ -74,7 +74,9 @@ def test_unsupported_timeout_is_refused_before_credentials(tmp_path: Path, kind:
 def selector() -> str:
     source = WRAPPER.read_text(encoding="utf-8")
     start = source.index("select_gnu_timeout() {")
-    end = source.index("\n}\n", start) + len("\n}\n")
+    end = source.index(
+        '\nGNU_TIMEOUT_BIN="$(select_gnu_timeout "${UNITY_TIMEOUT_EXECUTABLE:-}")"', start
+    )
     return source[start:end]
 
 

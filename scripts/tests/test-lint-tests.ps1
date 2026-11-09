@@ -135,7 +135,7 @@ namespace WallstopStudios.UnityHelpers.Tests
         [Test]
         public void MyTest()
         {
-            var go = Track(new GameObject("test"));
+            var go = new GameObject("test");
             Object.DestroyImmediate(go);
         }
     }
@@ -1075,6 +1075,20 @@ namespace WallstopStudios.UnityHelpers.Tests
 }
 
 foreach ($shape in @(
+  @{ Name = 'DifferentStringLiterals'; Body = 'Track(GameObject.Find("Foo")); Object.DestroyImmediate(GameObject.Find("Bar"));'; Expected = 1 },
+  @{ Name = 'SameStringLiteral'; Body = 'Track(GameObject.Find("Foo")); Object.DestroyImmediate(GameObject.Find("Foo"));'; Expected = 0 },
+  @{ Name = 'DifferentCharacterLiterals'; Body = "Track(items['a']); Object.DestroyImmediate(items['b']);"; Expected = 1 },
+  @{ Name = 'SameCharacterLiteral'; Body = "Track(items['a']); Object.DestroyImmediate(items['a']);"; Expected = 0 },
+  @{ Name = 'LiteralDelimiters'; Body = 'Track(Find(")](")); Object.DestroyImmediate(Find(")]("));'; Expected = 0 },
+  @{ Name = 'DifferentVerbatimLiterals'; Body = 'Track(Find(@"a)")); Object.DestroyImmediate(Find(@"b)"));'; Expected = 1 },
+  @{ Name = 'CommentsInsideExpression'; Body = 'Track(Find(/* a */value)); Object.DestroyImmediate(Find(/* b */value));'; Expected = 0 },
+  @{ Name = 'TrackedFactoryAssignment'; Body = 'GameObject value = Track(new GameObject()); Object.DestroyImmediate(value);'; Expected = 0 },
+  @{ Name = 'TrackedAssignmentAcrossLines'; Body = "Editor editor =`n                Track(Editor.CreateEditor(target)); Object.DestroyImmediate(editor);"; Expected = 0 },
+  @{ Name = 'TrackedAssignmentHasExactName'; Body = 'var value = Track(Create()); Object.DestroyImmediate(Value);'; Expected = 1 },
+  @{ Name = 'TrackedAssignmentIsNotAnotherVariable'; Body = 'var tracked = Track(Create()); Object.DestroyImmediate(other);'; Expected = 1 },
+  @{ Name = 'ComparisonDoesNotAssign'; Body = 'var ok = value == Track(Create()); Object.DestroyImmediate(value);'; Expected = 1 },
+  @{ Name = 'WrapperDoesNotAssignTrackResult'; Body = 'var value = Wrap(Track(Create())); Object.DestroyImmediate(value);'; Expected = 1 },
+  @{ Name = 'TrackedVerbatimIdentifier'; Body = 'var @object = Track(Create()); Object.DestroyImmediate(@object);'; Expected = 0 },
   @{ Name = 'TrackingMustPrecedeDestroy'; Body = 'Object.DestroyImmediate(value); Track(value);'; Expected = 1 },
   @{ Name = 'CaseSensitiveExpression'; Body = 'Track(value); Object.DestroyImmediate(Value);'; Expected = 1 },
   @{ Name = 'GenericArgumentsWithDestroyFlag'; Body = 'Track(Select<GameObject, Transform>(items[0], other)); Object.DestroyImmediate(Select<GameObject, Transform>(items[0], other), true);'; Expected = 0 },

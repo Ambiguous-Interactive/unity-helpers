@@ -141,7 +141,11 @@ def files_to_check(repository: Path, paths: list[str] | None, *, fixture: bool) 
             check=True,
             timeout=30,
         )
-        names = sorted(set(result.stdout.decode("utf-8").rstrip("\0").split("\0")))
+        names = sorted(
+            name
+            for name in set(result.stdout.decode("utf-8").rstrip("\0").split("\0"))
+            if name and os.path.lexists(repository / name)
+        )
     selected: list[Path] = []
     for name in names:
         if not name:
@@ -166,31 +170,33 @@ def main(argv: list[str] | None = None) -> int:
     try:
         paths = files_to_check(repository, args.paths, fixture=args.repo_root is not None)
         counts = dict.fromkeys(ROOTS, 0)
-        sources: list[tuple[Path, str, list[Violation]]] = []
+        sources: list[tuple[Path, str, list[Violation], str]] = []
         for path in paths:
             relative = path.relative_to(repository).as_posix()
             root = relative.split("/", 1)[0]
             if root in counts:
                 counts[root] += 1
             try:
-                text = path.read_bytes().decode("utf-8-sig")
+                raw = path.read_bytes()
+                encoding = "utf-8-sig" if raw.startswith(b"\xef\xbb\xbf") else "utf-8"
+                text = raw.decode(encoding)
             except (OSError, UnicodeError) as error:
                 raise ValueError(f"{relative}: {error}") from error
-            sources.append((path, text, analyze(text)))
+            sources.append((path, text, analyze(text), encoding))
         if not args.paths:
             for root, count in counts.items():
                 if count == 0:
                     raise ValueError(
                         f"{root}/ yielded no C# files; this run examined nothing there"
                     )
-        violations = sum(len(found) for _, _, found in sources)
+        violations = sum(len(found) for _, _, found, _ in sources)
         if args.fix:
             rewritten = declined = 0
-            for path, text, found in sources:
+            for path, text, found, encoding in sources:
                 result, refused = rewrite(text, found)
                 declined += refused
                 if result != text:
-                    path.write_bytes(result.encode("utf-8"))
+                    path.write_bytes(result.encode(encoding))
                     rewritten += 1
             print(
                 f"[lint-comment-block-form] Rewrote {rewritten} file(s); declined {declined} run(s) whose text carries a comment delimiter."
@@ -199,7 +205,7 @@ def main(argv: list[str] | None = None) -> int:
         if violations:
             print(f"[lint-comment-block-form] {violations} multi-line // comment run(s).")
             print("Delete the run, or write it as one /* ... */ block. See .llm/context.md rule 8.")
-            for path, _, found in sources:
+            for path, _, found, _ in sources:
                 for violation in found:
                     relative = escape_command_data(path.relative_to(repository).as_posix())
                     print(
