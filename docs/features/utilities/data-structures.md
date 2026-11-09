@@ -495,8 +495,9 @@ medians across dense, sparse and shifted keys at 8, 64, 1,024 and 16,384 entries
 This is a modest insertion improvement with a 4% regression in one Mono cell; it does not
 establish a general lookup or iteration speedup. The fixed-work churn control retains 64 slots.
 Per-call checksums, Dictionary comparisons, timer controls and healthy process/stream completion
-are recorded with [source identities and summaries](../../performance/intmap-index-evidence.json).
-The [capture archive](../../performance/intmap-index-captures.zip) includes every raw round.
+are recorded in [#1131](https://github.com/wallstop/unity-helpers/issues/1131).
+Raw captures, summaries and source/process receipts remain in ignored local storage. The measured
+candidate source SHA256 is `5913fe429dc86bef53d200cbbb4d365d4c8ad424eeb336a7db66ae341bc2d819`.
 These host measurements do not qualify Unity players, large values or arbitrary application work.
 
 The unchanged consumer protocol was also replayed against the source from release 3.7.1,
@@ -504,13 +505,13 @@ verified after namespace and newline normalization. At 64, 1,024 and 16,384 entr
 candidate's hit/miss/insert ratios versus 3.7.1 span 0.987–1.093 / 1.031–1.314 / 1.014–1.195
 on .NET and 0.999–1.256 / 1.018–1.169 / 1.044–1.219 on Mono. Iteration versus Dictionary spans
 0.822–0.977 and 1.056–1.091 respectively. Iteration meets the target; lookup and insertion still
-exceed its 10% budget in some cells. The archive maps the original arm labels to actual source
+exceed its 10% budget in some cells. The local capture maps original arm labels to actual source
 identities; its initial 3.6.2 control is preserved separately and excluded from this comparison.
 
 An earlier encoded-key candidate was rejected. Two complete calibrated .NET processes exposed
 lookup regressions up to 14%, iteration regressions up to 15% and repeated-zero costs of
 1.47–1.81 times main. Its third process was stopped after rejection and excluded from the results;
-the partial capture remains in the archive. Short consumer-protocol runs had hidden these costs.
+the partial capture remains local. Short consumer-protocol runs had hidden these costs.
 The accepted change keeps the existing key representation. Issue
 [#1131](https://github.com/wallstop/unity-helpers/issues/1131) remains open.
 

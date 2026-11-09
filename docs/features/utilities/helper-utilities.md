@@ -1701,11 +1701,12 @@ horizontal or vertical flips, half turns, and other rotation metadata return nul
 before the helper reads `textureRect` or copies pixels. Disable rotation and tight packing on an
 atlas used for extraction. Unrotated rectangular atlas regions keep their existing pixel behavior.
 
-The [2026-11-09 atlas probes](../../performance/sprite-atlas-probes.zip) verified 30 packed,
+Native atlas probes on 2026-11-09 verified 30 packed,
 unrotated sprites against independent source-pixel gradients on Unity 6000.6.7f1. Rotation was
 enabled, but the packer used separate pages and produced no rotated sprites. This does not
 qualify the rotated-sprite acceptance case in
 [#1135](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1135), which remains open.
+The probe sources, results and process logs remain in ignored local storage.
 
 `ExtractSpriteRect` copies the sprite's `textureRect` region from its source sheet, so it reads a
 sprite out of a larger sheet without touching the sheet itself. The sheet must be readable, and a

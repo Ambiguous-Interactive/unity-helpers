@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -34,6 +35,41 @@ def test_mkdocs_output_is_unity_excluded_and_pages_uploads_that_output() -> None
     assert f"path: ./{output.as_posix()}\n" in workflow
     assert f'"{output.as_posix()}/index.html"' in workflow
     assert "mkdocs build --strict" in workflow
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="The documentation workflow runs Bash on Linux")
+@pytest.mark.parametrize("state", ["ready", "empty", "missing"])
+def test_docs_workflow_checks_the_actual_deployable_output(tmp_path: Path, state: str) -> None:
+    workflow = cast(
+        "dict[str, object]",
+        yaml.load(
+            (ROOT / ".github/workflows/validate-docs.yml").read_text(encoding="utf-8"),
+            Loader=yaml.BaseLoader,  # noqa: S506 - BaseLoader constructs only basic nodes.
+        ),
+    )
+    jobs = cast("dict[str, dict[str, object]]", workflow["jobs"])
+    steps = cast("list[dict[str, object]]", jobs["build-mkdocs-test"]["steps"])
+    selected = [step for step in steps if step.get("name") == "Verify build output"]
+    assert len(selected) == 1
+    legacy = tmp_path / "site"
+    legacy.mkdir()
+    (legacy / "index.html").write_text("Old output", encoding="utf-8")
+    if state != "missing":
+        output = tmp_path / ".artifacts/site"
+        output.mkdir(parents=True)
+        if state == "ready":
+            (output / "index.html").write_text("Current output", encoding="utf-8")
+    bash_path = shutil.which("bash")
+    assert bash_path is not None, "Bash is required to exercise the actual workflow step"
+    result = subprocess.run(
+        [bash_path, "-e", "-o", "pipefail", "-c", str(selected[0]["run"])],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=20,
+    )
+    assert result.returncode == (0 if state == "ready" else 1), result.stdout + result.stderr
 
 
 def run(name: str, root: Path) -> subprocess.CompletedProcess[str]:

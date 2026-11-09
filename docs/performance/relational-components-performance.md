@@ -45,12 +45,14 @@ predate these collection changes and use a different harness.
 ## Bounded parent collections (2026-11-09)
 
 Bounded parent queries now stop their walk at the requested depth or match count.
-The [raw samples and source/process receipts](./parent-collection-evidence.json) compare
-main `99e54b1e` with the candidate on Windows x64, Unity 6000.6.7f1 Editor Mono with
+Measurements recorded in [#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)
+compare main `99e54b1e` with the candidate on Windows x64, Unity 6000.6.7f1 Editor Mono with
 Release compilation. Each cell assigns an array, list and set together, uses 64 warm calls,
 calibrates batches to at least 20 ms, and records seven rounds in three fresh processes.
-Times below are medians of process medians in microseconds. The
-[source and native log archive](./parent-collection-captures.zip) preserves the captures.
+Times below are medians of process medians in microseconds. Raw captures remain in ignored local
+storage. Replay `RelationalParentCollectionTimingTests` with category `Performance` to collect
+new samples. The measured parent source SHA256 is
+`9369800b3f8ed73471a2cbc6d6778688f30fa6852a45d95500f1eb040de0d4ac`.
 
 | Ancestors | Field type | Bound   |    Before | After |
 | --------: | :--------- | :------ | --------: | ----: |
@@ -64,7 +66,7 @@ The four-ancestor sealed depth case is 18% slower. Unbounded base-type cases spa
 1.02–1.08 times the baseline, while unbounded sealed cases span 0.97–1.02. Empty
 queries span 1.04 times the baseline. These controls limit the claim to bounded workloads;
 small queries do not receive a universal speedup. An earlier candidate with larger small-query
-regressions was rejected and remains in the evidence as `candidate`; the accepted arm is `refined`.
+regressions was rejected; its captures remain local alongside the accepted candidate.
 
 Six native allocation checks cover warmed sealed list/set assignments with 0, 1 and 16
 ancestors under depth and count bounds. Positive allocation and negative reuse controls run
