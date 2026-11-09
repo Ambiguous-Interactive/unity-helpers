@@ -140,6 +140,15 @@ run.
 
 ---
 
+The Docker wrapper requires GNU coreutils `timeout` on the host and inside the container.
+It checks the selected implementation before reading host credentials or starting activation.
+The host accepts GNU `timeout`, `gnutimeout`, or `gtimeout` from `PATH`. To select one explicitly,
+set `UNITY_TIMEOUT_EXECUTABLE` to its command name or full path. Ubuntu 26.04 callers can install
+`gnu-coreutils` and set `UNITY_TIMEOUT_EXECUTABLE=gnutimeout`; macOS callers can install GNU
+coreutils and select `gtimeout`. The container must expose a GNU command under one of these names.
+An unsupported implementation fails immediately rather than starting a license operation with
+an unqualified watchdog. Run `npm run test:unity-timeout` for the selection and signal controls.
+
 After a Pro serial activation starts, the Docker wrapper attempts license return on every exit,
 including a partial activation that never produces a usable license file. The failed activation
 still fails the run. A successful return command is not sufficient cleanup evidence: CI retains its

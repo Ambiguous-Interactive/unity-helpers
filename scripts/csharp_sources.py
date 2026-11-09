@@ -6,7 +6,10 @@ import os
 import stat
 import sys
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 EXCLUDED = frozenset(("node_modules", ".git", "obj", "bin", "Library", "Temp"))
 
@@ -53,24 +56,25 @@ def source_files(repository: Path, roots: tuple[str, ...]) -> list[Path]:
     return sorted(files)
 
 
-def mask_noise(source: str, *, preserve_strings: bool = False) -> str:
-    """Keep offsets and line breaks while removing comments and literal contents."""
-    result = list(source)
+def source_tokens(source: str) -> Iterator[tuple[int, int, str]]:
+    """Yield literal, comment and directive spans without changing source offsets."""
     index = 0
     length = len(source)
     while index < length:
         start = index
-        literal = False
+        kind = "line"
         if source.startswith("//", index) or (
             source[index] == "#" and not source[source.rfind("\n", 0, index) + 1 : index].strip()
         ):
+            kind = "directive" if source[index] == "#" else "line"
             end = source.find("\n", index)
             index = length if end < 0 else end
         elif source.startswith("/*", index):
+            kind = "block"
             end = source.find("*/", index + 2)
             index = length if end < 0 else end + 2
         elif source[index] in ('"', "'"):
-            literal = True
+            kind = "literal"
             quote = source[index]
             verbatim = (
                 quote == '"'
@@ -103,9 +107,16 @@ def mask_noise(source: str, *, preserve_strings: bool = False) -> str:
         else:
             index += 1
             continue
-        if literal and preserve_strings:
+        yield start, min(index, length), kind
+
+
+def mask_noise(source: str, *, preserve_strings: bool = False) -> str:
+    """Keep offsets and line breaks while removing comments and literal contents."""
+    result = list(source)
+    for start, end, kind in source_tokens(source):
+        if kind == "literal" and preserve_strings:
             continue
-        for position in range(start, min(index, length)):
+        for position in range(start, end):
             if source[position] not in "\r\n":
                 result[position] = " "
     return "".join(result)

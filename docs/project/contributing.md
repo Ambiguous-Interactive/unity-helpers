@@ -207,6 +207,15 @@ every Undo target is valid. `npm run lint:odin-undo-safety` checks drawers and
 `npm run test:odin-undo-safety` runs its focused tests.
 Run `npm run test:csharp-lints` for discovery, parser and direct/PowerShell CLI controls.
 
+Multiline ordinary comment checks use typed Python through `npm run lint:comment-block-form`.
+The PowerShell entry point retains explicit paths, fixture roots, and `-Fix`; its JavaScript test
+entry point forwards to the same Python tests. Both use the shared C# scanner to distinguish
+comments from literals and XML documentation. Conversion preserves newline style and refuses
+runs containing comment delimiters. Full scans require a nonempty corpus in every owned root;
+missing or unreadable explicit inputs fail before any file is rewritten. Git discovery includes
+untracked sources and excludes ignored files. Run `npm run test:lint-comment-block-form` for the
+focused controls.
+
 The concurrent-cache checker also runs in typed Python through `npm run lint:concurrent-cache-fill`.
 It requires Runtime, Editor and Styles source roots, ignores comments and literal text, and preserves
 explicit overwrite reasons. Only a plain `SINGLE_THREADED` guard exempts writes; compound conditions

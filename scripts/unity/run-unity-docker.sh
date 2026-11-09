@@ -17,6 +17,7 @@ set -euo pipefail
 #   UNITY_TEST_PROJECT_DIR - Path to test project (default: /home/vscode/.unity-test-project)
 #   UNITY_USE_XVFB       - Set to 1 to install xvfb and use xvfb-run (for PlayMode tests)
 #   UNITY_TIMEOUT        - Main Unity command timeout in seconds (default: 1800)
+#   UNITY_TIMEOUT_EXECUTABLE - Optional host GNU timeout command or path
 #   UNITY_LICENSE_ACTIVATION_TIMEOUT - Per-attempt activation timeout (default: 300)
 #   UNITY_LICENSE_RETURN_TIMEOUT - Serial return timeout in seconds (default: 300)
 #   UNITY_TERMINATION_GRACE_SECONDS - TERM-to-KILL grace period (default: 30)
@@ -27,6 +28,33 @@ set -euo pipefail
 # Usage:
 #   ./run-unity-docker.sh -batchmode -nographics -quit -projectPath /project -logFile -
 ###############################################################################
+
+select_gnu_timeout() {
+    local candidates=(timeout gnutimeout gtimeout)
+    if [[ -n "${1:-}" ]]; then
+        candidates=("$1")
+    fi
+    local candidate resolved version directory
+    for candidate in "${candidates[@]}"; do
+        resolved="$(command -v -- "${candidate}" || true)"
+        if [[ -z "${resolved}" || ! -f "${resolved}" || ! -x "${resolved}" ]]; then
+            continue
+        fi
+        version="$("${resolved}" --version 2>/dev/null)" || continue
+        case "${version%%$'\n'*}" in
+            *'(GNU coreutils)'*)
+                directory="$(cd -- "$(dirname -- "${resolved}")" && pwd -P)" || continue
+                printf '%s/%s\n' "${directory}" "$(basename -- "${resolved}")"
+                return 0
+                ;;
+        esac
+    done
+    echo "ERROR: GNU coreutils timeout is required before Unity credential loading or license activation." >&2
+    echo "Install GNU coreutils (Ubuntu 26.04: gnu-coreutils) and set UNITY_TIMEOUT_EXECUTABLE=gnutimeout, or put GNU timeout on PATH." >&2
+    return 2
+}
+
+GNU_TIMEOUT_BIN="$(select_gnu_timeout "${UNITY_TIMEOUT_EXECUTABLE:-}")"
 
 UNITY_VERSION="${UNITY_VERSION:-2021.3.45f1}"
 UNITY_IMAGE_VERSION="${UNITY_IMAGE_VERSION:-3}"
@@ -164,6 +192,9 @@ fi
 INNER_SCRIPT='#!/usr/bin/env bash
 set -euo pipefail
 
+GNU_TIMEOUT_BIN="$(select_gnu_timeout)"
+export GNU_TIMEOUT_BIN
+
 if ! command -v pgrep; then
     echo "ERROR: pgrep is required to supervise the complete Unity process tree." >&2
     exit 2
@@ -213,7 +244,7 @@ run_with_watchdog() {
     shift 2
 
     local command_exit=0
-    timeout \
+    "${GNU_TIMEOUT_BIN}" \
         --signal=TERM \
         --kill-after="${UNITY_TERMINATION_GRACE_SECONDS}" \
         "${timeout_seconds}" \
@@ -320,7 +351,7 @@ run_with_watchdog_capture() {
 
     local command_exit=0
     WATCHDOG_CAPTURE_FILE="$(mktemp /tmp/unity-watchdog.XXXXXX)"
-    start_supervised_process timeout \
+    start_supervised_process "${GNU_TIMEOUT_BIN}" \
         --signal=TERM \
         --kill-after="${UNITY_TERMINATION_GRACE_SECONDS}" \
         "${timeout_seconds}" \
@@ -603,6 +634,8 @@ fi
 exit "${EXIT_CODE}"
 '
 
+INNER_SCRIPT="$(declare -f select_gnu_timeout)"$'\n'"${INNER_SCRIPT}"
+
 # Ensure test project directory exists
 mkdir -p "${UNITY_TEST_PROJECT_DIR}"
 mkdir -p "${UNITY_LICENSE_CACHE_LOCAL_DIR}" "${UNITY_LICENSE_CACHE_CONFIG_DIR}"
@@ -619,7 +652,7 @@ run_docker_client_with_watchdog() {
     shift 2
 
     local client_exit=0
-    timeout \
+    "${GNU_TIMEOUT_BIN}" \
         --signal=TERM \
         --kill-after="${UNITY_DOCKER_CLIENT_KILL_GRACE}" \
         "${timeout_seconds}" \
@@ -730,7 +763,7 @@ trap 'handle_interrupt 143' TERM
 # The workspace is mounted read-only (/workspace:ro) for safety.
 # The test project directory is mounted read-write (/project) for compilation artifacts.
 DOCKER_EXIT=0
-start_docker_run_client timeout \
+start_docker_run_client "${GNU_TIMEOUT_BIN}" \
     --signal=TERM \
     --kill-after="${UNITY_TERMINATION_GRACE_SECONDS}" \
     "${UNITY_CONTAINER_TIMEOUT}" \
