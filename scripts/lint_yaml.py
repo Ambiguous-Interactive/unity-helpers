@@ -8,12 +8,17 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from cli_encoding import configure_output, escape_command_data
+from cli_encoding import configure_output, escape_command_property
 from csharp_sources import is_link
 from yamllint.config import YamlLintConfig, YamlLintConfigError
 from yamllint.linter import run
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def escape_diagnostic(value: str) -> str:
+    """Keep plain diagnostics inert for both Actions command syntaxes."""
+    return escape_command_property(value).replace("[", "%5B").replace("]", "%5D")
 
 
 def git(repository: Path, *arguments: str) -> bytes:
@@ -141,8 +146,8 @@ def main(argv: list[str] | None = None) -> int:
                 errors += problem.level == "error"
                 warnings += problem.level == "warning"
                 print(
-                    f"{escape_command_data(name)}:{problem.line}:{problem.column}: "
-                    f"[{problem.level}] {escape_command_data(problem.desc)} ({problem.rule})"
+                    f"{escape_diagnostic(name)}:{problem.line}:{problem.column}: "
+                    f"[{problem.level}] {escape_diagnostic(problem.desc)} ({problem.rule})"
                 )
         if args.verbose or errors or warnings:
             print(
@@ -157,7 +162,7 @@ def main(argv: list[str] | None = None) -> int:
         YamlLintConfigError,
         subprocess.SubprocessError,
     ) as error:
-        print(f"[lint-yaml] ERROR: {escape_command_data(str(error))}")
+        print(f"[lint-yaml] ERROR: {escape_diagnostic(str(error))}")
         return 1
 
 

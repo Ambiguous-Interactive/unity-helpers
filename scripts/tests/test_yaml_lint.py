@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 import sys
@@ -14,6 +15,35 @@ from lint_yaml import main, sources
 
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG = b"extends: default\nrules:\n  document-start: disable\n  truthy: disable\n"
+
+
+@pytest.mark.parametrize(
+    ("name", "escaped"),
+    [
+        ("::warning::subject.yml", "%3A%3Awarning%3A%3Asubject.yml"),
+        (" ::stop-commands::subject.yaml", " %3A%3Astop-commands%3A%3Asubject.yaml"),
+        ("##[warning]subject.yml", "##%5Bwarning%5Dsubject.yml"),
+        ("prefix##[group]subject.yml", "prefix##%5Bgroup%5Dsubject.yml"),
+        ("##[warning subject]file.yml", "##%5Bwarning subject%5Dfile.yml"),
+    ],
+)
+@pytest.mark.parametrize("content", [b"key: [\n", None])
+def test_workflow_command_names_remain_plain_diagnostics(
+    repository: Path,
+    capsys: pytest.CaptureFixture[str],
+    name: str,
+    escaped: str,
+    content: bytes | None,
+) -> None:
+    if sys.platform == "win32" and ":" in name:
+        pytest.skip("Windows filenames forbid colons")
+    if content is not None:
+        (repository / name).write_bytes(content)
+    assert main(["--repo-root", str(repository), "--paths", name]) == 1
+    output = capsys.readouterr().out
+    assert escaped in output
+    assert re.search(r"^\s*::(?:warning|stop-commands)::", output, re.MULTILINE) is None
+    assert "##[" not in output
 
 
 def git(root: Path, *arguments: str) -> bytes:
@@ -55,7 +85,7 @@ def test_nul_inventory_and_diagnostics_preserve_newline_filename(
     (repository / name).write_bytes(b"key: [\n")
     assert main(["--repo-root", str(repository)]) == 1
     output = capsys.readouterr().out
-    assert "first%0A::error file=injected.yml:" in output
+    assert "first%0A%3A%3Aerror file=injected.yml:" in output
     assert "\n::error" not in output
 
 
