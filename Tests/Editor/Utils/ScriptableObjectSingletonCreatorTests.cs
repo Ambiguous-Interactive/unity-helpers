@@ -366,18 +366,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
                 ScriptableObjectSingletonCreatorTestAccess.ResetRetryState();
                 EditorUi.Suppress = _previousEditorUiSuppress;
+                try
+                {
+                    CleanupAllKnownTestFolders();
+                }
+                finally
+                {
+                    AssetPostprocessorDeferralTestAccess.Flush();
+                }
             }
-
-            // CleanupAllKnownTestFolders already batches its operations internally.
-            CleanupAllKnownTestFolders();
-            AssetPostprocessorDeferralTestAccess.Flush();
         }
 
         public override void OneTimeTearDown()
         {
-            base.OneTimeTearDown();
-
-            CleanupAllKnownTestFolders();
+            try
+            {
+                base.OneTimeTearDown();
+            }
+            finally
+            {
+                CleanupAllKnownTestFolders();
+            }
         }
 
         [UnityTest]

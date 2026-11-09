@@ -126,7 +126,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             if (statement.Parent is BlockSyntax block)
             {
                 int index = block.Statements.IndexOf(statement);
-                if (index > 0)
+                if (0 < index)
                 {
                     StatementSyntax previous = block.Statements[index - 1];
                     if (previous is LocalDeclarationStatementSyntax local)

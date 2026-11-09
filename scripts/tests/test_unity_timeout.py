@@ -36,12 +36,24 @@ def fixture_repository(root: Path) -> Path:
 
 
 @pytest.mark.parametrize("kind", ["uutils", "missing", "failing"])
-def test_unsupported_timeout_is_refused_before_credentials(tmp_path: Path, kind: str) -> None:
+@pytest.mark.parametrize("select_before_credentials", [True, False])
+def test_unsupported_timeout_credential_boundary_has_a_live_control(
+    tmp_path: Path, kind: str, select_before_credentials: bool
+) -> None:
     wrapper = fixture_repository(tmp_path)
     secrets = tmp_path / ".unity-secrets"
     secrets.mkdir()
-    if sys.platform != "win32":
-        os.mkfifo(secrets / "credentials.env")
+    (secrets / "credentials.env").write_text(
+        "UNITY_EMAIL=timeout-control@example.invalid\n", encoding="utf-8"
+    )
+    if not select_before_credentials:
+        source = wrapper.read_text(encoding="utf-8")
+        selection = 'GNU_TIMEOUT_BIN="$(select_gnu_timeout "${UNITY_TIMEOUT_EXECUTABLE:-}")"'
+        image = 'UNITY_IMAGE="unityci/editor:ubuntu-${UNITY_VERSION}-base-${UNITY_IMAGE_VERSION}"'
+        assert source.count(selection) == 1
+        assert source.count(image) == 1
+        source = source.replace(selection, "", 1).replace(image, selection + "\n\n" + image, 1)
+        wrapper.write_text(source, encoding="utf-8")
     unsupported = tmp_path / "unsupported timeout"
     body = "#!/bin/sh\nprintf 'timeout (uutils coreutils) 0.10.0\\n'\n"
     if kind == "failing":
@@ -50,6 +62,7 @@ def test_unsupported_timeout_is_refused_before_credentials(tmp_path: Path, kind:
         unsupported.write_text(body, encoding="utf-8")
         unsupported.chmod(0o755)
     environment = os.environ.copy()
+    environment.pop("UNITY_EMAIL", None)
     environment["UNITY_TIMEOUT_EXECUTABLE"] = str(unsupported)
     environment["UNITY_TEST_PROJECT_DIR"] = str(tmp_path / "project")
     environment["UNITY_LICENSE_CACHE_DIR"] = str(tmp_path / "cache")
@@ -63,10 +76,12 @@ def test_unsupported_timeout_is_refused_before_credentials(tmp_path: Path, kind:
             timeout=3,
         )
     except subprocess.TimeoutExpired:
-        pytest.fail("Unsupported timeout reached the credential FIFO instead of failing early")
+        pytest.fail("Unsupported timeout did not fail within the supervisor qualification bound")
     assert result.returncode == 2, result.stdout + result.stderr
     assert "GNU coreutils" in result.stderr
     assert "UNITY_TIMEOUT_EXECUTABLE" in result.stderr
+    loaded = "Loaded credentials from .unity-secrets/credentials.env" in result.stdout
+    assert loaded == (not select_before_credentials)
     assert not (tmp_path / "project").exists()
     assert not (tmp_path / "cache").exists()
 
