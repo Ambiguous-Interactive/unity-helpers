@@ -1,5 +1,10 @@
 [
   {
+    "id": "yaml-controls",
+    "name": "YAML source and command boundary controls",
+    "run": "npm run test:lint-yaml"
+  },
+  {
     "id": "check-registries",
     "name": "Typed check registry contracts",
     "run": "npm run test:check-registries"

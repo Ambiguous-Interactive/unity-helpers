@@ -442,80 +442,6 @@ runTest("interactive defaults preserve process headroom without slowing GitHub A
   assert.strictEqual(defaultJobs({ GITHUB_ACTIONS: "true" }), Math.max(1, cores));
 });
 
-runTest("YAML lint passes git's tracked and unignored corpus without walking ignored trees", () => {
-  const fixture = fs.mkdtempSync(path.join(os.tmpdir(), "lint-yaml-corpus-"));
-  try {
-    const scriptsDirectory = path.join(fixture, "scripts");
-    const binDirectory = path.join(fixture, "bin");
-    fs.mkdirSync(scriptsDirectory, { recursive: true });
-    fs.mkdirSync(binDirectory, { recursive: true });
-    fs.mkdirSync(path.join(fixture, "ignored"), { recursive: true });
-    fs.copyFileSync(
-      path.join(repoRoot, "scripts", "lint-yaml.ps1"),
-      path.join(scriptsDirectory, "lint-yaml.ps1")
-    );
-    fs.writeFileSync(path.join(fixture, ".yamllint.yaml"), "---\nrules: {}\n");
-    fs.writeFileSync(path.join(fixture, ".gitignore"), ".yamllint.yaml\nignored/\n");
-    fs.writeFileSync(path.join(fixture, "tracked.yml"), "---\ntracked: true\n");
-    fs.writeFileSync(path.join(fixture, "untracked.yaml"), "---\nuntracked: true\n");
-    fs.writeFileSync(path.join(fixture, "ignored", "invalid.yml"), "bad:\n indentation\n");
-
-    const recorder = path.join(binDirectory, "yamllint.js");
-    fs.writeFileSync(
-      recorder,
-      'const fs = require("fs");\nfs.writeFileSync(process.env.YAML_ARGS_FILE, JSON.stringify(process.argv.slice(2)));\n'
-    );
-    const unixLauncher = path.join(binDirectory, "yamllint");
-    fs.writeFileSync(unixLauncher, `#!/usr/bin/env node\n${fs.readFileSync(recorder, "utf8")}`);
-    fs.chmodSync(unixLauncher, 0o755);
-    fs.writeFileSync(
-      path.join(binDirectory, "yamllint.cmd"),
-      `@"${process.execPath}" "${recorder}" %*\r\n`
-    );
-
-    for (const args of [
-      ["init", "--quiet"],
-      ["add", ".gitignore", "tracked.yml"]
-    ]) {
-      const git = spawnSync("git", ["-C", fixture, ...args], { encoding: "utf8" });
-      assert.strictEqual(git.status, 0, git.stderr || git.stdout);
-    }
-
-    const argsFile = path.join(fixture, "yamllint-args.json");
-    const environment = {
-      ...process.env,
-      PATH: `${binDirectory}${path.delimiter}${process.env.PATH || ""}`,
-      YAML_ARGS_FILE: argsFile
-    };
-    const runLint = (args) =>
-      spawnSync(
-        "pwsh",
-        ["-NoProfile", "-File", path.join(scriptsDirectory, "lint-yaml.ps1"), ...args],
-        {
-          cwd: fixture,
-          encoding: "utf8",
-          env: environment
-        }
-      );
-
-    const repositoryRun = runLint(["-VerboseOutput"]);
-    assert.strictEqual(repositoryRun.status, 0, repositoryRun.stderr || repositoryRun.stdout);
-    assert.match(repositoryRun.stdout, /Linting 2 YAML file\(s\)/);
-    const repositoryArgs = JSON.parse(fs.readFileSync(argsFile, "utf8"));
-    assert.ok(repositoryArgs.includes(path.join(fixture, "tracked.yml")));
-    assert.ok(repositoryArgs.includes(path.join(fixture, "untracked.yaml")));
-    assert.ok(!repositoryArgs.some((arg) => arg.includes("invalid.yml")));
-
-    const explicitRun = runLint(["-Paths", "tracked.yml", "untracked.yaml", "-VerboseOutput"]);
-    assert.strictEqual(explicitRun.status, 0, explicitRun.stderr || explicitRun.stdout);
-    const explicitArgs = JSON.parse(fs.readFileSync(argsFile, "utf8"));
-    assert.ok(explicitArgs.includes("tracked.yml"));
-    assert.ok(explicitArgs.includes("untracked.yaml"));
-  } finally {
-    fs.rmSync(fixture, { recursive: true, force: true });
-  }
-});
-
 runTest("--only with an unknown id fails instead of passing vacuously", () => {
   const result = spawnSync(
     process.execPath,
@@ -559,6 +485,7 @@ runTest("no linter in scripts/ has been left unreachable", () => {
   // (#453). An allowlist whose entries are prose excuses whatever is put in it -- the quiet half of
   // #445, one level up: the thing named still exists, so nothing goes red.
   const runElsewhere = new Map([
+    ["scripts/lint-yaml.ps1", "yaml-controls"],
     ["scripts/validate-lint-error-codes.ps1", "lint-code-controls"],
     ["scripts/lint-drawer-multiobject.ps1", "drawer-controls"],
     ["scripts/lint-gitignore-docs.ps1", "gitignore-controls"],
@@ -583,6 +510,7 @@ runTest("no linter in scripts/ has been left unreachable", () => {
   // Only the kinds something actually claims. A registered predicate nothing uses is a dead branch
   // inside the one test whose whole point is that a claim has to be executable.
   const owners = new Map([
+    ["yaml-controls", (file) => registeredControlsInvoke(file, "scripts/tests/test_yaml_lint.py")],
     [
       "lint-code-controls",
       (file) => registeredControlsInvoke(file, "scripts/tests/test_lint_error_codes.py")

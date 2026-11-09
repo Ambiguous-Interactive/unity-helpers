@@ -67,7 +67,7 @@ jobs:
 
       - name: Setup retained protobuf compiler SDK
         id: retained_protobuf_dotnet
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73
         env:
           DOTNET_INSTALL_DIR: ${{ runner.temp }}/retained-protobuf-dotnet
         with:
@@ -85,7 +85,7 @@ jobs:
 
       - name: Setup .NET
         id: dotnet
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73
         env:
           DOTNET_INSTALL_DIR: ${{ runner.temp }}/unity-helpers-dotnet
         with:

@@ -63,11 +63,11 @@ jobs:
 
       - name: Verify build output
         run: |
-          if [[ -d "site" ]]; then
+          if [[ -f ".artifacts/site/index.html" ]]; then
             echo "MkDocs site built successfully"
             echo "Site contents:"
-            find site -type f | head -20
+            find .artifacts/site -type f | sed -n '1,20p'
           else
-            echo "MkDocs build did not produce site directory"
+            echo "MkDocs build did not produce .artifacts/site/index.html"
             exit 1
           fi

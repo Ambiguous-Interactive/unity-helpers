@@ -264,6 +264,13 @@ Examples:
 - Scope: Up the transform chain (optionally excluding self)
 - Controls: `OnlyAncestors`, `MaxDepth`
 
+Collection queries walk from the nearest eligible ancestor outward. `MaxDepth` stops the
+walk at the owner-relative depth, and `MaxCount` stops after enough filtered matches. Lists
+and sets reuse temporary buffers; returned arrays still allocate. The query takes a snapshot
+before rebuilding the destination, so a set comparer that changes the hierarchy cannot add
+matches to the current assignment. Disabled components remain eligible; `IncludeInactive`
+controls inactive GameObjects. See [measured costs and limits](../../performance/relational-components-performance.md#bounded-parent-collections-2026-11-09).
+
 Examples:
 
 <!-- doc-sample: compiles -->

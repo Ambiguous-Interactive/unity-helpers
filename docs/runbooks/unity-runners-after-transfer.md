@@ -278,7 +278,12 @@ A failed move also stops the run without clearing the original project.
 
 EditMode runs compiler-isolation fixtures in a fresh editor process before the broader suite.
 These cases carry `CompilationIsolation` and must all pass without skips. Their results and log
-remain under the mode's `compilation/` artifact directory. The source API, backup recovery,
+remain under the mode's `compilation/` artifact directory.
+`OdinMigrationDictionaryCompilationTests` lives in the dedicated
+`WallstopStudios.UnityHelpers.Tests.Editor.OdinCompilation` assembly. The compiler target and
+runtime caller remain separate test assemblies. The general Editor Tools test assembly does not
+reference them, so migration compilation no longer recompiles unrelated tool tests. Keep the
+fixture's ten cases and dependent-assembly assertions when changing this boundary. The source API, backup recovery,
 import-verification, source/data apply, and recovery-record/scene fixtures each run in a separate fresh editor process
 with `MigrationIsolation`; their artifacts remain under `migration/<fixture-name>/`.
 The broader process excludes both categories, so each case runs once. All processes share the

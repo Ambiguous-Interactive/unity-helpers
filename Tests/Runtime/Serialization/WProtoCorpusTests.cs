@@ -13,6 +13,38 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     [Category("Fast")]
     public sealed class WProtoCorpusTests
     {
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(32)]
+        [TestCase(1048576)]
+        public void ByteOracleChecksLengthAndEveryBoundaryMutation(int length)
+        {
+            byte[] expected = new byte[length];
+            for (int index = 0; index < length; ++index)
+            {
+                expected[index] = unchecked((byte)(index * 31 + 7));
+            }
+            byte[] actual = (byte[])expected.Clone();
+            WProtoBenchmarkCorpus.AssertBytesEqual(expected, actual);
+            byte[] differentLength = new byte[length + 1];
+            Assert.Throws<AssertionException>(() =>
+                WProtoBenchmarkCorpus.AssertBytesEqual(expected, differentLength)
+            );
+            if (length == 0)
+            {
+                return;
+            }
+            foreach (int index in new[] { 0, length / 2, length - 1 })
+            {
+                actual[index] ^= 1;
+                Assert.Throws<AssertionException>(() =>
+                    WProtoBenchmarkCorpus.AssertBytesEqual(expected, actual)
+                );
+                actual[index] ^= 1;
+            }
+            WProtoBenchmarkCorpus.AssertBytesEqual(expected, actual);
+        }
+
         [TestCase(false)]
         [TestCase(true)]
         public void FrozenIdentitySetRejectsMissingOrExtraWorkloads(bool includeUnpacked)

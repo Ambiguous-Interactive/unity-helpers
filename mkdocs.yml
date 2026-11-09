@@ -1,5 +1,6 @@
 # yaml-language-server: $schema=https://squidfunk.github.io/mkdocs-material/schema.json
 site_name: Unity Helpers
+site_dir: .artifacts/site
 
 validation:
   nav:

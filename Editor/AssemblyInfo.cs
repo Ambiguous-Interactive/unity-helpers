@@ -14,6 +14,7 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("WallstopStudios.UnityHelpers.Tests.Editor.Extensions")]
 [assembly: InternalsVisibleTo("WallstopStudios.UnityHelpers.Tests.Editor.Helper")]
 [assembly: InternalsVisibleTo("WallstopStudios.UnityHelpers.Tests.Editor.Reflex")]
+[assembly: InternalsVisibleTo("WallstopStudios.UnityHelpers.Tests.Editor.OdinCompilation")]
 [assembly: InternalsVisibleTo("WallstopStudios.UnityHelpers.Tests.Editor.Settings")]
 [assembly: InternalsVisibleTo("WallstopStudios.UnityHelpers.Tests.Editor.Sprites.Animation")]
 [assembly: InternalsVisibleTo("WallstopStudios.UnityHelpers.Tests.Editor.Sprites.Cropper")]

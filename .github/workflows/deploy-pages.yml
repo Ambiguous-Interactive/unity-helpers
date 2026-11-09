@@ -60,14 +60,14 @@ jobs:
           echo "Validating MkDocs build output..."
 
           # Check that site directory exists and has content
-          if [ ! -d "site" ]; then
+          if [ ! -d ".artifacts/site" ]; then
             echo "::error::Build failed - site directory not found"
             exit 1
           fi
 
           # Count generated files
-          html_count=$(find site -name "*.html" -type f | wc -l)
-          total_count=$(find site -type f | wc -l)
+          html_count=$(find .artifacts/site -name "*.html" -type f | wc -l)
+          total_count=$(find .artifacts/site -type f | wc -l)
 
           echo "Build Statistics:"
           echo "   HTML files: $html_count"
@@ -79,7 +79,7 @@ jobs:
           fi
 
           # Check for index.html
-          if [ ! -f "site/index.html" ]; then
+          if [ ! -f ".artifacts/site/index.html" ]; then
             echo "::error::Build missing index.html"
             exit 1
           fi
@@ -90,15 +90,15 @@ jobs:
         if: github.event.inputs.debug_enabled == 'true'
         run: |
           echo "Site structure:"
-          find site -type f | head -50
+          find .artifacts/site -type f | head -50
           echo ""
           echo "Index.html preview:"
-          head -30 site/index.html || true
+          head -30 .artifacts/site/index.html || true
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9
         with:
-          path: ./site
+          path: ./.artifacts/site
 
       - name: Build summary
         run: |
@@ -107,9 +107,9 @@ jobs:
             echo ""
             echo "| Metric | Value |"
             echo "|--------|-------|"
-            echo "| HTML Files | $(find site -name '*.html' -type f | wc -l) |"
-            echo "| Total Files | $(find site -type f | wc -l) |"
-            echo "| Total Size | $(du -sh site | cut -f1) |"
+            echo "| HTML Files | $(find .artifacts/site -name '*.html' -type f | wc -l) |"
+            echo "| Total Files | $(find .artifacts/site -type f | wc -l) |"
+            echo "| Total Size | $(du -sh .artifacts/site | cut -f1) |"
             echo "| Base Path | \`${{ steps.pages.outputs.base_path }}\` |"
           } >> "$GITHUB_STEP_SUMMARY"
 

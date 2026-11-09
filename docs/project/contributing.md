@@ -224,10 +224,23 @@ remain checked because another symbol may enable that branch in a concurrent bui
 `npm run test:lint-concurrent-cache-fill` for the original fixtures, parser boundaries and both CLI routes.
 The PowerShell entry points remain compatibility launchers.
 
+YAML validation uses the same locked Python project through `npm run lint:yaml`.
+The PowerShell command remains a compatibility launcher with multiple-path support.
+The `metadata` dependency group installs yamllint. The runner checks tracked and untracked,
+nonignored YAML files without walking ignored build trees. Missing explicit inputs and invalid
+configuration fail visibly. `--staged-only` reads Git index blobs, so unstaged edits cannot hide
+invalid staged YAML. Warnings remain nonblocking. Run the `yaml-controls` contract check for
+source-discovery, staged-content, parser and launcher coverage.
+
 The lockfile pins Ruff, mypy, Pyright, pytest, and their dependencies. `lint:python` checks Ruff
 formatting and correctness rules plus both type checkers in strict mode. Function signatures must
 be fully annotated and explicit `Any` is forbidden. CI runs these checks on Linux and Windows,
 along with the package tests.
+
+Local MkDocs builds and Pages deployment write `.artifacts/site/`. The dot directory keeps copied
+Unity metadata outside asset import scope. Use the default destination for local checks; building
+into a visible package folder can duplicate GUIDs when Unity imports the copied `.meta` files.
+
 The existing `scripts/generate-meta.sh` entry point delegates to Python and retains `--force`,
 CRLF metadata, and importer defaults. Use `npm run meta:generate -- <path>` or invoke
 `scripts/generate_meta.py` through uv for a shell-independent entry point. Existing metadata is
