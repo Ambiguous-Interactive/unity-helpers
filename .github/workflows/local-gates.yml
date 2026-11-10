@@ -232,7 +232,7 @@ jobs:
         if: matrix.phase == 'sources'
         run: npm run test:stable-assets
 
-      - name: Run IntMap correctness without Unity
+      - name: Run integer-map correctness without Unity
         if: matrix.phase == 'sources'
         run: npm run test:intmap
 
@@ -315,7 +315,7 @@ jobs:
           scripts/tests/test_check_eol.py scripts/tests/test_lint_error_codes.py
           scripts/tests/test_code_samples.py
           scripts/tests/test_skill_sizes.py scripts/tests/test_comment_block_form.py
-          scripts/tests/test_yaml_lint.py scripts/tests/test_no_regions.py scripts/tests/test_dependabot.py -q
+          scripts/tests/test_yaml_lint.py scripts/tests/test_no_regions.py scripts/tests/test_dependabot.py scripts/tests/test_doc_samples.py -q
 
       - name: Verify compiler payload publication on Windows
         shell: pwsh
