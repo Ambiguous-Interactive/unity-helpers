@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.IntMap.Tests
 
     internal static class IntMapRecoveryProcess
     {
+        internal const string LongMapKind = "longmap";
         internal const string ZeroKeyKind = "zero";
         internal const string NonzeroKeyKind = "nonzero";
         internal const string IndicesKeyKind = "indices";
@@ -19,7 +20,8 @@ namespace WallstopStudios.UnityHelpers.IntMap.Tests
             Require(arguments.Length == 1, "Exactly one recovery scenario is required.");
             string keyKind = arguments[0];
             Require(
-                string.Equals(keyKind, ZeroKeyKind, StringComparison.Ordinal)
+                string.Equals(keyKind, LongMapKind, StringComparison.Ordinal)
+                    || string.Equals(keyKind, ZeroKeyKind, StringComparison.Ordinal)
                     || string.Equals(keyKind, NonzeroKeyKind, StringComparison.Ordinal)
                     || string.Equals(keyKind, IndicesKeyKind, StringComparison.Ordinal),
                 "The recovery scenario must be recognized."
@@ -37,10 +39,11 @@ namespace WallstopStudios.UnityHelpers.IntMap.Tests
             }
             Require(controlFailed, "The heap limit must refuse the positive allocation control.");
 
-            if (
-                arguments.Length == 1
-                && string.Equals(keyKind, IndicesKeyKind, StringComparison.Ordinal)
-            )
+            if (string.Equals(keyKind, LongMapKind, StringComparison.Ordinal))
+            {
+                VerifyLongMapRecovery();
+            }
+            else if (string.Equals(keyKind, IndicesKeyKind, StringComparison.Ordinal))
             {
                 VerifyRecovery<byte>(262144, false, static key => (byte)(key % 251));
             }
@@ -53,6 +56,80 @@ namespace WallstopStudios.UnityHelpers.IntMap.Tests
                 );
             }
             Console.WriteLine(PassMarker + " preserves the map and all views.");
+        }
+
+        private static void VerifyLongMapRecovery()
+        {
+            const int Count = 262144;
+            LongMap<RecoveryValue> map = new LongMap<RecoveryValue>(Count);
+            for (int index = 0; index < Count; ++index)
+            {
+                Require(
+                    map.TrySet((ulong)index, new RecoveryValue { data = index + 17 }),
+                    "Initial long-key insertion must succeed."
+                );
+            }
+            int capacity = map.Capacity;
+            LongMap<RecoveryValue>.Enumerator pairs = map.GetEnumerator();
+            LongMap<RecoveryValue>.KeyEnumerator keys = map.Keys.GetEnumerator();
+            LongMap<RecoveryValue>.ValueEnumerator values = map.Values.GetEnumerator();
+            bool refused = false;
+            try
+            {
+                map.TrySet(ulong.MaxValue, new RecoveryValue { data = 123 });
+            }
+            catch (OutOfMemoryException)
+            {
+                refused = true;
+            }
+            Require(refused, "The limited heap must refuse long-map growth.");
+            Require(
+                map.Count == Count && map.Capacity == capacity,
+                "Failed long-map growth must retain count and capacity."
+            );
+            Require(!map.ContainsKey(ulong.MaxValue), "The refused key must remain absent.");
+            int observed = 0;
+            while (pairs.MoveNext())
+            {
+                System.Collections.Generic.KeyValuePair<ulong, RecoveryValue> pair = pairs.Current;
+                Require(
+                    pair.Key == (ulong)observed && pair.Value.data == observed + 17,
+                    "Packed long-map entries must remain intact."
+                );
+                Require(
+                    map.TryGet(pair.Key, out RecoveryValue value) && value.Equals(pair.Value),
+                    "All long-map lookups must remain valid."
+                );
+                Require(
+                    keys.MoveNext() && keys.Current == pair.Key,
+                    "Existing long-map key views must remain valid."
+                );
+                Require(
+                    values.MoveNext() && values.Current.Equals(pair.Value),
+                    "Existing long-map value views must remain valid."
+                );
+                ++observed;
+            }
+            Require(
+                observed == Count && !keys.MoveNext() && !values.MoveNext(),
+                "Long-map views must retain every original entry."
+            );
+            Require(
+                map.TrySet(17, new RecoveryValue { data = 99 }),
+                "Replacement after failed growth must succeed."
+            );
+            Require(
+                map.Remove(18, out RecoveryValue removed) && removed.data == 35,
+                "Removal after failed growth must succeed."
+            );
+            Require(
+                map.TryAdd(ulong.MaxValue, new RecoveryValue { data = 123 }),
+                "Insertion into freed capacity must succeed."
+            );
+            Require(
+                map.TryGet(ulong.MaxValue, out RecoveryValue inserted) && inserted.data == 123,
+                "The replacement key must be readable."
+            );
         }
 
         private static void VerifyRecovery<T>(

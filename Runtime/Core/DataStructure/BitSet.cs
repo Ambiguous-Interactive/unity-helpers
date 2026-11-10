@@ -541,11 +541,16 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             results.Clear();
-            for (int i = 0; i < _capacity; ++i)
+            int wordCount = _capacity == 0 ? 0 : ((_capacity - 1) >> BitsPerLongShift) + 1;
+            for (int word = 0; word < wordCount; ++word)
             {
-                if (TryGet(i, out bool value) && value)
+                foreach (int bit in BitOps.SetBits(_bits[word]))
                 {
-                    results.Add(i);
+                    int index = (word << BitsPerLongShift) + bit;
+                    if (index < _capacity)
+                    {
+                        results.Add(index);
+                    }
                 }
             }
             return results;
@@ -557,12 +562,28 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// </summary>
         public IEnumerable<int> EnumerateSetIndices()
         {
-            for (int i = 0; i < _capacity; ++i)
+            int cursor = 0;
+            while (cursor < _capacity)
             {
-                if (TryGet(i, out bool value) && value)
+                int word = cursor >> BitsPerLongShift;
+                ulong remaining = _bits[word] & (ulong.MaxValue << (cursor & BitsPerLongMask));
+                if (remaining == 0)
                 {
-                    yield return i;
+                    long nextWord = ((long)word + 1) << BitsPerLongShift;
+                    if (_capacity <= nextWord)
+                    {
+                        yield break;
+                    }
+                    cursor = (int)nextWord;
+                    continue;
                 }
+                int index = (word << BitsPerLongShift) + BitOps.TrailingZeroCount(remaining);
+                if (_capacity <= index)
+                {
+                    yield break;
+                }
+                cursor = index + 1;
+                yield return index;
             }
         }
 

@@ -530,7 +530,15 @@
         "wvalue",
         "rebitcast",
         "PREFS",
-        "Dox"
+        "Dox",
+        "GraphReach",
+        "LongMap",
+        "LongSet",
+        "KeyedObjectPool",
+        "SetBitEnumerator",
+        "SetBits",
+        "SelectBit",
+        "EnumMembershipCache"
       ]
     },
     {
@@ -974,7 +982,8 @@
         "mkfifo",
         "gtimeout",
         "unpadded",
-        "PGO"
+        "PGO",
+        "Bruijn"
       ]
     }
   ],

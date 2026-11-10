@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "sourceRevision": "1053338b435a8f706e1d52970469695acbc3af66",
   "scope": "Reviewed WProto guide capability claims and explicit limitations; source witness additions after this revision are unqualified until fresh ordinary artifacts are verified.",
-  "guideSha256": "ee25e6ef3e4bfe157d94f638eca0a0297e86ee16ade51008979ecb05bb921e41",
+  "guideSha256": "bf5381c00f030c72f4e5582ae24a712052ea4a44e5a37a9669efa5a8109847e9",
   "qualificationPolicy": "This catalog records no current qualification. Complete means complete declared selector coverage, not semantic/backend acceptance. Fixture receipts are verified separately; missing or partial lane requirements prevent full-catalog completion.",
   "lanes": [
     {

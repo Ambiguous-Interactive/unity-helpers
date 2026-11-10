@@ -362,6 +362,22 @@ CLI errors, policy validation, and the real npm payload. They also inject type, 
 defects to prove each gate rejects them. Port remaining scripts incrementally while keeping their
 CLI contracts and executable controls.
 
+### Marked Documentation Compiler Samples
+
+`npm run lint:doc-samples` extracts marked C# fences through the locked Python toolchain and
+compiles both runtime and Editor corpora. Use `<!-- doc-sample: compiles -->` before a complete
+runtime example, or `<!-- doc-sample: compiles-editor -->` for Editor-only APIs. CommonMark
+backtick and tilde fences are supported. Source line numbers identify the first code line.
+Markers inside other code blocks are data; misplaced markers, empty claimed samples and
+sanitized filename collisions fail before output changes.
+
+The extractor shares the C# literal scanner with the other Python checks. It preserves literal
+text when hoisting using directives and classifying compilation scopes. Explicit `DOC_SAMPLES_ROOT`,
+`DOC_SAMPLES_OUT` and `DOC_SAMPLES_REQUIRE_BOTH` values retain fixture and automation support.
+Outputs cannot replace documentation or traverse links. Stale generated sources are removed;
+unrelated files in the output directory are preserved. The two legacy Node commands remain thin
+compatibility launchers, including the explicit Editor compiler failure control.
+
 ### GitHub Credentials in the Container
 
 The container resolves github.com credentials from a cached token. The Dev Containers credential
@@ -471,13 +487,13 @@ write failures fail validation; an execution failure cannot be mistaken for a cl
 
 ## Python Tooling
 
-Use Python 3.11 for the repository's Python checks. The dev container pins `uv==0.13.7` and
+Use Python 3.11.8 or newer for the repository's Python checks. The dev container pins `uv==0.13.7` and
 exposes it as `uv`. Documentation CI installs that same version with pip, then installs the
 fully pinned `requirements-docs.lock` with uv. `requirements-docs.txt` lists the direct
 constraints; the lock records their transitive versions. Run locally with:
 
 ```bash
-uv venv .venv --python 3.11
+uv venv .venv --python '>=3.11.8,<3.12'
 uv pip install --python .venv/bin/python -r requirements-docs.lock
 .venv/bin/mkdocs build --strict
 ```
@@ -509,11 +525,11 @@ the pinned uv version:
 
 ```bash
 uv lock --project scripts/python~
-uv pip compile --universal --python-version 3.11 requirements-docs.txt --output-file requirements-docs.lock
+uv pip compile --universal --python-version 3.11.8 requirements-docs.txt --output-file requirements-docs.lock
 uv pip compile --universal --python-version 3.11 requirements-wiki.in --output-file requirements-wiki.txt
 ```
 
-Review the lock diff, install into a fresh Python 3.11 environment, run the strict MkDocs
+Review the lock diff, install into a fresh Python 3.11.8 or newer environment, run the strict MkDocs
 build and wiki tests, and keep the CI `uv` pin aligned with `.devcontainer/Dockerfile`. The
 single Z3 requirement and container tooling requirements are exact pins; update those and
 their checks together. The `pip install` commands that bootstrap uv are deliberate because

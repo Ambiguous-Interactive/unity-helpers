@@ -8,6 +8,51 @@
 
 This guide covers several foundational data structures used across the library and when to use them.
 
+## Unsigned 64-Bit Maps and Sets
+
+`LongMap<TValue>` and `LongSet` accept every `ulong` key, including zero and `ulong.MaxValue`.
+Both mix the full 64-bit key before selecting a hash slot, so keys sharing their low bits do not
+all start at the same slot. They share one open-addressing implementation; `LongSet` stores a
+byte placeholder per live key. Neither type is thread-safe.
+
+`LongMap` provides `TrySet`, `TryGet`, `ContainsKey`, `Remove(key, out value)`, an indexer and
+concrete key/value views, like `IntMap`. `TryAdd` refuses an existing key without replacing its
+value. The indexer throws for a missing read; use `TryGet` for expected misses. Null values
+are supported and remain distinct from missing keys.
+
+Live entries stay packed, so concrete map, key, value and set iteration are O(Count) and do not
+box their enumerators. Enumeration order is unspecified and can change after removal. Successful
+insertion, replacement, removal and a nonempty clear invalidate existing enumerators. Failed
+insertion of an existing key and removal of a missing key leave them usable. Interface-based
+iteration can box the value-type views and enumerators.
+
+Capacity reserves two hash slots per live-entry slot and grows geometrically. `Clear` visits
+only live entries, releases their values and keeps capacity. Growth prepares replacement storage
+before publishing it; a failed allocation leaves prior contents and enumerators usable. The
+constructor's capacity hint counts live entries; `Capacity` reports hash slots. Negative hints
+and hints above `LongMap<TValue>.MaximumCapacity` are rejected. Once the maximum live-entry
+capacity is full, `TryAdd` and insertion through `TrySet` return false; replacing an existing
+value still succeeds. Allocation failures can throw before that theoretical limit.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using WallstopStudios.UnityHelpers.Core.DataStructure;
+
+LongMap<int> depths = new(128);
+depths.TrySet(1UL << 48, 3);
+bool found = depths.TryGet(1UL << 48, out int depth);
+LongSet visited = new(128);
+bool firstVisit = visited.TryAdd(ulong.MaxValue);
+foreach (ulong state in visited)
+{
+    UnityEngine.Debug.Log(state);
+}
+```
+
+These APIs do not promise a timing ratio over `Dictionary` or `HashSet`; measure the complete
+workload on the target backend.
+
 ## Cyclic Buffer (Ring Buffer)
 
 - What it is: Fixed-capacity circular array with head/tail indices that wrap.
@@ -534,6 +579,17 @@ The accepted change keeps the existing key representation. Issue
 Keep a regular dictionary when its key range, interfaces or integration requirements fit your
 application better. A faster lookup does not by itself offset greater retained storage or a costly
 conversion at an API boundary.
+
+### Rejected Raw-Sentinel Experiment
+
+The [raw-sentinel triage capture](../../performance/intmap-raw-sentinel-rejected.zip) tests storing zero
+in the table with a reserved empty marker. Two complete Linux .NET 10 processes retain raw rounds,
+independent value checks, source and binary hashes, clean exits and both stream ends. Repeated-zero
+lookup medians take 1.56–2.00 times current main; small-map insertion medians take 1.12–1.18 times
+main. The candidate is rejected and `IntMap` is unchanged. This is neither a Mono/Unity result nor
+qualification against the original consumer budget. The archive contains source inputs, replay code and receipts. Copy `src/`, `IntMapAb.csproj`,
+`global.json` and `measure.py` into a fresh directory, then run
+`python3 measure.py --runtime net10 --processes 2` with SDK 10.0.403 installed.
 
 ## String Wrapper (Interned Flyweight)
 

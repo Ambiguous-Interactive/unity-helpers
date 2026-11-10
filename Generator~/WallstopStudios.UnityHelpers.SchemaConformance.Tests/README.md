@@ -1,8 +1,8 @@
 # Exported schema conformance
 
 This separate Linux x64 .NET 9 suite compiles the real schema exporter and the ordinary
-`WProtoSchemaTextTests` fixture. It also sends the export directly to **protoc 27.2**, from the pinned
-private `Grpc.Tools` 2.67.0 build dependency. The executable version and SHA-256 must match the
+`WProtoSchemaTextTests` fixture. It also sends the export directly to **protoc 35.1**, from the pinned
+private `Grpc.Tools` 2.85.0 build dependency. The executable version and SHA-256 must match the
 reviewed Linux x64 binary. The tool and its package never enter the Unity runtime or package payload.
 
 ```bash
@@ -46,3 +46,5 @@ and WProto bytes as test attachments. Compiler identity is recorded in NUnit out
 Set `WPROTO_SCHEMA_EVIDENCE_ROOT` to select the process-output directory; otherwise it stays under
 the ignored test binary directory. The generator workflow retains this output with the ordinary
 TRX results, separately from the strict v2/v3 invocation receipts.
+
+Earlier protoc 27.2 receipts and frozen v1 catalog entries retain their original compiler identity. New conformance runs do not relabel that historical evidence.
