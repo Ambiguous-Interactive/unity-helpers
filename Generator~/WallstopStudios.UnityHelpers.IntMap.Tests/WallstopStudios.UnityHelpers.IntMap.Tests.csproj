@@ -16,8 +16,13 @@
       Link="ObjectsHashCodeStub.cs"
     />
     <Compile Include="../../Runtime/Core/DataStructure/IntMap.cs" Link="IntMap.cs" />
+    <Compile Include="../../Runtime/Core/DataStructure/LongMap.cs" Link="LongMap.cs" />
+    <Compile Include="../../Runtime/Core/DataStructure/LongSet.cs" Link="LongSet.cs" />
+    <Compile Include="../../Tests/Runtime/DataStructures/LongMapTests.cs" Link="LongMapTests.cs" />
+    <Compile Include="../../Tests/Runtime/DataStructures/LongSetTests.cs" Link="LongSetTests.cs" />
     <Compile Include="IntMapRecoveryProcess.cs" />
     <Compile Include="IntMapRecoveryTests.cs" />
+    <Compile Include="LongMapRetentionTests.cs" />
     <Compile Include="../../Tests/Runtime/DataStructures/IntMapTests.cs" Link="IntMapTests.cs" />
     <Compile Include="../../Tests/Runtime/TestUtils/GCAssert.cs" Link="GCAssert.cs" />
   </ItemGroup>

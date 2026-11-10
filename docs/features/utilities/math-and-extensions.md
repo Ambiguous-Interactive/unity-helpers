@@ -1501,6 +1501,28 @@ Array.Sort(days, EnumNameComparer<DayOfWeek>.Instance);
 cannot be stored in a class field or kept across an `await` or coroutine yield;
 retrieve the view where you use it.
 
+`EnumValues<T>.IsDefined(value)` checks declared membership without boxing or per-call
+reflection. It uses a bounded array window for dense enums and binary search for sparse enums.
+Aliases are declared values; undeclared flags combinations are not. Cache initialization may allocate.
+
+`EnumNameCache<T>.TryParse(ReadOnlySpan<char>, out T, bool ignoreCase = false)` accepts declared
+names only. It does not trim whitespace, parse numbers, or combine comma-separated flags names.
+A declared composite flags name is accepted. Parsing scans cached names without allocating.
+With `ignoreCase: true`, comparisons use ordinal case folding; names that differ only by case
+and identify different values are ambiguous and fail. Failure sets the output to `default`.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using System;
+using WallstopStudios.UnityHelpers.Core.Helper;
+using WallstopStudios.UnityHelpers.Core.Extension;
+
+bool declared = EnumValues<DayOfWeek>.IsDefined(DayOfWeek.Monday);
+bool parsed = EnumNameCache<DayOfWeek>.TryParse("Monday".AsSpan(), out DayOfWeek day);
+bool numeric = EnumNameCache<DayOfWeek>.TryParse("1".AsSpan(), out _); // false
+```
+
 When the enum is known only as a `Type`, use `EnumValues.Of(type)` or
 `EnumValues.TryGetValues(type, out Array values)`. Both return the same shared array
 for that type, in framework unsigned numeric order with aliases kept. **Never modify

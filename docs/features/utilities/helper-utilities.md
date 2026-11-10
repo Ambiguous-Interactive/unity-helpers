@@ -205,6 +205,36 @@ The caller must clean up any native object its destruction callback failed to de
 
 ---
 
+### Pools by Key
+
+`KeyedObjectPool<TKey, T>` owns a `TrackedObjectPool<T>` for each requested key. Its producer
+receives the key when a new object is needed; equivalent keys reuse the first key's pool.
+`Release(item)` finds the owner by managed object identity, including for destroyed objects.
+Foreign items, duplicate returns, null keys and post-disposal operations return `false`.
+A producer returning an object already owned by any of this owner's pools is refused.
+
+Use it on the Unity main thread. Keys must keep stable equality and hashing. The optional
+`maxIdleCount` applies separately to each key; zero or less means unbounded. `Dispose` reaches
+both idle and checked-out live items through `onDestroy`. A null destruction callback leaves
+object destruction to the caller. Callback exceptions are logged and follow the tracked pool's
+failure rules; callbacks may release items or dispose the owner. Same-key recursive production
+is refused. Warm checkout and return of existing items allocate no garbage.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using UnityEngine;
+using WallstopStudios.UnityHelpers.Utils;
+
+using KeyedObjectPool<int, Texture2D> textures = new(
+    producer: key => new Texture2D(key, key),
+    onDestroy: texture => UnityEngine.Object.Destroy(texture));
+if (textures.TryTake(16, out Texture2D texture))
+{
+    textures.Release(texture);
+}
+```
+
 ## Gameplay Helpers
 
 ### Predictive Aiming
@@ -1821,6 +1851,54 @@ bool isFlag = BitOps.IsPowerOfTwo(1UL << 7); // exactly one bit set
 `NextPowerOfTwo` throws `ArgumentOutOfRangeException` when no exact power of two is representable
 (negative values, or values beyond 2^30 / 2^31 / 2^62 / 2^63 for int / uint / long / ulong) instead
 of overflowing silently.
+
+---
+
+### Set-Bit Traversal and Graph Reachability
+
+`BitOps.SetBits(ulong)` returns a struct traversal of the mask's set-bit indices in ascending
+order. `foreach` does not box it or allocate an iterator. `BitOps.SelectBit(mask, rank)` returns
+the zero-based ranked set-bit index, or `-1` for a negative or exhausted rank. Trailing-zero
+counts use a portable de Bruijn lookup; zero still returns 64 for `ulong` and 32 for `uint`.
+`BitSet.GetSetBits` and `EnumerateSetIndices` skip unset words and visit set bits in order;
+the latter keeps its existing `IEnumerable<int>` API and iterator allocation. Between iterator
+moves it observes changes ahead of its cursor, including growth, clearing and shrinking.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using WallstopStudios.UnityHelpers.Core.Helper;
+
+foreach (int index in BitOps.SetBits(0b1010UL))
+{
+    UnityEngine.Debug.Log(index); // 1, then 3
+}
+int second = BitOps.SelectBit(0b1010UL, 1); // 3
+```
+
+`GraphReach.Reachable(nodeCount, edges, root, BitSet reached)` replaces a reusable result with
+all nodes reachable along directed edges, including the root itself. It runs in O(V + E) time
+using pooled adjacency and queue arrays. Size the result once and warm the scratch pools for
+calls without garbage allocation. Duplicate edges, self-links, cycles and disconnected nodes
+are supported. A null result, nonpositive node count, invalid root, or invalid edge returns
+`false`; a supplied result is cleared on failure. Every edge is validated, including edges in
+unreachable components. Neither input order nor the input span is changed.
+
+For up to 64 nodes, `GraphReach.Reachable(nodeCount, edges, root)` returns a `ulong` mask using
+stack storage. Invalid input, including more than 64 nodes, returns zero. The input graph and
+result must not be changed concurrently with either call.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using WallstopStudios.UnityHelpers.Core.DataStructure;
+using WallstopStudios.UnityHelpers.Core.Helper;
+
+(int from, int to)[] edges = { (0, 1), (1, 2), (2, 0) };
+BitSet reached = new(4);
+bool valid = GraphReach.Reachable(4, edges, 0, reached);
+ulong mask = GraphReach.Reachable(4, edges, 0); // bits 0, 1 and 2
+```
 
 ---
 

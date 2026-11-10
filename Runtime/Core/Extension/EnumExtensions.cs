@@ -56,11 +56,12 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         where T : unmanaged, Enum
     {
         private static readonly EnumNameCacheData Cache;
+        private static readonly string[] DeclaredNames = Enum.GetNames(typeof(T));
 
         static EnumNameCache()
         {
             ReadOnlySpan<T> values = EnumValues<T>.Values;
-            string[] names = Enum.GetNames(typeof(T));
+            string[] names = DeclaredNames;
             int valueCount = values.Length;
 
             bool useArray = EnumLookupStrategy<T>.TryComputeArrayWindow(
@@ -119,6 +120,34 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             Cache = new EnumNameCacheData(namesArray, namesDict, useArray, minValue, arrayLength);
+        }
+
+        /// <summary>Parses a declared name without accepting numbers, whitespace or flags lists.</summary>
+        /// <remarks>Case-insensitive names that identify different values are ambiguous and fail.</remarks>
+        public static bool TryParse(ReadOnlySpan<char> name, out T value, bool ignoreCase = false)
+        {
+            ReadOnlySpan<T> values = EnumValues<T>.Values;
+            StringComparison comparison = ignoreCase
+                ? StringComparison.OrdinalIgnoreCase
+                : StringComparison.Ordinal;
+            bool found = false;
+            T candidate = default;
+            for (int i = 0; i < DeclaredNames.Length; ++i)
+            {
+                if (!name.Equals(DeclaredNames[i].AsSpan(), comparison))
+                {
+                    continue;
+                }
+                if (found && !EqualityComparer<T>.Default.Equals(candidate, values[i]))
+                {
+                    value = default;
+                    return false;
+                }
+                candidate = values[i];
+                found = true;
+            }
+            value = candidate;
+            return found;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -628,7 +657,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     /// </summary>
     /// <typeparam name="T">The unmanaged enum type.</typeparam>
     internal static class EnumNumericHelper<T>
-        where T : unmanaged, Enum
+        where T : struct, Enum
     {
         /// <summary>
         /// True when the enum's underlying type is signed and can therefore hold negative members.
@@ -708,7 +737,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     /// </summary>
     /// <typeparam name="T">The unmanaged enum type.</typeparam>
     internal static class EnumLookupStrategy<T>
-        where T : unmanaged, Enum
+        where T : struct, Enum
     {
         /// <summary>
         /// Largest number of array slots a name cache will allocate for an enum.

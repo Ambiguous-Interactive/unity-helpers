@@ -18,6 +18,95 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     /// </remarks>
     public static class BitOps
     {
+        private static readonly byte[] TrailingZeroIndices =
+        {
+            0,
+            1,
+            48,
+            2,
+            57,
+            49,
+            28,
+            3,
+            61,
+            58,
+            50,
+            42,
+            38,
+            29,
+            17,
+            4,
+            62,
+            55,
+            59,
+            36,
+            53,
+            51,
+            43,
+            22,
+            45,
+            39,
+            33,
+            30,
+            24,
+            18,
+            12,
+            5,
+            63,
+            47,
+            56,
+            27,
+            60,
+            41,
+            37,
+            16,
+            54,
+            35,
+            52,
+            21,
+            44,
+            32,
+            23,
+            11,
+            46,
+            26,
+            40,
+            15,
+            34,
+            20,
+            31,
+            10,
+            25,
+            14,
+            19,
+            9,
+            13,
+            8,
+            7,
+            6,
+        };
+
+        /// <summary>Enumerates set-bit indices from least to most significant without allocating.</summary>
+        public static SetBitEnumerator SetBits(ulong mask)
+        {
+            return new SetBitEnumerator(mask);
+        }
+
+        /// <summary>Returns the zero-based ranked set-bit index, or -1 for an invalid rank.</summary>
+        public static int SelectBit(ulong mask, int rank)
+        {
+            if (rank < 0 || 64 <= rank)
+            {
+                return -1;
+            }
+            while (0 < rank && mask != 0)
+            {
+                mask &= mask - 1;
+                --rank;
+            }
+            return mask == 0 ? -1 : TrailingZeroCount(mask);
+        }
+
         /// <summary>
         /// Counts the set bits (population count) of a <see cref="ulong"/> value.
         /// </summary>
@@ -77,11 +166,13 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int TrailingZeroCount(ulong value)
         {
-            /*
-                Isolating the lowest set bit and decrementing leaves exactly that many lower bits
-                set; zero wraps to all ones, which PopCount scores as 64.
-            */
-            return PopCount((value & (0UL - value)) - 1UL);
+            if (value == 0)
+            {
+                return 64;
+            }
+            ulong isolated = value & unchecked(0UL - value);
+            int index = (int)(unchecked(isolated * 0x03F79D71B4CB0A89UL) >> 58);
+            return TrailingZeroIndices[index];
         }
 
         /// <summary>
@@ -103,7 +194,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int TrailingZeroCount(uint value)
         {
-            return PopCount((value & (0U - value)) - 1U);
+            return value == 0 ? 32 : TrailingZeroCount((ulong)value);
         }
 
         /// <summary>

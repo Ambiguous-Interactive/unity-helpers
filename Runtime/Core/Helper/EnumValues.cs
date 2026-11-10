@@ -12,5 +12,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     {
         /// <summary>Gets all declared values in unsigned numeric order, retaining aliases.</summary>
         public static ReadOnlySpan<T> Values => EnumValuesCache<T>.Values;
+
+        /// <summary>Checks whether the value is declared, without boxing or accepting undeclared flags combinations.</summary>
+        public static bool IsDefined(T value)
+        {
+            return EnumMembershipCache<T>.IsDefined(value);
+        }
     }
 }

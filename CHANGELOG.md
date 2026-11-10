@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `LongMap<T>` and `LongSet` for unsigned 64-bit keys, packed iteration, reusable storage and mixed hash slots ([#1162](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1162)).
+- Add allocation-free set-bit traversal and ranked bit selection ([#1158](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1158)).
+- Add declared-name enum parsing and cached enum membership checks without per-call boxing ([#1159](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1159), [#1160](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1160)).
+- Add directed graph reachability with reusable bitsets and a 64-node mask form ([#1161](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1161)).
+- Add keyed Unity object pools that route returns to their owner and dispose idle and checked-out items ([#1163](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1163)).
 - Add `WUH028` to flag redundant clears of freshly rented `Buffers` collections. See [the analyzer guide](./docs/performance/analyzers.md#wuh028-fresh-pooled-collection-clears).
 - Add `WUH027` warnings for redundant explicit caller names, with overload checks and Analyzer Policy examples.
 - Add `EnumValues.Of(Type)` and `TryGetValues` for shared enum arrays when the enum type is known at runtime ([#1129](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1129)).
@@ -25,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Skip unset words when collecting or enumerating sparse `BitSet` indices.
 - Reduce repeated script searches during bulk binding validation ([#1106](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1106)).
 - Move array-pool and lease definitions into separate source files; source-based builds must include those files ([#1130](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1130)).
 - Skip unrelated animation curves when collecting sprites for one renderer, and reduce temporary enumeration objects in `AnimatedSpriteFrames` ([#1113](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1113)).
