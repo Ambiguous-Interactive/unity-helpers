@@ -685,8 +685,8 @@ IEnumerable<Sprite> childFrames = clip.GetSpritesFromClip("Shadow");
 A `null` filter matches anything, so `GetSpritesFromClip(null, null, null)` is the unfiltered walk.
 `type` is matched exactly: a subclass of the type you name does not match.
 Filters reject unrelated bindings before loading their keyframe arrays. Enumeration
-remains deferred: edits made before enumeration are visible, and enumerating again
-reads the clip again. Results retain binding and keyframe order, including repeated sprites.
+remains deferred: edits made before enumeration are visible, and each enumeration
+reads the current clip. Results retain binding and keyframe order, including repeated sprites.
 
 Diagrams:
 

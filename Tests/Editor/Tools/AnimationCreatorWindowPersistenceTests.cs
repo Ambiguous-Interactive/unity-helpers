@@ -751,13 +751,43 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             Undo.ClearUndo(_window);
         }
 
-        private Sprite[] CreateSpriteSheet()
+        [TestCase(2, TestName = "ConfigFrames.SharedSheets.PreserveBothAnimations")]
+        [TestCase(32, TestName = "ConfigFrames.ManySharedSlices.PreserveBothAnimations")]
+        public void SharedSpriteSheetsResolveAcrossAnimationsAndRepeatedLoads(int count)
+        {
+            Sprite[] first = CreateSpriteSheet(count, "first");
+            Sprite[] second = CreateSpriteSheet(count, "second");
+            List<Sprite> forward = new();
+            List<Sprite> reverse = new();
+            for (int index = 0; index < count; ++index)
+            {
+                forward.Add(first[index]);
+                forward.Add(second[index]);
+                forward.Add(first[index]);
+                reverse.Insert(0, second[index]);
+                reverse.Insert(0, first[index]);
+            }
+            _window.animationData.Add(new AnimationData { frames = forward });
+            _window.animationData.Add(new AnimationData { frames = reverse });
+            AnimationCreatorConfig config = JsonUtility.FromJson<AnimationCreatorConfig>(
+                JsonUtility.ToJson(_window.CreateConfigFromCurrentState())
+            );
+            for (int iteration = 0; iteration < 3; ++iteration)
+            {
+                _window.ApplyConfigToCurrentState(config);
+                Assert.That(_window.animationData, Has.Count.EqualTo(2));
+                Assert.That(_window.animationData[0].frames, Is.EqualTo(forward));
+                Assert.That(_window.animationData[1].frames, Is.EqualTo(reverse));
+            }
+        }
+
+        private Sprite[] CreateSpriteSheet(int count = 2, string fileName = "sheet")
         {
             _ = TempFolderAsset;
-            string path = _tempFolder + "/sheet.asset";
-            Texture2D texture = new(16, 8);
+            string path = _tempFolder + "/" + fileName + ".asset";
+            Texture2D texture = new(count * 8, 8);
             AssetDatabase.CreateAsset(texture, path);
-            for (int index = 0; index < 2; ++index)
+            for (int index = 0; index < count; ++index)
             {
                 Sprite sprite = Sprite.Create(texture, new Rect(index * 8, 0, 8, 8), Vector2.zero);
                 sprite.name = "Run_" + index;
@@ -773,7 +803,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                     sprites.Add(sprite);
                 }
             }
-            Assert.That(sprites, Has.Count.EqualTo(2));
+            Assert.That(sprites, Has.Count.EqualTo(count));
             sprites.Sort((left, right) => string.CompareOrdinal(left.name, right.name));
             return sprites.ToArray();
         }

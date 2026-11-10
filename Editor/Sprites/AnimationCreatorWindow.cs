@@ -367,38 +367,44 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         private static Sprite ResolveSprite(
             AnimationSpriteReference reference,
-            Dictionary<string, Object[]> assetsByGuid
+            Dictionary<(Guid assetGuid, long localFileId), Sprite> spritesByIdentity,
+            HashSet<Guid> loadedAssetGuids
         )
         {
-            if (reference == null || !Guid.TryParseExact(reference.guid, "N", out _))
+            if (reference == null || !Guid.TryParseExact(reference.guid, "N", out Guid assetGuid))
             {
                 return null;
             }
-            if (!assetsByGuid.TryGetValue(reference.guid, out Object[] assets))
+            if (loadedAssetGuids.Add(assetGuid))
             {
                 string path = AssetDatabase.GUIDToAssetPath(reference.guid);
-                assets = string.IsNullOrWhiteSpace(path)
+                Object[] assets = string.IsNullOrWhiteSpace(path)
                     ? Array.Empty<Object>()
-                    : AssetDatabase.LoadAllAssetsAtPath(path);
-                assetsByGuid.Add(reference.guid, assets);
-            }
-            foreach (Object asset in assets)
-            {
-                if (
-                    asset is Sprite sprite
-                    && AssetDatabase.TryGetGUIDAndLocalFileIdentifier(
-                        sprite,
-                        out string guid,
-                        out long localFileId
-                    )
-                    && localFileId == reference.localFileId
-                    && string.Equals(guid, reference.guid, StringComparison.OrdinalIgnoreCase)
-                )
+                    : AssetDatabase.LoadAllAssetsAtPath(path) ?? Array.Empty<Object>();
+                foreach (Object asset in assets)
                 {
-                    return sprite;
+                    if (
+                        asset is Sprite sprite
+                        && sprite != null
+                        && AssetDatabase.TryGetGUIDAndLocalFileIdentifier(
+                            sprite,
+                            out string guid,
+                            out long localFileId
+                        )
+                        && Guid.TryParseExact(guid, "N", out Guid sourceGuid)
+                        && sourceGuid == assetGuid
+                    )
+                    {
+                        spritesByIdentity.TryAdd((assetGuid, localFileId), sprite);
+                    }
                 }
             }
-            return null;
+            return spritesByIdentity.TryGetValue(
+                (assetGuid, reference.localFileId),
+                out Sprite resolved
+            )
+                ? resolved
+                : null;
         }
 
         private static string EnsureUniqueName(string baseName, ISet<string> used)
@@ -528,6 +534,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             strictNumericOrdering = config.strictNumericOrdering;
 
             animationData.Clear();
+            using PooledResource<
+                Dictionary<(Guid assetGuid, long localFileId), Sprite>
+            > spritesLease = DictionaryBuffer<
+                (Guid assetGuid, long localFileId),
+                Sprite
+            >.Dictionary.Get(
+                out Dictionary<(Guid assetGuid, long localFileId), Sprite> spritesByIdentity
+            );
+            using PooledResource<HashSet<Guid>> loadedAssetsLease = Buffers<Guid>.HashSet.Get(
+                out HashSet<Guid> loadedAssetGuids
+            );
             foreach (AnimationCreatorConfig.AnimationDataEntry entry in config.animationEntries)
             {
                 AnimationData data = new()
@@ -548,13 +565,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
                 if (entry.frameReferences is { Count: > 0 })
                 {
-                    using PooledResource<Dictionary<string, Object[]>> assetsLease =
-                        DictionaryBuffer<string, Object[]>.Dictionary.Get(
-                            out Dictionary<string, Object[]> assetsByGuid
-                        );
                     foreach (AnimationSpriteReference reference in entry.frameReferences)
                     {
-                        Sprite sprite = ResolveSprite(reference, assetsByGuid);
+                        Sprite sprite = ResolveSprite(
+                            reference,
+                            spritesByIdentity,
+                            loadedAssetGuids
+                        );
                         if (sprite != null)
                         {
                             data.frames.Add(sprite);

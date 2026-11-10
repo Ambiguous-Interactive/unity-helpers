@@ -287,3 +287,29 @@ def test_powershell_test_launcher_forwards_filter(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
     assert "4 passed" in result.stdout
     assert "deselected" in result.stdout
+
+
+def test_default_missing_configuration_preserves_diagnostic(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert main(["--repo-root", str(tmp_path)]) == 1
+    assert "dependabot.yml not found" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("inside_repository", [False, True])
+def test_directory_links_are_checked_only_within_repository(
+    tmp_path: Path, inside_repository: bool
+) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    target = tmp_path / "target"
+    target.mkdir()
+    (target / "config.yml").write_text(BASIC, encoding="utf-8")
+    linked = (repository if inside_repository else tmp_path) / "alias"
+    try:
+        linked.symlink_to(target, target_is_directory=True)
+    except OSError:
+        pytest.skip("The host cannot create directory symlinks")
+    assert main(["--repo-root", str(repository), "--paths", str(linked / "config.yml")]) == (
+        1 if inside_repository else 0
+    )

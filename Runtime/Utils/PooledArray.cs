@@ -31,14 +31,14 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// <code>
     /// // Using with SystemArrayPool (array may be larger than requested)
     /// using PooledArray&lt;int&gt; pooled = SystemArrayPool&lt;int&gt;.Get(100, out int[] array);
-    /// for (int i = 0; i &lt; pooled.Length; i++) // Use pooled.Length, not array.Length
+    /// for (int i = 0; i &lt; pooled.length; ++i) // Use pooled.length, not array.Length
     /// {
     ///     array[i] = i * 2;
     /// }
     ///
     /// // Using with WallstopArrayPool (array is exact size)
     /// using PooledArray&lt;int&gt; pooled2 = WallstopArrayPool&lt;int&gt;.Get(100, out int[] buffer);
-    /// for (int i = 0; i &lt; pooled2.Length; i++)
+    /// for (int i = 0; i &lt; pooled2.length; ++i)
     /// {
     ///     buffer[i] = i * 3;
     /// }

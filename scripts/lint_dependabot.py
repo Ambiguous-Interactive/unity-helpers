@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -296,13 +297,16 @@ def main(argv: list[str] | None = None) -> int:
         paths = args.paths or [repository / ".github/dependabot.yml"]
         inputs: list[tuple[Path, str]] = []
         for candidate in paths:
-            path = candidate if candidate.is_absolute() else repository / candidate
-            if (
-                not path.is_file()
-                or is_link(path)
-                or any(is_link(parent) for parent in path.parents)
+            selected = candidate if candidate.is_absolute() else repository / candidate
+            path = Path(os.path.abspath(selected))  # noqa: PTH100 - inspect links before resolving them.
+            if not path.is_file():
+                raise ValueError(f"{path.name} not found or not a regular file: {path}")
+            if is_link(path) or any(
+                is_link(parent)
+                for parent in path.parents
+                if parent != repository and parent.is_relative_to(repository)
             ):
-                raise ValueError(f"Configuration is missing, linked, or not a regular file: {path}")
+                raise ValueError(f"Configuration is linked: {path}")
             inputs.append((path, path.read_text(encoding="utf-8-sig")))
         count = 0
         for path, text in inputs:

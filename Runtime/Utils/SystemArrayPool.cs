@@ -33,17 +33,10 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// </remarks>
     /// <example>
     /// <code>
-    /// // Correct usage - use lease.Length, not lease.Array.Length
-    /// using PooledArray&lt;int&gt; lease = SystemArrayPool&lt;int&gt;.Get(count, out int[] buffer);
-    /// for (int i = 0; i &lt; lease.Length; i++)  // ✓ Use lease.Length
+    /// using PooledArray&lt;int&gt; lease = SystemArrayPool&lt;int&gt;.Get(100, out int[] buffer);
+    /// for (int index = 0; index &lt; lease.length; ++index)
     /// {
-    ///     buffer[i] = ProcessItem(i);
-    /// }
-    ///
-    /// // WRONG - buffer.Length may be larger than requested
-    /// for (int i = 0; i &lt; buffer.Length; i++)  // ✗ May iterate past valid data
-    /// {
-    ///     ...
+    ///     buffer[index] = index;
     /// }
     /// </code>
     /// </example>
