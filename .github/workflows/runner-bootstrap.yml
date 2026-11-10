@@ -146,7 +146,7 @@ jobs:
       cancel-in-progress: true
     steps:
       - name: Require the selected Unity runner online
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/check-unity-runner-availability@24752b019c23df00aa484bbcedbf7bcf9212d0be # v1.17.1
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/check-unity-runner-availability@f556633883ebf2a212f0e84a869b89bd191f63bb # v1.17.1
         with:
           reader-app-id: ${{ secrets.BUILD_LOCK_READER_APP_ID }}
           reader-app-private-key: ${{ secrets.BUILD_LOCK_READER_APP_PRIVATE_KEY }}
