@@ -625,6 +625,11 @@ PoolPurgeSettings.Configure<byte[]>(o =>
 
 ## Renting an Array
 
+Source-based builds can include `Runtime/Utils/SystemArrayPool.cs`, `PooledArray.cs`
+and `PooledArrayClearPolicy.cs` separately from the coroutine buffer declarations.
+These types retain their existing namespace, API and disposal behavior. They still
+need their ordinary helper dependencies; this is not a complete standalone core source set.
+
 `SystemArrayPool<T>.Get` rents from the process-wide `ArrayPool<T>.Shared`. Two consequences follow,
 and they pull in opposite directions.
 

@@ -486,6 +486,8 @@ runTest("no linter in scripts/ has been left unreachable", () => {
   // #445, one level up: the thing named still exists, so nothing goes red.
   const runElsewhere = new Map([
     ["scripts/lint-yaml.ps1", "yaml-controls"],
+    ["scripts/lint-no-regions.ps1", "region-controls"],
+    ["scripts/lint-dependabot.ps1", "dependabot-controls"],
     ["scripts/validate-lint-error-codes.ps1", "lint-code-controls"],
     ["scripts/lint-drawer-multiobject.ps1", "drawer-controls"],
     ["scripts/lint-gitignore-docs.ps1", "gitignore-controls"],
@@ -510,7 +512,15 @@ runTest("no linter in scripts/ has been left unreachable", () => {
   // Only the kinds something actually claims. A registered predicate nothing uses is a dead branch
   // inside the one test whose whole point is that a claim has to be executable.
   const owners = new Map([
+    [
+      "dependabot-controls",
+      (file) => registeredControlsInvoke(file, "scripts/tests/test_dependabot.py")
+    ],
     ["yaml-controls", (file) => registeredControlsInvoke(file, "scripts/tests/test_yaml_lint.py")],
+    [
+      "region-controls",
+      (file) => registeredControlsInvoke(file, "scripts/tests/test_no_regions.py")
+    ],
     [
       "lint-code-controls",
       (file) => registeredControlsInvoke(file, "scripts/tests/test_lint_error_codes.py")

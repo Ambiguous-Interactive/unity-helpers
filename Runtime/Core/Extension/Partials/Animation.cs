@@ -111,7 +111,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Thread Safety: Must be called from Unity main thread. Editor-only.
         /// Null Handling: Returns empty enumerable if clip is null. Null filters match anything.
         /// Performance: O(n*m) where n is number of bindings and m is keyframes per binding.
-        /// Allocations: Allocates arrays for bindings and keyframes.
+        /// Allocations: Allocates a binding array and keyframe arrays only for matching bindings.
+        /// Enumeration is deferred and reads the clip again on each enumeration.
         /// Unity Behavior: Only available in Unity Editor. Uses AnimationUtility.
         /// Edge Cases: A clip animating a child's renderer yields nothing for the root's path,
         /// rather than the child's sprites.
@@ -123,28 +124,76 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             Type type = null
         )
         {
-            foreach ((EditorCurveBinding binding, Sprite sprite) in clip.GetSpriteFramesFromClip())
+            if (clip == null)
             {
-                if (path != null && !string.Equals(binding.path, path, StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                if (
-                    propertyName != null
-                    && !string.Equals(binding.propertyName, propertyName, StringComparison.Ordinal)
-                )
-                {
-                    continue;
-                }
-
-                if (type != null && binding.type != type)
-                {
-                    continue;
-                }
-
-                yield return sprite;
+                yield break;
             }
+
+            EditorCurveBinding[] bindings = AnimationUtility.GetObjectReferenceCurveBindings(clip);
+            foreach (EditorCurveBinding binding in bindings)
+            {
+                if (!MatchesSpriteBinding(binding, path, propertyName, type))
+                {
+                    continue;
+                }
+
+                ObjectReferenceKeyframe[] keyframes = AnimationUtility.GetObjectReferenceCurve(
+                    clip,
+                    binding
+                );
+                foreach (ObjectReferenceKeyframe frame in keyframes)
+                {
+                    if (frame.value is Sprite sprite)
+                    {
+                        yield return sprite;
+                    }
+                }
+            }
+        }
+
+        internal static void AppendSpritesFromClip(
+            AnimationClip clip,
+            ICollection<Sprite> destination,
+            string path,
+            string propertyName,
+            Type type
+        )
+        {
+            EditorCurveBinding[] bindings = AnimationUtility.GetObjectReferenceCurveBindings(clip);
+            foreach (EditorCurveBinding binding in bindings)
+            {
+                if (!MatchesSpriteBinding(binding, path, propertyName, type))
+                {
+                    continue;
+                }
+
+                ObjectReferenceKeyframe[] keyframes = AnimationUtility.GetObjectReferenceCurve(
+                    clip,
+                    binding
+                );
+                foreach (ObjectReferenceKeyframe frame in keyframes)
+                {
+                    if (frame.value is Sprite sprite && sprite != null)
+                    {
+                        destination.Add(sprite);
+                    }
+                }
+            }
+        }
+
+        private static bool MatchesSpriteBinding(
+            EditorCurveBinding binding,
+            string path,
+            string propertyName,
+            Type type
+        )
+        {
+            return (path == null || string.Equals(binding.path, path, StringComparison.Ordinal))
+                && (
+                    propertyName == null
+                    || string.Equals(binding.propertyName, propertyName, StringComparison.Ordinal)
+                )
+                && (type == null || binding.type == type);
         }
 #endif
     }

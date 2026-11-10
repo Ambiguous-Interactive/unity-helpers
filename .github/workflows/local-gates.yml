@@ -315,7 +315,7 @@ jobs:
           scripts/tests/test_check_eol.py scripts/tests/test_lint_error_codes.py
           scripts/tests/test_code_samples.py
           scripts/tests/test_skill_sizes.py scripts/tests/test_comment_block_form.py
-          scripts/tests/test_yaml_lint.py -q
+          scripts/tests/test_yaml_lint.py scripts/tests/test_no_regions.py scripts/tests/test_dependabot.py -q
 
       - name: Verify compiler payload publication on Windows
         shell: pwsh

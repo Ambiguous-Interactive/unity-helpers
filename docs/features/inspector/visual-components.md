@@ -148,6 +148,8 @@ keyframe order and duplicate references within each clip; a `HashSet<Sprite>` ca
 Null frames, missing or destroyed inputs, and read-only destinations are ignored. The walk does not change assets or
 sample animations. These APIs use Unity Editor serialization on the main thread, allocate the
 binding/keyframe arrays requested by Unity, and do not infer clips from parent animators.
+Path-filtered reads load keyframes only for matching bindings. The eager collectors
+append directly without creating intermediate sprite enumerators.
 
 ---
 

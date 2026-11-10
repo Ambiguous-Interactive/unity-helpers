@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Reduce repeated script searches during bulk binding validation ([#1106](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1106)).
+- Move array-pool and lease definitions into separate source files; source-based builds must include those files ([#1130](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1130)).
+- Skip unrelated animation curves when collecting sprites for one renderer, and reduce temporary enumeration objects in `AnimatedSpriteFrames` ([#1113](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1113)).
 - Stop bounded parent-component collection searches at the requested depth or match count, and reuse temporary lists ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
 - Reduce child-component collection ordering work for sealed types while preserving breadth-first results, filters, limits, and collection reuse ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
 - Avoid a full project refresh when Animation Creator saves or deletes hidden configs.
@@ -35,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix Animation Creator omitting sprites from shared assets and losing exact frames or moved sheets when loading saved configurations ([#1154](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1154)).
 - Fix bounded and filtered child-component collections changing their selected matches when a set comparer modifies the hierarchy ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
 - Fix `ExtractSpriteRect` returning atlas-oriented pixels for packed rotation metadata; tight and rotated packing now return null with a clear error ([#1135](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1135)).
 - Fix texture fitting and animation copying reporting success after an operation exception with an empty diagnostic.

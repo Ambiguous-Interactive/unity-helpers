@@ -217,6 +217,17 @@ untracked sources and excludes ignored files and unstaged deletions. Discovered 
 still fail validation. Run `npm run test:lint-comment-block-form` for the
 focused controls.
 
+Region checks run as typed Python through the `no-regions` Repo Lint subject. The
+PowerShell entry point forwards `-VerboseOutput`, `-Fix`, `-Paths` and `-StagedOnly`.
+The shared C# scanner keeps directive-like text in multiline strings and comments
+intact. Repair preserves other bytes, UTF-8 BOMs and line endings. Full scans cover
+Runtime, Editor, Tests and Generator sources through Git's tracked and unignored
+inventory. Git-discovered filenames stay literal, including Unix backslashes.
+Staged checks read index blobs; repair is a worktree operation, so fix
+explicit paths and stage reviewed changes separately. CI never applies repairs.
+Run `uv run --project scripts/python~ --locked pytest scripts/tests/test_no_regions.py -q`
+for parser, index, path and launcher controls.
+
 The concurrent-cache checker also runs in typed Python through `npm run lint:concurrent-cache-fill`.
 It requires Runtime, Editor and Styles source roots, ignores comments and literal text, and preserves
 explicit overwrite reasons. Only a plain `SINGLE_THREADED` guard exempts writes; compound conditions
@@ -231,6 +242,15 @@ nonignored YAML files without walking ignored build trees. Missing explicit inpu
 configuration fail visibly. `--staged-only` reads Git index blobs, so unstaged edits cannot hide
 invalid staged YAML. Warnings remain nonblocking. Run the `yaml-controls` contract check for
 source-discovery, staged-content, parser and launcher coverage.
+
+Dependabot structure checks also use typed Python and the `metadata` group. Run
+`npm run lint:dependabot` and `npm run test:lint-dependabot`. The checker accepts
+multi-ecosystem groups with inherited schedules, YAML aliases and merges, and
+mapping keys in any order. Ordinary dependency groups may select dependency or
+update types without a `patterns` field. Duplicate keys, cyclic aliases, missing
+inputs and malformed shapes fail visibly. GitHub's
+[options reference](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference)
+defines the ecosystem-specific options beyond these structural checks.
 
 The lockfile pins Ruff, mypy, Pyright, pytest, and their dependencies. `lint:python` checks Ruff
 formatting and correctness rules plus both type checkers in strict mode. Function signatures must

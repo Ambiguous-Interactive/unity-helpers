@@ -198,6 +198,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         internal readonly SpritePreviewCache _previewTextureCache = new();
 
         internal SerializedObject _serializedObject;
+
+        [HideInInspector]
+        [SerializeField]
+        internal List<Sprite> _filteredSprites = new();
+
         private SerializedProperty _animationDataProp;
         private SerializedProperty _animationSourcesProp;
         private SerializedProperty _spriteNameRegexProp;
@@ -215,9 +220,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         private SerializedProperty _regexTestInputProp;
         private SerializedProperty _strictNumericOrderingProp;
 
-        [HideInInspector]
-        [SerializeField]
-        private List<Sprite> _filteredSprites = new();
         private int _matchedSpriteCount;
         private int _unmatchedSpriteCount;
         private Regex _compiledRegex;
@@ -363,6 +365,48 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             return false;
         }
 
+        private static Sprite ResolveSprite(
+            AnimationSpriteReference reference,
+            Dictionary<(Guid assetGuid, long localFileId), Sprite> spritesByIdentity,
+            HashSet<Guid> loadedAssetGuids
+        )
+        {
+            if (reference == null || !Guid.TryParseExact(reference.guid, "N", out Guid assetGuid))
+            {
+                return null;
+            }
+            if (loadedAssetGuids.Add(assetGuid))
+            {
+                string path = AssetDatabase.GUIDToAssetPath(reference.guid);
+                Object[] assets = string.IsNullOrWhiteSpace(path)
+                    ? Array.Empty<Object>()
+                    : AssetDatabase.LoadAllAssetsAtPath(path) ?? Array.Empty<Object>();
+                foreach (Object asset in assets)
+                {
+                    if (
+                        asset is Sprite sprite
+                        && sprite != null
+                        && AssetDatabase.TryGetGUIDAndLocalFileIdentifier(
+                            sprite,
+                            out string guid,
+                            out long localFileId
+                        )
+                        && Guid.TryParseExact(guid, "N", out Guid sourceGuid)
+                        && sourceGuid == assetGuid
+                    )
+                    {
+                        spritesByIdentity.TryAdd((assetGuid, localFileId), sprite);
+                    }
+                }
+            }
+            return spritesByIdentity.TryGetValue(
+                (assetGuid, reference.localFileId),
+                out Sprite resolved
+            )
+                ? resolved
+                : null;
+        }
+
         private static string EnsureUniqueName(string baseName, ISet<string> used)
         {
             if (!used.Contains(baseName))
@@ -382,7 +426,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         /// <summary>
         /// Creates an AnimationCreatorConfig from the current window state.
         /// </summary>
-        /// <returns>A config object representing the current settings.</returns>
+        /// <returns>A config object retaining frame order, duplicates and persistent sprite identities.</returns>
         internal AnimationCreatorConfig CreateConfigFromCurrentState()
         {
             AnimationCreatorConfig config = new()
@@ -428,7 +472,29 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         string path = AssetDatabase.GetAssetPath(sprite);
                         if (!string.IsNullOrWhiteSpace(path))
                         {
-                            entry.framePaths.Add(path);
+                            if (
+                                AssetDatabase.TryGetGUIDAndLocalFileIdentifier(
+                                    sprite,
+                                    out string guid,
+                                    out long localFileId
+                                )
+                            )
+                            {
+                                entry.framePaths.Add(path);
+                                entry.frameReferences.Add(
+                                    new AnimationSpriteReference
+                                    {
+                                        guid = guid,
+                                        localFileId = localFileId,
+                                    }
+                                );
+                            }
+                            else
+                            {
+                                this.LogWarn(
+                                    $"Could not identify sprite '{sprite.name}' for animation '{data.animationName}'."
+                                );
+                            }
                         }
                     }
                 }
@@ -443,6 +509,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         /// Applies an AnimationCreatorConfig to the current window state.
         /// </summary>
         /// <param name="config">The config to apply.</param>
+        /// <remarks>Nonempty sprite references are authoritative; unavailable identities are skipped. Legacy path-only entries retain their original first-sprite lookup.</remarks>
         internal void ApplyConfigToCurrentState(AnimationCreatorConfig config)
         {
             if (config == null)
@@ -450,6 +517,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
+            Undo.RecordObject(this, "Load Animation Creator Configuration");
             AnimationCreatorConfig.MigrateConfig(config);
 
             spriteNameRegex = config.spriteNameRegex;
@@ -466,6 +534,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             strictNumericOrdering = config.strictNumericOrdering;
 
             animationData.Clear();
+            using PooledResource<
+                Dictionary<(Guid assetGuid, long localFileId), Sprite>
+            > spritesLease = DictionaryBuffer<
+                (Guid assetGuid, long localFileId),
+                Sprite
+            >.Dictionary.Get(
+                out Dictionary<(Guid assetGuid, long localFileId), Sprite> spritesByIdentity
+            );
+            using PooledResource<HashSet<Guid>> loadedAssetsLease = Buffers<Guid>.HashSet.Get(
+                out HashSet<Guid> loadedAssetGuids
+            );
             foreach (AnimationCreatorConfig.AnimationDataEntry entry in config.animationEntries)
             {
                 AnimationData data = new()
@@ -484,23 +563,46 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     frames = new List<Sprite>(),
                 };
 
-                foreach (string path in entry.framePaths)
+                if (entry.frameReferences is { Count: > 0 })
                 {
-                    if (string.IsNullOrWhiteSpace(path))
+                    foreach (AnimationSpriteReference reference in entry.frameReferences)
                     {
-                        continue;
-                    }
-
-                    Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(path);
-                    if (sprite != null)
-                    {
-                        data.frames.Add(sprite);
-                    }
-                    else
-                    {
-                        this.LogWarn(
-                            $"Could not load sprite at path '{path}' for animation '{entry.animationName}'."
+                        Sprite sprite = ResolveSprite(
+                            reference,
+                            spritesByIdentity,
+                            loadedAssetGuids
                         );
+                        if (sprite != null)
+                        {
+                            data.frames.Add(sprite);
+                        }
+                        else
+                        {
+                            this.LogWarn(
+                                $"Could not load saved sprite identity for animation '{entry.animationName}'."
+                            );
+                        }
+                    }
+                }
+                else if (entry.framePaths != null)
+                {
+                    foreach (string path in entry.framePaths)
+                    {
+                        if (string.IsNullOrWhiteSpace(path))
+                        {
+                            continue;
+                        }
+                        Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+                        if (sprite != null)
+                        {
+                            data.frames.Add(sprite);
+                        }
+                        else
+                        {
+                            this.LogWarn(
+                                $"Could not load sprite at path '{path}' for animation '{entry.animationName}'."
+                            );
+                        }
                     }
                 }
 
@@ -2395,10 +2497,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         );
                     }
 
-                    Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(path);
-
-                    if (sprite != null)
+                    foreach (Object asset in AssetDatabase.LoadAllAssetsAtPath(path))
                     {
+                        if (asset is not Sprite sprite)
+                        {
+                            continue;
+                        }
                         if (_compiledRegex.IsMatch(sprite.name))
                         {
                             _filteredSprites.Add(sprite);

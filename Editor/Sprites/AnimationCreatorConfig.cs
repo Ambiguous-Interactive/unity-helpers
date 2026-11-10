@@ -193,9 +193,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             public string animationName = string.Empty;
 
             /// <summary>
-            /// Asset paths of the sprite frames (relative to Assets/).
+            /// Legacy frame paths, used when sprite references are absent or empty.
             /// </summary>
             public List<string> framePaths = new();
+
+            /// <summary>
+            /// Ordered sprite identities; nonempty references take precedence over legacy paths.
+            /// </summary>
+            public List<AnimationSpriteReference> frameReferences = new();
 
             /// <summary>
             /// Constant frames per second.

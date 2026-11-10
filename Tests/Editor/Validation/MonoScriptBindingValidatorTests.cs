@@ -54,6 +54,41 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         }
 
         [Test]
+        public void BulkIndexPreservesForwardAndReverseBindingsAcrossCacheReset()
+        {
+            Type expected = typeof(MonoScriptBindingValidator);
+            Assert.That(
+                MonoScriptIndex.TryGetScriptGuid(expected, out string expectedGuid),
+                Is.True
+            );
+            MonoScriptIndex.ClearCaches();
+            List<MonoScriptBindingFinding> findings = ScanShippedTrees(
+                out int types,
+                out int scripts
+            );
+            Assert.That(findings, Is.Empty);
+            Assert.That(0 < types && 0 < scripts, Is.True);
+            TestContext.WriteLine($"scope=bulk-cache types={types} scripts={scripts}");
+            Assert.That(
+                MonoScriptIndex.TryGetScriptGuid(expected, out string indexedGuid),
+                Is.True
+            );
+            Assert.That(indexedGuid, Is.EqualTo(expectedGuid));
+            Assert.That(
+                MonoScriptIndex.TryGetScriptType(indexedGuid, out Type indexedType),
+                Is.True
+            );
+            Assert.That(indexedType, Is.SameAs(expected));
+            Assert.That(MonoScriptIndex.TryGetScriptGuid(typeof(int), out _), Is.False);
+            MonoScriptIndex.ClearCaches();
+            Assert.That(
+                MonoScriptIndex.TryGetScriptGuid(expected, out string refreshedGuid),
+                Is.True
+            );
+            Assert.That(refreshedGuid, Is.EqualTo(expectedGuid));
+        }
+
+        [Test]
         public void EveryShippedTypeCanBeAuthoredOntoSomething()
         {
             List<MonoScriptBindingFinding> findings = ScanShippedTrees(
@@ -61,6 +96,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 out int scriptsConsidered
             );
 
+            TestContext.WriteLine(
+                $"scope=package types={typesConsidered} scripts={scriptsConsidered}"
+            );
             Assert.IsTrue(0 < typesConsidered, "The type scope stopped matching the package.");
             Assert.IsTrue(0 < scriptsConsidered, "The script scope stopped matching the package.");
             CollectionAssert.IsEmpty(
@@ -102,6 +140,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 )
             );
 
+            TestContext.WriteLine($"scope=runtime types={runtimeTypes} scripts={runtimeScripts}");
+            TestContext.WriteLine($"scope=editor types={editorTypes} scripts={editorScripts}");
+            TestContext.WriteLine($"scope=tests types={testTypes} scripts={testScripts}");
             // Assert each imported tree independently; Samples~ is excluded because Unity never imports tilde folders.
             Assert.IsTrue(0 < runtimeTypes, "Runtime/ fell out of the assembly scope.");
             Assert.IsTrue(0 < runtimeScripts, "Runtime/ fell out of the script scope.");

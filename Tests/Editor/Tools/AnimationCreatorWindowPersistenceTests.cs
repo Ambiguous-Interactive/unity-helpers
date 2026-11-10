@@ -547,6 +547,30 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             }
         }
 
+        [TestCase(false, TestName = "ConfigFrames.MultipleSprites.PreserveOrderAndDuplicates")]
+        [TestCase(true, TestName = "ConfigFrames.MovedSheet.PreserveOrderAndDuplicates")]
+        public void SpriteSheetFramesSurviveSaveLoad(bool moveSheet)
+        {
+            Sprite[] sprites = CreateSpriteSheet();
+            Sprite[] expected = { sprites[1], sprites[0], sprites[1] };
+            _window.animationData.Add(
+                new AnimationData { animationName = "Sheet", frames = new List<Sprite>(expected) }
+            );
+            Assert.That(_window.SaveConfig(_tempFolder), Is.True);
+            if (moveSheet)
+            {
+                string source = AssetDatabase.GetAssetPath(sprites[0]);
+                Assert.That(
+                    AssetDatabase.MoveAsset(source, _tempFolder + "/moved.asset"),
+                    Is.Empty
+                );
+            }
+            _window.animationData.Clear();
+            Assert.That(_window.LoadConfig(_tempFolder), Is.True);
+            Assert.That(_window.animationData, Has.Count.EqualTo(1));
+            Assert.That(_window.animationData[0].frames, Is.EqualTo(expected));
+        }
+
         [Test]
         public void CurveDataPreservedThroughSaveLoad()
         {
@@ -585,6 +609,203 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                     $"Curve value at t={t}"
                 );
             }
+        }
+
+        [TestCase(".*", 2, TestName = "SpriteFilter.Sheet.FindsEverySprite")]
+        [TestCase("^Run_1$", 1, TestName = "SpriteFilter.Sheet.MatchesIndividualSpriteName")]
+        [TestCase("^Missing$", 0, TestName = "SpriteFilter.Sheet.RejectsUnmatchedNames")]
+        public void SpriteFilteringIncludesEverySubsprite(string pattern, int expectedCount)
+        {
+            Sprite[] sprites = CreateSpriteSheet();
+            _window.animationSources.Add(TempFolderAsset);
+            _window.ApplyConfigToCurrentState(
+                new AnimationCreatorConfig { spriteNameRegex = pattern }
+            );
+            Assert.That(_window._filteredSprites, Has.Count.EqualTo(expectedCount));
+            foreach (Sprite sprite in sprites)
+            {
+                Assert.That(
+                    _window._filteredSprites.Contains(sprite),
+                    Is.EqualTo(Regex.IsMatch(sprite.name, pattern))
+                );
+            }
+        }
+
+        [TestCase(
+            "missing-local",
+            TestName = "ConfigFrames.UnavailableLocalId.DoesNotSubstituteFirstSprite"
+        )]
+        [TestCase(
+            "missing-guid",
+            TestName = "ConfigFrames.UnavailableAsset.DoesNotSubstituteLegacyPath"
+        )]
+        [TestCase(
+            "invalid-guid",
+            TestName = "ConfigFrames.MalformedGuid.DoesNotSubstituteLegacyPath"
+        )]
+        [TestCase("blank-guid", TestName = "ConfigFrames.BlankGuid.DoesNotSubstituteLegacyPath")]
+        [TestCase("null", TestName = "ConfigFrames.NullReference.DoesNotSubstituteLegacyPath")]
+        public void UnavailableSpriteIdentityDoesNotFallBackToAnotherSprite(string failure)
+        {
+            Sprite[] sprites = CreateSpriteSheet();
+            _window.animationData.Add(
+                new AnimationData
+                {
+                    frames = new List<Sprite> { sprites[0], sprites[1], sprites[0] },
+                }
+            );
+            AnimationCreatorConfig config = _window.CreateConfigFromCurrentState();
+            AnimationCreatorConfig.AnimationDataEntry entry = config.animationEntries[0];
+            Assert.That(entry.frameReferences, Has.Count.EqualTo(3));
+            switch (failure)
+            {
+                case "missing-local":
+                    entry.frameReferences[1].localFileId = long.MaxValue;
+                    break;
+                case "missing-guid":
+                    entry.frameReferences[1].guid = "0123456789abcdef0123456789abcdef";
+                    break;
+                case "invalid-guid":
+                    entry.frameReferences[1].guid = "invalid";
+                    break;
+                case "blank-guid":
+                    entry.frameReferences[1].guid = " ";
+                    break;
+                case "null":
+                    entry.frameReferences[1] = null;
+                    break;
+            }
+            _window.ApplyConfigToCurrentState(config);
+            Assert.That(
+                _window.animationData[0].frames,
+                Is.EqualTo(new[] { sprites[0], sprites[0] })
+            );
+        }
+
+        [Test]
+        public void LegacyJsonRetainsPathBasedFirstSpriteLookup()
+        {
+            Sprite[] sprites = CreateSpriteSheet();
+            string path = AssetDatabase.GetAssetPath(sprites[0]);
+            string json =
+                "{\"version\":1,\"animationEntries\":[{\"framePaths\":[\""
+                + path
+                + "\",\""
+                + path
+                + "\"]}]}";
+            AnimationCreatorConfig config = JsonUtility.FromJson<AnimationCreatorConfig>(json);
+            _window.ApplyConfigToCurrentState(config);
+            Sprite first = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+            Assert.That(first != null, Is.True);
+            Assert.That(_window.animationData[0].frames, Is.EqualTo(new[] { first, first }));
+        }
+
+        [Test]
+        public void ReimportedAndUppercaseSpriteIdentityStillResolves()
+        {
+            Sprite[] sprites = CreateSpriteSheet();
+            _window.animationData.Add(
+                new AnimationData { frames = new List<Sprite> { sprites[1] } }
+            );
+            AnimationCreatorConfig config = _window.CreateConfigFromCurrentState();
+            AnimationSpriteReference reference = config.animationEntries[0].frameReferences[0];
+            reference.guid = reference.guid.ToUpperInvariant();
+            AssetDatabase.ImportAsset(
+                AssetDatabase.GetAssetPath(sprites[0]),
+                ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport
+            );
+            _window.ApplyConfigToCurrentState(
+                JsonUtility.FromJson<AnimationCreatorConfig>(JsonUtility.ToJson(config))
+            );
+            Assert.That(_window.animationData[0].frames, Has.Count.EqualTo(1));
+            Assert.That(_window.animationData[0].frames[0].name, Is.EqualTo("Run_1"));
+            Assert.That(
+                AssetDatabase.TryGetGUIDAndLocalFileIdentifier(
+                    _window.animationData[0].frames[0],
+                    out string guid,
+                    out long localFileId
+                ),
+                Is.True
+            );
+            Assert.That(guid, Is.EqualTo(reference.guid).IgnoreCase);
+            Assert.That(localFileId, Is.EqualTo(reference.localFileId));
+        }
+
+        [Test]
+        public void ApplyingSpriteReferencesSupportsUndoAndRedo()
+        {
+            Sprite[] sprites = CreateSpriteSheet();
+            _window.animationData.Add(
+                new AnimationData { frames = new List<Sprite> { sprites[1] } }
+            );
+            AnimationCreatorConfig config = _window.CreateConfigFromCurrentState();
+            _window.animationData[0].frames[0] = sprites[0];
+            Undo.ClearUndo(_window);
+            _window.ApplyConfigToCurrentState(config);
+            Undo.FlushUndoRecordObjects();
+            Assert.That(_window.animationData[0].frames, Is.EqualTo(new[] { sprites[1] }));
+            Undo.PerformUndo();
+            Assert.That(_window.animationData[0].frames, Is.EqualTo(new[] { sprites[0] }));
+            Undo.PerformRedo();
+            Assert.That(_window.animationData[0].frames, Is.EqualTo(new[] { sprites[1] }));
+            Undo.ClearUndo(_window);
+        }
+
+        [TestCase(2, TestName = "ConfigFrames.SharedSheets.PreserveBothAnimations")]
+        [TestCase(32, TestName = "ConfigFrames.ManySharedSlices.PreserveBothAnimations")]
+        public void SharedSpriteSheetsResolveAcrossAnimationsAndRepeatedLoads(int count)
+        {
+            Sprite[] first = CreateSpriteSheet(count, "first");
+            Sprite[] second = CreateSpriteSheet(count, "second");
+            List<Sprite> forward = new();
+            List<Sprite> reverse = new();
+            for (int index = 0; index < count; ++index)
+            {
+                forward.Add(first[index]);
+                forward.Add(second[index]);
+                forward.Add(first[index]);
+                reverse.Insert(0, second[index]);
+                reverse.Insert(0, first[index]);
+            }
+            _window.animationData.Add(new AnimationData { frames = forward });
+            _window.animationData.Add(new AnimationData { frames = reverse });
+            AnimationCreatorConfig config = JsonUtility.FromJson<AnimationCreatorConfig>(
+                JsonUtility.ToJson(_window.CreateConfigFromCurrentState())
+            );
+            for (int iteration = 0; iteration < 3; ++iteration)
+            {
+                _window.ApplyConfigToCurrentState(config);
+                Assert.That(_window.animationData, Has.Count.EqualTo(2));
+                Assert.That(_window.animationData[0].frames, Is.EqualTo(forward));
+                Assert.That(_window.animationData[1].frames, Is.EqualTo(reverse));
+            }
+        }
+
+        private Sprite[] CreateSpriteSheet(int count = 2, string fileName = "sheet")
+        {
+            _ = TempFolderAsset;
+            string path = _tempFolder + "/" + fileName + ".asset";
+            Texture2D texture = new(count * 8, 8);
+            AssetDatabase.CreateAsset(texture, path);
+            for (int index = 0; index < count; ++index)
+            {
+                Sprite sprite = Sprite.Create(texture, new Rect(index * 8, 0, 8, 8), Vector2.zero);
+                sprite.name = "Run_" + index;
+                AssetDatabase.AddObjectToAsset(sprite, path);
+            }
+            AssetDatabase.SaveAssets();
+            AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
+            List<Sprite> sprites = new();
+            foreach (UnityEngine.Object asset in AssetDatabase.LoadAllAssetsAtPath(path))
+            {
+                if (asset is Sprite sprite)
+                {
+                    sprites.Add(sprite);
+                }
+            }
+            Assert.That(sprites, Has.Count.EqualTo(count));
+            sprites.Sort((left, right) => string.CompareOrdinal(left.name, right.name));
+            return sprites.ToArray();
         }
     }
 #endif

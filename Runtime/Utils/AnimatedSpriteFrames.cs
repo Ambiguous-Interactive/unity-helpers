@@ -16,7 +16,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     public static class AnimatedSpriteFrames
     {
         /// <summary>Adds the nonnull sprite frames bound to one SpriteRenderer path in a clip.</summary>
-        /// <remarks>A null path matches any path; an empty path matches only the animated root. Read-only destinations are ignored.</remarks>
+        /// <remarks>A null path matches any path; an empty path matches only the animated root. Read-only destinations are ignored. Only matching bindings load keyframes.</remarks>
         public static void AddFramesOf(
             AnimationClip clip,
             string rendererPath,
@@ -28,19 +28,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
-            foreach (
-                Sprite sprite in clip.GetSpritesFromClip(
-                    rendererPath,
-                    UnityExtensions.SpriteBindingProperty,
-                    typeof(SpriteRenderer)
-                )
-            )
-            {
-                if (sprite != null)
-                {
-                    into.Add(sprite);
-                }
-            }
+            UnityExtensions.AppendSpritesFromClip(
+                clip,
+                into,
+                rendererPath,
+                UnityExtensions.SpriteBindingProperty,
+                typeof(SpriteRenderer)
+            );
         }
 
         /// <summary>Adds sprites and clip frames directly referenced by an object's visible serialized properties.</summary>
@@ -73,13 +67,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
                 else if (referenced is AnimationClip clip)
                 {
-                    foreach (Sprite frame in clip.GetSpritesFromClip())
-                    {
-                        if (frame != null)
-                        {
-                            into.Add(frame);
-                        }
-                    }
+                    UnityExtensions.AppendSpritesFromClip(clip, into, null, null, null);
                 }
             }
         }
