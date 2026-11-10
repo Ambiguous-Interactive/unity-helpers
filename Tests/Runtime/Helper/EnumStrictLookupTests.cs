@@ -80,10 +80,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [TestCase("First, Second")]
         [TestCase(" First")]
         [TestCase("First ")]
-        [TestCase("First\0")]
         [TestCase("Unknown")]
         public void ParsingRejectsAnythingExceptADeclaredName(string text)
         {
+            Assert.That(
+                EnumNameCache<FlagsValues>.TryParse(text.AsSpan(), out FlagsValues value),
+                Is.False
+            );
+            Assert.That(value, Is.EqualTo(default(FlagsValues)));
+        }
+
+        [Test]
+        public void ParsingRejectsEmbeddedNullCharacters()
+        {
+            string text = nameof(FlagsValues.First) + '\0';
+            Assert.That(text.Length, Is.EqualTo(6));
+            Assert.That(text[5], Is.EqualTo('\0'));
             Assert.That(
                 EnumNameCache<FlagsValues>.TryParse(text.AsSpan(), out FlagsValues value),
                 Is.False
