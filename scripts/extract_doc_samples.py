@@ -7,6 +7,7 @@ import os
 import re
 import stat
 import sys
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -343,7 +344,23 @@ def extract(root: Path, output: Path, *, require_both: bool) -> int:
             ):
                 stale.unlink()
     for target, source in rendered.items():
-        target.write_text(source, encoding="utf-8", newline="\n")
+        temporary: Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                newline="\n",
+                dir=target.parent,
+                prefix=f".{target.name}.",
+                suffix=".tmp",
+                delete=False,
+            ) as stream:
+                temporary = Path(stream.name)
+                stream.write(source)
+            temporary.replace(target)
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
     return 0
 
 

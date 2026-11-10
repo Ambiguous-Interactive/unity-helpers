@@ -219,6 +219,48 @@ def test_stale_generated_files_removed_but_unrelated_files_preserved(
     assert target.read_text(encoding="utf-8") == "preserve this too"
 
 
+@pytest.mark.parametrize("editor_only", [False, True])
+def test_rewriting_generated_hard_links_preserves_external_files(
+    tmp_path: Path, editor_only: bool
+) -> None:
+    marker = extractor.EDITOR_MARKER if editor_only else extractor.MARKER
+    root, output = tree(tmp_path, "public int Before;", marker=marker)
+    assert extractor.extract(root, output, require_both=False) == 0
+    target = next(output.rglob("*.cs"))
+    foreign = tmp_path / "external.cs"
+    foreign.hardlink_to(target)
+    original = foreign.read_bytes()
+    assert target.samefile(foreign)
+    page = root / "docs/page.md"
+    page.write_text(page.read_text(encoding="utf-8").replace("Before", "After"), encoding="utf-8")
+    assert extractor.extract(root, output, require_both=False) == 0
+    assert foreign.read_bytes() == original
+    assert "public int After;" in target.read_text(encoding="utf-8")
+    assert not target.samefile(foreign)
+
+
+def test_failed_replacement_preserves_output_and_removes_temporary_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, output = tree(tmp_path, "public int Before;")
+    assert extractor.extract(root, output, require_both=False) == 0
+    target = next(output.glob("*.cs"))
+    original = target.read_bytes()
+    page = root / "docs/page.md"
+    page.write_text(page.read_text(encoding="utf-8").replace("Before", "After"), encoding="utf-8")
+
+    def refuse_replacement(source: Path, destination: Path) -> Path:
+        assert destination == target
+        assert "public int After;" in source.read_text(encoding="utf-8")
+        raise OSError("replacement refused")
+
+    monkeypatch.setattr(Path, "replace", refuse_replacement)
+    with pytest.raises(OSError, match="replacement refused"):
+        extractor.extract(root, output, require_both=False)
+    assert target.read_bytes() == original
+    assert sorted(path.name for path in output.iterdir()) == [target.name, "editor"]
+
+
 @pytest.mark.parametrize("kind", ["source", "directory", "output", "generated"])
 def test_links_are_refused(tmp_path: Path, kind: str) -> None:
     root, output = tree(tmp_path, "public int Value;")
