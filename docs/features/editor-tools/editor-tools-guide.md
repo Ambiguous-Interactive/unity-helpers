@@ -810,6 +810,11 @@ caller can inspect or remove it.
   Null, empty, and whitespace-only config folders are rejected before file access; folders with
   spaces inside their names remain valid. Saving or deleting configs writes the files immediately
   without refreshing unrelated project assets. This also applies to `StreamingAssets` folders.
+  New saves identify every sprite by its asset GUID and local file ID, preserving frame order and
+  duplicates when a sheet moves. Nonempty `frameReferences` take precedence over `framePaths`;
+  unavailable identities are skipped with a warning instead of selecting another sprite. Older
+  path-only entries still load the first sprite at each path; they cannot recover slice identities
+  that were never saved. Filtering inspects every sprite within a shared asset by its own name.
   File changes are not reversed by Unity Undo.
 
 > **Visual Demo**

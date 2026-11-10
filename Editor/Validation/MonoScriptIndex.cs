@@ -104,6 +104,36 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             _fullIndexBuilt = false;
         }
 
+        internal static void BuildFullIndex()
+        {
+            if (_fullIndexBuilt)
+            {
+                return;
+            }
+
+            _fullIndexBuilt = true;
+            string[] guids = AssetDatabase.FindAssets("t:MonoScript");
+            if (guids == null)
+            {
+                return;
+            }
+
+            foreach (string guid in guids)
+            {
+                Type bound = BoundTypeOf(guid);
+                if (bound == null)
+                {
+                    continue;
+                }
+
+                GuidToType[guid] = bound;
+                if (!TypeToGuid.TryGetValue(bound, out string existing) || existing == null)
+                {
+                    TypeToGuid[bound] = guid;
+                }
+            }
+        }
+
         private static string FindScriptGuid(Type type)
         {
             string narrowed = FindScriptGuidByName(type);
@@ -139,36 +169,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             }
 
             return null;
-        }
-
-        private static void BuildFullIndex()
-        {
-            if (_fullIndexBuilt)
-            {
-                return;
-            }
-
-            _fullIndexBuilt = true;
-            string[] guids = AssetDatabase.FindAssets("t:MonoScript");
-            if (guids == null)
-            {
-                return;
-            }
-
-            foreach (string guid in guids)
-            {
-                Type bound = BoundTypeOf(guid);
-                if (bound == null)
-                {
-                    continue;
-                }
-
-                GuidToType[guid] = bound;
-                if (!TypeToGuid.TryGetValue(bound, out string existing) || existing == null)
-                {
-                    TypeToGuid[bound] = guid;
-                }
-            }
         }
 
         private static Type LoadScriptType(string guid)

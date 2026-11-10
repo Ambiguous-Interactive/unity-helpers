@@ -93,9 +93,10 @@ def rewrite(text: str, violations: list[Violation]) -> tuple[str, int]:
     return newline.join(lines), declined
 
 
-def checked_path(repository: Path, name: str) -> Path:
+def checked_path(repository: Path, name: str, *, literal: bool = False) -> Path:
     """Refuse absent, linked, special, or outside-repository writable inputs."""
-    path = Path(os.path.abspath(repository / name.replace("\\", "/")))  # noqa: PTH100
+    selected = name if literal else name.replace("\\", "/")
+    path = Path(os.path.abspath(repository / selected))  # noqa: PTH100
     if not path.is_relative_to(repository):
         raise ValueError(f"Source is outside the repository: {name}")
     current = path

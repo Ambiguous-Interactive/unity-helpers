@@ -83,6 +83,11 @@ Two rules, and neither is redundant:
 1. Every concrete `MonoBehaviour` and `ScriptableObject` resolves to a `MonoScript` — the symptom.
 2. Every script asset is named after the type it binds — the cause, and what keeps rule 1 true.
 
+Bulk binding scans populate the shared script index once per cache lifetime instead of searching
+for every type separately. The whole-package and per-tree checks keep their original scopes.
+Call `MonoScriptIndex.ClearCaches()` after script changes before starting a new scan; the menu
+commands already do this.
+
 Nested and open-generic component types are **not** excluded: neither can carry a `MonoScript`
 either, so excluding them licenses the same defect in a shape the check has stopped looking at.
 Abstract types are, because nothing can be an instance of one, and so are custom inspectors: Unity

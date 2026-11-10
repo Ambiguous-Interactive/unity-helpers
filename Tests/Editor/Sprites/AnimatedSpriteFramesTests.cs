@@ -36,6 +36,128 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             );
         }
 
+        private static void ReadEveryBinding(AnimationClip clip, List<Sprite> destination)
+        {
+            EditorCurveBinding[] bindings = AnimationUtility.GetObjectReferenceCurveBindings(clip);
+            foreach (EditorCurveBinding binding in bindings)
+            {
+                ObjectReferenceKeyframe[] frames = AnimationUtility.GetObjectReferenceCurve(
+                    clip,
+                    binding
+                );
+                foreach (ObjectReferenceKeyframe frame in frames)
+                {
+                    if (frame.value is Sprite sprite && sprite != null)
+                    {
+                        destination.Add(sprite);
+                    }
+                }
+            }
+        }
+
+        [Test]
+        public void FilteredEnumerationObservesClipChangesAtEnumerationTime()
+        {
+            AnimationClip clip = Track(new AnimationClip());
+            Sprite original = CreateSprite();
+            Sprite replacement = CreateSprite();
+            SetFrames(clip, string.Empty, typeof(SpriteRenderer), original);
+            IEnumerable<Sprite> deferred = clip.GetSpritesFromClip(
+                string.Empty,
+                UnityExtensions.SpriteBindingProperty,
+                typeof(SpriteRenderer)
+            );
+            SetFrames(clip, string.Empty, typeof(SpriteRenderer), replacement);
+            CollectionAssert.AreEqual(new[] { replacement }, deferred);
+            SetFrames(clip, string.Empty, typeof(SpriteRenderer), original);
+            CollectionAssert.AreEqual(new[] { original }, deferred);
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(64)]
+        public void EagerAndDeferredFiltersKeepOnlyTheMatchingBinding(int unrelatedCount)
+        {
+            AnimationClip clip = Track(new AnimationClip());
+            Sprite wanted = CreateSprite();
+            Sprite unrelated = CreateSprite();
+            SetFrames(clip, string.Empty, typeof(SpriteRenderer), wanted, null, wanted);
+            for (int index = 0; index < unrelatedCount; ++index)
+            {
+                string path = "Unrelated" + index;
+                SetFrames(clip, path, typeof(SpriteRenderer), unrelated);
+            }
+            List<Sprite> eager = new() { unrelated };
+            AnimatedSpriteFrames.AddFramesOf(clip, string.Empty, eager);
+            CollectionAssert.AreEqual(new[] { unrelated, wanted, wanted }, eager);
+            IEnumerable<Sprite> deferred = clip.GetSpritesFromClip(
+                string.Empty,
+                UnityExtensions.SpriteBindingProperty,
+                typeof(SpriteRenderer)
+            );
+            CollectionAssert.AreEqual(new[] { wanted, wanted }, deferred);
+        }
+
+        [Test]
+        [Category("Performance")]
+        public void FilteredReadsAvoidAllocatingUnrelatedKeyframeArrays()
+        {
+            const int iterations = 8;
+            const int capacity = 8192;
+            object control = new();
+            Action allocate = () => GC.KeepAlive(new byte[4096]);
+            Action reuse = () => GC.KeepAlive(control);
+            long positive = ProfilerAllocationCounter.Measure(allocate, iterations, capacity);
+            if (positive < iterations)
+            {
+                Assert.Ignore("The allocation recorder did not observe the positive control.");
+            }
+            Assert.That(ProfilerAllocationCounter.Measure(reuse, iterations, capacity), Is.Zero);
+
+            AnimationClip clip = Track(new AnimationClip());
+            Sprite sprite = CreateSprite();
+            Sprite[] frames = new Sprite[128];
+            Array.Fill(frames, sprite);
+            for (int index = 0; index < 16; ++index)
+            {
+                string path = "Unrelated" + index;
+                SetFrames(clip, path, typeof(SpriteRenderer), frames);
+            }
+            SetFrames(clip, string.Empty, typeof(SpriteRenderer), sprite);
+            List<Sprite> destination = new(4096);
+            for (int warmup = 0; warmup < 8; ++warmup)
+            {
+                ReadEveryBinding(clip, destination);
+                destination.Clear();
+                AnimatedSpriteFrames.AddFramesOf(clip, string.Empty, destination);
+                destination.Clear();
+            }
+
+            Action reference = () =>
+            {
+                destination.Clear();
+                ReadEveryBinding(clip, destination);
+            };
+            Action filtered = () =>
+            {
+                destination.Clear();
+                AnimatedSpriteFrames.AddFramesOf(clip, string.Empty, destination);
+            };
+            long referenceEvents = ProfilerAllocationCounter.Measure(
+                reference,
+                iterations,
+                capacity
+            );
+            Assert.That(destination.Count, Is.EqualTo(2049));
+            long filteredEvents = ProfilerAllocationCounter.Measure(filtered, iterations, capacity);
+            CollectionAssert.AreEqual(new[] { sprite }, destination);
+            Assert.That(referenceEvents, Is.GreaterThan(iterations));
+            Assert.That(filteredEvents, Is.LessThan(referenceEvents));
+            TestContext.WriteLine(
+                $"Unfiltered events={referenceEvents}; filtered events={filteredEvents}"
+            );
+        }
+
         [Test]
         public void ReadOnlyDestinationsAreIgnoredWithoutLosingTheirExistingSprites()
         {

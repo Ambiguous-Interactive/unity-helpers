@@ -33,6 +33,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         /// <param name="scriptsConsidered">Receives how many script assets rule two judged.</param>
         /// <returns><c>false</c> when the scan could not run at all.</returns>
         /// <remarks>
+        /// Bulk scans populate the shared script index once per cache lifetime. Call
+        /// <see cref="MonoScriptIndex.ClearCaches"/> after script changes.
         /// The two counts are outputs rather than diagnostics: a scan whose scope stops matching
         /// reports zero findings, and zero findings is exactly what a passing scan reports. A caller
         /// that asserts the counts are non-zero cannot be made green by a broken subject list.
@@ -62,6 +64,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         /// <param name="typesConsidered">Receives how many concrete types rule one judged.</param>
         /// <param name="scriptsConsidered">Receives how many script assets rule two judged.</param>
         /// <returns><c>false</c> when the scan could not run at all.</returns>
+        /// <remarks>Bulk scans populate the shared script index once per cache lifetime. Clear <see cref="MonoScriptIndex"/> caches after script changes.</remarks>
         public static bool TryScan(
             IReadOnlyList<string> assetPathPrefixes,
             List<MonoScriptBindingFinding> findings,
@@ -87,6 +90,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             findings.Clear();
             unreadable.Clear();
             HashSet<string> scopedAssemblies = ScopedAssemblyNames(assetPathPrefixes);
+            MonoScriptIndex.BuildFullIndex();
 
             foreach (Type type in ConcreteAuthorableTypes())
             {
