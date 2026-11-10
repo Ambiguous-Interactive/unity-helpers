@@ -95,9 +95,9 @@ namespace WallstopStudios.UnityHelpers.SchemaConformance.Tests
                 .ToLowerInvariant();
             TestContext.Out.WriteLine(Encoding.UTF8.GetString(version).Trim());
             TestContext.Out.WriteLine("protoc SHA256: " + digest);
-            Assert.AreEqual("libprotoc 27.2", Encoding.UTF8.GetString(version).Trim());
+            Assert.AreEqual("libprotoc 35.1", Encoding.UTF8.GetString(version).Trim());
             Assert.AreEqual(
-                "0e8f5a802a0768354f0a66eec112a968fbc0374521296e7355bfa352474c29ff",
+                "d4c92fddd3321a5034879345c4a091303a0cb3c2e284323513025959607c8590",
                 digest
             );
         }

@@ -3,9 +3,9 @@
 
 mkdocs~=1.6.1
 mkdocs-material~=9.8.0
-pymdown-extensions~=12.3
+pymdown-extensions~=13.0
 mkdocs-minify-plugin~=0.8.0
-mkdocs-git-revision-date-localized-plugin~=1.6.0
+mkdocs-git-revision-date-localized-plugin~=1.7.0
 
 # Required for social cards feature
 pillow>=10.0.0

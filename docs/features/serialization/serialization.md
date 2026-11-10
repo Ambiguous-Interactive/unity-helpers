@@ -2547,7 +2547,7 @@ These numeric schema fields have no enum member names or enum reservations; keep
 C# enum reservations to prevent reuse in your game. Other enum widths keep their enum declarations.
 Serializer bytes are unchanged, including the accepted alternate varints for unsigned enum values.
 
-The separate Linux x64 host conformance suite compiles actual exports with pinned protoc 27.2
+The separate Linux x64 host conformance suite compiles actual exports with pinned protoc 35.1
 and cross-reads independent text-format values through its C++ codec and WProto. It covers a
 finite set of scalar, collection, map, URI, BCL and wide-enum shapes, including absent and present
 nullable defaults, with malformed-schema, changed-tag and narrowed-enum controls. It does not qualify every schema,
