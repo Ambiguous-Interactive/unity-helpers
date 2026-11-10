@@ -175,15 +175,18 @@ def test_runtime_editor_partition_and_both_guards(tmp_path: Path) -> None:
     assert extractor.extract(root, output, require_both=True) == 1
     page = root / "docs/page.md"
     page.write_text(
-        page.read_text()
+        page.read_text(encoding="utf-8")
         + "\n"
         + extractor.EDITOR_MARKER
-        + "\n```cs\npublic int EditorValue;\n```\n"
+        + "\n```cs\npublic int EditorValue;\n```\n",
+        encoding="utf-8",
     )
     assert extractor.extract(root, output, require_both=True) == 0
     assert len(list(output.glob("*.cs"))) == 1
     assert len(list((output / "editor").glob("*.cs"))) == 1
-    page.write_text(extractor.EDITOR_MARKER + "\n```cs\npublic int EditorValue;\n```\n")
+    page.write_text(
+        extractor.EDITOR_MARKER + "\n```cs\npublic int EditorValue;\n```\n", encoding="utf-8"
+    )
     assert extractor.extract(root, output, require_both=True) == 1
 
 
@@ -203,17 +206,17 @@ def test_stale_generated_files_removed_but_unrelated_files_preserved(
     assert extractor.extract(root, output, require_both=False) == 0
     original = next(output.glob("*.cs"))
     unrelated = output / "handwritten.cs"
-    unrelated.write_text("preserve")
+    unrelated.write_text("preserve", encoding="utf-8")
     page = root / "docs/page.md"
-    page.write_text("\n" + page.read_text())
+    page.write_text("\n" + page.read_text(encoding="utf-8"), encoding="utf-8")
     assert extractor.extract(root, output, require_both=False) == 0
     assert not original.exists()
-    assert unrelated.read_text() == "preserve"
+    assert unrelated.read_text(encoding="utf-8") == "preserve"
     target = next(path for path in output.glob("*.cs") if path != unrelated)
-    target.write_text("preserve this too")
+    target.write_text("preserve this too", encoding="utf-8")
     with pytest.raises(ValueError, match="unrelated"):
         extractor.extract(root, output, require_both=False)
-    assert target.read_text() == "preserve this too"
+    assert target.read_text(encoding="utf-8") == "preserve this too"
 
 
 @pytest.mark.parametrize("kind", ["source", "directory", "output", "generated"])
@@ -222,7 +225,7 @@ def test_links_are_refused(tmp_path: Path, kind: str) -> None:
     foreign = tmp_path / "foreign"
     foreign.mkdir()
     source = foreign / "page.md"
-    source.write_text("preserve")
+    source.write_text("preserve", encoding="utf-8")
     try:
         if kind == "source":
             (root / "docs/page.md").unlink()
@@ -238,7 +241,7 @@ def test_links_are_refused(tmp_path: Path, kind: str) -> None:
         pytest.skip("Symlinks unavailable")
     with pytest.raises(ValueError, match=r"[Ll]ink|Unsafe"):
         extractor.extract(root, output, require_both=False)
-    assert source.read_text() == "preserve"
+    assert source.read_text(encoding="utf-8") == "preserve"
 
 
 @pytest.mark.parametrize("destination", [".", "docs", "docs/generated"])
@@ -253,7 +256,7 @@ def test_bom_unicode_and_foreign_working_directory_launcher(tmp_path: Path) -> N
     page = root / "docs/page.md"
     page.rename(root / "docs/é space.MD")
     page = root / "docs/é space.MD"
-    page.write_text(page.read_text(), encoding="utf-8-sig")
+    page.write_text(page.read_text(encoding="utf-8"), encoding="utf-8-sig")
     environment = dict(os.environ, DOC_SAMPLES_ROOT=str(root), DOC_SAMPLES_OUT=str(output))
     node = shutil.which("node")
     assert node is not None
@@ -267,7 +270,7 @@ def test_bom_unicode_and_foreign_working_directory_launcher(tmp_path: Path) -> N
         timeout=60,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    unit = next(output.glob("*.cs")).read_text()
+    unit = next(output.glob("*.cs")).read_text(encoding="utf-8")
     assert "docs/é space.MD:5" in unit
     assert "Runtime samples: 1; Editor-only samples: 0" in result.stdout
 
@@ -296,9 +299,8 @@ def test_actual_repository_compiler_corpus(tmp_path: Path) -> None:
 def test_editor_compiler_control(tmp_path: Path) -> None:
     editor = tmp_path / "editor"
     editor.mkdir()
-    (
-        editor / "EditorControl.cs"
-    ).write_text("""namespace WallstopStudios.UnityHelpers.DocSamples.EditorControl
+    (editor / "EditorControl.cs").write_text(
+        """namespace WallstopStudios.UnityHelpers.DocSamples.EditorControl
 {
     internal static class EditorControl
     {
@@ -306,7 +308,9 @@ def test_editor_compiler_control(tmp_path: Path) -> None:
         internal static object Missing() => UnityEditor.Compilation.CompilationPipeline.DefinitelyMissingDocSampleEditorMember();
     }
 }
-""")
+""",
+        encoding="utf-8",
+    )
     dotnet = shutil.which("dotnet")
     assert dotnet is not None
     result = subprocess.run(
