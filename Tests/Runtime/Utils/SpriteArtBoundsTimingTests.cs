@@ -17,6 +17,37 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     [Category("Performance")]
     public sealed class SpriteArtBoundsTimingTests : CommonTestBase
     {
+        private static long Measure(
+            SpriteAlphaMask mask,
+            Sprite sprite,
+            bool readSprite,
+            int calls,
+            bool expected
+        )
+        {
+            int foundCount = 0;
+            long start = Stopwatch.GetTimestamp();
+            if (readSprite)
+            {
+                for (int call = 0; call < calls; ++call)
+                {
+                    foundCount += SpriteArtBounds.TryGetLocalArtBounds(sprite, out _, out _)
+                        ? 1
+                        : 0;
+                }
+            }
+            else
+            {
+                for (int call = 0; call < calls; ++call)
+                {
+                    foundCount += SpriteArtBounds.TryGetLocalArtBounds(mask, out _, out _) ? 1 : 0;
+                }
+            }
+            long elapsed = Stopwatch.GetTimestamp() - start;
+            Assert.AreEqual(expected ? calls : 0, foundCount);
+            return elapsed;
+        }
+
         [TestCase(0, false)]
         [TestCase(1, false)]
         [TestCase(2, false)]
@@ -139,37 +170,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             UnityEngine.Debug.Log(
                 $"BOUNDS-ROWS pattern={pattern} sprite={readSprite} calls={calls} nanoseconds={rounds}"
             );
-        }
-
-        private static long Measure(
-            SpriteAlphaMask mask,
-            Sprite sprite,
-            bool readSprite,
-            int calls,
-            bool expected
-        )
-        {
-            int foundCount = 0;
-            long start = Stopwatch.GetTimestamp();
-            if (readSprite)
-            {
-                for (int call = 0; call < calls; ++call)
-                {
-                    foundCount += SpriteArtBounds.TryGetLocalArtBounds(sprite, out _, out _)
-                        ? 1
-                        : 0;
-                }
-            }
-            else
-            {
-                for (int call = 0; call < calls; ++call)
-                {
-                    foundCount += SpriteArtBounds.TryGetLocalArtBounds(mask, out _, out _) ? 1 : 0;
-                }
-            }
-            long elapsed = Stopwatch.GetTimestamp() - start;
-            Assert.AreEqual(expected ? calls : 0, foundCount);
-            return elapsed;
         }
     }
 }
