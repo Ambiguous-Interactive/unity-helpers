@@ -1045,7 +1045,8 @@ function Get-EditorTestStallSeconds {
 
 # UUM-153198 crashes during startup artifact pruning before managed tests load.
 # A broken UDS memory pool can also stall the following Editor startup.
-# Match complete native paths so ordinary test and compilation failures stay fatal.
+# Unity can explicitly refuse a corrupted ArtifactDB while returning zero.
+# Match complete startup signatures before any managed test stream.
 function Test-UnityArtifactDatabaseStartupFailure {
     param([string]$LogPath)
 
@@ -1057,8 +1058,14 @@ function Test-UnityArtifactDatabaseStartupFailure {
     $sharedMemoryFailure = $log.Contains('[Error] Command buffer shared memory issue') -and
         $log.Contains('[Error] Tried to create a new semaphore handle') -and
         $log.Contains('uds_sharedmutex_init')
-    return (($pruningFailure -or $sharedMemoryFailure) -and
-        $log.Contains('InitializeAssetDatabaseV2') -and
+    $nativeInitializationFailure = ($pruningFailure -or $sharedMemoryFailure) -and
+        $log.Contains('InitializeAssetDatabaseV2')
+    $knownDatabaseRefusal = $log -match '(?m)^Exiting because Library/ArtifactDB is corrupted\. Relaunch Editor without batch mode to view additional options\.\r?$' -or
+        ($log.Contains("mdb_env_open failed on 'Library/ArtifactDB' with error: -30793 'MDB_INVALID: File is not an LMDB file'") -and
+            $log -match '(?m)^Exiting because Library/ArtifactDB file is locked\r?$')
+    $corruptionExit = $knownDatabaseRefusal -and
+        $log -match '(?m)^Exiting without the bug reporter\. Application will terminate with return code 0\r?$'
+    return (($nativeInitializationFailure -or $corruptionExit) -and
         -not $log.Contains('[uh-test-stream] RUN-STARTED') -and
         -not $log.Contains('error CS'))
 }

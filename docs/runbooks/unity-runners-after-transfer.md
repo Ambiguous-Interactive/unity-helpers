@@ -351,6 +351,7 @@ when the log contains both the command-buffer memory-pool error and the existing
 error, plus `uds_sharedmutex_init` and `InitializeAssetDatabaseV2` frames. Recovery requires
 a harness-owned Library marker, absent NUnit results and no started test stream or compiler
 error. Artifact-pruning crashes additionally require the native stack header.
+The paired native messages `Exiting because Library/ArtifactDB is corrupted. Relaunch Editor without batch mode to view additional options.` and `Exiting without the bug reporter. Application will terminate with return code 0` also qualify. Unity can emit this refusal with a zero process exit before loading the test framework. An exact `MDB_INVALID` error (-30793), followed by its native ArtifactDB lock/refusal and zero-exit messages, also qualifies.
 The failed log and execution receipt retain `.first-attempt` names. The complete failed
 Library moves to `Library.artifact-database-failure-<id>` inside the generated project, and Unity
 rebuilds its derived state. Before this move, earlier matching harness-owned failed Libraries

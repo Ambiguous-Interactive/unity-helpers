@@ -628,7 +628,23 @@ try {
     }
     $artifactStack = "========== OUTPUTTING STACK TRACE ==================`nFindArtifactsToRemove`nGarbageCollectArtifactsFromDB`nInitializeAssetDatabaseV2"
     $sharedMemoryStack = "[Error] Command buffer shared memory issue`n[Error] Tried to create a new semaphore handle`nuds_sharedmutex_init`nInitializeAssetDatabaseV2"
+    $corruptDatabaseExit = "Exiting because Library/ArtifactDB is corrupted. Relaunch Editor without batch mode to view additional options.`nExiting without the bug reporter. Application will terminate with return code 0"
+    $invalidDatabaseExit = "mdb_env_open failed on 'Library/ArtifactDB' with error: -30793 'MDB_INVALID: File is not an LMDB file'`nExiting because Library/ArtifactDB file is locked`nExiting without the bug reporter. Application will terminate with return code 0"
     foreach ($case in @(
+            @{ Name = 'invalid-database'; Log = $invalidDatabaseExit; Results = $false; Owned = $true; Recover = $true },
+            @{ Name = 'database-lock-only'; Log = "Exiting because Library/ArtifactDB file is locked`nExiting without the bug reporter. Application will terminate with return code 0"; Results = $false; Owned = $true; Recover = $false },
+            @{ Name = 'invalid-database-partial'; Log = "mdb_env_open failed on 'Library/ArtifactDB' with error: -30793 'MDB_INVALID: File is not an LMDB file'"; Results = $false; Owned = $true; Recover = $false },
+            @{ Name = 'invalid-database-after-tests'; Log = $invalidDatabaseExit + "`n[uh-test-stream] RUN-STARTED"; Results = $false; Owned = $true; Recover = $false },
+            @{ Name = 'invalid-database-compiler-error'; Log = $invalidDatabaseExit + "`nerror CS0001"; Results = $false; Owned = $true; Recover = $false },
+            @{ Name = 'invalid-database-results'; Log = $invalidDatabaseExit; Results = $true; Owned = $true; Recover = $false },
+            @{ Name = 'invalid-database-unowned'; Log = $invalidDatabaseExit; Results = $false; Owned = $false; Recover = $false },
+            @{ Name = 'explicit-corruption'; Log = $corruptDatabaseExit; Results = $false; Owned = $true; Recover = $true },
+            @{ Name = 'explicit-corruption-partial'; Log = 'Exiting because Library/ArtifactDB is corrupted.'; Results = $false; Owned = $true; Recover = $false },
+            @{ Name = 'explicit-corruption-exit-only'; Log = 'Exiting without the bug reporter. Application will terminate with return code 0'; Results = $false; Owned = $true; Recover = $false },
+            @{ Name = 'explicit-corruption-after-tests'; Log = $corruptDatabaseExit + "`n[uh-test-stream] RUN-STARTED"; Results = $false; Owned = $true; Recover = $false },
+            @{ Name = 'explicit-corruption-compiler-error'; Log = $corruptDatabaseExit + "`nerror CS0001"; Results = $false; Owned = $true; Recover = $false },
+            @{ Name = 'explicit-corruption-results'; Log = $corruptDatabaseExit; Results = $true; Owned = $true; Recover = $false },
+            @{ Name = 'explicit-corruption-unowned'; Log = $corruptDatabaseExit; Results = $false; Owned = $false; Recover = $false },
             @{ Name = 'startup-corruption'; Log = $artifactStack; Results = $false; Owned = $true; Recover = $true },
             @{ Name = 'partial-stack'; Log = 'FindArtifactsToRemove'; Results = $false; Owned = $true; Recover = $false },
             @{ Name = 'after-tests'; Log = $artifactStack + "`n[uh-test-stream] RUN-STARTED"; Results = $false; Owned = $true; Recover = $false },
