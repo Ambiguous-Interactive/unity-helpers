@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     using System.Collections.Generic;
     using System.Security.Cryptography;
     using NUnit.Framework;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     [TestFixture]
@@ -120,9 +121,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.AreEqual(123, writer.WrittenSpan[0]);
         }
 
-        [TestCase(false)]
-        [TestCase(true)]
-        public void MapWitnessMatchesLegacyForReorderedEntries(bool reverse)
+        [TestCase(false, false)]
+        [TestCase(true, false)]
+        [TestCase(false, true)]
+        [TestCase(true, true)]
+        public void MapWitnessMatchesLegacyForReorderedEntries(bool reverse, bool referenceIdentity)
         {
             ProtoBenchmarkMap expected = new()
             {
@@ -132,16 +135,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     ["second"] = int.MaxValue,
                 },
             };
-            ProtoBenchmarkMap actual = new() { Value = new Dictionary<string, int>() };
+            IEqualityComparer<string> comparer = referenceIdentity
+                ? ReferenceIdentityComparer<string>.Instance
+                : StringComparer.Ordinal;
+            ProtoBenchmarkMap actual = new() { Value = new Dictionary<string, int>(comparer) };
+            string first = new("first".ToCharArray());
+            string second = new("second".ToCharArray());
             if (reverse)
             {
-                actual.Value.Add("second", int.MaxValue);
-                actual.Value.Add("first", int.MinValue);
+                actual.Value.Add(second, int.MaxValue);
+                actual.Value.Add(first, int.MinValue);
             }
             else
             {
-                actual.Value.Add("first", int.MinValue);
-                actual.Value.Add("second", int.MaxValue);
+                actual.Value.Add(first, int.MinValue);
+                actual.Value.Add(second, int.MaxValue);
             }
             CollectionAssert.AreEquivalent(expected.Value, actual.Value);
             WProtoBenchmarkCorpus.AssertMaps(expected, actual);
@@ -153,6 +161,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [TestCase(3)]
         [TestCase(4)]
         [TestCase(5)]
+        [TestCase(6)]
         public void MapWitnessRejectsChangedEntries(int mutation)
         {
             ProtoBenchmarkMap expected = new()
@@ -186,6 +195,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     {
                         ["FIRST"] = 17,
                         ["second"] = 34,
+                    };
+                    break;
+                case 6:
+                    actual.Value = new Dictionary<string, int>(
+                        ReferenceIdentityComparer<string>.Instance
+                    )
+                    {
+                        ["first"] = 17,
+                        [new string("first".ToCharArray())] = 17,
                     };
                     break;
             }
@@ -226,7 +244,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             {
                 expected.Value.Add(index.ToString(), index * 17);
             }
-            for (int index = count - 1; index >= 0; --index)
+            for (int index = count - 1; 0 <= index; --index)
             {
                 actual.Value.Add(index.ToString(), index * 17);
             }

@@ -279,6 +279,11 @@ A failed move also stops the run without clearing the original project.
 EditMode runs compiler-isolation fixtures in a fresh editor process before the broader suite.
 These cases carry `CompilationIsolation` and must all pass without skips. Their results and log
 remain under the mode's `compilation/` artifact directory.
+On Unity 6000.5, this phase passes `-refreshImportMode InProcess` to avoid the
+import-worker teardown heap corruption recorded as UUM-135237. The same assets and
+all ten compiler cases still execute. Unity fixed this shutdown defect in 6000.6.0f1.
+[Unity release notes](https://unity.com/releases/editor/whats-new/6000.6.0f1)
+
 `OdinMigrationDictionaryCompilationTests` lives in the dedicated
 `WallstopStudios.UnityHelpers.Tests.Editor.OdinCompilation` assembly. The compiler target and
 runtime caller remain separate test assemblies. The general Editor Tools test assembly does not
@@ -336,6 +341,16 @@ so an older readable file cannot certify a new attempt. Raw log lines and full
 Windows event messages are excluded from the receipt, and credential redaction still runs before
 writing it. Before a Package Manager retry overwrites the log and receipt, both first-attempt
 files are preserved with `.first-attempt` in their names.
+
+An Editor test invocation also recovers once from the startup artifact-pruning crash
+whose native stack contains `FindArtifactsToRemove`, `GarbageCollectArtifactsFromDB`
+and `InitializeAssetDatabaseV2`. Recovery requires a harness-owned Library marker,
+a native stack header, absent NUnit results and no started test stream or compiler error.
+The failed log and execution receipt retain `.first-attempt` names. The complete failed
+Library moves to `Library.artifact-database-failure-<id>` inside the generated project, and Unity
+rebuilds its derived state. A second failure propagates. Retain that directory when
+investigating the cache corruption. Unity tracks this startup defect as UUM-153198.
+[Unity issue tracker](https://issuetracker.unity.com/issues/25007/crash-on-isartifactstillrelevant-when-opening-a-project-with-corrupted-library)
 
 On Windows, these invocations also receive an isolated `-crash-report-folder` and a unique
 `-upmLogFile`. Both write outside uploaded artifacts. The receipt's `Process.NativeEvidence`

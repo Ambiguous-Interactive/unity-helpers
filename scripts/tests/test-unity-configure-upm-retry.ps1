@@ -50,6 +50,7 @@ foreach ($name in @(
         'Get-EditorTestCompletionGraceSeconds',
         'Get-EditorTestRunTimeoutSeconds',
         'Get-EditorTestStallSeconds',
+        'Test-UnityArtifactDatabaseStartupFailure',
         'Invoke-UnityEditorTestsWithPackageManagerRetry',
         'Invoke-UnityConfigurePass'
     )) {
@@ -618,6 +619,63 @@ try {
         Assert-That ($case.Name + ' configure preserves failure classification') ($preloadThrew -eq ($case.ExpectedCalls -eq 1))
 
     }
+
+    $artifactStack = "========== OUTPUTTING STACK TRACE ==================`nFindArtifactsToRemove`nGarbageCollectArtifactsFromDB`nInitializeAssetDatabaseV2"
+    foreach ($case in @(
+            @{ Name = 'startup-corruption'; Log = $artifactStack; Results = $false; Owned = $true; Recover = $true },
+            @{ Name = 'partial-stack'; Log = 'FindArtifactsToRemove'; Results = $false; Owned = $true; Recover = $false },
+            @{ Name = 'after-tests'; Log = $artifactStack + "`n[uh-test-stream] RUN-STARTED"; Results = $false; Owned = $true; Recover = $false },
+            @{ Name = 'compiler-error'; Log = $artifactStack + "`nerror CS0001"; Results = $false; Owned = $true; Recover = $false },
+            @{ Name = 'existing-results'; Log = $artifactStack; Results = $true; Owned = $true; Recover = $false },
+            @{ Name = 'unowned-library'; Log = $artifactStack; Results = $false; Owned = $false; Recover = $false }
+        )) {
+        $project = Join-Path $temporaryRoot $case.Name
+        $library = Join-Path $project 'Library'
+        $null = New-Item -ItemType Directory -Force $library
+        Set-Content (Join-Path $library 'ArtifactDB') 'corrupt-control'
+        if ($case.Owned) { Set-Content (Join-Path $library '.unity-helpers-repo-root.txt') 'owned-control' }
+        $artifactResults = Join-Path $project 'results.xml'
+        if ($case.Results) { Set-Content $artifactResults '<test-run />' }
+        $script:artifactCalls = 0
+        $script:artifactLog = $case.Log
+        function Invoke-UnityEditor {
+            param($EditorPath, $Arguments, $Label, $LogPath, $CompletionPattern, $CompletionGraceSeconds, $TimeoutSeconds, $StallSeconds)
+            ++$script:artifactCalls
+            Set-Content $LogPath $script:artifactLog
+            throw 'No loaded Test Framework snapshot was captured.'
+        }
+        $recoveryThrew = $false
+        try { $null = Invoke-UnityEditorTestsWithPackageManagerRetry -EditorPath 'owned-editor' -Arguments @('-runTests') -Label $case.Name -LogPath $nativeLog -ResultsPath $artifactResults -Project $project }
+        catch { $recoveryThrew = $true }
+        $expectedCalls = if ($case.Recover) { 2 } else { 1 }
+        Assert-That ($case.Name + ' bounds recovery and preserves persistent failure') ($script:artifactCalls -eq $expectedCalls -and $recoveryThrew)
+        $retained = @(Get-ChildItem -LiteralPath $project -Directory -Filter 'Library.artifact-database-failure-*')
+        Assert-That ($case.Name + ' retains only the failed owned cache') ($retained.Count -eq [int]$case.Recover)
+        if ($case.Recover) {
+            Assert-That 'corrupt ArtifactDB remains available for diagnosis' ((Get-Content (Join-Path $retained[0].FullName 'ArtifactDB') -Raw).Trim() -ceq 'corrupt-control')
+            Assert-That 'startup recovery preserves the first native log' ((Get-Content (Join-Path $temporaryRoot 'native.first-attempt.log') -Raw).Contains('GarbageCollectArtifactsFromDB'))
+        }
+    }
+
+    $project = Join-Path $temporaryRoot 'startup-recovers'
+    $library = Join-Path $project 'Library'
+    $null = New-Item -ItemType Directory -Force $library
+    Set-Content (Join-Path $library '.unity-helpers-repo-root.txt') 'owned-control'
+    $script:artifactCalls = 0
+    $script:artifactLog = $artifactStack
+    function Invoke-UnityEditor {
+        param($EditorPath, $Arguments, $Label, $LogPath, $CompletionPattern, $CompletionGraceSeconds, $TimeoutSeconds, $StallSeconds)
+        ++$script:artifactCalls
+        if ($script:artifactCalls -eq 1) {
+            Set-Content $LogPath $script:artifactLog
+            throw 'No loaded Test Framework snapshot was captured.'
+        }
+        Set-Content $LogPath 'Recovered editor'
+        return 0
+    }
+    $recoveredExit = Invoke-UnityEditorTestsWithPackageManagerRetry -EditorPath 'owned-editor' -Arguments @('-runTests') -Label 'startup-recovers' -LogPath $nativeLog -ResultsPath (Join-Path $project 'results.xml') -Project $project
+    Assert-That 'startup recovery returns the second native result' ($recoveredExit -eq 0 -and $script:artifactCalls -eq 2)
+    Assert-That 'rebuilt Library preserves its ownership marker' ((Get-Content (Join-Path $library '.unity-helpers-repo-root.txt') -Raw).Trim() -ceq 'owned-control')
 
 
 } finally {

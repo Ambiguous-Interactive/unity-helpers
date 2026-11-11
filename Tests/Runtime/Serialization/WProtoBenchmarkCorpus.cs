@@ -156,8 +156,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             {
                 return;
             }
+            HashSet<string> observedKeys = new(StringComparer.Ordinal);
             foreach (KeyValuePair<string, int> entry in actualValues)
             {
+                Assert.IsTrue(observedKeys.Add(entry.Key));
                 Assert.IsTrue(expectedValues.TryGetValue(entry.Key, out int expectedValue));
                 Assert.AreEqual(expectedValue, entry.Value);
             }

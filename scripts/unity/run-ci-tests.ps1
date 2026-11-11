@@ -1043,6 +1043,21 @@ function Get-EditorTestStallSeconds {
     return $Default
 }
 
+# UUM-153198 crashes during startup artifact pruning before managed tests load.
+# Match the complete native path so ordinary test and compilation failures stay fatal.
+function Test-UnityArtifactDatabaseStartupFailure {
+    param([string]$LogPath)
+
+    if (-not (Test-Path -LiteralPath $LogPath -PathType Leaf)) { return $false }
+    $log = [IO.File]::ReadAllText($LogPath)
+    return ($log.Contains('========== OUTPUTTING STACK TRACE') -and
+        $log.Contains('FindArtifactsToRemove') -and
+        $log.Contains('GarbageCollectArtifactsFromDB') -and
+        $log.Contains('InitializeAssetDatabaseV2') -and
+        -not $log.Contains('[uh-test-stream] RUN-STARTED') -and
+        -not $log.Contains('error CS'))
+}
+
 function Invoke-UnityEditorTestsWithPackageManagerRetry {
     param(
         [Parameter(Mandatory = $true)][string]$EditorPath,
@@ -1069,17 +1084,25 @@ function Invoke-UnityEditorTestsWithPackageManagerRetry {
             -StallSeconds $runStall
     } catch {
         if ((Test-Path -LiteralPath $ResultsPath -PathType Leaf) -or
-            -not (Test-UnityConfigurePackageManagerRetryableFailure -LogPath $LogPath)) { throw }
+            (-not (Test-UnityConfigurePackageManagerRetryableFailure -LogPath $LogPath) -and
+                -not (Test-UnityArtifactDatabaseStartupFailure -LogPath $LogPath))) { throw }
         $runExit = 1
     }
 
+    $artifactDatabaseFailure = Test-UnityArtifactDatabaseStartupFailure -LogPath $LogPath
     if ((Test-Path -LiteralPath $ResultsPath -PathType Leaf) -or
-        -not (Test-UnityPackageManagerTransientFailure -LogPath $LogPath)) {
+        (-not $artifactDatabaseFailure -and -not (Test-UnityPackageManagerTransientFailure -LogPath $LogPath))) {
         return $runExit
     }
 
-    Write-CiWarning "Unity Package Manager canceled package resolution before NUnit results existed; clearing UPM state and retrying once."
-    Write-UnityPackageManagerTransientFailureWarnings -LogPath $LogPath
+    $retryReason = 'UPM cancellation'
+    if ($artifactDatabaseFailure) {
+        $retryReason = 'startup artifact-database corruption (UUM-153198)'
+        Write-CiWarning 'Unity crashed while pruning its artifact database before tests loaded; retaining the failed Library and rebuilding once.'
+    } else {
+        Write-CiWarning 'Unity Package Manager canceled package resolution before NUnit results existed; clearing UPM state and retrying once.'
+        Write-UnityPackageManagerTransientFailureWarnings -LogPath $LogPath
+    }
     $firstAttemptLogPath = Join-Path (Split-Path -Parent $LogPath) ("{0}.first-attempt.log" -f [System.IO.Path]::GetFileNameWithoutExtension($LogPath))
     try {
         Copy-Item -LiteralPath $LogPath -Destination $firstAttemptLogPath -Force -ErrorAction Stop
@@ -1095,7 +1118,21 @@ function Invoke-UnityEditorTestsWithPackageManagerRetry {
             Write-CiWarning 'Could not preserve first failed Unity execution diagnostics before retry.'
         }
     }
-    Clear-UnityPackageManagerRetryState -Project $Project
+    if ($artifactDatabaseFailure) {
+        $library = Join-Path $Project 'Library'
+        $marker = Join-Path $library '.unity-helpers-repo-root.txt'
+        if (-not (Test-Path -LiteralPath $marker -PathType Leaf)) {
+            throw 'Artifact-database recovery requires a harness-owned Library marker.'
+        }
+        $repoMarker = [IO.File]::ReadAllText($marker)
+        $retainedLibrary = Join-Path $Project ('Library.artifact-database-failure-' + [guid]::NewGuid().ToString('N'))
+        Move-Item -LiteralPath $library -Destination $retainedLibrary -ErrorAction Stop
+        $null = New-Item -ItemType Directory -Path $library
+        [IO.File]::WriteAllText($marker, $repoMarker)
+        Write-CiNotice "Retained failed Library for diagnosis: $retainedLibrary"
+    } else {
+        Clear-UnityPackageManagerRetryState -Project $Project
+    }
 
     if (Test-Path -LiteralPath $ResultsPath -PathType Leaf) {
         Remove-Item -LiteralPath $ResultsPath -Force
@@ -1104,7 +1141,7 @@ function Invoke-UnityEditorTestsWithPackageManagerRetry {
     return Invoke-UnityEditor `
         -EditorPath $EditorPath `
         -Arguments $Arguments `
-        -Label "$Label (retry 1 after UPM cancellation)" `
+        -Label "$Label (retry 1 after $retryReason)" `
         -LogPath $LogPath `
         -CompletionPattern $script:EditorTestCompletionSentinel `
         -CompletionGraceSeconds $completionGrace `
@@ -1182,9 +1219,14 @@ function New-UnityEditorTestPhases {
 }
 
 function New-UnityEditorPhaseArguments {
-    param([string[]]$Arguments, [string]$TestCategory, [string]$TestFilter)
+    param([string[]]$Arguments, [string]$TestCategory, [string]$TestFilter, [string]$UnityVersion)
 
     $phaseArguments = @($Arguments)
+    # UUM-135237 corrupts the heap when 6000.5 tears down an import worker
+    # after the compilation-isolation fixture. Import the same assets in-process.
+    if ($UnityVersion -match '^6000\.5\.' -and $TestCategory -ceq 'CompilationIsolation') {
+        $phaseArguments += @('-refreshImportMode', 'InProcess')
+    }
     if (-not [string]::IsNullOrWhiteSpace($TestCategory)) {
         $phaseArguments += @('-testCategory', $TestCategory)
     }
@@ -5680,7 +5722,7 @@ try {
             -IsolateCompilationFixtures:$IsolateCompilationFixtures -EditorPhaseGroup $EditorPhaseGroup)
         foreach ($phase in $phases) {
             $phaseArguments = @(New-UnityEditorPhaseArguments -Arguments $testArgs `
-                -TestCategory $phase.TestCategory -TestFilter $phase.TestFilter)
+                -TestCategory $phase.TestCategory -TestFilter $phase.TestFilter -UnityVersion $UnityVersion)
             Invoke-UnityEditorTestPhase -EditorPath $UnityEditorPath `
                 -Arguments $phaseArguments -Label "Run Unity $UnityVersion $TestMode tests" `
                 -ArtifactsPath $phase.ArtifactsPath -Project $ProjectPath -PackageRoot $RepoRoot `

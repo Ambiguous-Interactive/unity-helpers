@@ -149,6 +149,18 @@ foreach ($TestFilter in @('', $expectedFilter)) {
     }
 }
 
+foreach ($version in @('2021.3.45f1', '6000.5.2f1', '6000.6.0f1')) {
+    foreach ($category in @('CompilationIsolation', 'MigrationIsolation', 'FocusedAcceptance')) {
+        $arguments = @(New-UnityEditorPhaseArguments -Arguments @('-runTests', '-projectPath', 'owned project') `
+            -TestCategory $category -TestFilter 'Owned.Fixture' -UnityVersion $version)
+        $position = [Array]::IndexOf($arguments, '-refreshImportMode')
+        $expectedOverride = $version -ceq '6000.5.2f1' -and $category -ceq 'CompilationIsolation'
+        if (($position -ge 0) -ne $expectedOverride) { throw 'Import-mode override escaped the affected version and phase.' }
+        if ($expectedOverride -and $arguments[$position + 1] -cne 'InProcess') { throw 'Affected phase lost in-process importing.' }
+        if ($arguments[2] -cne 'owned project' -or $arguments[-1] -cne 'Owned.Fixture') { throw 'Import override changed existing arguments.' }
+    }
+}
+
 $invocations = @($ast.FindAll({
             param($node)
             $node -is [System.Management.Automation.Language.CommandAst] -and
