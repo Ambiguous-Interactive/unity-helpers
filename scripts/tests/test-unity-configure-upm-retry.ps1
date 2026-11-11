@@ -747,6 +747,38 @@ try {
     Assert-That 'a new setup failure has no stale current log' (-not (Test-Path -LiteralPath $nativeLog))
 
 
+    $lockedProject = Join-Path $temporaryRoot 'locked-diagnostics'
+    $lockedLibrary = Join-Path $lockedProject 'Library'
+    $null = New-Item -ItemType Directory -Force $lockedLibrary
+    Set-Content (Join-Path $lockedLibrary '.unity-helpers-repo-root.txt') 'owned-control'
+    $script:lockedRetention = Join-Path $lockedProject ('Library.artifact-database-failure-' + ('f' * 32))
+    $null = New-Item -ItemType Directory $script:lockedRetention
+    Set-Content (Join-Path $script:lockedRetention '.unity-helpers-repo-root.txt') 'owned-control'
+    function Remove-Item {
+        param([string]$LiteralPath, [switch]$Recurse, [switch]$Force, [object]$ErrorAction)
+        if ($LiteralPath -ceq $script:lockedRetention) { throw 'Controlled locked diagnostic directory.' }
+        Microsoft.PowerShell.Management\Remove-Item @PSBoundParameters
+    }
+    $script:lockedCalls = 0
+    $script:artifactLog = $artifactStack
+    function Invoke-UnityEditor {
+        param($EditorPath, $Arguments, $Label, $LogPath, $CompletionPattern, $CompletionGraceSeconds, $TimeoutSeconds, $StallSeconds)
+        ++$script:lockedCalls
+        if ($script:lockedCalls -eq 1) {
+            Set-Content -LiteralPath $LogPath -Value $script:artifactLog
+            throw 'No loaded Test Framework snapshot was captured.'
+        }
+        Set-Content -LiteralPath $LogPath -Value 'Recovered editor'
+        return 0
+    }
+    $lockedExit = $null
+    try {
+        $lockedExit = Invoke-UnityEditorTestsWithPackageManagerRetry -EditorPath 'owned-editor' -Arguments @('-runTests') -Label 'locked-diagnostics' -LogPath $nativeLog -ResultsPath (Join-Path $lockedProject 'results.xml') -Project $lockedProject
+    } catch { $lockedExit = $null }
+    Assert-That 'locked older diagnostics allow the native recovery attempt' ($lockedExit -eq 0 -and $script:lockedCalls -eq 2)
+    Assert-That 'locked older diagnostics remain available' (Test-Path -LiteralPath $script:lockedRetention)
+    Assert-That 'locked older diagnostics produce an explicit warning' (@($script:notices | Where-Object { $_ -like 'warning:Could not remove earlier failed Library*' }).Count -eq 1)
+
 
 } finally {
     Remove-Item -LiteralPath $temporaryRoot -Recurse -Force -ErrorAction SilentlyContinue

@@ -400,3 +400,32 @@ def test_parallel_checks_isolate_startup_caches_and_preserve_uv(
         assert not Path(cache).exists()
         assert uv == expected_uv
     assert {name: os.environ.get(name) for name in before} == before
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="Linux startup-cache environment")
+@pytest.mark.parametrize("error_type", [RuntimeError, KeyError])
+@pytest.mark.parametrize("uv_cache", [None, "explicit uv"])
+@pytest.mark.parametrize("cache_home", [None, "explicit cache"])
+def test_home_lookup_is_lazy_and_failures_retain_all_results(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    error_type: type[RuntimeError | KeyError],
+    uv_cache: str | None,
+    cache_home: str | None,
+) -> None:
+    for name, value in (("UV_CACHE_DIR", uv_cache), ("XDG_CACHE_HOME", cache_home)):
+        if value is None:
+            monkeypatch.delenv(name, raising=False)
+        else:
+            monkeypatch.setenv(name, str(tmp_path / value))
+
+    def unavailable_home() -> Path:
+        raise error_type("controlled home lookup failure")
+
+    monkeypatch.setattr(Path, "home", unavailable_home)
+    results = run_checks([Check("first", "First", "true"), Check("second", "Second", "exit 3")], 2)
+    assert [result.id for result in results] == ["first", "second"]
+    assert [result.ok for result in results] == [bool(uv_cache or cache_home), False]
+    if not uv_cache and not cache_home:
+        assert error_type.__name__ in capsys.readouterr().out

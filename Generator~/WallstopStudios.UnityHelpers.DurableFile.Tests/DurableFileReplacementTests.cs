@@ -98,6 +98,22 @@ namespace WallstopStudios.UnityHelpers.DurableFile.Tests
             }
         }
 
+        private static IEnumerable<TestCaseData> SharingFailureCases()
+        {
+            foreach (string operation in Operations)
+            {
+                foreach (int errorCode in new[] { 32, 1175, 29 })
+                {
+                    foreach (int failures in new[] { 1, 2, 3, 4 })
+                    {
+                        yield return new TestCaseData(operation, errorCode, failures).SetName(
+                            $"Replacement.{operation}.Error{errorCode}.Failures{failures}"
+                        );
+                    }
+                }
+            }
+        }
+
         private static Exception UnsupportedFailure(bool platformFailure)
         {
             return platformFailure
@@ -253,6 +269,46 @@ namespace WallstopStudios.UnityHelpers.DurableFile.Tests
             );
             Assert.AreEqual(1, SimulatedFile.ReplacementCalls);
             Assert.AreEqual(0, SimulatedFile.DestinationDeleteCalls);
+            AssertPublicationCleanup();
+        }
+
+        [TestCaseSource(nameof(SharingFailureCases))]
+        public async Task ReplacementContentionIsBoundedAndPreservesPublication(
+            string operation,
+            int errorCode,
+            int failures
+        )
+        {
+            RealFile.WriteAllBytes(_destination, OriginalBytes);
+            IOException failure = new IOException(
+                "Simulated Windows replacement failure.",
+                unchecked((int)0x80070000) | errorCode
+            );
+            SimulatedFile.ReplacementFailure = failure;
+            SimulatedFile.ReplacementFailuresRemaining = failures;
+
+            Exception error = await Execute(operation);
+
+            bool retryable = errorCode == 32 || errorCode == 1175;
+            bool recovered = retryable && failures < 3;
+            if (recovered)
+            {
+                Assert.IsTrue(error == null, error?.ToString());
+            }
+            else
+            {
+                Assert.AreSame(failure, error);
+            }
+            CollectionAssert.AreEqual(
+                recovered ? ExpectedBytes(operation) : OriginalBytes,
+                RealFile.ReadAllBytes(_destination)
+            );
+            Assert.AreEqual(
+                retryable ? Math.Min(failures + 1, 3) : 1,
+                SimulatedFile.ReplacementCalls
+            );
+            Assert.AreEqual(0, SimulatedFile.DestinationDeleteCalls);
+            Assert.AreEqual(0, SimulatedFile.MoveCalls);
             AssertPublicationCleanup();
         }
 

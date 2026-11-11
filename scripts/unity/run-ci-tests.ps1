@@ -1137,14 +1137,18 @@ function Invoke-UnityEditorTestsWithPackageManagerRetry {
             throw 'Artifact-database recovery requires a harness-owned Library marker.'
         }
         $repoMarker = [IO.File]::ReadAllText($marker)
-        # Keep one failed harness-owned Library per project for diagnosis.
+        # Prune earlier harness-owned diagnostics when their files can be removed.
         foreach ($previous in @(Get-ChildItem -LiteralPath $Project -Directory -Force -Filter 'Library.artifact-database-failure-*')) {
             if ($previous.Name -cnotmatch '^Library\.artifact-database-failure-[0-9a-f]{32}$' -or
                 ($previous.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { continue }
-            $previousMarker = Join-Path $previous.FullName '.unity-helpers-repo-root.txt'
-            if ((Test-Path -LiteralPath $previousMarker -PathType Leaf) -and
-                [IO.File]::ReadAllText($previousMarker) -ceq $repoMarker) {
-                Remove-Item -LiteralPath $previous.FullName -Recurse -Force -ErrorAction Stop
+            try {
+                $previousMarker = Join-Path $previous.FullName '.unity-helpers-repo-root.txt'
+                if ((Test-Path -LiteralPath $previousMarker -PathType Leaf) -and
+                    [IO.File]::ReadAllText($previousMarker) -ceq $repoMarker) {
+                    Remove-Item -LiteralPath $previous.FullName -Recurse -Force -ErrorAction Stop
+                }
+            } catch {
+                Write-CiWarning "Could not remove earlier failed Library '$($previous.FullName)': $($_.Exception.Message)"
             }
         }
         $retainedLibrary = Join-Path $Project ('Library.artifact-database-failure-' + [guid]::NewGuid().ToString('N'))

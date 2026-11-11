@@ -156,8 +156,8 @@ def run_check(check: Check) -> Result:
         # when independent Linux checks launch PowerShell at the same time.
         with tempfile.TemporaryDirectory(prefix="unity-helpers-check-cache-") as cache:
             if sys.platform == "linux":
-                cache_home = environment.get("XDG_CACHE_HOME") or str(Path.home() / ".cache")
                 if not environment.get("UV_CACHE_DIR"):
+                    cache_home = environment.get("XDG_CACHE_HOME") or str(Path.home() / ".cache")
                     environment["UV_CACHE_DIR"] = str(Path(cache_home) / "uv")
                 environment["XDG_CACHE_HOME"] = cache
             process = subprocess.run(  # noqa: S603 - reviewed repository shell commands are intentional.
@@ -172,7 +172,7 @@ def run_check(check: Check) -> Result:
         status = process.returncode
         output = process.stdout.decode("utf-8", errors="replace")
         reason = f"signal {-status}" if status < 0 else f"exit {status}"
-    except OSError as error:
+    except (OSError, RuntimeError, KeyError) as error:
         status = None
         output = f"{error.__class__.__name__}: {error}\n"
         if isinstance(error, FileNotFoundError):

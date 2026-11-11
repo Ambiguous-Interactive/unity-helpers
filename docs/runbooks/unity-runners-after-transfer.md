@@ -354,10 +354,11 @@ error. Artifact-pruning crashes additionally require the native stack header.
 The failed log and execution receipt retain `.first-attempt` names. The complete failed
 Library moves to `Library.artifact-database-failure-<id>` inside the generated project, and Unity
 rebuilds its derived state. Before this move, earlier matching harness-owned failed Libraries
-in the current project are removed, retaining one failed Library per project. Foreign markers,
+in the current project are pruned, targeting one failed Library per project. A locked older copy
+produces a warning and remains available while recovery continues. Foreign markers,
 unrecognized directory names and linked directories are preserved. Each attempt removes its
 previous current log before launch, so an earlier stack cannot authorize a new recovery. A second failure propagates. Retain that directory when
-investigating the cache corruption. Unity tracks this startup defect as UUM-153198.
+investigating the cache corruption. Unity tracks the artifact-pruning crash as UUM-153198.
 [Unity issue tracker](https://issuetracker.unity.com/issues/25007/crash-on-isartifactstillrelevant-when-opening-a-project-with-corrupted-library)
 
 On Windows, these invocations also receive an isolated `-crash-report-folder` and a unique

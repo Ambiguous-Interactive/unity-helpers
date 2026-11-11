@@ -31,6 +31,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     /// It is <b>not</b> full crash safety — .NET cannot flush a <i>directory</i>, so a filesystem
     /// may still reorder the rename behind the data write. On platforms without
     /// <c>File.Replace</c>, replacement reports failure and preserves the existing destination.
+    /// Windows sharing violations and inability to remove the replaced file receive up to three
+    /// replacement attempts with 10 ms and 20 ms waits while retaining staged contents and ownership.
+    /// Persistent contention reports failure and preserves the existing destination.
     /// Creating an absent destination remains supported. A second process using the public write,
     /// append, or delete APIs cannot take ownership of the same destination while one of them is active; its operation
     /// reports failure instead. This is ownership isolation, not a cross-process transaction or a
@@ -65,6 +68,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         // FileMode.Append does not provide atomic append; bounded per-path gates prevent writer overlap.
         private const int GateCount = 32;
+        private const int SharingViolationHResult = unchecked((int)0x80070020);
+        private const int UnableToRemoveReplacedHResult = unchecked((int)0x80070497);
+        private const int ReplacementAttemptLimit = 3;
+        private const int ReplacementRetryDelayMilliseconds = 10;
 
         private static readonly SemaphoreSlim[] Gates = CreateGates();
 
@@ -1467,13 +1474,29 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         private static void Replace(string temporaryPath, string path)
         {
-            try
+            for (int attempt = 1; ; ++attempt)
             {
-                File.Replace(temporaryPath, path, destinationBackupFileName: null);
-            }
-            catch (FileNotFoundException)
-            {
-                File.Move(temporaryPath, path);
+                try
+                {
+                    File.Replace(temporaryPath, path, destinationBackupFileName: null);
+                    return;
+                }
+                catch (IOException failure)
+                    when (attempt < ReplacementAttemptLimit
+                        && (
+                            failure.HResult == SharingViolationHResult
+                            || failure.HResult == UnableToRemoveReplacedHResult
+                        )
+                    )
+                {
+                    // These Windows errors retain both names, so the same staged bytes can be retried.
+                    Thread.Sleep(ReplacementRetryDelayMilliseconds * attempt);
+                }
+                catch (FileNotFoundException)
+                {
+                    File.Move(temporaryPath, path);
+                    return;
+                }
             }
         }
     }

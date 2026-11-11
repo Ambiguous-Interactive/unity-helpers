@@ -1223,6 +1223,7 @@ cancelled append may have written part of its new record.
   destination still uses a move; subsequent replacements require platform support.
 - The data is forced out of the page cache before the swap makes it live.
 - Concurrent writes to the same path from your game are serialized.
+- Windows sharing violations and replacement error 1175 receive up to three replacement attempts with 10 ms and 20 ms waits. The staged bytes and ownership remain held through these attempts. Persistent contention reports failure and preserves the previous save. Other replacement failures propagate immediately.
 - A second process using the public `DurableFile` write, append, or delete APIs cannot change the same
   destination while the first operation owns it. Its competing operation reports failure.
 
