@@ -547,6 +547,33 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.AreSame(cachedName, secondCall);
         }
 
+        [TestCase(241)]
+        [TestCase(249)]
+        [TestCase(255)]
+        public void CachedNameRetainsSmallFlagCombinationsAboveDeclaredValues(int bits)
+        {
+            BoundedFlags value = (BoundedFlags)bits;
+
+            string first = value.ToCachedName();
+
+            Assert.AreEqual(value.ToString("G"), first);
+            Assert.AreSame(first, value.ToCachedName());
+        }
+
+        [TestCase(257)]
+        [TestCase(511)]
+        public void CachedNameDoesNotExtendWideFlagCombinations(int bits)
+        {
+            WideFlags value = (WideFlags)bits;
+
+            string first = value.ToCachedName();
+            string second = value.ToCachedName();
+
+            Assert.AreEqual(value.ToString("G"), first);
+            Assert.AreEqual(first, second);
+            Assert.AreNotSame(first, second);
+        }
+
         /// <summary>
         /// An enum whose declared values span more than the 256-slot array window falls back to a
         /// dictionary, and that dictionary used to take an entry for every value it was asked
@@ -1066,6 +1093,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Seventh = 1 << 6,
             Eighth = 1 << 7,
             All = First | Second | Third | Fourth | Fifth | Sixth | Seventh | Eighth,
+        }
+
+        [Flags]
+        private enum BoundedFlags : byte
+        {
+            First = 1,
+            Second = 2,
+            Third = 4,
+            Fourth = 8,
+            Upper = 240,
+        }
+
+        [Flags]
+        private enum WideFlags : ushort
+        {
+            First = 1,
+            Upper = 256,
         }
 
         private enum SmallTestEnum : short

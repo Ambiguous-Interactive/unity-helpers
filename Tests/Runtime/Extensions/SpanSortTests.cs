@@ -66,6 +66,78 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.That(values[length + 1], Is.EqualTo(int.MinValue));
         }
 
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(17)]
+        [TestCase(257)]
+        public void InPlaceInsertionSortPreservesEqualKeysAndSurroundingStorage(int count)
+        {
+            (int key, int order)[] values = new (int, int)[count + 2];
+            values[0] = (int.MinValue, -1);
+            values[count + 1] = (int.MaxValue, -1);
+            for (int index = 0; index < count; ++index)
+            {
+                values[index + 1] = ((index * 17) % 13, index);
+            }
+            (int key, int order)[] expected = values.AsSpan(1, count).ToArray();
+            Array.Sort(
+                expected,
+                Comparer<(int key, int order)>.Create(
+                    static (left, right) =>
+                    {
+                        int key = left.key.CompareTo(right.key);
+                        return key == 0 ? left.order.CompareTo(right.order) : key;
+                    }
+                )
+            );
+
+            values
+                .AsSpan(1, count)
+                .InsertionSortInPlace(
+                    Comparer<(int key, int order)>.Create(
+                        static (left, right) => left.key.CompareTo(right.key)
+                    )
+                );
+
+            CollectionAssert.AreEqual(expected, values.AsSpan(1, count).ToArray());
+            Assert.AreEqual((int.MinValue, -1), values[0]);
+            Assert.AreEqual((int.MaxValue, -1), values[count + 1]);
+        }
+
+        [Test]
+        public void InPlaceInsertionSortSupportsStackStorageAndDescendingOrder()
+        {
+            Span<int> span = stackalloc int[] { 3, 1, 2, 3, -4 };
+            span.InsertionSortInPlace(
+                Comparer<int>.Create(static (left, right) => right.CompareTo(left))
+            );
+            CollectionAssert.AreEqual(new[] { 3, 3, 2, 1, -4 }, span.ToArray());
+        }
+
+        [Test]
+        public void InPlaceInsertionSortKeepsEveryValueAfterAComparerThrows()
+        {
+            int[] values = { 4, 3, 1, 2 };
+            int comparisons = 0;
+            IComparer<int> comparer = Comparer<int>.Create(
+                (left, right) =>
+                {
+                    if (++comparisons == 3)
+                    {
+                        throw new InvalidOperationException();
+                    }
+                    return left.CompareTo(right);
+                }
+            );
+
+            Assert.Throws<InvalidOperationException>(() =>
+                values.AsSpan().InsertionSortInPlace(comparer)
+            );
+            Assert.AreEqual(3, comparisons);
+            CollectionAssert.AreEqual(new[] { 3, 4, 1, 2 }, values);
+        }
+
         [TestCaseSource(nameof(Algorithms))]
         public void SortSupportsStackStorageAndDescendingComparer(SortAlgorithm algorithm)
         {

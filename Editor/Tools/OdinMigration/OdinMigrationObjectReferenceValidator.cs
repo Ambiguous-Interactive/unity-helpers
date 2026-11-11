@@ -74,6 +74,59 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             _objects = captured.AsReadOnly();
         }
 
+        internal static AuthoredAssetDocument NormalizeSceneReferences(
+            AuthoredAssetDocument document,
+            IReadOnlyList<string> lines
+        )
+        {
+            IReadOnlyList<AuthoredAssetEntry> entries = document.Entries;
+            int count = entries.Count;
+            AuthoredAssetEntry[] normalized = null;
+            for (int index = 0; index < count; ++index)
+            {
+                AuthoredAssetEntry entry = entries[index];
+                if (
+                    entry.HasBlockValue
+                    && (
+                        string.Equals(
+                            entry.Key,
+                            CorrespondingSourceObjectKey,
+                            StringComparison.Ordinal
+                        ) || string.Equals(entry.Key, PrefabInstanceKey, StringComparison.Ordinal)
+                    )
+                    && entry.InlineValue.StartsWith("{", StringComparison.Ordinal)
+                    && !entry.InlineValue.EndsWith("}", StringComparison.Ordinal)
+                )
+                {
+                    if (normalized == null)
+                    {
+                        normalized = new AuthoredAssetEntry[count];
+                        for (int prefix = 0; prefix < index; ++prefix)
+                        {
+                            normalized[prefix] = entries[prefix];
+                        }
+                    }
+                    entry = NormalizeSceneReference(entry, lines);
+                }
+                if (normalized != null)
+                {
+                    normalized[index] = entry;
+                }
+            }
+
+            return normalized == null
+                ? document
+                : new AuthoredAssetDocument(
+                    document.FileId,
+                    document.UnityTypeId,
+                    document.RootKey,
+                    document.IsStripped,
+                    document.StartLineNumber,
+                    document.EndLineNumber,
+                    Array.AsReadOnly(normalized)
+                );
+        }
+
         private static IReadOnlyDictionary<long, AuthoredAssetDocument> ReadScene(string guid)
         {
             string assetPath = AssetDatabase.GUIDToAssetPath(guid);
@@ -127,69 +180,39 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                         "A referenced scene file identifier occurs more than once."
                     );
                 }
-                List<AuthoredAssetEntry> normalized = new List<AuthoredAssetEntry>();
-                foreach (AuthoredAssetEntry entry in document.Entries.AsValueEnumerableRequired())
-                {
-                    if (
-                        (
-                            string.Equals(
-                                entry.Key,
-                                CorrespondingSourceObjectKey,
-                                StringComparison.Ordinal
-                            )
-                            || string.Equals(entry.Key, PrefabInstanceKey, StringComparison.Ordinal)
-                        )
-                        && entry.HasBlockValue
-                        && entry.InlineValue.StartsWith("{", StringComparison.Ordinal)
-                        && !entry.InlineValue.EndsWith("}", StringComparison.Ordinal)
-                    )
-                    {
-                        StringBuilder value = new StringBuilder(entry.InlineValue);
-                        for (int line = entry.LineNumber; line < entry.EndLineNumber - 1; ++line)
-                        {
-                            string continuation = lines[line];
-                            int indent = 0;
-                            while (indent < continuation.Length && continuation[indent] == ' ')
-                            {
-                                ++indent;
-                            }
-                            if (indent <= entry.Indent || string.IsNullOrWhiteSpace(continuation))
-                            {
-                                throw new InvalidDataException(
-                                    "A prefab reference continuation is malformed."
-                                );
-                            }
-                            value.Append(' ').Append(continuation.Trim());
-                        }
-                        normalized.Add(
-                            new AuthoredAssetEntry(
-                                entry.Key,
-                                value.ToString(),
-                                entry.Indent,
-                                entry.LineNumber,
-                                entry.EndLineNumber
-                            )
-                        );
-                    }
-                    else
-                    {
-                        normalized.Add(entry);
-                    }
-                }
-                documents.Add(
-                    document.FileId,
-                    new AuthoredAssetDocument(
-                        document.FileId,
-                        document.UnityTypeId,
-                        document.RootKey,
-                        document.IsStripped,
-                        document.StartLineNumber,
-                        document.EndLineNumber,
-                        normalized.AsReadOnly()
-                    )
-                );
+                documents.Add(document.FileId, NormalizeSceneReferences(document, lines));
             }
             return documents;
+        }
+
+        private static AuthoredAssetEntry NormalizeSceneReference(
+            AuthoredAssetEntry entry,
+            IReadOnlyList<string> lines
+        )
+        {
+            StringBuilder value = new StringBuilder(entry.InlineValue);
+            for (int line = entry.LineNumber; line < entry.EndLineNumber - 1; ++line)
+            {
+                string continuation = lines[line];
+                int indent = 0;
+                while (indent < continuation.Length && continuation[indent] == ' ')
+                {
+                    ++indent;
+                }
+                if (indent <= entry.Indent || string.IsNullOrWhiteSpace(continuation))
+                {
+                    throw new InvalidDataException("A prefab reference continuation is malformed.");
+                }
+                value.Append(' ').Append(continuation.Trim());
+            }
+            return new AuthoredAssetEntry(
+                entry.Key,
+                value.ToString(),
+                entry.Indent,
+                entry.LineNumber,
+                entry.EndLineNumber,
+                entry.SequenceDepth
+            );
         }
 
         private static bool MatchesPrefabSource(
@@ -313,18 +336,28 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 _scenes.Add(expectedGuid, documents);
             }
             return documents.TryGetValue(expectedFileId, out AuthoredAssetDocument matched)
-                && matched.TryGetEntry(CorrespondingSourceObjectKey, out AuthoredAssetEntry source)
-                && matched.TryGetEntry(PrefabInstanceKey, out AuthoredAssetEntry instance)
+                && AuthoredAssetYaml.TryGetOnlyDirectEntry(
+                    matched,
+                    CorrespondingSourceObjectKey,
+                    out AuthoredAssetEntry source
+                )
+                && AuthoredAssetYaml.TryGetOnlyDirectEntry(
+                    matched,
+                    PrefabInstanceKey,
+                    out AuthoredAssetEntry instance
+                )
                 && AuthoredAssetYaml.TryParseObjectReference(
                     source.InlineValue,
                     out long sourceId,
                     out string sourceGuid
                 )
-                && AuthoredAssetYaml.TryParseObjectReference(
+                && AuthoredAssetYaml.TryResolveObjectReference(
                     instance.InlineValue,
+                    expectedGuid,
                     out long instanceId,
-                    out string _
+                    out string instanceGuid
                 )
+                && string.Equals(instanceGuid, expectedGuid, StringComparison.OrdinalIgnoreCase)
                 && MatchesPrefabSource(reference, sourceGuid, sourceId)
                 && global.targetPrefabId == unchecked((ulong)instanceId);
         }

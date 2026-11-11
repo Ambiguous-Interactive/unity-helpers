@@ -15,7 +15,8 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// Uses original PNG pixels in the Editor or readable texture pixels. Packed atlas fallbacks
         /// require rectangular, unrotated packing; tight and rotated atlas data are refused.
         /// Separate alpha textures require source PNG pixels or the mask overload.
-        /// Mask bounds multiply double pixel offsets by stored float units per pixel before rounding to float.
+        /// Scans effective alpha directly, without allocating an intermediate mask.
+        /// Bounds multiply double pixel offsets by stored float units per pixel before rounding to float.
         /// </remarks>
         public static bool TryGetLocalArtBounds(
             Sprite sprite,
@@ -24,25 +25,47 @@ namespace WallstopStudios.UnityHelpers.Utils
             byte alphaThreshold = 1
         )
         {
-            if (
-                !SpriteMaskReader.TryRead(
-                    sprite,
-                    out SpriteAlphaMask mask,
-                    out string failure,
-                    alphaThreshold
-                )
-            )
+            if (!SpriteMaskReader.TryReadPixels(sprite, out SpritePixelRegion region, out error))
             {
                 if (sprite != null && sprite.packed && sprite.associatedAlphaSplitTexture == null)
                 {
                     return TryGetPackedArtBounds(sprite, alphaThreshold, out bounds, out error);
                 }
-                error = failure;
                 bounds = default;
                 return false;
             }
 
-            return TryGetLocalArtBounds(mask, out bounds, out error);
+            int width = region.Region.width;
+            int height = region.Region.height;
+            int left = width;
+            int bottom = height;
+            int right = -1;
+            int top = -1;
+            for (int row = 0; row < height; ++row)
+            {
+                for (int column = 0; column < width; ++column)
+                {
+                    byte alpha = region.GetPixel(column, row).a;
+                    if (alpha == 0 || alpha < alphaThreshold)
+                    {
+                        continue;
+                    }
+
+                    left = Mathf.Min(left, column);
+                    bottom = Mathf.Min(bottom, row);
+                    right = Mathf.Max(right, column);
+                    top = row;
+                }
+            }
+
+            return TryCreatePixelBounds(
+                new Vector2Int(left, bottom),
+                new Vector2Int(right + 1, top + 1),
+                region.Pivot,
+                region.UnitsPerPixel,
+                out bounds,
+                out error
+            );
         }
 
         /// <summary>Measures the local bounds of a previously read mask without allocating or copying pixels.</summary>
@@ -96,18 +119,14 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
             }
 
-            if (right < 0)
-            {
-                error = "The sprite mask is fully transparent.";
-                bounds = default;
-                return false;
-            }
-
-            double minX = (left - (double)pivot.x) * units.x;
-            double minY = (bottom - (double)pivot.y) * units.y;
-            double maxX = (right + 1 - (double)pivot.x) * units.x;
-            double maxY = (top + 1 - (double)pivot.y) * units.y;
-            return TryCreateBounds(minX, minY, maxX, maxY, out bounds, out error);
+            return TryCreatePixelBounds(
+                new Vector2Int(left, bottom),
+                new Vector2Int(right + 1, top + 1),
+                pivot,
+                units,
+                out bounds,
+                out error
+            );
         }
 
         /// <summary>Mirrors local art bounds about the renderer origin on each flipped axis.</summary>
@@ -142,6 +161,29 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
 
             return lowest;
+        }
+
+        private static bool TryCreatePixelBounds(
+            Vector2Int minimum,
+            Vector2Int maximumExclusive,
+            Vector2 pivot,
+            Vector2 units,
+            out Bounds bounds,
+            out string error
+        )
+        {
+            if (maximumExclusive.x <= minimum.x)
+            {
+                error = "The sprite mask is fully transparent.";
+                bounds = default;
+                return false;
+            }
+
+            double minX = (minimum.x - (double)pivot.x) * units.x;
+            double minY = (minimum.y - (double)pivot.y) * units.y;
+            double maxX = (maximumExclusive.x - (double)pivot.x) * units.x;
+            double maxY = (maximumExclusive.y - (double)pivot.y) * units.y;
+            return TryCreateBounds(minX, minY, maxX, maxY, out bounds, out error);
         }
 
         private static bool TryCreateBounds(

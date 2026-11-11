@@ -33,7 +33,8 @@ Run `npm run test:validate-devcontainer-urls` for the offline HTTP and parser co
 
 ### Fast C# Feedback
 
-Use fixture-scoped builds while editing runtime or Editor tests:
+Use fixture-scoped builds while editing runtime or Editor tests. The npm command runs the
+locked Python tool through uv and uses the installed .NET SDK:
 
 ```bash
 npm run typecheck:iterate -- tests --server --files Tests/Runtime/Serialization/WProtoEnumFormatterTests.cs

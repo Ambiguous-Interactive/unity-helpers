@@ -1626,6 +1626,7 @@ pixels are unavailable, so an opaque color texture cannot hide transparency stor
 Read an exact `SpriteAlphaMask`, for example from the original PNG in the Editor, and use the
 mask overload for those sprites.
 
+The sprite overload scans effective alpha directly without creating a mask array.
 Read bounds when the sprite or its source changes. If you already hold a `SpriteAlphaMask`, use
 the mask overload to avoid reading the texture again. The mask overload checks dimensions and
 coordinates, borrows the pixel array, and allocates no result storage.

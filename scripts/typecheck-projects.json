@@ -1,0 +1,37 @@
+[
+  {
+    "id": "runtime",
+    "tree": "Runtime/",
+    "project": "Generator~/WallstopStudios.UnityHelpers.TypeCheck/WallstopStudios.UnityHelpers.TypeCheck.csproj",
+    "anchor": "WallstopStudios.UnityHelpers.Core.DataStructure.Circle",
+    "anchorFile": "Runtime/Core/DataStructure/Circle.cs"
+  },
+  {
+    "id": "editor",
+    "tree": "Editor/",
+    "project": "Generator~/WallstopStudios.UnityHelpers.EditorCheck/WallstopStudios.UnityHelpers.EditorCheck.csproj",
+    "anchor": "WallstopStudios.UnityHelpers.Editor.Validation.SerializableDictionaryAssetValidator",
+    "anchorFile": "Editor/Validation/SerializableDictionaryAssetValidator.cs"
+  },
+  {
+    "id": "tests",
+    "tree": "Tests/Runtime/",
+    "project": "Generator~/WallstopStudios.UnityHelpers.TestCheck/WallstopStudios.UnityHelpers.TestCheck.csproj",
+    "anchor": "WallstopStudios.UnityHelpers.Tests.Tags.TagHandlerTests",
+    "anchorFile": "Tests/Runtime/Tags/TagHandlerTests.cs"
+  },
+  {
+    "id": "editor-tests",
+    "tree": "Tests/Editor/",
+    "project": "Generator~/WallstopStudios.UnityHelpers.EditorTestCheck/WallstopStudios.UnityHelpers.EditorTestCheck.csproj",
+    "anchor": "WallstopStudios.UnityHelpers.Tests.Windows.PrefabCheckerTests",
+    "anchorFile": "Tests/Editor/Windows/PrefabCheckerTests.cs"
+  },
+  {
+    "id": "integrations",
+    "tree": "Runtime/Integrations/",
+    "project": "Generator~/WallstopStudios.UnityHelpers.IntegrationCheck/WallstopStudios.UnityHelpers.IntegrationCheck.csproj",
+    "anchor": "WallstopStudios.UnityHelpers.Integrations.Zenject.RelationalComponentSceneInitializer",
+    "anchorFile": "Runtime/Integrations/Zenject/RelationalComponentSceneInitializer.cs"
+  }
+]

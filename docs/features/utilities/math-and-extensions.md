@@ -1225,6 +1225,10 @@ Comparer exceptions propagate; the caller's span stays unchanged, and pooled buf
 returned and cleared when they contain managed references. The explicit algorithm argument
 keeps `Sort(comparer)` available to the framework without an ambiguous extension call.
 
+For small or nearly sorted spans, use `values.InsertionSortInPlace(comparer)` to avoid the
+copy and buffer rent. It keeps equal elements in their original order. If the comparer throws,
+completed insertions remain applied and the span still contains every original element.
+
 ### Dictionary Helpers
 
 **Thread-safe get-or-create:**
@@ -1561,6 +1565,10 @@ The cache picks its strategy from how far apart the enum's members are, not how 
 there are: members within 256 of each other get a direct array index, anything wider
 gets a dictionary. Negative members count normally toward that span, so
 `enum Direction { Left = -1, None = 0, Right = 1 }` is three slots wide, not billions.
+
+For `[Flags]` enums, `ToCachedName()` extends the array from zero through the bitwise OR
+of the declared values when the result is below 256. The first lookup formats each unnamed
+combination with the runtime's general enum format. Later lookups reuse the string.
 
 ### Display Names for UI
 

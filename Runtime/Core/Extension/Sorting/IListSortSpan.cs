@@ -63,6 +63,33 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             span.Sort(comparer, SortAlgorithm.Insertion);
         }
 
+        /// <summary>Stably sorts a span in place without renting a buffer.</summary>
+        /// <remarks>
+        /// Intended for short or nearly sorted spans. If the comparer throws, earlier insertions
+        /// remain applied and every original element remains in the span.
+        /// </remarks>
+        public static void InsertionSortInPlace<T, TComparer>(this Span<T> span, TComparer comparer)
+            where TComparer : IComparer<T>
+        {
+            int count = span.Length;
+            for (int index = 1; index < count; ++index)
+            {
+                T value = span[index];
+                int destination = index;
+                while (0 < destination && 0 < comparer.Compare(span[destination - 1], value))
+                {
+                    --destination;
+                }
+
+                int shift = index - destination;
+                if (0 < shift)
+                {
+                    span.Slice(destination, shift).CopyTo(span.Slice(destination + 1, shift));
+                    span[destination] = value;
+                }
+            }
+        }
+
         /// <summary>Sorts a span using MeteorSort and the supplied comparer.</summary>
         /// <remarks>Uses the pooled-copy and failure guarantees of <see cref="Sort{T, TComparer}(Span{T}, TComparer, SortAlgorithm)"/>.</remarks>
         public static void MeteorSort<T, TComparer>(this Span<T> span, TComparer comparer)

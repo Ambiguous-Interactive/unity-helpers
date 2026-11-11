@@ -51,57 +51,7 @@ const repoRoot = path.resolve(__dirname, "..");
  * type from that tree. `anchorFile` is checked before any build so a moved anchor is reported as a
  * stale control rather than as a broken gate.
  */
-const CHECK_PROJECTS = Object.freeze([
-  {
-    id: "runtime",
-    tree: "Runtime/",
-    project:
-      "Generator~/WallstopStudios.UnityHelpers.TypeCheck/WallstopStudios.UnityHelpers.TypeCheck.csproj",
-    anchor: "WallstopStudios.UnityHelpers.Core.DataStructure.Circle",
-    anchorFile: "Runtime/Core/DataStructure/Circle.cs"
-  },
-  {
-    id: "editor",
-    tree: "Editor/",
-    project:
-      "Generator~/WallstopStudios.UnityHelpers.EditorCheck/WallstopStudios.UnityHelpers.EditorCheck.csproj",
-    anchor: "WallstopStudios.UnityHelpers.Editor.Validation.SerializableDictionaryAssetValidator",
-    anchorFile: "Editor/Validation/SerializableDictionaryAssetValidator.cs"
-  },
-  {
-    id: "tests",
-    tree: "Tests/Runtime/",
-    project:
-      "Generator~/WallstopStudios.UnityHelpers.TestCheck/WallstopStudios.UnityHelpers.TestCheck.csproj",
-    anchor: "WallstopStudios.UnityHelpers.Tests.Tags.TagHandlerTests",
-    anchorFile: "Tests/Runtime/Tags/TagHandlerTests.cs"
-  },
-  {
-    id: "editor-tests",
-    tree: "Tests/Editor/",
-    project:
-      "Generator~/WallstopStudios.UnityHelpers.EditorTestCheck/WallstopStudios.UnityHelpers.EditorTestCheck.csproj",
-    anchor: "WallstopStudios.UnityHelpers.Tests.Windows.PrefabCheckerTests",
-    anchorFile: "Tests/Editor/Windows/PrefabCheckerTests.cs"
-  },
-  {
-    /*
-        The fifth tree (#687). Nothing compiled `Runtime/Integrations/**` until this project, so
-        `WUH003` -- the diagnostic that reports the exact `??`-on-a-ScriptableObject shape four of
-        these files shipped -- had never once run over them. The anchor matters more here than
-        anywhere else in this table: the gate's whole subject is a tree that used to be excluded by
-        a glob, and an `Exclude` line coming back would leave a project that still loads both
-        analyzers, still reports both diagnostics against the control file, and compiles nothing.
-        `RelationalComponentSceneInitializer` is one of the four files that carried the defect.
-    */
-    id: "integrations",
-    tree: "Runtime/Integrations/",
-    project:
-      "Generator~/WallstopStudios.UnityHelpers.IntegrationCheck/WallstopStudios.UnityHelpers.IntegrationCheck.csproj",
-    anchor: "WallstopStudios.UnityHelpers.Integrations.Zenject.RelationalComponentSceneInitializer",
-    anchorFile: "Runtime/Integrations/Zenject/RelationalComponentSceneInitializer.cs"
-  }
-]);
+const CHECK_PROJECTS = Object.freeze(require("./typecheck-projects.json"));
 
 function analyzerControl(anchor) {
   return `namespace WallstopStudios.UnityHelpers.CheckControls

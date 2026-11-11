@@ -15,6 +15,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
     using UnityEngine.SceneManagement;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration;
+    using WallstopStudios.UnityHelpers.Editor.Validation;
     using WallstopStudios.UnityHelpers.Tests.Core;
     using Object = UnityEngine.Object;
 
@@ -74,6 +75,52 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             );
             Assert.AreEqual(1, payloads.Count);
             return payloads[0];
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void SceneNormalizationReusesInlineDocumentsAndPreservesWrappedReferences(
+            bool wrapped
+        )
+        {
+            List<string> lines = new()
+            {
+                "--- !u!1 &1",
+                "GameObject:",
+                "  m_ObjectHideFlags: 0",
+                wrapped
+                    ? "  m_CorrespondingSourceObject: {fileID: 21300000,"
+                    : "  m_CorrespondingSourceObject: " + RecordedReference,
+            };
+            if (wrapped)
+            {
+                lines.Add("    guid: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb, type: 3}");
+            }
+            lines.Add("  m_Name: Fixture");
+            AuthoredAssetDocument original = AuthoredAssetYaml.ReadDocuments(lines)[0];
+
+            AuthoredAssetDocument normalized =
+                OdinMigrationObjectReferenceValidator.NormalizeSceneReferences(original, lines);
+
+            if (wrapped)
+            {
+                Assert.AreNotSame(original, normalized);
+            }
+            else
+            {
+                Assert.AreSame(original, normalized);
+            }
+            Assert.AreEqual(original.FileId, normalized.FileId);
+            Assert.AreEqual(original.StartLineNumber, normalized.StartLineNumber);
+            Assert.AreEqual(original.EndLineNumber, normalized.EndLineNumber);
+            Assert.AreEqual(original.Entries.Count, normalized.Entries.Count);
+            Assert.AreEqual(original.Entries[0], normalized.Entries[0]);
+            Assert.AreEqual(RecordedReference, normalized.Entries[1].InlineValue);
+            int count = original.Entries.Count;
+            for (int index = 2; index < count; ++index)
+            {
+                Assert.AreEqual(original.Entries[index], normalized.Entries[index]);
+            }
         }
 
         [SetUp]
@@ -272,6 +319,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
         [TestCase(false, true, false, 5)]
         [TestCase(false, true, false, 6)]
         [TestCase(false, true, false, 7)]
+        [TestCase(false, true, false, 8)]
+        [TestCase(false, true, false, 9)]
+        [TestCase(false, true, false, 10)]
         public void SavedSceneObjectReferencesMatchTheirAuthoredFileIds(
             bool local,
             bool prefab,
@@ -442,6 +492,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                         @"(m_CorrespondingSourceObject: \{fileID: -?\d+, guid: [a-fA-F0-9]{32},\r?\n)(    type: 3\})",
                         "$1\n$2"
                     );
+                    File.WriteAllText(sourcePath, altered);
+                }
+                else if (8 <= invalidScene)
+                {
+                    string original = File.ReadAllText(sourcePath);
+                    const string sourcePattern =
+                        @"(?m)^(  m_CorrespondingSourceObject: \{fileID: -?\d+, guid: [a-fA-F0-9]{32},\r?\n)(    type: 3\}\r?)$";
+                    string altered = invalidScene switch
+                    {
+                        8 => Regex.Replace(original, sourcePattern, "$1$2\n$1$2"),
+                        9 => Regex.Replace(original, sourcePattern, "  m_Nested:\n  $1  $2"),
+                        _ => Regex.Replace(
+                            original,
+                            @"(?m)^(  m_PrefabInstance: \{fileID: -?[1-9]\d*)(\}\r?)$",
+                            "$1, guid: 00000000000000000000000000000001, type: 3$2"
+                        ),
+                    };
+                    Assert.AreNotEqual(original, altered);
                     File.WriteAllText(sourcePath, altered);
                 }
                 string reference =
