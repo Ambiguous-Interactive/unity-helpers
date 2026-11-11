@@ -144,6 +144,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             );
         }
 
+        internal static void AssertMaps(ProtoBenchmarkMap expected, ProtoBenchmarkMap actual)
+        {
+            Assert.IsTrue(expected != null);
+            Assert.IsTrue(actual != null);
+            Dictionary<string, int> expectedValues = expected.Value;
+            Dictionary<string, int> actualValues = actual.Value;
+            Assert.IsTrue(expectedValues != null);
+            Assert.AreEqual(expectedValues.Count, actualValues?.Count ?? 0);
+            if (actualValues == null)
+            {
+                return;
+            }
+            foreach (KeyValuePair<string, int> entry in actualValues)
+            {
+                Assert.IsTrue(expectedValues.TryGetValue(entry.Key, out int expectedValue));
+                Assert.AreEqual(expectedValue, entry.Value);
+            }
+        }
+
         private static IReadOnlyList<IReadOnlyList<CalibratedBenchmarkMeasurement>> RunFrozenCorpus(
             string operation
         )
@@ -271,11 +290,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                             "maps",
                             size.ToString(CultureInfo.InvariantCulture),
                             new ProtoBenchmarkMap { Value = map },
-                            (expected, actual) =>
-                                CollectionAssert.AreEquivalent(
-                                    expected.Value,
-                                    actual.Value ?? new Dictionary<string, int>()
-                                )
+                            AssertMaps
                         )
                     );
                 families[4]

@@ -120,6 +120,119 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.AreEqual(123, writer.WrittenSpan[0]);
         }
 
+        [TestCase(false)]
+        [TestCase(true)]
+        public void MapWitnessMatchesLegacyForReorderedEntries(bool reverse)
+        {
+            ProtoBenchmarkMap expected = new()
+            {
+                Value = new Dictionary<string, int>
+                {
+                    ["first"] = int.MinValue,
+                    ["second"] = int.MaxValue,
+                },
+            };
+            ProtoBenchmarkMap actual = new() { Value = new Dictionary<string, int>() };
+            if (reverse)
+            {
+                actual.Value.Add("second", int.MaxValue);
+                actual.Value.Add("first", int.MinValue);
+            }
+            else
+            {
+                actual.Value.Add("first", int.MinValue);
+                actual.Value.Add("second", int.MaxValue);
+            }
+            CollectionAssert.AreEquivalent(expected.Value, actual.Value);
+            WProtoBenchmarkCorpus.AssertMaps(expected, actual);
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(3)]
+        [TestCase(4)]
+        [TestCase(5)]
+        public void MapWitnessRejectsChangedEntries(int mutation)
+        {
+            ProtoBenchmarkMap expected = new()
+            {
+                Value = new Dictionary<string, int> { ["first"] = 17, ["second"] = 34 },
+            };
+            ProtoBenchmarkMap actual = new()
+            {
+                Value = new Dictionary<string, int>(expected.Value, StringComparer.Ordinal),
+            };
+            switch (mutation)
+            {
+                case 0:
+                    actual.Value["first"] = 18;
+                    break;
+                case 1:
+                    actual.Value.Remove("first");
+                    break;
+                case 2:
+                    actual.Value.Add("third", 51);
+                    break;
+                case 3:
+                    actual.Value.Remove("first");
+                    actual.Value.Add("FIRST", 17);
+                    break;
+                case 4:
+                    actual.Value = null;
+                    break;
+                case 5:
+                    actual.Value = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["FIRST"] = 17,
+                        ["second"] = 34,
+                    };
+                    break;
+            }
+            Assert.Throws<AssertionException>(() =>
+                CollectionAssert.AreEquivalent(
+                    expected.Value,
+                    actual.Value ?? new Dictionary<string, int>()
+                )
+            );
+            Assert.Throws<AssertionException>(() =>
+                WProtoBenchmarkCorpus.AssertMaps(expected, actual)
+            );
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void MapWitnessAcceptsMissingEmptyMap(bool missing)
+        {
+            ProtoBenchmarkMap expected = new() { Value = new Dictionary<string, int>() };
+            ProtoBenchmarkMap actual = new()
+            {
+                Value = missing ? null : new Dictionary<string, int>(),
+            };
+            CollectionAssert.AreEquivalent(
+                expected.Value,
+                actual.Value ?? new Dictionary<string, int>()
+            );
+            WProtoBenchmarkCorpus.AssertMaps(expected, actual);
+        }
+
+        [Test]
+        public void MapWitnessHandlesReversedLargeMap()
+        {
+            const int count = 1024;
+            ProtoBenchmarkMap expected = new() { Value = new Dictionary<string, int>() };
+            ProtoBenchmarkMap actual = new() { Value = new Dictionary<string, int>() };
+            for (int index = 0; index < count; ++index)
+            {
+                expected.Value.Add(index.ToString(), index * 17);
+            }
+            for (int index = count - 1; index >= 0; --index)
+            {
+                actual.Value.Add(index.ToString(), index * 17);
+            }
+            WProtoBenchmarkCorpus.AssertMaps(expected, actual);
+        }
+
         [Test]
         public void FrozenCorpusHasIndependentSemanticWitnesses()
         {
