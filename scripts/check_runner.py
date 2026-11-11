@@ -12,6 +12,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from dataclasses import asdict, dataclass
@@ -151,15 +152,23 @@ def run_check(check: Check) -> Result:
     environment = dict(os.environ)
     environment["PYTHONDONTWRITEBYTECODE"] = "1"
     try:
-        process = subprocess.run(  # noqa: S603 - reviewed repository shell commands are intentional.
-            [resolve_bash(), "-c", check.run],
-            cwd=ROOT,
-            env=environment,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            check=False,
-        )
+        # PowerShell/PowerShell#26528 corrupts the shared startup JIT profile
+        # when independent Linux checks launch PowerShell at the same time.
+        with tempfile.TemporaryDirectory(prefix="unity-helpers-check-cache-") as cache:
+            if sys.platform == "linux":
+                cache_home = environment.get("XDG_CACHE_HOME") or str(Path.home() / ".cache")
+                if not environment.get("UV_CACHE_DIR"):
+                    environment["UV_CACHE_DIR"] = str(Path(cache_home) / "uv")
+                environment["XDG_CACHE_HOME"] = cache
+            process = subprocess.run(  # noqa: S603 - reviewed repository shell commands are intentional.
+                [resolve_bash(), "-c", check.run],
+                cwd=ROOT,
+                env=environment,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                check=False,
+            )
         status = process.returncode
         output = process.stdout.decode("utf-8", errors="replace")
         reason = f"signal {-status}" if status < 0 else f"exit {status}"

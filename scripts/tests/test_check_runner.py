@@ -346,3 +346,57 @@ def test_checks_do_not_mutate_python_bytecode_cache(
     assert run_check(Check("cache", "Cache input stability", command)).ok
     assert flag.read_text(encoding="utf-8") == "1"
     assert not cache.exists()
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="PowerShell uses XDG cache roots on Linux")
+@pytest.mark.parametrize("cache_home", [None, "", "existing cache"])
+@pytest.mark.parametrize("uv_cache", [None, "", "existing uv"])
+def test_parallel_checks_isolate_startup_caches_and_preserve_uv(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    cache_home: str | None,
+    uv_cache: str | None,
+) -> None:
+    for name, value in (("XDG_CACHE_HOME", cache_home), ("UV_CACHE_DIR", uv_cache)):
+        if value is None:
+            monkeypatch.delenv(name, raising=False)
+        else:
+            monkeypatch.setenv(name, str(tmp_path / value) if value else "")
+    before = {name: os.environ.get(name) for name in ("XDG_CACHE_HOME", "UV_CACHE_DIR")}
+    child = tmp_path / "cache_child.py"
+    child.write_text(
+        "import json, os, sys\n"
+        "from pathlib import Path\n"
+        "cache = Path(os.environ['XDG_CACHE_HOME'])\n"
+        "assert cache.is_dir()\n"
+        "Path(sys.argv[1]).write_text(json.dumps([str(cache), os.environ['UV_CACHE_DIR']]))\n"
+        "sys.exit(int(sys.argv[2]))\n",
+        encoding="utf-8",
+    )
+    checks = [
+        Check(
+            str(index),
+            "Cache isolation",
+            " ".join(
+                shlex.quote(value)
+                for value in [
+                    sys.executable,
+                    str(child),
+                    str(tmp_path / f"{index}.json"),
+                    str(index),
+                ]
+            ),
+        )
+        for index in range(2)
+    ]
+    results = run_checks(checks, 2)
+    assert [result.ok for result in results] == [True, False]
+    observations = [json.loads((tmp_path / f"{index}.json").read_text()) for index in range(2)]
+    expected_uv = before["UV_CACHE_DIR"] or str(
+        Path(before["XDG_CACHE_HOME"] or Path.home() / ".cache") / "uv"
+    )
+    assert observations[0][0] != observations[1][0]
+    for cache, uv in observations:
+        assert not Path(cache).exists()
+        assert uv == expected_uv
+    assert {name: os.environ.get(name) for name in before} == before

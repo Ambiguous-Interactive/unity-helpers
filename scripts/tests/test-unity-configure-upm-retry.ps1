@@ -627,13 +627,20 @@ try {
         return & $script:artifactDetection -LogPath $LogPath
     }
     $artifactStack = "========== OUTPUTTING STACK TRACE ==================`nFindArtifactsToRemove`nGarbageCollectArtifactsFromDB`nInitializeAssetDatabaseV2"
+    $sharedMemoryStack = "[Error] Command buffer shared memory issue`n[Error] Tried to create a new semaphore handle`nuds_sharedmutex_init`nInitializeAssetDatabaseV2"
     foreach ($case in @(
             @{ Name = 'startup-corruption'; Log = $artifactStack; Results = $false; Owned = $true; Recover = $true },
             @{ Name = 'partial-stack'; Log = 'FindArtifactsToRemove'; Results = $false; Owned = $true; Recover = $false },
             @{ Name = 'after-tests'; Log = $artifactStack + "`n[uh-test-stream] RUN-STARTED"; Results = $false; Owned = $true; Recover = $false },
             @{ Name = 'compiler-error'; Log = $artifactStack + "`nerror CS0001"; Results = $false; Owned = $true; Recover = $false },
             @{ Name = 'existing-results'; Log = $artifactStack; Results = $true; Owned = $true; Recover = $false },
-            @{ Name = 'unowned-library'; Log = $artifactStack; Results = $false; Owned = $false; Recover = $false }
+            @{ Name = 'unowned-library'; Log = $artifactStack; Results = $false; Owned = $false; Recover = $false },
+            @{ Name = 'startup-shared-memory'; Log = $sharedMemoryStack; Results = $false; Owned = $true; Recover = $true },
+            @{ Name = 'shared-memory-partial'; Log = '[Error] Command buffer shared memory issue'; Results = $false; Owned = $true; Recover = $false },
+            @{ Name = 'shared-memory-after-tests'; Log = $sharedMemoryStack + "`n[uh-test-stream] RUN-STARTED"; Results = $false; Owned = $true; Recover = $false },
+            @{ Name = 'shared-memory-compiler-error'; Log = $sharedMemoryStack + "`nerror CS0001"; Results = $false; Owned = $true; Recover = $false },
+            @{ Name = 'shared-memory-results'; Log = $sharedMemoryStack; Results = $true; Owned = $true; Recover = $false },
+            @{ Name = 'shared-memory-unowned'; Log = $sharedMemoryStack; Results = $false; Owned = $false; Recover = $false }
         )) {
         $project = Join-Path $temporaryRoot $case.Name
         $library = Join-Path $project 'Library'
@@ -660,9 +667,9 @@ try {
         Assert-That ($case.Name + ' bounds recovery and preserves persistent failure') ($script:artifactCalls -eq $expectedCalls -and $recoveryThrew)
         $retained = @(Get-ChildItem -LiteralPath $project -Directory -Filter 'Library.artifact-database-failure-*')
         Assert-That ($case.Name + ' retains only the failed owned cache') ($retained.Count -eq [int]$case.Recover)
-        if ($case.Recover) {
+        if ($case.Recover -and $retained.Count -eq 1) {
             Assert-That 'corrupt ArtifactDB remains available for diagnosis' ((Get-Content (Join-Path $retained[0].FullName 'ArtifactDB') -Raw).Trim() -ceq 'corrupt-control')
-            Assert-That 'startup recovery preserves the first native log' ((Get-Content (Join-Path $temporaryRoot 'native.first-attempt.log') -Raw).Contains('GarbageCollectArtifactsFromDB'))
+            Assert-That 'startup recovery preserves the first native log' ((Get-Content (Join-Path $temporaryRoot 'native.first-attempt.log') -Raw).Trim() -ceq $case.Log)
         }
     }
 
@@ -670,6 +677,26 @@ try {
     $library = Join-Path $project 'Library'
     $null = New-Item -ItemType Directory -Force $library
     Set-Content (Join-Path $library '.unity-helpers-repo-root.txt') 'owned-control'
+    $previousLibraries = @()
+    foreach ($identity in @('a', 'b', 'c')) {
+        $previous = Join-Path $project ('Library.artifact-database-failure-' + ($identity * 32))
+        $null = New-Item -ItemType Directory $previous
+        Set-Content (Join-Path $previous '.unity-helpers-repo-root.txt') 'owned-control'
+        $previousLibraries += $previous
+    }
+    $foreignLibrary = Join-Path $project ('Library.artifact-database-failure-' + ('d' * 32))
+    $null = New-Item -ItemType Directory $foreignLibrary
+    Set-Content (Join-Path $foreignLibrary '.unity-helpers-repo-root.txt') 'foreign-control'
+    $unrecognizedLibrary = Join-Path $project 'Library.artifact-database-failure-author-data'
+    $null = New-Item -ItemType Directory $unrecognizedLibrary
+    $linkedLibrary = $null
+    if (-not $IsWindows) {
+        $linkTarget = Join-Path $temporaryRoot 'linked-library-target'
+        $null = New-Item -ItemType Directory $linkTarget
+        Set-Content (Join-Path $linkTarget '.unity-helpers-repo-root.txt') 'owned-control'
+        $linkedLibrary = Join-Path $project ('Library.artifact-database-failure-' + ('e' * 32))
+        $null = New-Item -ItemType SymbolicLink -Path $linkedLibrary -Target $linkTarget
+    }
     $script:artifactCalls = 0
     $script:artifactDetectionCalls = 0
     $script:artifactLog = $artifactStack
@@ -687,6 +714,38 @@ try {
     Assert-That 'successful recovery reads its first native log once' ($script:artifactDetectionCalls -eq 1)
     Assert-That 'startup recovery returns the second native result' ($recoveredExit -eq 0 -and $script:artifactCalls -eq 2)
     Assert-That 'rebuilt Library preserves its ownership marker' ((Get-Content (Join-Path $library '.unity-helpers-repo-root.txt') -Raw).Trim() -ceq 'owned-control')
+    Assert-That 'recovery removes earlier owned failed Libraries in the current project' (@($previousLibraries | Where-Object { Test-Path -LiteralPath $_ }).Count -eq 0)
+    $ownedFailures = @(Get-ChildItem -LiteralPath $project -Directory -Filter 'Library.artifact-database-failure-*' | Where-Object {
+            $candidateMarker = Join-Path $_.FullName '.unity-helpers-repo-root.txt'
+            (Test-Path -LiteralPath $candidateMarker) -and (Get-Content -LiteralPath $candidateMarker -Raw).Trim() -ceq 'owned-control'
+        })
+    $expectedOwnedEntries = if ($null -ne $linkedLibrary) { 2 } else { 1 }
+    Assert-That 'recovery retains exactly its latest failed Library and any preexisting link' ($ownedFailures.Count -eq $expectedOwnedEntries)
+    if ($null -ne $linkedLibrary) {
+        Assert-That 'recovery preserves linked retained directories' (Test-Path -LiteralPath $linkedLibrary -PathType Container)
+    }
+    Assert-That 'recovery preserves foreign and unrecognized directories' ((Test-Path -LiteralPath $foreignLibrary) -and (Test-Path -LiteralPath $unrecognizedLibrary))
+
+    $staleProject = Join-Path $temporaryRoot 'stale-startup-log'
+    $staleLibrary = Join-Path $staleProject 'Library'
+    $null = New-Item -ItemType Directory -Force $staleLibrary
+    Set-Content (Join-Path $staleLibrary '.unity-helpers-repo-root.txt') 'owned-control'
+    $originalDatabase = Join-Path $staleLibrary 'ArtifactDB'
+    Set-Content -LiteralPath $originalDatabase -Value 'healthy-control'
+    Set-Content -LiteralPath $nativeLog -Value $artifactStack
+    $script:staleCalls = 0
+    function Invoke-UnityEditor {
+        param($EditorPath, $Arguments, $Label, $LogPath, $CompletionPattern, $CompletionGraceSeconds, $TimeoutSeconds, $StallSeconds)
+        ++$script:staleCalls
+        throw 'Controlled framework-evidence setup failure before launching Unity.'
+    }
+    $staleThrew = $false
+    try { $null = Invoke-UnityEditorTestsWithPackageManagerRetry -EditorPath 'owned-editor' -Arguments @('-runTests') -Label 'stale-log' -LogPath $nativeLog -ResultsPath (Join-Path $staleProject 'results.xml') -Project $staleProject }
+    catch { $staleThrew = $true }
+    Assert-That 'a stale startup stack cannot retry a new setup failure' ($staleThrew -and $script:staleCalls -eq 1)
+    Assert-That 'a stale startup stack cannot move the current Library' ((Test-Path -LiteralPath $originalDatabase) -and (Get-Content -LiteralPath $originalDatabase -Raw).Trim() -ceq 'healthy-control')
+    Assert-That 'a new setup failure has no stale current log' (-not (Test-Path -LiteralPath $nativeLog))
+
 
 
 } finally {

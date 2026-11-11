@@ -1044,15 +1044,20 @@ function Get-EditorTestStallSeconds {
 }
 
 # UUM-153198 crashes during startup artifact pruning before managed tests load.
-# Match the complete native path so ordinary test and compilation failures stay fatal.
+# A broken UDS memory pool can also stall the following Editor startup.
+# Match complete native paths so ordinary test and compilation failures stay fatal.
 function Test-UnityArtifactDatabaseStartupFailure {
     param([string]$LogPath)
 
     if (-not (Test-Path -LiteralPath $LogPath -PathType Leaf)) { return $false }
     $log = [IO.File]::ReadAllText($LogPath)
-    return ($log.Contains('========== OUTPUTTING STACK TRACE') -and
+    $pruningFailure = $log.Contains('========== OUTPUTTING STACK TRACE') -and
         $log.Contains('FindArtifactsToRemove') -and
-        $log.Contains('GarbageCollectArtifactsFromDB') -and
+        $log.Contains('GarbageCollectArtifactsFromDB')
+    $sharedMemoryFailure = $log.Contains('[Error] Command buffer shared memory issue') -and
+        $log.Contains('[Error] Tried to create a new semaphore handle') -and
+        $log.Contains('uds_sharedmutex_init')
+    return (($pruningFailure -or $sharedMemoryFailure) -and
         $log.Contains('InitializeAssetDatabaseV2') -and
         -not $log.Contains('[uh-test-stream] RUN-STARTED') -and
         -not $log.Contains('error CS'))
@@ -1073,6 +1078,9 @@ function Invoke-UnityEditorTestsWithPackageManagerRetry {
     $runStall = Get-EditorTestStallSeconds
 
     $artifactDatabaseFailure = $null
+    if (Test-Path -LiteralPath $LogPath -PathType Leaf) {
+        Remove-Item -LiteralPath $LogPath -Force -ErrorAction Stop
+    }
     try {
         $runExit = Invoke-UnityEditor `
             -EditorPath $EditorPath `
@@ -1101,8 +1109,8 @@ function Invoke-UnityEditorTestsWithPackageManagerRetry {
 
     $retryReason = 'UPM cancellation'
     if ($artifactDatabaseFailure) {
-        $retryReason = 'startup artifact-database corruption (UUM-153198)'
-        Write-CiWarning 'Unity crashed while pruning its artifact database before tests loaded; retaining the failed Library and rebuilding once.'
+        $retryReason = 'startup artifact-database corruption'
+        Write-CiWarning 'Unity failed while initializing its artifact database before tests loaded; retaining the failed Library and rebuilding once.'
     } else {
         Write-CiWarning 'Unity Package Manager canceled package resolution before NUnit results existed; clearing UPM state and retrying once.'
         Write-UnityPackageManagerTransientFailureWarnings -LogPath $LogPath
@@ -1129,6 +1137,16 @@ function Invoke-UnityEditorTestsWithPackageManagerRetry {
             throw 'Artifact-database recovery requires a harness-owned Library marker.'
         }
         $repoMarker = [IO.File]::ReadAllText($marker)
+        # Keep one failed harness-owned Library per project for diagnosis.
+        foreach ($previous in @(Get-ChildItem -LiteralPath $Project -Directory -Force -Filter 'Library.artifact-database-failure-*')) {
+            if ($previous.Name -cnotmatch '^Library\.artifact-database-failure-[0-9a-f]{32}$' -or
+                ($previous.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { continue }
+            $previousMarker = Join-Path $previous.FullName '.unity-helpers-repo-root.txt'
+            if ((Test-Path -LiteralPath $previousMarker -PathType Leaf) -and
+                [IO.File]::ReadAllText($previousMarker) -ceq $repoMarker) {
+                Remove-Item -LiteralPath $previous.FullName -Recurse -Force -ErrorAction Stop
+            }
+        }
         $retainedLibrary = Join-Path $Project ('Library.artifact-database-failure-' + [guid]::NewGuid().ToString('N'))
         Move-Item -LiteralPath $library -Destination $retainedLibrary -ErrorAction Stop
         $null = New-Item -ItemType Directory -Path $library
@@ -1138,8 +1156,10 @@ function Invoke-UnityEditorTestsWithPackageManagerRetry {
         Clear-UnityPackageManagerRetryState -Project $Project
     }
 
-    if (Test-Path -LiteralPath $ResultsPath -PathType Leaf) {
-        Remove-Item -LiteralPath $ResultsPath -Force
+    foreach ($stalePath in @($ResultsPath, $LogPath)) {
+        if (Test-Path -LiteralPath $stalePath -PathType Leaf) {
+            Remove-Item -LiteralPath $stalePath -Force -ErrorAction Stop
+        }
     }
 
     return Invoke-UnityEditor `

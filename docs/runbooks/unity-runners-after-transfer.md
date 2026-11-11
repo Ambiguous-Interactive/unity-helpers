@@ -342,13 +342,21 @@ Windows event messages are excluded from the receipt, and credential redaction s
 writing it. Before a Package Manager retry overwrites the log and receipt, both first-attempt
 files are preserved with `.first-attempt` in their names.
 
+<!-- cspell:ignore uds sharedmutex -->
+
 An Editor test invocation also recovers once from the startup artifact-pruning crash
 whose native stack contains `FindArtifactsToRemove`, `GarbageCollectArtifactsFromDB`
-and `InitializeAssetDatabaseV2`. Recovery requires a harness-owned Library marker,
-a native stack header, absent NUnit results and no started test stream or compiler error.
+and `InitializeAssetDatabaseV2`. It also recognizes a failed asset-database shared-memory startup
+when the log contains both the command-buffer memory-pool error and the existing-semaphore
+error, plus `uds_sharedmutex_init` and `InitializeAssetDatabaseV2` frames. Recovery requires
+a harness-owned Library marker, absent NUnit results and no started test stream or compiler
+error. Artifact-pruning crashes additionally require the native stack header.
 The failed log and execution receipt retain `.first-attempt` names. The complete failed
 Library moves to `Library.artifact-database-failure-<id>` inside the generated project, and Unity
-rebuilds its derived state. A second failure propagates. Retain that directory when
+rebuilds its derived state. Before this move, earlier matching harness-owned failed Libraries
+in the current project are removed, retaining one failed Library per project. Foreign markers,
+unrecognized directory names and linked directories are preserved. Each attempt removes its
+previous current log before launch, so an earlier stack cannot authorize a new recovery. A second failure propagates. Retain that directory when
 investigating the cache corruption. Unity tracks this startup defect as UUM-153198.
 [Unity issue tracker](https://issuetracker.unity.com/issues/25007/crash-on-isartifactstillrelevant-when-opening-a-project-with-corrupted-library)
 
