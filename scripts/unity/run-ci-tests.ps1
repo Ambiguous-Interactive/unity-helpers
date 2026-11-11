@@ -1072,6 +1072,7 @@ function Invoke-UnityEditorTestsWithPackageManagerRetry {
     $runTimeout = Get-EditorTestRunTimeoutSeconds
     $runStall = Get-EditorTestStallSeconds
 
+    $artifactDatabaseFailure = $null
     try {
         $runExit = Invoke-UnityEditor `
             -EditorPath $EditorPath `
@@ -1083,15 +1084,18 @@ function Invoke-UnityEditorTestsWithPackageManagerRetry {
             -TimeoutSeconds $runTimeout `
             -StallSeconds $runStall
     } catch {
-        if ((Test-Path -LiteralPath $ResultsPath -PathType Leaf) -or
-            (-not (Test-UnityConfigurePackageManagerRetryableFailure -LogPath $LogPath) -and
-                -not (Test-UnityArtifactDatabaseStartupFailure -LogPath $LogPath))) { throw }
+        if (Test-Path -LiteralPath $ResultsPath -PathType Leaf) { throw }
+        $artifactDatabaseFailure = Test-UnityArtifactDatabaseStartupFailure -LogPath $LogPath
+        if (-not (Test-UnityConfigurePackageManagerRetryableFailure -LogPath $LogPath) -and
+            -not $artifactDatabaseFailure) { throw }
         $runExit = 1
     }
 
-    $artifactDatabaseFailure = Test-UnityArtifactDatabaseStartupFailure -LogPath $LogPath
-    if ((Test-Path -LiteralPath $ResultsPath -PathType Leaf) -or
-        (-not $artifactDatabaseFailure -and -not (Test-UnityPackageManagerTransientFailure -LogPath $LogPath))) {
+    if (Test-Path -LiteralPath $ResultsPath -PathType Leaf) { return $runExit }
+    if ($null -eq $artifactDatabaseFailure) {
+        $artifactDatabaseFailure = Test-UnityArtifactDatabaseStartupFailure -LogPath $LogPath
+    }
+    if (-not $artifactDatabaseFailure -and -not (Test-UnityPackageManagerTransientFailure -LogPath $LogPath)) {
         return $runExit
     }
 

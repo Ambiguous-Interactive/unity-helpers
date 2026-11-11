@@ -620,6 +620,12 @@ try {
 
     }
 
+    $script:artifactDetection = ${function:Test-UnityArtifactDatabaseStartupFailure}
+    function Test-UnityArtifactDatabaseStartupFailure {
+        param([string]$LogPath)
+        ++$script:artifactDetectionCalls
+        return & $script:artifactDetection -LogPath $LogPath
+    }
     $artifactStack = "========== OUTPUTTING STACK TRACE ==================`nFindArtifactsToRemove`nGarbageCollectArtifactsFromDB`nInitializeAssetDatabaseV2"
     foreach ($case in @(
             @{ Name = 'startup-corruption'; Log = $artifactStack; Results = $false; Owned = $true; Recover = $true },
@@ -637,6 +643,7 @@ try {
         $artifactResults = Join-Path $project 'results.xml'
         if ($case.Results) { Set-Content $artifactResults '<test-run />' }
         $script:artifactCalls = 0
+        $script:artifactDetectionCalls = 0
         $script:artifactLog = $case.Log
         function Invoke-UnityEditor {
             param($EditorPath, $Arguments, $Label, $LogPath, $CompletionPattern, $CompletionGraceSeconds, $TimeoutSeconds, $StallSeconds)
@@ -647,6 +654,8 @@ try {
         $recoveryThrew = $false
         try { $null = Invoke-UnityEditorTestsWithPackageManagerRetry -EditorPath 'owned-editor' -Arguments @('-runTests') -Label $case.Name -LogPath $nativeLog -ResultsPath $artifactResults -Project $project }
         catch { $recoveryThrew = $true }
+        $expectedReads = if ($case.Results) { 0 } else { 1 }
+        Assert-That ($case.Name + ' bounds native log reads') ($script:artifactDetectionCalls -eq $expectedReads)
         $expectedCalls = if ($case.Recover) { 2 } else { 1 }
         Assert-That ($case.Name + ' bounds recovery and preserves persistent failure') ($script:artifactCalls -eq $expectedCalls -and $recoveryThrew)
         $retained = @(Get-ChildItem -LiteralPath $project -Directory -Filter 'Library.artifact-database-failure-*')
@@ -662,6 +671,7 @@ try {
     $null = New-Item -ItemType Directory -Force $library
     Set-Content (Join-Path $library '.unity-helpers-repo-root.txt') 'owned-control'
     $script:artifactCalls = 0
+    $script:artifactDetectionCalls = 0
     $script:artifactLog = $artifactStack
     function Invoke-UnityEditor {
         param($EditorPath, $Arguments, $Label, $LogPath, $CompletionPattern, $CompletionGraceSeconds, $TimeoutSeconds, $StallSeconds)
@@ -674,6 +684,7 @@ try {
         return 0
     }
     $recoveredExit = Invoke-UnityEditorTestsWithPackageManagerRetry -EditorPath 'owned-editor' -Arguments @('-runTests') -Label 'startup-recovers' -LogPath $nativeLog -ResultsPath (Join-Path $project 'results.xml') -Project $project
+    Assert-That 'successful recovery reads its first native log once' ($script:artifactDetectionCalls -eq 1)
     Assert-That 'startup recovery returns the second native result' ($recoveredExit -eq 0 -and $script:artifactCalls -eq 2)
     Assert-That 'rebuilt Library preserves its ownership marker' ((Get-Content (Join-Path $library '.unity-helpers-repo-root.txt') -Raw).Trim() -ceq 'owned-control')
 
