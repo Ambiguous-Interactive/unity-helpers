@@ -468,9 +468,9 @@
     },
     {
       "name": "use-data-structures",
-      "sha256": "d81550c770bcfb6a2973c3b0f55b613596784cd65ebe7ea01ad0f64ae423786c",
+      "sha256": "3f4b06c753ffc347d5f98862eb668aaf10dd4538c78620cee56b4bb972ccfe35",
       "parts": ["use-data-structures-part-1.md", "use-data-structures-part-2.md"],
-      "routerSha256": "d69d20b8dfee6c2a8b40a00a62822b80b9ffdddac74ced48e996241b8857c7e2"
+      "routerSha256": "eba20d3c326491d1771ecfdb2070d8643d8d4b337e1985b2ca59b2a7812d4da7"
     },
     {
       "name": "use-discriminated-union",

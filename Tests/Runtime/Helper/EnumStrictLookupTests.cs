@@ -138,6 +138,39 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.That(EnumNameCache<EmptyValues>.TryParse("First".AsSpan(), out _), Is.False);
         }
 
+        [TestCase(StringComparison.CurrentCulture)]
+        [TestCase(StringComparison.CurrentCultureIgnoreCase)]
+        [TestCase(StringComparison.InvariantCulture)]
+        [TestCase(StringComparison.InvariantCultureIgnoreCase)]
+        [TestCase(StringComparison.Ordinal)]
+        [TestCase(StringComparison.OrdinalIgnoreCase)]
+        public void ParsingUsesTheRequestedComparison(StringComparison comparison)
+        {
+            const string input = "alias";
+            bool expected = input.AsSpan().Equals(nameof(AliasedValues.Alias).AsSpan(), comparison);
+            bool parsed = EnumNameCache<AliasedValues>.TryParse(
+                input.AsSpan(),
+                out AliasedValues value,
+                comparison
+            );
+            Assert.AreEqual(expected, parsed);
+            Assert.AreEqual(expected ? AliasedValues.Alias : default(AliasedValues), value);
+        }
+
+        [TestCase(-1)]
+        [TestCase(int.MaxValue)]
+        public void ParsingRefusesUndefinedComparisonValues(int comparison)
+        {
+            Assert.IsFalse(
+                EnumNameCache<AliasedValues>.TryParse(
+                    nameof(AliasedValues.Alias).AsSpan(),
+                    out AliasedValues value,
+                    (StringComparison)comparison
+                )
+            );
+            Assert.AreEqual(default(AliasedValues), value);
+        }
+
         [Test]
         public void MembershipDoesNotAcceptCachedUndeclaredNames()
         {

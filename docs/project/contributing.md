@@ -31,6 +31,13 @@ A successful 200 or 206 response also permits curl's size-limit stop when a serv
 Missing resources, HTTP errors, and other transfer failures still fail validation.
 Run `npm run test:validate-devcontainer-urls` for the offline HTTP and parser controls.
 
+Use `npm run eol:fix` to normalize tracked text files through locked uv. The PowerShell
+launcher still accepts `-Paths`, `-DryRun`, and `-ModifiedPathList` for scoped repairs. A dry
+run returns 2 when changes are needed and can write a NUL-delimited list of affected paths.
+Preflight uses that list to check for unstaged changes before editing. The fixer refuses
+files and links outside the checkout, hard-linked files, and invalid text that would need rewriting.
+Internal symbolic links use the target's path and line-ending policy in the repair plan.
+
 ### Fast C# Feedback
 
 Use fixture-scoped builds while editing runtime or Editor tests. The npm command runs the

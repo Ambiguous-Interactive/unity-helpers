@@ -1509,7 +1509,8 @@ retrieve the view where you use it.
 reflection. It uses a bounded array window for dense enums and binary search for sparse enums.
 Aliases are declared values; undeclared flags combinations are not. Cache initialization may allocate.
 
-`EnumNameCache<T>.TryParse(ReadOnlySpan<char>, out T, bool ignoreCase = false)` accepts declared
+`EnumNameCache<T>.TryParse(ReadOnlySpan<char>, out T, StringComparison comparison = StringComparison.Ordinal)`
+accepts declared
 names only. It does not trim whitespace, parse numbers, or combine comma-separated flags names.
 A declared composite flags name is accepted. Parsing scans cached names without allocating.
 With `ignoreCase: true`, comparisons use ordinal case folding; names that differ only by case
@@ -1525,6 +1526,8 @@ using WallstopStudios.UnityHelpers.Core.Extension;
 bool declared = EnumValues<DayOfWeek>.IsDefined(DayOfWeek.Monday);
 bool parsed = EnumNameCache<DayOfWeek>.TryParse("Monday".AsSpan(), out DayOfWeek day);
 bool numeric = EnumNameCache<DayOfWeek>.TryParse("1".AsSpan(), out _); // false
+bool folded = EnumNameCache<DayOfWeek>.TryParse(
+    "monday".AsSpan(), out _, StringComparison.OrdinalIgnoreCase);
 ```
 
 When the enum is known only as a `Type`, use `EnumValues.Of(type)` or
@@ -1566,9 +1569,12 @@ there are: members within 256 of each other get a direct array index, anything w
 gets a dictionary. Negative members count normally toward that span, so
 `enum Direction { Left = -1, None = 0, Right = 1 }` is three slots wide, not billions.
 
-For `[Flags]` enums, `ToCachedName()` extends the array from zero through the bitwise OR
-of the declared values when the result is below 256. The first lookup formats each unnamed
+For `[Flags]` enums with nonnegative declared values, `ToCachedName()` extends the array from zero
+through the bitwise OR of those values when the result is below 256. The first lookup formats each unnamed
 combination with the runtime's general enum format. Later lookups reuse the string.
+
+The boolean `ignoreCase` overload remains available and selects ordinal or ordinal-ignore-case
+comparison. Undefined `StringComparison` values return false.
 
 ### Display Names for UI
 

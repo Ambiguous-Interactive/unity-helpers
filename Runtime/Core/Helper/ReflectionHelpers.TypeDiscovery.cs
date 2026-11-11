@@ -199,7 +199,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
         /// <summary>Gets loaded types derived from the specified type, with optional value types.</summary>
-        /// <remarks>Set <paramref name="includeValueTypes"/> to include structs while keeping abstract types and interfaces excluded. <paramref name="includeAbstract"/> continues to include all kinds.</remarks>
+        /// <remarks>Set <paramref name="includeValueTypes"/> to include structs and enums while keeping abstract types and interfaces excluded. <paramref name="includeAbstract"/> continues to include all kinds.</remarks>
         public static IEnumerable<Type> GetTypesDerivedFrom(
             Type baseType,
             bool includeAbstract,

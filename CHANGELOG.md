@@ -13,9 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add stable in-place insertion sort for spans without renting a buffer ([#1157](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1157)).
 - Add optional struct discovery to `GetTypesDerivedFrom` while retaining the default class-only filter ([#1169](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1169)).
-- Add `LongMap<T>` and `LongSet` for unsigned 64-bit keys, packed iteration, reusable storage and mixed hash slots ([#1162](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1162)).
-- Add allocation-free set-bit traversal and ranked bit selection ([#1158](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1158)).
-- Add declared-name enum parsing and cached enum membership checks without per-call boxing ([#1159](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1159), [#1160](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1160)).
+- Add `LongMap<T>` and `LongSet` for unsigned 64-bit keys, packed iteration, reusable storage and key-only set storage ([#1162](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1162)).
+- Add allocation-free set-bit traversal, live `BitSet.SetIndices` traversal, and ranked bit selection ([#1158](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1158)).
+- Add declared-name enum parsing with a string comparison policy and cached membership checks without per-call boxing ([#1159](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1159), [#1160](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1160)).
 - Add directed graph reachability with reusable bitsets and a 64-node mask form ([#1161](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1161)).
 - Add keyed Unity object pools that route returns to their owner and dispose idle and checked-out items ([#1163](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1163)).
 - Add `WUH028` to flag redundant clears of freshly rented `Buffers` collections. See [the analyzer guide](./docs/performance/analyzers.md#wuh028-fresh-pooled-collection-clears).

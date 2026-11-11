@@ -114,7 +114,7 @@ out binding, out yaml, out failure)` combines compiler binding, complete Nodes c
 liveReferencedObjects, out failure)` checks a loaded imported document against its retained Nodes
   values. It checks owner/script identity, keys, entry/list counts, nulls and object addresses.
   Scene prefab references require unique direct source-object and instance fields, and the
-  instance must belong to the owning scene. Wrapped Unity flow mappings are supported.
+  instance must belong to the same scene as the referenced object. Wrapped Unity flow mappings are supported.
 - `TryPreviewDictionarySources(payload, fields, out preview, out failure)` proposes source
   changes for compiler-bound fields without writing files. Each immutable proposal contains its
   compiler path, original source, and proposed source.

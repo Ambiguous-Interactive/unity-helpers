@@ -292,6 +292,32 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             );
         }
 
+        [TestCase(false)]
+        [TestCase(true)]
+        public void DerivedTypeDiscoveryIncludesEnumsWhenValueTypesAreRequested(
+            bool includeValueTypes
+        )
+        {
+            Type expected = typeof(WallstopStudios.UnityHelpers.Core.Extension.SortAlgorithm);
+            Type[] generic = ReflectionHelpers
+                .GetTypesDerivedFrom<Enum>(
+                    includeAbstract: false,
+                    includeValueTypes: includeValueTypes
+                )
+                .ToArray();
+            Type[] nonGeneric = ReflectionHelpers
+                .GetTypesDerivedFrom(
+                    typeof(Enum),
+                    includeAbstract: false,
+                    includeValueTypes: includeValueTypes
+                )
+                .ToArray();
+
+            CollectionAssert.AreEquivalent(generic, nonGeneric);
+            Assert.AreEqual(includeValueTypes, generic.Contains(expected));
+            CollectionAssert.DoesNotContain(generic, typeof(Enum));
+        }
+
         [UnityEngine.Scripting.Preserve]
         private interface IDiscoveryContract { }
 

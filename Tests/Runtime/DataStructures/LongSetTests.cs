@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     using System.Collections.Generic;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.DataStructure;
+    using WallstopStudios.UnityHelpers.Tests.TestUtils;
 
     [TestFixture]
     [Category("Fast")]
@@ -60,7 +61,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             LongSet set = new();
             Assert.That(set.TryAdd(ulong.MaxValue), Is.True);
-            LongMap<byte>.KeyEnumerator iterator = set.GetEnumerator();
+            LongSet.Enumerator iterator = set.GetEnumerator();
             Assert.That(set.TryAdd(ulong.MaxValue), Is.False);
             Assert.That(set.Remove(1), Is.False);
             Assert.That(iterator.MoveNext(), Is.True);
@@ -72,6 +73,101 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             set.Clear();
             Assert.Throws<InvalidOperationException>(() => iterator.MoveNext());
             Assert.Throws<InvalidOperationException>(() => boxed.MoveNext());
+        }
+
+        [Test]
+        public void WraparoundCollisionsSurviveRemovalClearAndGrowth()
+        {
+            List<ulong> keys = new();
+            for (ulong key = 0; keys.Count < 9; ++key)
+            {
+                if ((LongMap<byte>.Mix(key) & 15) == 15)
+                {
+                    keys.Add(key);
+                }
+            }
+            LongSet set = new(0);
+            for (int index = 0; index < 8; ++index)
+            {
+                Assert.IsTrue(set.TryAdd(keys[index]));
+            }
+            Assert.IsTrue(set.Remove(keys[3]));
+            Assert.IsTrue(set.Remove(keys[7]));
+            Assert.IsTrue(set.TryAdd(keys[7]));
+            Assert.IsTrue(set.TryAdd(keys[3]));
+            Assert.IsTrue(set.TryAdd(keys[8]));
+            Assert.Greater(set.Capacity, 16);
+            foreach (ulong key in keys)
+            {
+                Assert.IsTrue(set.Contains(key));
+            }
+            set.Clear();
+            Assert.IsEmpty(set);
+            foreach (ulong key in keys)
+            {
+                Assert.IsFalse(set.Contains(key));
+                Assert.IsTrue(set.TryAdd(key));
+            }
+            CollectionAssert.AreEquivalent(keys, set);
+        }
+
+        [TestCase(11)]
+        [TestCase(731)]
+        public void SeededOperationsMatchIndependentSetAfterEveryStep(int seed)
+        {
+            Random random = new(seed);
+            HashSet<ulong> expected = new();
+            LongSet actual = new(0);
+            for (int step = 0; step < 4096; ++step)
+            {
+                ulong key = (ulong)random.Next(128) << 40;
+                int operation = random.Next(32);
+                if (operation == 0)
+                {
+                    actual.Clear();
+                    expected.Clear();
+                }
+                else if (operation < 12)
+                {
+                    Assert.AreEqual(expected.Remove(key), actual.Remove(key));
+                }
+                else
+                {
+                    Assert.AreEqual(expected.Add(key), actual.TryAdd(key));
+                }
+                Assert.AreEqual(expected.Count, actual.Count);
+                Assert.IsTrue(expected.SetEquals(actual));
+                Assert.AreEqual(expected.Contains(key), actual.Contains(key));
+            }
+        }
+
+        [TestCase(-1)]
+        [TestCase(int.MaxValue)]
+        public void InvalidCapacityIsRejected(int capacity)
+        {
+            Assert.Throws<ArgumentOutOfRangeException>(() => new LongSet(capacity));
+        }
+
+        [Test]
+        public void DedicatedSetRetainsLessStorageThanAMapOfBytes()
+        {
+            GCAssert.IgnoreIfAllocationMeasurementUnavailable();
+            _ = new LongSet(8);
+            _ = new LongMap<byte>(8);
+            long beforeMap = GC.GetAllocatedBytesForCurrentThread();
+            LongMap<byte> map = new(1024);
+            long mapBytes = GC.GetAllocatedBytesForCurrentThread() - beforeMap;
+            long beforeSet = GC.GetAllocatedBytesForCurrentThread();
+            LongSet set = new(1024);
+            long setBytes = GC.GetAllocatedBytesForCurrentThread() - beforeSet;
+            GC.KeepAlive(map);
+            GC.KeepAlive(set);
+            if (mapBytes == 0)
+            {
+                Assert.Ignore("The counter did not observe the retained map arrays.");
+            }
+            Assert.Less(setBytes, mapBytes);
+            TestContext.WriteLine($"Map bytes: {mapBytes}; set bytes: {setBytes}.");
         }
     }
 }

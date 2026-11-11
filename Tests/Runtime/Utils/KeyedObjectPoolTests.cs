@@ -288,5 +288,32 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 Assert.That(destroyed, Is.EqualTo(3));
             }
         }
+
+        [Test]
+        public void DisposalCallbacksCannotMutateTheChildPoolDictionary()
+        {
+            List<Texture2D> destroyed = new();
+            KeyedObjectPool<int, Texture2D> pool = null;
+            Texture2D checkedOut = null;
+            pool = new KeyedObjectPool<int, Texture2D>(
+                _ => Track(new Texture2D(1, 1)),
+                onDestroy: item =>
+                {
+                    destroyed.Add(item);
+                    Assert.IsFalse(pool.TryTake(99, out _));
+                    Assert.IsFalse(pool.Release(checkedOut));
+                    pool.Dispose();
+                }
+            );
+            Assert.IsTrue(pool.TryTake(1, out Texture2D idle));
+            Assert.IsTrue(pool.Release(idle));
+            Assert.IsTrue(pool.TryTake(2, out checkedOut));
+            Assert.DoesNotThrow(pool.Dispose);
+            Assert.IsTrue(pool.IsDisposed);
+            Assert.AreEqual(0, pool.PoolCount);
+            CollectionAssert.AreEquivalent(new[] { idle, checkedOut }, destroyed);
+            pool.Dispose();
+            Assert.AreEqual(2, destroyed.Count);
+        }
     }
 }

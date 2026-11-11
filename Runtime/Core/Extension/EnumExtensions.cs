@@ -123,17 +123,24 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             Cache = new EnumNameCacheData(namesArray, namesDict, useArray, minValue, arrayLength);
         }
 
-        /// <summary>Parses a declared name without accepting numbers, whitespace or flags lists.</summary>
-        /// <remarks>Case-insensitive names that identify different values are ambiguous and fail.</remarks>
-        public static bool TryParse(ReadOnlySpan<char> name, out T value, bool ignoreCase = false)
+        /// <summary>Parses a declared name using the requested string comparison.</summary>
+        /// <remarks>Names matching distinct values under the selected comparison are ambiguous and fail. Undefined comparison values fail.</remarks>
+        public static bool TryParse(
+            ReadOnlySpan<char> name,
+            out T value,
+            StringComparison comparison = StringComparison.Ordinal
+        )
         {
+            if ((uint)StringComparison.OrdinalIgnoreCase < (uint)comparison)
+            {
+                value = default;
+                return false;
+            }
             ReadOnlySpan<T> values = EnumValues<T>.Values;
-            StringComparison comparison = ignoreCase
-                ? StringComparison.OrdinalIgnoreCase
-                : StringComparison.Ordinal;
             bool found = false;
             T candidate = default;
-            for (int i = 0; i < DeclaredNames.Length; ++i)
+            int nameCount = DeclaredNames.Length;
+            for (int i = 0; i < nameCount; ++i)
             {
                 if (!name.Equals(DeclaredNames[i].AsSpan(), comparison))
                 {
@@ -149,6 +156,16 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
             value = candidate;
             return found;
+        }
+
+        /// <summary>Parses a declared name using ordinal comparison and optional case folding.</summary>
+        public static bool TryParse(ReadOnlySpan<char> name, out T value, bool ignoreCase)
+        {
+            return TryParse(
+                name,
+                out value,
+                ignoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal
+            );
         }
 
         /// <summary>Returns the cached general-format name when the value is in the cache window.</summary>

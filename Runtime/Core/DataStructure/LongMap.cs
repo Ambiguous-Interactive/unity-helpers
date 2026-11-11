@@ -88,7 +88,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ulong Mix(ulong key)
+        internal static ulong Mix(ulong key)
         {
             unchecked
             {

@@ -101,6 +101,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         }
 
         /// <summary>Disposes every child pool, reaching its idle and checked-out objects once.</summary>
+        /// <remarks>Disposal is latched before callbacks run, so reentrant takes, returns, and disposal cannot mutate the child-pool collection.</remarks>
         public void Dispose()
         {
             if (_disposed)

@@ -322,6 +322,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
         [TestCase(false, true, false, 8)]
         [TestCase(false, true, false, 9)]
         [TestCase(false, true, false, 10)]
+        [TestCase(false, true, false, 11)]
+        [TestCase(false, true, false, 12)]
         public void SavedSceneObjectReferencesMatchTheirAuthoredFileIds(
             bool local,
             bool prefab,
@@ -499,10 +501,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                     string original = File.ReadAllText(sourcePath);
                     const string sourcePattern =
                         @"(?m)^(  m_CorrespondingSourceObject: \{fileID: -?\d+, guid: [a-fA-F0-9]{32},\r?\n)(    type: 3\}\r?)$";
+                    const string instancePattern =
+                        @"(?m)^(  m_PrefabInstance: \{fileID: -?[1-9]\d*\}\r?)$";
                     string altered = invalidScene switch
                     {
                         8 => Regex.Replace(original, sourcePattern, "$1$2\n$1$2"),
                         9 => Regex.Replace(original, sourcePattern, "  m_Nested:\n  $1  $2"),
+                        11 => Regex.Replace(original, instancePattern, "$1\n$1"),
+                        12 => Regex.Replace(original, instancePattern, "  m_Nested:\n  $1"),
                         _ => Regex.Replace(
                             original,
                             @"(?m)^(  m_PrefabInstance: \{fileID: -?[1-9]\d*)(\}\r?)$",

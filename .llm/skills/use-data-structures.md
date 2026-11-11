@@ -43,6 +43,8 @@
 
 [Read section](../references/use-data-structures-part-2.md#performance-tips)
 
+### [Key-Only Storage](../references/use-data-structures-part-2.md#key-only-storage)
+
 ### [Use Pooled Collections with Data Structures](../references/use-data-structures-part-2.md#use-pooled-collections-with-data-structures)
 
 ### [Pre-size Collections](../references/use-data-structures-part-2.md#pre-size-collections)

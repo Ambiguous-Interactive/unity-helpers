@@ -350,7 +350,7 @@
     "validate:npm-package": "pwsh -NoProfile -File scripts/validate-npm-package.ps1 -VerboseOutput",
     "test:lint-xml-doc-summaries": "uv run --project scripts/python~ --locked pytest scripts/tests/test_xml_doc_summaries.py -q",
     "test:lint-unity-file-naming": "uv run --project scripts/python~ --locked pytest scripts/tests/test_unity_file_naming.py -q",
-    "test:check-eol": "uv run --project scripts/python~ --locked pytest scripts/tests/test_check_eol.py -q",
+    "test:check-eol": "uv run --project scripts/python~ --locked pytest scripts/tests/test_check_eol.py scripts/tests/test_normalize_eol.py -q",
     "test:gitignore-docs": "uv run --quiet --project scripts/python~ --locked pytest scripts/tests/test_gitignore_docs.py -q",
     "test:validate-mcp-config": "pwsh -NoProfile -File scripts/tests/test-validate-mcp-config.ps1",
     "test:github-mcp": "node --test scripts/tests/test-github-mcp.mjs",
