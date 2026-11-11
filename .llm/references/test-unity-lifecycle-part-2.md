@@ -113,7 +113,7 @@ public IEnumerator OnInspectorGuiDoesNotThrowForTarget()
 | `UNH001`       | Remove `DestroyImmediate`; use `Track()` OR add `// UNH-SUPPRESS` if testing destroy behavior |
 | `UNH002`       | Wrap object creation with `Track()`: `Track(new GameObject())`                                |
 | `UNH003`       | Add `: CommonTestBase` or `: EditorCommonTestBase` to test class                              |
-| Helper classes | Add file path to `$allowedHelperFiles` in `scripts/lint-tests.ps1`                            |
+| Helper classes | Add file path to `HELPERS` in `scripts/lint_tests.py`                            |
 
 ---
 

@@ -89,6 +89,114 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             ).SetName("ArtMask.Overflow.Refused");
         }
 
+        private static IEnumerable<TestCaseData> PixelBoundaryCases()
+        {
+            foreach (int width in new[] { 1, 7, 32 })
+            {
+                foreach (int pattern in new[] { 0, 1, 2, 3, 4, 5 })
+                {
+                    foreach (byte threshold in new byte[] { 0, 1, 128, 255 })
+                    {
+                        yield return new TestCaseData(width, pattern, threshold).SetName(
+                            $"PixelBounds.Width{width}.Pattern{pattern}.Threshold{threshold}"
+                        );
+                    }
+                }
+            }
+        }
+
+        [TestCaseSource(nameof(PixelBoundaryCases))]
+        public void PixelBoundsMatchEveryVisiblePixel(int width, int pattern, byte threshold)
+        {
+            const int height = 9;
+            const float pixelsPerUnit = 17f;
+            Color32[] pixels = new Color32[width * height];
+            bool[] visible = new bool[pixels.Length];
+            int minimumX = width;
+            int minimumY = height;
+            int maximumX = -1;
+            int maximumY = -1;
+            for (int row = 0; row < height; ++row)
+            {
+                for (int column = 0; column < width; ++column)
+                {
+                    byte alpha = pattern switch
+                    {
+                        0 => 0,
+                        1 => 255,
+                        2 => column == width / 2 ? (byte)255 : (byte)0,
+                        3 => (row == 0 || row == height - 1) && (column == 0 || column == width - 1)
+                            ? (byte)128
+                            : (byte)0,
+                        4 => (column + row) % 2 == 0 ? (byte)255 : (byte)0,
+                        _ => (byte)((column * 41 + row * 17) % 256),
+                    };
+                    int index = row * width + column;
+                    pixels[index] = new Color32(0, 0, 0, alpha);
+                    visible[index] = alpha != 0 && threshold <= alpha;
+                    if (visible[index])
+                    {
+                        minimumX = Math.Min(minimumX, column);
+                        minimumY = Math.Min(minimumY, row);
+                        maximumX = Math.Max(maximumX, column);
+                        maximumY = Math.Max(maximumY, row);
+                    }
+                }
+            }
+
+            Texture2D texture = Track(new Texture2D(width, height, TextureFormat.RGBA32, false));
+            texture.SetPixels32(pixels);
+            texture.Apply();
+            Rect rectangle = new(0, 0, width, height);
+            Vector2 normalizedPivot = new(0.25f, 0.75f);
+            Sprite sprite = Track(
+                Sprite.Create(texture, rectangle, normalizedPivot, pixelsPerUnit)
+            );
+            Vector2 pivot = sprite.pivot;
+            Vector2 units = Vector2.one / pixelsPerUnit;
+            SpriteAlphaMask mask = new(visible, width, height, pivot, units);
+            bool expected = 0 <= maximumX;
+            Assert.AreEqual(
+                expected,
+                SpriteArtBounds.TryGetLocalArtBounds(
+                    mask,
+                    out Bounds maskBounds,
+                    out string maskError
+                ),
+                maskError
+            );
+            Assert.AreEqual(
+                expected,
+                SpriteArtBounds.TryGetLocalArtBounds(
+                    sprite,
+                    out Bounds spriteBounds,
+                    out string spriteError,
+                    threshold
+                ),
+                spriteError
+            );
+            if (!expected)
+            {
+                Assert.AreEqual(default(Bounds), maskBounds);
+                Assert.AreEqual(default(Bounds), spriteBounds);
+                return;
+            }
+
+            Vector3 expectedMinimum = new(
+                (float)((minimumX - (double)pivot.x) * units.x),
+                (float)((minimumY - (double)pivot.y) * units.y),
+                0
+            );
+            Vector3 expectedMaximum = new(
+                (float)((maximumX + 1 - (double)pivot.x) * units.x),
+                (float)((maximumY + 1 - (double)pivot.y) * units.y),
+                0
+            );
+            Assert.That(Vector3.Distance(expectedMinimum, maskBounds.min), Is.LessThan(0.00001f));
+            Assert.That(Vector3.Distance(expectedMaximum, maskBounds.max), Is.LessThan(0.00001f));
+            Assert.AreEqual(maskBounds, spriteBounds);
+        }
+
         [TestCaseSource(nameof(InvalidMasks))]
         public void InvalidMasksFailWithEmptyBoundsAndAReason(SpriteAlphaMask mask)
         {

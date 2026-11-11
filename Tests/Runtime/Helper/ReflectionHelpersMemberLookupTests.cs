@@ -72,6 +72,48 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsTrue(fi != null, "Expected MarkedField to be discovered.");
         }
 
+        [TestCase(true)]
+        [TestCase(false)]
+        public void SafeAttributedFieldsIncludeEveryDeclarationOnce(bool inherit)
+        {
+            Type type = typeof(AttributedFieldLeaf);
+            HashSet<(Type, string)> expected = new()
+            {
+                (typeof(AttributedFieldBase), AttributedFieldBase.PrivateFieldName),
+                (typeof(AttributedFieldBase), AttributedFieldBase.PrivateStaticFieldName),
+                (typeof(AttributedFieldBase), nameof(AttributedFieldBase.sharedValue)),
+                (typeof(AttributedFieldBase), AttributedFieldBase.ProtectedFieldName),
+                (typeof(AttributedFieldDerived), nameof(AttributedFieldDerived.sharedValue)),
+            };
+
+            for (int iteration = 0; iteration < 2; ++iteration)
+            {
+                FieldInfo[] fields = type.GetFieldsWithAttributeSafe<RuntimeMarkerAttribute>(
+                    inherit
+                );
+                HashSet<(Type, string)> actual = new();
+                foreach (FieldInfo field in fields)
+                {
+                    Assert.IsTrue(
+                        actual.Add((field.DeclaringType, field.Name)),
+                        "Duplicate field."
+                    );
+                }
+                CollectionAssert.AreEquivalent(expected, actual);
+                Assert.AreEqual(expected.Count, fields.Length);
+            }
+        }
+
+        [TestCase(typeof(object))]
+        [TestCase(typeof(int))]
+        [TestCase(null)]
+        public void SafeAttributedFieldsReturnEmptyWithoutMatches(Type type)
+        {
+            FieldInfo[] fields = type.GetFieldsWithAttributeSafe<RuntimeMarkerAttribute>();
+            Assert.IsTrue(fields != null);
+            Assert.IsEmpty(fields);
+        }
+
         [Test]
         public void GetMethodsWithAttributeWithinReturnsMethod()
         {

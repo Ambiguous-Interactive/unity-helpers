@@ -21,16 +21,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
         private static readonly TestCaseData[] MoveEventCases =
         {
             new TestCaseData(0, 2, new[] { "Two", "One", "Three" }).SetName(
-                "MoveEvent_MovesFirstElementTowardsEnd"
+                "MoveEvent.MovesFirstElementTowardsEnd"
             ),
             new TestCaseData(2, -3, new[] { "Three", "One", "Two" }).SetName(
-                "MoveEvent_ClampsLowIndexToStart"
+                "MoveEvent.ClampsLowIndexToStart"
             ),
             new TestCaseData(1, 1, new[] { "One", "Two", "Three" }).SetName(
-                "MoveEvent_NoOpWhenIndicesMatch"
+                "MoveEvent.NoOpWhenIndicesMatch"
             ),
             new TestCaseData(0, 10, new[] { "Two", "Three", "One" }).SetName(
-                "MoveEvent_ClampsHighIndexToEnd"
+                "MoveEvent.ClampsHighIndexToEnd"
             ),
         };
 

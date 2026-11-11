@@ -3799,6 +3799,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 
+        /// <summary>Finds attributed fields declared on the type and all its base types.</summary>
+        /// <remarks>
+        /// Includes private and static base fields and both declarations of a hidden name, once each.
+        /// The inherit argument controls attribute lookup, not traversal of base types.
+        /// Returns an empty array for a null type.
+        /// </remarks>
         public static FieldInfo[] GetFieldsWithAttributeSafe<TAttribute>(
             this Type type,
             bool inherit = true
@@ -3812,16 +3818,15 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             try
             {
-                FieldInfo[] fields = type.GetFields(
+                const BindingFlags flags =
                     BindingFlags.Public
-                        | BindingFlags.NonPublic
-                        | BindingFlags.Instance
-                        | BindingFlags.Static
-                );
+                    | BindingFlags.NonPublic
+                    | BindingFlags.Instance
+                    | BindingFlags.Static;
                 using PooledResource<List<FieldInfo>> lease = Buffers<FieldInfo>.List.Get(
                     out List<FieldInfo> result
                 );
-                foreach (FieldInfo field in fields)
+                foreach (FieldInfo field in EnumerateDeclaredAndInheritedFields(type, flags))
                 {
                     if (HasAttributeSafe<TAttribute>(field, inherit))
                     {

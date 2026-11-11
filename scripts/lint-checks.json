@@ -357,7 +357,7 @@
   {
     "id": "lint-tests-test",
     "name": "Test linter self-test",
-    "run": "pwsh -NoProfile -File scripts/tests/test-lint-tests.ps1 -VerboseOutput"
+    "run": "uv run --quiet --project scripts/python~ --locked pytest scripts/tests/test_lifecycle_lint.py -q"
   },
   {
     "id": "unity-mode-coordinator",

@@ -168,6 +168,10 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             RegexOptions.Compiled | RegexOptions.CultureInvariant
         );
 
+        private static readonly Dictionary<string, Regex> MethodSignatures = new(
+            StringComparer.Ordinal
+        );
+
         // Shared clear helpers mutate the same handler state and need the same drain guarantee.
         private static readonly string[] HandlerClearEquivalentCalls =
         {
@@ -649,15 +653,19 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         */
         private static string ExtractMethodBody(string source, string methodName)
         {
-            Regex signature = new(
-                "\\b(?:public|internal|private|protected)(?:\\s+(?:public|internal|private|protected))?"
-                    + "(?:\\s+(?:static|override|async|sealed|new|virtual|unsafe|extern|partial))*"
-                    + "\\s+(?:void|Task|Task<[^>]+>|ValueTask|ValueTask<[^>]+>|IEnumerator|IEnumerable|IAsyncEnumerable<[^>]+>)"
-                    + "\\s+"
-                    + Regex.Escape(methodName)
-                    + "\\s*\\(",
-                RegexOptions.CultureInvariant | RegexOptions.Singleline
-            );
+            if (!MethodSignatures.TryGetValue(methodName, out Regex signature))
+            {
+                signature = new(
+                    "\\b(?:public|internal|private|protected)(?:\\s+(?:public|internal|private|protected))?"
+                        + "(?:\\s+(?:static|override|async|sealed|new|virtual|unsafe|extern|partial))*"
+                        + "\\s+(?:void|Task|Task<[^>]+>|ValueTask|ValueTask<[^>]+>|IEnumerator|IEnumerable|IAsyncEnumerable<[^>]+>)"
+                        + "\\s+"
+                        + Regex.Escape(methodName)
+                        + "\\s*\\(",
+                    RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.Singleline
+                );
+                MethodSignatures.Add(methodName, signature);
+            }
             Match match = signature.Match(source);
             while (match.Success)
             {

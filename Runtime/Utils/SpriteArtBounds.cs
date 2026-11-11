@@ -43,19 +43,33 @@ namespace WallstopStudios.UnityHelpers.Utils
             int top = -1;
             for (int row = 0; row < height; ++row)
             {
-                for (int column = 0; column < width; ++column)
+                int first = 0;
+                for (; first < width; ++first)
                 {
-                    byte alpha = region.GetPixel(column, row).a;
-                    if (alpha == 0 || alpha < alphaThreshold)
+                    byte alpha = region.GetPixel(first, row).a;
+                    if (alpha != 0 && alphaThreshold <= alpha)
                     {
-                        continue;
+                        break;
                     }
-
-                    left = Mathf.Min(left, column);
-                    bottom = Mathf.Min(bottom, row);
-                    right = Mathf.Max(right, column);
-                    top = row;
                 }
+                if (first == width)
+                {
+                    continue;
+                }
+
+                int last = width - 1;
+                for (; first < last; --last)
+                {
+                    byte alpha = region.GetPixel(last, row).a;
+                    if (alpha != 0 && alphaThreshold <= alpha)
+                    {
+                        break;
+                    }
+                }
+                left = Mathf.Min(left, first);
+                bottom = Mathf.Min(bottom, row);
+                right = Mathf.Max(right, last);
+                top = row;
             }
 
             return TryCreatePixelBounds(
@@ -105,18 +119,25 @@ namespace WallstopStudios.UnityHelpers.Utils
             for (int row = 0; row < height; ++row)
             {
                 int offset = row * width;
-                for (int column = 0; column < width; ++column)
+                int first = 0;
+                while (first < width && !pixels[offset + first])
                 {
-                    if (!pixels[offset + column])
-                    {
-                        continue;
-                    }
-
-                    left = Mathf.Min(left, column);
-                    bottom = Mathf.Min(bottom, row);
-                    right = Mathf.Max(right, column);
-                    top = row;
+                    ++first;
                 }
+                if (first == width)
+                {
+                    continue;
+                }
+
+                int last = width - 1;
+                while (first < last && !pixels[offset + last])
+                {
+                    --last;
+                }
+                left = Mathf.Min(left, first);
+                bottom = Mathf.Min(bottom, row);
+                right = Mathf.Max(right, last);
+                top = row;
             }
 
             return TryCreatePixelBounds(

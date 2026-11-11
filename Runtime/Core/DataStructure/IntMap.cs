@@ -233,7 +233,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 value = result;
                 return present;
             }
-            if (key < MinimumAllowedKey || _count == 0)
+            if (_count == 0)
             {
                 value = default(TValue);
                 return false;

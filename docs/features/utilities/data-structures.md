@@ -562,6 +562,27 @@ the partial capture remains local. Short consumer-protocol runs had hidden these
 The accepted change keeps the existing key representation. Issue
 [#1131](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1131) remains open.
 
+### Small-map lookup comparison (2026-11-11)
+
+`TryGet` now probes reserved keys through the existing lookup path; insertion still refuses them.
+Three fresh processes per runtime compared main `a86ec34b` with this change on Linux x64,
+.NET 10.0.14 and Mono 6.14.1. Each process covered 159 cells with independent checksums,
+64 warm calls, at least 20 ms calibration, and 21 rotating-order raw rounds.
+The table gives the range of median paired process ratios across the tested cells; lower is faster.
+
+| Runtime     |        Hits |      Misses | Fresh insert | Pair iteration |
+| :---------- | ----------: | ----------: | -----------: | -------------: |
+| .NET 10     | 0.904–1.024 | 0.874–1.013 |  0.981–1.036 |    0.983–1.012 |
+| Mono 6.14.1 | 0.801–1.007 | 0.961–1.026 |  0.983–1.032 |    0.992–1.009 |
+
+Eight-entry dense hits improved in every process: 9–17% on .NET and 11–21% on Mono.
+Other cells include small regressions, so this is no universal speed guarantee.
+All six processes exited zero, ended both streams, and retained stable source and binary hashes.
+The [replay archive](../../performance/intmap-lookup-guard.zip) includes the harness, source variants,
+raw rounds and receipts. These current-main comparisons do not establish the original 3.7.1
+consumer budget; [#1131](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1131) remains open.
+Unity players and arbitrary value types still require separate measurement.
+
 ### Capacity and key limits
 
 - Keys below `IntMap<TValue>.MinimumAllowedKey` are reserved. `TrySet` refuses them; the indexer
