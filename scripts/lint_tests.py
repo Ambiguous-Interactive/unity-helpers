@@ -833,6 +833,7 @@ def main(argv: list[str] | None = None) -> int:
                         "Assert.IsNull/Assert.IsNotNull could not be auto-fixed; repair this call manually",
                     )
                     for m in NULL_ASSERTION.finditer(revised_source.code)
+                    if not revised_source.suppressed(revised_source.line_at(m.start()))
                 ]
             else:
                 revised = text

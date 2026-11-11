@@ -92,7 +92,8 @@ commands remain compatibility entry points. Explicit `--paths` are literal files
 linked or unreadable inputs fail. Full scans require a nonempty `Tests` tree and exclude Unity's
 hidden consumer folders. Null-assertion repair validates the full input batch before writing,
 preserves encoding and line endings, and refuses writable hard links. Comments and string literals
-are neither repaired nor treated as test code. Editor-reference guards must exclude player builds even
+are neither repaired nor treated as test code. Calls left for manual repair retain inline suppressions.
+Editor-reference guards must exclude player builds even
 when another symbol is enabled; merely mentioning `UNITY_EDITOR` in an OR condition is insufficient.
 
 The regression corpus in `scripts/tests/fixtures/test-lifecycle-v1.json` records 144 actual

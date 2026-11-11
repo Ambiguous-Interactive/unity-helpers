@@ -467,3 +467,33 @@ def test_unmatched_assertion_reports_manual_repair(tmp_path: Path, text: str) ->
     path.write_text(text, encoding="utf-8")
     assert main(["--repo-root", str(tmp_path), "--paths", str(path), "--fix-null-checks"]) == 1
     assert path.read_text(encoding="utf-8") == text
+
+
+@pytest.mark.parametrize("method", ["IsNull", "IsNotNull"])
+def test_generic_invocation_condition_keeps_type_argument_comma(method: str) -> None:
+    expression = 'Count < Limit, OtherCount > (0) ? "a" : "b"'
+    operator = "==" if method == "IsNull" else "!="
+    assert len(split_arguments(expression)) == 1
+    assert repair_null_assertions(f"Assert.{method}({expression});") == (
+        f"Assert.IsTrue(({expression}) {operator} null);"
+    )
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "if (ready) { Assert.IsNull(target); }",
+        "global::NUnit.Framework.Assert.IsNotNull(target);",
+        "Invoke(() => Assert.IsNull(target));",
+    ],
+)
+@pytest.mark.parametrize("suppression", ["// UNH-SUPPRESS", "/* UNH-SUPPRESS */"])
+def test_unmatched_assertion_preserves_inline_suppression(
+    tmp_path: Path, text: str, suppression: str
+) -> None:
+    path = tmp_path / "Subject.cs"
+    text += " " + suppression
+    path.write_text(text, encoding="utf-8")
+    assert analyze(text, "Subject.cs", editor_only=False) == []
+    assert main(["--repo-root", str(tmp_path), "--paths", str(path), "--fix-null-checks"]) == 0
+    assert path.read_text(encoding="utf-8") == text
