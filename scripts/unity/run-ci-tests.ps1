@@ -1070,6 +1070,36 @@ function Test-UnityArtifactDatabaseStartupFailure {
         -not $log.Contains('error CS'))
 }
 
+function Reset-UnityArtifactDatabaseLibrary {
+    param([Parameter(Mandatory = $true)][string]$Project)
+
+    $library = Join-Path $Project 'Library'
+    $marker = Join-Path $library '.unity-helpers-repo-root.txt'
+    if (-not (Test-Path -LiteralPath $marker -PathType Leaf)) {
+        throw 'Artifact-database recovery requires a harness-owned Library marker.'
+    }
+    $repoMarker = [IO.File]::ReadAllText($marker)
+    # Prune earlier harness-owned diagnostics when their files can be removed.
+    foreach ($previous in @(Get-ChildItem -LiteralPath $Project -Directory -Force -Filter 'Library.artifact-database-failure-*')) {
+        if ($previous.Name -cnotmatch '^Library\.artifact-database-failure-[0-9a-f]{32}$' -or
+            ($previous.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { continue }
+        try {
+            $previousMarker = Join-Path $previous.FullName '.unity-helpers-repo-root.txt'
+            if ((Test-Path -LiteralPath $previousMarker -PathType Leaf) -and
+                [IO.File]::ReadAllText($previousMarker) -ceq $repoMarker) {
+                Remove-Item -LiteralPath $previous.FullName -Recurse -Force -ErrorAction Stop
+            }
+        } catch {
+            Write-CiWarning "Could not remove earlier failed Library '$($previous.FullName)': $($_.Exception.Message)"
+        }
+    }
+    $retainedLibrary = Join-Path $Project ('Library.artifact-database-failure-' + [guid]::NewGuid().ToString('N'))
+    Move-Item -LiteralPath $library -Destination $retainedLibrary -ErrorAction Stop
+    $null = New-Item -ItemType Directory -Path $library
+    [IO.File]::WriteAllText($marker, $repoMarker)
+    Write-CiNotice "Retained failed Library for diagnosis: $retainedLibrary"
+}
+
 function Invoke-UnityEditorTestsWithPackageManagerRetry {
     param(
         [Parameter(Mandatory = $true)][string]$EditorPath,
@@ -1138,31 +1168,7 @@ function Invoke-UnityEditorTestsWithPackageManagerRetry {
         }
     }
     if ($artifactDatabaseFailure) {
-        $library = Join-Path $Project 'Library'
-        $marker = Join-Path $library '.unity-helpers-repo-root.txt'
-        if (-not (Test-Path -LiteralPath $marker -PathType Leaf)) {
-            throw 'Artifact-database recovery requires a harness-owned Library marker.'
-        }
-        $repoMarker = [IO.File]::ReadAllText($marker)
-        # Prune earlier harness-owned diagnostics when their files can be removed.
-        foreach ($previous in @(Get-ChildItem -LiteralPath $Project -Directory -Force -Filter 'Library.artifact-database-failure-*')) {
-            if ($previous.Name -cnotmatch '^Library\.artifact-database-failure-[0-9a-f]{32}$' -or
-                ($previous.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { continue }
-            try {
-                $previousMarker = Join-Path $previous.FullName '.unity-helpers-repo-root.txt'
-                if ((Test-Path -LiteralPath $previousMarker -PathType Leaf) -and
-                    [IO.File]::ReadAllText($previousMarker) -ceq $repoMarker) {
-                    Remove-Item -LiteralPath $previous.FullName -Recurse -Force -ErrorAction Stop
-                }
-            } catch {
-                Write-CiWarning "Could not remove earlier failed Library '$($previous.FullName)': $($_.Exception.Message)"
-            }
-        }
-        $retainedLibrary = Join-Path $Project ('Library.artifact-database-failure-' + [guid]::NewGuid().ToString('N'))
-        Move-Item -LiteralPath $library -Destination $retainedLibrary -ErrorAction Stop
-        $null = New-Item -ItemType Directory -Path $library
-        [IO.File]::WriteAllText($marker, $repoMarker)
-        Write-CiNotice "Retained failed Library for diagnosis: $retainedLibrary"
+        Reset-UnityArtifactDatabaseLibrary -Project $Project
     } else {
         Clear-UnityPackageManagerRetryState -Project $Project
     }
@@ -4970,6 +4976,9 @@ function Invoke-UnityConfigurePass {
     if (Test-Path -LiteralPath $MarkerPath -PathType Leaf) {
         Remove-Item -LiteralPath $MarkerPath -Force
     }
+    if (Test-Path -LiteralPath $LogPath -PathType Leaf) {
+        Remove-Item -LiteralPath $LogPath -Force -ErrorAction Stop
+    }
     $configureArgs = @(
         '-quit',
         '-batchmode',
@@ -5007,12 +5016,15 @@ function Invoke-UnityConfigurePass {
     }
 
     $firstAttemptLogPath = $null
+    $artifactDatabaseFailure = $null
     $processObservation = @{ State = 'unavailable' }
     $configureStartedUtc = [DateTime]::UtcNow
     try {
         $configureExit = & $invokeConfigure $Label
     } catch {
-        if (-not (Test-UnityConfigureMarker -MarkerPath $MarkerPath -StartedUtc $configureStartedUtc) -or
+        if (-not (Test-UnityConfigureMarker -MarkerPath $MarkerPath -StartedUtc $configureStartedUtc)) { throw }
+        $artifactDatabaseFailure = Test-UnityArtifactDatabaseStartupFailure -LogPath $LogPath
+        if (-not $artifactDatabaseFailure -and
             -not (Test-UnityConfigurePackageManagerRetryableFailure -LogPath $LogPath)) { throw }
         $configureExit = 1
     } finally {
@@ -5023,16 +5035,25 @@ function Invoke-UnityConfigurePass {
     }
     $configureProblem = Test-UnityConfigureMarker -MarkerPath $MarkerPath -StartedUtc $configureStartedUtc
 
-    # A fresh marker always wins: Apply completed, and any UPM message in the log predates that
-    # durable proof. Retry only a marker-less exact cancellation/IPC signature, once. Compilation,
-    # test, and arbitrary non-zero failures never reach this branch.
+    if ($null -eq $artifactDatabaseFailure) {
+        $artifactDatabaseFailure = -not [string]::IsNullOrWhiteSpace($configureProblem) -and
+            (Test-UnityArtifactDatabaseStartupFailure -LogPath $LogPath)
+    }
+    # A fresh marker proves Apply completed. Marker-less known startup database failures and
+    # exact UPM cancellation signatures receive one recovery attempt.
     if (
         -not [string]::IsNullOrWhiteSpace($configureProblem) -and
-        (Test-UnityConfigurePackageManagerRetryableFailure -LogPath $LogPath)
+        ($artifactDatabaseFailure -or (Test-UnityConfigurePackageManagerRetryableFailure -LogPath $LogPath))
     ) {
         Write-UnityConfigureFailureObservation -LogPath $LogPath -ProcessObservation $processObservation -Suffix 'first-attempt'
-        Write-CiWarning "Unity Package Manager canceled package resolution before the configure marker existed; clearing UPM state and retrying once."
-        Write-UnityPackageManagerTransientFailureWarnings -LogPath $LogPath
+        $retryReason = 'UPM cancellation'
+        if ($artifactDatabaseFailure) {
+            $retryReason = 'startup artifact-database corruption'
+            Write-CiWarning 'Unity failed while initializing its artifact database before configuration completed; retaining the failed Library and rebuilding once.'
+        } else {
+            Write-CiWarning "Unity Package Manager canceled package resolution before the configure marker existed; clearing UPM state and retrying once."
+            Write-UnityPackageManagerTransientFailureWarnings -LogPath $LogPath
+        }
         $preservedLogPath = Join-Path (Split-Path -Parent $LogPath) ("{0}.first-attempt.log" -f [System.IO.Path]::GetFileNameWithoutExtension($LogPath))
         try {
             Copy-Item -LiteralPath $LogPath -Destination $preservedLogPath -Force -ErrorAction Stop
@@ -5041,15 +5062,30 @@ function Invoke-UnityConfigurePass {
         } catch {
             Write-CiWarning "Could not preserve first failed Unity configure log before retry: $($_.Exception.Message)"
         }
-        Clear-UnityPackageManagerRetryState -Project $ProjectPath
+        $observationPath = [IO.Path]::ChangeExtension($LogPath, 'execution-diagnostics.json')
+        if (Test-Path -LiteralPath $observationPath -PathType Leaf) {
+            try {
+                Copy-Item -LiteralPath $observationPath -Destination ([IO.Path]::ChangeExtension($preservedLogPath, 'execution-diagnostics.json')) -Force -ErrorAction Stop
+            } catch {
+                Write-CiWarning 'Could not preserve first failed Unity configure execution diagnostics before retry.'
+            }
+        }
+        if ($artifactDatabaseFailure) {
+            Reset-UnityArtifactDatabaseLibrary -Project $ProjectPath
+        } else {
+            Clear-UnityPackageManagerRetryState -Project $ProjectPath
+        }
         if (Test-Path -LiteralPath $MarkerPath -PathType Leaf) {
             Remove-Item -LiteralPath $MarkerPath -Force
         }
 
+        if (Test-Path -LiteralPath $LogPath -PathType Leaf) {
+            Remove-Item -LiteralPath $LogPath -Force -ErrorAction Stop
+        }
         $processObservation = @{ State = 'unavailable' }
         $configureStartedUtc = [DateTime]::UtcNow
         try {
-            $configureExit = & $invokeConfigure "$Label (retry 1 after UPM cancellation)"
+            $configureExit = & $invokeConfigure "$Label (retry 1 after $retryReason)"
         } finally {
             if ($null -ne $FrozenContext) { $FrozenContext.ConfigureOutcomes.Add([pscustomobject]$processObservation.Clone()) }
             Remove-Item -LiteralPath Env:\UH_CONFIGURE_MARKER_PATH -ErrorAction SilentlyContinue

@@ -51,6 +51,7 @@ foreach ($name in @(
         'Get-EditorTestRunTimeoutSeconds',
         'Get-EditorTestStallSeconds',
         'Test-UnityArtifactDatabaseStartupFailure',
+        'Reset-UnityArtifactDatabaseLibrary',
         'Invoke-UnityEditorTestsWithPackageManagerRetry',
         'Invoke-UnityConfigurePass'
     )) {
@@ -686,6 +687,71 @@ try {
         if ($case.Recover -and $retained.Count -eq 1) {
             Assert-That 'corrupt ArtifactDB remains available for diagnosis' ((Get-Content (Join-Path $retained[0].FullName 'ArtifactDB') -Raw).Trim() -ceq 'corrupt-control')
             Assert-That 'startup recovery preserves the first native log' ((Get-Content (Join-Path $temporaryRoot 'native.first-attempt.log') -Raw).Trim() -ceq $case.Log)
+        }
+        $configureProject = Join-Path $temporaryRoot ($case.Name + '-configure')
+        $configureLibrary = Join-Path $configureProject 'Library'
+        $null = New-Item -ItemType Directory -Force $configureLibrary
+        Set-Content (Join-Path $configureLibrary 'ArtifactDB') 'corrupt-configure-control'
+        if ($case.Owned) { Set-Content (Join-Path $configureLibrary '.unity-helpers-repo-root.txt') 'owned-control' }
+        $script:configureArtifactCalls = 0
+        $script:configureArtifactHasMarker = $case.Results
+        $configureMarker = Join-Path $configureProject 'configured.marker'
+        $configureArtifactInvoker = {
+            param($Arguments, $AttemptLog, $AttemptLabel)
+            ++$script:configureArtifactCalls
+            Set-Content -LiteralPath $AttemptLog -Value $script:artifactLog
+            if ($script:configureArtifactHasMarker) { Set-Content -LiteralPath $env:UH_CONFIGURE_MARKER_PATH -Value 'fresh' }
+            throw 'No loaded Test Framework snapshot was captured.'
+        }
+        $configureThrew = $false
+        try { $null = Invoke-UnityConfigurePass -EditorPath 'owned-editor' -ProjectPath $configureProject -MarkerPath $configureMarker -LogPath $nativeLog -Label $case.Name -ConfigureInvoker $configureArtifactInvoker }
+        catch { $configureThrew = $true }
+        Assert-That ($case.Name + ' configure bounds recovery and preserves persistent failure') ($script:configureArtifactCalls -eq $expectedCalls -and $configureThrew)
+        $configureRetained = @(Get-ChildItem -LiteralPath $configureProject -Directory -Filter 'Library.artifact-database-failure-*')
+        Assert-That ($case.Name + ' configure retains only the failed owned cache') ($configureRetained.Count -eq [int]$case.Recover)
+        Assert-That ($case.Name + ' configure clears its marker environment') (-not (Test-Path Env:UH_CONFIGURE_MARKER_PATH))
+    }
+
+    foreach ($signature in @($artifactStack, $sharedMemoryStack, $corruptDatabaseExit, $invalidDatabaseExit)) {
+        foreach ($firstThrows in @($false, $true)) {
+            $configureProject = Join-Path $temporaryRoot ([guid]::NewGuid().ToString('N'))
+            $configureLibrary = Join-Path $configureProject 'Library'
+            $null = New-Item -ItemType Directory -Force $configureLibrary
+            Set-Content (Join-Path $configureLibrary '.unity-helpers-repo-root.txt') 'owned-control'
+            Set-Content (Join-Path $configureLibrary 'ArtifactDB') 'corrupt-configure-control'
+            $script:configureSuccessCalls = 0
+            $script:configureSuccessLog = $signature
+            $script:configureSuccessThrows = $firstThrows
+            $script:configureSuccessSawStaleLog = $false
+            Set-Content -LiteralPath $nativeLog -Value 'stale previous configure log'
+            $configureSuccessInvoker = {
+                param($Arguments, $AttemptLog, $AttemptLabel)
+                ++$script:configureSuccessCalls
+                if (Test-Path -LiteralPath $AttemptLog) { $script:configureSuccessSawStaleLog = $true }
+                @{ Process = @{ ProcessId = $script:configureSuccessCalls } } | ConvertTo-Json | Set-Content -LiteralPath ([IO.Path]::ChangeExtension($AttemptLog, 'execution-diagnostics.json'))
+                if ($script:configureSuccessCalls -eq 1) {
+                    Set-Content -LiteralPath $AttemptLog -Value $script:configureSuccessLog
+                    if ($script:configureSuccessThrows) { throw 'No loaded Test Framework snapshot was captured.' }
+                    return 0
+                }
+                Set-Content -LiteralPath $AttemptLog -Value 'configured second attempt'
+                Set-Content -LiteralPath $env:UH_CONFIGURE_MARKER_PATH -Value 'fresh'
+                return 0
+            }
+            $context = [pscustomobject]@{ ConfigureOutcomes = [Collections.Generic.List[object]]::new() }
+            $configureMarker = Join-Path $configureProject 'configured.marker'
+            $configureThrew = $false
+            try { $null = Invoke-UnityConfigurePass -EditorPath 'owned-editor' -ProjectPath $configureProject -MarkerPath $configureMarker -LogPath $nativeLog -Label 'configure recovers' -ConfigureInvoker $configureSuccessInvoker -FrozenContext $context }
+            catch { $configureThrew = $true }
+            Assert-That 'configure startup recovery requires a fresh successful retry marker' (-not $configureThrew -and $script:configureSuccessCalls -eq 2 -and (Test-Path -LiteralPath $configureMarker))
+            Assert-That 'configure clears stale logs before both attempts' (-not $script:configureSuccessSawStaleLog)
+            $firstConfigureLog = Join-Path $temporaryRoot 'native.first-attempt.log'
+            Assert-That 'configure recovery preserves the exact first log' ((Test-Path -LiteralPath $firstConfigureLog) -and [IO.File]::ReadAllText($firstConfigureLog).Trim() -ceq $signature)
+            $firstConfigureReceipt = Join-Path $temporaryRoot 'native.first-attempt.execution-diagnostics.json'
+            $firstProcessId = if (Test-Path -LiteralPath $firstConfigureReceipt) { (Get-Content -LiteralPath $firstConfigureReceipt -Raw | ConvertFrom-Json).Process.ProcessId } else { 0 }
+            $finalProcessId = (Get-Content -LiteralPath ([IO.Path]::ChangeExtension($nativeLog, 'execution-diagnostics.json')) -Raw | ConvertFrom-Json).Process.ProcessId
+            Assert-That 'configure recovery preserves distinct first and final execution receipts' ($firstProcessId -eq 1 -and $finalProcessId -eq 2)
+            Assert-That 'configure frozen provenance records both attempts independently' ($context.ConfigureOutcomes.Count -eq 2 -and -not [Object]::ReferenceEquals($context.ConfigureOutcomes[0], $context.ConfigureOutcomes[1]))
         }
     }
 
