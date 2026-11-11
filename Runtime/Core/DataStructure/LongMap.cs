@@ -6,7 +6,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     using System;
     using System.Collections;
     using System.Collections.Generic;
-    using System.Runtime.CompilerServices;
 
     /// <summary>Maps all 64-bit unsigned keys using mixed open addressing and packed live entries.</summary>
     /// <remarks>Not thread-safe. Enumeration is O(Count), has no ordering guarantee and fails on mutation. Removal and clear release stored value references.</remarks>
@@ -85,17 +84,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _entrySlots = new int[slots / 2];
             _slots = new int[slots];
             _mask = slots - 1;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ulong Mix(ulong key)
-        {
-            unchecked
-            {
-                key = (key ^ (key >> 30)) * 0xBF58476D1CE4E5B9UL;
-                key = (key ^ (key >> 27)) * 0x94D049BB133111EBUL;
-                return key ^ (key >> 31);
-            }
         }
 
         /// <summary>Inserts or replaces a value, returning false only at the maximum live-entry capacity.</summary>
@@ -185,7 +173,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         private int FindSlot(ulong key)
         {
-            int slot = (int)(Mix(key) & (ulong)_mask);
+            int slot = (int)(LongHash.Mix(key) & (ulong)_mask);
             while (_slots[slot] != 0 && _keys[_slots[slot] - 1] != key)
             {
                 slot = (slot + 1) & _mask;
@@ -237,7 +225,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             Array.Copy(_values, values, _count);
             for (int entry = 0; entry < _count; ++entry)
             {
-                int slot = (int)(Mix(keys[entry]) & (ulong)mask);
+                int slot = (int)(LongHash.Mix(keys[entry]) & (ulong)mask);
                 while (slots[slot] != 0)
                 {
                     slot = (slot + 1) & mask;
@@ -258,7 +246,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             while (_slots[slot] != 0)
             {
                 int entry = _slots[slot] - 1;
-                int home = (int)(Mix(_keys[entry]) & (ulong)_mask);
+                int home = (int)(LongHash.Mix(_keys[entry]) & (ulong)_mask);
                 if (((gap - home) & _mask) < ((slot - home) & _mask))
                 {
                     _slots[gap] = _slots[slot];

@@ -279,6 +279,11 @@ A failed move also stops the run without clearing the original project.
 EditMode runs compiler-isolation fixtures in a fresh editor process before the broader suite.
 These cases carry `CompilationIsolation` and must all pass without skips. Their results and log
 remain under the mode's `compilation/` artifact directory.
+On Unity 6000.5, this phase passes `-refreshImportMode InProcess` to avoid the
+import-worker teardown heap corruption recorded as UUM-135237. The same assets and
+all ten compiler cases still execute. Unity fixed this shutdown defect in 6000.6.0f1.
+[Unity release notes](https://unity.com/releases/editor/whats-new/6000.6.0f1)
+
 `OdinMigrationDictionaryCompilationTests` lives in the dedicated
 `WallstopStudios.UnityHelpers.Tests.Editor.OdinCompilation` assembly. The compiler target and
 runtime caller remain separate test assemblies. The general Editor Tools test assembly does not
@@ -336,6 +341,25 @@ so an older readable file cannot certify a new attempt. Raw log lines and full
 Windows event messages are excluded from the receipt, and credential redaction still runs before
 writing it. Before a Package Manager retry overwrites the log and receipt, both first-attempt
 files are preserved with `.first-attempt` in their names.
+
+<!-- cspell:ignore uds sharedmutex -->
+
+An Editor test or configuration invocation also recovers once from the startup artifact-pruning crash
+whose native stack contains `FindArtifactsToRemove`, `GarbageCollectArtifactsFromDB`
+and `InitializeAssetDatabaseV2`. It also recognizes a failed asset-database shared-memory startup
+when the log contains both the command-buffer memory-pool error and the existing-semaphore
+error, plus `uds_sharedmutex_init` and `InitializeAssetDatabaseV2` frames. Recovery requires
+a harness-owned Library marker and an incomplete invocation. Test passes require absent NUnit results, while configuration requires a missing fresh success marker. The log must also precede a started test stream and contain no compiler error. Artifact-pruning crashes additionally require the native stack header.
+The complete native message `Exiting because Library/ArtifactDB is corrupted. Relaunch Editor without batch mode to view additional options.` also qualifies. The exact `MDB_INVALID` error (-30793) opening `Library/ArtifactDB` identifies an invalid cache and also qualifies. Unity can exit zero before loading the test framework. The process receipt records its exit code, since a stopped output drain can omit Unity's final exit line.
+The failed log and execution receipt retain `.first-attempt` names. The complete failed
+Library moves to `Library.artifact-database-failure-<id>` inside the generated project, and Unity
+rebuilds its derived state. Before this move, earlier matching harness-owned failed Libraries
+in the current project are pruned, targeting one failed Library per project. A locked older copy
+produces a warning and remains available while recovery continues. Foreign markers,
+unrecognized directory names and linked directories are preserved. Each attempt removes its
+previous current log before launch, so an earlier stack cannot authorize a new recovery. A second failure propagates. Retain that directory when
+investigating the cache corruption. Unity tracks the artifact-pruning crash as UUM-153198.
+[Unity issue tracker](https://issuetracker.unity.com/issues/25007/crash-on-isartifactstillrelevant-when-opening-a-project-with-corrupted-library)
 
 On Windows, these invocations also receive an isolated `-crash-report-folder` and a unique
 `-upmLogFile`. Both write outside uploaded artifacts. The receipt's `Process.NativeEvidence`

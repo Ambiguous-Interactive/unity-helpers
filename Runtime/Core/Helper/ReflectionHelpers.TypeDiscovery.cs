@@ -174,29 +174,36 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return null;
         }
 
-        /// <summary>
-        /// Gets all loaded types derived from T. In editor, uses TypeCache for speed.
-        /// </summary>
+        /// <summary>Gets loaded types derived from <typeparamref name="T"/>, excluding that type itself.</summary>
         public static IEnumerable<Type> GetTypesDerivedFrom<T>(bool includeAbstract = false)
         {
-#if UNITY_EDITOR
-            try
-            {
-                TypeCache.TypeCollection list = TypeCache.GetTypesDerivedFrom<T>();
-                return FilterCachedTypes(list, includeAbstract);
-            }
-            catch { }
-#endif
-            Type baseType = typeof(T);
-            return FilterDerivedTypes(GetAllLoadedTypes(), baseType, includeAbstract);
+            return GetTypesDerivedFrom(typeof(T), includeAbstract);
         }
 
-        /// <summary>
-        /// Gets all loaded types derived from the specified base type. In editor, uses TypeCache for speed.
-        /// </summary>
+        /// <summary>Gets loaded types derived from <typeparamref name="T"/>, with optional value types.</summary>
+        public static IEnumerable<Type> GetTypesDerivedFrom<T>(
+            bool includeAbstract,
+            bool includeValueTypes
+        )
+        {
+            return GetTypesDerivedFrom(typeof(T), includeAbstract, includeValueTypes);
+        }
+
+        /// <summary>Gets loaded types derived from the specified type, excluding that type itself.</summary>
         public static IEnumerable<Type> GetTypesDerivedFrom(
             Type baseType,
             bool includeAbstract = false
+        )
+        {
+            return GetTypesDerivedFrom(baseType, includeAbstract, includeValueTypes: false);
+        }
+
+        /// <summary>Gets loaded types derived from the specified type, with optional value types.</summary>
+        /// <remarks>Set <paramref name="includeValueTypes"/> to include structs and enums while keeping abstract types and interfaces excluded. <paramref name="includeAbstract"/> continues to include all kinds.</remarks>
+        public static IEnumerable<Type> GetTypesDerivedFrom(
+            Type baseType,
+            bool includeAbstract,
+            bool includeValueTypes
         )
         {
             if (baseType == null)
@@ -207,11 +214,16 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             try
             {
                 TypeCache.TypeCollection list = TypeCache.GetTypesDerivedFrom(baseType);
-                return FilterCachedTypes(list, includeAbstract);
+                return FilterCachedTypes(list, includeAbstract, baseType, includeValueTypes);
             }
             catch { }
 #endif
-            return FilterDerivedTypes(GetAllLoadedTypes(), baseType, includeAbstract);
+            return FilterDerivedTypes(
+                GetAllLoadedTypes(),
+                baseType,
+                includeAbstract,
+                includeValueTypes
+            );
         }
 
         /// <summary>
@@ -759,23 +771,33 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 
-        private static bool IsDiscoverableType(Type type, bool includeAbstract)
+        private static bool IsDiscoverableType(
+            Type type,
+            bool includeAbstract,
+            bool includeValueTypes = false
+        )
         {
-            return type != null && (includeAbstract || (type.IsClass && !type.IsAbstract));
+            return type != null
+                && (
+                    includeAbstract
+                    || (type.IsClass && !type.IsAbstract)
+                    || (includeValueTypes && type.IsValueType)
+                );
         }
 
         private static IEnumerable<Type> FilterDerivedTypes(
             IEnumerable<Type> types,
             Type baseType,
-            bool includeAbstract
+            bool includeAbstract,
+            bool includeValueTypes
         )
         {
             foreach (Type type in types)
             {
                 if (
-                    type != null
+                    type != baseType
+                    && IsDiscoverableType(type, includeAbstract, includeValueTypes)
                     && baseType.IsAssignableFrom(type)
-                    && IsDiscoverableType(type, includeAbstract)
                 )
                 {
                     yield return type;
@@ -887,12 +909,17 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 #if UNITY_EDITOR
         private static IEnumerable<Type> FilterCachedTypes(
             TypeCache.TypeCollection types,
-            bool includeAbstract
+            bool includeAbstract,
+            Type baseType = null,
+            bool includeValueTypes = false
         )
         {
             foreach (Type type in types)
             {
-                if (IsDiscoverableType(type, includeAbstract))
+                if (
+                    type != baseType
+                    && IsDiscoverableType(type, includeAbstract, includeValueTypes)
+                )
                 {
                     yield return type;
                 }

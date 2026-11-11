@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.IntMap.Tests
     internal static class IntMapRecoveryProcess
     {
         internal const string LongMapKind = "longmap";
+        internal const string LongSetKind = "longset";
         internal const string ZeroKeyKind = "zero";
         internal const string NonzeroKeyKind = "nonzero";
         internal const string IndicesKeyKind = "indices";
@@ -21,6 +22,7 @@ namespace WallstopStudios.UnityHelpers.IntMap.Tests
             string keyKind = arguments[0];
             Require(
                 string.Equals(keyKind, LongMapKind, StringComparison.Ordinal)
+                    || string.Equals(keyKind, LongSetKind, StringComparison.Ordinal)
                     || string.Equals(keyKind, ZeroKeyKind, StringComparison.Ordinal)
                     || string.Equals(keyKind, NonzeroKeyKind, StringComparison.Ordinal)
                     || string.Equals(keyKind, IndicesKeyKind, StringComparison.Ordinal),
@@ -42,6 +44,10 @@ namespace WallstopStudios.UnityHelpers.IntMap.Tests
             if (string.Equals(keyKind, LongMapKind, StringComparison.Ordinal))
             {
                 VerifyLongMapRecovery();
+            }
+            else if (string.Equals(keyKind, LongSetKind, StringComparison.Ordinal))
+            {
+                VerifyLongSetRecovery();
             }
             else if (string.Equals(keyKind, IndicesKeyKind, StringComparison.Ordinal))
             {
@@ -130,6 +136,47 @@ namespace WallstopStudios.UnityHelpers.IntMap.Tests
                 map.TryGet(ulong.MaxValue, out RecoveryValue inserted) && inserted.data == 123,
                 "The replacement key must be readable."
             );
+        }
+
+        private static void VerifyLongSetRecovery()
+        {
+            const int count = 1048576;
+            LongSet set = new LongSet(count);
+            for (int index = 0; index < count; ++index)
+            {
+                Require(set.TryAdd((ulong)index), "Initial long-set insertion must succeed.");
+            }
+            int capacity = set.Capacity;
+            LongSet.Enumerator iterator = set.GetEnumerator();
+            bool refused = false;
+            try
+            {
+                set.TryAdd(ulong.MaxValue);
+            }
+            catch (OutOfMemoryException)
+            {
+                refused = true;
+            }
+            Require(refused, "The limited heap must refuse long-set growth.");
+            Require(
+                set.Count == count && set.Capacity == capacity,
+                "Failed growth must retain the set."
+            );
+            Require(!set.Contains(ulong.MaxValue), "A refused key must remain absent.");
+            int observed = 0;
+            while (iterator.MoveNext())
+            {
+                Require(
+                    iterator.Current == (ulong)observed,
+                    "Original enumeration must remain valid."
+                );
+                Require(set.Contains(iterator.Current), "Original keys must remain reachable.");
+                ++observed;
+            }
+            Require(observed == count, "Every original key must remain present.");
+            Require(set.Remove(17), "Removal after failed growth must succeed.");
+            Require(set.TryAdd(ulong.MaxValue), "Insertion into freed capacity must succeed.");
+            Require(set.Contains(ulong.MaxValue), "The replacement key must remain reachable.");
         }
 
         private static void VerifyRecovery<T>(

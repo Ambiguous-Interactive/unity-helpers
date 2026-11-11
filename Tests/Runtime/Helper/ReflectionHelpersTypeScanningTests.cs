@@ -260,11 +260,68 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 .ToArray();
 
             Assert.Contains(typeof(PrewarmTesterComponent), derived);
+            CollectionAssert.DoesNotContain(derived, typeof(Component));
             Assert.IsTrue(
                 derived.All(type => type != null && typeof(Component).IsAssignableFrom(type))
             );
             Assert.IsTrue(includeAbstract || derived.All(type => type.IsClass && !type.IsAbstract));
             Assert.IsEmpty(ReflectionHelpers.GetTypesDerivedFrom(null, includeAbstract));
         }
+
+        [TestCase(false, false)]
+        [TestCase(false, true)]
+        [TestCase(true, false)]
+        [TestCase(true, true)]
+        public void DerivedTypeDiscoveryIncludesRequestedValueTypes(
+            bool includeAbstract,
+            bool includeValueTypes
+        )
+        {
+            Type[] generic = ReflectionHelpers
+                .GetTypesDerivedFrom<IDiscoveryContract>(includeAbstract, includeValueTypes)
+                .ToArray();
+            Type[] nonGeneric = ReflectionHelpers
+                .GetTypesDerivedFrom(typeof(IDiscoveryContract), includeAbstract, includeValueTypes)
+                .ToArray();
+
+            CollectionAssert.AreEquivalent(generic, nonGeneric);
+            CollectionAssert.DoesNotContain(generic, typeof(IDiscoveryContract));
+            Assert.AreEqual(
+                includeAbstract || includeValueTypes,
+                generic.Contains(typeof(DiscoveryValue))
+            );
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void DerivedTypeDiscoveryIncludesEnumsWhenValueTypesAreRequested(
+            bool includeValueTypes
+        )
+        {
+            Type expected = typeof(WallstopStudios.UnityHelpers.Core.Extension.SortAlgorithm);
+            Type[] generic = ReflectionHelpers
+                .GetTypesDerivedFrom<Enum>(
+                    includeAbstract: false,
+                    includeValueTypes: includeValueTypes
+                )
+                .ToArray();
+            Type[] nonGeneric = ReflectionHelpers
+                .GetTypesDerivedFrom(
+                    typeof(Enum),
+                    includeAbstract: false,
+                    includeValueTypes: includeValueTypes
+                )
+                .ToArray();
+
+            CollectionAssert.AreEquivalent(generic, nonGeneric);
+            Assert.AreEqual(includeValueTypes, generic.Contains(expected));
+            CollectionAssert.DoesNotContain(generic, typeof(Enum));
+        }
+
+        [UnityEngine.Scripting.Preserve]
+        private interface IDiscoveryContract { }
+
+        [UnityEngine.Scripting.Preserve]
+        private readonly struct DiscoveryValue : IDiscoveryContract { }
     }
 }

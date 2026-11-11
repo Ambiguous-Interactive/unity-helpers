@@ -12,8 +12,8 @@ This guide covers several foundational data structures used across the library a
 
 `LongMap<TValue>` and `LongSet` accept every `ulong` key, including zero and `ulong.MaxValue`.
 Both mix the full 64-bit key before selecting a hash slot, so keys sharing their low bits do not
-all start at the same slot. They share one open-addressing implementation; `LongSet` stores a
-byte placeholder per live key. Neither type is thread-safe.
+all start at the same slot. `LongSet` stores packed keys and hash-slot indices in two arrays.
+It has no value storage or map instance. Neither type is thread-safe.
 
 `LongMap` provides `TrySet`, `TryGet`, `ContainsKey`, `Remove(key, out value)`, an indexer and
 concrete key/value views, like `IntMap`. `TryAdd` refuses an existing key without replacing its
@@ -26,8 +26,9 @@ insertion, replacement, removal and a nonempty clear invalidate existing enumera
 insertion of an existing key and removal of a missing key leave them usable. Interface-based
 iteration can box the value-type views and enumerators.
 
-Capacity reserves two hash slots per live-entry slot and grows geometrically. `Clear` visits
-only live entries, releases their values and keeps capacity. Growth prepares replacement storage
+Capacity reserves two hash slots per live-entry slot and grows geometrically. Map `Clear` visits
+live entries and releases their values. Set `Clear` locates each live key along its probe path
+without scanning unused capacity. Set removal also looks up the moved final key. Both retain capacity. Growth prepares replacement storage
 before publishing it; a failed allocation leaves prior contents and enumerators usable. The
 constructor's capacity hint counts live entries; `Capacity` reports hash slots. Negative hints
 and hints above `LongMap<TValue>.MaximumCapacity` are rejected. Once the maximum live-entry
@@ -389,6 +390,7 @@ bits.RightShift(1);
 
 Tips
 
+- Iterate `bits.SetIndices` to visit live set indices in ascending order with a value-type enumerator and no iterator allocation. It observes changes ahead of its cursor and supports resizing between moves. `EnumerateSetIndices()` keeps the existing `IEnumerable<int>` entry point.
 - Capacity grows automatically when setting beyond bounds; prefer sizing appropriately upfront for fewer resizes. `TrySet` and `TryFlip` return `false` for negative indices and for `int.MaxValue`, whose required capacity cannot be represented; indexer assignments at those indices do nothing.
 - Left/Right shift drop/zero-fill at the edges; use with care if capacity is small.
 - `LeftShift` updates words in place without temporary storage or pool activity. It preserves capacity and independent immutable snapshots, ignores nonpositive shifts, and clears the set when the shift reaches capacity.

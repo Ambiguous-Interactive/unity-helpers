@@ -328,16 +328,21 @@ function Run-PowerShellPathBindingContractTests {
     $content = Get-Content -Path $scriptInfo.Path -Raw
     $hasRemainingArgs = $content -match 'ValueFromRemainingArguments\s*=\s*\$true' -and
       $content -match '\$AdditionalPaths'
-    $usesEffectivePaths = $content -match '\$effectivePaths'
-    $coversGitignore = $content -match '\^\\\.gitignore\$'
-    if ($scriptInfo.Name -eq 'check-eol.ps1') {
-      $usesEffectivePaths = $content -match '\$selectedPaths\s*=\s*@\(\$Paths\)\s*\+\s*@\(\$AdditionalPaths\)' -and
-        $content -match '\$arguments\s*\+=\s*\$selectedPaths'
-      $pythonChecker = Join-Path $repoRoot 'scripts/check_eol.py'
-      $coversGitignore = (Test-Path $pythonChecker) -and $content -match 'check_eol\.py'
-      if ($coversGitignore) {
-        $pythonContent = Get-Content -Path $pythonChecker -Raw
-        $coversGitignore = $pythonContent -match 'path\.casefold\(\)\s*==\s*"\.gitignore"'
+    $usesEffectivePaths = $content -match '\$selectedPaths\s*=\s*@\(\$Paths\)\s*\+\s*@\(\$AdditionalPaths\)' -and
+      $content -match '\$arguments\s*\+=\s*(?:@\()?\$selectedPaths'
+    $pythonChecker = Join-Path $repoRoot 'scripts/check_eol.py'
+    $coversGitignore = $false
+    if (Test-Path $pythonChecker) {
+      $pythonContent = Get-Content -Path $pythonChecker -Raw
+      $coversGitignore = $pythonContent -match 'path\.casefold\(\)\s*==\s*"\.gitignore"'
+      if ($scriptInfo.Name -eq 'normalize-eol.ps1') {
+        $pythonNormalizer = Join-Path $repoRoot 'scripts/normalize_eol.py'
+        $coversGitignore = $coversGitignore -and (Test-Path $pythonNormalizer) -and
+          $content -match 'normalize_eol\.py' -and
+          (Get-Content -Path $pythonNormalizer -Raw) -match '(?m)^from check_eol import [^#\r\n]*\bsupported\b'
+      }
+      else {
+        $coversGitignore = $coversGitignore -and $content -match 'check_eol\.py'
       }
     }
 
@@ -357,7 +362,7 @@ function Run-PowerShellPathBindingContractTests {
     $normalizeContent = Get-Content -Path $normalizePath -Raw
     Write-TestResult `
       -TestName 'normalize-eol.ps1 can emit modified paths for exact preflight restaging' `
-      -Passed ($normalizeContent -match '\$ModifiedPathList' -and $normalizeContent -match '\[char\]0') `
+      -Passed ($normalizeContent -match '\$ModifiedPathList' -and $normalizeContent -match '--modified-path-list') `
       -Message 'Expected a NUL-delimited ModifiedPathList output contract for agent-preflight restaging.'
   }
 

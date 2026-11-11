@@ -12,6 +12,7 @@ from cli_encoding import configure_output
 
 ROOT = Path(__file__).resolve().parents[1]
 NOT_OURS = {
+    "FlagsAttribute": "System.FlagsAttribute",
     "ObsoleteAttribute": "System.ObsoleteAttribute",
     "JsonConverterAttribute": "System.Text.Json.Serialization.JsonConverterAttribute",
     "JsonIgnoreAttribute": "System.Text.Json.Serialization.JsonIgnoreAttribute",

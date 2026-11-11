@@ -125,6 +125,40 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 
         [Test]
+        public void ValueBitSetTraversalSharesLiveMutationSemanticsAndCopiesState()
+        {
+            BitSet bits = new(192);
+            bits.TrySet(1);
+            bits.TrySet(130);
+            BitSet.SetIndexEnumerator iterator = bits.SetIndices;
+            BitSet.SetIndexEnumerator copy = iterator;
+            Assert.IsTrue(iterator.Equals(copy));
+            Assert.AreEqual(iterator.GetHashCode(), copy.GetHashCode());
+            Assert.IsTrue(iterator.MoveNext());
+            Assert.AreEqual(1, iterator.Current);
+            Assert.IsFalse(iterator.Equals(copy));
+            bits.TryClear(130);
+            bits.TrySet(2);
+            bits.Resize(256);
+            bits.TrySet(255);
+            Assert.IsTrue(iterator.MoveNext());
+            Assert.AreEqual(2, iterator.Current);
+            Assert.IsTrue(iterator.MoveNext());
+            Assert.AreEqual(255, iterator.Current);
+            Assert.IsFalse(iterator.MoveNext());
+            bits.Resize(512);
+            bits.TrySet(300);
+            Assert.IsFalse(iterator.MoveNext());
+            iterator.Reset();
+            Assert.IsTrue(iterator.MoveNext());
+            Assert.AreEqual(1, iterator.Current);
+            bits.Resize(1);
+            Assert.IsFalse(iterator.MoveNext());
+            Assert.IsFalse(default(BitSet.SetIndexEnumerator).MoveNext());
+            CollectionAssert.IsEmpty(bits.EnumerateSetIndices());
+        }
+
+        [Test]
         public void WarmTraversalDoesNotAllocate()
         {
             BitOps.TrailingZeroCount(1UL);

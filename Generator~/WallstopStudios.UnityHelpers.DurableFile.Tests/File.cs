@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     internal static class File
     {
         internal static Exception ReplacementFailure { get; set; }
+        internal static int ReplacementFailuresRemaining { get; set; } = -1;
         internal static bool RejectMove { get; set; }
         internal static string ObservedDestination { get; set; }
         internal static int ReplacementCalls { get; private set; }
@@ -18,6 +19,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         internal static void Reset()
         {
             ReplacementFailure = null;
+            ReplacementFailuresRemaining = -1;
             RejectMove = false;
             ObservedDestination = null;
             ReplacementCalls = 0;
@@ -68,8 +70,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         )
         {
             ++ReplacementCalls;
-            if (ReplacementFailure != null)
+            if (ReplacementFailure != null && ReplacementFailuresRemaining != 0)
             {
+                if (0 < ReplacementFailuresRemaining)
+                {
+                    --ReplacementFailuresRemaining;
+                }
                 throw ReplacementFailure;
             }
 

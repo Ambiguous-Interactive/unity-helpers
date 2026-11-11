@@ -283,14 +283,14 @@ wheels = [
 
 [[package]]
 name = "markdown-it-py"
-version = "4.2.0"
+version = "4.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "mdurl" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/06/ff/7841249c247aa650a76b9ee4bbaeae59370dc8bfd2f6c01f3630c35eb134/markdown_it_py-4.2.0.tar.gz", hash = "sha256:04a21681d6fbb623de53f6f364d352309d4094dd4194040a10fd51833e418d49", size = 82454, upload-time = "2026-05-07T12:08:28.36Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/16/fc/cee2c45553c9a9bf77d8b0c391560c556d7ed756b1f0bb35eb5d48db09ea/markdown_it_py-4.3.0.tar.gz", hash = "sha256:91a58fa5b72c71a40cf7177250fd767480d7a2bb3ac426ccfb76fb90305fdaaa", size = 242701, upload-time = "2026-11-10T16:18:30.467Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b3/81/4da04ced5a082363ecfa159c010d200ecbd959ae410c10c0264a38cac0f5/markdown_it_py-4.2.0-py3-none-any.whl", hash = "sha256:9f7ebbcd14fe59494226453aed97c1070d83f8d24b6fc3a3bcf9a38092641c4a", size = 91687, upload-time = "2026-05-07T12:08:27.182Z" },
+    { url = "https://files.pythonhosted.org/packages/c9/31/5f0ac2f1a1c67423c995c731a11cd4ad05d081a2be969d74f868bdb9cc70/markdown_it_py-4.3.0-py3-none-any.whl", hash = "sha256:7aa1511a46c39138de78d9eba92ce47e63124d8003fc98b3a351909e04239efa", size = 96951, upload-time = "2026-11-10T16:18:28.975Z" },
 ]
 
 [[package]]
@@ -703,7 +703,7 @@ dev = [
     { name = "ruff", specifier = ">=0.17.3" },
     { name = "types-pyyaml", specifier = ">=6.0.12.20261030" },
     { name = "yamllint", specifier = ">=1.38.0" },
-    { name = "z3-solver", specifier = "==5.3.3.0" },
+    { name = "z3-solver", specifier = "==5.4.0.0" },
 ]
 documentation = [{ name = "markdown-it-py", specifier = ">=4.2.0" }]
 fixtures = [{ name = "pillow", specifier = ">=13.0.0" }]
@@ -711,7 +711,7 @@ metadata = [
     { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "yamllint", specifier = ">=1.38.0" },
 ]
-proof = [{ name = "z3-solver", specifier = "==5.3.3.0" }]
+proof = [{ name = "z3-solver", specifier = "==5.4.0.0" }]
 
 [[package]]
 name = "yamllint"
@@ -728,17 +728,16 @@ wheels = [
 
 [[package]]
 name = "z3-solver"
-version = "5.3.3.0"
+version = "5.4.0.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/55/15/89a6263f1476d9b636d301073ea3923833b3035d9ff5668d6eef7f5f6579/z3_solver-5.3.3.0.tar.gz", hash = "sha256:d95af3980d65ccfd60d23124c6769b1f1564c437049502ce70c476e43abb3d42", size = 6185723, upload-time = "2026-10-29T14:14:10.905Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/92/f7/3a237a64f429d0898ff4ccb81fb69320d8f955ab1f7c43e5ae794d1bfa41/z3_solver-5.4.0.0.tar.gz", hash = "sha256:46b7a3256c275cb041ddece36b20ab1ed28082f3d2b4722d906c8ca68f251f0c", size = 6314026, upload-time = "2026-11-10T04:31:37.837Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f6/c5/377b91ca159c84effd838f4e73181050c8dd02783a300b4cd245e44c365a/z3_solver-5.3.3.0-py3-none-macosx_13_0_arm64.whl", hash = "sha256:814ddeb607535c211e11e1af60c9c69fe8f957b304003a562d9bfc3ceefa295c", size = 45040018, upload-time = "2026-10-29T14:13:49.363Z" },
-    { url = "https://files.pythonhosted.org/packages/d7/7c/f4e11f170a847b97db3cedc43545582e4f02b7210021866c558fbc9bccde/z3_solver-5.3.3.0-py3-none-macosx_13_0_x86_64.whl", hash = "sha256:d7d337366240fd6b02ca1a68d545350c43834999b7683b24958ff4a7a9b8b112", size = 48555514, upload-time = "2026-10-29T14:13:52.81Z" },
-    { url = "https://files.pythonhosted.org/packages/2e/04/d785e50a2f6cd78549bebe730f2afeab5187c62085fc19b7ac272602fb2f/z3_solver-5.3.3.0-py3-none-manylinux_2_27_x86_64.whl", hash = "sha256:0431023a82278dab706c02a320f63178ee0755fb8f10a5c980f0bfe3c84f6f96", size = 37875123, upload-time = "2026-10-29T14:13:55.634Z" },
-    { url = "https://files.pythonhosted.org/packages/e9/e4/73b6722cb58aeac9b6e95e02d7837ad8d929e7ba613bc73c7216ef09bffa/z3_solver-5.3.3.0-py3-none-manylinux_2_38_aarch64.whl", hash = "sha256:701619d4995695819e150e9fa10218b67a5a2241868f31dddccfe2d3fe15f986", size = 32147101, upload-time = "2026-10-29T14:13:58.546Z" },
-    { url = "https://files.pythonhosted.org/packages/3a/7f/67f8b07bf6569df86f955ae56b916b38d1dc38e7c1b439ddd16e6ada71e4/z3_solver-5.3.3.0-py3-none-manylinux_2_38_riscv64.whl", hash = "sha256:2db25738d963f398e2dcd25913dc80a0489a6d37e33034f04027dccbbe166323", size = 32956771, upload-time = "2026-10-29T14:14:01.189Z" },
-    { url = "https://files.pythonhosted.org/packages/be/0d/39cfeb73dafdc22000e5e915abe7d1e3f238710a32f0531b23b77f80608a/z3_solver-5.3.3.0-py3-none-pyemscripten_2026_0_wasm32.whl", hash = "sha256:9381d9516345f53b21a8f4df243c5d608e9625aac658c3fb3975457bad260f60", size = 6705560, upload-time = "2026-10-29T15:37:48.9Z" },
-    { url = "https://files.pythonhosted.org/packages/14/a3/2e9ab821d416000808b1c2b00a2ce1663b83f33c68d40251e560e127a76a/z3_solver-5.3.3.0-py3-none-win32.whl", hash = "sha256:7ae136a73ae44bfd9359883a3ee5a6819c0537de5f9c8f09b5d3463dd41572cb", size = 15110256, upload-time = "2026-10-29T14:14:03.701Z" },
-    { url = "https://files.pythonhosted.org/packages/fd/e5/ae23ab342acb1a18adc893f633f24c0a227aa745888c162bbec7070e4a8e/z3_solver-5.3.3.0-py3-none-win_amd64.whl", hash = "sha256:d189844a586242fe3d2a701c09751a80d518645931931a7c6bf29df679044215", size = 16926690, upload-time = "2026-10-29T14:14:06.124Z" },
-    { url = "https://files.pythonhosted.org/packages/81/67/64fbd2b32ed88d6e3a2de0a57bce2af0eec516ef620b7bfe9211d74c2c4a/z3_solver-5.3.3.0-py3-none-win_arm64.whl", hash = "sha256:b6db581c558022ce4ef5cff7a17c3d658eb2807fc73298a96b82a8f7afdb81dc", size = 17519150, upload-time = "2026-10-29T14:14:08.582Z" },
+    { url = "https://files.pythonhosted.org/packages/c6/6f/d366bc0ccc83de7db5edd0232509d41d988792ac912a1421642161f9b580/z3_solver-5.4.0.0-py3-none-macosx_13_0_arm64.whl", hash = "sha256:a1b36f0dd038c030d88711474c93b95e863c30a22e9def53ad5965c6092c92a7", size = 45536203, upload-time = "2026-11-10T04:31:16.402Z" },
+    { url = "https://files.pythonhosted.org/packages/50/f3/0ff14921ed10cfe93e83ab9f1166cbbb357e1553e6c48f82e729b3f1b258/z3_solver-5.4.0.0-py3-none-macosx_13_0_x86_64.whl", hash = "sha256:407522390c4d11696b10d43c76d22d4e60b7f11d75d9defe6f064e073edd904f", size = 49234664, upload-time = "2026-11-10T04:31:19.79Z" },
+    { url = "https://files.pythonhosted.org/packages/95/46/f06cc919197faa9f05674e54dc8146cb76b187604a7165682511d0ec2944/z3_solver-5.4.0.0-py3-none-manylinux_2_27_x86_64.whl", hash = "sha256:0549ffad554178a59480ba41b5279cfbb27053ed5a2da269ae1a48214d5db34b", size = 38646288, upload-time = "2026-11-10T04:31:22.69Z" },
+    { url = "https://files.pythonhosted.org/packages/b5/c2/f94e80684da251701ec6a23ae5ca66e6beb4b20b59d0b1a6210bcb3ffc45/z3_solver-5.4.0.0-py3-none-manylinux_2_38_aarch64.whl", hash = "sha256:fffb36861d4da1f9584d0fd4a80dbf247fdfbebb04b5c31a90b460b14c86cab0", size = 32595739, upload-time = "2026-11-10T04:31:25.298Z" },
+    { url = "https://files.pythonhosted.org/packages/f2/aa/44174a4b955467271d32c868c602d608d1887969c20723fbbf06fb9adaf2/z3_solver-5.4.0.0-py3-none-manylinux_2_38_riscv64.whl", hash = "sha256:672ffb01d3502b24f5d05f264043dfc979019735cc8c5b124e0773b3a0da835c", size = 33481875, upload-time = "2026-11-10T04:31:28.226Z" },
+    { url = "https://files.pythonhosted.org/packages/eb/19/044e732c6f566520a8d1a45f51c9f2652b7c2e3ab1a08cca08d1576e6d98/z3_solver-5.4.0.0-py3-none-win32.whl", hash = "sha256:686531b2b9b94f405b8b625e6592bba5605fca8dc1b66c0b82bca5299bd7cf35", size = 15359228, upload-time = "2026-11-10T04:31:30.777Z" },
+    { url = "https://files.pythonhosted.org/packages/ca/74/10194624395dfc1d0fa70bb2d7a659d83ef009d0d6f4c7508b9c14284a68/z3_solver-5.4.0.0-py3-none-win_amd64.whl", hash = "sha256:a8e3e153ae2bc69d128c59406ffda37d4ce1277963040da148605fd77a4ae789", size = 17116577, upload-time = "2026-11-10T04:31:33.153Z" },
+    { url = "https://files.pythonhosted.org/packages/3f/6b/c239beed3ed82242c494266aa21a26ab8f57d8f707a8ab117450a9f0d560/z3_solver-5.4.0.0-py3-none-win_arm64.whl", hash = "sha256:d550a06befefc4c5b6528912ec004134aca2b7320ed21143b8148eae7ba33df7", size = 17692873, upload-time = "2026-11-10T04:31:35.776Z" },
 ]

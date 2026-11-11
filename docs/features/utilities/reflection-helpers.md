@@ -291,6 +291,12 @@ original order. Discovery uses direct iterators, and member signature constructi
 buffer. The returned sequence and reflection results can still allocate, so keep discovery outside
 frame loops and retain the delegates you need.
 
+`GetTypesDerivedFrom` excludes the queried type itself in the Editor and in players.
+Use `includeAbstract: false, includeValueTypes: true` to include concrete value types such as
+structs and enums when they satisfy the requested base type or interface. The default discovers
+concrete classes, and `includeAbstract: true` keeps the existing behavior of including abstract
+types, interfaces, and value types.
+
 ```csharp
 // Discovery. In the editor these use UnityEditor.TypeCache automatically.
 IEnumerable<Type> enemies = ReflectionHelpers.GetTypesDerivedFrom<Enemy>();

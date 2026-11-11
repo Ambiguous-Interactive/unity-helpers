@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.Utils
 {
+    using System;
     using System.Collections.Generic;
     using NUnit.Framework;
     using UnityEngine;
@@ -125,6 +126,67 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             );
             Assert.AreEqual(default(Bounds), bounds);
             StringAssert.Contains("transparent", error);
+        }
+
+        [Test]
+        public void DirectBoundsAvoidAllocatingAnIntermediateAlphaMask()
+        {
+            const int iterations = 32;
+            const int capacity = 512;
+            const int warmup = 8;
+            Texture2D texture = Track(new Texture2D(32, 16, TextureFormat.RGBA32, false));
+            texture.SetPixel(17, 5, Color.white);
+            texture.Apply();
+            Sprite sprite = Track(
+                Sprite.Create(texture, new Rect(4, 2, 24, 12), new Vector2(0.4f, 0.75f), 13f)
+            );
+
+            Bounds reference = default;
+            Bounds direct = default;
+            int referenceSuccesses = 0;
+            int directSuccesses = 0;
+            Action withMask = () =>
+            {
+                if (
+                    SpriteMaskReader.TryRead(sprite, out SpriteAlphaMask mask, out _)
+                    && SpriteArtBounds.TryGetLocalArtBounds(mask, out reference, out _)
+                )
+                {
+                    ++referenceSuccesses;
+                }
+            };
+            Action withoutMask = () =>
+            {
+                if (SpriteArtBounds.TryGetLocalArtBounds(sprite, out direct, out _))
+                {
+                    ++directSuccesses;
+                }
+            };
+
+            long referenceEvents = ProfilerAllocationCounter.Measure(
+                withMask,
+                iterations,
+                capacity,
+                warmup
+            );
+            long directEvents = ProfilerAllocationCounter.Measure(
+                withoutMask,
+                iterations,
+                capacity,
+                warmup
+            );
+            Assert.AreEqual(iterations + warmup, referenceSuccesses);
+            Assert.AreEqual(referenceSuccesses, directSuccesses);
+            Assert.AreEqual(reference, direct);
+            if (referenceEvents == 0)
+            {
+                Assert.Ignore("The profiler did not observe the explicit mask and pixel arrays.");
+            }
+
+            TestContext.WriteLine(
+                $"Allocation events with a mask: {referenceEvents}; direct: {directEvents}."
+            );
+            Assert.That(directEvents, Is.LessThan(referenceEvents));
         }
 
         [TestCase(0, 1.5f)]

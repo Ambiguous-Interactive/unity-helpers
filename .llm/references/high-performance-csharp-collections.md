@@ -65,6 +65,8 @@ A counting loop is the right shape in exactly four cases:
 4. **The body mutates the collection or writes back through the indexer.** `foreach` throws on the
    first and cannot do the second for a struct element.
 
+When adding a hot traversal API, expose a concrete value-type enumerator that foreach can use without boxing. Keep existing interface-returning entry points source-compatible and document live mutation, cursor, and reset behavior. Test the concrete path with an allocation positive control. Use typed equality in enumerator tests to avoid boxing through assertion APIs.
+
 When foreach is needed for an interface sequence, use `WAsValueEnumerable()` for array, exact
 list and exact hash-set fast paths; package code uses `AsValueEnumerableRequired()` when null
 must retain its original failure. Audit eligible interface foreach sites across Runtime and

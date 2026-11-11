@@ -50,6 +50,8 @@ foreach ($name in @(
         'Get-EditorTestCompletionGraceSeconds',
         'Get-EditorTestRunTimeoutSeconds',
         'Get-EditorTestStallSeconds',
+        'Test-UnityArtifactDatabaseStartupFailure',
+        'Reset-UnityArtifactDatabaseLibrary',
         'Invoke-UnityEditorTestsWithPackageManagerRetry',
         'Invoke-UnityConfigurePass'
     )) {
@@ -618,6 +620,250 @@ try {
         Assert-That ($case.Name + ' configure preserves failure classification') ($preloadThrew -eq ($case.ExpectedCalls -eq 1))
 
     }
+
+    $script:artifactDetection = ${function:Test-UnityArtifactDatabaseStartupFailure}
+    function Test-UnityArtifactDatabaseStartupFailure {
+        param([string]$LogPath)
+        ++$script:artifactDetectionCalls
+        return & $script:artifactDetection -LogPath $LogPath
+    }
+    $artifactStack = "========== OUTPUTTING STACK TRACE ==================`nFindArtifactsToRemove`nGarbageCollectArtifactsFromDB`nInitializeAssetDatabaseV2"
+    $sharedMemoryStack = "[Error] Command buffer shared memory issue`n[Error] Tried to create a new semaphore handle`nuds_sharedmutex_init`nInitializeAssetDatabaseV2"
+    $corruptDatabaseExit = "Exiting because Library/ArtifactDB is corrupted. Relaunch Editor without batch mode to view additional options.`nExiting without the bug reporter. Application will terminate with return code 0"
+    $invalidDatabaseExit = "mdb_env_open failed on 'Library/ArtifactDB' with error: -30793 'MDB_INVALID: File is not an LMDB file'`nExiting because Library/ArtifactDB file is locked`nExiting without the bug reporter. Application will terminate with return code 0"
+    $corruptDatabaseMessage = 'Exiting because Library/ArtifactDB is corrupted. Relaunch Editor without batch mode to view additional options.'
+    $invalidDatabaseMessage = "mdb_env_open failed on 'Library/ArtifactDB' with error: -30793 'MDB_INVALID: File is not an LMDB file'"
+    foreach ($case in @(
+            @{ Name = 'corruption-without-footer'; Log = $corruptDatabaseMessage; Results = $false; Owned = $true; Recover = $true },
+            @{ Name = 'invalid-without-footer'; Log = $invalidDatabaseMessage; Results = $false; Owned = $true; Recover = $true },
+            @{ Name = 'invalid-database'; Log = $invalidDatabaseExit; Results = $false; Owned = $true; Recover = $true },
+            @{ Name = 'database-lock-only'; Log = "Exiting because Library/ArtifactDB file is locked`nExiting without the bug reporter. Application will terminate with return code 0"; Results = $false; Owned = $true; Recover = $false },
+            @{ Name = 'invalid-database-partial'; Log = "mdb_env_open failed on 'Library/ArtifactDB' with error: -30793"; Results = $false; Owned = $true; Recover = $false },
+            @{ Name = 'invalid-database-after-tests'; Log = $invalidDatabaseExit + "`n[uh-test-stream] RUN-STARTED"; Results = $false; Owned = $true; Recover = $false },
+            @{ Name = 'invalid-database-compiler-error'; Log = $invalidDatabaseExit + "`nerror CS0001"; Results = $false; Owned = $true; Recover = $false },
+            @{ Name = 'invalid-database-results'; Log = $invalidDatabaseExit; Results = $true; Owned = $true; Recover = $false },
+            @{ Name = 'invalid-database-unowned'; Log = $invalidDatabaseExit; Results = $false; Owned = $false; Recover = $false },
+            @{ Name = 'explicit-corruption'; Log = $corruptDatabaseExit; Results = $false; Owned = $true; Recover = $true },
+            @{ Name = 'explicit-corruption-partial'; Log = 'Exiting because Library/ArtifactDB is corrupted.'; Results = $false; Owned = $true; Recover = $false },
+            @{ Name = 'explicit-corruption-exit-only'; Log = 'Exiting without the bug reporter. Application will terminate with return code 0'; Results = $false; Owned = $true; Recover = $false },
+            @{ Name = 'explicit-corruption-after-tests'; Log = $corruptDatabaseExit + "`n[uh-test-stream] RUN-STARTED"; Results = $false; Owned = $true; Recover = $false },
+            @{ Name = 'explicit-corruption-compiler-error'; Log = $corruptDatabaseExit + "`nerror CS0001"; Results = $false; Owned = $true; Recover = $false },
+            @{ Name = 'explicit-corruption-results'; Log = $corruptDatabaseExit; Results = $true; Owned = $true; Recover = $false },
+            @{ Name = 'explicit-corruption-unowned'; Log = $corruptDatabaseExit; Results = $false; Owned = $false; Recover = $false },
+            @{ Name = 'startup-corruption'; Log = $artifactStack; Results = $false; Owned = $true; Recover = $true },
+            @{ Name = 'partial-stack'; Log = 'FindArtifactsToRemove'; Results = $false; Owned = $true; Recover = $false },
+            @{ Name = 'after-tests'; Log = $artifactStack + "`n[uh-test-stream] RUN-STARTED"; Results = $false; Owned = $true; Recover = $false },
+            @{ Name = 'compiler-error'; Log = $artifactStack + "`nerror CS0001"; Results = $false; Owned = $true; Recover = $false },
+            @{ Name = 'existing-results'; Log = $artifactStack; Results = $true; Owned = $true; Recover = $false },
+            @{ Name = 'unowned-library'; Log = $artifactStack; Results = $false; Owned = $false; Recover = $false },
+            @{ Name = 'startup-shared-memory'; Log = $sharedMemoryStack; Results = $false; Owned = $true; Recover = $true },
+            @{ Name = 'shared-memory-partial'; Log = '[Error] Command buffer shared memory issue'; Results = $false; Owned = $true; Recover = $false },
+            @{ Name = 'shared-memory-after-tests'; Log = $sharedMemoryStack + "`n[uh-test-stream] RUN-STARTED"; Results = $false; Owned = $true; Recover = $false },
+            @{ Name = 'shared-memory-compiler-error'; Log = $sharedMemoryStack + "`nerror CS0001"; Results = $false; Owned = $true; Recover = $false },
+            @{ Name = 'shared-memory-results'; Log = $sharedMemoryStack; Results = $true; Owned = $true; Recover = $false },
+            @{ Name = 'shared-memory-unowned'; Log = $sharedMemoryStack; Results = $false; Owned = $false; Recover = $false }
+        )) {
+        $project = Join-Path $temporaryRoot $case.Name
+        $library = Join-Path $project 'Library'
+        $null = New-Item -ItemType Directory -Force $library
+        Set-Content (Join-Path $library 'ArtifactDB') 'corrupt-control'
+        if ($case.Owned) { Set-Content (Join-Path $library '.unity-helpers-repo-root.txt') 'owned-control' }
+        $artifactResults = Join-Path $project 'results.xml'
+        if ($case.Results) { Set-Content $artifactResults '<test-run />' }
+        $script:artifactCalls = 0
+        $script:artifactDetectionCalls = 0
+        $script:artifactLog = $case.Log
+        function Invoke-UnityEditor {
+            param($EditorPath, $Arguments, $Label, $LogPath, $CompletionPattern, $CompletionGraceSeconds, $TimeoutSeconds, $StallSeconds)
+            ++$script:artifactCalls
+            Set-Content $LogPath $script:artifactLog
+            throw 'No loaded Test Framework snapshot was captured.'
+        }
+        $recoveryThrew = $false
+        try { $null = Invoke-UnityEditorTestsWithPackageManagerRetry -EditorPath 'owned-editor' -Arguments @('-runTests') -Label $case.Name -LogPath $nativeLog -ResultsPath $artifactResults -Project $project }
+        catch { $recoveryThrew = $true }
+        $expectedReads = if ($case.Results) { 0 } else { 1 }
+        Assert-That ($case.Name + ' bounds native log reads') ($script:artifactDetectionCalls -eq $expectedReads)
+        $expectedCalls = if ($case.Recover) { 2 } else { 1 }
+        Assert-That ($case.Name + ' bounds recovery and preserves persistent failure') ($script:artifactCalls -eq $expectedCalls -and $recoveryThrew)
+        $retained = @(Get-ChildItem -LiteralPath $project -Directory -Filter 'Library.artifact-database-failure-*')
+        Assert-That ($case.Name + ' retains only the failed owned cache') ($retained.Count -eq [int]$case.Recover)
+        if ($case.Recover -and $retained.Count -eq 1) {
+            Assert-That 'corrupt ArtifactDB remains available for diagnosis' ((Get-Content (Join-Path $retained[0].FullName 'ArtifactDB') -Raw).Trim() -ceq 'corrupt-control')
+            Assert-That 'startup recovery preserves the first native log' ((Get-Content (Join-Path $temporaryRoot 'native.first-attempt.log') -Raw).Trim() -ceq $case.Log)
+        }
+        $configureProject = Join-Path $temporaryRoot ($case.Name + '-configure')
+        $configureLibrary = Join-Path $configureProject 'Library'
+        $null = New-Item -ItemType Directory -Force $configureLibrary
+        Set-Content (Join-Path $configureLibrary 'ArtifactDB') 'corrupt-configure-control'
+        if ($case.Owned) { Set-Content (Join-Path $configureLibrary '.unity-helpers-repo-root.txt') 'owned-control' }
+        $script:configureArtifactCalls = 0
+        $script:configureArtifactHasMarker = $case.Results
+        $configureMarker = Join-Path $configureProject 'configured.marker'
+        $configureArtifactInvoker = {
+            param($Arguments, $AttemptLog, $AttemptLabel)
+            ++$script:configureArtifactCalls
+            Set-Content -LiteralPath $AttemptLog -Value $script:artifactLog
+            if ($script:configureArtifactHasMarker) { Set-Content -LiteralPath $env:UH_CONFIGURE_MARKER_PATH -Value 'fresh' }
+            throw 'No loaded Test Framework snapshot was captured.'
+        }
+        $configureThrew = $false
+        try { $null = Invoke-UnityConfigurePass -EditorPath 'owned-editor' -ProjectPath $configureProject -MarkerPath $configureMarker -LogPath $nativeLog -Label $case.Name -ConfigureInvoker $configureArtifactInvoker }
+        catch { $configureThrew = $true }
+        Assert-That ($case.Name + ' configure bounds recovery and preserves persistent failure') ($script:configureArtifactCalls -eq $expectedCalls -and $configureThrew)
+        $configureRetained = @(Get-ChildItem -LiteralPath $configureProject -Directory -Filter 'Library.artifact-database-failure-*')
+        Assert-That ($case.Name + ' configure retains only the failed owned cache') ($configureRetained.Count -eq [int]$case.Recover)
+        Assert-That ($case.Name + ' configure clears its marker environment') (-not (Test-Path Env:UH_CONFIGURE_MARKER_PATH))
+    }
+
+    foreach ($signature in @($artifactStack, $sharedMemoryStack, $corruptDatabaseExit, $invalidDatabaseExit, $corruptDatabaseMessage, $invalidDatabaseMessage)) {
+        foreach ($firstThrows in @($false, $true)) {
+            $configureProject = Join-Path $temporaryRoot ([guid]::NewGuid().ToString('N'))
+            $configureLibrary = Join-Path $configureProject 'Library'
+            $null = New-Item -ItemType Directory -Force $configureLibrary
+            Set-Content (Join-Path $configureLibrary '.unity-helpers-repo-root.txt') 'owned-control'
+            Set-Content (Join-Path $configureLibrary 'ArtifactDB') 'corrupt-configure-control'
+            $script:configureSuccessCalls = 0
+            $script:configureSuccessLog = $signature
+            $script:configureSuccessThrows = $firstThrows
+            $script:configureSuccessSawStaleLog = $false
+            Set-Content -LiteralPath $nativeLog -Value 'stale previous configure log'
+            $configureSuccessInvoker = {
+                param($Arguments, $AttemptLog, $AttemptLabel)
+                ++$script:configureSuccessCalls
+                if (Test-Path -LiteralPath $AttemptLog) { $script:configureSuccessSawStaleLog = $true }
+                @{ Process = @{ ProcessId = $script:configureSuccessCalls } } | ConvertTo-Json | Set-Content -LiteralPath ([IO.Path]::ChangeExtension($AttemptLog, 'execution-diagnostics.json'))
+                if ($script:configureSuccessCalls -eq 1) {
+                    Set-Content -LiteralPath $AttemptLog -Value $script:configureSuccessLog
+                    if ($script:configureSuccessThrows) { throw 'No loaded Test Framework snapshot was captured.' }
+                    return 0
+                }
+                Set-Content -LiteralPath $AttemptLog -Value 'configured second attempt'
+                Set-Content -LiteralPath $env:UH_CONFIGURE_MARKER_PATH -Value 'fresh'
+                return 0
+            }
+            $context = [pscustomobject]@{ ConfigureOutcomes = [Collections.Generic.List[object]]::new() }
+            $configureMarker = Join-Path $configureProject 'configured.marker'
+            $configureThrew = $false
+            try { $null = Invoke-UnityConfigurePass -EditorPath 'owned-editor' -ProjectPath $configureProject -MarkerPath $configureMarker -LogPath $nativeLog -Label 'configure recovers' -ConfigureInvoker $configureSuccessInvoker -FrozenContext $context }
+            catch { $configureThrew = $true }
+            Assert-That 'configure startup recovery requires a fresh successful retry marker' (-not $configureThrew -and $script:configureSuccessCalls -eq 2 -and (Test-Path -LiteralPath $configureMarker))
+            Assert-That 'configure clears stale logs before both attempts' (-not $script:configureSuccessSawStaleLog)
+            $firstConfigureLog = Join-Path $temporaryRoot 'native.first-attempt.log'
+            Assert-That 'configure recovery preserves the exact first log' ((Test-Path -LiteralPath $firstConfigureLog) -and [IO.File]::ReadAllText($firstConfigureLog).Trim() -ceq $signature)
+            $firstConfigureReceipt = Join-Path $temporaryRoot 'native.first-attempt.execution-diagnostics.json'
+            $firstProcessId = if (Test-Path -LiteralPath $firstConfigureReceipt) { (Get-Content -LiteralPath $firstConfigureReceipt -Raw | ConvertFrom-Json).Process.ProcessId } else { 0 }
+            $finalProcessId = (Get-Content -LiteralPath ([IO.Path]::ChangeExtension($nativeLog, 'execution-diagnostics.json')) -Raw | ConvertFrom-Json).Process.ProcessId
+            Assert-That 'configure recovery preserves distinct first and final execution receipts' ($firstProcessId -eq 1 -and $finalProcessId -eq 2)
+            Assert-That 'configure frozen provenance records both attempts independently' ($context.ConfigureOutcomes.Count -eq 2 -and -not [Object]::ReferenceEquals($context.ConfigureOutcomes[0], $context.ConfigureOutcomes[1]))
+        }
+    }
+
+    $project = Join-Path $temporaryRoot 'startup-recovers'
+    $library = Join-Path $project 'Library'
+    $null = New-Item -ItemType Directory -Force $library
+    Set-Content (Join-Path $library '.unity-helpers-repo-root.txt') 'owned-control'
+    $previousLibraries = @()
+    foreach ($identity in @('a', 'b', 'c')) {
+        $previous = Join-Path $project ('Library.artifact-database-failure-' + ($identity * 32))
+        $null = New-Item -ItemType Directory $previous
+        Set-Content (Join-Path $previous '.unity-helpers-repo-root.txt') 'owned-control'
+        $previousLibraries += $previous
+    }
+    $foreignLibrary = Join-Path $project ('Library.artifact-database-failure-' + ('d' * 32))
+    $null = New-Item -ItemType Directory $foreignLibrary
+    Set-Content (Join-Path $foreignLibrary '.unity-helpers-repo-root.txt') 'foreign-control'
+    $unrecognizedLibrary = Join-Path $project 'Library.artifact-database-failure-author-data'
+    $null = New-Item -ItemType Directory $unrecognizedLibrary
+    $linkedLibrary = $null
+    if (-not $IsWindows) {
+        $linkTarget = Join-Path $temporaryRoot 'linked-library-target'
+        $null = New-Item -ItemType Directory $linkTarget
+        Set-Content (Join-Path $linkTarget '.unity-helpers-repo-root.txt') 'owned-control'
+        $linkedLibrary = Join-Path $project ('Library.artifact-database-failure-' + ('e' * 32))
+        $null = New-Item -ItemType SymbolicLink -Path $linkedLibrary -Target $linkTarget
+    }
+    $script:artifactCalls = 0
+    $script:artifactDetectionCalls = 0
+    $script:artifactLog = $artifactStack
+    function Invoke-UnityEditor {
+        param($EditorPath, $Arguments, $Label, $LogPath, $CompletionPattern, $CompletionGraceSeconds, $TimeoutSeconds, $StallSeconds)
+        ++$script:artifactCalls
+        if ($script:artifactCalls -eq 1) {
+            Set-Content $LogPath $script:artifactLog
+            throw 'No loaded Test Framework snapshot was captured.'
+        }
+        Set-Content $LogPath 'Recovered editor'
+        return 0
+    }
+    $recoveredExit = Invoke-UnityEditorTestsWithPackageManagerRetry -EditorPath 'owned-editor' -Arguments @('-runTests') -Label 'startup-recovers' -LogPath $nativeLog -ResultsPath (Join-Path $project 'results.xml') -Project $project
+    Assert-That 'successful recovery reads its first native log once' ($script:artifactDetectionCalls -eq 1)
+    Assert-That 'startup recovery returns the second native result' ($recoveredExit -eq 0 -and $script:artifactCalls -eq 2)
+    Assert-That 'rebuilt Library preserves its ownership marker' ((Get-Content (Join-Path $library '.unity-helpers-repo-root.txt') -Raw).Trim() -ceq 'owned-control')
+    Assert-That 'recovery removes earlier owned failed Libraries in the current project' (@($previousLibraries | Where-Object { Test-Path -LiteralPath $_ }).Count -eq 0)
+    $ownedFailures = @(Get-ChildItem -LiteralPath $project -Directory -Filter 'Library.artifact-database-failure-*' | Where-Object {
+            $candidateMarker = Join-Path $_.FullName '.unity-helpers-repo-root.txt'
+            (Test-Path -LiteralPath $candidateMarker) -and (Get-Content -LiteralPath $candidateMarker -Raw).Trim() -ceq 'owned-control'
+        })
+    $expectedOwnedEntries = if ($null -ne $linkedLibrary) { 2 } else { 1 }
+    Assert-That 'recovery retains exactly its latest failed Library and any preexisting link' ($ownedFailures.Count -eq $expectedOwnedEntries)
+    if ($null -ne $linkedLibrary) {
+        Assert-That 'recovery preserves linked retained directories' (Test-Path -LiteralPath $linkedLibrary -PathType Container)
+    }
+    Assert-That 'recovery preserves foreign and unrecognized directories' ((Test-Path -LiteralPath $foreignLibrary) -and (Test-Path -LiteralPath $unrecognizedLibrary))
+
+    $staleProject = Join-Path $temporaryRoot 'stale-startup-log'
+    $staleLibrary = Join-Path $staleProject 'Library'
+    $null = New-Item -ItemType Directory -Force $staleLibrary
+    Set-Content (Join-Path $staleLibrary '.unity-helpers-repo-root.txt') 'owned-control'
+    $originalDatabase = Join-Path $staleLibrary 'ArtifactDB'
+    Set-Content -LiteralPath $originalDatabase -Value 'healthy-control'
+    Set-Content -LiteralPath $nativeLog -Value $artifactStack
+    $script:staleCalls = 0
+    function Invoke-UnityEditor {
+        param($EditorPath, $Arguments, $Label, $LogPath, $CompletionPattern, $CompletionGraceSeconds, $TimeoutSeconds, $StallSeconds)
+        ++$script:staleCalls
+        throw 'Controlled framework-evidence setup failure before launching Unity.'
+    }
+    $staleThrew = $false
+    try { $null = Invoke-UnityEditorTestsWithPackageManagerRetry -EditorPath 'owned-editor' -Arguments @('-runTests') -Label 'stale-log' -LogPath $nativeLog -ResultsPath (Join-Path $staleProject 'results.xml') -Project $staleProject }
+    catch { $staleThrew = $true }
+    Assert-That 'a stale startup stack cannot retry a new setup failure' ($staleThrew -and $script:staleCalls -eq 1)
+    Assert-That 'a stale startup stack cannot move the current Library' ((Test-Path -LiteralPath $originalDatabase) -and (Get-Content -LiteralPath $originalDatabase -Raw).Trim() -ceq 'healthy-control')
+    Assert-That 'a new setup failure has no stale current log' (-not (Test-Path -LiteralPath $nativeLog))
+
+
+    $lockedProject = Join-Path $temporaryRoot 'locked-diagnostics'
+    $lockedLibrary = Join-Path $lockedProject 'Library'
+    $null = New-Item -ItemType Directory -Force $lockedLibrary
+    Set-Content (Join-Path $lockedLibrary '.unity-helpers-repo-root.txt') 'owned-control'
+    $script:lockedRetention = Join-Path $lockedProject ('Library.artifact-database-failure-' + ('f' * 32))
+    $null = New-Item -ItemType Directory $script:lockedRetention
+    Set-Content (Join-Path $script:lockedRetention '.unity-helpers-repo-root.txt') 'owned-control'
+    function Remove-Item {
+        param([string]$LiteralPath, [switch]$Recurse, [switch]$Force, [object]$ErrorAction)
+        if ($LiteralPath -ceq $script:lockedRetention) { throw 'Controlled locked diagnostic directory.' }
+        Microsoft.PowerShell.Management\Remove-Item @PSBoundParameters
+    }
+    $script:lockedCalls = 0
+    $script:artifactLog = $artifactStack
+    function Invoke-UnityEditor {
+        param($EditorPath, $Arguments, $Label, $LogPath, $CompletionPattern, $CompletionGraceSeconds, $TimeoutSeconds, $StallSeconds)
+        ++$script:lockedCalls
+        if ($script:lockedCalls -eq 1) {
+            Set-Content -LiteralPath $LogPath -Value $script:artifactLog
+            throw 'No loaded Test Framework snapshot was captured.'
+        }
+        Set-Content -LiteralPath $LogPath -Value 'Recovered editor'
+        return 0
+    }
+    $lockedExit = $null
+    try {
+        $lockedExit = Invoke-UnityEditorTestsWithPackageManagerRetry -EditorPath 'owned-editor' -Arguments @('-runTests') -Label 'locked-diagnostics' -LogPath $nativeLog -ResultsPath (Join-Path $lockedProject 'results.xml') -Project $lockedProject
+    } catch { $lockedExit = $null }
+    Assert-That 'locked older diagnostics allow the native recovery attempt' ($lockedExit -eq 0 -and $script:lockedCalls -eq 2)
+    Assert-That 'locked older diagnostics remain available' (Test-Path -LiteralPath $script:lockedRetention)
+    Assert-That 'locked older diagnostics produce an explicit warning' (@($script:notices | Where-Object { $_ -like 'warning:Could not remove earlier failed Library*' }).Count -eq 1)
 
 
 } finally {

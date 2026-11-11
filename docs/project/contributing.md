@@ -31,9 +31,18 @@ A successful 200 or 206 response also permits curl's size-limit stop when a serv
 Missing resources, HTTP errors, and other transfer failures still fail validation.
 Run `npm run test:validate-devcontainer-urls` for the offline HTTP and parser controls.
 
+Use `npm run eol:fix` to normalize supported tracked text files through locked uv.
+The allowlist in `scripts/check_eol.py` controls selection. The fixer skips `.py` and `.js` files. The PowerShell
+launcher still accepts `-Paths`, `-DryRun`, and `-ModifiedPathList` for scoped repairs. A dry
+run returns 2 when changes are needed and can write a NUL-delimited list of affected paths.
+Preflight uses that list to check for unstaged changes before editing. The fixer refuses
+files and links outside the checkout, hard-linked files, and invalid text that would need rewriting.
+Internal symbolic links use the target's path and line-ending policy in the repair plan.
+
 ### Fast C# Feedback
 
-Use fixture-scoped builds while editing runtime or Editor tests:
+Use fixture-scoped builds while editing runtime or Editor tests. The npm command runs the
+locked Python tool through uv and uses the installed .NET SDK:
 
 ```bash
 npm run typecheck:iterate -- tests --server --files Tests/Runtime/Serialization/WProtoEnumFormatterTests.cs
@@ -147,6 +156,11 @@ reporting to the locked Python environment. Exclusive checks finish before concu
 failed checks do not prevent the remaining checks from running. Windows uses the Bash executable
 from its Git for Windows installation. `npm run test:check-runner`
 exercises these contracts, including an interrupted child that exits zero.
+Linux checks receive separate temporary cache roots to isolate PowerShell startup profiles.
+The runner preserves the existing uv cache directory and removes each temporary root after its
+child exits, including failed checks. This prevents concurrent suites from sharing the startup
+profile implicated in PowerShell issue 26528.
+[Upstream issue](https://github.com/PowerShell/PowerShell/issues/26528)
 
 A check can declare a `completionPattern` when exit status alone is insufficient. The native
 acceptance self-test requires its final completion line after cleanup as well as exit zero.

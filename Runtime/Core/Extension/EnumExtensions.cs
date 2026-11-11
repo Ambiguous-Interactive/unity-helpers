@@ -48,9 +48,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     /// </summary>
     /// <typeparam name="T">The unmanaged enum type to cache names for.</typeparam>
     /// <remarks>
-    /// Uses array-based lookup for enums with small ranges (≤256 values) and dictionary-based lookup for larger enums.
-    /// Thread-safe with reader-writer locking for dictionary operations.
-    /// Performance: O(1) lookups for both array and dictionary strategies.
+    /// Uses an array for small ranges and a dictionary for declared values of larger enums.
+    /// Flag masks below 256 extend the name window from zero through the full mask.
+    /// Names are published atomically when first requested.
     /// </remarks>
     public static class EnumNameCache<T>
         where T : unmanaged, Enum
@@ -77,8 +77,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             if (useArray)
             {
-                minValue = windowMinValue;
-                arrayLength = windowLength;
+                int flagWindowLength = GetSmallFlagWindowLength(values);
+                minValue = flagWindowLength == 0 ? windowMinValue : 0UL;
+                arrayLength = flagWindowLength == 0 ? windowLength : flagWindowLength;
                 namesArray = new string[arrayLength];
 
                 for (int i = 0; i < valueCount; ++i)
@@ -122,17 +123,24 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             Cache = new EnumNameCacheData(namesArray, namesDict, useArray, minValue, arrayLength);
         }
 
-        /// <summary>Parses a declared name without accepting numbers, whitespace or flags lists.</summary>
-        /// <remarks>Case-insensitive names that identify different values are ambiguous and fail.</remarks>
-        public static bool TryParse(ReadOnlySpan<char> name, out T value, bool ignoreCase = false)
+        /// <summary>Parses a declared name using the requested string comparison.</summary>
+        /// <remarks>Names matching distinct values under the selected comparison are ambiguous and fail. Undefined comparison values fail.</remarks>
+        public static bool TryParse(
+            ReadOnlySpan<char> name,
+            out T value,
+            StringComparison comparison = StringComparison.Ordinal
+        )
         {
+            if ((uint)StringComparison.OrdinalIgnoreCase < (uint)comparison)
+            {
+                value = default;
+                return false;
+            }
             ReadOnlySpan<T> values = EnumValues<T>.Values;
-            StringComparison comparison = ignoreCase
-                ? StringComparison.OrdinalIgnoreCase
-                : StringComparison.Ordinal;
             bool found = false;
             T candidate = default;
-            for (int i = 0; i < DeclaredNames.Length; ++i)
+            int nameCount = DeclaredNames.Length;
+            for (int i = 0; i < nameCount; ++i)
             {
                 if (!name.Equals(DeclaredNames[i].AsSpan(), comparison))
                 {
@@ -150,6 +158,17 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             return found;
         }
 
+        /// <summary>Parses a declared name using ordinal comparison and optional case folding.</summary>
+        public static bool TryParse(ReadOnlySpan<char> name, out T value, bool ignoreCase)
+        {
+            return TryParse(
+                name,
+                out value,
+                ignoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal
+            );
+        }
+
+        /// <summary>Returns the cached general-format name when the value is in the cache window.</summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static string ToCachedName(T value)
         {
@@ -189,9 +208,30 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
             }
 
-            // Cache only declared members; arbitrary values and flag combinations would grow the cache without bound.
-
             return value.ToString("G");
+        }
+
+        private static int GetSmallFlagWindowLength(ReadOnlySpan<T> values)
+        {
+            if (!typeof(T).IsDefined(typeof(FlagsAttribute), inherit: false))
+            {
+                return 0;
+            }
+
+            ulong mask = 0;
+            foreach (T value in values)
+            {
+                if (
+                    !EnumNumericHelper<T>.TryConvertToUInt64(value, out ulong key)
+                    || EnumLookupStrategy<T>.MaximumArrayLength <= key
+                )
+                {
+                    return 0;
+                }
+                mask |= key;
+            }
+
+            return (int)mask + 1;
         }
     }
 

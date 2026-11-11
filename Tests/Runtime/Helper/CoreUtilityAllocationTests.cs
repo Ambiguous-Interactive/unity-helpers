@@ -32,6 +32,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [TestCase(4)]
         [TestCase(5)]
         [TestCase(6)]
+        [TestCase(7)]
         public void WarmUtilityPathsProduceNoObservableAllocation(int shape)
         {
             object[] retained = new object[1];
@@ -48,6 +49,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             int sum = 0;
             (int from, int to)[] edges = { (0, 1), (1, 2), (2, 0), (2, 3) };
             BitSet result = new(64);
+            BitSet setIndices = new(4096);
+            setIndices.TrySet(3);
+            setIndices.TrySet(2048);
             LongMap<int> map = new(64);
             LongSet set = new(64);
             for (ulong key = 0; key < 64; ++key)
@@ -105,7 +109,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                         map.TryAdd(key << 32, (int)key);
                     }
                 },
-                _ => () =>
+                6 => () =>
                 {
                     foreach (ulong key in set)
                     {
@@ -117,6 +121,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                     for (ulong key = 0; key < 64; ++key)
                     {
                         set.TryAdd(key << 32);
+                    }
+                },
+                _ => () =>
+                {
+                    foreach (int bit in setIndices.SetIndices)
+                    {
+                        sum += bit;
                     }
                 },
             };

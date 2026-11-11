@@ -51,9 +51,11 @@ jobs:
             dotnet tool update $id --local
           }
 
+      - name: Setup Python tooling
+        uses: ./.github/actions/setup-python-tools
+
       - name: Normalize EOL (dotnet tools manifest)
-        shell: pwsh
-        run: ./scripts/normalize-eol.ps1 -Paths ".config/dotnet-tools.json" -VerboseOutput
+        run: uv run --project scripts/python~ --locked --no-dev python scripts/normalize_eol.py --paths .config/dotnet-tools.json --verbose
 
       - name: Detect manifest changes
         id: git_changes

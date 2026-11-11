@@ -4,6 +4,10 @@
 
 ## Performance Tips
 
+### Key-Only Storage
+
+For a specialized set, use key-only storage without placeholder value arrays. Share hashing and probing logic when that preserves the storage contract. Measure retained allocation against the corresponding map, and cover wrapped collisions, moved-entry removal, clear/reuse, growth, and allocation-failure recovery. Document any additional lookup cost introduced by reducing storage.
+
 ### Use Pooled Collections with Data Structures
 
 ```csharp

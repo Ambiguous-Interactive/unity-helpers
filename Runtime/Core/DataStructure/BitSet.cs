@@ -562,27 +562,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// </summary>
         public IEnumerable<int> EnumerateSetIndices()
         {
-            int cursor = 0;
-            while (cursor < _capacity)
+            foreach (int index in SetIndices)
             {
-                int word = cursor >> BitsPerLongShift;
-                ulong remaining = _bits[word] & (ulong.MaxValue << (cursor & BitsPerLongMask));
-                if (remaining == 0)
-                {
-                    long nextWord = ((long)word + 1) << BitsPerLongShift;
-                    if (_capacity <= nextWord)
-                    {
-                        yield break;
-                    }
-                    cursor = (int)nextWord;
-                    continue;
-                }
-                int index = (word << BitsPerLongShift) + BitOps.TrailingZeroCount(remaining);
-                if (_capacity <= index)
-                {
-                    yield break;
-                }
-                cursor = index + 1;
                 yield return index;
             }
         }

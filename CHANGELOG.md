@@ -11,9 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add `LongMap<T>` and `LongSet` for unsigned 64-bit keys, packed iteration, reusable storage and mixed hash slots ([#1162](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1162)).
-- Add allocation-free set-bit traversal and ranked bit selection ([#1158](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1158)).
-- Add declared-name enum parsing and cached enum membership checks without per-call boxing ([#1159](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1159), [#1160](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1160)).
+- Add stable in-place insertion sort for spans without renting a buffer ([#1157](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1157)).
+- Add optional struct discovery to `GetTypesDerivedFrom` while retaining the default class-only filter ([#1169](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1169)).
+- Add `LongMap<T>` and `LongSet` for unsigned 64-bit keys, packed iteration, reusable storage and key-only set storage ([#1162](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1162)).
+- Add allocation-free set-bit traversal, live `BitSet.SetIndices` traversal, and ranked bit selection ([#1158](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1158)).
+- Add declared-name enum parsing with a string comparison policy and cached membership checks without per-call boxing ([#1159](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1159), [#1160](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1160)).
 - Add directed graph reachability with reusable bitsets and a 64-node mask form ([#1161](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1161)).
 - Add keyed Unity object pools that route returns to their owner and dispose idle and checked-out items ([#1163](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1163)).
 - Add `WUH028` to flag redundant clears of freshly rented `Buffers` collections. See [the analyzer guide](./docs/performance/analyzers.md#wuh028-fresh-pooled-collection-clears).
@@ -30,6 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Update bundled JSON and immutable collections to 10.0.15 while retaining Unity assembly constraints ([#1052](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1052)).
+- Reduce allocations when measuring drawn sprite bounds ([#1113](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1113)).
+- Cache general-format enum flag names through the full mask when it fits in 256 slots ([#1168](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1168)).
 - Skip unset words when collecting or enumerating sparse `BitSet` indices.
 - Reduce repeated script searches during bulk binding validation ([#1106](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1106)).
 - Move array-pool and lease definitions into separate source files; source-based builds must include those files ([#1130](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1130)).
@@ -44,6 +49,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Retry Windows replacement contention up to three attempts in `DurableFile`, preserving the previous save when contention persists. This covers settings persistence during rapid Editor undo and redo.
+- Fix Odin dictionary migration accepting ambiguous prefab fields or an instance reference to another scene ([#794](https://github.com/Ambiguous-Interactive/unity-helpers/issues/794)).
+- Fix `GetTypesDerivedFrom` including the queried type itself in players ([#1169](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1169)).
 - Fix Animation Creator omitting sprites from shared assets and losing exact frames or moved sheets when loading saved configurations ([#1154](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1154)).
 - Fix bounded and filtered child-component collections changing their selected matches when a set comparer modifies the hierarchy ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
 - Fix `ExtractSpriteRect` returning atlas-oriented pixels for packed rotation metadata; tight and rotated packing now return null with a clear error ([#1135](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1135)).

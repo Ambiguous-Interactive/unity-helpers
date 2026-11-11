@@ -2466,10 +2466,14 @@ if ($eolTargets.Count -gt 0) {
         if ($normalizeEolDryRunExit -ne 0 -and $normalizeEolDryRunExit -ne 2) {
             $failureCount++
         }
-        else {
+        elseif ($normalizeEolDryRunExit -eq 2) {
             $plannedEolText = [System.Text.Encoding]::UTF8.GetString([System.IO.File]::ReadAllBytes($plannedEolPathList))
             $plannedEolTargets = @(Split-NulPathText -Text $plannedEolText)
-            if (-not (Test-CanRunWholeFileAutoFixOnStagedTargets `
+            if ($plannedEolTargets.Count -eq 0) {
+                Write-ErrorMsg 'EOL normalization reported changes without identifying any paths.'
+                $failureCount++
+            }
+            elseif (-not (Test-CanRunWholeFileAutoFixOnStagedTargets `
                         -RepoRoot $repoRoot `
                         -Paths $plannedEolTargets `
                         -InitiallyUnstagedPaths $initiallyUnstagedPaths `
@@ -2479,7 +2483,7 @@ if ($eolTargets.Count -gt 0) {
             else {
                 Push-Location $repoRoot
                 try {
-                    & (Join-Path $repoRoot 'scripts/normalize-eol.ps1') -Paths $eolTargets
+                    & (Join-Path $repoRoot 'scripts/normalize-eol.ps1') -Paths $plannedEolTargets
                     $normalizeEolExit = $LASTEXITCODE
                 }
                 finally {

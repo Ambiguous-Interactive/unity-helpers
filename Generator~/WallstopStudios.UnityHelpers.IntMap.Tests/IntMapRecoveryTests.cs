@@ -12,6 +12,10 @@ namespace WallstopStudios.UnityHelpers.IntMap.Tests
     public sealed class IntMapRecoveryTests
     {
         [TestCase(
+            IntMapRecoveryProcess.LongSetKind,
+            TestName = "FailedGrowth.LongSet.PreservesSet"
+        )]
+        [TestCase(
             IntMapRecoveryProcess.LongMapKind,
             TestName = "FailedGrowth.LongMap.PreservesMap"
         )]

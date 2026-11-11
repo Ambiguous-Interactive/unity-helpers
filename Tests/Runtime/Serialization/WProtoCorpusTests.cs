@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     using System.Collections.Generic;
     using System.Security.Cryptography;
     using NUnit.Framework;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     [TestFixture]
@@ -118,6 +119,136 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.AreEqual(123, writer.GetSpan(8)[0]);
             writer.Advance(1);
             Assert.AreEqual(123, writer.WrittenSpan[0]);
+        }
+
+        [TestCase(false, false)]
+        [TestCase(true, false)]
+        [TestCase(false, true)]
+        [TestCase(true, true)]
+        public void MapWitnessMatchesLegacyForReorderedEntries(bool reverse, bool referenceIdentity)
+        {
+            ProtoBenchmarkMap expected = new()
+            {
+                Value = new Dictionary<string, int>
+                {
+                    ["first"] = int.MinValue,
+                    ["second"] = int.MaxValue,
+                },
+            };
+            IEqualityComparer<string> comparer = referenceIdentity
+                ? ReferenceIdentityComparer<string>.Instance
+                : StringComparer.Ordinal;
+            ProtoBenchmarkMap actual = new() { Value = new Dictionary<string, int>(comparer) };
+            string first = new("first".ToCharArray());
+            string second = new("second".ToCharArray());
+            if (reverse)
+            {
+                actual.Value.Add(second, int.MaxValue);
+                actual.Value.Add(first, int.MinValue);
+            }
+            else
+            {
+                actual.Value.Add(first, int.MinValue);
+                actual.Value.Add(second, int.MaxValue);
+            }
+            CollectionAssert.AreEquivalent(expected.Value, actual.Value);
+            WProtoBenchmarkCorpus.AssertMaps(expected, actual);
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(3)]
+        [TestCase(4)]
+        [TestCase(5)]
+        [TestCase(6)]
+        public void MapWitnessRejectsChangedEntries(int mutation)
+        {
+            ProtoBenchmarkMap expected = new()
+            {
+                Value = new Dictionary<string, int> { ["first"] = 17, ["second"] = 34 },
+            };
+            ProtoBenchmarkMap actual = new()
+            {
+                Value = new Dictionary<string, int>(expected.Value, StringComparer.Ordinal),
+            };
+            switch (mutation)
+            {
+                case 0:
+                    actual.Value["first"] = 18;
+                    break;
+                case 1:
+                    actual.Value.Remove("first");
+                    break;
+                case 2:
+                    actual.Value.Add("third", 51);
+                    break;
+                case 3:
+                    actual.Value.Remove("first");
+                    actual.Value.Add("FIRST", 17);
+                    break;
+                case 4:
+                    actual.Value = null;
+                    break;
+                case 5:
+                    actual.Value = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["FIRST"] = 17,
+                        ["second"] = 34,
+                    };
+                    break;
+                case 6:
+                    actual.Value = new Dictionary<string, int>(
+                        ReferenceIdentityComparer<string>.Instance
+                    )
+                    {
+                        ["first"] = 17,
+                        [new string("first".ToCharArray())] = 17,
+                    };
+                    break;
+            }
+            Assert.Throws<AssertionException>(() =>
+                CollectionAssert.AreEquivalent(
+                    expected.Value,
+                    actual.Value ?? new Dictionary<string, int>()
+                )
+            );
+            Assert.Throws<AssertionException>(() =>
+                WProtoBenchmarkCorpus.AssertMaps(expected, actual)
+            );
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void MapWitnessAcceptsMissingEmptyMap(bool missing)
+        {
+            ProtoBenchmarkMap expected = new() { Value = new Dictionary<string, int>() };
+            ProtoBenchmarkMap actual = new()
+            {
+                Value = missing ? null : new Dictionary<string, int>(),
+            };
+            CollectionAssert.AreEquivalent(
+                expected.Value,
+                actual.Value ?? new Dictionary<string, int>()
+            );
+            WProtoBenchmarkCorpus.AssertMaps(expected, actual);
+        }
+
+        [Test]
+        public void MapWitnessHandlesReversedLargeMap()
+        {
+            const int count = 1024;
+            ProtoBenchmarkMap expected = new() { Value = new Dictionary<string, int>() };
+            ProtoBenchmarkMap actual = new() { Value = new Dictionary<string, int>() };
+            for (int index = 0; index < count; ++index)
+            {
+                expected.Value.Add(index.ToString(), index * 17);
+            }
+            for (int index = count - 1; 0 <= index; --index)
+            {
+                actual.Value.Add(index.ToString(), index * 17);
+            }
+            WProtoBenchmarkCorpus.AssertMaps(expected, actual);
         }
 
         [Test]
