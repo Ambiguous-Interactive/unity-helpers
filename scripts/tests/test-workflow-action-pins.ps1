@@ -19,6 +19,7 @@ foreach ($workflow in Get-ChildItem -LiteralPath $workflowRoot -File | Where-Obj
 
         $reference = $Matches['reference']
         if ($reference.StartsWith('./', [StringComparison]::Ordinal) -or
+            $reference.StartsWith('$/', [StringComparison]::Ordinal) -or
             $reference.StartsWith('docker://', [StringComparison]::Ordinal)) {
             continue
         }

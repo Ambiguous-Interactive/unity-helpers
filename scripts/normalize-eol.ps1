@@ -27,5 +27,9 @@ if ($selectedPaths.Count -gt 0) {
         [System.IO.Path]::GetFullPath($_, $PWD.ProviderPath)
     })
 }
+if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
+    [Console]::Error.WriteLine('[normalize-eol] uv is required. Install uv, then rerun npm run eol:fix.')
+    exit 1
+}
 & uv @arguments
 exit $LASTEXITCODE

@@ -29,8 +29,9 @@ class Edit:
     mode: int
 
 
-def selected_files(repository: Path, paths: list[str] | None) -> list[Path]:
+def selected_files(repository: Path, paths: list[str] | None, root_spelling: Path) -> list[Path]:
     """Select literal paths without widening an explicit scope."""
+    names: list[str]
     if paths is None:
         names = [
             os.fsdecode(record)
@@ -38,7 +39,15 @@ def selected_files(repository: Path, paths: list[str] | None) -> list[Path]:
             if record
         ]
     else:
-        names = [relative_path(repository, name) for name in paths if name.strip()]
+        names = []
+        for name in paths:
+            if not name.strip():
+                continue
+            candidate = Path(name.replace("\\", "/"))
+            anchor = repository
+            if candidate.is_absolute() and candidate.is_relative_to(root_spelling):
+                anchor = root_spelling
+            names.append(relative_path(anchor, name))
     selected: dict[Path, None] = {}
     for name in names:
         if not supported(name):
@@ -46,7 +55,8 @@ def selected_files(repository: Path, paths: list[str] | None) -> list[Path]:
         path = (repository / name).resolve()
         if not path.is_relative_to(repository):
             raise ValueError(f"Path is outside the repository: {name}")
-        selected[path] = None
+        if supported(path.relative_to(repository).as_posix()):
+            selected[path] = None
     return list(selected)
 
 
@@ -124,10 +134,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args(argv)
     try:
-        repository = Path(os.path.abspath(args.repo_root))  # noqa: PTH100 - retain root links for rejection.
-        if not repository.is_dir() or is_link(repository):
-            raise ValueError(f"Repository is missing or linked: {repository}")
-        files = selected_files(repository, args.paths)
+        root_spelling = Path(os.path.abspath(args.repo_root))  # noqa: PTH100 - check the requested root.
+        if not root_spelling.is_dir() or is_link(root_spelling):
+            raise ValueError(f"Repository is missing or linked: {root_spelling}")
+        repository = root_spelling.resolve()
+        files = selected_files(repository, args.paths, root_spelling)
         edits = plan_edits(repository, files)
         if args.paths is None and not files:
             raise ValueError("No tracked text files were selected")

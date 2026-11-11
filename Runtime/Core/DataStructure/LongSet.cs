@@ -118,7 +118,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
             for (int entry = 0; entry < count; ++entry)
             {
-                int slot = (int)(LongMap<byte>.Mix(_keys[entry]) & (ulong)_mask);
+                int slot = (int)(LongHash.Mix(_keys[entry]) & (ulong)_mask);
                 while (_slots[slot] != entry + 1)
                 {
                     slot = (slot + 1) & _mask;
@@ -138,7 +138,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         private int FindSlot(ulong key)
         {
-            int slot = (int)(LongMap<byte>.Mix(key) & (ulong)_mask);
+            int slot = (int)(LongHash.Mix(key) & (ulong)_mask);
             while (_slots[slot] != 0 && _keys[_slots[slot] - 1] != key)
             {
                 slot = (slot + 1) & _mask;
@@ -156,7 +156,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             Array.Copy(_keys, keys, count);
             for (int entry = 0; entry < count; ++entry)
             {
-                int slot = (int)(LongMap<byte>.Mix(keys[entry]) & (ulong)mask);
+                int slot = (int)(LongHash.Mix(keys[entry]) & (ulong)mask);
                 while (slots[slot] != 0)
                 {
                     slot = (slot + 1) & mask;
@@ -174,7 +174,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             while (_slots[slot] != 0)
             {
                 int entry = _slots[slot] - 1;
-                int home = (int)(LongMap<byte>.Mix(_keys[entry]) & (ulong)_mask);
+                int home = (int)(LongHash.Mix(_keys[entry]) & (ulong)_mask);
                 if (((gap - home) & _mask) < ((slot - home) & _mask))
                 {
                     _slots[gap] = _slots[slot];

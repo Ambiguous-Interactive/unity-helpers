@@ -339,7 +339,7 @@ function Run-PowerShellPathBindingContractTests {
         $pythonNormalizer = Join-Path $repoRoot 'scripts/normalize_eol.py'
         $coversGitignore = $coversGitignore -and (Test-Path $pythonNormalizer) -and
           $content -match 'normalize_eol\.py' -and
-          (Get-Content -Path $pythonNormalizer -Raw) -match 'from check_eol import.*supported'
+          (Get-Content -Path $pythonNormalizer -Raw) -match '(?m)^from check_eol import [^#\r\n]*\bsupported\b'
       }
       else {
         $coversGitignore = $coversGitignore -and $content -match 'check_eol\.py'

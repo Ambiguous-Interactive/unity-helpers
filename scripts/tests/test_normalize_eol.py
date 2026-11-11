@@ -214,7 +214,9 @@ def test_default_scope_refuses_git_discovery_failure(tmp_path: Path) -> None:
     assert path.read_bytes() == b"line\n"
 
 
-def test_powershell_launcher_keeps_all_paths_from_the_callers_directory(tmp_path: Path) -> None:
+def test_powershell_launcher_keeps_all_paths_from_the_callers_directory(
+    tmp_path: Path,
+) -> None:
     shell = shutil.which("pwsh")
     assert shell is not None
     scripts = tmp_path / "scripts"
@@ -264,3 +266,86 @@ def test_powershell_launcher_keeps_all_paths_from_the_callers_directory(tmp_path
     assert report.read_bytes() == b"nested/first file.cs\0nested/second file.md\0"
     assert first.read_bytes() == b"first\n"
     assert second.read_bytes() == b"second\r\n"
+
+
+@pytest.mark.parametrize("target_name", ["state.bin", ".git/config", "Tool.py"])
+def test_internal_links_skip_unsupported_canonical_targets(
+    tmp_path: Path, target_name: str
+) -> None:
+    target = tmp_path / target_name
+    target.parent.mkdir(exist_ok=True)
+    target.write_bytes(b"line\n")
+    alias = tmp_path / "alias.md"
+    try:
+        alias.symlink_to(target)
+    except OSError:
+        if os.name != "nt":
+            raise
+        pytest.skip("Windows fixture cannot create a symlink")
+    report = tmp_path / "changes"
+    assert (
+        main(
+            [
+                "--repo-root",
+                str(tmp_path),
+                "--dry-run",
+                "--modified-path-list",
+                str(report),
+                "--paths",
+                str(alias),
+            ]
+        )
+        == 0
+    )
+    assert report.read_bytes() == b""
+    assert main(["--repo-root", str(tmp_path), "--paths", str(alias)]) == 0
+    assert target.read_bytes() == b"line\n"
+
+
+@pytest.mark.parametrize("scope", ["tracked", "relative", "absolute", "canonical"])
+def test_repository_root_with_linked_ancestor_accepts_supported_path_spellings(
+    tmp_path: Path, scope: str
+) -> None:
+    root = tmp_path / "actual" / "repo"
+    root.mkdir(parents=True)
+    alias = tmp_path / "alias"
+    try:
+        alias.symlink_to(root.parent, target_is_directory=True)
+    except OSError:
+        if os.name != "nt":
+            raise
+        pytest.skip("Windows fixture cannot create a symlink")
+    spelling = alias / root.name
+    target = root / "Example.cs"
+    target.write_bytes(b"line\n")
+    git = shutil.which("git")
+    assert git is not None
+    subprocess.run([git, "init", "-q"], cwd=root, check=True, timeout=10)
+    subprocess.run([git, "add", "--", target.name], cwd=root, check=True, timeout=10)
+    args = ["--repo-root", str(spelling)]
+    if scope != "tracked":
+        selected = {
+            "relative": target.name,
+            "absolute": str(spelling / target.name),
+            "canonical": str(target),
+        }
+        args += ["--paths", selected[scope]]
+    assert main(args) == 0
+    assert target.read_bytes() == b"line\r\n"
+
+
+def test_powershell_launcher_explains_a_missing_uv_executable(tmp_path: Path) -> None:
+    shell = shutil.which("pwsh")
+    assert shell is not None
+    result = subprocess.run(
+        [shell, "-NoProfile", "-File", str(ROOT / "scripts/normalize-eol.ps1")],
+        cwd=tmp_path,
+        env={**os.environ, "PATH": str(tmp_path)},
+        capture_output=True,
+        encoding="utf-8",
+        check=False,
+        timeout=15,
+    )
+    assert result.returncode != 0
+    assert "uv is required" in result.stderr
+    assert "Install uv" in result.stderr

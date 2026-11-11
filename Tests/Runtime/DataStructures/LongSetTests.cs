@@ -81,7 +81,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             List<ulong> keys = new();
             for (ulong key = 0; keys.Count < 9; ++key)
             {
-                if ((LongMap<byte>.Mix(key) & 15) == 15)
+                if ((LongHash.Mix(key) & 15) == 15)
                 {
                     keys.Add(key);
                 }

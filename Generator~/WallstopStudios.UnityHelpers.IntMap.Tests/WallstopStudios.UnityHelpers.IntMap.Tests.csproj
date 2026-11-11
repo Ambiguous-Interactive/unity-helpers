@@ -16,6 +16,7 @@
       Link="ObjectsHashCodeStub.cs"
     />
     <Compile Include="../../Runtime/Core/DataStructure/IntMap.cs" Link="IntMap.cs" />
+    <Compile Include="../../Runtime/Core/DataStructure/LongHash.cs" Link="LongHash.cs" />
     <Compile Include="../../Runtime/Core/DataStructure/LongMap.cs" Link="LongMap.cs" />
     <Compile Include="../../Runtime/Core/DataStructure/LongSet.cs" Link="LongSet.cs" />
     <Compile Include="../../Tests/Runtime/DataStructures/LongMapTests.cs" Link="LongMapTests.cs" />

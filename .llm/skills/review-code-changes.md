@@ -91,7 +91,7 @@ Review Summary:
 
 ## Current Pull Request Feedback
 
-When review feedback is part of the task, fetch current issue comments, reviews, and inline threads for every referenced pull request, including merged pull requests. A handoff or prior completion receipt describes its recorded point in time. Compare new comment timestamps and thread state with that receipt before treating the work as complete.
+When review feedback is part of the task, fetch current issue comments, reviews, and inline threads for every referenced pull request, including merged pull requests. A handoff or prior completion receipt describes its recorded time. Compare new comment timestamps and thread state with that receipt before treating the work as complete.
 
 Give each current actionable comment a disposition backed by the implementation, a regression test, or a specific explanation. Read full comment bodies and nested replies. After a push, inspect new feedback against the pushed commit and repeat before merge. Record any remaining requests in the issue or handoff with their current identifiers.
 
