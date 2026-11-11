@@ -104,6 +104,32 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             }
         }
 
+        [TestCase(typeof(AttributedFieldBase), true)]
+        [TestCase(typeof(AttributedFieldBase), false)]
+        [TestCase(typeof(AttributedFieldDerived), true)]
+        [TestCase(typeof(AttributedFieldDerived), false)]
+        [TestCase(typeof(AttributedFieldLeaf), true)]
+        [TestCase(typeof(AttributedFieldLeaf), false)]
+        public void FieldPredicatesIncludePrivateInstanceAndStaticBaseFields(
+            Type type,
+            bool inherit
+        )
+        {
+            Assert.IsTrue(
+                type.HasAnyFieldWithAttribute<System.ComponentModel.DescriptionAttribute>(inherit)
+            );
+            Assert.IsTrue(
+                type.HasAnyFieldWithAttributes(
+                    new[] { null, typeof(System.ComponentModel.DescriptionAttribute) },
+                    inherit
+                )
+            );
+            Assert.IsTrue(type.HasAnyFieldWithAttribute<HideInInspector>(inherit));
+            Assert.IsTrue(
+                type.HasAnyFieldWithAttributes(new[] { typeof(HideInInspector) }, inherit)
+            );
+        }
+
         [TestCase(typeof(object))]
         [TestCase(typeof(int))]
         [TestCase(null)]

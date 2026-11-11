@@ -40,6 +40,7 @@ METHOD = re.compile(
     r"^\s*(?:\[[^\]]+\]\s*)*(?:(?:public|private|protected|internal|static|async|override|virtual|sealed|new|extern|unsafe|partial)\s+)+[\w.<>?,\s\[\]]+?\s+(?P<name>[A-Za-z_]\w*)\s*\("
 )
 NULL_CALL = re.compile(r"(?m)^(?P<indent>[ \t]*)Assert\.(?P<kind>IsNotNull|IsNull)\s*\(")
+NULL_ASSERTION = re.compile(r"Assert\.Is(?:Not)?Null\s*\(")
 SOURCE_NAME = re.compile(
     r'\bTestCaseSource(?:Attribute)?\s*\(\s*(?:nameof\s*\(\s*(\w+)\s*\)|"([^"\r\n]+)")',
     re.DOTALL,
@@ -137,6 +138,7 @@ def closing(code: str, start: int, opening: str = "(", close: str = ")") -> int:
 
 
 def generic_angle(code: str, index: int) -> bool:
+    """Keep comparison operators from consuming commas between assertion arguments."""
     previous = code[:index].rstrip()
     if not previous or not re.search(r"[\w)>\]]$", previous):
         return False
@@ -147,11 +149,15 @@ def generic_angle(code: str, index: int) -> bool:
     end = closing(code, index, "<", ">")
     if end < 0 or (lower and "," in code[index + 1 : end]):
         return False
+    span = code[index + 1 : end]
+    if re.search(r"(?<!:):(?!:)|[=+/%&|!;{}]", span):
+        return False
     following = code[end + 1 :].lstrip()
     return not following or following[0] in "()[]{}.,;?"
 
 
 def ambiguous_angle(code: str) -> bool:
+    """Decline comma-spanning comparisons that could masquerade as generic arguments."""
     for match in re.finditer(r"\b([a-z]\w*)<", code):
         start = match.end() - 1
         end = closing(code, start, "<", ">")
@@ -159,6 +165,15 @@ def ambiguous_angle(code: str) -> bool:
             continue
         following = code[end + 1 :].lstrip()
         if following and following[0] in "()[]{}.,;?":
+            return True
+    for match in re.finditer(r"\b[A-Z]\w*\s*<", code):
+        start = match.end() - 1
+        end = closing(code, start, "<", ">")
+        if (
+            end >= 0
+            and "," in code[start + 1 : end]
+            and re.search(r"(?<!:):(?!:)|[=+/%&|!;{}]", code[start + 1 : end])
+        ):
             return True
     return False
 
@@ -190,6 +205,7 @@ def split_arguments(text: str) -> list[str]:
 
 
 def repair_null_assertions(text: str) -> str:
+    """Repair standalone calls while preserving argument boundaries and expression precedence."""
     source = Source(text)
     replacements: list[tuple[int, int, str]] = []
     for match in NULL_CALL.finditer(source.code):
@@ -214,7 +230,9 @@ def repair_null_assertions(text: str) -> str:
             continue
         if not expression or re.match(r"@?[A-Za-z_]\w*\s*:(?!:)", Source(expression).code):
             continue
-        if re.search(r"\?|[&|^]|(?<![=!<>])=(?!=)", Source(expression).code):
+        if re.match(r"\s*from\b", expression_source.code) or re.search(
+            r"\?|[&|^]|(?<![=!<>])=(?!=)", expression_source.code
+        ):
             expression = f"({expression})"
         suffix = ",".join(arguments[1:]).strip()
         suffix = f", {suffix}" if suffix else ""
@@ -631,14 +649,16 @@ def analyze(text: str, relative: str, *, editor_only: bool) -> list[Finding]:
                 )
             )
     findings.extend(coroutine_sources(source))
-    for match in re.finditer(r"Assert\.Is(?:Not)?Null\s*\(", source.code):
+    for match in NULL_ASSERTION.finditer(source.code):
         add(
             match.start(),
             "UNH005",
             "Use Assert.IsTrue(expr == null) or Assert.IsTrue(expr != null) for Unity object null checks",
         )
 
-    perf = PERF.search(source.comments_masked) is not None
+    perf = any(
+        not source.code[match.start()].isspace() for match in PERF.finditer(source.comments_masked)
+    )
     test = TEST_FILE.search(source.code) is not None
     tags = relative.startswith("Tests/Runtime/Tags/")
     infra = relative.startswith("Tests/Core/") or relative.endswith("TestBase.cs")
@@ -805,13 +825,14 @@ def main(argv: list[str] | None = None) -> int:
             relative = path.relative_to(root).as_posix()
             if args.fix_null_checks:
                 revised = repair_null_assertions(text)
+                revised_source = Source(revised)
                 found = [
                     Finding(
-                        Source(revised).line_at(m.start()),
+                        revised_source.line_at(m.start()),
                         "UNH005",
                         "Assert.IsNull/Assert.IsNotNull could not be auto-fixed; repair this call manually",
                     )
-                    for m in NULL_CALL.finditer(Source(revised).code)
+                    for m in NULL_ASSERTION.finditer(revised_source.code)
                 ]
             else:
                 revised = text

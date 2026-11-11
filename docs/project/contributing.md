@@ -104,11 +104,12 @@ those captures and adds input, scanner, repair and compatibility-launcher contro
 uv run --project scripts/python~ --locked pytest scripts/tests/test_lifecycle_lint.py -q
 ```
 
-Three alternating fresh-process pairs over the same 1,785 C# files retained identical
+At commit `87fc1cd1`, three alternating fresh-process pairs over the same 1,785 C# files retained identical
 75 path/line/code diagnostics. Median complete-command time fell from 26.05 to 9.25 seconds
 on this Linux host. This includes process launch and the full scan; it does not predict CI timing.
 The [timing captures and replay sources](../performance/lifecycle-checker-port.zip) retain the
-unchanged source inventory, all six observations and tool identities.
+unchanged source inventory, all six observations and tool identities. The timing data applies to that version. Later fixes to assertion repair and category detection
+have separate correctness coverage.
 
 Documentation counts use `scripts/doc_counts.py` through locked uv. `npm run lint:doc-counts`
 checks without writing; `npm run sync:doc-counts` updates only the documented target files.

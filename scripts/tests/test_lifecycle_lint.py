@@ -419,3 +419,51 @@ def test_powershell_test_launcher_forwards_filter(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
     assert "1 passed" in result.stdout
     assert "deselected" in result.stdout
+
+
+@pytest.mark.parametrize("method", ["IsNull", "IsNotNull"])
+def test_comparisons_across_arguments_require_manual_repair(method: str) -> None:
+    arguments = 'Count < Limit ? first : second, OtherCount > (0) ? "a" : "b"'
+    text = f"Assert.{method}({arguments});"
+    assert len(split_arguments(arguments)) == 2
+    assert repair_null_assertions(text) == text
+
+
+@pytest.mark.parametrize("method", ["IsNull", "IsNotNull"])
+@pytest.mark.parametrize("prefix", ["", "/* retain this explanation */ "])
+def test_query_expression_comparison_is_outside_the_query(method: str, prefix: str) -> None:
+    expression = prefix + "from item in values select item"
+    operator = "==" if method == "IsNull" else "!="
+    assert repair_null_assertions(f"Assert.{method}({expression});") == (
+        f"Assert.IsTrue(({expression}) {operator} null);"
+    )
+
+
+@pytest.mark.parametrize("category", ["Performance", "Stress"])
+def test_category_inside_raw_string_cannot_disable_performance_rules(category: str) -> None:
+    text = (
+        "class PerformanceHelpersTests : CommonTestBase {\n"
+        'const string sample = """[Category("' + category + '")]""";\n'
+        "[Test] public void Run() {\n"
+        "for (int index = 0; index < 60000; ++index) {}\n"
+        "System.Threading.Thread.Sleep(5);\n"
+        "object wait = new WaitForSeconds(1);\n"
+        "}\n}"
+    )
+    found = analyze(text, "Tests/Runtime/Tags/PerformanceHelpersTests.cs", editor_only=False)
+    assert {item.code for item in found} == {"UNH007", "UNH008", "UNH010", "UNH013"}
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "if (ready) { Assert.IsNull(target); }",
+        "global::NUnit.Framework.Assert.IsNotNull(target);",
+        "Invoke(() => Assert.IsNull(target));",
+    ],
+)
+def test_unmatched_assertion_reports_manual_repair(tmp_path: Path, text: str) -> None:
+    path = tmp_path / "Subject.cs"
+    path.write_text(text, encoding="utf-8")
+    assert main(["--repo-root", str(tmp_path), "--paths", str(path), "--fix-null-checks"]) == 1
+    assert path.read_text(encoding="utf-8") == text

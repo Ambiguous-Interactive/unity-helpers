@@ -322,7 +322,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         > InstanceFieldsIncludingBaseTypesCache = new();
 #endif
 
-        private const BindingFlags AllInstanceFieldsFlags =
+        private const BindingFlags AllFieldsFlags =
             BindingFlags.Public
             | BindingFlags.NonPublic
             | BindingFlags.Instance
@@ -3841,10 +3841,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 
-        /// <summary>
-        /// Checks if a type has any field decorated with the specified attribute type.
-        /// Short-circuits on first match for efficiency.
-        /// </summary>
+        /// <summary>Checks whether the type or a base type declares a field with the attribute.</summary>
         /// <typeparam name="TAttribute">The attribute type to search for.</typeparam>
         /// <param name="type">The type to inspect.</param>
         /// <param name="inherit">Whether to search the attribute's inheritance chain.</param>
@@ -3852,29 +3849,26 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         public static bool HasAnyFieldWithAttribute<TAttribute>(this Type type, bool inherit = true)
             where TAttribute : Attribute
         {
-            if (type == null)
+            Type current = type;
+            while (current != null && current != typeof(object))
             {
-                return false;
-            }
-
-            FieldInfo[] fields = GetFieldsCached(type, AllInstanceFieldsFlags);
-
-            foreach (FieldInfo field in fields)
-            {
-                if (HasAttributeSafe<TAttribute>(field, inherit))
+                FieldInfo[] fields = GetFieldsCached(
+                    current,
+                    AllFieldsFlags | BindingFlags.DeclaredOnly
+                );
+                foreach (FieldInfo field in fields)
                 {
-                    return true;
+                    if (HasAttributeSafe<TAttribute>(field, inherit))
+                    {
+                        return true;
+                    }
                 }
+                current = SafeGetBaseType(current);
             }
-
             return false;
         }
 
-        /// <summary>
-        /// Checks if a type has any field decorated with any of the specified attribute types.
-        /// Short-circuits on first match for efficiency. Useful when checking for multiple
-        /// related attributes without allocating enumerators.
-        /// </summary>
+        /// <summary>Checks whether the type or a base type declares a field with any of the attributes.</summary>
         /// <param name="type">The type to inspect.</param>
         /// <param name="attributeTypes">The attribute types to search for.</param>
         /// <param name="inherit">Whether to search the attribute's inheritance chain.</param>
@@ -3890,24 +3884,32 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return false;
             }
 
-            FieldInfo[] fields = GetFieldsCached(type, AllInstanceFieldsFlags);
-
-            foreach (FieldInfo field in fields)
+            Type current = type;
+            while (current != null && current != typeof(object))
             {
-                if (field == null)
+                FieldInfo[] fields = GetFieldsCached(
+                    current,
+                    AllFieldsFlags | BindingFlags.DeclaredOnly
+                );
+                foreach (FieldInfo field in fields)
                 {
-                    continue;
-                }
-
-                foreach (Type attributeType in attributeTypes)
-                {
-                    if (attributeType != null && HasAttributeSafe(field, attributeType, inherit))
+                    if (field == null)
                     {
-                        return true;
+                        continue;
+                    }
+                    foreach (Type attributeType in attributeTypes)
+                    {
+                        if (
+                            attributeType != null
+                            && HasAttributeSafe(field, attributeType, inherit)
+                        )
+                        {
+                            return true;
+                        }
                     }
                 }
+                current = SafeGetBaseType(current);
             }
-
             return false;
         }
 

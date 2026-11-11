@@ -321,6 +321,10 @@ Dictionary<string, object> byName = typeof(Boss).GetAllAttributeValuesSafe();
 // byName["Saveable"] is the SaveableAttribute instance
 ```
 
+`HasAnyFieldWithAttribute` and `HasAnyFieldWithAttributes` inspect the same field declarations,
+including private and static base fields, and stop at the first match. They reuse cached field
+arrays. Their `inherit` argument controls attribute lookup while the type hierarchy is always searched.
+
 Related helpers: `GetAllLoadedTypes`, `GetTypesFromAssembly`, `GetTypesFromAssemblyName`,
 `GetComponentTypes`, `GetScriptableObjectTypes`, `GetMethodsWithAttribute`,
 `GetFieldsWithAttribute`, `GetMethodsWithAttributeSafe`, `GetPropertiesWithAttributeSafe`,

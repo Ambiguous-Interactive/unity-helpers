@@ -3,6 +3,9 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.Helper
 {
+    using System.ComponentModel;
+    using UnityEngine;
+
     public class AttributedFieldBase
     {
         public const string PrivateFieldName = nameof(_privateValue);
@@ -12,6 +15,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         public static int PrivateStaticValue => _privateStaticValue;
 
         [RuntimeMarker]
+        [HideInInspector]
         private static int _privateStaticValue = 2;
 
         public int PrivateValue => _privateValue;
@@ -23,6 +27,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         protected int protectedValue;
 
         [RuntimeMarker]
+        [Description("Private instance fixture")]
         private int _privateValue = 1;
     }
 }
