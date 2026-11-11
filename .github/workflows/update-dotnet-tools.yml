@@ -52,7 +52,7 @@ jobs:
           }
 
       - name: Setup Python tooling
-        uses: $/.github/actions/setup-python-tools
+        uses: ./.github/actions/setup-python-tools
 
       - name: Normalize EOL (dotnet tools manifest)
         run: uv run --project scripts/python~ --locked --no-dev python scripts/normalize_eol.py --paths .config/dotnet-tools.json --verbose

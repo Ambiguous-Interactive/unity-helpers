@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Update bundled JSON and immutable collections to 10.0.15 while retaining Unity assembly constraints ([#1052](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1052)).
 - Reduce allocations when measuring drawn sprite bounds ([#1113](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1113)).
 - Cache general-format enum flag names through the full mask when it fits in 256 slots ([#1168](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1168)).
 - Skip unset words when collecting or enumerating sparse `BitSet` indices.
