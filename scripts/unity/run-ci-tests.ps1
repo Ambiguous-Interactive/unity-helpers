@@ -1061,11 +1061,8 @@ function Test-UnityArtifactDatabaseStartupFailure {
     $nativeInitializationFailure = ($pruningFailure -or $sharedMemoryFailure) -and
         $log.Contains('InitializeAssetDatabaseV2')
     $knownDatabaseRefusal = $log -match '(?m)^Exiting because Library/ArtifactDB is corrupted\. Relaunch Editor without batch mode to view additional options\.\r?$' -or
-        ($log.Contains("mdb_env_open failed on 'Library/ArtifactDB' with error: -30793 'MDB_INVALID: File is not an LMDB file'") -and
-            $log -match '(?m)^Exiting because Library/ArtifactDB file is locked\r?$')
-    $corruptionExit = $knownDatabaseRefusal -and
-        $log -match '(?m)^Exiting without the bug reporter\. Application will terminate with return code 0\r?$'
-    return (($nativeInitializationFailure -or $corruptionExit) -and
+        $log.Contains("mdb_env_open failed on 'Library/ArtifactDB' with error: -30793 'MDB_INVALID: File is not an LMDB file'")
+    return (($nativeInitializationFailure -or $knownDatabaseRefusal) -and
         -not $log.Contains('[uh-test-stream] RUN-STARTED') -and
         -not $log.Contains('error CS'))
 }

@@ -631,10 +631,14 @@ try {
     $sharedMemoryStack = "[Error] Command buffer shared memory issue`n[Error] Tried to create a new semaphore handle`nuds_sharedmutex_init`nInitializeAssetDatabaseV2"
     $corruptDatabaseExit = "Exiting because Library/ArtifactDB is corrupted. Relaunch Editor without batch mode to view additional options.`nExiting without the bug reporter. Application will terminate with return code 0"
     $invalidDatabaseExit = "mdb_env_open failed on 'Library/ArtifactDB' with error: -30793 'MDB_INVALID: File is not an LMDB file'`nExiting because Library/ArtifactDB file is locked`nExiting without the bug reporter. Application will terminate with return code 0"
+    $corruptDatabaseMessage = 'Exiting because Library/ArtifactDB is corrupted. Relaunch Editor without batch mode to view additional options.'
+    $invalidDatabaseMessage = "mdb_env_open failed on 'Library/ArtifactDB' with error: -30793 'MDB_INVALID: File is not an LMDB file'"
     foreach ($case in @(
+            @{ Name = 'corruption-without-footer'; Log = $corruptDatabaseMessage; Results = $false; Owned = $true; Recover = $true },
+            @{ Name = 'invalid-without-footer'; Log = $invalidDatabaseMessage; Results = $false; Owned = $true; Recover = $true },
             @{ Name = 'invalid-database'; Log = $invalidDatabaseExit; Results = $false; Owned = $true; Recover = $true },
             @{ Name = 'database-lock-only'; Log = "Exiting because Library/ArtifactDB file is locked`nExiting without the bug reporter. Application will terminate with return code 0"; Results = $false; Owned = $true; Recover = $false },
-            @{ Name = 'invalid-database-partial'; Log = "mdb_env_open failed on 'Library/ArtifactDB' with error: -30793 'MDB_INVALID: File is not an LMDB file'"; Results = $false; Owned = $true; Recover = $false },
+            @{ Name = 'invalid-database-partial'; Log = "mdb_env_open failed on 'Library/ArtifactDB' with error: -30793"; Results = $false; Owned = $true; Recover = $false },
             @{ Name = 'invalid-database-after-tests'; Log = $invalidDatabaseExit + "`n[uh-test-stream] RUN-STARTED"; Results = $false; Owned = $true; Recover = $false },
             @{ Name = 'invalid-database-compiler-error'; Log = $invalidDatabaseExit + "`nerror CS0001"; Results = $false; Owned = $true; Recover = $false },
             @{ Name = 'invalid-database-results'; Log = $invalidDatabaseExit; Results = $true; Owned = $true; Recover = $false },
@@ -712,7 +716,7 @@ try {
         Assert-That ($case.Name + ' configure clears its marker environment') (-not (Test-Path Env:UH_CONFIGURE_MARKER_PATH))
     }
 
-    foreach ($signature in @($artifactStack, $sharedMemoryStack, $corruptDatabaseExit, $invalidDatabaseExit)) {
+    foreach ($signature in @($artifactStack, $sharedMemoryStack, $corruptDatabaseExit, $invalidDatabaseExit, $corruptDatabaseMessage, $invalidDatabaseMessage)) {
         foreach ($firstThrows in @($false, $true)) {
             $configureProject = Join-Path $temporaryRoot ([guid]::NewGuid().ToString('N'))
             $configureLibrary = Join-Path $configureProject 'Library'

@@ -350,7 +350,7 @@ and `InitializeAssetDatabaseV2`. It also recognizes a failed asset-database shar
 when the log contains both the command-buffer memory-pool error and the existing-semaphore
 error, plus `uds_sharedmutex_init` and `InitializeAssetDatabaseV2` frames. Recovery requires
 a harness-owned Library marker and an incomplete invocation. Test passes require absent NUnit results, while configuration requires a missing fresh success marker. The log must also precede a started test stream and contain no compiler error. Artifact-pruning crashes additionally require the native stack header.
-The paired native messages `Exiting because Library/ArtifactDB is corrupted. Relaunch Editor without batch mode to view additional options.` and `Exiting without the bug reporter. Application will terminate with return code 0` also qualify. Unity can emit this refusal with a zero process exit before loading the test framework. An exact `MDB_INVALID` error (-30793), followed by its native ArtifactDB lock/refusal and zero-exit messages, also qualifies.
+The complete native message `Exiting because Library/ArtifactDB is corrupted. Relaunch Editor without batch mode to view additional options.` also qualifies. The exact `MDB_INVALID` error (-30793) opening `Library/ArtifactDB` identifies an invalid cache and also qualifies. Unity can exit zero before loading the test framework. The process receipt records its exit code, since a stopped output drain can omit Unity's final exit line.
 The failed log and execution receipt retain `.first-attempt` names. The complete failed
 Library moves to `Library.artifact-database-failure-<id>` inside the generated project, and Unity
 rebuilds its derived state. Before this move, earlier matching harness-owned failed Libraries
