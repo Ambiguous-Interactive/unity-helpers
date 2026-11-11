@@ -662,28 +662,63 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         {
             string path = Path.Combine(_testDirectory, "ledger.log");
             const int writerCount = 4;
-            const int recordsPerWriter = 50;
-
+            const int recordsPerWriter = 4;
+            const int payloadLength = 8192;
+            const int recordCount = writerCount * recordsPerWriter;
+            using Barrier roundStart = new(writerCount);
+            bool[] succeeded = new bool[recordCount];
+            Exception[] errors = new Exception[recordCount];
             Task[] writers = new Task[writerCount];
             for (int writer = 0; writer < writerCount; ++writer)
             {
                 int writerId = writer;
-                writers[writer] = Task.Run(() =>
-                {
-                    for (int record = 0; record < recordsPerWriter; ++record)
+                writers[writer] = Task.Factory.StartNew(
+                    () =>
                     {
-                        Assert.IsTrue(
-                            DurableFile.TryAppendAllText(path, $"{writerId}:{record}\n", out _)
-                        );
-                    }
-                });
+                        try
+                        {
+                            string payload = new((char)('A' + writerId), payloadLength);
+                            for (int record = 0; record < recordsPerWriter; ++record)
+                            {
+                                roundStart.SignalAndWait();
+                                int index = writerId * recordsPerWriter + record;
+                                succeeded[index] = DurableFile.TryAppendAllText(
+                                    path,
+                                    $"{writerId}:{record}:{payload}\n",
+                                    out errors[index]
+                                );
+                            }
+                        }
+                        finally
+                        {
+                            roundStart.RemoveParticipant();
+                        }
+                    },
+                    CancellationToken.None,
+                    TaskCreationOptions.LongRunning,
+                    TaskScheduler.Default
+                );
             }
 
             Task.WaitAll(writers);
 
-            HashSet<string> records = new(File.ReadAllLines(path));
-            records.Remove(string.Empty);
-            Assert.AreEqual(writerCount * recordsPerWriter, records.Count);
+            for (int index = 0; index < recordCount; ++index)
+            {
+                Assert.IsTrue(succeeded[index], $"Append {index} failed: {errors[index]}");
+            }
+
+            string[] lines = File.ReadAllLines(path);
+            Assert.AreEqual(recordCount, lines.Length);
+            HashSet<string> records = new(lines);
+            Assert.AreEqual(recordCount, records.Count);
+            for (int writer = 0; writer < writerCount; ++writer)
+            {
+                string payload = new((char)('A' + writer), payloadLength);
+                for (int record = 0; record < recordsPerWriter; ++record)
+                {
+                    Assert.IsTrue(records.Contains($"{writer}:{record}:{payload}"));
+                }
+            }
         }
 
         [Test]
