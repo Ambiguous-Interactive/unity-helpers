@@ -367,6 +367,7 @@ runTest("no contract test in scripts/tests/ has been left unreachable", () => {
   // suite that still exists and no longer runs). The excuse is a PREDICATE, not prose.
   const runElsewhere = new Map([
     ["scripts/tests/test-lint-dependabot.ps1", "dependabot-controls"],
+    ["scripts/tests/test-lint-tests.ps1", "lifecycle-controls"],
     ["scripts/tests/test-validate-lint-error-codes.ps1", "lint-code-controls"],
     ["scripts/tests/test-fixture-runspace.ps1", "lint-code-controls"],
     ["scripts/tests/test-check-eol.ps1", "eol-controls"],
@@ -392,6 +393,10 @@ runTest("no contract test in scripts/tests/ has been left unreachable", () => {
     ["scripts/tests/test-sync-issue-template-versions.ps1", "workflow"]
   ]);
   const owners = new Map([
+    [
+      "lifecycle-controls",
+      (file) => registeredControlsInvoke(file, "scripts/tests/test_lifecycle_lint.py")
+    ],
     [
       "dependabot-controls",
       (file) => registeredControlsInvoke(file, "scripts/tests/test_dependabot.py")

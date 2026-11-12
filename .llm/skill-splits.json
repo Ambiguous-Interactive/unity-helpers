@@ -250,7 +250,7 @@
     },
     {
       "name": "linter-reference",
-      "sha256": "38c5f3a6669cdf428e7b33e30d22593b9ee014be379ebd009d4db1115cbebdea",
+      "sha256": "6113f6cd4bedf1fa3667c1b2578259c4b4b5437d62d0c8317400dc94c014f242",
       "parts": [
         "linter-reference-part-1.md",
         "linter-reference-part-2.md",
@@ -406,7 +406,7 @@
     },
     {
       "name": "test-unity-lifecycle",
-      "sha256": "cdfcefe4b5da829f37ca7f7750b4e7a24ca03d08c8e1ec62e7c6112268eca41b",
+      "sha256": "97ecaf21c32fccf75a6abc2212773e21f1a8a31a9b393b63c9bc5d39c9752420",
       "parts": [
         "test-unity-lifecycle-part-1.md",
         "test-unity-lifecycle-part-2.md",

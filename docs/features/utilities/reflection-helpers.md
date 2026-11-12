@@ -284,6 +284,11 @@ catch inspection failures and return the method's missing-result value, such as 
 or an empty array. A missing result does not distinguish an absent attribute from failed inspection;
 do not treat it as proof that a required contract is valid.
 
+`GetFieldsWithAttributeSafe<TAttribute>` includes fields from every base type, including private
+and static fields. A derived field that hides a base field does not remove that base declaration;
+each declaration appears once. Its `inherit` argument controls attribute lookup, not the base-type
+walk. The returned array has no guaranteed ordering.
+
 Discovery captures the available assemblies when you call it and inspects their types as you
 enumerate. Enumerating the same result again uses that assembly snapshot; call the helper again
 after loading another assembly. Partial type-load failures retain the types that loaded, in their
@@ -315,6 +320,10 @@ FieldInfo[] saved = typeof(Boss).GetFieldsWithAttributeSafe<SaveableAttribute>()
 Dictionary<string, object> byName = typeof(Boss).GetAllAttributeValuesSafe();
 // byName["Saveable"] is the SaveableAttribute instance
 ```
+
+`HasAnyFieldWithAttribute` and `HasAnyFieldWithAttributes` inspect the same field declarations,
+including private and static base fields, and stop at the first match. They reuse cached field
+arrays. Their `inherit` argument controls attribute lookup while the type hierarchy is always searched.
 
 Related helpers: `GetAllLoadedTypes`, `GetTypesFromAssembly`, `GetTypesFromAssemblyName`,
 `GetComponentTypes`, `GetScriptableObjectTypes`, `GetMethodsWithAttribute`,

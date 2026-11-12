@@ -340,7 +340,7 @@
     "validate:hook-perms": "bash scripts/validate-hook-permissions.sh",
     "validate:hook-spell-parity": "bash scripts/tests/test-hook-spell-parity.sh",
     "validate:cspell-files-parity": "bash scripts/tests/test-cspell-hook-files-parity.sh",
-    "lint:tests": "pwsh -NoProfile -File scripts/lint-tests.ps1 -VerboseOutput",
+    "lint:tests": "uv run --quiet --project scripts/python~ --locked --no-dev python scripts/lint_tests.py --verbose",
     "lint:doc-counts": "uv run --quiet --project scripts/python~ --locked --no-dev python scripts/doc_counts.py check",
     "sync:doc-counts": "uv run --quiet --project scripts/python~ --locked --no-dev python scripts/doc_counts.py sync",
     "lint:readme-mirror": "node scripts/lint-readme-mirror.js --verbose",

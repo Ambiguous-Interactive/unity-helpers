@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `StopwatchTimestamp` for elapsed time and counter-tick conversions without a timer allocation ([#1179](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1179)).
 - Add stable in-place insertion sort for spans without renting a buffer ([#1157](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1157)).
 - Add optional struct discovery to `GetTypesDerivedFrom` while retaining the default class-only filter ([#1169](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1169)).
 - Add `LongMap<T>` and `LongSet` for unsigned 64-bit keys, packed iteration, reusable storage and key-only set storage ([#1162](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1162)).
@@ -33,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Update bundled JSON and immutable collections to 10.0.15 while retaining Unity assembly constraints ([#1052](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1052)).
-- Reduce allocations when measuring drawn sprite bounds ([#1113](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1113)).
+- Reduce allocations and speed up dense drawn sprite bounds ([#1113](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1113)).
 - Cache general-format enum flag names through the full mask when it fits in 256 slots ([#1168](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1168)).
 - Skip unset words when collecting or enumerating sparse `BitSet` indices.
 - Reduce repeated script searches during bulk binding validation ([#1106](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1106)).
@@ -42,13 +43,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Stop bounded parent-component collection searches at the requested depth or match count, and reuse temporary lists ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
 - Reduce child-component collection ordering work for sealed types while preserving breadth-first results, filters, limits, and collection reuse ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
 - Avoid a full project refresh when Animation Creator saves or deletes hidden configs.
-- Speed up `IntMap` iteration and sparse clears, and reduce insertion work. Extra indexing uses more memory and can slow fresh construction; see [measurements and costs](./docs/features/utilities/data-structures.md#iteration-measurements-and-costs) ([#1131](https://github.com/wallstop/unity-helpers/issues/1131)).
+- Speed up `IntMap` iteration and sparse clears, and reduce insertion and small-map lookup work. Extra indexing uses more memory and can slow fresh construction; see [measurements and costs](./docs/features/utilities/data-structures.md#iteration-measurements-and-costs) ([#1131](https://github.com/wallstop/unity-helpers/issues/1131)).
 - Standardize coroutine helpers: missing required arguments throw `ArgumentNullException`, inactive GameObjects start no work, and `TryExecuteTrackedAfterDelay` still returns false ([#1125](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1125)).
 - Allow runtime assemblies to call `AnimatedSpriteFrames` and `SceneCanonicalizer` inside `UNITY_EDITOR` guards, preserving existing namespaces and compiled editor references ([#1126](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1126)).
 - Group Polygon Collider Optimizer and relational installers under the Wallstop Studios/Unity Helpers component menu.
 
 ### Fixed
 
+- Fix safe attributed-field lookup and field predicates missing private and static base fields ([#1184](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1184)).
 - Retry Windows replacement contention up to three attempts in `DurableFile`, preserving the previous save when contention persists. This covers settings persistence during rapid Editor undo and redo.
 - Fix Odin dictionary migration accepting ambiguous prefab fields or an instance reference to another scene ([#794](https://github.com/Ambiguous-Interactive/unity-helpers/issues/794)).
 - Fix `GetTypesDerivedFrom` including the queried type itself in players ([#1169](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1169)).

@@ -241,6 +241,7 @@ nav:
           - Test Run Reporter: features/editor-tools/test-run-reporter.md
   - Performance:
       - Bendable Line Sampling: performance/bendable-line-sampling.md
+      - Sprite Bounds Row Scans: performance/sprite-bounds-row-scan.md
       - Avoid Enumerator Boxing: performance/enumeration-audit.md
       - Pooled Resource Ownership: performance/ownership-audit.md
       - Random Generators: performance/random-performance.md

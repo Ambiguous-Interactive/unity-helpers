@@ -1310,6 +1310,45 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(count, map.Count);
         }
 
+        [TestCase(int.MinValue, 0)]
+        [TestCase(int.MinValue + 1, 0)]
+        [TestCase(int.MinValue, 64)]
+        [TestCase(int.MinValue + 1, 64)]
+        public void ReservedLookupsInPopulatedTablesPreserveValuesAndEnumerators(
+            int reserved,
+            int hint
+        )
+        {
+            IntMap<string> map = new(hint);
+            for (int index = 0; index < 64; ++index)
+            {
+                Assert.IsTrue(map.TrySet(index * 1024, "value"));
+            }
+            int capacity = map.Capacity;
+            IntMap<string>.Enumerator entries = map.GetEnumerator();
+            Assert.IsTrue(entries.MoveNext());
+            Assert.IsFalse(map.TryGet(reserved, out string missing));
+            Assert.IsTrue(missing == null);
+            Assert.IsFalse(map.ContainsKey(reserved));
+            Assert.IsFalse(map.TrySet(reserved, "invalid"));
+            Assert.IsFalse(map.Remove(reserved, out string removed));
+            Assert.IsTrue(removed == null);
+            int observed = 1;
+            while (entries.MoveNext())
+            {
+                Assert.AreEqual("value", entries.Current.Value);
+                ++observed;
+            }
+            Assert.AreEqual(64, observed);
+            Assert.AreEqual(64, map.Count);
+            Assert.AreEqual(capacity, map.Capacity);
+            for (int index = 0; index < 64; ++index)
+            {
+                Assert.IsTrue(map.TryGet(index * 1024, out string value));
+                Assert.AreEqual("value", value);
+            }
+        }
+
         [Test]
         public void ReservedMarkerKeysAreRefusedWithoutThrowing()
         {

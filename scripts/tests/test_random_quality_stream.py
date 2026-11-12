@@ -167,7 +167,7 @@ def test_proof_environment_policy() -> None:
         tomllib.loads((ROOT / "scripts/python~/pyproject.toml").read_text(encoding="utf-8"))
     )
     groups = object_map(settings["dependency-groups"])
-    assert groups["proof"] == ["z3-solver==5.4.0.0"]
+    assert groups["proof"] == ["z3-solver==5.4.1.0"]
 
     def proto_defines(path: str) -> list[dict[str, object]]:
         return [

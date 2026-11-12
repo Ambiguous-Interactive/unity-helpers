@@ -77,7 +77,40 @@ Malformed, negative or nonfinite durations and results without fixtures or cases
 missing durations on skipped tests count as zero. A step summary appends UTF-8 Markdown when
 `GITHUB_STEP_SUMMARY` is set. The existing PowerShell command retains its parameter names.
 
+`AssetPostprocessorContractTests` caches compiled method-signature expressions while retaining
+its complete source scan and eight case identities. On Windows x64 Unity 6000.6.7f1 Editor Mono,
+three alternating process pairs reduced median fixture duration from 7.81 to 5.82 seconds.
+Paired candidate/baseline ratios ranged from 0.589 to 0.903; all six processes passed eight cases,
+exited zero and reached both stream ends. These are fixture timings, not the whole EditMode suite
+or editor startup. The [source variants, NUnit results and receipts](../performance/editor-contract-regex.zip)
+make the scoped comparison reproducible.
+
 ### Typed Python scripts
+
+`npm run lint:tests` runs the typed Python test-lifecycle checker. The PowerShell lint and test
+commands remain compatibility entry points. Explicit `--paths` are literal files; absent,
+linked or unreadable inputs fail. Full scans require a nonempty `Tests` tree and exclude Unity's
+hidden consumer folders. Null-assertion repair validates the full input batch before writing,
+preserves encoding and line endings, and refuses writable hard links. Comments and string literals
+are neither repaired nor treated as test code. Calls left for manual repair retain inline suppressions.
+Editor-reference guards must exclude player builds even
+when another symbol is enabled; merely mentioning `UNITY_EDITOR` in an OR condition is insufficient.
+
+The regression corpus in `scripts/tests/fixtures/test-lifecycle-v1.json` records 144 actual
+invocations of the previous linter at `a86ec34b`, including diagnostics and repaired contents.
+The original PowerShell suite passed all 157 assertions before the port. The Python suite replays
+those captures and adds input, scanner, repair and compatibility-launcher controls:
+
+```bash
+uv run --project scripts/python~ --locked pytest scripts/tests/test_lifecycle_lint.py -q
+```
+
+At commit `87fc1cd1`, three alternating fresh-process pairs over the same 1,785 C# files retained identical
+75 path/line/code diagnostics. Median complete-command time fell from 26.05 to 9.25 seconds
+on this Linux host. This includes process launch and the full scan; it does not predict CI timing.
+The [timing captures and replay sources](../performance/lifecycle-checker-port.zip) retain the
+unchanged source inventory, all six observations and tool identities. The timing data applies to that version. Later fixes to assertion repair and category detection
+have separate correctness coverage.
 
 Documentation counts use `scripts/doc_counts.py` through locked uv. `npm run lint:doc-counts`
 checks without writing; `npm run sync:doc-counts` updates only the documented target files.

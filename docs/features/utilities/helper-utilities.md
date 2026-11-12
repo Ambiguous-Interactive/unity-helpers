@@ -19,6 +19,7 @@ Static helper classes and utilities that solve common programming problems witho
 - [Scene Helpers](#scene-helpers): Scene queries and loading
 - [Advanced Utilities](#advanced-utilities): `RestorableGlobal<T>`, `BitOps`, statistics, null checks, hashing, SHA-256, formatting
 - [Texture and Sprite Pixel Helpers](#texture-and-sprite-pixel-helpers): Rotation and sprite-region extraction
+- [Stopwatch Timestamps](#stopwatch-timestamps): Elapsed time and exact duration-to-counter conversions
 - [Environment Detection](#environment-detection): CI, batch mode, and runtime environment
 
 ---
@@ -1627,7 +1628,7 @@ pixels are unavailable, so an opaque color texture cannot hide transparency stor
 Read an exact `SpriteAlphaMask`, for example from the original PNG in the Editor, and use the
 mask overload for those sprites.
 
-The sprite overload scans effective alpha directly without creating a mask array.
+The sprite overload scans effective alpha directly without creating a mask array. Both overloads stop scanning a row after finding its two visible edges. Dense masks benefit most; transparent cached masks measured 6–9% slower. See the [row-scan measurements and replay](../../performance/sprite-bounds-row-scan.md).
 Read bounds when the sprite or its source changes. If you already hold a `SpriteAlphaMask`, use
 the mask overload to avoid reading the texture again. The mask overload checks dimensions and
 coordinates, borrows the pixel array, and allocates no result storage.
@@ -2311,3 +2312,40 @@ foreach (string varName in Helpers.CiEnvironmentVariables.All)
 - [Reflection Helpers](./reflection-helpers.md) - High-performance reflection utilities
 - [Singletons](./singletons.md) - RuntimeSingleton and ScriptableObjectSingleton
 - [Data Structures](./data-structures.md) - Cache, spatial trees, and other collections
+
+## Stopwatch Timestamps
+
+Added in the next release. Use `StopwatchTimestamp` from
+`WallstopStudios.UnityHelpers.Core.Helper` when you need elapsed time without creating a
+`Stopwatch` object. `Since` accepts a timestamp from `Stopwatch.GetTimestamp()` and returns a
+signed `TimeSpan`. `ToMilliseconds` and `ToNanoseconds` accept counter ticks, not `TimeSpan` ticks.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using System;
+using System.Diagnostics;
+using WallstopStudios.UnityHelpers.Core.Helper;
+
+public static class LoadTimer
+{
+    public static TimeSpan Measure(Action load)
+    {
+        long start = Stopwatch.GetTimestamp();
+        load?.Invoke();
+        return StopwatchTimestamp.Since(start);
+    }
+
+    public static long CounterTicksForFrameBudget()
+    {
+        return StopwatchTimestamp.TicksFrom(TimeSpan.FromMilliseconds(16));
+    }
+}
+```
+
+`TicksFrom` truncates fractional counter ticks toward zero and saturates at `long.MinValue` or
+`long.MaxValue` when a duration exceeds the counter's range. It keeps integer precision for large
+durations. `Since` uses wrapping counter subtraction, truncates to `TimeSpan` ticks and saturates
+at `TimeSpan` limits. A future start can produce a negative duration. Floating-point conversions
+return approximate values in the requested units; timestamps are meaningful only for the same
+counter and runtime.

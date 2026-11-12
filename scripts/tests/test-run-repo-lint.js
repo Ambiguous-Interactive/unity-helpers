@@ -487,6 +487,7 @@ runTest("no linter in scripts/ has been left unreachable", () => {
   const runElsewhere = new Map([
     ["scripts/lint-yaml.ps1", "yaml-controls"],
     ["scripts/lint-no-regions.ps1", "region-controls"],
+    ["scripts/lint-tests.ps1", "lifecycle-controls"],
     ["scripts/lint-dependabot.ps1", "dependabot-controls"],
     ["scripts/validate-lint-error-codes.ps1", "lint-code-controls"],
     ["scripts/lint-drawer-multiobject.ps1", "drawer-controls"],
@@ -558,6 +559,10 @@ runTest("no linter in scripts/ has been left unreachable", () => {
       (file) => registeredControlsInvoke(file, "scripts/tests/test_comment_block_form.py")
     ],
     ["csharp-controls", csharpControlsInvoke],
+    [
+      "lifecycle-controls",
+      (file) => registeredControlsInvoke(file, "scripts/tests/test_lifecycle_lint.py")
+    ],
     [
       "naming-controls",
       (file) => registeredControlsInvoke(file, "scripts/tests/test_unity_file_naming.py")
