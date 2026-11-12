@@ -592,12 +592,26 @@ uv pip install --python .venv/bin/python -r requirements-docs.lock
 | Dev container image                           | `.devcontainer/requirements-tools.txt`                | Pinned uv installs yamllint and pinned MCP tools; pip bootstraps uv | Tools run from the image, not during hooks                                                                                  |
 | Optional local hooks and Unity/result helpers | No Python packages installed by hooks                 | Existing interpreter or optional yamllint tool                      | Hooks call `yamllint` when available; helper scripts call `python3`                                                         |
 
-Release, metadata, binary-check, feedback, wiki, changelog, and XML-summary commands use the shared locked uv project.
+Release, metadata, binary-check, feedback, wiki, changelog, XML-summary, and README mirror commands use the shared locked uv project.
 The asset fixture generators use its `fixtures` group, and the bounded-random proof uses its `proof` group.
 Every Python source is in strict scope; PowerShell, Bash, JavaScript, and inline workflow implementations
 still need migration. The old
 `requirements-wiki.in` and `requirements-wiki.txt` remain compatibility inputs for existing
 standalone environments; current wiki CI uses the shared uv lock.
+
+`npm run sync:readme-mirror` generates [the documentation front page](../readme.md) from the root README with
+`readme_mirror.py`. `npm run lint:readme-mirror` checks it without writing. Both use
+locked Python; the historical Node commands remain compatibility launchers.
+Prettier still formats the generated Markdown. Cross-document fragments map from
+the target headings; source prose and fenced examples retain their content.
+Missing or empty sources, unsafe output links, and formatter errors fail the
+command. Successful writes replace the complete mirror atomically.
+The [port evidence](../performance/readme-mirror-port.zip) retains the original
+corpus, native Windows checks and paired startup captures. Startup remains slower
+than the original Node command; the port makes no startup performance claim.
+
+Six pure singleton policy tests avoid asset setup and refresh while integration
+cases retain their cleanup. See the [fixture measurements](../performance/singleton-policy-fixtures.md).
 
 Earlier installer comparisons measured the bootstrap costs. On Python 3.11, fresh environments with separate cold and
 warm caches gave documentation installs of 8.66/5.90 seconds with pip and 5.42/0.15 seconds

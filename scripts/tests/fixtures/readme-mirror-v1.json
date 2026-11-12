@@ -1,0 +1,157 @@
+{
+  "producer": "0245efa33be68b390422366a238a6b8c8a4d4716",
+  "documents": {
+    "docs/overview/index.md": "# Guide\n\n## Alpha & Beta\n## Café Tokyo\n",
+    "CHANGELOG.md": "# Changelog\n"
+  },
+  "cases": [
+    {
+      "source": "# Title\n",
+      "content": "<!-- Generated from ../README.md by scripts/sync-readme-mirror.js -- edit that file and run `npm run sync:readme-mirror`. -->\n\n# Title\n",
+      "problems": []
+    },
+    {
+      "source": "# Title\n\n[Self](#title)\n",
+      "content": "<!-- Generated from ../README.md by scripts/sync-readme-mirror.js -- edit that file and run `npm run sync:readme-mirror`. -->\n\n# Title\n\n[Self](#title)\n",
+      "problems": []
+    },
+    {
+      "source": "# Title\n\n[Missing](#missing)\n",
+      "content": "<!-- Generated from ../README.md by scripts/sync-readme-mirror.js -- edit that file and run `npm run sync:readme-mirror`. -->\n\n# Title\n\n[Missing](#missing)\n",
+      "problems": [
+        "README.md links to '#missing', which is not the GitHub slug of any heading in it"
+      ]
+    },
+    {
+      "source": "# Title\n\n## Alpha & Beta\n[Self](#alpha--beta)\n",
+      "content": "<!-- Generated from ../README.md by scripts/sync-readme-mirror.js -- edit that file and run `npm run sync:readme-mirror`. -->\n\n# Title\n\n## Alpha & Beta\n[Self](#alpha--beta)\n",
+      "problems": [
+        "README.md links to '#alpha--beta', but that heading publishes as '#alpha-beta'. Rename the heading to letters, digits and spaces so both renderers agree: the mirror can carry only one of the two, and markdownlint's MD051 checks it with GitHub's slugger"
+      ]
+    },
+    {
+      "source": "# Title\n\n[Guide](./docs/overview/index.md)\n",
+      "content": "<!-- Generated from ../README.md by scripts/sync-readme-mirror.js -- edit that file and run `npm run sync:readme-mirror`. -->\n\n# Title\n\n[Guide](./overview/index.md)\n",
+      "problems": []
+    },
+    {
+      "source": "# Title\n\n[Guide](docs/overview/index.md#alpha--beta)\n",
+      "content": "<!-- Generated from ../README.md by scripts/sync-readme-mirror.js -- edit that file and run `npm run sync:readme-mirror`. -->\n\n# Title\n\n[Guide](overview/index.md#alpha-beta)\n",
+      "problems": []
+    },
+    {
+      "source": "# Title\n\n[Guide](./docs/overview/index.md#café-tokyo)\n",
+      "content": "<!-- Generated from ../README.md by scripts/sync-readme-mirror.js -- edit that file and run `npm run sync:readme-mirror`. -->\n\n# Title\n\n[Guide](./overview/index.md#cafe-tokyo)\n",
+      "problems": []
+    },
+    {
+      "source": "# Title\n\n[Log](./CHANGELOG.md#notes)\n",
+      "content": "<!-- Generated from ../README.md by scripts/sync-readme-mirror.js -- edit that file and run `npm run sync:readme-mirror`. -->\n\n# Title\n\n[Log](https://github.com/wallstop/unity-helpers/blob/main/CHANGELOG.md#notes)\n",
+      "problems": []
+    },
+    {
+      "source": "# Title\n\n[Missing](./not-a-real-file.md)\n",
+      "content": "<!-- Generated from ../README.md by scripts/sync-readme-mirror.js -- edit that file and run `npm run sync:readme-mirror`. -->\n\n# Title\n\n[Missing](./not-a-real-file.md)\n",
+      "problems": [
+        "README.md links to './not-a-real-file.md', which does not exist in the repository"
+      ]
+    },
+    {
+      "source": "# Title\n\n[Web](https://example.com/a#b) [Mail](mailto:a@example.com)\n",
+      "content": "<!-- Generated from ../README.md by scripts/sync-readme-mirror.js -- edit that file and run `npm run sync:readme-mirror`. -->\n\n# Title\n\n[Web](https://example.com/a#b) [Mail](mailto:a@example.com)\n",
+      "problems": []
+    },
+    {
+      "source": "# Title\n\n<img src=\"./docs/images/banner.svg\"> <a href=\"./CHANGELOG.md\">Log</a>\n",
+      "content": "<!-- Generated from ../README.md by scripts/sync-readme-mirror.js -- edit that file and run `npm run sync:readme-mirror`. -->\n\n# Title\n\n<img src=\"./images/banner.svg\"> <a href=\"https://github.com/wallstop/unity-helpers/blob/main/CHANGELOG.md\">Log</a>\n",
+      "problems": []
+    },
+    {
+      "source": "# Title\n\n```md\n[x](./docs/overview/index.md)\n# Hidden\n```\n",
+      "content": "<!-- Generated from ../README.md by scripts/sync-readme-mirror.js -- edit that file and run `npm run sync:readme-mirror`. -->\n\n# Title\n\n```md\n[x](./docs/overview/index.md)\n# Hidden\n```\n",
+      "problems": []
+    },
+    {
+      "source": "# Title\n\n~~~md\n[x](./docs/overview/index.md)\n~~~\n",
+      "content": "<!-- Generated from ../README.md by scripts/sync-readme-mirror.js -- edit that file and run `npm run sync:readme-mirror`. -->\n\n# Title\n\n~~~md\n[x](./docs/overview/index.md)\n~~~\n",
+      "problems": []
+    },
+    {
+      "source": "# Title\n\n[Guide](./docs/overview/index.md#missing)\n",
+      "content": "<!-- Generated from ../README.md by scripts/sync-readme-mirror.js -- edit that file and run `npm run sync:readme-mirror`. -->\n\n# Title\n\n[Guide](./overview/index.md#missing)\n",
+      "problems": []
+    },
+    {
+      "source": "# Title\n\n[Root](/docs/overview/index.md) [Host](//example.com)\n",
+      "content": "<!-- Generated from ../README.md by scripts/sync-readme-mirror.js -- edit that file and run `npm run sync:readme-mirror`. -->\n\n# Title\n\n[Root](/docs/overview/index.md) [Host](//example.com)\n",
+      "problems": []
+    },
+    {
+      "source": "# Title\n\n[Data](data:text/plain,a)\n",
+      "content": "<!-- Generated from ../README.md by scripts/sync-readme-mirror.js -- edit that file and run `npm run sync:readme-mirror`. -->\n\n# Title\n\n[Data](data:text/plain,a)\n",
+      "problems": []
+    }
+  ],
+  "slugs": [
+    {
+      "heading": "⚡ Top Time-Savers",
+      "github": "-top-time-savers",
+      "mkdocs": "top-time-savers"
+    },
+    {
+      "heading": "1. 🎨 Inspector Tooling",
+      "github": "1--inspector-tooling",
+      "mkdocs": "1-inspector-tooling"
+    },
+    {
+      "heading": "Benchmarking & Verification",
+      "github": "benchmarking--verification",
+      "mkdocs": "benchmarking-verification"
+    },
+    {
+      "heading": "⚠️ IL2CPP Code Stripping Considerations",
+      "github": "-il2cpp-code-stripping-considerations",
+      "mkdocs": "il2cpp-code-stripping-considerations"
+    },
+    {
+      "heading": "Core Features",
+      "github": "core-features",
+      "mkdocs": "core-features"
+    },
+    {
+      "heading": "IL2CPP/WebGL notes",
+      "github": "il2cppwebgl-notes",
+      "mkdocs": "il2cppwebgl-notes"
+    },
+    {
+      "heading": "Random Number Generators",
+      "github": "random-number-generators",
+      "mkdocs": "random-number-generators"
+    },
+    {
+      "heading": "Café Tokyo",
+      "github": "café-tokyo",
+      "mkdocs": "cafe-tokyo"
+    },
+    {
+      "heading": "中文",
+      "github": "中文",
+      "mkdocs": ""
+    },
+    {
+      "heading": "A_B",
+      "github": "a_b",
+      "mkdocs": "a_b"
+    },
+    {
+      "heading": "A - B",
+      "github": "a---b",
+      "mkdocs": "a-b"
+    },
+    {
+      "heading": "a\tb",
+      "github": "ab",
+      "mkdocs": "a-b"
+    }
+  ]
+}
