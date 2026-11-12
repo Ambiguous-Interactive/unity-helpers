@@ -110,6 +110,12 @@ The frozen `scripts/tests/fixtures/doc-links-v1.json` replays 41 actual invocati
 checker after its complete 51-assertion suite passed. Additional Python controls cover source
 masking, shell heredocs, JavaScript regex literals, lexical case, missing indexed files, links
 outside the repository, and actual compatibility launches from another working directory.
+Markdown targets resolve from their document directory; source references retain repository-root
+fallback. Reference definitions keep target validation without prose-only style errors. Fences
+track their marker and length. Python docstrings are identified by syntax, while assigned and
+returned multiline strings remain visible. Source references do not truncate longer extensions
+such as `.mdx` to `.md`.
+
 The checker retains the earlier inline-link grammar limitation for parentheses inside targets.
 The [replay capture](../performance/doc-link-checker-port.zip) retains the original corpus, source
 identities, native Windows results and six suite timing observations. The expanded 90-case suite

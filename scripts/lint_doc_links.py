@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import os
 import re
 import shutil
@@ -17,7 +18,9 @@ from csharp_sources import source_tokens
 
 SCHEME = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.\-]*:")
 MARKDOWN_PATH = re.compile(r"[A-Za-z0-9._/\-]+\.md(?:#[A-Za-z0-9_\-]+)?(?![A-Za-z0-9_-])")
-CODE_PATH = re.compile(r"docs[\\/][A-Za-z0-9._/\\-]+\.md(?:#[A-Za-z0-9_\-]+)?", re.I)
+CODE_PATH = re.compile(
+    r"docs[\\/][A-Za-z0-9._/\\-]+\.md(?:#[A-Za-z0-9_\-]+)?(?![A-Za-z0-9_-])", re.I
+)
 CODE_SPAN = re.compile(r"(?:``(.+?)``|`([^`\n]+)`)")
 INLINE_PATH = re.compile(
     r"(^|[^A-Za-z0-9_.-])(?P<path>[A-Za-z0-9._/\\-]+\.md(?:#[A-Za-z0-9_\-]+)?)(?![A-Za-z0-9_-])",
@@ -26,7 +29,7 @@ INLINE_PATH = re.compile(
 LINK = re.compile(r"(?P<image>!?)\[(?P<label>[^\]]*)\]\((?P<target>[^)]+)\)")
 REFERENCE = re.compile(r"!\[[^\]]*\]\[(?P<label>[^\]]+)\]")
 DEFINITION = re.compile(r"^\s*\[(?P<label>[^\]]+)\]:\s*(?P<rest>.+)$")
-FENCE = re.compile(r"^\s*(?:```|~~~)")
+FENCE = re.compile(r"^ {0,3}(?P<marker>`{3,}|~{3,})(?P<info>.*)$")
 CODE_EXTENSIONS = frozenset(
     [
         ".cs",
@@ -106,8 +109,8 @@ class Repository:
     root: Path
     files: list[str]
     entries: set[str] = field(init=False)
-    targets: dict[tuple[str, str], bool] = field(
-        default_factory=lambda: dict[tuple[str, str], bool]()
+    targets: dict[tuple[str, str, bool], bool] = field(
+        default_factory=lambda: dict[tuple[str, str, bool], bool]()
     )
 
     def __post_init__(self) -> None:
@@ -127,8 +130,8 @@ class Repository:
             return False
         return relative in self.entries and normalized.exists()
 
-    def resolve(self, source: str, target: str) -> bool:
-        key = (source, target)
+    def resolve(self, source: str, target: str, *, root_fallback: bool = True) -> bool:
+        key = (source, target, root_fallback)
         if key in self.targets:
             return self.targets[key]
         normalized = target.strip().replace("\\", "/")
@@ -139,7 +142,11 @@ class Repository:
         found = False
         if decoded.strip() and "\0" not in decoded:
             found = self.exists(self.root / Path(source).parent / decoded)
-            if not found and not decoded.startswith("."):
+            if (
+                not found
+                and (root_fallback or decoded.startswith("/"))
+                and not decoded.startswith(".")
+            ):
                 found = self.exists(self.root / decoded.lstrip("/"))
         self.targets[key] = found
         return found
@@ -169,6 +176,46 @@ def inventory(root: Path) -> list[str]:
     return names
 
 
+def python_docstring_ranges(text: str) -> list[tuple[int, int]]:
+    try:
+        tree = ast.parse(text)
+    except (SyntaxError, ValueError, RecursionError):
+        return []
+    lines = text.split("\n")
+    starts = [0]
+    for line in lines[:-1]:
+        starts.append(starts[-1] + len(line) + 1)
+
+    def offset(line: int, byte_column: int) -> int:
+        prefix = lines[line - 1].encode("utf-8")[:byte_column].decode("utf-8")
+        return starts[line - 1] + len(prefix)
+
+    ranges: list[tuple[int, int]] = []
+    for node in ast.walk(tree):
+        if (
+            not isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
+            or not node.body
+        ):
+            continue
+        first = node.body[0]
+        if (
+            not isinstance(first, ast.Expr)
+            or not isinstance(first.value, ast.Constant)
+            or not isinstance(first.value.value, str)
+        ):
+            continue
+        literal = first.value
+        if literal.end_lineno is None or literal.end_col_offset is None:
+            continue
+        ranges.append(
+            (
+                offset(literal.lineno, literal.col_offset),
+                offset(literal.end_lineno, literal.end_col_offset),
+            )
+        )
+    return ranges
+
+
 def mask_comments(text: str, suffix: str) -> str:
     """Preserve executable string references while masking language comments and Python docstrings."""
     masked = list(text)
@@ -196,6 +243,9 @@ def mask_comments(text: str, suffix: str) -> str:
     powershell = suffix in {".ps1", ".psm1", ".psd1"}
     javascript = suffix in {".js", ".jsx", ".ts", ".tsx"}
     python = suffix == ".py"
+    if python:
+        for start, end in python_docstring_ranges(text):
+            mask(start, end)
     shell = suffix == ".sh"
     boundary_hash = shell or suffix in {".yaml", ".yml"}
     regex_allowed = True
@@ -276,7 +326,6 @@ def mask_comments(text: str, suffix: str) -> str:
                     index += 3
                     break
                 index += 2 if text[index] == "\\" else 1
-            mask(start, min(index, len(text)))
         elif text[index] in ("'", '"', "`"):
             quote = text[index]
             index += 1
@@ -308,13 +357,26 @@ def mask_comments(text: str, suffix: str) -> str:
 
 
 def visible_lines(text: str) -> list[tuple[int, str]]:
-    in_fence = False
+    fence_character = ""
+    fence_length = 0
     result: list[tuple[int, str]] = []
     for number, line in enumerate(text.splitlines(), 1):
-        if FENCE.match(line):
-            in_fence = not in_fence
-        elif not in_fence:
-            result.append((number, line))
+        fence = FENCE.match(line)
+        if fence_character:
+            if (
+                fence
+                and fence["marker"][0] == fence_character
+                and len(fence["marker"]) >= fence_length
+                and not fence["info"].strip()
+            ):
+                fence_character = ""
+                fence_length = 0
+            continue
+        if fence and (fence["marker"][0] == "~" or "`" not in fence["info"]):
+            fence_character = fence["marker"][0]
+            fence_length = len(fence["marker"])
+            continue
+        result.append((number, line))
     return result
 
 
@@ -327,7 +389,7 @@ def markdown_findings(repository: Repository, path: str, text: str, mode: str) -
         findings.append(Finding(path, number, message, line))
 
     def check_target(target: str, number: int, kind: str, line: str = "") -> None:
-        if is_local(target) and not repository.resolve(path, target):
+        if is_local(target) and not repository.resolve(path, target, root_fallback=False):
             if kind == "Image":
                 report(number, f"Image target '{target}' does not resolve to a file", line)
                 return
@@ -368,7 +430,7 @@ def markdown_findings(repository: Repository, path: str, text: str, mode: str) -
             stripped = LINK.sub("", line)
             stripped = re.sub(r"<[^>]+>", "", stripped)
             stripped = CODE_SPAN.sub("", stripped)
-            if MARKDOWN_PATH.search(stripped):
+            if not DEFINITION.match(line) and MARKDOWN_PATH.search(stripped):
                 report(
                     number,
                     "Bare .md mention; convert to [Readable Text](file.md)",
@@ -408,7 +470,9 @@ def markdown_findings(repository: Repository, path: str, text: str, mode: str) -
                 definition_target = definitions.get(match["label"].strip().casefold())
                 if definition_target:
                     target, _ = definition_target
-                    if is_local(target) and not repository.resolve(path, target):
+                    if is_local(target) and not repository.resolve(
+                        path, target, root_fallback=False
+                    ):
                         report(
                             number,
                             f"Image reference '{match['label']}' points to '{target}' which does not resolve",

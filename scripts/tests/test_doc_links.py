@@ -332,3 +332,76 @@ def test_cli_preserves_newlines_and_spaces_in_git_names(tmp_path: Path, name: st
     assert result.returncode == 1
     assert escape_command_data(name) in result.stdout
     assert "missing.md" in result.stdout
+
+
+@pytest.mark.parametrize("extension", ["mdx", "md_backup", "md5"])
+def test_review_source_extensions_are_not_truncated(tmp_path: Path, extension: str) -> None:
+    repository = populate(tmp_path, {"program.py": f'path = "docs/guide.{extension}"\n'})
+    assert not scan(repository, ["program.py"]).findings
+
+
+def test_review_markdown_cannot_borrow_a_root_relative_target(tmp_path: Path) -> None:
+    repository = populate(tmp_path, {"docs/page.md": "", "LICENSE": "", "program.py": ""})
+    assert repository.resolve("docs/page.md", "LICENSE")
+    findings = markdown_findings(repository, "docs/page.md", "[license](LICENSE)", "Targets")
+    assert len(findings) == 1
+    assert repository.resolve("program.py", "LICENSE")
+
+
+@pytest.mark.parametrize("mode", ["All", "Format", "Targets"])
+def test_review_reference_definitions_keep_validation_without_bare_prose_errors(
+    tmp_path: Path, mode: str
+) -> None:
+    repository = populate(tmp_path, {"README.md": "", "docs/guide.md": ""})
+    source = "[Guide][guide]\n[guide]: ./docs/guide.md\n"
+    assert not markdown_findings(repository, "README.md", source, mode)
+    if mode != "Format":
+        missing = markdown_findings(
+            repository, "README.md", source.replace("guide.md", "gone.md"), mode
+        )
+        assert len(missing) == 1
+    if mode != "Targets":
+        prose = markdown_findings(repository, "README.md", source + "See docs/guide.md\n", mode)
+        assert len(prose) == 1
+        assert prose[0].line == 3
+
+
+@pytest.mark.parametrize(
+    ("opening", "inside", "closing"),
+    [
+        ("````", "```", "````"),
+        ("~~~", "```", "~~~~"),
+        ("````", "~~~", "`````"),
+        ("~~~", "~~~not-closing", "~~~"),
+    ],
+)
+def test_review_fences_preserve_marker_and_minimum_length(
+    tmp_path: Path, opening: str, inside: str, closing: str
+) -> None:
+    repository = populate(tmp_path, {"README.md": ""})
+    source = f"{opening}\n{inside}\n[example](./missing.md)\n{closing}\n[real](./also-missing.md)\n"
+    findings = markdown_findings(repository, "README.md", source, "Targets")
+    assert len(findings) == 1
+    assert findings[0].line == 5
+
+
+@pytest.mark.parametrize(
+    "source", ['path = """docs/missing.md"""\n', 'def value():\n    return """docs/missing.md"""\n']
+)
+def test_review_executable_triple_strings_remain_visible(tmp_path: Path, source: str) -> None:
+    repository = populate(tmp_path, {"program.py": source})
+    assert len(scan(repository, ["program.py"]).findings) == 1
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        '"""docs/documentation.md"""\npath = """docs/live.md"""\n',
+        'class É:\n    "docs/documentation.md"\n    path = """docs/live.md"""\n',
+        'async def value():\n    """docs/documentation.md"""\n    return """docs/live.md"""\n',
+    ],
+)
+def test_review_docstrings_are_masked_by_syntactic_position(source: str) -> None:
+    masked = mask_comments(source, ".py")
+    assert "docs/documentation.md" not in masked
+    assert "docs/live.md" in masked
