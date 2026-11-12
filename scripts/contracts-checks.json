@@ -625,5 +625,11 @@
     "id": "unity-timeout",
     "name": "GNU timeout selection and early refusal",
     "run": "npm run test:unity-timeout"
+  },
+  {
+    "id": "doc-link-test-launcher",
+    "name": "Documentation link test compatibility launcher",
+    "run": "npm run test:doc-links-launcher",
+    "completionPattern": "^1 passed(?:, [0-9]+ deselected)? in "
   }
 ]

@@ -1541,7 +1541,7 @@ function Run-DocumentationWorkflowContractTests {
       Where-Object {
         $candidateText = Get-WorkflowContentWithoutComments -Path $_.FullName
         # Anchored so `test-lint-doc-links.ps1` does not read as an invocation of the linter itself.
-        ($candidateText -match '(?<![\w-])lint-doc-links\.ps1') -or
+        ($candidateText -match '(?<![\w-])(?:lint-doc-links\.ps1|lint_doc_links\.py)') -or
         $candidateText.Contains('run-repo-lint.js') -or
         $candidateText -match '(?m)^\s*(?:run:\s*)?uv run --project scripts/python~ --locked --no-dev python scripts/check_registries\.py lint(?: --direct)?\s*$'
       }
@@ -1574,12 +1574,12 @@ function Run-DocumentationWorkflowContractTests {
   # The lookbehind is load-bearing: `test-lint-doc-links.ps1` CONTAINS `lint-doc-links.ps1`, so an
   # unanchored match let the linter's own self-test stand in for the linter. Deleting the real check
   # from the registry then left this passing.
-  $linterCall = '(?<![\w-])lint-doc-links\.ps1'
+  $linterCall = '(?<![\w-])(?:lint-doc-links\.ps1|lint_doc_links\.py)'
   $coversBothModes = (
-    $docLinkSources -match "$linterCall(?![^\r\n]*-Mode\s+(?:Targets|Format))" -or
+    $docLinkSources -match "$linterCall(?![^\r\n]*--?Mode\s+(?:Targets|Format))" -or
     (
-      $docLinkSources -match "$linterCall[^\r\n]*-Mode\s+Targets" -and
-      $docLinkSources -match "$linterCall[^\r\n]*-Mode\s+Format"
+      $docLinkSources -match "$linterCall[^\r\n]*--?Mode\s+Targets" -and
+      $docLinkSources -match "$linterCall[^\r\n]*--?Mode\s+Format"
     )
   )
   $usesCanonicalDocLinkLinter = ($docLinkWorkflows.Count -gt 0 -and $coversBothModes)
@@ -1596,7 +1596,10 @@ function Run-DocumentationWorkflowContractTests {
   # The checks must not be filtered away from their own sources. An unfiltered workflow runs on
   # every change, which covers those sources by definition and is the stronger guarantee.
   [string[]]$requiredDocLinkSources = @(
-    'scripts/comment-stripping.ps1',
+    'scripts/csharp_sources.py',
+    'scripts/cli_encoding.py',
+    'scripts/lint_doc_links.py',
+    'scripts/tests/test_doc_links.py',
     'scripts/lint-doc-links.ps1',
     'scripts/run-doc-link-lint.js',
     'scripts/tests/test-lint-doc-links.ps1'
@@ -1648,7 +1651,7 @@ function Run-DocumentationWorkflowContractTests {
   Write-TestResult `
     -TestName 'doc link checks cover both Targets and Format modes' `
     -Passed $usesCanonicalDocLinkLinter `
-    -Message 'Expected the canonical linter to run with distinct -Mode Targets and -Mode Format.'
+    -Message 'Expected the canonical linter to cover both Targets and Format, including its default All mode.'
 
   Write-TestResult `
     -TestName 'doc link check jobs bound their runtime' `
