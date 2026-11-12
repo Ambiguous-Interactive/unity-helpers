@@ -1815,3 +1815,115 @@ await myValueTask.WithContinuation(() => Debug.Log("Done!"));
 - Serialization formats: [Serialization Guide](../serialization/serialization.md)
 - Effects system: [Effects System](../effects/effects-system.md)
 - Relational Components: [Relational Components](../relational-components/relational-components.md)
+
+## Stable score distributions and sorted statistics
+
+Use `WallMath.LogSumExp(ReadOnlySpan<double>)` when scores would overflow if you
+exponentiated them directly. `SoftmaxInPlace(Span<double>, temperature)` turns scores
+into probabilities in the supplied storage. It subtracts the largest score before
+exponentiation and also handles differences that overflow before temperature scaling.
+`Sigmoid` and `Softplus` preserve the small negative tail without overflowing on
+large positive inputs.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using System;
+using WallstopStudios.UnityHelpers.Core.Helper;
+
+Span<double> scores = stackalloc double[] { 1000d, 1001d, 1002d };
+double combined = WallMath.LogSumExp(scores);
+bool normalized = WallMath.SoftmaxInPlace(scores, temperature: 0.5d);
+```
+
+Softmax requires a positive finite temperature and at least one score. NaN or a
+list containing only negative infinities returns false without changing the input.
+Positive infinities divide all probability equally between them. Log-sum-exp
+returns negative infinity for empty input and propagates NaN. These operations
+allocate no managed storage.
+
+`random.TryNextSoftmaxIndex(logits, scratch, out index, temperature)` uses the same
+normalization and one random draw. Scratch must hold every logit; its unused tail
+is preserved. Scratch may overlap the logits. Invalid inputs consume no draw and
+return false with index zero; the used scratch prefix may already contain the
+copied logits. The original logits remain unchanged when storage is disjoint.
+
+| Method on `WallMath`               | Input and result                                                           |
+| ---------------------------------- | -------------------------------------------------------------------------- |
+| `PercentileOfSorted(sorted, p)`    | Ascending doubles; linear interpolation at `p * (count - 1)`               |
+| `PercentileNearestRank(sorted, p)` | Ascending doubles; rank `ceil(p * count)`, with zero selecting the minimum |
+| `TryMedian(sorted, out median)`    | Ascending doubles; interpolated midpoint, with false and NaN on failure    |
+| `AverageRanks(values, ranks)`      | One-based ranks in original order; ties receive their average rank         |
+| `Spearman(x, y)`                   | Pearson correlation of the tie-averaged ranks                              |
+| `KendallTauB(x, y)`                | Concordant minus discordant pairs, normalized with ties in each input      |
+
+The sorted operations validate ascending order and NaN in O(n), then read the
+requested rank without copying, sorting or allocating. Empty, unsorted or
+NaN-containing inputs and percentiles outside [0, 1] produce NaN. Infinite bounds
+use the existing percentile policy: equal infinities remain equal, one infinity
+determines an interior value, and opposite infinities produce NaN. Finite extremes
+interpolate without overflowing their difference.
+
+Rank operations accept infinities as ordered values and reject NaN. Average ranks
+returns false without writes for a short destination or NaN input; an empty input
+succeeds. Its destination may overlap its input and any unused tail is preserved.
+Correlations return NaN for mismatched lengths, fewer than two pairs, or a constant
+input. They preserve both inputs, use pooled scratch arrays and run in O(n log n).
+Pools may allocate when first used or when capacity grows.
+
+## CSS cubic Bézier motion
+
+`CubicBezier` in `WallstopStudios.UnityHelpers.Core.Math` stores the two control
+points of a CSS easing from (0, 0) to (1, 1). Both input coordinates must be finite
+and lie in [0, 1]; output coordinates may overshoot but must be finite.
+`IsValid` reports that contract, including for deserialized values.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using UnityEngine;
+using WallstopStudios.UnityHelpers.Core.Math;
+
+CubicBezier ease = new(0.25f, 0.1f, 0.25f, 1f);
+double progress = ease.Evaluate(0.5d);
+AnimationCurve curve = ease.ToAnimationCurve(keyCount: 2);
+```
+
+`Evaluate` solves the input coordinate with bracketed Newton steps and a bisection
+fallback, then evaluates the output coordinate. It allocates no managed storage.
+Finite inputs outside [0, 1] follow the endpoint-line rules in the
+[CSS easing specification](https://drafts.csswg.org/css-easing/#cubic-bezier-easing-functions).
+Invalid controls or nonfinite input return NaN. The default value describes a
+linear easing on [0, 1].
+
+`ToAnimationCurve` subdivides the same cubic at uniform parameter intervals and
+preserves each segment through weighted tangents. It accepts 2 through
+`CubicBezier.MaximumKeyCount` (4096) keys. Two keys are sufficient for a
+representable cubic; extra keys do not select another easing. Conversion allocates
+key storage and a curve, and the curve clamps outside [0, 1].
+
+Unity keys cannot represent a nonzero vertical handle with a finite tangent.
+Conversion returns null for such handles, nonfinite float tangents or collapsed
+float key times. `TryToAnimationCurve(keyCount, out curve)` reports the same refusal
+as false and null. A valid easing can therefore evaluate successfully while its
+curve conversion is refused. No approximation is silently substituted.
+
+## Sorted bounds and reproducible paired shuffles
+
+`LowerBound(value, comparer)` and `UpperBound(value, comparer)` accept mutable or
+read-only spans and a struct implementing `IComparer<T>`. The span must already be
+sorted by that comparer. Lower bound selects the first value that is not less than
+the search value; upper bound selects the first strictly greater value. Both
+return the span length when no such element exists, and zero for an empty span.
+They run in O(log n), do not write the input and do not box the comparer.
+
+The existing `Shuffle` uses ascending `Next(i, count)` draws.
+`ShuffleDescending` uses descending `Next(i + 1)` draws, from the last index to one.
+Both draw exactly `count - 1` times for nontrivial spans. This choice matters for
+retained seeds: changing direction changes the generated sequence.
+
+`first.Shuffle(second, random)` applies one ascending permutation to two aligned
+spans. It returns false before writes or draws when lengths differ. Both spans must have disjoint storage, including when their element types match;
+overlapping views are unsupported.
+Empty and single-element spans consume no draws. A null generator uses
+`PRNG.Instance`. The operations allocate no managed storage after generator setup.

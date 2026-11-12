@@ -16,7 +16,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     /// Includes IEEE-754-aware helpers (BoundedFloat/BoundedDouble) that adjust bit patterns to maintain strict inequalities.
     /// Useful for RNG upper bounds, indices, and cyclical arithmetic.
     /// </remarks>
-    public static class WallMath
+    public static partial class WallMath
     {
         /// <summary>Reports whether both vector components are finite.</summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1679,6 +1679,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             double lhs = sorted[lower].ToDouble(null);
             double rhs = sorted[upper].ToDouble(null);
+            return InterpolateOrdered(lhs, rhs, fraction);
+        }
+
+        private static double InterpolateOrdered(double lhs, double rhs, double fraction)
+        {
             if (lhs == rhs)
             {
                 return lhs;
