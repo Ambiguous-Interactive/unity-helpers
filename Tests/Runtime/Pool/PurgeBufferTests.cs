@@ -262,29 +262,42 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             List<object> workerBuffer = null;
             List<object> workerReused = null;
             Exception workerFailure = null;
+            int workerStage = 0;
             Thread worker = new(() =>
             {
                 try
                 {
+                    Volatile.Write(ref workerStage, 1);
                     workerBuffer = PurgeBuffer<object>.Rent();
+                    Volatile.Write(ref workerStage, 2);
                     workerBuffer.Add(new object());
+                    Volatile.Write(ref workerStage, 3);
                     PurgeBuffer<object>.Return(workerBuffer);
+                    Volatile.Write(ref workerStage, 4);
                     workerReused = PurgeBuffer<object>.Rent();
+                    Volatile.Write(ref workerStage, 5);
                     PurgeBuffer<object>.Return(workerReused);
+                    Volatile.Write(ref workerStage, 6);
                 }
                 catch (Exception exception)
                 {
                     workerFailure = exception;
+                }
+                finally
+                {
+                    Volatile.Write(ref workerStage, 7);
                 }
             })
             {
                 IsBackground = true,
             };
             worker.Start();
-            Assert.IsTrue(
-                worker.Join(TimeSpan.FromSeconds(5)),
-                "Worker must finish its pure managed operations."
+            bool joined = worker.Join(TimeSpan.FromSeconds(5));
+            TestContext.WriteLine(
+                $"Worker joined={joined}; stage={Volatile.Read(ref workerStage)}; "
+                    + $"state={worker.ThreadState}; failure={workerFailure}"
             );
+            Assert.IsTrue(joined, "Worker must finish its pure managed operations.");
             Assert.IsTrue(workerFailure == null);
             Assert.AreNotSame(mainBuffer, workerBuffer);
             Assert.AreSame(workerBuffer, workerReused);

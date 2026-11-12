@@ -18,7 +18,7 @@ on:
   workflow_dispatch:
     inputs:
       unity-version:
-        description: "Pin a single Unity version. Empty = full matrix."
+        description: "Validate a Unity version; licensed jobs still run the full static matrix."
         required: false
         default: ""
         type: string

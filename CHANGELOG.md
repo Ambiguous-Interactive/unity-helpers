@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add stable score distributions, sorted-span percentiles, tie-averaged ranks and rank correlations ([#1177](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1177)).
+- Add CSS cubic Bézier evaluation and weighted animation-curve conversion ([#1186](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1186)).
+- Add span insertion bounds with struct comparers, paired shuffles and descending seeded shuffles ([#1178](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1178)).
 - Add `ThreadAmbient<T>` for per-thread context with nested scopes and safe repeated disposal ([#1175](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1175)).
 - Add stable little-endian integer hash steps, raw UTF-16 text hashing, and explicitly weak whole-word FNV folding ([#1174](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1174)).
 - Add `HoldSet` for independent input or pause holds, disposable handles, occupancy callbacks, and destroyed-owner cleanup ([#1183](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1183)).
@@ -36,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Read only the selected rectangle when querying readable RGBA32 sprite masks, art bounds and ink regions ([#1113](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1113)).
 - Compute integer floor logarithms with portable branchless lookups, preserving zero and signed bit-pattern results ([#1170](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1170)).
 - Update bundled JSON and immutable collections to 10.0.15 while retaining Unity assembly constraints ([#1052](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1052)).
 - Reduce repeated pixel reads in sprite ink-region queries, reduce allocations, and speed up dense drawn sprite bounds ([#1113](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1113)).

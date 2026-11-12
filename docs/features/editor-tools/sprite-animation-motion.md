@@ -97,3 +97,12 @@ Use the actual keyframe time and actual clip length, not an assumed frame rate;
 clips can have uneven timing.
 
 Related: [Animation tools](./editor-tools-guide.md#animation-tools).
+
+### Reading small sprite regions
+
+`SpriteMaskReader`, the sprite-art bounds queries and ink-region queries read only
+the selected base-mip rectangle into managed pixel storage for readable RGBA32
+subregions. They preserve colours, alpha policy and local coordinates. Full-image
+queries and other readable formats keep their existing conversion path. This does
+not add packed-player or unreadable-texture support. See the
+[measured sizes and platform limits](../../performance/sprite-region-read.md).

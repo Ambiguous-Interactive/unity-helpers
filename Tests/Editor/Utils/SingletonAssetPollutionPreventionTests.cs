@@ -8,8 +8,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     using System.Collections;
     using System.Collections.Generic;
     using System.IO;
-    using System.Linq;
-    using System.Reflection;
     using NUnit.Framework;
     using UnityEditor;
     using UnityEngine;
@@ -23,7 +21,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     using WallstopStudios.UnityHelpers.Editor.Utils;
     using WallstopStudios.UnityHelpers.Tests.AssetProcessors;
     using WallstopStudios.UnityHelpers.Tests.Core;
-    using WallstopStudios.UnityHelpers.Tests.Core.TestTypes;
     using Object = UnityEngine.Object;
 
     [TestFixture]
@@ -32,36 +29,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     public sealed class SingletonAssetPollutionPreventionTests : CommonTestBase
     {
         private const string ResourcesRoot = "Assets/Resources";
-
-        private static Type[] AllTestSingletonTypes =>
-            new List<Type>(AllTestSingletonTypesWithExclusion)
-                .Concat(TestSingletonTypesWithoutExclusion)
-                .ToArray();
-
-        private static readonly Type[] AllTestSingletonTypesWithExclusion = new[]
-        {
-            typeof(TestSingleton),
-            typeof(EmptyPathSingleton),
-            typeof(CustomPathSingleton),
-            typeof(MultipleInstancesSingleton),
-            typeof(ResourceBackedSingleton),
-            typeof(DeepPathResourceSingleton),
-            typeof(WrongPathFallbackSingleton),
-            typeof(MultiAssetScriptableSingleton),
-            typeof(LifecycleScriptableSingleton),
-            typeof(MissingResourceSingleton),
-            typeof(AutoScriptableSingleton),
-            typeof(ScriptableMismatchSingleton),
-            typeof(SingleLevelPathSingleton),
-        };
-
-        private static readonly Type[] TestSingletonTypesWithoutExclusion = new[]
-        {
-            typeof(CreatorPathSingleton),
-            typeof(NestedDiskSingleton),
-            typeof(CaseMismatch),
-            typeof(Duplicate),
-        };
 
         private EditorAssetFileScope _productionAssets;
         private bool _previousIncludeTestAssemblies;
@@ -247,113 +214,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             }
         }
 
-        [Test]
-        public void AllTestSingletonTypesWithExclusionHaveTheAttribute()
-        {
-            List<string> missingAttribute = new();
-            foreach (Type type in AllTestSingletonTypesWithExclusion)
-            {
-                if (
-                    !ReflectionHelpers.TryGetAttributeSafe<ExcludeFromSingletonCreationAttribute>(
-                        type,
-                        out _,
-                        inherit: false
-                    )
-                )
-                {
-                    missingAttribute.Add(type.FullName);
-                }
-            }
-
-            Assert.IsEmpty(
-                missingAttribute,
-                $"The following test singleton types are missing [ExcludeFromSingletonCreation] attribute:\n{string.Join("\n", missingAttribute)}"
-            );
-        }
-
-        [Test]
-        public void CreatorTestTypesDoNotHaveExclusionAttribute()
-        {
-            List<string> hasAttribute = new();
-            foreach (Type type in TestSingletonTypesWithoutExclusion)
-            {
-                if (
-                    ReflectionHelpers.TryGetAttributeSafe<ExcludeFromSingletonCreationAttribute>(
-                        type,
-                        out _,
-                        inherit: false
-                    )
-                )
-                {
-                    hasAttribute.Add(type.FullName);
-                }
-            }
-
-            Assert.IsEmpty(
-                hasAttribute,
-                $"The following creator test types should NOT have [ExcludeFromSingletonCreation] attribute as they are used to test creation logic:\n{string.Join("\n", hasAttribute)}"
-            );
-        }
-
-        [Test]
-        public void DuplicatePollutionFoldersAreNotProtected()
-        {
-            string[] duplicatePaths = new[]
-            {
-                "Assets/Resources/Wallstop Studios/Unity Helpers 1",
-                "Assets/Resources/Wallstop Studios/Unity Helpers 2",
-                "Assets/Resources/Wallstop Studios/Unity Helpers 10",
-                "Assets/Resources/Wallstop Studios/Unity Helpers 99",
-                "Assets/Resources/Wallstop Studios 1",
-                "Assets/Resources/Wallstop Studios 2",
-            };
-
-            List<string> incorrectlyProtected = new();
-            foreach (string path in duplicatePaths)
-            {
-                if (ProtectionTestHooks.TestIsProtectedPath(path))
-                {
-                    incorrectlyProtected.Add(path);
-                }
-            }
-
-            Assert.IsEmpty(
-                incorrectlyProtected,
-                $"The following duplicate pollution folders are incorrectly marked as protected:\n"
-                    + $"{string.Join("\n", incorrectlyProtected)}\n"
-                    + "These should be deletable during test cleanup."
-            );
-        }
-
-        [Test]
-        public void MainProductionFoldersAreProtected()
-        {
-            string[] mainFolders = new[]
-            {
-                "Assets/Resources/Wallstop Studios",
-                "Assets/Resources/Wallstop Studios/Unity Helpers",
-                "Assets/Plugins",
-                "Assets/Editor Default Resources",
-                "Assets/StreamingAssets",
-            };
-
-            List<string> unprotected = new();
-            foreach (string path in mainFolders)
-            {
-                if (!ProtectionTestHooks.TestIsProtectedPath(path))
-                {
-                    unprotected.Add(path);
-                }
-            }
-
-            Assert.IsEmpty(
-                unprotected,
-                $"The following main production folders are NOT protected:\n"
-                    + $"{string.Join("\n", unprotected)}\n"
-                    + "These should be protected from test cleanup."
-            );
-        }
-
         [UnityTest]
         public IEnumerator EnsureSingletonAssetsDoesNotCreateAssetsForExcludedTypes()
         {
@@ -364,7 +224,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             ScriptableObjectSingletonCreatorTestAccess.AllowAssetCreationDuringSuppression = true;
 
             List<string> beforePaths = new();
-            foreach (Type type in AllTestSingletonTypesWithExclusion)
+            foreach (Type type in SingletonTestTypes.WithExclusion)
             {
                 string path = GetExpectedAssetPath(type);
                 if (
@@ -382,7 +242,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             yield return null;
 
             List<string> unexpectedlyCreated = new();
-            foreach (Type type in AllTestSingletonTypesWithExclusion)
+            foreach (Type type in SingletonTestTypes.WithExclusion)
             {
                 string path = GetExpectedAssetPath(type);
                 if (string.IsNullOrEmpty(path))
@@ -425,7 +285,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             yield return null;
 
             List<string> createdAssets = new();
-            foreach (Type type in AllTestSingletonTypesWithExclusion)
+            foreach (Type type in SingletonTestTypes.WithExclusion)
             {
                 string path = GetExpectedAssetPath(type);
                 if (string.IsNullOrEmpty(path))
@@ -463,7 +323,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             yield return null;
 
             List<string> createdAssets = new();
-            foreach (Type type in AllTestSingletonTypesWithExclusion)
+            foreach (Type type in SingletonTestTypes.WithExclusion)
             {
                 string path = GetExpectedAssetPath(type);
                 if (string.IsNullOrEmpty(path))
@@ -518,7 +378,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 if (!initialAssetGuids.Contains(guid))
                 {
                     string path = AssetDatabase.GUIDToAssetPath(guid);
-                    foreach (Type type in AllTestSingletonTypesWithExclusion)
+                    foreach (Type type in SingletonTestTypes.WithExclusion)
                     {
                         if (path.Contains(type.Name))
                         {
@@ -533,36 +393,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.IsEmpty(
                 newAssets,
                 $"Test singleton assets were unexpectedly created in Resources:\n{string.Join("\n", newAssets)}"
-            );
-        }
-
-        [Test]
-        public void ExcludeFromSingletonCreationAttributeIsDefinedCorrectly()
-        {
-            Type attributeType = typeof(ExcludeFromSingletonCreationAttribute);
-            Assert.IsTrue(
-                attributeType.IsSealed,
-                "ExcludeFromSingletonCreationAttribute should be sealed"
-            );
-
-            AttributeUsageAttribute usage =
-                attributeType.GetCustomAttribute<AttributeUsageAttribute>();
-            Assert.IsTrue(
-                usage != null,
-                "ExcludeFromSingletonCreationAttribute should have AttributeUsage"
-            );
-            Assert.AreEqual(
-                AttributeTargets.Class,
-                usage.ValidOn,
-                "ExcludeFromSingletonCreationAttribute should target classes"
-            );
-            Assert.IsFalse(
-                usage.Inherited,
-                "ExcludeFromSingletonCreationAttribute should not be inherited"
-            );
-            Assert.IsFalse(
-                usage.AllowMultiple,
-                "ExcludeFromSingletonCreationAttribute should not allow multiple"
             );
         }
 
@@ -582,7 +412,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             yield return null;
 
             List<string> createdAssets = new();
-            foreach (Type type in TestSingletonTypesWithoutExclusion)
+            foreach (Type type in SingletonTestTypes.WithoutExclusion)
             {
                 string path = GetExpectedAssetPath(type);
                 if (string.IsNullOrEmpty(path))
@@ -601,24 +431,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.IsEmpty(
                 createdAssets,
                 $"Test types should not be created when IncludeTestAssemblies=false (protected by IsTestType):\n{string.Join("\n", createdAssets)}"
-            );
-        }
-
-        [Test]
-        public void AllTestTypesAreDetectedByIsTestTypeHelper()
-        {
-            List<string> notDetected = new();
-            foreach (Type type in AllTestSingletonTypes)
-            {
-                if (!TestAssemblyHelper.IsTestType(type))
-                {
-                    notDetected.Add(type.FullName);
-                }
-            }
-
-            Assert.IsEmpty(
-                notDetected,
-                $"The following test singleton types are not detected by TestAssemblyHelper.IsTestType:\n{string.Join("\n", notDetected)}"
             );
         }
 
@@ -702,7 +514,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
         private IEnumerator CleanupExistingTestSingletonAssets()
         {
-            foreach (Type type in AllTestSingletonTypes)
+            foreach (Type type in SingletonTestTypes.All)
             {
                 string path = GetExpectedAssetPath(type);
                 if (!string.IsNullOrEmpty(path))

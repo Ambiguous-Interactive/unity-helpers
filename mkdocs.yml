@@ -241,6 +241,8 @@ nav:
           - Test Run Reporter: features/editor-tools/test-run-reporter.md
   - Performance:
       - Bendable Line Sampling: performance/bendable-line-sampling.md
+      - Sprite Rectangle Reads: performance/sprite-region-read.md
+      - Singleton Policy Fixtures: performance/singleton-policy-fixtures.md
       - Sprite Bounds Row Scans: performance/sprite-bounds-row-scan.md
       - Sprite Ink Traversal: performance/sprite-ink-traversal.md
       - Integer Bit Lookup Tables: performance/bit-lookup-tables.md

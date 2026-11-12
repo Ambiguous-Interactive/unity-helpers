@@ -39,7 +39,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     /// user-defined conversion.
     /// </para>
     /// </remarks>
-    public static class SpanExtensions
+    public static partial class SpanExtensions
     {
         /// <summary>
         /// Randomly shuffles a span in place using the Fisher-Yates algorithm.
