@@ -12,6 +12,105 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     [Category("Fast")]
     public sealed class SpriteMaskReaderTests : CommonTestBase
     {
+        [TestCase(0, 0, 4, 3, false)]
+        [TestCase(1, 2, 3, 2, false)]
+        [TestCase(4, 5, 4, 3, true)]
+        [TestCase(7, 7, 1, 1, true)]
+        public void RgbaSubregionCopiesOnlyItsBaseMipPixels(
+            int x,
+            int y,
+            int width,
+            int height,
+            bool mipmaps
+        )
+        {
+            const int textureSize = 8;
+            Texture2D texture = Track(
+                new Texture2D(textureSize, textureSize, TextureFormat.RGBA32, mipmaps)
+            );
+            Color32[] original = new Color32[textureSize * textureSize];
+            for (int index = 0; index < original.Length; ++index)
+            {
+                original[index] = new Color32(
+                    (byte)(index * 3),
+                    (byte)(255 - index),
+                    (byte)(index * 2),
+                    (byte)(index * 4)
+                );
+            }
+            texture.SetPixels32(original);
+            texture.Apply();
+            Sprite sprite = Track(
+                Sprite.Create(texture, new Rect(x, y, width, height), new Vector2(0.25f, 0.75f), 2f)
+            );
+            Assert.IsTrue(
+                SpriteMaskReader.TryReadPixels(
+                    sprite,
+                    out SpritePixelRegion region,
+                    out string error
+                ),
+                error
+            );
+            Assert.AreEqual(width * height, region.Pixels.Length);
+            Assert.AreEqual(width, region.TextureWidth);
+            Assert.AreEqual(new RectInt(0, 0, width, height), region.Region);
+            Assert.AreEqual(new Vector2(width * 0.25f, height * 0.75f), region.Pivot);
+            Assert.AreEqual(new Vector2(0.5f, 0.5f), region.UnitsPerPixel);
+            for (int row = 0; row < height; ++row)
+            {
+                for (int column = 0; column < width; ++column)
+                {
+                    Assert.AreEqual(
+                        original[(y + row) * textureSize + x + column],
+                        region.GetPixel(column, row)
+                    );
+                }
+            }
+            CollectionAssert.AreEqual(original, texture.GetPixels32());
+            region.Pixels[0] = default;
+            CollectionAssert.AreEqual(original, texture.GetPixels32());
+        }
+
+        [TestCase(TextureFormat.ARGB32)]
+        [TestCase(TextureFormat.RGB24)]
+        [TestCase(TextureFormat.Alpha8)]
+        public void OtherReadableFormatsKeepTheirConvertedPixelSemantics(TextureFormat format)
+        {
+            Texture2D texture = Track(new Texture2D(4, 4, format, false));
+            Color32[] input = new Color32[16];
+            for (int index = 0; index < input.Length; ++index)
+            {
+                input[index] = new Color32(
+                    (byte)(index * 7),
+                    (byte)(index * 11),
+                    (byte)(index * 13),
+                    (byte)(index * 17)
+                );
+            }
+            texture.SetPixels32(input);
+            texture.Apply();
+            Color32[] expected = texture.GetPixels32();
+            Sprite sprite = Track(Sprite.Create(texture, new Rect(1, 1, 2, 2), Vector2.zero));
+            Assert.IsTrue(
+                SpriteMaskReader.TryReadPixels(
+                    sprite,
+                    out SpritePixelRegion region,
+                    out string error
+                ),
+                error
+            );
+            for (int row = 0; row < 2; ++row)
+            {
+                for (int column = 0; column < 2; ++column)
+                {
+                    Assert.AreEqual(
+                        expected[(row + 1) * 4 + column + 1],
+                        region.GetPixel(column, row)
+                    );
+                }
+            }
+        }
+
         [Test]
         public void InkQueryUsesTheSelectedSpriteRectangleAndItsLocalMapping()
         {

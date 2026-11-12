@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Utils
 {
     using System;
+    using Unity.Collections;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Helper;
 #if UNITY_EDITOR
@@ -25,6 +26,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// Alpha zero is always transparent; other pixels are opaque at or above the threshold.
         /// Editor PNG masks honor the texture importer's alpha source.
         /// Separate alpha textures require original PNG pixels in the Editor.
+        /// Readable RGBA32 subregions copy only their selected base-mip pixels.
         /// </remarks>
         public static bool TryRead(
             Sprite sprite,
@@ -201,9 +203,11 @@ namespace WallstopStudios.UnityHelpers.Utils
             bool alphaFromGrayscale = false
         )
         {
+            int sourceTextureWidth = texture.width;
+            int sourceTextureHeight = texture.height;
             Rect rectangle = sprite.rect;
-            double scaleX = (double)texture.width / importedWidth;
-            double scaleY = (double)texture.height / importedHeight;
+            double scaleX = (double)sourceTextureWidth / importedWidth;
+            double scaleY = (double)sourceTextureHeight / importedHeight;
             double left = rectangle.xMin * scaleX;
             double bottom = rectangle.yMin * scaleY;
             double right = rectangle.xMax * scaleX;
@@ -229,8 +233,8 @@ namespace WallstopStudios.UnityHelpers.Utils
                 || yStart < 0
                 || width <= 0
                 || height <= 0
-                || texture.width < (long)xStart + width
-                || texture.height < (long)yStart + height
+                || sourceTextureWidth < (long)xStart + width
+                || sourceTextureHeight < (long)yStart + height
                 || int.MaxValue < (long)width * height
             )
             {
@@ -258,17 +262,51 @@ namespace WallstopStudios.UnityHelpers.Utils
                 region = default;
                 return false;
             }
-            Color32[] pixels = texture.GetPixels32();
-            if ((long)texture.width * texture.height != pixels.Length)
+            Color32[] pixels;
+            int textureWidth;
+            RectInt sourceRegion;
+            if (
+                (long)width * height < (long)sourceTextureWidth * sourceTextureHeight
+                && texture.format == TextureFormat.RGBA32
+            )
             {
-                error = "The texture pixels do not match its dimensions.";
-                region = default;
-                return false;
+                NativeArray<Color32> raw = texture.GetPixelData<Color32>(0);
+                if ((long)sourceTextureWidth * sourceTextureHeight != raw.Length)
+                {
+                    error = "The texture pixels do not match its dimensions.";
+                    region = default;
+                    return false;
+                }
+                pixels = new Color32[width * height];
+                int sourceWidth = sourceTextureWidth;
+                for (int row = 0; row < height; ++row)
+                {
+                    NativeArray<Color32>.Copy(
+                        raw,
+                        (yStart + row) * sourceWidth + xStart,
+                        pixels,
+                        row * width,
+                        width
+                    );
+                }
+                textureWidth = width;
+                sourceRegion = new RectInt(0, 0, width, height);
             }
-            RectInt sourceRegion = new(xStart, yStart, width, height);
+            else
+            {
+                pixels = texture.GetPixels32();
+                if ((long)sourceTextureWidth * sourceTextureHeight != pixels.Length)
+                {
+                    error = "The texture pixels do not match its dimensions.";
+                    region = default;
+                    return false;
+                }
+                textureWidth = sourceTextureWidth;
+                sourceRegion = new RectInt(xStart, yStart, width, height);
+            }
             region = new SpritePixelRegion(
                 pixels,
-                texture.width,
+                textureWidth,
                 sourceRegion,
                 maskPivot,
                 unitsPerPixel,
