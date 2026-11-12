@@ -609,6 +609,9 @@ command. Successful writes replace the complete mirror atomically.
 The [port evidence](../performance/readme-mirror-port.zip) retains the original
 corpus, native Windows checks and paired startup captures. Startup remains slower
 than the original Node command; the port makes no startup performance claim.
+The archive records the initial 64-case source snapshot. Later fixes also reject
+missing documentation assets and preserve inline-code link examples; their current
+regressions remain in the source suite. Historical captures keep their recorded identities.
 
 Six pure singleton policy tests avoid asset setup and refresh while integration
 cases retain their cleanup. See the [fixture measurements](../performance/singleton-policy-fixtures.md).

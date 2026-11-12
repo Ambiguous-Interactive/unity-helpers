@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import unicodedata
+from bisect import bisect_right
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 from urllib.parse import quote, unquote
@@ -83,6 +84,36 @@ def fragment_map(text: str) -> dict[str, str]:
     return result
 
 
+def rewrite_outside_inline_code(text: str, transform: Callable[[str], str]) -> str:
+    """Transform prose while preserving matched backtick spans byte for byte."""
+    runs = list(re.finditer(r"`+", text))
+    by_length: dict[int, list[int]] = {}
+    for index, run in enumerate(runs):
+        by_length.setdefault(len(run[0]), []).append(index)
+    pieces: list[str] = []
+    start = 0
+    index = 0
+    while index < len(runs):
+        opening = runs[index]
+        previous = opening.start() - 1
+        while previous >= 0 and text[previous] == "\\":
+            previous -= 1
+        escapes = opening.start() - 1 - previous
+        matching = by_length[len(opening[0])]
+        next_position = bisect_right(matching, index)
+        if escapes % 2 or next_position == len(matching):
+            index += 1
+            continue
+        closing_index = matching[next_position]
+        closing = runs[closing_index]
+        pieces.append(transform(text[start : opening.start()]))
+        pieces.append(text[opening.start() : closing.end()])
+        start = closing.end()
+        index = closing_index + 1
+    pieces.append(transform(text[start:]))
+    return "".join(pieces)
+
+
 def build_mirror(source: str, read_doc: Callable[[str], str], root: Path) -> tuple[str, list[str]]:
     problems: list[str] = []
     cache: dict[str, dict[str, str]] = {}
@@ -118,12 +149,10 @@ def build_mirror(source: str, read_doc: Callable[[str], str], root: Path) -> tup
         if not path.is_relative_to(root.resolve()):
             problems.append(f"{SOURCE} links to '{target}', which leaves the repository")
             return target
+        if not path.exists():
+            problems.append(f"{SOURCE} links to '{target}', which does not exist in the repository")
+            return target
         if not relative.startswith("docs/"):
-            if not path.exists():
-                problems.append(
-                    f"{SOURCE} links to '{target}', which does not exist in the repository"
-                )
-                return target
             return BLOB_BASE + location.removeprefix("./") + ("#" + fragment if separator else "")
         inner = quote(relative[len("docs/") :], safe="/-._~")
         prefixed = ("./" if location.startswith("./") else "") + inner
@@ -136,20 +165,35 @@ def build_mirror(source: str, read_doc: Callable[[str], str], root: Path) -> tup
         )
         return prefixed + "#" + mapped
 
+    def rewrite_links(prose: str) -> str:
+        rewritten = re.sub(
+            r"(\]\()([^)\s]+)(\))",
+            lambda match: match[1] + rewrite(match[2]) + match[3],
+            prose,
+        )
+        return re.sub(
+            r"""\b(src|href)=(["'])([^"'\n]+)\2""",
+            lambda match: match[1] + "=" + match[2] + rewrite(match[3]) + match[2],
+            rewritten,
+        )
+
     lines: list[str] = []
+    paragraph: list[str] = []
+
+    def flush_paragraph() -> None:
+        if paragraph:
+            lines.extend(
+                rewrite_outside_inline_code("\n".join(paragraph), rewrite_links).split("\n")
+            )
+            paragraph.clear()
+
     for line, fenced in fenced_lines(source):
-        if not fenced:
-            line = re.sub(
-                r"(\]\()([^)\s]+)(\))",
-                lambda match: match[1] + rewrite(match[2]) + match[3],
-                line,
-            )
-            line = re.sub(
-                r"""\b(src|href)=(["'])([^"']+)\2""",
-                lambda match: match[1] + "=" + match[2] + rewrite(match[3]) + match[2],
-                line,
-            )
-        lines.append(line)
+        if fenced or not line.strip():
+            flush_paragraph()
+            lines.append(line)
+        else:
+            paragraph.append(line)
+    flush_paragraph()
     return BANNER + "\n\n" + "\n".join(lines), problems
 
 

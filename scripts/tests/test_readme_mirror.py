@@ -43,6 +43,11 @@ def populate(root: Path) -> dict[str, str]:
         file = root / name
         file.parent.mkdir(parents=True, exist_ok=True)
         file.write_text(content, encoding="utf-8")
+    # The frozen HTML-image case assumes this asset exists. Keep its historical
+    # output unchanged while supplying that precondition explicitly.
+    image = root / "docs/images/banner.svg"
+    image.parent.mkdir(parents=True, exist_ok=True)
+    image.write_text("<svg/>", encoding="utf-8")
     return documents
 
 
@@ -107,13 +112,13 @@ def test_generator_roundtrip_drift_and_missing_mirror(
     assert "already current" in capsys.readouterr().out
 
 
-@pytest.mark.parametrize("name", ["sync-readme-mirror.js", "lint-readme-mirror.js"])
+@pytest.mark.parametrize("name", ["scripts/sync-readme-mirror.js", "scripts/lint-readme-mirror.js"])
 def test_compatibility_launchers_from_foreign_directory(tmp_path: Path, name: str) -> None:
     node = shutil.which("node")
     assert node is not None
     environment = {**os.environ, "README_MIRROR_ROOT": str(ROOT)}
     result = subprocess.run(
-        [node, str(ROOT / "scripts" / name), "--check", "--verbose"],
+        [node, str(ROOT / name), "--check", "--verbose"],
         cwd=tmp_path,
         env=environment,
         capture_output=True,
@@ -336,3 +341,57 @@ def test_terminated_generator_returns_legacy_failure(tmp_path: Path) -> None:
     custom = tmp_path / "terminated.js"
     custom.write_text("process.kill(process.pid, 'SIGTERM');", encoding="utf-8")
     assert main(["--sync-script", str(custom)]) == 1
+
+
+@pytest.mark.parametrize(
+    "target",
+    ["./docs/missing.md", "docs/missing.md#section", "./docs/images/missing.svg"],
+)
+def test_missing_docs_targets_fail_without_publishing(tmp_path: Path, target: str) -> None:
+    populate(tmp_path)
+    source = tmp_path / "README.md"
+    source.write_text(f"# Title\n\n[Missing]({target})\n", encoding="utf-8")
+    mirror = tmp_path / "docs/readme.md"
+    mirror.write_text("previous mirror", encoding="utf-8")
+    for arguments in [[], ["--check"]]:
+        assert main(["--repo-root", str(tmp_path), *arguments]) == 1
+        assert mirror.read_text(encoding="utf-8") == "previous mirror"
+
+
+@pytest.mark.parametrize(
+    "example",
+    [
+        "`[example](./missing.md)`",
+        '``[example](./missing.md) ` <img src="./docs/missing.svg">``',
+        "`[example](./missing.md)\nsecond line`",
+        "``[example](./missing.md)\n`shorter delimiter`\nend``",
+        "`first` and `[example](./missing.md)`",
+        "\\\\`[example](./missing.md)`",
+        "`[example](./missing.md)\\`",
+    ],
+)
+def test_inline_code_preserves_examples_and_real_links(tmp_path: Path, example: str) -> None:
+    documents = populate(tmp_path)
+    source = f"# Title\n\n{example} [Log](./CHANGELOG.md)\n"
+    content, problems = build_mirror(source, documents.__getitem__, tmp_path)
+    assert problems == []
+    assert example in content
+    assert "[Log](https://github.com/wallstop/unity-helpers/blob/main/CHANGELOG.md)" in content
+
+
+@pytest.mark.parametrize("prefix", ["`unclosed ", "\\`escaped "])
+def test_unmatched_or_escaped_backticks_keep_real_links_active(tmp_path: Path, prefix: str) -> None:
+    documents = populate(tmp_path)
+    source = f"# Title\n\n{prefix}[Log](./CHANGELOG.md)\n"
+    content, problems = build_mirror(source, documents.__getitem__, tmp_path)
+    assert problems == []
+    assert prefix in content
+    assert "[Log](https://github.com/wallstop/unity-helpers/blob/main/CHANGELOG.md)" in content
+
+
+def test_inline_code_cannot_suppress_links_in_another_paragraph(tmp_path: Path) -> None:
+    documents = populate(tmp_path)
+    source = "# Title\n\n`unclosed\n\n[Missing](./docs/missing.md)\nclosing`\n"
+    _, problems = build_mirror(source, documents.__getitem__, tmp_path)
+    assert len(problems) == 1
+    assert "does not exist" in problems[0]
