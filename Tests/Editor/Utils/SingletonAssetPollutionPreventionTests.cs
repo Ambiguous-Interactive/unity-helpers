@@ -69,100 +69,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         private bool _previousEditorUiSuppress;
         private readonly List<string> _createdAssets = new();
 
-        private static IEnumerable<ProtectedPathTestCase> ProtectedPathTestCases()
-        {
-            yield return new ProtectedPathTestCase(
-                "Assets/Resources/Wallstop Studios",
-                true,
-                false,
-                "Main Wallstop Studios folder should be protected"
-            );
-            yield return new ProtectedPathTestCase(
-                "Assets/Resources/Wallstop Studios/Unity Helpers",
-                true,
-                false,
-                "Main Unity Helpers folder should be protected"
-            );
-            yield return new ProtectedPathTestCase(
-                "Assets/Resources/Wallstop Studios/Unity Helpers/SomeAsset.asset",
-                true,
-                false,
-                "Assets inside Unity Helpers should be protected"
-            );
-            yield return new ProtectedPathTestCase(
-                "Assets/Resources/Wallstop Studios 1",
-                false,
-                true,
-                "Wallstop Studios 1 is a duplicate and should NOT be protected"
-            );
-            yield return new ProtectedPathTestCase(
-                "Assets/Resources/Wallstop Studios 2",
-                false,
-                true,
-                "Wallstop Studios 2 is a duplicate and should NOT be protected"
-            );
-            yield return new ProtectedPathTestCase(
-                "Assets/Resources/Wallstop Studios/Unity Helpers 1",
-                false,
-                true,
-                "Unity Helpers 1 is a duplicate and should NOT be protected"
-            );
-            yield return new ProtectedPathTestCase(
-                "Assets/Resources/Wallstop Studios/Unity Helpers 15",
-                false,
-                true,
-                "Unity Helpers 15 is a duplicate and should NOT be protected"
-            );
-            yield return new ProtectedPathTestCase(
-                "Assets/Resources/Wallstop Studios/Unity Helpers 1/SomeAsset.asset",
-                false,
-                true,
-                "Assets inside duplicate Unity Helpers should NOT be protected"
-            );
-            yield return new ProtectedPathTestCase(
-                "Assets/Resources/Wallstop Studios/Unity Helpers 99/Nested/File.asset",
-                false,
-                true,
-                "Nested assets inside duplicate Unity Helpers should NOT be protected"
-            );
-            yield return new ProtectedPathTestCase(
-                "Assets/Plugins",
-                true,
-                false,
-                "Plugins folder should be protected"
-            );
-            yield return new ProtectedPathTestCase(
-                "Assets/Plugins/SomePlugin/Code.cs",
-                true,
-                false,
-                "Assets inside Plugins should be protected"
-            );
-            yield return new ProtectedPathTestCase(
-                "Assets/TempTestFolder",
-                false,
-                false,
-                "Temp test folders should NOT be protected"
-            );
-            yield return new ProtectedPathTestCase(
-                "Assets/Resources/Tests",
-                false,
-                false,
-                "Test folders in Resources should NOT be protected"
-            );
-            yield return new ProtectedPathTestCase(
-                "",
-                false,
-                false,
-                "Empty path should NOT be protected"
-            );
-            yield return new ProtectedPathTestCase(
-                null,
-                false,
-                false,
-                "Null path should NOT be protected"
-            );
-        }
-
         /// <summary>
         /// Data source for duplicate folder detection tests.
         /// Each entry contains: parentPath, folderBaseName
@@ -386,34 +292,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.IsEmpty(
                 hasAttribute,
                 $"The following creator test types should NOT have [ExcludeFromSingletonCreation] attribute as they are used to test creation logic:\n{string.Join("\n", hasAttribute)}"
-            );
-        }
-
-        [Test]
-        public void IsProtectedPathReturnsExpectedValue(
-            [ValueSource(nameof(ProtectedPathTestCases))] ProtectedPathTestCase testCase
-        )
-        {
-            bool actual = ProtectionTestHooks.TestIsProtectedPath(testCase.Path);
-            Assert.That(
-                actual,
-                Is.EqualTo(testCase.ExpectedIsProtected),
-                $"IsProtectedPath(\"{testCase.Path ?? "(null)"}\") returned {actual}, expected {testCase.ExpectedIsProtected}. "
-                    + $"Description: {testCase.Description}"
-            );
-        }
-
-        [Test]
-        public void IsKnownDuplicatePollutionReturnsExpectedValue(
-            [ValueSource(nameof(ProtectedPathTestCases))] ProtectedPathTestCase testCase
-        )
-        {
-            bool actual = ProtectionTestHooks.TestIsKnownDuplicatePollution(testCase.Path);
-            Assert.That(
-                actual,
-                Is.EqualTo(testCase.ExpectedIsDuplicatePollution),
-                $"IsKnownDuplicatePollution(\"{testCase.Path ?? "(null)"}\") returned {actual}, expected {testCase.ExpectedIsDuplicatePollution}. "
-                    + $"Description: {testCase.Description}"
             );
         }
 
@@ -869,32 +747,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             TryDeleteEmptyFolder(ResourcesRoot);
             yield return null;
-        }
-
-        public sealed class ProtectedPathTestCase
-        {
-            public string Path { get; }
-            public bool ExpectedIsProtected { get; }
-            public bool ExpectedIsDuplicatePollution { get; }
-            public string Description { get; }
-
-            public ProtectedPathTestCase(
-                string path,
-                bool expectedIsProtected,
-                bool expectedIsDuplicatePollution,
-                string description
-            )
-            {
-                Path = path;
-                ExpectedIsProtected = expectedIsProtected;
-                ExpectedIsDuplicatePollution = expectedIsDuplicatePollution;
-                Description = description;
-            }
-
-            public override string ToString()
-            {
-                return $"{(Path ?? "(null)")} - {Description}";
-            }
         }
 
         public sealed class DuplicateFolderTestCase

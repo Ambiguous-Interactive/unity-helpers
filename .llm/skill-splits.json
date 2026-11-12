@@ -250,7 +250,7 @@
     },
     {
       "name": "linter-reference",
-      "sha256": "6113f6cd4bedf1fa3667c1b2578259c4b4b5437d62d0c8317400dc94c014f242",
+      "sha256": "eb3dec89af14f2677e2204e0fbf4beb61145454293416d3539e4c2db4408c94f",
       "parts": [
         "linter-reference-part-1.md",
         "linter-reference-part-2.md",

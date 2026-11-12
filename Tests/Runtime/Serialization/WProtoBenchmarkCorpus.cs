@@ -73,14 +73,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         };
 
         /// <summary>Verifies every frozen workload without collecting timings.</summary>
-        public static void VerifyFrozenCorpus()
+        public static void VerifyFrozenCorpus(int? size = null)
         {
             IReadOnlyList<IReadOnlyList<CalibratedBenchmarkMeasurement>> families = RunFrozenCorpus(
-                VerifyOnly
+                VerifyOnly,
+                size
             );
             Assert.AreEqual(7, families.Count);
-            Assert.AreEqual(8, families[2].Count);
-            Assert.AreEqual(4, families[4].Count);
+            Assert.AreEqual(size.HasValue ? 2 : 8, families[2].Count);
+            Assert.AreEqual(size.HasValue ? 1 : 4, families[4].Count);
         }
 
         /// <summary>Measures all workloads for one preregistered API path.</summary>
@@ -166,7 +167,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         private static IReadOnlyList<IReadOnlyList<CalibratedBenchmarkMeasurement>> RunFrozenCorpus(
-            string operation
+            string operation,
+            int? selectedSize = null
         )
         {
             HashSet<string> identities = new HashSet<string>(StringComparer.Ordinal);
@@ -178,6 +180,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             }
             foreach (int size in CorpusSizes)
             {
+                if (selectedSize.HasValue && selectedSize.Value != size)
+                {
+                    continue;
+                }
                 ProtoBenchmarkScalars scalars = new ProtoBenchmarkScalars
                 {
                     First = size == 0 ? 0UL : 127UL,
@@ -340,14 +346,37 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                         )
                     );
             }
-            Assert.IsTrue(
-                ProtoBenchmarkCorpusIdentity.IsComplete(
-                    identities,
-                    operation.StartsWith("read-", StringComparison.Ordinal)
-                        || string.Equals(operation, VerifyOnly, StringComparison.Ordinal)
-                ),
-                "Every frozen workload identity must appear exactly once."
-            );
+            if (selectedSize.HasValue)
+            {
+                string suffix = "/" + selectedSize.Value.ToString(CultureInfo.InvariantCulture);
+                HashSet<string> expectedIdentities = new HashSet<string>(StringComparer.Ordinal);
+                foreach (string identifier in ProtoBenchmarkCorpusIdentity.Identifiers(true))
+                {
+                    if (
+                        identifier.EndsWith(suffix, StringComparison.Ordinal)
+                        || identifier.EndsWith(suffix + "-unpacked", StringComparison.Ordinal)
+                    )
+                    {
+                        expectedIdentities.Add(identifier);
+                    }
+                }
+                Assert.AreEqual(8, expectedIdentities.Count);
+                Assert.IsTrue(
+                    identities.SetEquals(expectedIdentities),
+                    "Every frozen workload for this input size must appear exactly once."
+                );
+            }
+            else
+            {
+                Assert.IsTrue(
+                    ProtoBenchmarkCorpusIdentity.IsComplete(
+                        identities,
+                        operation.StartsWith("read-", StringComparison.Ordinal)
+                            || string.Equals(operation, VerifyOnly, StringComparison.Ordinal)
+                    ),
+                    "Every frozen workload identity must appear exactly once."
+                );
+            }
             return families;
         }
 

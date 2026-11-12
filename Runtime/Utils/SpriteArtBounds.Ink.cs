@@ -21,6 +21,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// equal luma selects the lowest RGB value. Regions use four-connected exact RGB neighbors;
         /// equal-sized regions select the first bottom-left row-major seed. Coordinates use double
         /// accumulation and the pixel mapping used by the alpha-mask reader.
+        /// The connectivity scan remembers rejected pixels instead of rereading them for each neighbor.
         /// </remarks>
         public static bool TryGetCentreOfLargestDarkestInkRegion(
             Sprite sprite,
@@ -205,6 +206,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 {
                     return false;
                 }
+                reached[index] = true;
                 Color32 pixel = pixels.GetPixel(index);
                 if (pixel.a != byte.MaxValue)
                 {
@@ -215,7 +217,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 {
                     return false;
                 }
-                reached[index] = true;
                 frontier[frontierCount++] = index;
                 return true;
             }

@@ -85,7 +85,46 @@ exited zero and reached both stream ends. These are fixture timings, not the who
 or editor startup. The [source variants, NUnit results and receipts](../performance/editor-contract-regex.zip)
 make the scoped comparison reproducible.
 
+### Pure EditMode fixtures
+
+Keep pure string and value tests in fixtures without asset setup. The singleton path tests now
+retain all 30 input/expected-value cases in a plain fixture, while the 13 asset integration cases
+keep their existing setup and cleanup. Three alternating fresh Unity 6000.6.7f1 process pairs pass
+all 43 cases with equal canonical case inventories. The moved cases take a median 1.368 seconds
+before and 0.002 after. The whole cohort medians are 10.557 and 8.667 seconds, with one slower
+candidate pair. This does not establish full-suite or CI timing. The
+[replay capture](../performance/editmode-path-fixtures.zip) retains source variants, all six NUnit
+results, process receipts, source hashes and the complete case inventory.
+
 ### Typed Python scripts
+
+Documentation links run through `scripts/lint_doc_links.py` in locked uv. The `doc-links`
+and `doc-links-test` Repo Lint subjects and both npm link commands use Python directly. The Node
+and PowerShell commands remain compatibility entry points. `--mode Targets` checks local file and directory targets;
+`--mode Format` checks Markdown style; `All` does both. `--paths` accepts literal repository paths
+and refuses missing or external sources. Empty supported-source scans fail. Git inventories use NUL delimiters, preserve exact case,
+and include untracked files while respecting ignore rules. Targets must exist inside the repository.
+Angle-bracket targets preserve spaces; URL-encoded paths are decoded before resolution.
+
+The frozen `scripts/tests/fixtures/doc-links-v1.json` replays 41 actual invocations of the original
+checker after its complete 51-assertion suite passed. Additional Python controls cover source
+masking, shell heredocs, JavaScript regex literals, lexical case, missing indexed files, links
+outside the repository, and actual compatibility launches from another working directory.
+Markdown targets resolve from their document directory; source references retain repository-root
+fallback. Reference definitions keep target validation without prose-only style errors. Fences
+track their marker and length. Python docstrings are identified by syntax, while assigned and
+returned multiline strings remain visible. Source references do not truncate longer extensions
+such as `.mdx` to `.md`.
+
+The checker retains the earlier inline-link grammar limitation for parentheses inside targets.
+The [replay capture](../performance/doc-link-checker-port.zip) retains the original corpus, source
+identities, native Windows results and six suite timing observations. The expanded 90-case suite
+takes about eight seconds locally, as did the original 51-assertion suite; no consistent suite
+speedup is established.
+
+```bash
+uv run --project scripts/python~ --locked pytest scripts/tests/test_doc_links.py -q
+```
 
 `npm run lint:tests` runs the typed Python test-lifecycle checker. The PowerShell lint and test
 commands remain compatibility entry points. Explicit `--paths` are literal files; absent,
@@ -665,9 +704,9 @@ use the shared locked Python toolchain; the former hyphenated entry point remain
   still covers the whole repository.
 - Enforce EOL/encoding: `npm run eol:check`
 - Lint GitHub Actions: `actionlint`
-- Verify Markdown/code links: `npm run lint:doc-links` (cross-platform wrapper that locates PowerShell automatically)
+- Verify Markdown/code links: `npm run lint:doc-links` (locked uv Python)
   - The wrapper lives at `scripts/run-doc-link-lint.js` so you can also run `node ./scripts/run-doc-link-lint.js --verbose` if you are not using npm scripts.
-  - The underlying PowerShell script validates intra-repo Markdown links _and_ any `docs/...` references inside source files or scripts. The `lint-doc-links` GitHub Actions workflow runs it on every PR, so run it locally before pushing large doc updates.
+  - The Python checker validates intra-repo Markdown links and `docs/...` references inside source files or scripts. Repo Lint runs it on every PR, so run it locally before pushing large doc updates.
 
 ## Style and Naming
 

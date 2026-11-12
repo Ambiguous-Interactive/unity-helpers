@@ -251,10 +251,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             WProtoBenchmarkCorpus.AssertMaps(expected, actual);
         }
 
-        [Test]
-        public void FrozenCorpusHasIndependentSemanticWitnesses()
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(32)]
+        [TestCase(1024)]
+        public void FrozenCorpusHasIndependentSemanticWitnesses(int size)
         {
-            WProtoBenchmarkCorpus.VerifyFrozenCorpus();
+            WProtoBenchmarkCorpus.VerifyFrozenCorpus(size);
         }
     }
 }

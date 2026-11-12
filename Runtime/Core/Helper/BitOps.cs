@@ -18,73 +18,198 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     /// </remarks>
     public static class BitOps
     {
-        private static readonly byte[] TrailingZeroIndices =
+        private static ReadOnlySpan<byte> TrailingZeroIndices
         {
-            0,
-            1,
-            48,
-            2,
-            57,
-            49,
-            28,
-            3,
-            61,
-            58,
-            50,
-            42,
-            38,
-            29,
-            17,
-            4,
-            62,
-            55,
-            59,
-            36,
-            53,
-            51,
-            43,
-            22,
-            45,
-            39,
-            33,
-            30,
-            24,
-            18,
-            12,
-            5,
-            63,
-            47,
-            56,
-            27,
-            60,
-            41,
-            37,
-            16,
-            54,
-            35,
-            52,
-            21,
-            44,
-            32,
-            23,
-            11,
-            46,
-            26,
-            40,
-            15,
-            34,
-            20,
-            31,
-            10,
-            25,
-            14,
-            19,
-            9,
-            13,
-            8,
-            7,
-            6,
-        };
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get =>
+                new byte[]
+                {
+                    0,
+                    1,
+                    48,
+                    2,
+                    57,
+                    49,
+                    28,
+                    3,
+                    61,
+                    58,
+                    50,
+                    42,
+                    38,
+                    29,
+                    17,
+                    4,
+                    62,
+                    55,
+                    59,
+                    36,
+                    53,
+                    51,
+                    43,
+                    22,
+                    45,
+                    39,
+                    33,
+                    30,
+                    24,
+                    18,
+                    12,
+                    5,
+                    63,
+                    47,
+                    56,
+                    27,
+                    60,
+                    41,
+                    37,
+                    16,
+                    54,
+                    35,
+                    52,
+                    21,
+                    44,
+                    32,
+                    23,
+                    11,
+                    46,
+                    26,
+                    40,
+                    15,
+                    34,
+                    20,
+                    31,
+                    10,
+                    25,
+                    14,
+                    19,
+                    9,
+                    13,
+                    8,
+                    7,
+                    6,
+                };
+        }
+
+        private static ReadOnlySpan<byte> Log2UintIndices
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get =>
+                new byte[]
+                {
+                    0,
+                    9,
+                    1,
+                    10,
+                    13,
+                    21,
+                    2,
+                    29,
+                    11,
+                    14,
+                    16,
+                    18,
+                    22,
+                    25,
+                    3,
+                    30,
+                    8,
+                    12,
+                    20,
+                    28,
+                    15,
+                    17,
+                    24,
+                    7,
+                    19,
+                    27,
+                    23,
+                    6,
+                    26,
+                    5,
+                    4,
+                    31,
+                };
+        }
+
+        private static ReadOnlySpan<byte> Log2UlongIndices
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get =>
+                new byte[]
+                {
+                    0,
+                    47,
+                    1,
+                    56,
+                    48,
+                    27,
+                    2,
+                    60,
+                    57,
+                    49,
+                    41,
+                    37,
+                    28,
+                    16,
+                    3,
+                    61,
+                    54,
+                    58,
+                    35,
+                    52,
+                    50,
+                    42,
+                    21,
+                    44,
+                    38,
+                    32,
+                    29,
+                    23,
+                    17,
+                    11,
+                    4,
+                    62,
+                    46,
+                    55,
+                    26,
+                    59,
+                    40,
+                    36,
+                    15,
+                    53,
+                    34,
+                    51,
+                    20,
+                    43,
+                    31,
+                    22,
+                    10,
+                    45,
+                    25,
+                    39,
+                    14,
+                    33,
+                    19,
+                    30,
+                    9,
+                    24,
+                    13,
+                    18,
+                    8,
+                    12,
+                    7,
+                    6,
+                    5,
+                    63,
+                };
+        }
+
+#if ENABLE_MONO
+        private static readonly byte[] MonoTrailingZeroIndices = TrailingZeroIndices.ToArray();
+        private static readonly byte[] MonoLog2UintIndices = Log2UintIndices.ToArray();
+        private static readonly byte[] MonoLog2UlongIndices = Log2UlongIndices.ToArray();
+#endif
 
         /// <summary>Enumerates set-bit indices from least to most significant without allocating.</summary>
         public static SetBitEnumerator SetBits(ulong mask)
@@ -172,7 +297,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
             ulong isolated = value & unchecked(0UL - value);
             int index = (int)(unchecked(isolated * 0x03F79D71B4CB0A89UL) >> 58);
+#if ENABLE_MONO
+            return MonoTrailingZeroIndices[index];
+#else
             return TrailingZeroIndices[index];
+#endif
         }
 
         /// <summary>
@@ -214,35 +343,21 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// </summary>
         /// <param name="value">The value to inspect.</param>
         /// <returns>The floor of log2(<paramref name="value"/>); 0 when <paramref name="value"/> is 0 or 1.</returns>
+        /// <remarks>Uses bit smearing and portable de Bruijn indexing.</remarks>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int Log2(uint value)
         {
-            int log = 0;
-            if (0x0001_0000U <= value)
-            {
-                value >>= 16;
-                log = 16;
-            }
-
-            if (0x0000_0100U <= value)
-            {
-                value >>= 8;
-                log += 8;
-            }
-
-            if (0x0000_0010U <= value)
-            {
-                value >>= 4;
-                log += 4;
-            }
-
-            if (0x0000_0004U <= value)
-            {
-                value >>= 2;
-                log += 2;
-            }
-
-            return log + (int)(value >> 1);
+            value |= value >> 1;
+            value |= value >> 2;
+            value |= value >> 4;
+            value |= value >> 8;
+            value |= value >> 16;
+            int index = (int)(unchecked(value * 0x07C4ACDDU) >> 27);
+#if ENABLE_MONO
+            return MonoLog2UintIndices[index];
+#else
+            return Log2UintIndices[index];
+#endif
         }
 
         /// <summary>
@@ -263,17 +378,22 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// </summary>
         /// <param name="value">The value to inspect.</param>
         /// <returns>The floor of log2(<paramref name="value"/>); 0 when <paramref name="value"/> is 0 or 1.</returns>
+        /// <remarks>Uses bit smearing and portable de Bruijn indexing.</remarks>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int Log2(ulong value)
         {
-            int log = 0;
-            if (0x1_0000_0000UL <= value)
-            {
-                value >>= 32;
-                log = 32;
-            }
-
-            return log + Log2((uint)value);
+            value |= value >> 1;
+            value |= value >> 2;
+            value |= value >> 4;
+            value |= value >> 8;
+            value |= value >> 16;
+            value |= value >> 32;
+            int index = (int)(unchecked(value * 0x03F79D71B4CB0A89UL) >> 58);
+#if ENABLE_MONO
+            return MonoLog2UlongIndices[index];
+#else
+            return Log2UlongIndices[index];
+#endif
         }
 
         /// <summary>

@@ -1504,6 +1504,19 @@ function Find-WorkflowsUsingAction {
   return $found
 }
 
+function Test-DocLinkModeCoverage {
+  param([string]$Content)
+  $linterCall = '(?<![\w-])(?:python(?:3(?:\.\d+)?)?|pwsh(?:\.exe)?)\s+[^\r\n]*?(?<![\w-])(?:lint-doc-links\.ps1|lint_doc_links\.py)'
+  $modeFlag = '--?Mode\b'
+  $modeValue = '--?Mode(?:\s*=\s*|\s+)\\?["'']?'
+  $modeEnd = '\\?["'']?(?=\s|[,}]|$)'
+  $coversAll = $Content -match "$linterCall(?![^\r\n]*$modeFlag)" -or
+    $Content -match "$linterCall[^\r\n]*${modeValue}All${modeEnd}"
+  $coversTargets = $Content -match "$linterCall[^\r\n]*${modeValue}Targets${modeEnd}"
+  $coversFormat = $Content -match "$linterCall[^\r\n]*${modeValue}Format${modeEnd}"
+  return ($coversAll -or ($coversTargets -and $coversFormat))
+}
+
 function Run-DocumentationWorkflowContractTests {
   Write-Host ""
   Write-Host "Documentation workflow contracts:" -ForegroundColor Magenta
@@ -1541,7 +1554,7 @@ function Run-DocumentationWorkflowContractTests {
       Where-Object {
         $candidateText = Get-WorkflowContentWithoutComments -Path $_.FullName
         # Anchored so `test-lint-doc-links.ps1` does not read as an invocation of the linter itself.
-        ($candidateText -match '(?<![\w-])lint-doc-links\.ps1') -or
+        ($candidateText -match '(?<![\w-])(?:lint-doc-links\.ps1|lint_doc_links\.py)') -or
         $candidateText.Contains('run-repo-lint.js') -or
         $candidateText -match '(?m)^\s*(?:run:\s*)?uv run --project scripts/python~ --locked --no-dev python scripts/check_registries\.py lint(?: --direct)?\s*$'
       }
@@ -1574,14 +1587,37 @@ function Run-DocumentationWorkflowContractTests {
   # The lookbehind is load-bearing: `test-lint-doc-links.ps1` CONTAINS `lint-doc-links.ps1`, so an
   # unanchored match let the linter's own self-test stand in for the linter. Deleting the real check
   # from the registry then left this passing.
-  $linterCall = '(?<![\w-])lint-doc-links\.ps1'
-  $coversBothModes = (
-    $docLinkSources -match "$linterCall(?![^\r\n]*-Mode\s+(?:Targets|Format))" -or
-    (
-      $docLinkSources -match "$linterCall[^\r\n]*-Mode\s+Targets" -and
-      $docLinkSources -match "$linterCall[^\r\n]*-Mode\s+Format"
-    )
-  )
+  foreach ($control in @(
+    @{ Name='legacy default'; Content='pwsh -File scripts/lint-doc-links.ps1'; Expected=$true },
+    @{ Name='Python default'; Content='python scripts/lint_doc_links.py'; Expected=$true },
+    @{ Name='explicit All'; Content='python scripts/lint_doc_links.py --mode=All'; Expected=$true },
+    @{ Name='Targets only'; Content='python scripts/lint_doc_links.py --mode Targets'; Expected=$false },
+    @{ Name='equals Targets'; Content='python scripts/lint_doc_links.py --mode=Targets'; Expected=$false },
+    @{ Name='quoted Targets'; Content='python scripts/lint_doc_links.py --mode "Targets"'; Expected=$false },
+    @{ Name='single quoted Targets'; Content='python scripts/lint_doc_links.py --mode ''Targets'''; Expected=$false },
+    @{ Name='equals quoted Targets'; Content='python scripts/lint_doc_links.py --mode="Targets"'; Expected=$false },
+    @{ Name='quoted Format'; Content='python scripts/lint_doc_links.py --mode "Format"'; Expected=$false },
+    @{ Name='both equals'; Content='python scripts/lint_doc_links.py --mode=Targets
+python scripts/lint_doc_links.py --mode=Format'; Expected=$true },
+    @{ Name='both quoted'; Content='python scripts/lint_doc_links.py --mode ''Targets''
+python scripts/lint_doc_links.py --mode "Format"'; Expected=$true },
+    @{ Name='test launcher'; Content='pwsh -File scripts/tests/test-lint-doc-links.ps1'; Expected=$false },
+    @{ Name='Python test suite'; Content='pytest scripts/tests/test_doc_links.py'; Expected=$false },
+    @{ Name='filter and single mode'; Content='paths:
+  - "scripts/lint_doc_links.py"
+run: python scripts/lint_doc_links.py --mode=Targets'; Expected=$false },
+    @{ Name='filter only'; Content='paths:
+  - "scripts/lint_doc_links.py"'; Expected=$false },
+    @{ Name='filter and both modes'; Content='paths:
+  - "scripts/lint_doc_links.py"
+run: python scripts/lint_doc_links.py --mode=Targets
+run: python scripts/lint_doc_links.py --mode=Format'; Expected=$true },
+    @{ Name='absent'; Content=''; Expected=$false }
+  )) {
+    Write-TestResult -TestName ("doc link modes: " + $control.Name) -Passed ((Test-DocLinkModeCoverage -Content $control.Content) -eq $control.Expected) -Message $control.Content
+  }
+
+  $coversBothModes = Test-DocLinkModeCoverage -Content $docLinkSources
   $usesCanonicalDocLinkLinter = ($docLinkWorkflows.Count -gt 0 -and $coversBothModes)
 
   # A link walk that hangs should fail its job, not hold a runner to the six-hour ceiling.
@@ -1596,7 +1632,10 @@ function Run-DocumentationWorkflowContractTests {
   # The checks must not be filtered away from their own sources. An unfiltered workflow runs on
   # every change, which covers those sources by definition and is the stronger guarantee.
   [string[]]$requiredDocLinkSources = @(
-    'scripts/comment-stripping.ps1',
+    'scripts/csharp_sources.py',
+    'scripts/cli_encoding.py',
+    'scripts/lint_doc_links.py',
+    'scripts/tests/test_doc_links.py',
     'scripts/lint-doc-links.ps1',
     'scripts/run-doc-link-lint.js',
     'scripts/tests/test-lint-doc-links.ps1'
@@ -1648,7 +1687,7 @@ function Run-DocumentationWorkflowContractTests {
   Write-TestResult `
     -TestName 'doc link checks cover both Targets and Format modes' `
     -Passed $usesCanonicalDocLinkLinter `
-    -Message 'Expected the canonical linter to run with distinct -Mode Targets and -Mode Format.'
+    -Message 'Expected the canonical linter to cover both Targets and Format, including its default All mode.'
 
   Write-TestResult `
     -TestName 'doc link check jobs bound their runtime' `

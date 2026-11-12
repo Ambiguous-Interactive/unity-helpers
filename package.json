@@ -130,8 +130,8 @@
   "scripts": {
     "docs:serve": "bundle exec jekyll serve --baseurl \"\" --livereload",
     "docs:build": "bundle exec jekyll build --baseurl \"\"",
-    "lint:docs": "node ./scripts/run-doc-link-lint.js",
-    "lint:doc-links": "node ./scripts/run-doc-link-lint.js --verbose",
+    "lint:docs": "uv run --quiet --project scripts/python~ --locked --no-dev python scripts/lint_doc_links.py",
+    "lint:doc-links": "uv run --quiet --project scripts/python~ --locked --no-dev python scripts/lint_doc_links.py --verbose",
     "lint:code-samples": "uv run --project scripts/python~ --locked --no-dev --group documentation python scripts/extract_code_samples.py --extract-only",
     "lint:doc-identifiers": "uv run --project scripts/python~ --locked --no-dev python scripts/lint_doc_identifiers.py",
     "lint:code-samples:verbose": "uv run --project scripts/python~ --locked --no-dev --group documentation python scripts/extract_code_samples.py --verbose --extract-only",
@@ -421,7 +421,8 @@
     "lint:drawer-multiobject": "uv run --project scripts/python~ --locked --no-dev python scripts/lint_drawer_multiobject.py --verbose",
     "test:drawer-multiobject": "uv run --project scripts/python~ --locked pytest scripts/tests/test_drawer_multiobject.py -q",
     "lint:skill-sizes": "uv run --project scripts/python~ --locked --no-dev python scripts/lint_skill_sizes.py --verbose",
-    "test:skill-sizes": "uv run --project scripts/python~ --locked pytest scripts/tests/test_skill_sizes.py -q"
+    "test:skill-sizes": "uv run --project scripts/python~ --locked pytest scripts/tests/test_skill_sizes.py -q",
+    "test:doc-links-launcher": "pwsh -NoProfile -File scripts/tests/test-lint-doc-links.ps1 -k test_non_repository_and_empty_inventory_fail_closed"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",
