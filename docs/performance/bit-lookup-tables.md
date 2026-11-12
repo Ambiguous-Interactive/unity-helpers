@@ -4,7 +4,10 @@
 returns zero, and signed overloads still interpret the unsigned bit pattern. Lookup data lives
 in constant read-only spans. Mono reads fixed array caches initialized once from those spans:
 span construction was slower in the native editor even after getter inlining. The caches hold
-160 table bytes plus array overhead. Warm lookups create no arrays.
+160 table bytes plus array overhead. Warm lookups create no arrays. The C# compiler lowers
+the constant `new byte[]` span expressions to static data addresses and a value-type span
+constructor; the emitted getters contain no `newarr`. A stack allocation would copy those
+constant bytes on every call. The captured IL covers all three getters.
 
 Three alternating fresh process pairs on Windows x64 Unity 6000.6.7f1 Editor Mono compare main
 `af80061e` with this implementation. Inputs contain 4,096 values in a seeded shuffled order,

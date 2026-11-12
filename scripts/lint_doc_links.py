@@ -110,7 +110,7 @@ class Repository:
     files: list[str]
     entries: set[str] = field(init=False)
     targets: dict[tuple[str, str, bool], bool] = field(
-        default_factory=lambda: dict[tuple[str, str, bool], bool]()
+        default_factory=dict[tuple[str, str, bool], bool]
     )
 
     def __post_init__(self) -> None:
@@ -404,6 +404,23 @@ def markdown_findings(repository: Repository, path: str, text: str, mode: str) -
                 line,
             )
 
+    def check_target_format(target: str, number: int, line: str) -> None:
+        if target == "/unity-helpers" or target.startswith("/unity-helpers/"):
+            suggestion = re.sub(r"^/unity-helpers/?", "./", target)
+            if suggestion == "./":
+                suggestion = "./README.md"
+            report(
+                number,
+                f"Absolute GitHub Pages path '{target}' will break in CI; use relative path instead (e.g., '{suggestion}')",
+                line,
+            )
+        if re.match(r"[a-zA-Z]", target) and not SCHEME.match(target):
+            report(
+                number,
+                f"Internal link '{target}' missing relative prefix (./ or ../); jekyll-relative-links requires explicit relative paths",
+                line,
+            )
+
     for number, line in lines:
         definition = DEFINITION.match(line)
         if definition:
@@ -446,22 +463,10 @@ def markdown_findings(repository: Repository, path: str, text: str, mode: str) -
                         line,
                     )
             for match in LINK.finditer(without_code):
-                target = match["target"]
-                if target == "/unity-helpers" or target.startswith("/unity-helpers/"):
-                    suggestion = re.sub(r"^/unity-helpers/?", "./", target)
-                    if suggestion == "./":
-                        suggestion = "./README.md"
-                    report(
-                        number,
-                        f"Absolute GitHub Pages path '{target}' will break in CI; use relative path instead (e.g., '{suggestion}')",
-                        line,
-                    )
-                if re.match(r"[a-zA-Z]", target) and not SCHEME.match(target):
-                    report(
-                        number,
-                        f"Internal link '{target}' missing relative prefix (./ or ../); jekyll-relative-links requires explicit relative paths",
-                        line,
-                    )
+                check_target_format(target_text(match["target"]), number, line)
+            definition = DEFINITION.match(line)
+            if definition:
+                check_target_format(target_text(definition["rest"]), number, line)
         if mode != "Format":
             for match in LINK.finditer(without_code):
                 target = target_text(match["target"])

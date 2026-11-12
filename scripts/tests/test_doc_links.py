@@ -405,3 +405,13 @@ def test_review_docstrings_are_masked_by_syntactic_position(source: str) -> None
     masked = mask_comments(source, ".py")
     assert "docs/documentation.md" not in masked
     assert "docs/live.md" in masked
+
+
+@pytest.mark.parametrize("mode", ["All", "Format"])
+@pytest.mark.parametrize("target", ["docs/guide.md", "/unity-helpers/docs/guide.md"])
+def test_review_reference_destinations_require_relative_format(
+    tmp_path: Path, mode: str, target: str
+) -> None:
+    repository = populate(tmp_path, {"README.md": "", "docs/guide.md": ""})
+    findings = markdown_findings(repository, "README.md", f"[guide]: {target}\n", mode)
+    assert any("relative" in finding.message for finding in findings)

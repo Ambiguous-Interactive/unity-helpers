@@ -1506,7 +1506,7 @@ function Find-WorkflowsUsingAction {
 
 function Test-DocLinkModeCoverage {
   param([string]$Content)
-  $linterCall = '(?<![\w-])(?:lint-doc-links\.ps1|lint_doc_links\.py)'
+  $linterCall = '(?<![\w-])(?:python(?:3(?:\.\d+)?)?|pwsh(?:\.exe)?)\s+[^\r\n]*?(?<![\w-])(?:lint-doc-links\.ps1|lint_doc_links\.py)'
   $modeFlag = '--?Mode\b'
   $modeValue = '--?Mode(?:\s*=\s*|\s+)\\?["'']?'
   $modeEnd = '\\?["'']?(?=\s|[,}]|$)'
@@ -1603,6 +1603,15 @@ python scripts/lint_doc_links.py --mode=Format'; Expected=$true },
 python scripts/lint_doc_links.py --mode "Format"'; Expected=$true },
     @{ Name='test launcher'; Content='pwsh -File scripts/tests/test-lint-doc-links.ps1'; Expected=$false },
     @{ Name='Python test suite'; Content='pytest scripts/tests/test_doc_links.py'; Expected=$false },
+    @{ Name='filter and single mode'; Content='paths:
+  - "scripts/lint_doc_links.py"
+run: python scripts/lint_doc_links.py --mode=Targets'; Expected=$false },
+    @{ Name='filter only'; Content='paths:
+  - "scripts/lint_doc_links.py"'; Expected=$false },
+    @{ Name='filter and both modes'; Content='paths:
+  - "scripts/lint_doc_links.py"
+run: python scripts/lint_doc_links.py --mode=Targets
+run: python scripts/lint_doc_links.py --mode=Format'; Expected=$true },
     @{ Name='absent'; Content=''; Expected=$false }
   )) {
     Write-TestResult -TestName ("doc link modes: " + $control.Name) -Passed ((Test-DocLinkModeCoverage -Content $control.Content) -eq $control.Expected) -Message $control.Content
