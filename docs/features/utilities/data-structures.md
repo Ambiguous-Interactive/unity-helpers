@@ -663,6 +663,21 @@ unchanged. All six processes exit zero, reach both stream ends and retain stable
 hashes. The archive preserves raw rounds, sources, checksums and replay commands. This expanded
 main comparison does not satisfy the recovered original consumer's 3.7.1 budget or qualify Unity players.
 
+### Rejected Empty-Slot-Loop Experiment
+
+The [empty-slot-loop capture](../../performance/intmap-empty-slot-rejected.zip) moves the
+insertion loop's empty-slot test to its boundary. It preserves lookup statements, indexing and
+resize policy. Three fresh processes each on Linux x64 .NET 10.0.14 and Mono 6.14.1 cover 195
+cells, including replacements, with 64 warm calls, at least 20 ms calibration and 21 rotating
+rounds. All six exit zero with both streams complete and stable source and binary hashes.
+
+Some fresh fills improve, but replacement medians regress in every process: the eight-entry
+dense .NET case takes 1.144 times main, and the 64-entry sparse Mono case takes 1.173 times
+main. The candidate is rejected; production code is unchanged. Unchanged lookup bodies also
+show differences between the compiled arms, so these observations do not attribute every timing
+difference to the edited branch. This is host triage against main `0245efa3`, not the original
+consumer harness, the 3.7.1 acceptance budget or Unity player qualification.
+
 ## String Wrapper (Interned Flyweight)
 
 - What it is: `StringWrapper`, a shared wrapper around a string, so a key you look up repeatedly costs one reference comparison in the common case instead of a character-by-character compare.
