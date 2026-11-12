@@ -488,6 +488,7 @@ runTest("no linter in scripts/ has been left unreachable", () => {
     ["scripts/lint-yaml.ps1", "yaml-controls"],
     ["scripts/lint-no-regions.ps1", "region-controls"],
     ["scripts/lint-tests.ps1", "lifecycle-controls"],
+    ["scripts/lint-doc-links.ps1", "doc-link-controls"],
     ["scripts/lint-dependabot.ps1", "dependabot-controls"],
     ["scripts/validate-lint-error-codes.ps1", "lint-code-controls"],
     ["scripts/lint-drawer-multiobject.ps1", "drawer-controls"],
@@ -559,6 +560,10 @@ runTest("no linter in scripts/ has been left unreachable", () => {
       (file) => registeredControlsInvoke(file, "scripts/tests/test_comment_block_form.py")
     ],
     ["csharp-controls", csharpControlsInvoke],
+    [
+      "doc-link-controls",
+      (file) => registeredControlsInvoke(file, "scripts/tests/test_doc_links.py")
+    ],
     [
       "lifecycle-controls",
       (file) => registeredControlsInvoke(file, "scripts/tests/test_lifecycle_lint.py")

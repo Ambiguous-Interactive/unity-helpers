@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `ThreadAmbient<T>` for per-thread context with nested scopes and safe repeated disposal ([#1175](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1175)).
+- Add stable little-endian integer hash steps, raw UTF-16 text hashing, and explicitly weak whole-word FNV folding ([#1174](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1174)).
+- Add `HoldSet` for independent input or pause holds, disposable handles, occupancy callbacks, and destroyed-owner cleanup ([#1183](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1183)).
 - Add `StopwatchTimestamp` for elapsed time and counter-tick conversions without a timer allocation ([#1179](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1179)).
 - Add stable in-place insertion sort for spans without renting a buffer ([#1157](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1157)).
 - Add optional struct discovery to `GetTypesDerivedFrom` while retaining the default class-only filter ([#1169](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1169)).
@@ -33,8 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Compute integer floor logarithms with portable branchless lookups, preserving zero and signed bit-pattern results ([#1170](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1170)).
 - Update bundled JSON and immutable collections to 10.0.15 while retaining Unity assembly constraints ([#1052](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1052)).
-- Reduce allocations and speed up dense drawn sprite bounds ([#1113](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1113)).
+- Reduce repeated pixel reads in sprite ink-region queries, reduce allocations, and speed up dense drawn sprite bounds ([#1113](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1113)).
 - Cache general-format enum flag names through the full mask when it fits in 256 slots ([#1168](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1168)).
 - Skip unset words when collecting or enumerating sparse `BitSet` indices.
 - Reduce repeated script searches during bulk binding validation ([#1106](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1106)).

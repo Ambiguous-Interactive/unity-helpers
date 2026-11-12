@@ -901,6 +901,85 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return hash;
         }
 
+        /// <summary>Appends an Int32's four little-endian two's-complement bytes to a stable hash.</summary>
+        /// <remarks>The result equals hashing those bytes with <paramref name="hash"/> as the seed, without a temporary buffer.</remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static ulong AppendStableHash64V1(ulong hash, int value)
+        {
+            uint remaining = unchecked((uint)value);
+            for (int index = 0; index < sizeof(int); ++index)
+            {
+                hash = unchecked((hash ^ (byte)remaining) * Fnv64Prime);
+                remaining >>= 8;
+            }
+            return hash;
+        }
+
+        /// <summary>Appends an Int64's eight little-endian two's-complement bytes to a stable hash.</summary>
+        /// <remarks>The result equals hashing those bytes with <paramref name="hash"/> as the seed, without a temporary buffer.</remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static ulong AppendStableHash64V1(ulong hash, long value)
+        {
+            ulong remaining = unchecked((ulong)value);
+            for (int index = 0; index < sizeof(long); ++index)
+            {
+                hash = unchecked((hash ^ (byte)remaining) * Fnv64Prime);
+                remaining >>= 8;
+            }
+            return hash;
+        }
+
+        /// <summary>Hashes raw UTF-16 code units as little-endian bytes with the frozen 64-bit FNV-1a algorithm.</summary>
+        /// <remarks>
+        /// No encoding buffer, normalization, surrogate replacement, or terminating null is used.
+        /// Empty input returns the seed. The explicit name keeps existing byte-span calls unambiguous.
+        /// This differs from UTF-8 text hashing and is not cryptographic.
+        /// </remarks>
+        public static ulong StableHashUtf16Le64V1(
+            ReadOnlySpan<char> text,
+            ulong seed = Fnv64OffsetBasis
+        )
+        {
+            ulong hash = seed;
+            foreach (char character in text)
+            {
+                hash = unchecked((hash ^ (byte)character) * Fnv64Prime);
+                hash = unchecked((hash ^ (byte)(character >> 8)) * Fnv64Prime);
+            }
+            return hash;
+        }
+
+        /// <summary>Folds each unsigned word into one frozen 64-bit FNV-1a multiply step.</summary>
+        /// <remarks>
+        /// Empty input returns the seed. This hashes whole words, not their bytes, and gives different results
+        /// from StableHash64V1. High-bit differences never reach lower bits, so this weak, noncryptographic
+        /// fold must not be treated as a general-purpose content digest. Future algorithms use other names.
+        /// </remarks>
+        public static ulong Fnv1aWordFold64(
+            ReadOnlySpan<ulong> words,
+            ulong seed = Fnv64OffsetBasis
+        )
+        {
+            ulong hash = seed;
+            foreach (ulong word in words)
+            {
+                hash = unchecked((hash ^ word) * Fnv64Prime);
+            }
+            return hash;
+        }
+
+        /// <summary>Folds signed words by their two's-complement bit patterns with the frozen word-fold algorithm.</summary>
+        /// <remarks>Shares the weak mixing and seed contract of <see cref="Fnv1aWordFold64(ReadOnlySpan{ulong}, ulong)"/>.</remarks>
+        public static ulong Fnv1aWordFold64(ReadOnlySpan<long> words, ulong seed = Fnv64OffsetBasis)
+        {
+            ulong hash = seed;
+            foreach (long word in words)
+            {
+                hash = unchecked((hash ^ (ulong)word) * Fnv64Prime);
+            }
+            return hash;
+        }
+
         /// <summary>
         /// Computes the SHA-256 digest of <paramref name="text"/> as a lowercase hex string.
         /// </summary>

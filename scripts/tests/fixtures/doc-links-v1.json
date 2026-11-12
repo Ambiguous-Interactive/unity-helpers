@@ -1,0 +1,846 @@
+[
+  {
+    "Result": {
+      "ExitCode": 0,
+      "Output": "Markdown link lint passed: no issues found."
+    },
+    "Case": {
+      "Name": "Pass_PsDocstringExampleIgnored",
+      "Files": [
+        {
+          "Path": "docs/readme.md",
+          "Content": "# Readme\n"
+        },
+        {
+          "Path": "scripts/example.ps1",
+          "Content": "<#\n.EXAMPLE\n    Some-Command -Path 'C:\\repo\\Docs\\readme.md'\n#>\nparam()\nWrite-Host 'ok'"
+        }
+      ],
+      "ExpectedExit": 0,
+      "ExpectedOutputContains": ["Markdown link lint passed"]
+    }
+  },
+  {
+    "Result": {
+      "ExitCode": 0,
+      "Output": "Markdown link lint passed: no issues found."
+    },
+    "Case": {
+      "Name": "Pass_CsXmlDocIgnored",
+      "Files": [
+        {
+          "Path": "src/foo.cs",
+          "Content": "class Foo {\n    /// <example>docs/foo.md</example>\n    public void Bar() { }\n}"
+        }
+      ],
+      "ExpectedExit": 0,
+      "ExpectedOutputContains": ["Markdown link lint passed"]
+    }
+  },
+  {
+    "Result": {
+      "ExitCode": 0,
+      "Output": "Markdown link lint passed: no issues found."
+    },
+    "Case": {
+      "Name": "Pass_CsBlockCommentIgnored",
+      "Files": [
+        {
+          "Path": "src/foo.cs",
+          "Content": "class Foo {\n    /* see docs/foo.md */\n    public void Bar() { }\n}"
+        }
+      ],
+      "ExpectedExit": 0,
+      "ExpectedOutputContains": ["Markdown link lint passed"]
+    }
+  },
+  {
+    "Result": {
+      "ExitCode": 0,
+      "Output": "Markdown link lint passed: no issues found."
+    },
+    "Case": {
+      "Name": "Pass_PythonTripleQuoteDocstringIgnored",
+      "Files": [
+        {
+          "Path": "src/foo.py",
+          "Content": "\"\"\"\nModule docs.\nSee docs/foo.md for details.\n\"\"\"\ndef bar():\n    pass"
+        }
+      ],
+      "ExpectedExit": 0,
+      "ExpectedOutputContains": ["Markdown link lint passed"]
+    }
+  },
+  {
+    "Result": {
+      "ExitCode": 0,
+      "Output": "Markdown link lint passed: no issues found."
+    },
+    "Case": {
+      "Name": "Pass_PythonHashCommentIgnored",
+      "Files": [
+        {
+          "Path": "src/foo.py",
+          "Content": "# docs/foo.md placeholder reference in comment\ndef bar():\n    pass"
+        }
+      ],
+      "ExpectedExit": 0,
+      "ExpectedOutputContains": ["Markdown link lint passed"]
+    }
+  },
+  {
+    "Result": {
+      "ExitCode": 0,
+      "Output": "Markdown link lint passed: no issues found."
+    },
+    "Case": {
+      "Name": "Pass_ShHashCommentIgnored",
+      "Files": [
+        {
+          "Path": "src/foo.sh",
+          "Content": "#!/usr/bin/env bash\n# docs/foo.md historical reference\necho ok"
+        }
+      ],
+      "ExpectedExit": 0,
+      "ExpectedOutputContains": ["Markdown link lint passed"]
+    }
+  },
+  {
+    "Result": {
+      "ExitCode": 0,
+      "Output": "Markdown link lint passed: no issues found."
+    },
+    "Case": {
+      "Name": "Pass_YamlHashCommentIgnored",
+      "Files": [
+        {
+          "Path": ".github/workflows/x.yml",
+          "Content": "name: X\n# docs/foo.md sample reference\non: [push]\njobs:\n  ok:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo ok"
+        }
+      ],
+      "ExpectedExit": 0,
+      "ExpectedOutputContains": ["Markdown link lint passed"]
+    }
+  },
+  {
+    "Result": {
+      "ExitCode": 0,
+      "Output": "Markdown link lint passed: no issues found."
+    },
+    "Case": {
+      "Name": "Pass_CmdRemIgnored",
+      "Files": [
+        {
+          "Path": "src/foo.cmd",
+          "Content": "@echo off\nREM docs/foo.md historical reference\necho ok"
+        }
+      ],
+      "ExpectedExit": 0,
+      "ExpectedOutputContains": ["Markdown link lint passed"]
+    }
+  },
+  {
+    "Result": {
+      "ExitCode": 1,
+      "Output": "/tmp/test-lint-doc-links-486400724/repo-147643037/scripts/example.ps1:5: Source reference 'docs/fictional-live.md' does not resolve to an existing markdown file\nMarkdown link lint failed: 1 issue(s) found."
+    },
+    "Case": {
+      "Name": "Pass_DocstringIgnoredButLiveReferenceCaught",
+      "Files": [
+        {
+          "Path": "scripts/example.ps1",
+          "Content": "<#\n.EXAMPLE\n    See docs/fictional-comment.md for details.\n#>\n$p = 'docs/fictional-live.md'\nWrite-Host $p"
+        }
+      ],
+      "ExpectedExit": 1,
+      "ExpectedOutputContains": ["docs/fictional-live.md"],
+      "ExpectedOutputNotContains": ["docs/fictional-comment.md"]
+    }
+  },
+  {
+    "Result": {
+      "ExitCode": 1,
+      "Output": "/tmp/test-lint-doc-links-486400724/repo-3614699/src/foo.cs:3: Source reference 'docs/nonexistent.md' does not resolve to an existing markdown file\nMarkdown link lint failed: 1 issue(s) found."
+    },
+    "Case": {
+      "Name": "Fail_LiveCsReferenceCaught",
+      "Files": [
+        {
+          "Path": "src/foo.cs",
+          "Content": "class Foo {\n    public void Bar() {\n        var path = \"docs/nonexistent.md\";\n    }\n}"
+        }
+      ],
+      "ExpectedExit": 1,
+      "ExpectedOutputContains": ["docs/nonexistent.md", "Source reference"],
+      "ExpectedOutputNotContains": [
+        "Bare .md mention",
+        "jekyll-relative-links",
+        "Absolute GitHub Pages path"
+      ]
+    }
+  },
+  {
+    "Result": {
+      "ExitCode": 1,
+      "Output": "/tmp/test-lint-doc-links-486400724/repo-1879928972/src/foo.ps1:1: Source reference 'docs/nonexistent.md' does not resolve to an existing markdown file\nMarkdown link lint failed: 1 issue(s) found."
+    },
+    "Case": {
+      "Name": "Fail_PsLiveReferenceCaught",
+      "Files": [
+        {
+          "Path": "src/foo.ps1",
+          "Content": "$x = 'docs/nonexistent.md'\nWrite-Host $x"
+        }
+      ],
+      "ExpectedExit": 1,
+      "ExpectedOutputContains": ["docs/nonexistent.md", "Source reference"],
+      "ExpectedOutputNotContains": [
+        "Bare .md mention",
+        "jekyll-relative-links",
+        "Absolute GitHub Pages path"
+      ]
+    }
+  },
+  {
+    "Result": {
+      "ExitCode": 1,
+      "Output": "/tmp/test-lint-doc-links-486400724/repo-2120831246/src/foo.py:1: Source reference 'docs/nonexistent.md' does not resolve to an existing markdown file\nMarkdown link lint failed: 1 issue(s) found."
+    },
+    "Case": {
+      "Name": "Fail_HashInQuotedStringStillLive",
+      "Files": [
+        {
+          "Path": "src/foo.py",
+          "Content": "x = \"docs/nonexistent.md # not a comment\""
+        }
+      ],
+      "ExpectedExit": 1,
+      "ExpectedOutputContains": ["docs/nonexistent.md", "Source reference"],
+      "ExpectedOutputNotContains": [
+        "Bare .md mention",
+        "jekyll-relative-links",
+        "Absolute GitHub Pages path"
+      ]
+    }
+  },
+  {
+    "Result": {
+      "ExitCode": 1,
+      "Output": "/tmp/test-lint-doc-links-486400724/repo-458339422/src/foo.cs:3: Source reference 'docs/nonexistent.md' does not resolve to an existing markdown file\nMarkdown link lint failed: 1 issue(s) found."
+    },
+    "Case": {
+      "Name": "Fail_ReferenceAfterClosingComment",
+      "Files": [
+        {
+          "Path": "src/foo.cs",
+          "Content": "class Foo {\n    public void Bar() {\n        /* intro */ var p = \"docs/nonexistent.md\";\n    }\n}"
+        }
+      ],
+      "ExpectedExit": 1,
+      "ExpectedOutputContains": ["docs/nonexistent.md", "Source reference"],
+      "ExpectedOutputNotContains": [
+        "Bare .md mention",
+        "jekyll-relative-links",
+        "Absolute GitHub Pages path"
+      ]
+    }
+  },
+  {
+    "Result": {
+      "ExitCode": 1,
+      "Output": "/tmp/test-lint-doc-links-486400724/repo-1251358250/README.md:1: Markdown link target './Docs/readme.md' does not resolve to an existing markdown file\nMarkdown link lint failed: 1 issue(s) found."
+    },
+    "Case": {
+      "Name": "Fail_CaseMismatchCaught_CrossPlatform",
+      "Files": [
+        {
+          "Path": "docs/readme.md",
+          "Content": "# Readme\n"
+        },
+        {
+          "Path": "README.md",
+          "Content": "See [docs](./Docs/readme.md).\n"
+        }
+      ],
+      "ExpectedExit": 1,
+      "ExpectedOutputContains": ["does not resolve to an existing markdown file"],
+      "ExpectedOutputNotContains": [
+        "missing relative prefix",
+        "jekyll-relative-links",
+        "Bare .md mention",
+        "Absolute GitHub Pages path"
+      ]
+    }
+  },
+  {
+    "Result": {
+      "ExitCode": 0,
+      "Output": "Markdown link lint passed: no issues found."
+    },
+    "Case": {
+      "Name": "Pass_ExactCaseMatches",
+      "Files": [
+        {
+          "Path": "docs/readme.md",
+          "Content": "# Readme\n"
+        },
+        {
+          "Path": "README.md",
+          "Content": "See [docs](./docs/readme.md).\n"
+        }
+      ],
+      "ExpectedExit": 0,
+      "ExpectedOutputContains": ["Markdown link lint passed"]
+    }
+  },
+  {
+    "Result": {
+      "ExitCode": 1,
+      "Output": "/tmp/test-lint-doc-links-486400724/repo-681267040/README.md:1: Bare .md mention; convert to [Readable Text](file.md)\nMarkdown link lint failed: 1 issue(s) found."
+    },
+    "Case": {
+      "Name": "Fail_BareMdMention_InMarkdown",
+      "Files": [
+        {
+          "Path": "README.md",
+          "Content": "See foo.md please.\n"
+        }
+      ],
+      "ExpectedExit": 1,
+      "ExpectedOutputContains": ["Bare .md mention"],
+      "ExpectedOutputNotContains": [
+        "jekyll-relative-links",
+        "Absolute GitHub Pages path",
+        "does not resolve to an existing markdown file"
+      ]
+    }
+  },
+  {
+    "Result": {
+      "ExitCode": 1,
+      "Output": "/tmp/test-lint-doc-links-486400724/repo-2075081588/README.md:1: Inline code mentions markdown file 'docs/readme.md'; use a human-readable link instead\nMarkdown link lint failed: 1 issue(s) found."
+    },
+    "Case": {
+      "Name": "Fail_InlineCodeMarkdownReference_InMarkdown",
+      "Files": [
+        {
+          "Path": "README.md",
+          "Content": "See `docs/readme.md` please."
+        }
+      ],
+      "ExpectedExit": 1,
+      "ExpectedOutputContains": ["Inline code mentions markdown file", "docs/readme.md"],
+      "ExpectedOutputNotContains": [
+        "Bare .md mention",
+        "jekyll-relative-links",
+        "Absolute GitHub Pages path",
+        "does not resolve to an existing markdown file"
+      ]
+    }
+  },
+  {
+    "Result": {
+      "ExitCode": 0,
+      "Output": "Markdown link lint passed: no issues found."
+    },
+    "Case": {
+      "Name": "Pass_InlineCodeMarkdownGlobsAllowed",
+      "Files": [
+        {
+          "Path": "README.md",
+          "Content": "Patterns: `.md`, `*.md`, and `**/*.md`."
+        }
+      ],
+      "ExpectedExit": 0,
+      "ExpectedOutputContains": ["Markdown link lint passed"]
+    }
+  },
+  {
+    "Result": {
+      "ExitCode": 0,
+      "Output": "Markdown link lint passed: no issues found."
+    },
+    "Case": {
+      "Name": "Pass_InlineCodeMdxMentionAllowed",
+      "Files": [
+        {
+          "Path": "README.md",
+          "Content": "Use `foo.mdx` for MDX examples."
+        }
+      ],
+      "ExpectedExit": 0,
+      "ExpectedOutputContains": ["Markdown link lint passed"]
+    }
+  },
+  {
+    "Result": {
+      "ExitCode": 1,
+      "Output": "/tmp/test-lint-doc-links-486400724/repo-1956047316/README.md:1: Internal link 'docs/readme.md' missing relative prefix (./ or ../); jekyll-relative-links requires explicit relative paths\nMarkdown link lint failed: 1 issue(s) found."
+    },
+    "Case": {
+      "Name": "Fail_MissingRelativePrefix_InMarkdown",
+      "Files": [
+        {
+          "Path": "docs/readme.md",
+          "Content": "# Readme\n"
+        },
+        {
+          "Path": "README.md",
+          "Content": "See [readme](docs/readme.md).\n"
+        }
+      ],
+      "ExpectedExit": 1,
+      "ExpectedOutputContains": ["jekyll-relative-links"],
+      "ExpectedOutputNotContains": [
+        "Bare .md mention",
+        "Absolute GitHub Pages path",
+        "does not resolve to an existing markdown file"
+      ]
+    }
+  },
+  {
+    "Result": {
+      "ExitCode": 1,
+      "Output": "/tmp/test-lint-doc-links-486400724/repo-661923498/README.md:1: Absolute GitHub Pages path '/unity-helpers/foo' will break in CI; use relative path instead (e.g., './foo')\n/tmp/test-lint-doc-links-486400724/repo-661923498/README.md:1: Markdown link target '/unity-helpers/foo' does not resolve to an existing local file or directory\nMarkdown link lint failed: 2 issue(s) found."
+    },
+    "Case": {
+      "Name": "Fail_AbsoluteGitHubPagesPath_InMarkdown",
+      "Files": [
+        {
+          "Path": "README.md",
+          "Content": "See [home](/unity-helpers/foo).\n"
+        }
+      ],
+      "ExpectedExit": 1,
+      "ExpectedOutputContains": ["Absolute GitHub Pages path"],
+      "ExpectedOutputNotContains": [
+        "Bare .md mention",
+        "jekyll-relative-links",
+        "does not resolve to an existing markdown file"
+      ]
+    }
+  },
+  {
+    "Result": {
+      "ExitCode": 1,
+      "Output": "/tmp/test-lint-doc-links-486400724/repo-2054357541/README.md:1: Markdown link target './Docs/missing.md' does not resolve to an existing markdown file\nMarkdown link lint failed: 1 issue(s) found."
+    },
+    "Case": {
+      "Name": "Fail_SingleLineMarkdownNoTrailingNewline",
+      "Files": [
+        {
+          "Path": "README.md",
+          "Content": "See [docs](./Docs/missing.md).",
+          "NoNewline": true
+        }
+      ],
+      "ExpectedExit": 1,
+      "ExpectedOutputContains": [
+        "Docs/missing.md",
+        "does not resolve to an existing markdown file"
+      ],
+      "ExpectedOutputNotContains": [
+        "Bare .md mention",
+        "jekyll-relative-links",
+        "Absolute GitHub Pages path"
+      ]
+    }
+  },
+  {
+    "Result": {
+      "ExitCode": 0,
+      "Output": "Markdown link lint passed: no issues found."
+    },
+    "Case": {
+      "Name": "Pass_ValidMarkdownLink",
+      "Files": [
+        {
+          "Path": "docs/readme.md",
+          "Content": "# Readme\n"
+        },
+        {
+          "Path": "README.md",
+          "Content": "See [readme](./docs/readme.md).\n"
+        }
+      ],
+      "ExpectedExit": 0,
+      "ExpectedOutputContains": ["Markdown link lint passed"]
+    }
+  },
+  {
+    "Result": {
+      "ExitCode": 0,
+      "Output": "Markdown link lint passed: no issues found."
+    },
+    "Case": {
+      "Name": "Pass_ValidNonMarkdownLocalFileLink",
+      "Files": [
+        {
+          "Path": "LICENSE",
+          "Content": "MIT\n"
+        },
+        {
+          "Path": "README.md",
+          "Content": "See the [license](./LICENSE).\n"
+        }
+      ],
+      "ExpectedExit": 0,
+      "ExpectedOutputContains": ["Markdown link lint passed"]
+    }
+  },
+  {
+    "Result": {
+      "ExitCode": 0,
+      "Output": "Markdown link lint passed: no issues found."
+    },
+    "Case": {
+      "Name": "Pass_ValidLocalDirectoryLink",
+      "Files": [
+        {
+          "Path": "docs/readme.md",
+          "Content": "# Readme\n"
+        },
+        {
+          "Path": "README.md",
+          "Content": "See the [docs directory](./docs).\n"
+        }
+      ],
+      "ExpectedExit": 0,
+      "ExpectedOutputContains": ["Markdown link lint passed"]
+    }
+  },
+  {
+    "Result": {
+      "ExitCode": 0,
+      "Output": "Markdown link lint passed: no issues found."
+    },
+    "Case": {
+      "Name": "Pass_ValidLocalDirectoryLinkWithTrailingSlash",
+      "Files": [
+        {
+          "Path": "docs/readme.md",
+          "Content": "# Readme\n"
+        },
+        {
+          "Path": "README.md",
+          "Content": "See the [docs directory](./docs/).\n"
+        }
+      ],
+      "ExpectedExit": 0,
+      "ExpectedOutputContains": ["Markdown link lint passed"]
+    }
+  },
+  {
+    "Result": {
+      "ExitCode": 0,
+      "Output": "Markdown link lint passed: no issues found."
+    },
+    "Case": {
+      "Name": "Pass_SourceDirectorySelfLink",
+      "Files": [
+        {
+          "Path": "docs/readme.md",
+          "Content": "See this [directory](./).\n"
+        }
+      ],
+      "ExpectedExit": 0,
+      "ExpectedOutputContains": ["Markdown link lint passed"]
+    }
+  },
+  {
+    "Result": {
+      "ExitCode": 0,
+      "Output": "Markdown link lint passed: no issues found."
+    },
+    "Case": {
+      "Name": "Pass_RepoRootDirectorySelfLink",
+      "Files": [
+        {
+          "Path": "README.md",
+          "Content": "See this [repository root](./).\n"
+        }
+      ],
+      "ExpectedExit": 0,
+      "ExpectedOutputContains": ["Markdown link lint passed"]
+    }
+  },
+  {
+    "Result": {
+      "ExitCode": 0,
+      "Output": "Markdown link lint passed: no issues found."
+    },
+    "Case": {
+      "Name": "Pass_ParentDirectoryRepoRootLink",
+      "Files": [
+        {
+          "Path": "docs/readme.md",
+          "Content": "See the [repository root](../).\n"
+        }
+      ],
+      "ExpectedExit": 0,
+      "ExpectedOutputContains": ["Markdown link lint passed"]
+    }
+  },
+  {
+    "Result": {
+      "ExitCode": 0,
+      "Output": "Markdown link lint passed: no issues found."
+    },
+    "Case": {
+      "Name": "Pass_ValidSamplesReadmeLink",
+      "Files": [
+        {
+          "Path": "Samples~/DI - VContainer/README.md",
+          "Content": "# VContainer Sample\n"
+        },
+        {
+          "Path": "README.md",
+          "Content": "See [sample](./Samples~/DI%20-%20VContainer/README.md).\n"
+        }
+      ],
+      "ExpectedExit": 0,
+      "ExpectedOutputContains": ["Markdown link lint passed"]
+    }
+  },
+  {
+    "Result": {
+      "ExitCode": 0,
+      "Output": "Markdown link lint passed: no issues found."
+    },
+    "Case": {
+      "Name": "Pass_InlineCodePseudoLinkIgnoredByLocalTargetValidation",
+      "Files": [
+        {
+          "Path": "README.md",
+          "Content": "Use format `[Display Text](Page)` in examples.\n"
+        }
+      ],
+      "ExpectedExit": 0,
+      "ExpectedOutputContains": ["Markdown link lint passed"]
+    }
+  },
+  {
+    "Result": {
+      "ExitCode": 1,
+      "Output": "/tmp/test-lint-doc-links-486400724/repo-802299342/README.md:1: Markdown link target './LICENSE' does not resolve to an existing local file or directory\nMarkdown link lint failed: 1 issue(s) found."
+    },
+    "Case": {
+      "Name": "Fail_BrokenNonMarkdownLocalFileLink",
+      "Files": [
+        {
+          "Path": "README.md",
+          "Content": "See the [license](./LICENSE).\n"
+        }
+      ],
+      "ExpectedExit": 1,
+      "ExpectedOutputContains": ["LICENSE", "local file or directory"],
+      "ExpectedOutputNotContains": [
+        "Bare .md mention",
+        "jekyll-relative-links",
+        "Absolute GitHub Pages path"
+      ]
+    }
+  },
+  {
+    "Result": {
+      "ExitCode": 1,
+      "Output": "/tmp/test-lint-doc-links-486400724/repo-1052686910/README.md:3: Reference link target './LICENSE' does not resolve to an existing local file or directory\nMarkdown link lint failed: 1 issue(s) found."
+    },
+    "Case": {
+      "Name": "Fail_BrokenReferenceDefinitionNonMarkdownLink",
+      "Files": [
+        {
+          "Path": "README.md",
+          "Content": "See the [license][license].\n\n[license]: ./LICENSE\n"
+        }
+      ],
+      "ExpectedExit": 1,
+      "ExpectedOutputContains": ["Reference link target", "LICENSE", "local file or directory"],
+      "ExpectedOutputNotContains": [
+        "Bare .md mention",
+        "jekyll-relative-links",
+        "Absolute GitHub Pages path"
+      ]
+    }
+  },
+  {
+    "Result": {
+      "ExitCode": 1,
+      "Output": "/tmp/test-lint-doc-links-486400724/repo-711538505/README.md:1: Markdown link target './Samples~/Missing/README.md' does not resolve to an existing markdown file\nMarkdown link lint failed: 1 issue(s) found."
+    },
+    "Case": {
+      "Name": "Fail_BrokenSamplesReadmeLink",
+      "Files": [
+        {
+          "Path": "README.md",
+          "Content": "See [sample](./Samples~/Missing/README.md).\n"
+        }
+      ],
+      "ExpectedExit": 1,
+      "ExpectedOutputContains": [
+        "Samples~/Missing/README.md",
+        "does not resolve to an existing markdown file"
+      ],
+      "ExpectedOutputNotContains": [
+        "Bare .md mention",
+        "jekyll-relative-links",
+        "Absolute GitHub Pages path"
+      ]
+    }
+  },
+  {
+    "Result": {
+      "ExitCode": 0,
+      "Output": "Markdown link lint passed: no issues found.\n"
+    },
+    "Case": {
+      "Name": "Pass_SubdirectoryInvocationUsesRepoRootAnchoring",
+      "Files": [
+        {
+          "Path": "docs/readme.md",
+          "Content": "# Readme\n"
+        },
+        {
+          "Path": "README.md",
+          "Content": "See [readme](./docs/readme.md).\n"
+        }
+      ],
+      "WorkingDirectoryRelativePath": "docs",
+      "Cli": true,
+      "ExpectedExit": 0,
+      "ExpectedOutputContains": ["Markdown link lint passed"]
+    }
+  },
+  {
+    "Result": {
+      "ExitCode": 1,
+      "Output": "/tmp/test-lint-doc-links-486400724/repo-341135271/README.md:1: Bare .md mention; convert to [Readable Text](file.md)\nMarkdown link lint failed: 1 issue(s) found."
+    },
+    "Case": {
+      "Name": "Fail_PathScopedListedMarkdownViolation",
+      "Files": [
+        {
+          "Path": "README.md",
+          "Content": "See foo.md please.\n"
+        },
+        {
+          "Path": "docs/readme.md",
+          "Content": "# Readme\n"
+        }
+      ],
+      "Paths": ["README.md"],
+      "ExpectedExit": 1,
+      "ExpectedOutputContains": ["Bare .md mention"]
+    }
+  },
+  {
+    "Result": {
+      "ExitCode": 0,
+      "Output": "Markdown link lint passed: no issues found."
+    },
+    "Case": {
+      "Name": "Pass_PathScopedUnlistedMarkdownViolationIgnored",
+      "Files": [
+        {
+          "Path": "README.md",
+          "Content": "See foo.md please.\n"
+        },
+        {
+          "Path": "docs/readme.md",
+          "Content": "# Readme\n"
+        }
+      ],
+      "Paths": ["docs/readme.md"],
+      "ExpectedExit": 0,
+      "ExpectedOutputContains": ["Markdown link lint passed"]
+    }
+  },
+  {
+    "Result": {
+      "ExitCode": 1,
+      "Output": "/tmp/test-lint-doc-links-486400724/repo-1083345383/README.md:1: Bare .md mention; convert to [Readable Text](file.md)\nMarkdown link lint failed: 1 issue(s) found.\n"
+    },
+    "Case": {
+      "Name": "Fail_PathScopedSecondPathViolationCaught",
+      "Files": [
+        {
+          "Path": "docs/readme.md",
+          "Content": "# Readme\n"
+        },
+        {
+          "Path": "README.md",
+          "Content": "See foo.md please.\n"
+        }
+      ],
+      "Paths": ["docs/readme.md", "README.md"],
+      "Cli": true,
+      "ExpectedExit": 1,
+      "ExpectedOutputContains": ["Bare .md mention"]
+    }
+  },
+  {
+    "Result": {
+      "ExitCode": 0,
+      "Output": "Markdown link lint passed: no issues found.\n"
+    },
+    "Case": {
+      "Name": "Pass_FormatModeSkipsBrokenLocalTarget",
+      "Mode": "Format",
+      "Cli": true,
+      "Files": [
+        {
+          "Path": "README.md",
+          "Content": "See [missing](./docs/missing.md).\n"
+        }
+      ],
+      "ExpectedExit": 0,
+      "ExpectedOutputContains": ["Markdown link lint passed"],
+      "ExpectedOutputNotContains": ["does not resolve to an existing markdown file"]
+    }
+  },
+  {
+    "Result": {
+      "ExitCode": 0,
+      "Output": "Markdown link lint passed: no issues found."
+    },
+    "Case": {
+      "Name": "Pass_TargetModeSkipsMissingRelativePrefix",
+      "Mode": "Targets",
+      "Files": [
+        {
+          "Path": "docs/readme.md",
+          "Content": "# Readme\n"
+        },
+        {
+          "Path": "README.md",
+          "Content": "See [readme](docs/readme.md).\n"
+        }
+      ],
+      "ExpectedExit": 0,
+      "ExpectedOutputContains": ["Markdown link lint passed"],
+      "ExpectedOutputNotContains": ["jekyll-relative-links"]
+    }
+  },
+  {
+    "Result": {
+      "ExitCode": 1,
+      "Output": "/tmp/test-lint-doc-links-486400724/repo-1024208872/README.md:1: Markdown link target './docs/missing.md' does not resolve to an existing markdown file\nMarkdown link lint failed: 1 issue(s) found."
+    },
+    "Case": {
+      "Name": "Fail_TargetModeCatchesBrokenLocalTarget",
+      "Mode": "Targets",
+      "Files": [
+        {
+          "Path": "README.md",
+          "Content": "See [missing](./docs/missing.md).\n"
+        }
+      ],
+      "ExpectedExit": 1,
+      "ExpectedOutputContains": [
+        "docs/missing.md",
+        "does not resolve to an existing markdown file"
+      ],
+      "ExpectedOutputNotContains": ["jekyll-relative-links"]
+    }
+  }
+]

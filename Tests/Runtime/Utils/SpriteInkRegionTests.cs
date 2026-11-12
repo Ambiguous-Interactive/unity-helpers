@@ -158,6 +158,145 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             );
         }
 
+        [TestCase(0, 0f)]
+        [TestCase(0, 0.5f)]
+        [TestCase(0, 1f)]
+        [TestCase(1, 0f)]
+        [TestCase(1, 0.5f)]
+        [TestCase(1, 1f)]
+        [TestCase(2, 0f)]
+        [TestCase(2, 0.5f)]
+        [TestCase(2, 1f)]
+        [TestCase(3, 0f)]
+        [TestCase(3, 0.5f)]
+        [TestCase(3, 1f)]
+        public void SmallBinaryRegionsAgreeWithIndependentConnectivityOracle(
+            int alphaMode,
+            float share
+        )
+        {
+            const int width = 3;
+            const int height = 2;
+            const int count = width * height;
+            for (int pattern = 0; pattern < 1 << count; ++pattern)
+            {
+                Color32[] storage = new Color32[20];
+                int[] colours = new int[count];
+                int[] parents = new int[count];
+                int blackCount = 0;
+                int whiteCount = 0;
+                for (int index = 0; index < count; ++index)
+                {
+                    bool black = (pattern & (1 << index)) != 0;
+                    Color32 pixel = black
+                        ? new Color32(0, 0, 0, 255)
+                        : new Color32(255, 255, 255, 127);
+                    int x = index % width;
+                    int y = index / width;
+                    storage[(y + 1) * 5 + x + 1] = pixel;
+                    bool opaque = (alphaMode & 1) != 0 || ((alphaMode & 2) != 0 ? !black : black);
+                    colours[index] = opaque ? (black ? 0 : 1) : -1;
+                    blackCount += colours[index] == 0 ? 1 : 0;
+                    whiteCount += colours[index] == 1 ? 1 : 0;
+                    parents[index] = index;
+                }
+                int opaqueCount = blackCount + whiteCount;
+                float required = share * opaqueCount;
+                int selected =
+                    0 < blackCount && required <= blackCount ? 0
+                    : 0 < whiteCount && required <= whiteCount ? 1
+                    : -1;
+                int[] sizes = new int[count];
+                int[] sumsX = new int[count];
+                int[] sumsY = new int[count];
+                for (int first = 0; first < count; ++first)
+                {
+                    if (selected < 0 || colours[first] != selected)
+                    {
+                        continue;
+                    }
+                    for (int second = 0; second < first; ++second)
+                    {
+                        int distance =
+                            System.Math.Abs(first % width - second % width)
+                            + System.Math.Abs(first / width - second / width);
+                        if (distance != 1 || colours[second] != selected)
+                        {
+                            continue;
+                        }
+                        int left = Root(first);
+                        int right = Root(second);
+                        parents[System.Math.Max(left, right)] = System.Math.Min(left, right);
+                    }
+                }
+                for (int index = 0; index < count; ++index)
+                {
+                    if (selected < 0 || colours[index] != selected)
+                    {
+                        continue;
+                    }
+                    int root = Root(index);
+                    ++sizes[root];
+                    sumsX[root] += index % width;
+                    sumsY[root] += index / width;
+                }
+                int largest = 0;
+                for (int index = 1; index < count; ++index)
+                {
+                    if (sizes[largest] < sizes[index])
+                    {
+                        largest = index;
+                    }
+                }
+                Vector2 pivot = new(1.25f, 2.5f);
+                Vector2 units = new(0.3f, 0.6f);
+                SpritePixelRegion region = new(
+                    storage,
+                    5,
+                    new RectInt(1, 1, width, height),
+                    pivot,
+                    units,
+                    ignoreSourceAlpha: (alphaMode & 1) != 0,
+                    alphaFromGrayscale: (alphaMode & 2) != 0
+                );
+                bool found = SpriteArtBounds.TryGetCentreOfLargestDarkestInkRegion(
+                    region,
+                    share,
+                    out Vector2 centre,
+                    out string error
+                );
+                Assert.That(
+                    found,
+                    Is.EqualTo(0 < sizes[largest]),
+                    $"pattern={pattern} mode={alphaMode} share={share}: {error}"
+                );
+                if (found)
+                {
+                    float expectedX = (float)(
+                        (sumsX[largest] / (double)sizes[largest] + 0.5 - pivot.x) * units.x
+                    );
+                    float expectedY = (float)(
+                        (sumsY[largest] / (double)sizes[largest] + 0.5 - pivot.y) * units.y
+                    );
+                    Assert.That(centre.x, Is.EqualTo(expectedX).Within(0.000001f));
+                    Assert.That(centre.y, Is.EqualTo(expectedY).Within(0.000001f));
+                }
+                else
+                {
+                    Assert.That(centre, Is.EqualTo(Vector2.zero));
+                }
+
+                int Root(int index)
+                {
+                    while (parents[index] != index)
+                    {
+                        index = parents[index];
+                    }
+                    return index;
+                }
+            }
+        }
+
         [TestCaseSource(nameof(Centres))]
         public void ColourShareConnectivityAndTiesHaveStableCentres(
             string[] rows,

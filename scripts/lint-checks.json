@@ -187,7 +187,7 @@
   {
     "id": "doc-links-test",
     "name": "Doc-link linter self-test",
-    "run": "pwsh -NoProfile -File scripts/tests/test-lint-doc-links.ps1 -VerboseOutput"
+    "run": "uv run --quiet --project scripts/python~ --locked pytest scripts/tests/test_doc_links.py -q"
   },
   {
     "id": "deprecated-external-links",
@@ -197,7 +197,7 @@
   {
     "id": "doc-links",
     "name": "Markdown links (targets and format)",
-    "run": "pwsh -NoProfile -File scripts/lint-doc-links.ps1 -Mode All -VerboseOutput"
+    "run": "uv run --quiet --project scripts/python~ --locked --no-dev python scripts/lint_doc_links.py --verbose"
   },
   {
     "id": "gitignore-docs",

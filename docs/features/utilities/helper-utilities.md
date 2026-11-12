@@ -774,6 +774,39 @@ using (var buffer = Buffers<Transform>.List.Get())
 
 ## Threading
 
+### Per-thread context (`ThreadAmbient<T>`)
+
+`ThreadAmbient<T>.Current` reads the current thread's scoped context. `Push(value)` returns a
+readonly struct scope that restores the previous value when disposed. Nested scopes restore in
+reverse order, and copied or repeatedly disposed scopes cannot overwrite a newer scope. Null
+and default are valid context values.
+
+All callers using the same closed `T` share one context on each thread. Use distinct context types
+for independent channels. Values stay on their originating thread and do not flow across async
+continuations. An early or cross-thread disposal does nothing; it can be retried on the owning
+thread after its child scopes finish. `Scope.IsCurrent` reports only the current top scope.
+
+Push and disposal use no locks or per-scope managed allocations. Each thread receives an atomic
+identity on its first push; later pushes use only thread-local state. Runtime thread/type
+initialization is separate from the warmed allocation contract. Exhausting the finite identity
+space returns an inactive scope. This complements `RestorableGlobal<T>` when workers need
+independent context rather than one shared value.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using WallstopStudios.UnityHelpers.Core.Threading;
+
+using (ThreadAmbient<string>.Scope outer = ThreadAmbient<string>.Push("generation"))
+{
+    using (ThreadAmbient<string>.Scope inner = ThreadAmbient<string>.Push("solver"))
+    {
+        System.Console.WriteLine(ThreadAmbient<string>.Current);
+    }
+    System.Console.WriteLine(ThreadAmbient<string>.Current);
+}
+```
+
 ### UnityMainThreadDispatcher
 
 **Execute code on Unity's main thread from background threads:**
@@ -1569,6 +1602,41 @@ ulong signature = Objects.StableHash64V1(Encoding.UTF8.GetBytes("foobar"));
 // signature is 0x85944171f73967e8.
 ```
 
+`Objects.AppendStableHash64V1(hash, intValue)` and `(hash, longValue)` append exactly four or
+eight little-endian two's-complement bytes without creating a byte array. An `int` and the
+same numeric value as a `long` therefore append different byte sequences. The byte order and
+signed representation are frozen across platforms.
+
+`Objects.StableHashUtf16Le64V1(text.AsSpan(), seed)` hashes each raw UTF-16 code unit low byte first,
+then high byte. It does not normalize text, replace unpaired surrogates, or append a terminator.
+The optional seed defaults to `Objects.Fnv64OffsetBasis`. The explicit name preserves existing
+`StableHash64V1(default)` and `StableHash64V1(default, seed)` byte-span calls, including literal seeds. The scalar append forms also use a distinct name
+for this source compatibility.
+UTF-16 and UTF-8 hashes differ: use the format your persisted data already uses.
+
+`Objects.Fnv1aWordFold64(words, seed)` accepts signed or unsigned 64-bit word spans. Each whole
+word contributes one XOR and multiply; signed words contribute their two's-complement bits.
+It returns the seed for empty input and supports chunk folding. This first word-fold algorithm
+is permanently frozen; later algorithms will use different names.
+
+Whole-word folding is deliberately weak. A difference confined to high bits never reaches the
+lower bits, even after more words are folded. It is useful when reproducing an existing word
+signature, and gives different results from hashing those words' bytes. Keep exact state equality
+when resolving collisions; use a stronger digest for content identity or security.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using System;
+using WallstopStudios.UnityHelpers.Core.Helper;
+
+ulong hash = Objects.AppendStableHash64V1(Objects.Fnv64OffsetBasis, -42);
+hash = Objects.AppendStableHash64V1(hash, long.MinValue);
+ulong textHash = Objects.StableHashUtf16Le64V1("example".AsSpan());
+long[] words = { 0, 1, -1, long.MinValue };
+ulong wordSignature = Objects.Fnv1aWordFold64(words);
+```
+
 The constants and test vectors follow the [FNV specification](https://www.ietf.org/archive/id/draft-eastlake-fnv-35.html).
 Both FNV variants allow collisions and are non-cryptographic.
 
@@ -1658,6 +1726,9 @@ It does not change import settings.
 - Missing pixels, no fully opaque colour, no qualifying colour, and unrepresentable local
   coordinates return false, a zero centre, and a reason. Scratch arrays and colour counts are pooled;
   the texture pixel read still allocates its colour array.
+
+The [ink traversal measurements](../../performance/sprite-ink-traversal.md) describe a measured
+checkerboard improvement and the limits of that comparison.
 
 Apply `AsDrawn` for renderer flips, then `LowestCornerY` for world position, rotation and scale.
 Flips mirror around the renderer origin. The lowest corner can differ from the transformed
@@ -1838,6 +1909,13 @@ trailing zero count, floor log2, highest-bit isolation, power-of-two detection a
 ceiling that data structures, sorters and capacity sizing keep re-implementing. Every method is a
 pure, allocation-free function of its inputs; signed overloads interpret their argument as the
 two's-complement bit pattern.
+
+The unsigned `Log2` forms use bit smearing and portable de Bruijn indexing instead of a
+chain of input comparisons.
+`Log2(0)` and `Log2(1)` return zero. Logarithm and trailing-zero lookup data use constant
+read-only spans. Mono uses fixed array caches initialized once because its span construction
+is slower on this path; warm calls create no lookup arrays. See the
+[native measurements and replay](../../performance/bit-lookup-tables.md).
 
 <!-- doc-sample: compiles -->
 

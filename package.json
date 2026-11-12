@@ -130,8 +130,8 @@
   "scripts": {
     "docs:serve": "bundle exec jekyll serve --baseurl \"\" --livereload",
     "docs:build": "bundle exec jekyll build --baseurl \"\"",
-    "lint:docs": "node ./scripts/run-doc-link-lint.js",
-    "lint:doc-links": "node ./scripts/run-doc-link-lint.js --verbose",
+    "lint:docs": "uv run --quiet --project scripts/python~ --locked --no-dev python scripts/lint_doc_links.py",
+    "lint:doc-links": "uv run --quiet --project scripts/python~ --locked --no-dev python scripts/lint_doc_links.py --verbose",
     "lint:code-samples": "uv run --project scripts/python~ --locked --no-dev --group documentation python scripts/extract_code_samples.py --extract-only",
     "lint:doc-identifiers": "uv run --project scripts/python~ --locked --no-dev python scripts/lint_doc_identifiers.py",
     "lint:code-samples:verbose": "uv run --project scripts/python~ --locked --no-dev --group documentation python scripts/extract_code_samples.py --verbose --extract-only",

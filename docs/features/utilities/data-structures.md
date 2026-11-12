@@ -8,6 +8,44 @@
 
 This guide covers several foundational data structures used across the library and when to use them.
 
+## Counted holds
+
+`HoldSet` keeps input, pause, and loading locks held until every acquisition is released.
+Each `Acquire(owner)` creates an independent hold, even when the same owner acquires twice.
+The first-acquired callback runs on the empty-to-held transition; the last-released callback
+runs on the held-to-empty transition. State changes are committed before callbacks run, so
+callbacks can query, clear, dispose, or acquire from the set again.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using WallstopStudios.UnityHelpers.Core.DataStructure;
+
+using HoldSet inputHolds = new();
+object animationOwner = new();
+using (HoldSet.Handle hold = inputHolds.Acquire(animationOwner))
+{
+    bool inputBlocked = inputHolds.IsHeld;
+}
+```
+
+Handles are value types; disposing one repeatedly, or disposing copies of it, releases its
+acquisition once. A default handle is inactive. `Handle.IsHeld` queries that acquisition's current
+state. `Clear()` releases current holds and permits new ones; old handles cannot release a later
+acquisition. Disposing the set releases all holds and permanently refuses new acquisitions.
+
+Null and destroyed Unity owners cannot acquire. Call `SweepDestroyedOwners()` from your main-thread
+update or teardown to release holds whose Unity owners have since been destroyed. It returns the
+number released, leaves live Unity and ordinary managed owners held, and commits the whole sweep
+before invoking the final-release callback. Counts include destroyed owners until a sweep occurs.
+Ordinary managed owners remain held until their handles, or the set, release them.
+
+Use the set and its handles on the Unity main thread. Callback failures are logged. A failed
+first-acquired callback rolls back that acquisition and returns an inactive handle; other holds
+created by the callback remain independent. Release and disposal still commit when a callback fails.
+Handles do not allocate unless boxed as `IDisposable`; the set's dictionary and sweep scratch list
+can grow with peak usage and retain capacity for reuse. It holds owners strongly while acquired.
+
 ## Unsigned 64-Bit Maps and Sets
 
 `LongMap<TValue>` and `LongSet` accept every `ulong` key, including zero and `ulong.MaxValue`.
@@ -613,6 +651,17 @@ main. The candidate is rejected and `IntMap` is unchanged. This is neither a Mon
 qualification against the original consumer budget. The archive contains source inputs, replay code and receipts. Copy `src/`, `IntMapAb.csproj`,
 `global.json` and `measure.py` into a fresh directory, then run
 `python3 measure.py --runtime net10 --processes 2` with SDK 10.0.403 installed.
+
+### Rejected Empty-Count-Guard Experiment
+
+The [empty-count-guard capture](../../performance/intmap-empty-guard-rejected.zip) removes only
+`TryGet`'s early empty-count check from main `af80061e`. Three fresh Linux x64 processes per runtime
+use the same 159-cell calibrated harness and independent value checks. Mono lookup cells improve,
+but 16,384-entry .NET 10 hit medians regress in every process for dense, sparse and shifted keys;
+median paired ratios are 1.230, 1.175 and 1.246. The candidate is rejected and production remains
+unchanged. All six processes exit zero, reach both stream ends and retain stable input and binary
+hashes. The archive preserves raw rounds, sources, checksums and replay commands. This expanded
+main comparison does not satisfy the recovered original consumer's 3.7.1 budget or qualify Unity players.
 
 ## String Wrapper (Interned Flyweight)
 
