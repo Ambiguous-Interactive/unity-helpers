@@ -601,7 +601,8 @@ standalone environments; current wiki CI uses the shared uv lock.
 
 `npm run sync:readme-mirror` generates [the documentation front page](../readme.md) from the root README with
 `readme_mirror.py`. `npm run lint:readme-mirror` checks it without writing. Both use
-locked Python; the historical Node commands remain compatibility launchers.
+locked Python and the shared documentation parser; the historical Node commands
+remain compatibility launchers.
 Prettier still formats the generated Markdown. Cross-document fragments map from
 the target headings; source prose and fenced examples retain their content.
 Missing or empty sources, unsafe output links, and formatter errors fail the

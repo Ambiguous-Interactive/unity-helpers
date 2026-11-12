@@ -395,3 +395,87 @@ def test_inline_code_cannot_suppress_links_in_another_paragraph(tmp_path: Path) 
     _, problems = build_mirror(source, documents.__getitem__, tmp_path)
     assert len(problems) == 1
     assert "does not exist" in problems[0]
+
+
+@pytest.mark.parametrize(
+    "prefix",
+    [
+        "# `Title\n",
+        "`unclosed\n# Heading\n",
+        "`unclosed\n***\n",
+        "`unclosed\n---\n",
+        "- `unclosed\n- ",
+        "`unclosed\n> ",
+    ],
+)
+def test_block_boundaries_do_not_hide_missing_targets(
+    tmp_path: Path, prefix: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    documents = populate(tmp_path)
+    source = tmp_path / "README.md"
+    text = prefix + "[Missing](./docs/missing.md) `end`\n"
+    source.write_text(text, encoding="utf-8")
+    _, problems = build_mirror(text, documents.__getitem__, tmp_path)
+    assert len(problems) == 1
+    assert "does not exist" in problems[0]
+    mirror = tmp_path / "docs/readme.md"
+    mirror.write_text("previous mirror", encoding="utf-8")
+    assert main(["--repo-root", str(tmp_path), "--check"]) == 1
+    assert "does not exist" in capsys.readouterr().err
+    assert mirror.read_text(encoding="utf-8") == "previous mirror"
+
+
+def test_heading_links_are_still_rewritten(tmp_path: Path) -> None:
+    documents = populate(tmp_path)
+    source = "# [Log](./CHANGELOG.md) and `[Example](./missing.md)`\n"
+    content, problems = build_mirror(source, documents.__getitem__, tmp_path)
+    assert problems == []
+    assert "[Log](https://github.com/wallstop/unity-helpers/blob/main/CHANGELOG.md)" in content
+    assert "`[Example](./missing.md)`" in content
+
+
+def test_indented_examples_are_preserved(tmp_path: Path) -> None:
+    source = "# Title\n\n    [Example](./docs/missing.md)\n"
+    content, problems = build_mirror(source, lambda _: source, tmp_path)
+    assert problems == []
+    assert content == BANNER + "\n\n" + source
+
+
+@pytest.mark.parametrize("separator", ["\u0085", "\u2028", "\r\n", "\r"])
+def test_source_maps_preserve_literal_line_separators(tmp_path: Path, separator: str) -> None:
+    documents = populate(tmp_path)
+    source = f"first{separator}second\n[Log](./CHANGELOG.md)\n"
+    content, problems = build_mirror(source, documents.__getitem__, tmp_path)
+    assert problems == []
+    assert f"first{separator}second" in content
+    assert "[Log](https://github.com/wallstop/unity-helpers/blob/main/CHANGELOG.md)" in content
+
+
+@pytest.mark.parametrize("exists", [False, True])
+def test_inline_html_backticks_are_filename_characters(tmp_path: Path, exists: bool) -> None:
+    image = tmp_path / "docs/images/`asset`.svg"
+    if exists:
+        image.parent.mkdir(parents=True)
+        image.write_text("<svg/>", encoding="utf-8")
+    source = 'Prose <img src="./docs/images/`asset`.svg"> ends.\n'
+    content, problems = build_mirror(source, lambda _: source, tmp_path)
+    if exists:
+        assert problems == []
+        assert '<img src="./images/%60asset%60.svg">' in content
+    else:
+        assert len(problems) == 1
+        assert "does not exist" in problems[0]
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "``<img src='./docs/missing`asset`.svg'>``\n",
+        "`<img src='`outside`[Example](./missing.md)'>`\n",
+        'Prose \\<img src="`asset`.svg"> ends.\n',
+    ],
+)
+def test_html_shapes_do_not_override_code_span_ownership(tmp_path: Path, source: str) -> None:
+    content, problems = build_mirror(source, lambda _: source, tmp_path)
+    assert problems == []
+    assert content == BANNER + "\n\n" + source

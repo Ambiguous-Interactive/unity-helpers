@@ -18,6 +18,8 @@ from typing import TYPE_CHECKING, cast
 from urllib.parse import quote, unquote
 
 from cli_encoding import configure_output
+from markdown_it import MarkdownIt
+from markdown_it.common.html_re import HTML_TAG_RE
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -86,7 +88,16 @@ def fragment_map(text: str) -> dict[str, str]:
 
 def rewrite_outside_inline_code(text: str, transform: Callable[[str], str]) -> str:
     """Transform prose while preserving matched backtick spans byte for byte."""
+
+    def is_escaped(position: int) -> bool:
+        previous = position - 1
+        while previous >= 0 and text[previous] == "\\":
+            previous -= 1
+        return (position - 1 - previous) % 2 != 0
+
     runs = list(re.finditer(r"`+", text))
+    html_tags = list(HTML_TAG_RE.finditer(text))
+    html_index = 0
     by_length: dict[int, list[int]] = {}
     for index, run in enumerate(runs):
         by_length.setdefault(len(run[0]), []).append(index)
@@ -95,17 +106,24 @@ def rewrite_outside_inline_code(text: str, transform: Callable[[str], str]) -> s
     index = 0
     while index < len(runs):
         opening = runs[index]
-        previous = opening.start() - 1
-        while previous >= 0 and text[previous] == "\\":
-            previous -= 1
-        escapes = opening.start() - 1 - previous
+        while html_index < len(html_tags) and html_tags[html_index].end() <= opening.start():
+            html_index += 1
+        inside_html = (
+            html_index < len(html_tags)
+            and html_tags[html_index].start() <= opening.start()
+            and not is_escaped(html_tags[html_index].start())
+        )
         matching = by_length[len(opening[0])]
         next_position = bisect_right(matching, index)
-        if escapes % 2 or next_position == len(matching):
+        if inside_html or is_escaped(opening.start()) or next_position == len(matching):
             index += 1
             continue
         closing_index = matching[next_position]
         closing = runs[closing_index]
+        # A tag beginning inside code is literal, including any tail after the
+        # closing code delimiter. It cannot own a later backtick opener.
+        while html_index < len(html_tags) and html_tags[html_index].start() < closing.end():
+            html_index += 1
         pieces.append(transform(text[start : opening.start()]))
         pieces.append(text[opening.start() : closing.end()])
         start = closing.end()
@@ -171,30 +189,34 @@ def build_mirror(source: str, read_doc: Callable[[str], str], root: Path) -> tup
             lambda match: match[1] + rewrite(match[2]) + match[3],
             prose,
         )
+        return rewrite_html(rewritten)
+
+    def rewrite_html(prose: str) -> str:
         return re.sub(
             r"""\b(src|href)=(["'])([^"'\n]+)\2""",
             lambda match: match[1] + "=" + match[2] + rewrite(match[3]) + match[2],
-            rewritten,
+            prose,
         )
 
-    lines: list[str] = []
-    paragraph: list[str] = []
-
-    def flush_paragraph() -> None:
-        if paragraph:
-            lines.extend(
-                rewrite_outside_inline_code("\n".join(paragraph), rewrite_links).split("\n")
-            )
-            paragraph.clear()
-
-    for line, fenced in fenced_lines(source):
-        if fenced or not line.strip():
-            flush_paragraph()
-            lines.append(line)
-        else:
-            paragraph.append(line)
-    flush_paragraph()
-    return BANNER + "\n\n" + "\n".join(lines), problems
+    offsets = [0]
+    offsets.extend(ending.end() for ending in re.finditer(r"\r\n?|\n", source))
+    offsets.append(len(source))
+    pieces: list[str] = []
+    cursor = 0
+    for token in MarkdownIt("commonmark").parse(source):
+        if token.type not in {"inline", "html_block"} or token.map is None:
+            continue
+        start, end = offsets[token.map[0]], offsets[token.map[1]]
+        pieces.append(source[cursor:start])
+        original = source[start:end]
+        pieces.append(
+            rewrite_outside_inline_code(original, rewrite_links)
+            if token.type == "inline"
+            else rewrite_html(original)
+        )
+        cursor = end
+    pieces.append(source[cursor:])
+    return BANNER + "\n\n" + "".join(pieces), problems
 
 
 def prettier_binary(repository: Path) -> Path:

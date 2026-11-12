@@ -15,6 +15,8 @@ const result = spawnSync(
     path.join(root, "scripts/python~"),
     "--locked",
     "--no-dev",
+    "--group",
+    "documentation",
     "python",
     path.join(root, "scripts/readme_mirror.py"),
     "--check",
