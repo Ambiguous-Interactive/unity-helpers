@@ -17,7 +17,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     /// between a window that is tested and one that is merely written.
     /// </remarks>
     [TestFixture]
-    public sealed class ValidationResultFilterTests : CommonTestBase
+    public sealed class ValidationResultFilterTests : SynchronousEditorTestBase
     {
         private const string FirstGuid = "00000000000000000000000000000001";
 

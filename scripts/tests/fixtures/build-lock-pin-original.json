@@ -1,0 +1,113 @@
+{
+  "source": "scripts/resolve-build-lock-pin.js",
+  "sha256": "0056f663d3146f4a99e8b6a225be4bd03ea3421df0b74ed6e914728b8e79411d",
+  "cases": [
+    {
+      "name": "missing",
+      "action": "example",
+      "files": null,
+      "value": null,
+      "error": "No .github directory under <root>"
+    },
+    {
+      "name": "empty",
+      "action": "example",
+      "files": {},
+      "value": null,
+      "error": "No workflow or composite action references the build-lock action 'example'"
+    },
+    {
+      "name": "single",
+      "action": "example",
+      "files": {
+        "workflow.yml": "  - uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/example@0123456789abcdef0123456789abcdef01234567\n"
+      },
+      "value": "0123456789abcdef0123456789abcdef01234567",
+      "error": null
+    },
+    {
+      "name": "shared",
+      "action": "example",
+      "files": {
+        "a.yml": "  - uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/example@0123456789abcdef0123456789abcdef01234567\n",
+        "b.yaml": "  - uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/example@0123456789abcdef0123456789abcdef01234567\n"
+      },
+      "value": "0123456789abcdef0123456789abcdef01234567",
+      "error": null
+    },
+    {
+      "name": "tag",
+      "action": "example",
+      "files": {
+        "workflow.yml": "  - uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/example@v1\n"
+      },
+      "value": null,
+      "error": "Build-lock action 'example' must be pinned to a full 40-character commit SHA, never a tag or branch. Offending: .github/workflow.yml -> @v1"
+    },
+    {
+      "name": "uppercase",
+      "action": "example",
+      "files": {
+        "workflow.yml": "  - uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/example@0123456789ABCDEF0123456789ABCDEF01234567\n"
+      },
+      "value": null,
+      "error": "Build-lock action 'example' must be pinned to a full 40-character commit SHA, never a tag or branch. Offending: .github/workflow.yml -> @0123456789ABCDEF0123456789ABCDEF01234567"
+    },
+    {
+      "name": "different",
+      "action": "example",
+      "files": {
+        "a.yml": "  - uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/example@0123456789abcdef0123456789abcdef01234567\n",
+        "b.yml": "  - uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/example@ffffffffffffffffffffffffffffffffffffffff\n"
+      },
+      "value": null,
+      "error": "Build-lock action 'example' is pinned to 2 different commits. Usages: .github/a.yml -> @0123456789abcdef0123456789abcdef01234567, .github/b.yml -> @ffffffffffffffffffffffffffffffffffffffff"
+    },
+    {
+      "name": "comment",
+      "action": "example",
+      "files": {
+        "workflow.yml": "# uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/example@v1\n  - uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/example@0123456789abcdef0123456789abcdef01234567\n"
+      },
+      "value": "0123456789abcdef0123456789abcdef01234567",
+      "error": null
+    },
+    {
+      "name": "escaped-name",
+      "action": "a.b",
+      "files": {
+        "workflow.yml": "  - uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/a.b@0123456789abcdef0123456789abcdef01234567\n  - uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/axb@v1\n"
+      },
+      "value": "0123456789abcdef0123456789abcdef01234567",
+      "error": null
+    },
+    {
+      "name": "composite",
+      "action": "example",
+      "files": {
+        "workflows/a.yml": "  - uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/example@0123456789abcdef0123456789abcdef01234567\n",
+        "actions/composite/action.yml": "  - uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/example@0123456789abcdef0123456789abcdef01234567\n"
+      },
+      "value": "0123456789abcdef0123456789abcdef01234567",
+      "error": null
+    },
+    {
+      "name": "crlf",
+      "action": "example",
+      "files": {
+        "workflow.yml": "  - uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/example@0123456789abcdef0123456789abcdef01234567\r\n"
+      },
+      "value": "0123456789abcdef0123456789abcdef01234567",
+      "error": null
+    },
+    {
+      "name": "quoted",
+      "action": "example",
+      "files": {
+        "workflow.yml": "uses: \"Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/example@0123456789abcdef0123456789abcdef01234567\"\n"
+      },
+      "value": null,
+      "error": "No workflow or composite action references the build-lock action 'example'"
+    }
+  ]
+}

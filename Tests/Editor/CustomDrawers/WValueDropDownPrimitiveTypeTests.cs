@@ -20,7 +20,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
     [TestFixture]
     [NUnit.Framework.Category("Slow")]
     [NUnit.Framework.Category("Integration")]
-    public sealed class WValueDropDownPrimitiveTypeTests : CommonTestBase
+    public sealed class WValueDropDownPrimitiveTypeTests : SynchronousEditorTestBase
     {
         [Test]
         public void ApplyOptionUpdatesBoolSerializedProperty()

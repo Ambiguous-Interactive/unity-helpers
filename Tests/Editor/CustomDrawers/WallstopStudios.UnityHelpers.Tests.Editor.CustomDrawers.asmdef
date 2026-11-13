@@ -8,7 +8,8 @@
     "WallstopStudios.UnityHelpers.Editor",
     "WallstopStudios.UnityHelpers.Tests.Core",
     "WallstopStudios.UnityHelpers.Tests.Editor",
-    "WallstopStudios.UnityHelpers.Tests.Runtime"
+    "WallstopStudios.UnityHelpers.Tests.Runtime",
+    "WallstopStudios.UnityHelpers.TestSupport"
   ],
   "includePlatforms": ["Editor"],
   "excludePlatforms": [],

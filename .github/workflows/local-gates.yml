@@ -44,6 +44,16 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Setup Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: unity-helpers/scripts/python~/uv.lock
+
+      - name: Install uv
+        run: python -m pip install --disable-pip-version-check uv==0.13.7
+
       # Read the pin out of the workflows rather than restating it. Dependabot bumps a `uses:` SHA
       # but never a `ref:` input, so a hand-copied commit checks out the previous policy and the
       # parity suite then passes against the wrong version.
@@ -108,13 +118,6 @@ jobs:
           printf 'Selected .NET SDK: %s\n' "$selected_sdk"
           test "$selected_sdk" = "${EXPECTED_DOTNET_SDK:?Missing installed SDK version}"
 
-      - name: Setup Python
-        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
-        with:
-          python-version: "3.11"
-          cache: pip
-          cache-dependency-path: unity-helpers/scripts/python~/uv.lock
-
       - name: Install dependencies
         working-directory: unity-helpers
         run: |
@@ -124,9 +127,6 @@ jobs:
           else
             npm i --no-audit --no-fund
           fi
-
-      - name: Install uv
-        run: python -m pip install --disable-pip-version-check uv==0.13.7
 
       - name: Validate migrated Python scripts
         working-directory: unity-helpers

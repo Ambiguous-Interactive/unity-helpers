@@ -1,0 +1,183 @@
+{
+  "source": "scripts/validate-build-lock-action-inputs.js",
+  "sha256": "290caba8ca2ae9e513cb6e276dcc6f8802d0907ac11a306cb1bcb5f1ce005b88",
+  "cases": [
+    {
+      "operation": "keys",
+      "args": [
+        [
+          "      - name: Step",
+          "        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/example@0123456789abcdef0123456789abcdef01234567",
+          "        with:",
+          "          a: 1",
+          "          b: 2",
+          "",
+          "      - name: Next"
+        ],
+        1,
+        8
+      ],
+      "output": ["a", "b"]
+    },
+    {
+      "operation": "keys",
+      "args": [
+        [
+          "      - name: Step",
+          "        with:",
+          "          a: 1",
+          "          b: 2",
+          "        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/example@0123456789abcdef0123456789abcdef01234567",
+          "",
+          "      - name: Next"
+        ],
+        4,
+        8
+      ],
+      "output": ["a", "b"]
+    },
+    {
+      "operation": "keys",
+      "args": [
+        [
+          "      - uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/example@0123456789abcdef0123456789abcdef01234567",
+          "        with:",
+          "          a: 1",
+          "      - name: Next"
+        ],
+        0,
+        8
+      ],
+      "output": ["a"]
+    },
+    {
+      "operation": "keys",
+      "args": [
+        [
+          "      - uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/example@0123456789abcdef0123456789abcdef01234567",
+          "        with:",
+          "          a: 1",
+          "          paths:",
+          "            - one",
+          "            - two",
+          "          b: 2",
+          "      - name: Next"
+        ],
+        0,
+        8
+      ],
+      "output": ["a", "paths", "b"]
+    },
+    {
+      "operation": "keys",
+      "args": [
+        [
+          "      - uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/example@0123456789abcdef0123456789abcdef01234567",
+          "        with:",
+          "          script: |",
+          "            key: not-an-input",
+          "            other: also-not",
+          "          b: 2",
+          "      - name: Next"
+        ],
+        0,
+        8
+      ],
+      "output": ["script", "b"]
+    },
+    {
+      "operation": "keys",
+      "args": [
+        [
+          "      - uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/example@0123456789abcdef0123456789abcdef01234567",
+          "        with:",
+          "          # note: this is not a key",
+          "          a: 1",
+          "      - name: Next"
+        ],
+        0,
+        8
+      ],
+      "output": ["a"]
+    },
+    {
+      "operation": "keys",
+      "args": [
+        [
+          "      - uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/example@0123456789abcdef0123456789abcdef01234567",
+          "      - name: Next",
+          "        with:",
+          "          leaked: 1"
+        ],
+        0,
+        8
+      ],
+      "output": []
+    },
+    {
+      "operation": "keys",
+      "args": [
+        [
+          "      - uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/example@0123456789abcdef0123456789abcdef01234567",
+          "        with:",
+          "          a: 1",
+          "        env:",
+          "          NOT_AN_INPUT: 1",
+          "      - name: Next"
+        ],
+        0,
+        8
+      ],
+      "output": ["a"]
+    },
+    {
+      "operation": "keys",
+      "args": [
+        [
+          "      - name: Step",
+          "        env:",
+          "          X: 1",
+          "        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/example@0123456789abcdef0123456789abcdef01234567",
+          "        with:",
+          "          a: 1",
+          "      - name: Next"
+        ],
+        3,
+        8
+      ],
+      "output": ["a"]
+    },
+    {
+      "operation": "keys",
+      "args": [
+        [
+          "      - uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/example@0123456789abcdef0123456789abcdef01234567",
+          "        with:",
+          "          a: 1"
+        ],
+        0,
+        8
+      ],
+      "output": ["a"]
+    },
+    {
+      "operation": "inputs",
+      "args": [
+        "name: Example\ninputs:\n  plain:\n    description: required with no default\n    required: true\n  defaulted-after:\n    description: required, but the runner substitutes\n    required: true\n    default: \"d\"\n  defaulted-before:\n    default: \"d\"\n    required: true\n  optional:\n    description: not required\n    required: false\n  folded:\n    description: >-\n      a folded description whose text mentions\n      required: true\n    required: false\noutputs:\n  ignored:\n    description: outputs are not inputs",
+        "fixture"
+      ],
+      "output": [
+        ["plain", true],
+        ["defaulted-after", false],
+        ["defaulted-before", false],
+        ["optional", false],
+        ["folded", false]
+      ]
+    },
+    {
+      "operation": "inputs",
+      "args": ["name: Example\nruns:\n  using: node24\n", "fixture"],
+      "output": []
+    }
+  ]
+}

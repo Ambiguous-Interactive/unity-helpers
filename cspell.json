@@ -1280,7 +1280,8 @@
     "FSIZE",
     "RLIMIT",
     "SIGXFSZ",
-    "PTH"
+    "PTH",
+    "axb"
   ],
   "flagWords": [],
   "minWordLength": 3,

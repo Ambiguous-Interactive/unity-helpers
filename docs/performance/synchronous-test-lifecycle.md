@@ -64,3 +64,41 @@ four fixture files onto the frozen source snapshot before replaying. Each proces
 replay identities and failures separately. A previous pre-test IL-postprocessor pipe failure is
 tracked on [#343](https://github.com/Ambiguous-Interactive/unity-helpers/issues/343#issuecomment-6839715181);
 later passes do not explain or repair it.
+
+## Additional synchronous ownership scopes
+
+A second cohort migrates twelve synchronous fixtures, retaining all 347 original cases. Ten
+independent scope controls also run in each process. Managed resources are disposed in reverse
+registration order before Unity objects; duplicate resources use reference identity. Cleanup
+continues after failures, and callbacks cannot reopen or register into the closing scope.
+
+Three alternating fresh-process pairs on Unity 6000.6.7f1 Editor Mono pass all 357 cases in all
+six processes. Each process returns raw exit zero and reaches both stream ends without a drain
+stop. Temporary one-time loggers verify each fixture's loaded base and module identity. Source
+hashes remain unchanged during each capture; those loggers are absent from shipped fixtures.
+No other owned build or benchmark overlaps these captures.
+
+| Existing cohort        |     Before |      After | After/before |
+| ---------------------- | ---------: | ---------: | -----------: |
+| Pair 1                 | 2.973847 s | 3.153851 s |        1.061 |
+| Pair 2, reversed order | 2.959021 s | 2.984900 s |        1.009 |
+| Pair 3                 | 2.815570 s | 2.761018 s |        0.981 |
+| Median process sum     | 2.959021 s | 2.984900 s |        1.009 |
+
+These totals exclude the ten scope controls. The aggregate is flat to slightly slower; this
+cohort establishes synchronous cleanup behavior, not an iteration-time improvement. Individual
+fixture results and slower observations remain in the replay data. Historical Unity 2021 data
+for this cohort accounts for only about fourteen seconds and cannot explain the full shard
+time. Current Unity 2021/2022 qualification and the eight-minute CI target remain required.
+
+An earlier cold-batch baseline also included `StringInListDrawerTests`: five cases failed because
+Editor styles were uninitialized outside a GUI context. That fixture remains unchanged and is
+excluded from both measured arms; [#1193](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1193)
+tracks this failure. Another attempt lost its controller and child processes during
+startup, without a final receipt or NUnit result. [#1195](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1195)
+tracks that unknown cause; later successful
+captures do not resolve it. Compiler failures during harness preparation are retained separately
+from timing observations.
+
+The [additional replay archive](./local-pool-runtime-qualification.zip) retains these attempts,
+exact instrumented inputs, final source snapshots, process receipts and complete NUnit trees.

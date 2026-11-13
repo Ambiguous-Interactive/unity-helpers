@@ -13,6 +13,7 @@
 
 - [Overview](#overview)
 - [Quick Start](#quick-start)
+- [Single-owner Pools](#single-owner-pools)
 - [PoolOptions Configuration](#pooloptions-configuration)
 - [Global Settings (PoolPurgeSettings)](#global-settings-poolpurgesettings)
 - [Eviction Policies](#eviction-policies)
@@ -176,6 +177,71 @@ PoolPurgeSettings.Disable<CriticalResource>();
 ```
 
 ---
+
+## Single-owner Pools
+
+`LocalPool<T>` provides a bounded stack of managed objects for a solver, frame owner, or other
+caller with exclusive access. Plain `Rent()` and `Return(T)` perform no locking, clock reads,
+purge checks, or usage tracking. The default idle limit is 64 objects. Nonpositive limits disable
+retention. `Clear()` drops idle references and leaves outstanding rentals usable.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using System.Collections.Generic;
+using WallstopStudios.UnityHelpers.Utils;
+
+LocalPool<List<int>> pool = new(
+    static () => new List<int>(),
+    static list => list.Clear(),
+    maxRetained: 16
+);
+List<int> first = pool.Rent();
+List<int> second = pool.Rent();
+first.Add(42);
+pool.Return(second);
+pool.Return(first);
+
+using PooledResource<List<int>> lease = pool.Get(out List<int> scoped);
+scoped.Add(7);
+```
+
+Return every rental exactly once to its original pool. Do not use an item after returning it,
+and do not manually return an item managed by a lease. The producer must create an independently
+owned object. This pool does not detect foreign or duplicate returns. Use `TrackedObjectPool<T>`
+for Unity object lifecycle and checked ownership. A return callback runs even when the idle limit
+is full. Callback failures are logged and the affected object is discarded; recursive operations
+from callbacks are refused. A missing producer or failed production returns null.
+
+`Get(out T)` uses the existing copy-safe `PooledResource<T>` lease. Its disposal tracking has the
+same shared synchronization costs as other leases; use plain rent and return when that overhead
+matters. Pool storage itself remains single-owner, including when disposing a lease.
+
+`ThreadLocalArrayPool<T>` owns a separate stack on each calling thread and rents one exact array
+length. All elements are cleared on valid returns, including arrays dropped at the idle limit.
+The default idle limit is 64 arrays per thread. No dictionary of lengths grows as requests vary:
+create one owner for each fixed length, and use `SystemArrayPool<T>` for variable lengths.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using WallstopStudios.UnityHelpers.Utils;
+
+using ThreadLocalArrayPool<int> arrays = new(length: 64, maxRetainedPerThread: 8);
+int[] board = arrays.Rent();
+board[0] = 42;
+arrays.Return(board);
+using PooledResource<int[]> lease = arrays.Get(out int[] scratch);
+scratch[0] = 7;
+```
+
+Plain returns and lease disposal transfer the array to the returning thread. Wrong-length and null
+returns are ignored. Nonpositive lengths use `Array.Empty<T>()`; nonpositive retention limits
+still clear arrays but keep none. `ClearCurrentThread()` releases only that thread's idle storage.
+Dispose the owner after every user has stopped; simultaneous disposal and pool operations are
+unsupported. Disposed owners return null from rent and ignore returns. Neither pool disposes its
+managed items or destroys Unity objects. The [local measurements](../../performance/local-pools.md)
+compare plain returns with both lease paths and describe their scope.
 
 ## PoolOptions Configuration
 

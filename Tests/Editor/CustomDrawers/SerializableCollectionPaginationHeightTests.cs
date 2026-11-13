@@ -20,7 +20,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
     [TestFixture]
     [NUnit.Framework.Category("Slow")]
     [NUnit.Framework.Category("Integration")]
-    public sealed class SerializableCollectionPaginationHeightTests : CommonTestBase
+    public sealed class SerializableCollectionPaginationHeightTests : SynchronousEditorTestBase
     {
         private const int SmallPageSize = 5;
         private const int LargePageCount = 15;

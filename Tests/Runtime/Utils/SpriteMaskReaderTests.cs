@@ -20,6 +20,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [TestCase(4, 5, 4, 3, true, TextureFormat.RGB24)]
         [TestCase(7, 7, 1, 1, true, TextureFormat.RGBA32)]
         [TestCase(7, 7, 1, 1, true, TextureFormat.RGB24)]
+        [TestCase(0, 0, 4, 3, false, TextureFormat.ARGB32)]
+        [TestCase(1, 2, 3, 2, false, TextureFormat.ARGB32)]
+        [TestCase(4, 5, 4, 3, true, TextureFormat.ARGB32)]
+        [TestCase(7, 7, 1, 1, true, TextureFormat.ARGB32)]
+        [TestCase(0, 0, 4, 3, false, TextureFormat.BGRA32)]
+        [TestCase(1, 2, 3, 2, false, TextureFormat.BGRA32)]
+        [TestCase(4, 5, 4, 3, true, TextureFormat.BGRA32)]
+        [TestCase(7, 7, 1, 1, true, TextureFormat.BGRA32)]
+        [TestCase(0, 0, 4, 3, false, TextureFormat.Alpha8)]
+        [TestCase(1, 2, 3, 2, false, TextureFormat.Alpha8)]
+        [TestCase(4, 5, 4, 3, true, TextureFormat.Alpha8)]
+        [TestCase(7, 7, 1, 1, true, TextureFormat.Alpha8)]
         public void ReadableSubregionCopiesOnlyItsBaseMipPixels(
             int x,
             int y,

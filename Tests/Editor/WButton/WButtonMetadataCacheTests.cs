@@ -19,7 +19,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
     [TestFixture]
     [NUnit.Framework.Category("Slow")]
     [NUnit.Framework.Category("Integration")]
-    public sealed class WButtonMetadataCacheTests : CommonTestBase
+    public sealed class WButtonMetadataCacheTests : SynchronousEditorTestBase
     {
         private static int FindDictionaryKeyIndex(SerializedProperty keysProperty, string key)
         {

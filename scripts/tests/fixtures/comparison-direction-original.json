@@ -1,0 +1,618 @@
+{
+  "provenance": {
+    "source": "scripts/lint-comparison-direction.js",
+    "sha256": "919dcacfb0d4a888803dcae84634656b6cf39f2178a80e551084a9f18f7a581b",
+    "commit": "3f23d9f0dcf2c7ce0ff34b028c5c52a5e5a3aaf2"
+  },
+  "cases": [
+    {
+      "name": "a generic closer",
+      "source": "Dictionary<string, List<int>> map = null;",
+      "violations": [],
+      "reasons": [],
+      "fixed": "Dictionary<string, List<int>> map = null;"
+    },
+    {
+      "name": "a nested generic closer",
+      "source": "Func<int, Func<int, bool>> f = null;",
+      "violations": [],
+      "reasons": [],
+      "fixed": "Func<int, Func<int, bool>> f = null;"
+    },
+    {
+      "name": "a tuple inside a generic",
+      "source": "Dictionary<string, (int Line, string Text)> d = new();",
+      "violations": [],
+      "reasons": [],
+      "fixed": "Dictionary<string, (int Line, string Text)> d = new();"
+    },
+    {
+      "name": "a tuple type argument",
+      "source": "Buffers<(string, Func<object, object>)>.List.Get();",
+      "violations": [],
+      "reasons": [],
+      "fixed": "Buffers<(string, Func<object, object>)>.List.Get();"
+    },
+    {
+      "name": "a lambda arrow",
+      "source": "Func<int, int> f = x => x;",
+      "violations": [],
+      "reasons": [],
+      "fixed": "Func<int, int> f = x => x;"
+    },
+    {
+      "name": "a right shift",
+      "source": "int y = value >> 2;",
+      "violations": [],
+      "reasons": [],
+      "fixed": "int y = value >> 2;"
+    },
+    {
+      "name": "a shift assignment",
+      "source": "value >>= 2;",
+      "violations": [],
+      "reasons": [],
+      "fixed": "value >>= 2;"
+    },
+    {
+      "name": "an unsigned right shift",
+      "source": "int y = value >>> 2;",
+      "violations": [],
+      "reasons": [],
+      "fixed": "int y = value >>> 2;"
+    },
+    {
+      "name": "a relational pattern",
+      "source": "bool ok = c is >= (char)65 and <= (char)90;",
+      "violations": [],
+      "reasons": [],
+      "fixed": "bool ok = c is >= (char)65 and <= (char)90;"
+    },
+    {
+      "name": "a property pattern",
+      "source": "bool ok = obj is { Count: > 0 };",
+      "violations": [],
+      "reasons": [],
+      "fixed": "bool ok = obj is { Count: > 0 };"
+    },
+    {
+      "name": "a switch-expression arm",
+      "source": "int r = v switch { > 5 => 1, _ => 0 };",
+      "violations": [],
+      "reasons": [],
+      "fixed": "int r = v switch { > 5 => 1, _ => 0 };"
+    },
+    {
+      "name": "a switch-statement label",
+      "source": "switch (v) { case > 1: break; }",
+      "violations": [],
+      "reasons": [],
+      "fixed": "switch (v) { case > 1: break; }"
+    },
+    {
+      "name": "an or-pattern",
+      "source": "bool ok = value is < 0 or > 100;",
+      "violations": [],
+      "reasons": [],
+      "fixed": "bool ok = value is < 0 or > 100;"
+    },
+    {
+      "name": "an operator declaration",
+      "source": "public static bool operator >(A a, A b) => false;",
+      "violations": [],
+      "reasons": [],
+      "fixed": "public static bool operator >(A a, A b) => false;"
+    },
+    {
+      "name": "a line comment",
+      "source": "// count > 0",
+      "violations": [],
+      "reasons": [],
+      "fixed": "// count > 0"
+    },
+    {
+      "name": "a block comment",
+      "source": "/* count > 0 */",
+      "violations": [],
+      "reasons": [],
+      "fixed": "/* count > 0 */"
+    },
+    {
+      "name": "a doc comment",
+      "source": "/// <summary>count > 0</summary>",
+      "violations": [],
+      "reasons": [],
+      "fixed": "/// <summary>count > 0</summary>"
+    },
+    {
+      "name": "a string literal",
+      "source": "string s = \"a > b\";",
+      "violations": [],
+      "reasons": [],
+      "fixed": "string s = \"a > b\";"
+    },
+    {
+      "name": "a verbatim string literal",
+      "source": "string s = @\"a > b\";",
+      "violations": [],
+      "reasons": [],
+      "fixed": "string s = @\"a > b\";"
+    },
+    {
+      "name": "a character literal",
+      "source": "char c = '>';",
+      "violations": [],
+      "reasons": [],
+      "fixed": "char c = '>';"
+    },
+    {
+      "name": "a generic constraint",
+      "source": "void M<T>() where T : IComparable<T> { }",
+      "violations": [],
+      "reasons": [],
+      "fixed": "void M<T>() where T : IComparable<T> { }"
+    },
+    {
+      "name": "a pointer dereference",
+      "source": "unsafe { int v = p->field; }",
+      "violations": [],
+      "reasons": [],
+      "fixed": "unsafe { int v = p->field; }"
+    },
+    {
+      "name": "a raw string literal",
+      "source": "string s = \"\"\"a > b\"\"\";",
+      "violations": [],
+      "reasons": [],
+      "fixed": "string s = \"\"\"a > b\"\"\";"
+    },
+    {
+      "name": "a plain greater-than",
+      "source": "if (a > b) { }",
+      "violations": [
+        {
+          "operator": ">",
+          "line": 1,
+          "column": 7
+        }
+      ],
+      "reasons": [null],
+      "fixed": "if (b < a) { }"
+    },
+    {
+      "name": "a greater-or-equal",
+      "source": "if (a >= b) { }",
+      "violations": [
+        {
+          "operator": ">=",
+          "line": 1,
+          "column": 7
+        }
+      ],
+      "reasons": [null],
+      "fixed": "if (b <= a) { }"
+    },
+    {
+      "name": "a comparison beside a generic",
+      "source": "if (Comparer<int>.Default.Compare(a, b) > 0) { }",
+      "violations": [
+        {
+          "operator": ">",
+          "line": 1,
+          "column": 41
+        }
+      ],
+      "reasons": [null],
+      "fixed": "if (Comparer<int>0 < .Default.Compare(a, b)) { }"
+    },
+    {
+      "name": "a comparison after a less-than",
+      "source": "if (a < b && c > d) { }",
+      "violations": [
+        {
+          "operator": ">",
+          "line": 1,
+          "column": 16
+        }
+      ],
+      "reasons": [null],
+      "fixed": "if (a < b && d < c) { }"
+    },
+    {
+      "name": "a loop condition",
+      "source": "for (int i = n; i > 0; i--) { }",
+      "violations": [
+        {
+          "operator": ">",
+          "line": 1,
+          "column": 19
+        }
+      ],
+      "reasons": [null],
+      "fixed": "for (int i = n; 0 < i; i--) { }"
+    },
+    {
+      "name": "an indexer comparison",
+      "source": "if (arr[i] >= arr[j]) { }",
+      "violations": [
+        {
+          "operator": ">=",
+          "line": 1,
+          "column": 12
+        }
+      ],
+      "reasons": [null],
+      "fixed": "if (arr[j] <= arr[i]) { }"
+    },
+    {
+      "name": "a comparison inside a lambda body",
+      "source": "Func<int, bool> f = x => x > 0;",
+      "violations": [
+        {
+          "operator": ">",
+          "line": 1,
+          "column": 28
+        }
+      ],
+      "reasons": [null],
+      "fixed": "Func<int, bool> f = x => 0 < x;"
+    },
+    {
+      "name": "a comparison in an interpolation hole",
+      "source": "string s = $\"{x > y}\";",
+      "violations": [
+        {
+          "operator": ">",
+          "line": 1,
+          "column": 17
+        }
+      ],
+      "reasons": [null],
+      "fixed": "string s = $\"{y < x}\";"
+    },
+    {
+      "name": "a comparison after an increment",
+      "source": "if (i++ > 0) { }",
+      "violations": [
+        {
+          "operator": ">",
+          "line": 1,
+          "column": 9
+        }
+      ],
+      "reasons": [null],
+      "fixed": "if (0 < i++) { }"
+    },
+    {
+      "name": "both operators on one line",
+      "source": "if (a > b && c >= d) { }",
+      "violations": [
+        {
+          "operator": ">",
+          "line": 1,
+          "column": 7
+        },
+        {
+          "operator": ">=",
+          "line": 1,
+          "column": 16
+        }
+      ],
+      "reasons": [null, null],
+      "fixed": "if (b < a && d <= c) { }"
+    },
+    {
+      "name": "a property pattern beside a comparison",
+      "source": "if (o is { Count: > 0 } && n > 0) { }",
+      "violations": [
+        {
+          "operator": ">",
+          "line": 1,
+          "column": 30
+        }
+      ],
+      "reasons": [null],
+      "fixed": "if (o is { Count: > 0 } && 0 < n) { }"
+    },
+    {
+      "name": "control-34",
+      "source": "if (a + b > c * d) { }",
+      "violations": [
+        {
+          "operator": ">",
+          "line": 1,
+          "column": 11
+        }
+      ],
+      "reasons": [null],
+      "fixed": "if (c * d < a + b) { }"
+    },
+    {
+      "name": "control-35",
+      "source": "if (Next() > Peek()) { }",
+      "violations": [
+        {
+          "operator": ">",
+          "line": 1,
+          "column": 12
+        }
+      ],
+      "reasons": ["both operands can have a side effect, so swapping changes evaluation order"],
+      "fixed": "if (Next() > Peek()) { }"
+    },
+    {
+      "name": "control-36",
+      "source": "if (GetCount() > 0) { }",
+      "violations": [
+        {
+          "operator": ">",
+          "line": 1,
+          "column": 16
+        }
+      ],
+      "reasons": [null],
+      "fixed": "if (0 < GetCount()) { }"
+    },
+    {
+      "name": "control-37",
+      "source": "Write($\"x: {a > b}\");",
+      "violations": [
+        {
+          "operator": ">",
+          "line": 1,
+          "column": 15
+        }
+      ],
+      "reasons": [null],
+      "fixed": "Write($\"x: {b < a}\");"
+    },
+    {
+      "name": "control-38",
+      "source": "Write($\"{a > b} and {c >= d}\");",
+      "violations": [
+        {
+          "operator": ">",
+          "line": 1,
+          "column": 12
+        },
+        {
+          "operator": ">=",
+          "line": 1,
+          "column": 24
+        }
+      ],
+      "reasons": [null, null],
+      "fixed": "Write($\"{b < a} and {d <= c}\");"
+    },
+    {
+      "name": "control-39",
+      "source": "if (\n    someVeryLongName\n    > other) { }",
+      "violations": [
+        {
+          "operator": ">",
+          "line": 3,
+          "column": 5
+        }
+      ],
+      "reasons": ["comparison spans more than one line"],
+      "fixed": "if (\n    someVeryLongName\n    > other) { }"
+    },
+    {
+      "name": "control-40",
+      "source": "return a /*why*/ > b;",
+      "violations": [
+        {
+          "operator": ">",
+          "line": 1,
+          "column": 18
+        }
+      ],
+      "reasons": ["comparison contains a comment"],
+      "fixed": "return a /*why*/ > b;"
+    },
+    {
+      "name": "control-41",
+      "source": "if (a >> 2 > b) {}",
+      "violations": [
+        {
+          "operator": ">",
+          "line": 1,
+          "column": 12
+        }
+      ],
+      "reasons": [null],
+      "fixed": "if (a >> b < 2) {}"
+    },
+    {
+      "name": "control-42",
+      "source": "if (a > b << 2) {}",
+      "violations": [
+        {
+          "operator": ">",
+          "line": 1,
+          "column": 7
+        }
+      ],
+      "reasons": [null],
+      "fixed": "if (b < a << 2) {}"
+    },
+    {
+      "name": "control-43",
+      "source": "if (a >) {}",
+      "violations": [
+        {
+          "operator": ">",
+          "line": 1,
+          "column": 7
+        }
+      ],
+      "reasons": ["operand boundary not resolvable"],
+      "fixed": "if (a >) {}"
+    },
+    {
+      "name": "control-44",
+      "source": "if (a >== b) {}",
+      "violations": [],
+      "reasons": [],
+      "fixed": "if (a >== b) {}"
+    },
+    {
+      "name": "control-45",
+      "source": "// 😀\nif (a >= b) {}",
+      "violations": [
+        {
+          "operator": ">=",
+          "line": 2,
+          "column": 7
+        }
+      ],
+      "reasons": [null],
+      "fixed": "// 😀\nif (b <= a) {}"
+    },
+    {
+      "name": "control-46",
+      "source": "string text = \"😀\"; if (a > b) {}",
+      "violations": [
+        {
+          "operator": ">",
+          "line": 1,
+          "column": 27
+        }
+      ],
+      "reasons": [null],
+      "fixed": "string text = \"😀\"; if (b < a) {}"
+    },
+    {
+      "name": "control-47",
+      "source": "if (a > b) {}\r\nif (c >= d) {}\r\n",
+      "violations": [
+        {
+          "operator": ">",
+          "line": 1,
+          "column": 7
+        },
+        {
+          "operator": ">=",
+          "line": 2,
+          "column": 7
+        }
+      ],
+      "reasons": [null, null],
+      "fixed": "if (b < a) {}\r\nif (d <= c) {}\r\n"
+    },
+    {
+      "name": "control-48",
+      "source": "Write($@\"before {a > b}\nnext {c >= d}\");",
+      "violations": [
+        {
+          "operator": ">",
+          "line": 1,
+          "column": 20
+        },
+        {
+          "operator": ">=",
+          "line": 2,
+          "column": 9
+        }
+      ],
+      "reasons": [null, null],
+      "fixed": "Write($@\"before {b < a}\nnext {d <= c}\");"
+    },
+    {
+      "name": "control-49",
+      "source": "string literal = \"\"\"\na > b\n\"\"\"; if (c > d) {}",
+      "violations": [
+        {
+          "operator": ">",
+          "line": 3,
+          "column": 12
+        }
+      ],
+      "reasons": [null],
+      "fixed": "string literal = \"\"\"\na > b\n\"\"\"; if (d < c) {}"
+    },
+    {
+      "name": "control-50",
+      "source": "bool @class = true; if (@class > other) {}",
+      "violations": [
+        {
+          "operator": ">",
+          "line": 1,
+          "column": 32
+        }
+      ],
+      "reasons": [null],
+      "fixed": "bool @class = true; if (other < @class) {}"
+    },
+    {
+      "name": "control-51",
+      "source": "return (a + b) >= list[index + 1];",
+      "violations": [
+        {
+          "operator": ">=",
+          "line": 1,
+          "column": 16
+        }
+      ],
+      "reasons": [null],
+      "fixed": "return list[index + 1] <= (a + b);"
+    },
+    {
+      "name": "control-52",
+      "source": "return a > b ? 1 : 2;",
+      "violations": [
+        {
+          "operator": ">",
+          "line": 1,
+          "column": 10
+        }
+      ],
+      "reasons": [null],
+      "fixed": "return b < a ? 1 : 2;"
+    },
+    {
+      "name": "control-53",
+      "source": "return new Thing() > NewThing();",
+      "violations": [
+        {
+          "operator": ">",
+          "line": 1,
+          "column": 20
+        }
+      ],
+      "reasons": ["both operands can have a side effect, so swapping changes evaluation order"],
+      "fixed": "return new Thing() > NewThing();"
+    },
+    {
+      "name": "control-54",
+      "source": "return (await One()) > (await Two());",
+      "violations": [
+        {
+          "operator": ">",
+          "line": 1,
+          "column": 22
+        }
+      ],
+      "reasons": ["both operands can have a side effect, so swapping changes evaluation order"],
+      "fixed": "return (await One()) > (await Two());"
+    },
+    {
+      "name": "control-55",
+      "source": "return a > b && c >= d;",
+      "violations": [
+        {
+          "operator": ">",
+          "line": 1,
+          "column": 10
+        },
+        {
+          "operator": ">=",
+          "line": 1,
+          "column": 19
+        }
+      ],
+      "reasons": [null, null],
+      "fixed": "return b < a && d <= c;"
+    }
+  ]
+}

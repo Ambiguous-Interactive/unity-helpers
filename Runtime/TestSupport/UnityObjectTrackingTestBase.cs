@@ -19,6 +19,7 @@ namespace WallstopStudios.UnityHelpers.TestSupport
     public abstract class UnityObjectTrackingTestBase
     {
         private readonly List<Object> _trackedObjects = new();
+        private readonly List<IDisposable> _trackedDisposables = new();
         private bool _scopeActive;
 
         /// <summary>Starts an isolated synchronous object scope.</summary>
@@ -27,6 +28,7 @@ namespace WallstopStudios.UnityHelpers.TestSupport
         {
             Assert.IsFalse(_scopeActive, "The prior synchronous scope is still active.");
             Assert.That(_trackedObjects.Count, Is.Zero);
+            Assert.That(_trackedDisposables.Count, Is.Zero);
             _scopeActive = true;
         }
 
@@ -38,9 +40,22 @@ namespace WallstopStudios.UnityHelpers.TestSupport
             {
                 return;
             }
+            _scopeActive = false;
             string failure = null;
             try
             {
+                for (int index = _trackedDisposables.Count - 1; 0 <= index; --index)
+                {
+                    try
+                    {
+                        _trackedDisposables[index].Dispose();
+                    }
+                    catch (Exception exception)
+                        when (exception is not OutOfMemoryException and not StackOverflowException)
+                    {
+                        failure = exception.ToString();
+                    }
+                }
                 for (int index = _trackedObjects.Count - 1; 0 <= index; --index)
                 {
                     Object instance = _trackedObjects[index];
@@ -66,9 +81,17 @@ namespace WallstopStudios.UnityHelpers.TestSupport
             finally
             {
                 _trackedObjects.Clear();
+                _trackedDisposables.Clear();
                 _scopeActive = false;
             }
             Assert.That(failure, Is.Null);
+        }
+
+        /// <summary>Creates and tracks a transient GameObject with the supplied name.</summary>
+        protected GameObject NewGameObject(string name = "GameObject")
+        {
+            Assert.IsTrue(_scopeActive, "A synchronous object scope must be active.");
+            return Track(new GameObject(name));
         }
 
         /// <summary>Creates and tracks a transient ScriptableObject.</summary>
@@ -78,6 +101,27 @@ namespace WallstopStudios.UnityHelpers.TestSupport
             Assert.IsTrue(_scopeActive, "A synchronous object scope must be active.");
             T instance = ScriptableObject.CreateInstance<T>();
             return Track(instance);
+        }
+
+        /// <summary>Tracks a managed resource for reverse-order disposal before Unity objects are destroyed.</summary>
+        /// <remarks>Null resources are ignored and the same instance is disposed once. Cleanup continues after a disposal failure and then fails the test.</remarks>
+        protected T TrackDisposable<T>(T resource)
+            where T : class, IDisposable
+        {
+            Assert.IsTrue(_scopeActive, "A synchronous object scope must be active.");
+            if (resource == null)
+            {
+                return null;
+            }
+            foreach (IDisposable existing in _trackedDisposables)
+            {
+                if (ReferenceEquals(existing, resource))
+                {
+                    return resource;
+                }
+            }
+            _trackedDisposables.Add(resource);
+            return resource;
         }
 
         /// <summary>Tracks a collection of transient objects owned by the test.</summary>

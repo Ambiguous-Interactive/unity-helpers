@@ -240,6 +240,7 @@ nav:
           - Failed Tests Exporter: features/editor-tools/failed-tests-exporter.md
           - Test Run Reporter: features/editor-tools/test-run-reporter.md
   - Performance:
+      - Local Pool Costs: performance/local-pools.md
       - Bendable Line Sampling: performance/bendable-line-sampling.md
       - Sprite Rectangle Reads: performance/sprite-region-read.md
       - Singleton Policy Fixtures: performance/singleton-policy-fixtures.md

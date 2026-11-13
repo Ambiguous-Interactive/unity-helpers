@@ -17,6 +17,12 @@ Persistent Editor assets are refused. Use a coroutine lifecycle fixture when def
 or frame boundaries are part of the behavior under test. Do not manually destroy shared assets
 or transfer tracked objects to another owner.
 
+`TrackDisposable<T>` registers a managed resource for cleanup before tracked Unity objects are
+destroyed. Resources are disposed in reverse registration order, and registering the same instance
+again does not dispose it twice. Null resources are ignored. A cleanup failure still releases the
+remaining resources and objects, then fails the test. Cleanup closes the scope before callbacks
+run, so callbacks cannot reenter cleanup or register more resources.
+
 `AllocationProbe.IgnoreWhenUnmeasurable()` requires a known allocation to be observable before
 using Unity's allocation constraint. `ProfilerAllocationCounter.Measure` counts current-thread
 allocation events, warms the action first, and rejects truncated results and invalid bounds.

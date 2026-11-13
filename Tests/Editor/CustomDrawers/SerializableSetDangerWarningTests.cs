@@ -20,7 +20,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
     [TestFixture]
     [NUnit.Framework.Category("Slow")]
     [NUnit.Framework.Category("Integration")]
-    public sealed class SerializableSetDangerWarningTests : CommonTestBase
+    public sealed class SerializableSetDangerWarningTests : SynchronousEditorTestBase
     {
         [Test]
         public void ValueIsValidReturnsFalseForNullString()

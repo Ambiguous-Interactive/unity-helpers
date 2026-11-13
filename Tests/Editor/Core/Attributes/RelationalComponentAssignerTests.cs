@@ -16,7 +16,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.Attributes
     [TestFixture]
     [NUnit.Framework.Category("Slow")]
     [NUnit.Framework.Category("Integration")]
-    public sealed class RelationalComponentAssignerTests : CommonTestBase
+    public sealed class RelationalComponentAssignerTests : SynchronousEditorTestBase
     {
         [Test]
         public void HasRelationalAssignmentsRespectsMetadata()
