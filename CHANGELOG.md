@@ -62,6 +62,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Apply the Unity 6000.5 in-process import workaround to configure, build, and test launches.
+- Refuse ambiguous comparison rewrites and overlapping edits in the source checker ([#859](https://github.com/Ambiguous-Interactive/unity-helpers/issues/859)).
 - Fix safe attributed-field lookup and field predicates missing private and static base fields ([#1184](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1184)).
 - Retry Windows replacement contention up to three attempts in `DurableFile`, preserving the previous save when contention persists. This covers settings persistence during rapid Editor undo and redo.
 - Fix Odin dictionary migration accepting ambiguous prefab fields or an instance reference to another scene ([#794](https://github.com/Ambiguous-Interactive/unity-helpers/issues/794)).

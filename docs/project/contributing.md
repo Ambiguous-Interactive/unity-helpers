@@ -107,6 +107,13 @@ The original 41 controls passed before capture. Reports retain UTF-16 columns an
 numbers; rewrites preserve CRLF bytes. These observations establish parity for the retained corpus,
 not a complete C# parser or permission to reorder arbitrary property getters.
 
+The original observations include unsafe rewrites. Current controls retain that historical data
+but require manual changes for generic or shift operands and comparisons without a literal
+constant on either side. A literal boundary avoids reordering two potentially dependent reads
+or effects. Overlapping edits are refused, including edits surrounding interpolation holes;
+disjoint edits can still apply, with a failing exit status for unresolved comparisons. The replay
+archive captures the initial port at `7390d47d`, before these safety corrections.
+
 A local full-tree comparison over the same 2915 files used three alternating pairs. Median
 process times were 7.001 seconds for the original Node checker and 10.014 seconds for Python.
 The port is slower in all three pairs; this change establishes typed tooling and retained behavior,

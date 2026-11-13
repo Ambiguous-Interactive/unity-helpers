@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import re
 import sys
+from bisect import bisect_left
 from pathlib import Path
 from typing import Literal, NamedTuple
 
@@ -511,10 +512,8 @@ def find_violations(tokens: list[Token], generic: set[int]) -> list[Violation]:
 
 
 def is_boundary(token: Token) -> bool:
-    return (
-        (token.kind == "punctuation" and token.text in BOUNDARY_PUNCTUATION)
-        or (token.kind == "keyword" and token.text in BOUNDARY_KEYWORDS)
-        or token.kind == "angle"
+    return (token.kind == "punctuation" and token.text in BOUNDARY_PUNCTUATION) or (
+        token.kind == "keyword" and token.text in BOUNDARY_KEYWORDS
     )
 
 
@@ -553,24 +552,18 @@ def operand_range(
     )
 
 
-def is_impure(tokens: list[Token], extent: TextRange) -> bool:
-    for index in range(extent.start, extent.end):
-        token = tokens[index]
-        if (
-            (token.kind == "punctuation" and token.text in ("++", "--"))
-            or (token.kind == "keyword" and token.text in ("new", "stackalloc"))
-            or (token.kind == "identifier" and token.text == "await")
-        ):
-            return True
-        if token.kind == "punctuation" and token.text == "(" and index > 0:
-            previous = tokens[index - 1]
-            if (
-                previous.kind == "identifier"
-                or (previous.kind == "angle" and previous.text == ">")
-                or (previous.kind == "punctuation" and previous.text in (")", "]"))
-            ):
-                return True
-    return False
+def is_literal_constant(tokens: list[Token], extent: TextRange) -> bool:
+    count = extent.end - extent.start
+    if count == 2 and tokens[extent.start].text in ("+", "-"):
+        return tokens[extent.start + 1].kind == "number"
+    if count != 1:
+        return False
+    token = tokens[extent.start]
+    return (
+        token.kind == "number"
+        or (token.kind == "string" and token.text.startswith(('"', "'", '@"')))
+        or (token.kind == "keyword" and token.text in ("true", "false", "null"))
+    )
 
 
 def plan_fix(text: str, tokens: list[Token], generic: set[int], violation: Violation) -> Plan:
@@ -579,11 +572,9 @@ def plan_fix(text: str, tokens: list[Token], generic: set[int], violation: Viola
     if left is None or right is None:
         return Plan(reason="operand boundary not resolvable")
     for index in range(left.start, right.end):
-        if (
-            tokens[index].kind == "angle"
-            and index not in generic
-            and index != violation.operator_index
-        ):
+        if tokens[index].kind == "angle" and index != violation.operator_index:
+            if index in generic:
+                return Plan(reason="operand contains generic arguments")
             return Plan(reason="operand contains a shift or another comparison")
     start = tokens[left.start].start
     end = tokens[right.end - 1].end
@@ -592,14 +583,28 @@ def plan_fix(text: str, tokens: list[Token], generic: set[int], violation: Viola
         return Plan(reason="comparison spans more than one line")
     if "//" in span or "/*" in span:
         return Plan(reason="comparison contains a comment")
-    if is_impure(tokens, left) and is_impure(tokens, right):
-        return Plan(
-            reason="both operands can have a side effect, so swapping changes evaluation order"
-        )
+    if not (is_literal_constant(tokens, left) or is_literal_constant(tokens, right)):
+        return Plan(reason="operand independence requires a literal constant")
     left_text = text[tokens[left.start].start : tokens[left.end - 1].end]
     right_text = text[tokens[right.start].start : tokens[right.end - 1].end]
     flipped = "<" if violation.operator == ">" else "<="
     return Plan(start, end, f"{right_text} {flipped} {left_text}")
+
+
+def overlapping_plans(plans: list[Plan]) -> set[int]:
+    rejected: set[int] = set()
+    furthest_end = -1
+    furthest_index = -1
+    for index, plan in sorted(
+        ((index, plan) for index, plan in enumerate(plans) if plan.replacement is not None),
+        key=lambda pair: (pair[1].start, pair[1].end),
+    ):
+        if plan.start < furthest_end:
+            rejected.update((index, furthest_index))
+        if furthest_end < plan.end:
+            furthest_end = plan.end
+            furthest_index = index
+    return rejected
 
 
 def display_path(file: Path) -> str:
@@ -659,8 +664,22 @@ def main(argv: list[str] | None = None) -> int:
         relative = display_path(file)
         edits: list[Plan] = []
         lines = text.split("\n")
-        for violation in violations:
-            plan = plan_fix(text, tokens, generic, violation) if fix else Plan(reason="not fixing")
+        plans = [
+            plan_fix(text, tokens, generic, violation) if fix else Plan(reason="not fixing")
+            for violation in violations
+        ]
+        overlaps = overlapping_plans(plans) if fix else set[int]()
+        operator_positions = (
+            sorted(violation.operator_start for violation in violations) if fix else []
+        )
+        for index, (violation, plan) in enumerate(zip(violations, plans, strict=True)):
+            if index in overlaps or (
+                plan.replacement is not None
+                and bisect_left(operator_positions, plan.end)
+                - bisect_left(operator_positions, plan.start)
+                > 1
+            ):
+                plan = Plan(reason="overlapping rewrite plans")
             if fix and plan.replacement is not None:
                 edits.append(plan)
                 fixed += 1

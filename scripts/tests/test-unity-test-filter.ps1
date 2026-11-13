@@ -14,7 +14,7 @@ foreach ($name in @('Test-NUnitResults', 'Get-UnityFailedNodeCount',
         'ConvertTo-UnsignedExitHex', 'Get-NativeExitCodeDescription',
         'Get-UnityCrashSignature', 'Write-UnityBenignExitWarning',
         'Write-UnityExecutionSymptomDiagnostics', 'New-UnityEditorTestPhases',
-        'New-UnityEditorPhaseArguments',
+        'New-UnityImportArguments', 'New-UnityEditorPhaseArguments',
         'Invoke-UnityEditorTestPhase')) {
     $function = $ast.Find({
             param($node)
@@ -154,10 +154,36 @@ foreach ($version in @('2021.3.45f1', '6000.5.2f1', '6000.6.0f1')) {
         $arguments = @(New-UnityEditorPhaseArguments -Arguments @('-runTests', '-projectPath', 'owned project') `
             -TestCategory $category -TestFilter 'Owned.Fixture' -UnityVersion $version)
         $position = [Array]::IndexOf($arguments, '-refreshImportMode')
-        $expectedOverride = $version -ceq '6000.5.2f1' -and $category -ceq 'CompilationIsolation'
-        if (($position -ge 0) -ne $expectedOverride) { throw 'Import-mode override escaped the affected version and phase.' }
+        $expectedOverride = $version -ceq '6000.5.2f1'
+        if (($position -ge 0) -ne $expectedOverride) { throw 'Import-mode override escaped the affected version.' }
         if ($expectedOverride -and $arguments[$position + 1] -cne 'InProcess') { throw 'Affected phase lost in-process importing.' }
         if ($arguments[2] -cne 'owned project' -or $arguments[-1] -cne 'Owned.Fixture') { throw 'Import override changed existing arguments.' }
+    }
+}
+
+$observedEditor = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Invoke-UnityObservedEditor'
+    }, $true)
+$importAssignment = $observedEditor.Body.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.AssignmentStatementAst] -and
+        $node.Left -is [System.Management.Automation.Language.VariableExpressionAst] -and
+        $node.Left.VariablePath.UserPath -ceq 'Arguments'
+    }, $true)
+if ($null -eq $importAssignment) { throw 'Observed editor launch must apply the import policy.' }
+foreach ($UnityVersion in @('2021.3.45f1', '2022.3.45f1', '6000.5.2f1', '6000.6.0f1')) {
+    foreach ($operation in @('-executeMethod', '-runTests')) {
+        $Arguments = @('-projectPath', 'owned project', $operation, 'Owned.Method')
+        Invoke-Expression $importAssignment.Extent.Text
+        Invoke-Expression $importAssignment.Extent.Text
+        $position = [Array]::IndexOf($Arguments, '-refreshImportMode')
+        $affected = $UnityVersion -ceq '6000.5.2f1'
+        if (($position -ge 0) -ne $affected -or $Arguments.Count -ne $(if ($affected) { 6 } else { 4 })) {
+            throw 'Configure/build launch lost its version-scoped, idempotent import policy.'
+        }
+        if ($affected -and $Arguments[$position + 1] -cne 'InProcess') { throw 'Affected launch must import in-process.' }
+        if ($Arguments[1] -cne 'owned project' -or $Arguments[3] -cne 'Owned.Method') { throw 'Import policy changed the launch selection.' }
     }
 }
 
