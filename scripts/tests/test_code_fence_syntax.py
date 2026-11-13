@@ -79,11 +79,11 @@ def test_repository_docs_are_nonempty_and_valid() -> None:
     "script",
     ["scripts/check-code-fence-syntax.sh", "scripts/tests/test-check-code-fence-syntax.sh"],
 )
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Shell compatibility entry points use POSIX paths; Windows invokes Python directly",
+)
 def test_shell_compatibility_launchers(script: str, tmp_path: Path) -> None:
-    if sys.platform == "win32":
-        pytest.skip(
-            "Shell compatibility entry points use POSIX paths; Windows invokes Python directly"
-        )
     bash = shutil.which("bash")
     if bash is None:
         pytest.skip("Bash is required for its compatibility launcher")
