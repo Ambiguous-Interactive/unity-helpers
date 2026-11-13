@@ -8,6 +8,7 @@ import json
 import math
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -22,6 +23,13 @@ from cli_encoding import configure_output
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATES = Path(__file__).with_name("typecheck-control-sources")
 DIAGNOSTIC_PATTERN = re.compile(r"\b(CS\d{4}|WPROTO\d{3}|WUH\d{3})\b", re.ASCII)
+BUILD_DIAGNOSTIC_LINE_PATTERN = re.compile(
+    r"(?:^|:\s*)(error|warning)(?:\s+([A-Z][A-Z0-9_]*))?\s*:", re.ASCII | re.IGNORECASE
+)
+AUDIT_COMPLETION_PATTERN = re.compile(
+    r"\[counting-loop-audit\] [1-9]\d* excluded-source subjects, [1-9]\d* references, reporting control passed, (\d+) findings\.",
+    re.ASCII,
+)
 JS_WHITESPACE = "\t\v\f \u00a0\ufeff\n\r\u2028\u2029\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u202f\u205f\u3000"
 DECIMAL = re.compile(r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?")
 
@@ -222,6 +230,54 @@ def expected_diagnostics(project: Project, control: Control) -> tuple[str, ...]:
     return (*control.expected, *production)
 
 
+def is_completed_audit_wrapper(project: Project, control: Control, line: str, output: str) -> bool:
+    if project.id != "editor" or control.id != "excluded-loops":
+        return False
+    normalized = line.strip().replace("\\", "/")
+    project_path = str(ROOT / project.project).replace("\\", "/")
+    if not normalized.startswith(project_path + "("):
+        return False
+    prefix = (
+        re.escape(project_path)
+        + r'\(\d+,\d+\): error MSB3073: The command "(.*)" exited with code 1\.'
+    )
+    wrapper = re.fullmatch(prefix, normalized, re.ASCII)
+    if wrapper is None:
+        return False
+    try:
+        command = shlex.split(wrapper.group(1))
+        if len(command) != 9 or command[:3] != ["dotnet", "run", "--project"] or command[4] != "--":
+            return False
+        audit_project = (
+            ROOT
+            / "Generator~/WallstopStudios.UnityHelpers.CountingLoopAudit/WallstopStudios.UnityHelpers.CountingLoopAudit.csproj"
+        )
+        if Path(command[3]).resolve() != audit_project.resolve():
+            return False
+        manifests = [Path(argument).resolve() for argument in command[5:]]
+        expected_names = [
+            f"counting-loop-{name}.txt" for name in ("sources", "references", "symbols", "subjects")
+        ]
+        intermediate = (ROOT / project.project).parent / "obj"
+        if [path.name for path in manifests] != expected_names:
+            return False
+        if len({path.parent for path in manifests}) != 1 or not manifests[0].is_relative_to(
+            intermediate
+        ):
+            return False
+    except (OSError, ValueError, RuntimeError):
+        return False
+    audit_lines = [
+        line.strip()
+        for line in output.splitlines()
+        if line.strip().startswith("[counting-loop-audit]")
+    ]
+    if len(audit_lines) != 1:
+        return False
+    completion = AUDIT_COMPLETION_PATTERN.fullmatch(audit_lines[0])
+    return completion is not None and completion.group(1) == str(len(control.expected))
+
+
 def classify(project: Project, control: Control, attempt: Attempt) -> str | None:
     reported = diagnostics_in(attempt.output)
     expected = expected_diagnostics(project, control)
@@ -245,6 +301,22 @@ def classify(project: Project, control: Control, attempt: Attempt) -> str | None
             f"the ordinary gate and fix that first -- or the anchor {project.anchor} no longer "
             "resolves, which means this project has stopped compiling that tree."
         )
+    for line in attempt.output.splitlines():
+        diagnostic = BUILD_DIAGNOSTIC_LINE_PATTERN.search(line)
+        if diagnostic is None or diagnostic.group(1).lower() != "error":
+            continue
+        code = diagnostic.group(2)
+        if (
+            code is not None
+            and code.upper() == "MSB3073"
+            and is_completed_audit_wrapper(project, control, line, attempt.output)
+        ):
+            continue
+        if code is None or code.upper() not in expected:
+            return (
+                f"{project.id} {control.id}: the build reported an error outside the expected "
+                f"diagnostics: {line.strip()}"
+            )
     return None
 
 

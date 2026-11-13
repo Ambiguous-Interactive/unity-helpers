@@ -62,6 +62,8 @@
 - For CI/CD bash scripts, use POSIX-compliant tools (see [validate-before-commit](../skills/validate-before-commit.md#portable-shell-scripting-in-workflows-critical))
 - **Never commit** `Library/`, `obj/`, secrets, tokens, or root `progress/`; never force-add ignored
   progress. Put durable evidence in issues or commit bodies. **Do commit** asset `.meta` files.
+- Do not commit ZIP archives anywhere in the repository. Keep raw captures in ignored `progress/`,
+  publish small readable qualification records, and link older evidence by its immutable commit URL.
 - Store raw probe source, binaries, and live logs outside the package or under a dot-prefixed or
   `~`-suffixed directory such as `progress/.artifacts/`. Git-ignored paths remain visible to
   Unity: imported probe DLLs can trigger API Updater dialogs and duplicate assemblies. Keep

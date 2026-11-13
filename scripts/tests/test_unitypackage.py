@@ -518,3 +518,21 @@ def test_python_bootstrap_uses_native_powershell() -> None:
         "--disable-pip-version-check",
         "uv==0.13.8",
     ]
+
+
+def test_repository_does_not_track_zip_archives() -> None:
+    git = shutil.which("git")
+    assert git is not None
+    assert (REPO_ROOT / "package.json").is_file()
+    result = subprocess.run(
+        [git, "ls-files", "--cached", "-z"],
+        cwd=REPO_ROOT,
+        check=False,
+        capture_output=True,
+        timeout=COMMAND_TIMEOUT_SECONDS,
+    )
+    assert result.returncode == 0, result.stderr
+    archives = [name for name in result.stdout.split(b"\0") if name.lower().endswith(b".zip")]
+    assert not archives, (
+        "Keep raw archives outside the tracked tree; use readable qualification records."
+    )

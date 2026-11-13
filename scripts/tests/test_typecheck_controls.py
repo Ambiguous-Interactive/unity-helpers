@@ -114,7 +114,11 @@ def test_original_metadata_and_rendered_control_bodies_are_preserved() -> None:
         assert list(control.production_expected) == control_metadata.get("productionExpected", [])
         assert list(control.project_ids) == control_metadata.get("projectIds", [])
         assert control.property_name == control_metadata.get("property", "WallstopCheckControl")
-        assert controls.render(control, "Example.Anchor") == FIXTURE["templates"][control.id]
+        original_body = FIXTURE["templates"][control.id]
+        equality_only_body = original_body.replace(
+            "public struct ControlMissingEquality", "public readonly struct ControlMissingEquality"
+        )
+        assert controls.render(control, "Example.Anchor") == equality_only_body
 
 
 @pytest.mark.parametrize("case", FIXTURE["classifications"])
@@ -459,3 +463,145 @@ def test_every_installed_sdk_is_selected_and_mismatches_are_rejected(
 
 def test_all_eight_sdk_installations_have_controls() -> None:
     assert len(sdk_guards()) == 8
+
+
+def test_both_typecheck_phases_bootstrap_python_before_commands() -> None:
+    phase = as_mapping(as_mapping(workflow("local-gates.yml")["jobs"])["typecheck-phases"])
+    phase_steps = steps(phase)
+    bootstrap = [
+        (index, step)
+        for index, step in enumerate(phase_steps)
+        if step.get("uses") == "./.github/actions/setup-python-tools"
+    ]
+    assert len(bootstrap) == 1
+    bootstrap_index, bootstrap_step = bootstrap[0]
+    assert "if" not in bootstrap_step
+    commands = [
+        index
+        for index, step in enumerate(phase_steps)
+        if step.get("run") in {"npm run typecheck:unity", "npm run typecheck:controls -- --jobs=1"}
+    ]
+    assert len(commands) == 2
+    assert all(bootstrap_index < index for index in commands)
+
+
+def test_fork_formatter_bootstraps_pinned_uv_before_node_launcher() -> None:
+    phase_steps = steps(as_mapping(workflow("prettier-autofix.yml")["jobs"])["autofix_fork"])
+    python_setup = [
+        index
+        for index, step in enumerate(phase_steps)
+        if str(step.get("uses", "")).startswith("actions/setup-python@")
+    ]
+    assert len(python_setup) == 1
+    bootstrap = [
+        (index, step)
+        for index, step in enumerate(phase_steps)
+        if "python -m pip install" in str(step.get("run", ""))
+    ]
+    assert len(bootstrap) == 1
+    bootstrap_index, bootstrap_step = bootstrap[0]
+    assert bootstrap_step["shell"] == "pwsh"
+    setup_action = as_mapping(
+        yaml.safe_load((ROOT / ".github/actions/setup-python-tools/action.yml").read_text())
+    )
+    expected = next(step["run"] for step in steps(setup_action["runs"]) if "run" in step)
+    assert bootstrap_step["run"] == expected
+    format_commands = [
+        index
+        for index, step in enumerate(phase_steps)
+        if "npm run format:" in str(step.get("run", ""))
+    ]
+    assert format_commands
+    assert python_setup[0] < bootstrap_index < min(format_commands)
+    assert all(not str(step.get("uses", "")).startswith("./") for step in phase_steps), (
+        "Fork-head formatting must bootstrap from pinned actions and trusted workflow text."
+    )
+
+
+@pytest.mark.parametrize(
+    ("extra", "must_fail"),
+    [
+        ("project.csproj : error MSB4018: task failed", True),
+        ("project.csproj : error NU1301: feed unavailable", True),
+        ("project.csproj : error : task failed", True),
+        ("error: subprocess failed", True),
+        ("project.csproj : warning NU1605: quoted error MSB4018: text", False),
+        ("source.cs(1,1): error WUH003: quoted error MSB4018: text", False),
+    ],
+)
+def test_expected_codes_do_not_hide_unknown_build_errors(extra: str, must_fail: bool) -> None:
+    project = PROJECTS["runtime"]
+    control = CONTROL_BY_ID["analyzers"]
+    output = "\n".join(
+        f"source.cs(1,1): error {code}: controlled defect"
+        for code in controls.expected_diagnostics(project, control)
+    )
+    result = controls.classify(project, control, controls.Attempt(1, output + "\n" + extra))
+    assert (result is not None) is must_fail
+
+
+def test_retained_node_test_launcher_executes_a_selected_control() -> None:
+    import shutil
+    import subprocess
+
+    node = shutil.which("node")
+    assert node is not None
+    launcher = ROOT / "scripts/tests/test-typecheck-controls.js"
+    result = subprocess.run(
+        [
+            node,
+            str(launcher),
+            "-k",
+            "test_original_metadata_and_rendered_control_bodies_are_preserved",
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        encoding="utf-8",
+        timeout=30,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "1 passed" in result.stdout
+
+
+@pytest.mark.parametrize(
+    "defect",
+    ["none", "other-task", "missing-completion", "audit-fatal", "wrong-exit", "compound-command"],
+)
+def test_only_the_completed_excluded_audit_can_have_its_expected_exec_wrapper(defect: str) -> None:
+    project = PROJECTS["editor"]
+    control = CONTROL_BY_ID["excluded-loops"]
+    error_lines = "\n".join(
+        f"source.cs(1,1): error {code}: controlled defect" for code in control.expected
+    )
+    audit_project = (
+        ROOT
+        / "Generator~/WallstopStudios.UnityHelpers.CountingLoopAudit/WallstopStudios.UnityHelpers.CountingLoopAudit.csproj"
+    )
+    manifests = " ".join(
+        f'"{(ROOT / project.project).parent / "obj/Debug/netstandard2.1" / name}"'
+        for name in (
+            "counting-loop-sources.txt",
+            "counting-loop-references.txt",
+            "counting-loop-symbols.txt",
+            "counting-loop-subjects.txt",
+        )
+    )
+    completion = "[counting-loop-audit] 10 excluded-source subjects, 195 references, reporting control passed, 6 findings."
+    wrapper = f'{ROOT / project.project}(366,5): error MSB3073: The command "dotnet run --project "{audit_project}" -- {manifests}" exited with code 1.'
+    if defect == "other-task":
+        wrapper = wrapper.replace(
+            "WallstopStudios.UnityHelpers.CountingLoopAudit.csproj", "Other.csproj"
+        )
+    elif defect == "missing-completion":
+        completion = ""
+    elif defect == "audit-fatal":
+        completion += "\n[counting-loop-audit] unexpected failure"
+    elif defect == "wrong-exit":
+        wrapper = wrapper.replace("code 1.", "code 2.")
+    elif defect == "compound-command":
+        wrapper = wrapper.replace('" exited with code 1.', ' && other-command" exited with code 1.')
+    result = controls.classify(
+        project, control, controls.Attempt(1, error_lines + "\n" + completion + "\n" + wrapper)
+    )
+    assert (result is None) is (defect == "none")

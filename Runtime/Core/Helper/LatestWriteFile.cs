@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     using System;
     using System.Collections.Generic;
     using System.IO;
+    using System.Runtime.InteropServices;
     using WritePayload = WallstopStudios.UnityHelpers.Core.OneOf.FastOneOf<string, byte[]>;
 #if !SINGLE_THREADED
     using System.Threading;
@@ -20,10 +21,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     /// </remarks>
     public sealed class LatestWriteFile : IDisposable
     {
-        private static readonly StringComparer PathComparer =
-            Path.DirectorySeparatorChar == '\\'
-                ? StringComparer.OrdinalIgnoreCase
-                : StringComparer.Ordinal;
+        private static readonly StringComparer PathComparer = CreatePathComparer();
 
         /// <summary>Gets the number of distinct queued paths, excluding writes already in progress.</summary>
         public int PendingPathCount
@@ -79,6 +77,13 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 #if !SINGLE_THREADED
             _drainCallback = DrainPendingWrites;
 #endif
+        }
+
+        private static StringComparer CreatePathComparer()
+        {
+            bool isWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
+            bool isMac = RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
+            return isWindows || isMac ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
         }
 
         private static string NormalizePath(string path)

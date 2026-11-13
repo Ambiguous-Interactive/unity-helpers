@@ -1299,6 +1299,7 @@ Keep one `LatestWriteFile` for a store whose newest pending snapshot replaces ea
 It retains one queued payload per normalized path. A write already in progress finishes first;
 its newer replacement follows it. Text stays immutable and is encoded as UTF-8 only when written.
 Byte submissions make an owned copy so callers can immediately reuse their array.
+Path identity ignores case on Windows and macOS and uses ordinal comparison on other hosts.
 
 <!-- doc-sample: compiles -->
 

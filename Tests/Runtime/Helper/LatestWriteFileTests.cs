@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     using System;
     using System.Collections.Generic;
     using System.IO;
+    using System.Runtime.InteropServices;
     using System.Text;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Helper;
@@ -55,6 +56,60 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.That(File.ReadAllText(path), Is.EqualTo("last"));
             Assert.That(writer.PendingPathCount, Is.Zero);
             Assert.IsTrue(writer.Failure == null);
+        }
+
+        [Test]
+        public void CaseAliasesFollowTheHostPathComparison()
+        {
+            bool isWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
+            bool isMac = RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
+            bool ignoreCase = isWindows || isMac;
+            string lower = Path.Combine(_directory, "case.txt");
+            string upper = Path.Combine(_directory, "CASE.txt");
+            using LatestWriteFile writer = new(writeInBackground: false);
+            Assert.IsTrue(writer.TryEnqueueText(lower, "old", out Exception error));
+            Assert.IsTrue(error == null);
+            Assert.IsTrue(writer.TryEnqueueText(upper, "new", out error));
+            Assert.IsTrue(error == null);
+            Assert.That(writer.PendingPathCount, Is.EqualTo(ignoreCase ? 1 : 2));
+            Assert.IsTrue(writer.Flush(out error));
+            Assert.IsTrue(error == null);
+            Assert.That(File.ReadAllText(lower), Is.EqualTo(ignoreCase ? "new" : "old"));
+            if (!ignoreCase)
+            {
+                Assert.That(File.ReadAllText(upper), Is.EqualTo("new"));
+            }
+        }
+
+        [Test]
+        public void CaseAliasRecoveryClearsOnlyTheMatchingDestinationFailure()
+        {
+            bool isWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
+            bool isMac = RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
+            bool ignoreCase = isWindows || isMac;
+            string lower = Path.Combine(_directory, "recovery.txt");
+            string upper = Path.Combine(_directory, "RECOVERY.txt");
+            Directory.CreateDirectory(lower);
+            using LatestWriteFile writer = new(writeInBackground: false);
+            Assert.IsTrue(writer.TryEnqueueText(lower, "blocked", out Exception error));
+            Assert.IsTrue(error == null);
+            Assert.IsFalse(writer.Flush(out error));
+            Assert.IsTrue(error != null);
+            Directory.Delete(lower);
+            Assert.IsTrue(writer.TryEnqueueText(upper, "recovered", out error));
+            Assert.IsTrue(error == null);
+            Assert.That(writer.Flush(out error), Is.EqualTo(ignoreCase));
+            Assert.That(writer.Failure == null, Is.EqualTo(ignoreCase));
+            Assert.That(File.ReadAllText(upper), Is.EqualTo("recovered"));
+            if (!ignoreCase)
+            {
+                Assert.IsTrue(writer.TryEnqueueText(lower, "separate", out error));
+                Assert.IsTrue(error == null);
+                Assert.IsTrue(writer.Flush(out error));
+                Assert.IsTrue(error == null);
+                Assert.IsTrue(writer.Failure == null);
+                Assert.That(File.ReadAllText(upper), Is.EqualTo("recovered"));
+            }
         }
 
         [TestCase(null)]

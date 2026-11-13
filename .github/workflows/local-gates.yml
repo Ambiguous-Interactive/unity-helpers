@@ -218,7 +218,6 @@ jobs:
             hashFiles('Generator~/**/*.csproj', 'Generator~/**/*.props', 'Generator~/**/*.targets', '**/NuGet.Config', '**/nuget.config') }}
 
       - name: Setup Python tooling
-        if: matrix.phase == 'sources'
         uses: ./.github/actions/setup-python-tools
 
       # Separate checkouts keep control-injected build outputs away from ordinary builds.

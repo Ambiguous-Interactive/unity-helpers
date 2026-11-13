@@ -41,5 +41,5 @@ between variants. Offline inspection of the captured DLL confirms the Mono cache
 one array load per lookup and constant-data span getters without array creation. Initialization
 creates the caches once; the IL check describes warm lookup paths.
 
-The [replay archive](./bit-lookup-tables.zip) contains source variants, fixtures, all six NUnit
+The [replay archive](https://raw.githubusercontent.com/Ambiguous-Interactive/unity-helpers/587d3de6fde16c76a0ba256872cfe8c800bf1287/docs/performance/bit-lookup-tables.zip) contains source variants, fixtures, all six NUnit
 results, raw rounds, process receipts, source and assembly identities, IL records and replay steps.

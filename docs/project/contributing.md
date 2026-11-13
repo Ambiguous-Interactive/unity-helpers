@@ -82,7 +82,7 @@ its complete source scan and eight case identities. On Windows x64 Unity 6000.6.
 three alternating process pairs reduced median fixture duration from 7.81 to 5.82 seconds.
 Paired candidate/baseline ratios ranged from 0.589 to 0.903; all six processes passed eight cases,
 exited zero and reached both stream ends. These are fixture timings, not the whole EditMode suite
-or editor startup. The [source variants, NUnit results and receipts](../performance/editor-contract-regex.zip)
+or editor startup. The [source variants, NUnit results and receipts](https://raw.githubusercontent.com/Ambiguous-Interactive/unity-helpers/587d3de6fde16c76a0ba256872cfe8c800bf1287/docs/performance/editor-contract-regex.zip)
 make the scoped comparison reproducible.
 
 ### Pure EditMode fixtures
@@ -93,7 +93,7 @@ keep their existing setup and cleanup. Three alternating fresh Unity 6000.6.7f1 
 all 43 cases with equal canonical case inventories. The moved cases take a median 1.368 seconds
 before and 0.002 after. The whole cohort medians are 10.557 and 8.667 seconds, with one slower
 candidate pair. This does not establish full-suite or CI timing. The
-[replay capture](../performance/editmode-path-fixtures.zip) retains source variants, all six NUnit
+[replay capture](https://raw.githubusercontent.com/Ambiguous-Interactive/unity-helpers/587d3de6fde16c76a0ba256872cfe8c800bf1287/docs/performance/editmode-path-fixtures.zip) retains source variants, all six NUnit
 results, process receipts, source hashes and the complete case inventory.
 
 ### Typed Python scripts
@@ -125,7 +125,7 @@ archive captures the initial port at `7390d47d`, before these safety corrections
 A local full-tree comparison over the same 2915 files used three alternating pairs. Median
 process times were 7.001 seconds for the original Node checker and 10.014 seconds for Python.
 The port is slower in all three pairs; this change establishes typed tooling and retained behavior,
-not a startup-speed improvement. The [replay data](../performance/local-pool-runtime-qualification.zip)
+not a startup-speed improvement. The [replay data](https://raw.githubusercontent.com/Ambiguous-Interactive/unity-helpers/587d3de6fde16c76a0ba256872cfe8c800bf1287/docs/performance/local-pool-runtime-qualification.zip)
 retains the commands, source hashes, coverage validation and all six observations.
 
 Documentation links run through `scripts/lint_doc_links.py` in locked uv. The `doc-links`
@@ -147,7 +147,7 @@ returned multiline strings remain visible. Source references do not truncate lon
 such as `.mdx` to `.md`.
 
 The checker retains the earlier inline-link grammar limitation for parentheses inside targets.
-The [replay capture](../performance/doc-link-checker-port.zip) retains the original corpus, source
+The [replay capture](https://raw.githubusercontent.com/Ambiguous-Interactive/unity-helpers/587d3de6fde16c76a0ba256872cfe8c800bf1287/docs/performance/doc-link-checker-port.zip) retains the original corpus, source
 identities, native Windows results and six suite timing observations. The expanded 90-case suite
 takes about eight seconds locally, as did the original 51-assertion suite; no consistent suite
 speedup is established.
@@ -177,7 +177,7 @@ uv run --project scripts/python~ --locked pytest scripts/tests/test_lifecycle_li
 At commit `87fc1cd1`, three alternating fresh-process pairs over the same 1,785 C# files retained identical
 75 path/line/code diagnostics. Median complete-command time fell from 26.05 to 9.25 seconds
 on this Linux host. This includes process launch and the full scan; it does not predict CI timing.
-The [timing captures and replay sources](../performance/lifecycle-checker-port.zip) retain the
+The [timing captures and replay sources](https://raw.githubusercontent.com/Ambiguous-Interactive/unity-helpers/587d3de6fde16c76a0ba256872cfe8c800bf1287/docs/performance/lifecycle-checker-port.zip) retain the
 unchanged source inventory, all six observations and tool identities. The timing data applies to that version. Later fixes to assertion repair and category detection
 have separate correctness coverage.
 
@@ -637,7 +637,7 @@ Prettier still formats the generated Markdown. Cross-document fragments map from
 the target headings; source prose and fenced examples retain their content.
 Missing or empty sources, unsafe output links, and formatter errors fail the
 command. Successful writes replace the complete mirror atomically.
-The [port evidence](../performance/readme-mirror-port.zip) retains the original
+The [port evidence](https://raw.githubusercontent.com/Ambiguous-Interactive/unity-helpers/587d3de6fde16c76a0ba256872cfe8c800bf1287/docs/performance/readme-mirror-port.zip) retains the original
 corpus, native Windows checks and paired startup captures. Startup remains slower
 than the original Node command; the port makes no startup performance claim.
 The archive records the initial 64-case source snapshot. Later fixes also reject
@@ -865,9 +865,16 @@ guards. Additional controls cover subprocess bytes, retry bounds and group sched
 controls supplement the real negative builds; they do not replace them. The Node entry points
 remain compatibility launchers.
 
-The [launcher and compiler-control replay archive](./tool-launcher-control-qualification.zip)
-retains the original executables, frozen observations, migrated sources, all eleven real
-negative-build results and native Windows qualification. The uv 0.13.8 Windows runs cover 346 passing controls, including malformed paths and
-metadata access failures, plus strict analysis over 143 Python sources with UTF-8 mode disabled. The initial 306-control
-proof and the failed Windows Bash-selection and formatting captures remain in the archive.
-No timing improvement is claimed for these ports.
+The equality witness is now readonly so it targets missing equality without also triggering
+an unrelated readonly diagnostic. Its original source remains in the frozen fixture. Unknown
+coded or code-less build errors fail even when every expected diagnostic is present. The
+excluded-source control recognizes its audit wrapper only after a complete reporting-control
+summary with exactly the expected findings, the named audit command, and exit code one.
+Missing or fatal audit reports, other commands and other exit codes fail.
+
+The [launcher and compiler-control qualification record](./tool-launcher-control-qualification.csv)
+lists capture outcomes, source hashes and selected log hashes. Frozen original observations and
+control sources live under `scripts/`; raw logs and original executables remain in ignored `progress/`.
+The uv 0.13.8 Windows runs cover 346 passing controls, including malformed paths and metadata
+access failures, plus strict analysis over 143 Python sources with UTF-8 mode disabled. Earlier
+failed captures remain identified in the record. No timing improvement is claimed for these ports.

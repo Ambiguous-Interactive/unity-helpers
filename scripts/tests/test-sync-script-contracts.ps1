@@ -1087,10 +1087,21 @@ function Run-RepoLocalPrettierContractTests {
     'format:yaml',
     'format:yaml:check'
   )
+  $repoLocalPrettierCommandPattern = '^(?:node\s+\./scripts/run-prettier\.js|uv\s+run\s+--quiet\s+--project\s+scripts/python~\s+--locked\s+--no-dev\s+python\s+scripts/run_node_bin\.py\s+prettier)(?:\s|$)'
+  foreach ($control in @(
+      @{ Name = 'Legacy'; Command = 'node ./scripts/run-prettier.js --check -- x.md'; Expected = $true },
+      @{ Name = 'Typed'; Command = 'uv run --quiet --project scripts/python~ --locked --no-dev python scripts/run_node_bin.py prettier --check -- x.md'; Expected = $true },
+      @{ Name = 'Unlocked'; Command = 'uv run --quiet --project scripts/python~ --no-dev python scripts/run_node_bin.py prettier --check -- x.md'; Expected = $false },
+      @{ Name = 'HostPath'; Command = 'prettier --check x.md'; Expected = $false },
+      @{ Name = 'Npx'; Command = 'npx prettier --check x.md'; Expected = $false }
+    )) {
+    $isAcceptedLauncher = $control.Command -match $repoLocalPrettierCommandPattern
+    Write-TestResult -TestName "Prettier launcher admission: $($control.Name)" -Passed ($isAcceptedLauncher -eq $control.Expected)
+  }
   $formatScriptDrift = @()
   foreach ($scriptName in $formatScripts) {
     $scriptValue = [string]$packageJson.scripts.PSObject.Properties[$scriptName].Value
-    if ($scriptValue -notmatch 'node\s+\./scripts/run-prettier\.js') {
+    if ($scriptValue -notmatch $repoLocalPrettierCommandPattern) {
       $formatScriptDrift += "${scriptName}: ${scriptValue}"
     }
   }

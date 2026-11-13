@@ -131,7 +131,7 @@ at 64 slots in every current-main process. These results do not complete
 [#1131](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1131). They do not qualify
 Unity, IL2CPP, WebGL, arbitrary values or application workloads.
 
-The [qualification archive](./intmap-inlining-qualification.zip) contains all expanded and original
+The [qualification archive](https://raw.githubusercontent.com/Ambiguous-Interactive/unity-helpers/587d3de6fde16c76a0ba256872cfe8c800bf1287/docs/performance/intmap-inlining-qualification.zip) contains all expanded and original
 consumer source inputs, calibrated raw rounds, complete row sets, receipts, source/payload seals,
 environment records, analysis and controllers. It preserves the rejected hint and a separate
 unchanged-main replay. Earlier overlapping exploratory captures are excluded from the retention
@@ -159,7 +159,7 @@ cell also exceeds the limit: aggregate 1.171, with paired ratios 1.171, 1.012 an
 iteration observation varies substantially and does not establish a repeatable iteration defect.
 The .NET lookup regressions alone reject this candidate. Production `IntMap` remains unchanged.
 
-The [rejected-candidate archive](./intmap-first-probe-rejected.zip) contains exact sources,
+The [rejected-candidate archive](https://raw.githubusercontent.com/Ambiguous-Interactive/unity-helpers/587d3de6fde16c76a0ba256872cfe8c800bf1287/docs/performance/intmap-first-probe-rejected.zip) contains exact sources,
 binaries, all calibrated raw rounds, complete results, process receipts, source/payload seals
 and the analysis. This compares with current main, not the original 3.7.1 acceptance baseline;
 [#1131](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1131) remains open under
@@ -178,7 +178,8 @@ large-map hit controls also regress in both captures. The lookup geometric-mean 
 0.9697 and 0.9834, below the required 5% benefit. Production `IntMap` is unchanged, and no Mono
 qualification is claimed for this candidate.
 
-The [rejection archive](./intmap-empty-guard-rejection.zip) retains every cell and observation,
-process receipts, sealed source and binary hashes, controllers and the decision rule. This
-experiment does not replace the original consumer lookup, insertion and iteration budgets
-tracked in [the open acceptance issue](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1131).
+The [rejection record](./intmap-empty-guard-rejection.csv) contains all 396 reported cells,
+process receipts, sealed source/binary hashes and the decision rule. Raw per-round logs and
+the frozen harness remain in ignored `progress/`. This experiment does not replace the original
+consumer lookup, insertion and iteration budgets tracked in
+[the open acceptance issue](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1131).

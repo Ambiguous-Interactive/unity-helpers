@@ -231,9 +231,9 @@ cases from the final sources after removing the measurement reporters.
 
 A separate seven-case singleton cleanup candidate failed the same rule: paired ratios were
 1.0040, 1.1101 and 0.7615. Its median fixture duration changed from 7.996 to 8.027 seconds, so
-the original fixture was restored. All six failed-candidate captures are preserved alongside
-the accepted campaigns in the [lifecycle replay archive](./editor-lifecycle-qualification.zip).
+the original fixture was restored. The [lifecycle qualification record](./editor-lifecycle-qualification.csv)
+lists all 18 paired processes, canonical case identities, source/module hashes and the final
+175-case validation. Raw NUnit trees, controllers and source variants remain in ignored `progress/`.
 
 These are local fixture measurements. They do not establish the cause of earlier CI delays or
-prove a whole-suite time below seven minutes. The archive retains all NUnit trees, receipts,
-variant sources, module hashes and acceptance rules, including the rejected experiment.
+prove a whole-suite time below seven minutes.

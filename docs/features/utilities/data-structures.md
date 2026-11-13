@@ -554,7 +554,7 @@ also meet that bound. Lookup and insert costs exceed the allowed 10% increase in
 so [#1131](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1131) remains open. At eight dense keys,
 .NET misses take about twice 3.7.1's time. Churn keeps the current map at 64 slots in every process.
 
-The [source and result archive](../../performance/intmap-consumer-harness.zip) preserves the
+The [source and result archive](https://raw.githubusercontent.com/Ambiguous-Interactive/unity-helpers/587d3de6fde16c76a0ba256872cfe8c800bf1287/docs/performance/intmap-consumer-harness.zip) preserves the
 original harness and historical outputs, plus the separately built replay, stream captures,
 source hashes, and process receipts. The [evidence record](../../performance/intmap-consumer-evidence.json)
 contains all 666 replay summaries. Each process exits zero and reaches both stream ends with
@@ -616,7 +616,7 @@ The table gives the range of median paired process ratios across the tested cell
 Eight-entry dense hits improved in every process: 9–17% on .NET and 11–21% on Mono.
 Other cells include small regressions, so this is no universal speed guarantee.
 All six processes exited zero, ended both streams, and retained stable source and binary hashes.
-The [replay archive](../../performance/intmap-lookup-guard.zip) includes the harness, source variants,
+The [replay archive](https://raw.githubusercontent.com/Ambiguous-Interactive/unity-helpers/587d3de6fde16c76a0ba256872cfe8c800bf1287/docs/performance/intmap-lookup-guard.zip) includes the harness, source variants,
 raw rounds and receipts. These current-main comparisons do not establish the original 3.7.1
 consumer budget; [#1131](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1131) remains open.
 Unity players and arbitrary value types still require separate measurement.
@@ -643,7 +643,7 @@ conversion at an API boundary.
 
 ### Rejected Raw-Sentinel Experiment
 
-The [raw-sentinel triage capture](../../performance/intmap-raw-sentinel-rejected.zip) tests storing zero
+The [raw-sentinel triage capture](https://raw.githubusercontent.com/Ambiguous-Interactive/unity-helpers/587d3de6fde16c76a0ba256872cfe8c800bf1287/docs/performance/intmap-raw-sentinel-rejected.zip) tests storing zero
 in the table with a reserved empty marker. Two complete Linux .NET 10 processes retain raw rounds,
 independent value checks, source and binary hashes, clean exits and both stream ends. Repeated-zero
 lookup medians take 1.56–2.00 times current main; small-map insertion medians take 1.12–1.18 times
@@ -654,7 +654,7 @@ qualification against the original consumer budget. The archive contains source 
 
 ### Rejected Empty-Count-Guard Experiment
 
-The [empty-count-guard capture](../../performance/intmap-empty-guard-rejected.zip) removes only
+The [empty-count-guard capture](https://raw.githubusercontent.com/Ambiguous-Interactive/unity-helpers/587d3de6fde16c76a0ba256872cfe8c800bf1287/docs/performance/intmap-empty-guard-rejected.zip) removes only
 `TryGet`'s early empty-count check from main `af80061e`. Three fresh Linux x64 processes per runtime
 use the same 159-cell calibrated harness and independent value checks. Mono lookup cells improve,
 but 16,384-entry .NET 10 hit medians regress in every process for dense, sparse and shifted keys;
@@ -665,7 +665,7 @@ main comparison does not satisfy the recovered original consumer's 3.7.1 budget 
 
 ### Rejected Empty-Slot-Loop Experiment
 
-The [empty-slot-loop capture](../../performance/intmap-empty-slot-rejected.zip) moves the
+The [empty-slot-loop capture](https://raw.githubusercontent.com/Ambiguous-Interactive/unity-helpers/587d3de6fde16c76a0ba256872cfe8c800bf1287/docs/performance/intmap-empty-slot-rejected.zip) moves the
 insertion loop's empty-slot test to its boundary. It preserves lookup statements, indexing and
 resize policy. Three fresh processes each on Linux x64 .NET 10.0.14 and Mono 6.14.1 cover 195
 cells, including replacements, with 64 warm calls, at least 20 ms calibration and 21 rotating

@@ -27,7 +27,7 @@ Positive allocation controls accompany the four warmed zero-allocation observati
 processes return raw exit zero, reach both stream ends without a drain stop, retain identical
 source hashes and print the runtime module identity matching the captured DLL.
 
-The [replay archive](./local-pool-runtime-qualification.zip) contains frozen inputs, controllers,
+The [replay archive](https://raw.githubusercontent.com/Ambiguous-Interactive/unity-helpers/587d3de6fde16c76a0ba256872cfe8c800bf1287/docs/performance/local-pool-runtime-qualification.zip) contains frozen inputs, controllers,
 all 252 timing rows, complete NUnit trees and process receipts. It also contains the byte-format
 sprite correctness controls and additional Editor lifecycle experiment. Replay each arm with its
 named source snapshot and preserve new process identities separately.
@@ -57,8 +57,9 @@ least 5% shared geometric-mean benefit and no shared pair over 1.10. Each proces
 33 functional and allocation controls, emitted 147 timing rows, returned raw zero, reached
 both stream ends and matched its loaded runtime module to the captured DLL.
 
-The [shared buffer replay archive](./shared-buffer-qualification.zip) preserves all six NUnit
-trees, receipts, timing rows, controllers, variant sources and the hashed C# source snapshot.
-This snapshot precedes the unrelated coalesced-file-writer addition. The pool implementation
-is unchanged in the final runtime validation, which passes 864 cases with four existing skips.
+The [shared buffer qualification record](./shared-buffer-qualification.csv) contains all 882
+timing observations, process receipts, case results and source/module hashes. The measured
+snapshot precedes the unrelated coalesced-file-writer addition. The pool implementation is
+unchanged in the final runtime validation, which passes 866 cases with four existing skips.
+Raw NUnit trees, controllers and frozen source inputs remain in ignored `progress/`.
 These results do not qualify contention, player builds or another runtime.

@@ -4,7 +4,7 @@ namespace WallstopStudios.UnityHelpers.CheckControls
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
-    public struct ControlMissingEquality { }
+    public readonly struct ControlMissingEquality { }
 
     [WProtoContract]
     internal sealed class ControlContractIsNotPartial
