@@ -614,6 +614,21 @@ The archive records the initial 64-case source snapshot. Later fixes also reject
 missing documentation assets and preserve inline-code link examples; their current
 regressions remain in the source suite. Historical captures keep their recorded identities.
 
+`npm run check:reference-upstream-drift` checks the pinned sort and random source hashes through
+locked typed Python. `--manifest` and `--report` retain the historical CLI and JSON report shape;
+the Node entry points remain compatibility launchers. Downloads use a 30-second timeout and a
+16 MiB source limit. Source and redirect URLs stay on `raw.githubusercontent.com` over HTTPS.
+The checker rejects missing local files, paths escaping the repository, duplicate names, and
+empty coverage. Its tests replay frozen reports captured from the original JavaScript, plus
+manifest, URL, download, failure, and launcher controls. These checks do not update local source
+adaptations or their pinned hashes.
+
+The code-fence syntax validator and its regression suite also run through locked typed Python.
+The historical shell entry points remain compatibility launchers. The validator retains its
+comma-attribute rules, source locations, scan counts and failure exits. Seven original-executable
+corpora freeze its output. Pure parser controls cover fence lengths, indentation, nested paths,
+multiple findings and physical line endings; the suite also invokes both shell launchers.
+
 Six pure singleton policy tests avoid asset setup and refresh while integration
 cases retain their cleanup. See the [fixture measurements](../performance/singleton-policy-fixtures.md).
 
@@ -779,3 +794,10 @@ and binary hashes when updating provenance.
 A .NET Standard target and passing host tests do not establish Unity assembly ownership or backend
 health. The complete supported-version, stripped IL2CPP, WebGL and native process qualification
 remains tracked in [the dependency qualification issue](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1052).
+
+### Documentation environment
+
+Use Python 3.11.8 or later within the 3.11 series for the documentation lock. An older
+existing environment may build successfully with stale plugins while failing to install the
+current lock. Create a supported environment and sync `requirements-docs.lock` before running
+`mkdocs build --strict`; the repository's documentation CI uses that lock.

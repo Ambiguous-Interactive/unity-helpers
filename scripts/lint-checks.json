@@ -212,7 +212,7 @@
   {
     "id": "code-fence-syntax",
     "name": "Code fence syntax",
-    "run": "bash scripts/check-code-fence-syntax.sh"
+    "run": "uv run --quiet --project scripts/python~ --locked --no-dev python scripts/check_code_fence_syntax.py"
   },
   {
     "id": "markdown",

@@ -23,10 +23,13 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Setup Python tooling
+        uses: ./.github/actions/setup-python-tools
+
       - name: Check pinned upstream sources
         id: check
         continue-on-error: true
-        run: node scripts/check-reference-upstream-drift.js --report "${RUNNER_TEMP}/reference-upstream-drift.json"
+        run: uv run --quiet --project scripts/python~ --locked --no-dev python scripts/check_reference_upstream_drift.py --report "${RUNNER_TEMP}/reference-upstream-drift.json"
 
       - name: Open or update drift issue
         if: steps.check.outcome == 'failure'
