@@ -485,6 +485,7 @@ runTest("no linter in scripts/ has been left unreachable", () => {
   // (#453). An allowlist whose entries are prose excuses whatever is put in it -- the quiet half of
   // #445, one level up: the thing named still exists, so nothing goes red.
   const runElsewhere = new Map([
+    ["scripts/check-code-fence-syntax.sh", "fence-controls"],
     ["scripts/lint-readme-mirror.js", "readme-controls"],
     ["scripts/lint-yaml.ps1", "yaml-controls"],
     ["scripts/lint-no-regions.ps1", "region-controls"],
@@ -515,6 +516,10 @@ runTest("no linter in scripts/ has been left unreachable", () => {
   // Only the kinds something actually claims. A registered predicate nothing uses is a dead branch
   // inside the one test whose whole point is that a claim has to be executable.
   const owners = new Map([
+    [
+      "fence-controls",
+      (file) => registeredControlsInvoke(file, "scripts/tests/test_code_fence_syntax.py")
+    ],
     [
       "readme-controls",
       (file) => registeredControlsInvoke(file, "scripts/tests/test_readme_mirror.py")

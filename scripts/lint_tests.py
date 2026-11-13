@@ -49,7 +49,7 @@ PERF = re.compile(
     r'\[\s*(?:NUnit\.Framework\.)?Category(?:Attribute)?\(\s*"(?:Performance|Stress)"\s*\)\s*\]'
 )
 CREATION = r"\bnew\s+(?:GameObject|Texture2D|Material|Mesh|Camera)\s*\("
-BASE = r":\s*(?:CommonTestBase|AttributeTagsTestBase|TagsTestBase|EditorCommonTestBase|SpriteSheetExtractorTestBase|BatchedEditorTestBase|DetectAssetChangeTestBase|RelationalExactBindingTestBase)\b"
+BASE = r":\s*(?:CommonTestBase|SynchronousEditorTestBase|AttributeTagsTestBase|TagsTestBase|EditorCommonTestBase|SpriteSheetExtractorTestBase|BatchedEditorTestBase|DetectAssetChangeTestBase|RelationalExactBindingTestBase)\b"
 
 
 @dataclass(frozen=True)

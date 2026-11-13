@@ -1,0 +1,71 @@
+{
+  "provenance": {
+    "sourceCommit": "e3195eb3336072a0e47d4034e9dc6d108e9922d4",
+    "sha256": "3fb65e87f8d0b28855b761ff4a7a295e218d4b8067780bad6e3557a305a62ab3"
+  },
+  "cases": [
+    {
+      "name": "legal",
+      "files": {
+        "ok.md": "# Legal fences\n\n```csharp\nint value = 1;\n```\n\n```\nno language at all\n```\n\n```csharp title=\"Example.cs\" hl_lines=\"1 2\"\nint spaced = 2;\n```\n\n~~~python\nvalue = 3\n~~~\n\nProse may say ```csharp,ignore``` is wrong without being wrong itself, and a\nfenced body may contain commas:\n\n```text\none, two, three\n```\n"
+      },
+      "exit": 0,
+      "stdout": "========================================\nCode Fence Syntax Validator\n========================================\n\nDocs Directory: \u001b[0;34m<CORPUS>\u001b[0m\n\n----------------------------------------\nChecking for invalid code fence syntax\n----------------------------------------\n\nPattern: code fences with comma-separated attributes\n  Invalid: ```csharp,ignore or ```rust,no_run\n  Valid:   ```csharp or ```rust\n\n----------------------------------------\nSummary\n----------------------------------------\nMarkdown files scanned: \u001b[0;34m1\u001b[0m\n\n\u001b[0;32mNo code fence syntax issues found.\u001b[0m\n\n\u001b[0;32mVALIDATION PASSED\u001b[0m\n",
+      "stderr": ""
+    },
+    {
+      "name": "backtick",
+      "files": {
+        "guide.md": "# Guide\n\n```csharp,ignore\nint value = 1;\n```\n"
+      },
+      "exit": 1,
+      "stdout": "========================================\nCode Fence Syntax Validator\n========================================\n\nDocs Directory: \u001b[0;34m<CORPUS>\u001b[0m\n\n----------------------------------------\nChecking for invalid code fence syntax\n----------------------------------------\n\nPattern: code fences with comma-separated attributes\n  Invalid: ```csharp,ignore or ```rust,no_run\n  Valid:   ```csharp or ```rust\n\n\u001b[0;31mISSUE\u001b[0m <CORPUS>/guide.md:3\n  Found: ```csharp,ignore\n  Fix:   ```csharp  \u001b[1;33m(remove ',ignore')\u001b[0m\n\n----------------------------------------\nSummary\n----------------------------------------\nMarkdown files scanned: \u001b[0;34m1\u001b[0m\n\n\u001b[0;31mFound 1 code fence syntax issue(s)\u001b[0m\n\nMkDocs and GitHub Pages do not support comma-separated\nattributes in code fences. Remove the comma and everything\nafter it from the language identifier.\n\n\u001b[0;31mVALIDATION FAILED\u001b[0m\n",
+      "stderr": ""
+    },
+    {
+      "name": "tilde",
+      "files": {
+        "guide.md": "~~~python,no_run\nvalue = 1\n~~~\n"
+      },
+      "exit": 1,
+      "stdout": "========================================\nCode Fence Syntax Validator\n========================================\n\nDocs Directory: \u001b[0;34m<CORPUS>\u001b[0m\n\n----------------------------------------\nChecking for invalid code fence syntax\n----------------------------------------\n\nPattern: code fences with comma-separated attributes\n  Invalid: ```csharp,ignore or ```rust,no_run\n  Valid:   ```csharp or ```rust\n\n\u001b[0;31mISSUE\u001b[0m <CORPUS>/guide.md:1\n  Found: ```python,no_run\n  Fix:   ```python  \u001b[1;33m(remove ',no_run')\u001b[0m\n\n----------------------------------------\nSummary\n----------------------------------------\nMarkdown files scanned: \u001b[0;34m1\u001b[0m\n\n\u001b[0;31mFound 1 code fence syntax issue(s)\u001b[0m\n\nMkDocs and GitHub Pages do not support comma-separated\nattributes in code fences. Remove the comma and everything\nafter it from the language identifier.\n\n\u001b[0;31mVALIDATION FAILED\u001b[0m\n",
+      "stderr": ""
+    },
+    {
+      "name": "indented",
+      "files": {
+        "guide.md": "1. A step:\n\n    ```rust,no_run\n    let value = 1;\n    ```\n"
+      },
+      "exit": 1,
+      "stdout": "========================================\nCode Fence Syntax Validator\n========================================\n\nDocs Directory: \u001b[0;34m<CORPUS>\u001b[0m\n\n----------------------------------------\nChecking for invalid code fence syntax\n----------------------------------------\n\nPattern: code fences with comma-separated attributes\n  Invalid: ```csharp,ignore or ```rust,no_run\n  Valid:   ```csharp or ```rust\n\n\u001b[0;31mISSUE\u001b[0m <CORPUS>/guide.md:3\n  Found: ```rust,no_run\n  Fix:   ```rust  \u001b[1;33m(remove ',no_run')\u001b[0m\n\n----------------------------------------\nSummary\n----------------------------------------\nMarkdown files scanned: \u001b[0;34m1\u001b[0m\n\n\u001b[0;31mFound 1 code fence syntax issue(s)\u001b[0m\n\nMkDocs and GitHub Pages do not support comma-separated\nattributes in code fences. Remove the comma and everything\nafter it from the language identifier.\n\n\u001b[0;31mVALIDATION FAILED\u001b[0m\n",
+      "stderr": ""
+    },
+    {
+      "name": "long-fence",
+      "files": {
+        "guide.md": "````markdown,linenums\n```csharp\nint value = 1;\n```\n````\n"
+      },
+      "exit": 1,
+      "stdout": "========================================\nCode Fence Syntax Validator\n========================================\n\nDocs Directory: \u001b[0;34m<CORPUS>\u001b[0m\n\n----------------------------------------\nChecking for invalid code fence syntax\n----------------------------------------\n\nPattern: code fences with comma-separated attributes\n  Invalid: ```csharp,ignore or ```rust,no_run\n  Valid:   ```csharp or ```rust\n\n\u001b[0;31mISSUE\u001b[0m <CORPUS>/guide.md:1\n  Found: ```markdown,linenums\n  Fix:   ```markdown  \u001b[1;33m(remove ',linenums')\u001b[0m\n\n----------------------------------------\nSummary\n----------------------------------------\nMarkdown files scanned: \u001b[0;34m1\u001b[0m\n\n\u001b[0;31mFound 1 code fence syntax issue(s)\u001b[0m\n\nMkDocs and GitHub Pages do not support comma-separated\nattributes in code fences. Remove the comma and everything\nafter it from the language identifier.\n\n\u001b[0;31mVALIDATION FAILED\u001b[0m\n",
+      "stderr": ""
+    },
+    {
+      "name": "nested",
+      "files": {
+        "features/deep/guide.md": "```csharp,ignore\nint value = 1;\n```\n"
+      },
+      "exit": 1,
+      "stdout": "========================================\nCode Fence Syntax Validator\n========================================\n\nDocs Directory: \u001b[0;34m<CORPUS>\u001b[0m\n\n----------------------------------------\nChecking for invalid code fence syntax\n----------------------------------------\n\nPattern: code fences with comma-separated attributes\n  Invalid: ```csharp,ignore or ```rust,no_run\n  Valid:   ```csharp or ```rust\n\n\u001b[0;31mISSUE\u001b[0m <CORPUS>/features/deep/guide.md:1\n  Found: ```csharp,ignore\n  Fix:   ```csharp  \u001b[1;33m(remove ',ignore')\u001b[0m\n\n----------------------------------------\nSummary\n----------------------------------------\nMarkdown files scanned: \u001b[0;34m1\u001b[0m\n\n\u001b[0;31mFound 1 code fence syntax issue(s)\u001b[0m\n\nMkDocs and GitHub Pages do not support comma-separated\nattributes in code fences. Remove the comma and everything\nafter it from the language identifier.\n\n\u001b[0;31mVALIDATION FAILED\u001b[0m\n",
+      "stderr": ""
+    },
+    {
+      "name": "multiple",
+      "files": {
+        "guide.md": "```csharp,ignore\nint value = 1;\n```\n\n```rust,no_run\nlet value = 1;\n```\n"
+      },
+      "exit": 1,
+      "stdout": "========================================\nCode Fence Syntax Validator\n========================================\n\nDocs Directory: \u001b[0;34m<CORPUS>\u001b[0m\n\n----------------------------------------\nChecking for invalid code fence syntax\n----------------------------------------\n\nPattern: code fences with comma-separated attributes\n  Invalid: ```csharp,ignore or ```rust,no_run\n  Valid:   ```csharp or ```rust\n\n\u001b[0;31mISSUE\u001b[0m <CORPUS>/guide.md:1\n  Found: ```csharp,ignore\n  Fix:   ```csharp  \u001b[1;33m(remove ',ignore')\u001b[0m\n\n\u001b[0;31mISSUE\u001b[0m <CORPUS>/guide.md:5\n  Found: ```rust,no_run\n  Fix:   ```rust  \u001b[1;33m(remove ',no_run')\u001b[0m\n\n----------------------------------------\nSummary\n----------------------------------------\nMarkdown files scanned: \u001b[0;34m1\u001b[0m\n\n\u001b[0;31mFound 2 code fence syntax issue(s)\u001b[0m\n\nMkDocs and GitHub Pages do not support comma-separated\nattributes in code fences. Remove the comma and everything\nafter it from the language identifier.\n\n\u001b[0;31mVALIDATION FAILED\u001b[0m\n",
+      "stderr": ""
+    }
+  ]
+}

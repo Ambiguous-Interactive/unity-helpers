@@ -16,15 +16,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
     [TestFixture]
     [NUnit.Framework.Category("Slow")]
     [NUnit.Framework.Category("Integration")]
-    public sealed class WGroupLayoutBuilderTests : CommonTestBase
+    public sealed class WGroupLayoutBuilderTests : SynchronousEditorTestBase
     {
         private UnityHelpersSettings.WGroupAutoIncludeConfiguration _previousConfiguration;
         private bool _previousWGroupStartCollapsed;
 
         [SetUp]
-        public override void BaseSetUp()
+        public void InitializeGroupState()
         {
-            base.BaseSetUp();
             WGroupLayoutBuilder.ClearCache();
             _previousConfiguration = UnityHelpersSettings.GetWGroupAutoIncludeConfiguration();
             _previousWGroupStartCollapsed = UnityHelpersSettings
@@ -33,7 +32,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
         }
 
         [TearDown]
-        public override void TearDown()
+        public void RestoreGroupState()
         {
             WGroupLayoutBuilder.ClearCache();
             UnityHelpersSettingsTestAccess.SetWGroupAutoIncludeConfiguration(
@@ -42,7 +41,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             );
             UnityHelpersSettings.instance.WGroupFoldoutsStartCollapsed =
                 _previousWGroupStartCollapsed;
-            base.TearDown();
         }
 
         /// <summary>

@@ -3,70 +3,22 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.Core
 {
-    using NUnit.Framework;
-    using UnityEngine.TestTools.Constraints;
-    using Is = UnityEngine.TestTools.Constraints.Is;
-
-    /// <summary>
-    /// The control an allocation assertion needs before it means anything.
-    /// </summary>
-    /// <remarks>
-    /// <c>Is.Not.AllocatingGCMemory()</c> needs an instrument that can see an allocation. On an
-    /// IL2CPP standalone player it cannot, so the constraint there is the absence of a measurement
-    /// rather than a pass. Run this FIRST and skip when it says no: a control asserted after the
-    /// subject turns an unmeasurable platform into a red build.
-    /// </remarks>
+    /// <summary>Preserves the package test assembly's allocation-probe entry points.</summary>
     public static class AllocationProbe
     {
-        /// <summary>
-        /// How many iterations a probe runs, control and subject alike.
-        /// </summary>
-        public const int Iterations = 256;
+        /// <summary>Gets the shared probe iteration count.</summary>
+        public const int Iterations = TestSupport.AllocationProbe.Iterations;
 
-        /*
-            Static so nothing can prove the control's allocations dead and optimize them away.
-        */
-        private static string _sink;
-
-        /// <summary>
-        /// Skips the calling test when this platform cannot report an allocation it definitely made.
-        /// </summary>
+        /// <summary>Skips when the allocation control cannot be observed.</summary>
         public static void IgnoreWhenUnmeasurable()
         {
-            if (RecorderCanSeeAnAllocation())
-            {
-                return;
-            }
-
-            Assert.Ignore(
-                "GC allocation recording is inert on this player, so a 'did not allocate' "
-                    + "verdict would prove nothing"
-            );
+            TestSupport.AllocationProbe.IgnoreWhenUnmeasurable();
         }
 
-        /// <summary>
-        /// Whether an allocation the control definitely causes is one the recorder reports.
-        /// </summary>
+        /// <summary>Reports whether the recorder sees a known allocation.</summary>
         public static bool RecorderCanSeeAnAllocation()
         {
-            try
-            {
-                Assert.That(
-                    () =>
-                    {
-                        for (int index = 0; index < Iterations; ++index)
-                        {
-                            _sink = new string('x', 8 + (index & 7));
-                        }
-                    },
-                    Is.AllocatingGCMemory()
-                );
-                return true;
-            }
-            catch (AssertionException)
-            {
-                return false;
-            }
+            return TestSupport.AllocationProbe.RecorderCanSeeAnAllocation();
         }
     }
 }

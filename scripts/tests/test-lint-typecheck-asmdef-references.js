@@ -528,6 +528,7 @@ runTest("this repository's own typecheck projects are parsed, not silently skipp
     [...governedAsmdefs(testCheck, asmdefs, repoRoot).keys()].sort(),
     [
       "WallstopStudios.UnityHelpers.ConsumerMigration",
+      "WallstopStudios.UnityHelpers.TestSupport",
       "WallstopStudios.UnityHelpers.Tests.Core",
       "WallstopStudios.UnityHelpers.Tests.OdinCompilerCallers",
       "WallstopStudios.UnityHelpers.Tests.OdinCompilerTargets",
@@ -536,7 +537,7 @@ runTest("this repository's own typecheck projects are parsed, not silently skipp
       "WallstopStudios.UnityHelpers.Tests.Runtime.Performance",
       "WallstopStudios.UnityHelpers.Tests.Runtime.Random"
     ],
-    "the five PlayMode test asmdefs and three consumer asmdefs TestCheck compiles"
+    "the test-support assembly, five PlayMode test asmdefs and three consumer asmdefs TestCheck compiles"
   );
 
   // The #616 half. TestCheck's list above stops at `Tests/Runtime`, which is exactly the hole
@@ -553,6 +554,7 @@ runTest("this repository's own typecheck projects are parsed, not silently skipp
   assert.deepStrictEqual(
     editorTestGoverned,
     [
+      "WallstopStudios.UnityHelpers.TestSupport",
       "WallstopStudios.UnityHelpers.Tests.Capture.Targets",
       "WallstopStudios.UnityHelpers.Tests.Core",
       "WallstopStudios.UnityHelpers.Tests.Core.Editor",

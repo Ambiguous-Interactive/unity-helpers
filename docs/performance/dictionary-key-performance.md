@@ -83,3 +83,56 @@ a dense, hit-only microbenchmark cannot establish a win for a large, miss-heavy 
 
 Keep `Dictionary` when it meets your needs and you have no representative player measurement
 supporting a replacement. This page does not promise a faster replacement or an automatic conversion.
+
+## Insertion inlining qualification
+
+A serial comparison tests only an `AggressiveInlining` hint on `SetInternal`, against current
+main. Three fresh .NET 10 processes and three Mono processes cover 195 cells each, including
+four key shapes and sizes 8, 64, 1024 and 16384. Each workload warms 64 calls, calibrates to
+at least 20 ms, and retains 21 rotated rounds. Sources and compiled payload hashes stay fixed.
+
+The hint is rejected. Insertion candidate/baseline geometric means are 1.0050 on .NET and
+0.9612 on Mono; the equally weighted runtime aggregate is 0.9828. This misses the preregistered
+0.95 aggregate threshold and the requirement that both runtimes improve. No hit/miss/iteration
+cell has a median process ratio above 1.10 versus current main. The production map is unchanged.
+
+### Recovered consumer harness on unchanged main
+
+A separate serial replay uses the archived original-consumer program and its frozen 3.7.1
+baseline, with restored current main as the candidate. All six fresh processes return zero,
+reach both stream ends, report all 111 cells, and retain stable source/payload hashes. Values
+are medians of three process medians. Hit/miss/insert ratios compare with 3.7.1; iteration
+ratios compare with `Dictionary<int,int>`. All values are nanoseconds per operation or entry.
+
+| Runtime | Keys      | Count | Hit ns (3.7.1 ratio) | Miss ns (3.7.1 ratio) | Insert ns (3.7.1 ratio) | Iterate ns/entry (Dictionary ratio) |
+| ------- | --------- | ----: | -------------------: | --------------------: | ----------------------: | ----------------------------------: |
+| .NET 10 | dense     |     8 |       0.718 (1.010×) |        1.099 (1.998×) |         14.096 (1.209×) |                      0.519 (0.966×) |
+| .NET 10 | dense     |    64 |       0.823 (1.050×) |        0.755 (1.153×) |         12.802 (1.184×) |                      0.568 (0.974×) |
+| .NET 10 | dense     |  1024 |       0.782 (1.061×) |        0.681 (1.018×) |         11.744 (1.156×) |                      0.489 (0.970×) |
+| .NET 10 | sparse    |     8 |       0.895 (0.917×) |        0.681 (0.909×) |         11.853 (1.147×) |                      0.584 (1.076×) |
+| .NET 10 | sparse    |    64 |       0.948 (1.004×) |        0.861 (0.898×) |         10.792 (1.048×) |                      0.509 (0.992×) |
+| .NET 10 | sparse    |  1024 |       0.940 (0.959×) |        0.889 (0.871×) |         11.092 (1.081×) |                      0.411 (0.822×) |
+| .NET 10 | shift1024 |     8 |       0.824 (0.863×) |        0.670 (0.975×) |         11.564 (1.143×) |                      0.507 (1.030×) |
+| .NET 10 | shift1024 |    64 |       1.017 (0.978×) |        0.753 (0.996×) |         10.846 (1.064×) |                      0.497 (0.969×) |
+| .NET 10 | shift1024 |  1024 |       0.910 (0.998×) |        0.850 (1.006×) |         12.045 (1.136×) |                      0.433 (0.815×) |
+| Mono    | dense     |     8 |       2.205 (0.983×) |        2.667 (1.043×) |         12.273 (0.947×) |                      4.613 (1.197×) |
+| Mono    | dense     |    64 |       2.128 (0.964×) |        1.593 (1.027×) |         12.341 (0.968×) |                      2.997 (1.079×) |
+| Mono    | dense     |  1024 |       1.991 (1.002×) |        1.461 (1.010×) |         50.518 (1.188×) |                      2.712 (1.056×) |
+| Mono    | sparse    |     8 |       2.179 (1.005×) |        2.694 (1.057×) |         12.297 (0.961×) |                      4.583 (1.192×) |
+| Mono    | sparse    |    64 |       2.271 (0.973×) |        2.120 (1.043×) |         13.659 (1.062×) |                      3.002 (1.063×) |
+| Mono    | sparse    |  1024 |       2.306 (1.012×) |        2.400 (1.167×) |         58.021 (1.262×) |                      2.679 (1.069×) |
+| Mono    | shift1024 |     8 |       2.239 (1.039×) |        2.657 (1.041×) |         12.841 (1.006×) |                      4.651 (1.181×) |
+| Mono    | shift1024 |    64 |       3.369 (1.192×) |        1.655 (1.055×) |         15.050 (1.037×) |                      3.088 (1.100×) |
+| Mono    | shift1024 |  1024 |       2.081 (1.034×) |        1.568 (1.032×) |         48.563 (1.219×) |                      2.724 (1.037×) |
+
+Iteration meets the 1.5× Dictionary threshold for every required 64/1024 cell. However,
+13 hit/miss/insert cells exceed the original 10% allowance. Churn capacity remains bounded
+at 64 slots in every current-main process. These results do not complete
+[#1131](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1131). They do not qualify
+Unity, IL2CPP, WebGL, arbitrary values or application workloads.
+
+The [qualification archive](./intmap-inlining-qualification.zip) contains all expanded and original
+consumer source inputs, calibrated raw rounds, complete row sets, receipts, source/payload seals,
+environment records, analysis and controllers. It preserves the rejected hint and a separate
+unchanged-main replay. Earlier overlapping exploratory captures are excluded from the retention
+decision and remain retained locally.

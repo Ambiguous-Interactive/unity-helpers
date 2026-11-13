@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add a test-only support assembly with allocation controls and synchronous Unity object tracking for consumer test fixtures ([#1180](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1180)).
+- Add region-only reads for readable RGB24 sprites to reduce temporary pixel storage ([#1113](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1113)).
+- Add reusable weighted index tables, draw-sparing probability checks, and exponential and Gumbel samples ([#1176](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1176)).
 - Add stable score distributions, sorted-span percentiles, tie-averaged ranks and rank correlations ([#1177](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1177)).
 - Add CSS cubic Bézier evaluation and weighted animation-curve conversion ([#1186](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1186)).
 - Add span insertion bounds with struct comparers, paired shuffles and descending seeded shuffles ([#1178](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1178)).
