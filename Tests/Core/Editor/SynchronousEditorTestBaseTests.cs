@@ -13,6 +13,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
     [TestFixture]
     public sealed class SynchronousEditorTestBaseTests : SynchronousEditorTestBase
     {
+        private static IEnumerable<Texture2D> Enumerate(Texture2D texture)
+        {
+            yield return texture;
+        }
+
         [Test]
         public void CleanupDestroysAllTransientObjectKindsAndChildren()
         {
@@ -113,11 +118,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                     Object.DestroyImmediate(asset);
                 }
             }
-        }
-
-        private static IEnumerable<Texture2D> Enumerate(Texture2D texture)
-        {
-            yield return texture;
         }
     }
 }

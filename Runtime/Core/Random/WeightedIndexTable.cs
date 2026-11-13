@@ -58,12 +58,12 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         /// <remarks>Returns false for empty, nonfinite, or entirely disabled weights. Later source changes do not affect the table.</remarks>
         public static bool TryCreate(ReadOnlySpan<double> weights, out WeightedIndexTable table)
         {
-            table = null;
             double scale = 0d;
             foreach (double weight in weights)
             {
                 if (!double.IsFinite(weight))
                 {
+                    table = null;
                     return false;
                 }
                 if (scale < weight)
@@ -73,6 +73,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             }
             if (!(0d < scale))
             {
+                table = null;
                 return false;
             }
             int length = weights.Length;

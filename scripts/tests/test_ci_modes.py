@@ -258,6 +258,7 @@ def make_control(tmp_path: Path) -> tuple[list[Mode], Mode, dict[str, str], str]
         if ($ProjectRootMinimumFreeGb -ne 0) { throw 'Worker can prune sibling projects.' }
         if (@(Get-ChildItem -LiteralPath $env:CONTROL_EVENTS -Filter '*.initialized').Count -ne $expectedWorkers) { throw 'Workers started before all projects were prepared.' }
         Write-Host ('Mode diagnostics: ' + $TestMode)
+        Write-Host ('Startup cache: ' + $env:XDG_CACHE_HOME)
         [IO.File]::WriteAllText((Join-Path $env:CONTROL_EVENTS ($workerName + '.started')), [string]$PID)
         $deadline = [DateTime]::UtcNow.AddSeconds(10)
         while (@(Get-ChildItem -LiteralPath $env:CONTROL_EVENTS -Filter '*.started').Count -lt [Math]::Min(4, $expectedWorkers)) {
@@ -348,6 +349,8 @@ def make_control(tmp_path: Path) -> tuple[list[Mode], Mode, dict[str, str], str]
 def test_real_workers_overlap_and_keep_every_outcome(tmp_path: Path, failed: str) -> None:
     modes, preparation, environment, shell = make_control(tmp_path)
     environment["CONTROL_FAIL"] = failed
+    shared_cache = tmp_path / "shared cache"
+    environment["XDG_CACHE_HOME"] = str(shared_cache)
     output = tmp_path / "github-output"
     output.write_text("previous=value\n", encoding="utf-8")
     success = run(
@@ -365,10 +368,22 @@ def test_real_workers_overlap_and_keep_every_outcome(tmp_path: Path, failed: str
     expected = {mode.name: "failure" if mode.name == failed else "success" for mode in modes}
     assert receipt["Outcomes"] == expected
     assert receipt["ControllerCompleted"] is True
+    startup_caches: set[str] = set()
     for mode in modes:
         diagnostic = (tmp_path / mode.name / "mode-controller.log").read_text(encoding="utf-8")
         assert "#< CLIXML" not in diagnostic
         assert diagnostic.count("Mode diagnostics: " + mode.name) == 1
+        if sys.platform == "linux":
+            cache = next(
+                line.removeprefix("Startup cache: ")
+                for line in diagnostic.splitlines()
+                if line.startswith("Startup cache: ")
+            )
+            assert cache != str(shared_cache)
+            assert cache not in startup_caches
+            assert Path(cache).is_dir()
+            startup_caches.add(cache)
+    assert environment["XDG_CACHE_HOME"] == str(shared_cache)
     assert receipt["CleanupFailed"] is False
     assert len(receipt["Workers"]) == 3
     assert len(list((tmp_path / "events").glob("*.completed"))) == (2 if failed else 3)

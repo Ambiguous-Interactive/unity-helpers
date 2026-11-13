@@ -265,6 +265,14 @@ def launch(
     config = directory / f"{mode.name}.json"
     config.write_text(json.dumps(mode.parameters), encoding="utf-8")
     child_environment = dict(environment, UH_MODE_CONFIG=str(config))
+    if sys.platform == "linux":
+        # Each concurrent PowerShell needs its own startup JIT profile (PowerShell#26528).
+        if not child_environment.get("UV_CACHE_DIR"):
+            cache_home = child_environment.get("XDG_CACHE_HOME") or str(Path.home() / ".cache")
+            child_environment["UV_CACHE_DIR"] = str(Path(cache_home) / "uv")
+        child_environment["XDG_CACHE_HOME"] = tempfile.mkdtemp(
+            prefix=f"{mode.name}-startup-cache-", dir=directory
+        )
     if mode.name != "standalone":
         child_environment.pop("UH_NATIVE_ALLOCATOR_DIAGNOSTICS", None)
     command = [
@@ -434,7 +442,8 @@ def run(
                             raise RuntimeError("Isolated EditMode evidence is missing or conflicts")
                         shutil.move(str(folder / name), destination)
             shard = next(
-                (worker for worker in workers if worker.mode.name == "editmode_shard"), None
+                (worker for worker in workers if worker.mode.name == "editmode_shard"),
+                None,
             )
             if shard is not None:
                 primary = next(worker for worker in workers if worker.mode.name == "editmode")
