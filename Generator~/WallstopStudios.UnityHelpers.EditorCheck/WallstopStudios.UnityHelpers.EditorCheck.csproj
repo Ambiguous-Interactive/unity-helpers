@@ -260,7 +260,7 @@
          TypeCheck remains the gate that JUDGES it; a divergence here is a bug in one of the two. -->
     <Compile
       Include="$(RepoRoot)/Runtime/**/*.cs"
-      Exclude="$(RepoRoot)/Runtime/Integrations/**/*.cs;$(RepoRoot)/Runtime/Analyzers/**/*.cs;$(RepoRoot)/Runtime/Core/Extension/Partials/UI.cs;$(RepoRoot)/Runtime/Utils/MatchColliderToSprite.cs;$(RepoRoot)/Runtime/Visuals/UGUI/EnhancedImage.cs"
+      Exclude="$(RepoRoot)/Runtime/TestSupport/**/*.cs;$(RepoRoot)/Runtime/Integrations/**/*.cs;$(RepoRoot)/Runtime/Analyzers/**/*.cs;$(RepoRoot)/Runtime/Core/Extension/Partials/UI.cs;$(RepoRoot)/Runtime/Utils/MatchColliderToSprite.cs;$(RepoRoot)/Runtime/Visuals/UGUI/EnhancedImage.cs"
     />
     <!--
       The editor asmdef's scope: 230 of the 237 files under `Editor/`. The seven that are dropped

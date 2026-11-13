@@ -9,13 +9,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
     using System.Reflection;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Editor.Core.Helper;
-    using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Tests.Editor.TestTypes;
 
     [TestFixture]
     [NUnit.Framework.Category("Slow")]
     [NUnit.Framework.Category("Integration")]
-    public sealed class AnimationEventHelpersTests : CommonTestBase
+    public sealed class AnimationEventHelpersTests
     {
         [Test]
         public void TypesToMethodsIncludesDeclaringTypeAndFiltersEmptyEntries()

@@ -19,7 +19,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
     [TestFixture]
     [NUnit.Framework.Category("Slow")]
     [NUnit.Framework.Category("Integration")]
-    public sealed class WShowIfPropertyDrawerTests : CommonTestBase
+    public sealed class WShowIfPropertyDrawerTests : SynchronousEditorTestBase
     {
         private static WShowIfPropertyDrawer CreateDrawer(WShowIfAttribute attribute)
         {

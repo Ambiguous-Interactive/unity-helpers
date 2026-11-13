@@ -2,6 +2,27 @@
 
 This guide documents patterns for testing states that "should never happen" but could occur in production. These tests catch edge cases that defensive programming must handle gracefully.
 
+## Reuse the packaged test helpers
+
+Add `WallstopStudios.UnityHelpers.TestSupport` to your test assembly's references, keep
+`UNITY_INCLUDE_TESTS` in its define constraints, and reference `nunit.framework.dll` when
+`overrideReferences` is enabled. The support assembly is disabled outside test compilation;
+it does not require the package's `Tests/Core` sources.
+
+Derive synchronous NUnit fixtures from `UnityObjectTrackingTestBase` in
+`WallstopStudios.UnityHelpers.TestSupport`. `Track`, `TrackRange`, and
+`CreateScriptableObject<T>` register transient objects owned by the test. Setup starts a scope;
+teardown destroys its objects immediately in reverse order, including after a failed assertion.
+Persistent Editor assets are refused. Use a coroutine lifecycle fixture when deferred destruction
+or frame boundaries are part of the behavior under test. Do not manually destroy shared assets
+or transfer tracked objects to another owner.
+
+`AllocationProbe.IgnoreWhenUnmeasurable()` requires a known allocation to be observable before
+using Unity's allocation constraint. `ProfilerAllocationCounter.Measure` counts current-thread
+allocation events, warms the action first, and rejects truncated results and invalid bounds.
+Run a retained-allocation positive control before interpreting a zero count. The count is events,
+not allocated bytes; neither helper makes an unsupported player measurable.
+
 ## Run script checks through Python
 
 Use `npm run lint:repo -- --only <id>` or `npm run validate:tests:fast -- --only <id>`

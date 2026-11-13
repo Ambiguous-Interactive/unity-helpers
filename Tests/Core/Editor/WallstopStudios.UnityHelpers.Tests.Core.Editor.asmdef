@@ -6,7 +6,8 @@
     "UnityEngine.TestRunner",
     "WallstopStudios.UnityHelpers",
     "WallstopStudios.UnityHelpers.Editor",
-    "WallstopStudios.UnityHelpers.Tests.Core"
+    "WallstopStudios.UnityHelpers.Tests.Core",
+    "WallstopStudios.UnityHelpers.TestSupport"
   ],
   "includePlatforms": ["Editor"],
   "excludePlatforms": [],

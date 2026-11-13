@@ -15,7 +15,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
     using Object = UnityEngine.Object;
 
     [TestFixture]
-    public sealed class SpriteAnimationHelpersTests : CommonTestBase
+    public sealed class SpriteAnimationHelpersTests : SynchronousEditorTestBase
     {
         private static void SetFrames(
             AnimationClip clip,

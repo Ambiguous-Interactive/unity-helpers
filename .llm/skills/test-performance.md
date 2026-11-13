@@ -65,8 +65,11 @@ in JIT output does not prove compilation timing. JIT-disassembly runs establish 
 state, not accepted throughput.
 Preserve timing thresholds, measured work and allocation checks while repairing the instrument.
 
-Per-test FIXED overhead is negligible; the slow legs are explained by a few expensive fixtures, so MEASURE,
-don't guess. Every CI test run prints the slowest fixtures/cases (NUnit `duration`) via
+Compare fixture duration with summed case durations before attributing cost to test bodies.
+Lifecycle hooks, runner scheduling and work between cases can dominate; a local improvement does
+not establish the cause or size of a CI delay. Keep case identities and assertions unchanged when
+comparing lifecycle strategies, and validate cleanup separately. Every CI test run prints the
+slowest fixtures/cases (NUnit `duration`) via
 `scripts/unity/report-slow-tests.ps1` and writes a GitHub step-summary table; the devcontainer runner
 (`scripts/unity/run-tests.sh`) prints it automatically. Run it on any results XML:
 `pwsh -NoProfile -File scripts/unity/report-slow-tests.ps1 -ResultsPath <results.xml>`. To make it a HARD

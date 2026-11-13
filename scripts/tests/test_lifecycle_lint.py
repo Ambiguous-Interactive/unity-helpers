@@ -497,3 +497,14 @@ def test_unmatched_assertion_preserves_inline_suppression(
     assert analyze(text, "Subject.cs", editor_only=False) == []
     assert main(["--repo-root", str(tmp_path), "--paths", str(path), "--fix-null-checks"]) == 0
     assert path.read_text(encoding="utf-8") == text
+
+
+@pytest.mark.parametrize("base", ["SynchronousEditorTestBase", "SynchronousEditorTestBaseUnsafe"])
+def test_synchronous_editor_scope_is_an_exact_known_tracking_base(base: str) -> None:
+    source = (
+        "namespace WallstopStudios.Tests { class Fixture : " + base + " {\n"
+        '[Test] public void CreatesTrackedObject() { Track(new GameObject("tracked")); }\n'
+        "} }"
+    )
+    found = analyze(source, "Tests/Editor/Fixture.cs", editor_only=True)
+    assert any(item.code == "UNH003" for item in found) == (base != "SynchronousEditorTestBase")
