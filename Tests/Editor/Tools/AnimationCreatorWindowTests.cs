@@ -24,7 +24,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
     [TestFixture]
     [NUnit.Framework.Category("Slow")]
     [NUnit.Framework.Category("Integration")]
-    public sealed class AnimationCreatorWindowTests : CommonTestBase
+    public sealed class AnimationCreatorWindowTests : SynchronousEditorTestBase
     {
         private static IEnumerable<TestCaseData> FramerateModeEnumValuesCases()
         {

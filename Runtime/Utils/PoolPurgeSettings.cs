@@ -1648,7 +1648,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         internal static readonly object RegistryLock = new object();
         internal static readonly List<WeakReference<IPurgeable>> RegisteredPools =
             new List<WeakReference<IPurgeable>>();
-        internal static float _lastBudgetEnforcementTime;
+        internal static float _lastBudgetEnforcementTime = float.NegativeInfinity;
         private static readonly List<IPoolStatistics> BudgetEnforcementPools =
             new List<IPoolStatistics>();
 
@@ -1858,6 +1858,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// <summary>
         /// Tries to enforce the budget if the enforcement interval has elapsed.
         /// Called automatically during pool operations when <see cref="BudgetEnforcementEnabled"/> is true.
+        /// The first check after initialization or reset runs immediately; subsequent checks observe the interval.
         /// </summary>
         /// <returns>The number of items purged, or 0 if enforcement was not needed or not due.</returns>
         public static int TryEnforceBudgetIfNeeded()
@@ -1960,7 +1961,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             GlobalMaxPooledItems = DefaultGlobalMaxPooledItems;
             BudgetEnforcementEnabled = true;
             BudgetEnforcementIntervalSeconds = DefaultBudgetEnforcementIntervalSeconds;
-            Volatile.Write(ref _lastBudgetEnforcementTime, 0f);
+            Volatile.Write(ref _lastBudgetEnforcementTime, float.NegativeInfinity);
         }
 
         internal static void RunMaintenance()

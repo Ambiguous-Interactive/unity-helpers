@@ -1,20 +1,30 @@
 #!/usr/bin/env node
-
-const { spawnSync } = require("node:child_process");
+"use strict";
 const path = require("node:path");
-
-const repoRoot = path.resolve(__dirname, "..");
-const runnerPath = path.join(repoRoot, "scripts", "run-node-bin.js");
-
-const result = spawnSync(process.execPath, [runnerPath, "prettier", ...process.argv.slice(2)], {
-  cwd: repoRoot,
-  stdio: "inherit",
-  windowsHide: true
-});
-
+const { spawnSync } = require("node:child_process");
+const root = path.resolve(__dirname, "..");
+const result = spawnSync(
+  "uv",
+  [
+    "run",
+    "--quiet",
+    "--project",
+    path.join(root, "scripts/python~"),
+    "--locked",
+    "--no-dev",
+    "python",
+    path.join(root, "scripts/run_node_bin.py"),
+    "prettier",
+    ...process.argv.slice(2)
+  ],
+  {
+    cwd: root,
+    stdio: "inherit",
+    windowsHide: true,
+    env: { ...process.env, UH_NODE_EXECUTABLE: process.execPath }
+  }
+);
 if (result.error) {
-  console.error(`Failed to launch Prettier: ${result.error.message}`);
-  process.exit(1);
+  console.error(`Python tooling could not start: ${result.error.message}`);
 }
-
-process.exit(result.status ?? 1);
+process.exit(result.status === null ? 1 : result.status);

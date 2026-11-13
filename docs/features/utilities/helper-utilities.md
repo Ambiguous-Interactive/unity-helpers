@@ -854,6 +854,21 @@ async Task<string> GetTextFromMainThread()
 
 ### SingleThreadedThreadPool
 
+Supply `onException` to handle work failures on the worker without polling its exception queue:
+
+```csharp
+using SingleThreadedThreadPool pool = new(
+    runInBackground: true,
+    noWorkWaitTime: null,
+    onException: error => Console.Error.WriteLine(error)
+);
+```
+
+A successful callback handles the error without retaining it in `Exceptions`. If the callback
+throws, the queue keeps both failures in an `AggregateException`, bounded to the latest 64
+callback failures, and the worker continues. A null callback preserves the original queue behavior.
+The callback runs on the worker; it must return before that worker can finish draining or disposing.
+
 **Run background work one item at a time, in enqueue order:**
 
 The optional `noWorkWaitTime` controls how long an idle worker waits for a signal. Invalid delays
@@ -1277,6 +1292,57 @@ cancelled append may have written part of its new record.
 A leftover `.tmp` sibling (`DurableFile.TemporarySuffix`) is what an interrupted write leaves behind; it is
 safe to ignore or delete.
 `DurableFile.TryDelete` succeeds when a file is absent and reports failure for a directory or a file it cannot delete.
+
+### Coalesce Repeated Saves
+
+Keep one `LatestWriteFile` for a store whose newest pending snapshot replaces earlier ones.
+It retains one queued payload per normalized path. A write already in progress finishes first;
+its newer replacement follows it. Text stays immutable and is encoded as UTF-8 only when written.
+Byte submissions make an owned copy so callers can immediately reuse their array.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using System;
+using System.IO;
+using WallstopStudios.UnityHelpers.Core.Helper;
+
+string savePath = Path.Combine(Path.GetTempPath(), "player-save.json");
+using LatestWriteFile writer = new(
+    writeInBackground: false,
+    onFailure: (path, failure) => Console.Error.WriteLine($"{path}: {failure}")
+);
+
+if (!writer.TryEnqueueText(savePath, "{\"score\":10}", out Exception submissionError))
+{
+    Console.Error.WriteLine(submissionError);
+}
+if (!writer.TryEnqueueText(savePath, "{\"score\":20}", out submissionError))
+{
+    Console.Error.WriteLine(submissionError);
+}
+if (!writer.Flush(out Exception writeError))
+{
+    Console.Error.WriteLine(writeError);
+}
+```
+
+A successful submission means accepted, not saved. The default processes writes in the background;
+`writeInBackground: false` batches until an explicit `Flush` or disposal. In `SINGLE_THREADED`
+builds, automatic processing runs synchronously instead. `PendingPathCount` excludes the batch
+already being written. The example explicitly batches both changes and writes the latest one.
+
+`Flush` waits for an earlier write to finish, then writes the captured pending batch. Concurrent
+submissions can remain for a later flush. Stop producers before a final boundary, or call `Dispose`,
+which stops accepting submissions before flushing accepted work. Later submissions are rejected
+with an `ObjectDisposedException` in their error output. Repeated disposal is safe.
+
+Write failures invoke the callback outside the writer's locks, on the thread attempting the write.
+`Failure` and `Flush(out error)` also expose unresolved failures. A later successful write to the
+same path clears its failure; success on another path does not. A throwing failure callback retains
+both errors without stopping other paths. Failed writes are not automatically requeued.
+The underlying [DurableFile guarantees and limits](#durable-writes-for-player-data) still apply;
+coalescing is per path within one writer, not a multi-file transaction.
 
 ---
 

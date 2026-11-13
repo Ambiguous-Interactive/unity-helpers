@@ -164,3 +164,21 @@ binaries, all calibrated raw rounds, complete results, process receipts, source/
 and the analysis. This compares with current main, not the original 3.7.1 acceptance baseline;
 [#1131](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1131) remains open under
 the original consumer budgets above.
+
+### Rejected empty-count guard removal
+
+A later isolated candidate removed only the nonzero-key `TryGet` empty-count guard. Two fresh
+.NET 10 processes retained the calibrated 195-cell protocol and added three empty-map miss
+controls, for 198 cells per capture. Both processes passed the timed checksums and dictionary
+oracle, returned zero, reached both stream ends, and preserved source and payload hashes.
+
+The candidate was rejected by its preregistered early-stop rule. Empty-map misses cost 1.4523
+and 1.4891 times main; dense 16,384-key hits cost 1.2511 and 1.2291 times main. Sparse and shifted
+large-map hit controls also regress in both captures. The lookup geometric-mean ratios are
+0.9697 and 0.9834, below the required 5% benefit. Production `IntMap` is unchanged, and no Mono
+qualification is claimed for this candidate.
+
+The [rejection archive](./intmap-empty-guard-rejection.zip) retains every cell and observation,
+process receipts, sealed source and binary hashes, controllers and the decision rule. This
+experiment does not replace the original consumer lookup, insertion and iteration budgets
+tracked in [the open acceptance issue](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1131).

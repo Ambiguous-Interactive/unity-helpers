@@ -52,7 +52,7 @@ jobs:
           cache-dependency-path: unity-helpers/scripts/python~/uv.lock
 
       - name: Install uv
-        run: python -m pip install --disable-pip-version-check uv==0.13.7
+        run: python -m pip install --disable-pip-version-check uv==0.13.8
 
       # Read the pin out of the workflows rather than restating it. Dependabot bumps a `uses:` SHA
       # but never a `ref:` input, so a hand-copied commit checks out the previous policy and the

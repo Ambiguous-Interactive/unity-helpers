@@ -74,7 +74,7 @@ function New-TestRepo {
     $repoRoot = Split-Path -Parent $PSScriptRoot | Split-Path -Parent
     Copy-Item (Join-Path $repoRoot 'scripts/agent-preflight.ps1') (Join-Path $scriptsDir 'agent-preflight.ps1') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/lint_meta_files.py') (Join-Path $scriptsDir 'lint_meta_files.py') -Force
-    foreach ($module in @('lint_skill_sizes.py', 'cli_encoding.py', 'csharp_sources.py', 'check_eol.py', 'normalize_eol.py', 'validate_lint_error_codes.py', 'doc_counts.py', 'lint_tests.py', 'lint_comment_block_form.py')) {
+    foreach ($module in @('lint_skill_sizes.py', 'cli_encoding.py', 'csharp_sources.py', 'check_eol.py', 'normalize_eol.py', 'validate_lint_error_codes.py', 'doc_counts.py', 'lint_tests.py', 'lint_comment_block_form.py', 'run_node_bin.py')) {
         Copy-Item (Join-Path $repoRoot "scripts/$module") (Join-Path $scriptsDir $module) -Force
     }
     $pythonProject = Join-Path $scriptsDir 'python~'

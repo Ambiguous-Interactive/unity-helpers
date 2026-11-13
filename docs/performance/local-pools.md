@@ -31,3 +31,34 @@ The [replay archive](./local-pool-runtime-qualification.zip) contains frozen inp
 all 252 timing rows, complete NUnit trees and process receipts. It also contains the byte-format
 sprite correctness controls and additional Editor lifecycle experiment. Replay each arm with its
 named source snapshot and preserve new process identities separately.
+
+## Shared buffer synchronization
+
+A separate six-process A–B–B–A–A–B campaign compares main's shared pool implementation with a
+single synchronization root for storage, usage tracking and rolling samples. Producers and
+user callbacks still run outside that lock. The four shared paths improve by 21.3% in geometric
+mean across the paired observations. These are warmed Unity 6000.6.7f1 Windows Editor Mono
+measurements, with the same calibration and 21-round protocol described above.
+
+| Path             | Baseline median | Candidate median | Paired ratios          |
+| ---------------- | --------------: | ---------------: | ---------------------- |
+| Stack            |       25.064 ns |        25.215 ns | 1.0236, 1.0061, 0.9965 |
+| Local            |       25.831 ns |        26.355 ns | 1.0120, 1.0197, 1.1000 |
+| LocalLease       |       80.801 ns |        80.649 ns | 1.0105, 0.9934, 0.9930 |
+| SharedLease      |      406.001 ns |       315.712 ns | 0.7842, 0.7787, 0.7646 |
+| SharedList       |      406.245 ns |       313.817 ns | 0.7831, 0.7661, 0.7845 |
+| SharedHashSet    |      429.781 ns |       339.899 ns | 0.8111, 0.7859, 0.7930 |
+| SharedDictionary |      435.934 ns |       345.981 ns | 0.8160, 0.7937, 0.7803 |
+
+All seven paths are shown, including unchanged stack and local controls. One local control pair
+is 10.001% slower; it is outside the four-path shared acceptance scope and is retained here.
+Every shared pair improves, with a worst ratio of 0.8161. The preregistered rule required at
+least 5% shared geometric-mean benefit and no shared pair over 1.10. Each process passed all
+33 functional and allocation controls, emitted 147 timing rows, returned raw zero, reached
+both stream ends and matched its loaded runtime module to the captured DLL.
+
+The [shared buffer replay archive](./shared-buffer-qualification.zip) preserves all six NUnit
+trees, receipts, timing rows, controllers, variant sources and the hashed C# source snapshot.
+This snapshot precedes the unrelated coalesced-file-writer addition. The pool implementation
+is unchanged in the final runtime validation, which passes 864 cases with four existing skips.
+These results do not qualify contention, player builds or another runtime.

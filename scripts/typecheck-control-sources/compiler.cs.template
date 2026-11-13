@@ -1,0 +1,14 @@
+namespace WallstopStudios.UnityHelpers.CheckControls
+{
+    using System;
+
+    internal static class ControlMissingType
+    {
+        internal static readonly Type Anchor = typeof(__CHECK_ANCHOR__);
+
+        internal static object Missing()
+        {
+            return new ControlTypeThisGateMustNotResolve();
+        }
+    }
+}

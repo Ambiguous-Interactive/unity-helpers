@@ -553,6 +553,12 @@ On mobile platforms:
 
 ## Global Pool Registry
 
+Automatic budget checking is immediately eligible after initialization or
+`GlobalPoolRegistry.ResetBudgetSettings()`. Later checks use
+`BudgetEnforcementIntervalSeconds` to limit scanning work. Disabled enforcement or a
+nonpositive global limit does not consume that first check. Eligibility does not
+force a purge when retained items already fit the budget.
+
 Track and manage all pools system-wide:
 
 ```csharp
@@ -563,15 +569,16 @@ PoolPurgeSettings.GlobalMaxPooledItems = 50000;
 
 // Get global statistics
 GlobalPoolStatistics globalStats = GlobalPoolRegistry.GetStatistics();
-int totalPooled = globalStats.TotalPooledItems;
+long totalPooled = globalStats.TotalPooledItems;
 float budgetUtilization = globalStats.BudgetUtilization;
-int registeredPools = globalStats.RegisteredPoolCount;
+int registeredPools = globalStats.LivePoolCount;
 
 // Force budget enforcement
 GlobalPoolRegistry.EnforceBudget();
 
 // Try non-blocking budget check
-if (GlobalPoolRegistry.TryEnforceBudgetIfNeeded())
+int purged = GlobalPoolRegistry.TryEnforceBudgetIfNeeded();
+if (0 < purged)
 {
     // Budget was over, items purged
 }

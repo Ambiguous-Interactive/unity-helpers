@@ -1,0 +1,2046 @@
+{
+  "source": "scripts/typecheck-controls.js",
+  "commit": "587d3de6fde16c76a0ba256872cfe8c800bf1287",
+  "sha256": "5b63d82dcd4908d3b9e740a0b4bfd767080021d94acafe89e82c512a43003dc7",
+  "defaultJobsObserved": 2,
+  "projects": [
+    {
+      "id": "runtime",
+      "tree": "Runtime/",
+      "project": "Generator~/WallstopStudios.UnityHelpers.TypeCheck/WallstopStudios.UnityHelpers.TypeCheck.csproj",
+      "anchor": "WallstopStudios.UnityHelpers.Core.DataStructure.Circle",
+      "anchorFile": "Runtime/Core/DataStructure/Circle.cs"
+    },
+    {
+      "id": "editor",
+      "tree": "Editor/",
+      "project": "Generator~/WallstopStudios.UnityHelpers.EditorCheck/WallstopStudios.UnityHelpers.EditorCheck.csproj",
+      "anchor": "WallstopStudios.UnityHelpers.Editor.Validation.SerializableDictionaryAssetValidator",
+      "anchorFile": "Editor/Validation/SerializableDictionaryAssetValidator.cs"
+    },
+    {
+      "id": "tests",
+      "tree": "Tests/Runtime/",
+      "project": "Generator~/WallstopStudios.UnityHelpers.TestCheck/WallstopStudios.UnityHelpers.TestCheck.csproj",
+      "anchor": "WallstopStudios.UnityHelpers.Tests.Tags.TagHandlerTests",
+      "anchorFile": "Tests/Runtime/Tags/TagHandlerTests.cs"
+    },
+    {
+      "id": "editor-tests",
+      "tree": "Tests/Editor/",
+      "project": "Generator~/WallstopStudios.UnityHelpers.EditorTestCheck/WallstopStudios.UnityHelpers.EditorTestCheck.csproj",
+      "anchor": "WallstopStudios.UnityHelpers.Tests.Windows.PrefabCheckerTests",
+      "anchorFile": "Tests/Editor/Windows/PrefabCheckerTests.cs"
+    },
+    {
+      "id": "integrations",
+      "tree": "Runtime/Integrations/",
+      "project": "Generator~/WallstopStudios.UnityHelpers.IntegrationCheck/WallstopStudios.UnityHelpers.IntegrationCheck.csproj",
+      "anchor": "WallstopStudios.UnityHelpers.Integrations.Zenject.RelationalComponentSceneInitializer",
+      "anchorFile": "Runtime/Integrations/Zenject/RelationalComponentSceneInitializer.cs"
+    }
+  ],
+  "controls": [
+    {
+      "id": "analyzers",
+      "fileName": "WallstopCheckControlAnalyzers.cs",
+      "expected": ["WPROTO001", "WUH003", "WUH013", "WUH020", "WUH026"],
+      "productionExpected": ["WUH019", "WUH021", "WUH023"],
+      "meaning": "the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins"
+    },
+    {
+      "id": "compiler",
+      "fileName": "WallstopCheckControlCompiler.cs",
+      "expected": ["CS0246"],
+      "meaning": "the compiler itself is reporting, and the project is not silencing its errors"
+    },
+    {
+      "id": "excluded-loops",
+      "fileName": "WallstopCheckControlExcludedLoops.cs",
+      "expected": ["WUH013", "WUH019", "WUH021", "WUH023", "WUH026", "WUH028"],
+      "projectIds": ["editor"],
+      "property": "WallstopCountingLoopAuditControl",
+      "meaning": "the persistent audit rejects collection-size reads and missing struct equality in sources outside normal compilation"
+    }
+  ],
+  "templates": {
+    "analyzers": "namespace WallstopStudios.UnityHelpers.CheckControls\n{\n    using System;\n    using UnityEngine;\n    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;\n\n    public struct ControlMissingEquality { }\n\n    [WProtoContract]\n    internal sealed class ControlContractIsNotPartial\n    {\n        [WProtoMember(1)]\n        public int value;\n    }\n\n    internal static class ControlNullPropagation\n    {\n        internal static readonly Type Anchor = typeof(Example.Anchor);\n\n        internal static string NameOf(Transform target)\n        {\n            return target?.name;\n        }\n\n        internal static int Retrieve(System.Collections.Generic.Queue<int> values)\n        {\n            return values.Dequeue();\n        }\n\n        internal static int Snapshot(System.Collections.Generic.ICollection<int> values)\n        {\n            if (values.Count > 0)\n            {\n                return values.Count;\n            }\n            return 0;\n        }\n\n        internal static bool Logic(bool left, bool right)\n        {\n            return left | right;\n        }\n\n        internal static int Sum(int[] values)\n        {\n            int total = 0;\n            for (int index = 0; index < values.Length; index++)\n            {\n                total += values[index];\n            }\n            return total;\n        }\n    }\n}\n",
+    "compiler": "namespace WallstopStudios.UnityHelpers.CheckControls\n{\n    using System;\n\n    internal static class ControlMissingType\n    {\n        internal static readonly Type Anchor = typeof(Example.Anchor);\n\n        internal static object Missing()\n        {\n            return new ControlTypeThisGateMustNotResolve();\n        }\n    }\n}\n",
+    "excluded-loops": "namespace WallstopStudios.UnityHelpers.CheckControls\n{\n    public struct ControlExcludedMissingEquality { }\n\n    internal static class ControlExcludedCountingLoop\n    {\n        internal static readonly System.Type Anchor = typeof(Example.Anchor);\n        internal static void FreshPool()\n        {\n            using var lease = global::WallstopStudios.UnityHelpers.Utils.Buffers<int>.List.Get(out var items);\n            items.Clear();\n        }\n\n        internal static int Snapshot(System.Collections.Generic.ICollection<int> values)\n        {\n            if (values.Count > 0)\n            {\n                return values.Count;\n            }\n            return 0;\n        }\n\n        internal static bool Logic(bool left, bool right)\n        {\n            return left | right;\n        }\n\n        internal static int Sum(int[] values)\n        {\n            int total = 0;\n            for (int index = 0; index < values.Length; index++)\n            {\n                total += values[index];\n            }\n            return total;\n        }\n    }\n}\n"
+  },
+  "classifications": [
+    {
+      "project": "runtime",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023"
+      },
+      "output": "runtime analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "runtime",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023"
+      },
+      "output": null
+    },
+    {
+      "project": "runtime",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": ""
+      },
+      "output": "runtime analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "runtime",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": ""
+      },
+      "output": "runtime analyzers: the build failed but never reported WPROTO001, WUH003, WUH013, WUH020, WUH026, WUH019, WUH021, WUH023. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins. Reported: nothing."
+    },
+    {
+      "project": "runtime",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023"
+      },
+      "output": "runtime analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "runtime",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023"
+      },
+      "output": "runtime analyzers: the build failed but never reported WPROTO001. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins. Reported: WUH003, WUH013, WUH019, WUH020, WUH021, WUH023, WUH026."
+    },
+    {
+      "project": "runtime",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023"
+      },
+      "output": "runtime analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "runtime",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023"
+      },
+      "output": "runtime analyzers: the build failed but never reported WUH003. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins. Reported: WPROTO001, WUH013, WUH019, WUH020, WUH021, WUH023, WUH026."
+    },
+    {
+      "project": "runtime",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023"
+      },
+      "output": "runtime analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "runtime",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023"
+      },
+      "output": "runtime analyzers: the build failed but never reported WUH013. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins. Reported: WPROTO001, WUH003, WUH019, WUH020, WUH021, WUH023, WUH026."
+    },
+    {
+      "project": "runtime",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH026\nWUH019\nWUH021\nWUH023"
+      },
+      "output": "runtime analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "runtime",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH026\nWUH019\nWUH021\nWUH023"
+      },
+      "output": "runtime analyzers: the build failed but never reported WUH020. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins. Reported: WPROTO001, WUH003, WUH013, WUH019, WUH021, WUH023, WUH026."
+    },
+    {
+      "project": "runtime",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH019\nWUH021\nWUH023"
+      },
+      "output": "runtime analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "runtime",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH019\nWUH021\nWUH023"
+      },
+      "output": "runtime analyzers: the build failed but never reported WUH026. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins. Reported: WPROTO001, WUH003, WUH013, WUH019, WUH020, WUH021, WUH023."
+    },
+    {
+      "project": "runtime",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH021\nWUH023"
+      },
+      "output": "runtime analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "runtime",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH021\nWUH023"
+      },
+      "output": "runtime analyzers: the build failed but never reported WUH019. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins. Reported: WPROTO001, WUH003, WUH013, WUH020, WUH021, WUH023, WUH026."
+    },
+    {
+      "project": "runtime",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH023"
+      },
+      "output": "runtime analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "runtime",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH023"
+      },
+      "output": "runtime analyzers: the build failed but never reported WUH021. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins. Reported: WPROTO001, WUH003, WUH013, WUH019, WUH020, WUH023, WUH026."
+    },
+    {
+      "project": "runtime",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021"
+      },
+      "output": "runtime analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "runtime",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021"
+      },
+      "output": "runtime analyzers: the build failed but never reported WUH023. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins. Reported: WPROTO001, WUH003, WUH013, WUH019, WUH020, WUH021, WUH026."
+    },
+    {
+      "project": "runtime",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023\nCS9999"
+      },
+      "output": "runtime analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "runtime",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023\nCS9999"
+      },
+      "output": "runtime analyzers: the control fired, but the build also reported CS9999. Either Runtime/ does not type-check on its own -- run the ordinary gate and fix that first -- or the anchor WallstopStudios.UnityHelpers.Core.DataStructure.Circle no longer resolves, which means this project has stopped compiling that tree."
+    },
+    {
+      "project": "runtime",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023\nWUH999\nCS9999"
+      },
+      "output": "runtime analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "runtime",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023\nWUH999\nCS9999"
+      },
+      "output": "runtime analyzers: the control fired, but the build also reported CS9999, WUH999. Either Runtime/ does not type-check on its own -- run the ordinary gate and fix that first -- or the anchor WallstopStudios.UnityHelpers.Core.DataStructure.Circle no longer resolves, which means this project has stopped compiling that tree."
+    },
+    {
+      "project": "runtime",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023\nWPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023"
+      },
+      "output": "runtime analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "runtime",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023\nWPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023"
+      },
+      "output": null
+    },
+    {
+      "project": "runtime",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 0,
+        "output": "CS0246"
+      },
+      "output": "runtime compiler: the build SUCCEEDED with a control defect in it. Expected CS0246 so that the compiler itself is reporting, and the project is not silencing its errors."
+    },
+    {
+      "project": "runtime",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 1,
+        "output": "CS0246"
+      },
+      "output": null
+    },
+    {
+      "project": "runtime",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 0,
+        "output": ""
+      },
+      "output": "runtime compiler: the build SUCCEEDED with a control defect in it. Expected CS0246 so that the compiler itself is reporting, and the project is not silencing its errors."
+    },
+    {
+      "project": "runtime",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 1,
+        "output": ""
+      },
+      "output": "runtime compiler: the build failed but never reported CS0246. Expected CS0246 so that the compiler itself is reporting, and the project is not silencing its errors. Reported: nothing."
+    },
+    {
+      "project": "runtime",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 0,
+        "output": ""
+      },
+      "output": "runtime compiler: the build SUCCEEDED with a control defect in it. Expected CS0246 so that the compiler itself is reporting, and the project is not silencing its errors."
+    },
+    {
+      "project": "runtime",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 1,
+        "output": ""
+      },
+      "output": "runtime compiler: the build failed but never reported CS0246. Expected CS0246 so that the compiler itself is reporting, and the project is not silencing its errors. Reported: nothing."
+    },
+    {
+      "project": "runtime",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 0,
+        "output": "CS0246\nCS9999"
+      },
+      "output": "runtime compiler: the build SUCCEEDED with a control defect in it. Expected CS0246 so that the compiler itself is reporting, and the project is not silencing its errors."
+    },
+    {
+      "project": "runtime",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 1,
+        "output": "CS0246\nCS9999"
+      },
+      "output": "runtime compiler: the control fired, but the build also reported CS9999. Either Runtime/ does not type-check on its own -- run the ordinary gate and fix that first -- or the anchor WallstopStudios.UnityHelpers.Core.DataStructure.Circle no longer resolves, which means this project has stopped compiling that tree."
+    },
+    {
+      "project": "runtime",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 0,
+        "output": "CS0246\nWUH999\nCS9999"
+      },
+      "output": "runtime compiler: the build SUCCEEDED with a control defect in it. Expected CS0246 so that the compiler itself is reporting, and the project is not silencing its errors."
+    },
+    {
+      "project": "runtime",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 1,
+        "output": "CS0246\nWUH999\nCS9999"
+      },
+      "output": "runtime compiler: the control fired, but the build also reported CS9999, WUH999. Either Runtime/ does not type-check on its own -- run the ordinary gate and fix that first -- or the anchor WallstopStudios.UnityHelpers.Core.DataStructure.Circle no longer resolves, which means this project has stopped compiling that tree."
+    },
+    {
+      "project": "runtime",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 0,
+        "output": "CS0246\nCS0246"
+      },
+      "output": "runtime compiler: the build SUCCEEDED with a control defect in it. Expected CS0246 so that the compiler itself is reporting, and the project is not silencing its errors."
+    },
+    {
+      "project": "runtime",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 1,
+        "output": "CS0246\nCS0246"
+      },
+      "output": null
+    },
+    {
+      "project": "editor",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023"
+      },
+      "output": "editor analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "editor",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023"
+      },
+      "output": null
+    },
+    {
+      "project": "editor",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": ""
+      },
+      "output": "editor analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "editor",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": ""
+      },
+      "output": "editor analyzers: the build failed but never reported WPROTO001, WUH003, WUH013, WUH020, WUH026, WUH019, WUH021, WUH023. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins. Reported: nothing."
+    },
+    {
+      "project": "editor",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023"
+      },
+      "output": "editor analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "editor",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023"
+      },
+      "output": "editor analyzers: the build failed but never reported WPROTO001. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins. Reported: WUH003, WUH013, WUH019, WUH020, WUH021, WUH023, WUH026."
+    },
+    {
+      "project": "editor",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023"
+      },
+      "output": "editor analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "editor",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023"
+      },
+      "output": "editor analyzers: the build failed but never reported WUH003. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins. Reported: WPROTO001, WUH013, WUH019, WUH020, WUH021, WUH023, WUH026."
+    },
+    {
+      "project": "editor",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023"
+      },
+      "output": "editor analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "editor",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023"
+      },
+      "output": "editor analyzers: the build failed but never reported WUH013. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins. Reported: WPROTO001, WUH003, WUH019, WUH020, WUH021, WUH023, WUH026."
+    },
+    {
+      "project": "editor",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH026\nWUH019\nWUH021\nWUH023"
+      },
+      "output": "editor analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "editor",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH026\nWUH019\nWUH021\nWUH023"
+      },
+      "output": "editor analyzers: the build failed but never reported WUH020. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins. Reported: WPROTO001, WUH003, WUH013, WUH019, WUH021, WUH023, WUH026."
+    },
+    {
+      "project": "editor",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH019\nWUH021\nWUH023"
+      },
+      "output": "editor analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "editor",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH019\nWUH021\nWUH023"
+      },
+      "output": "editor analyzers: the build failed but never reported WUH026. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins. Reported: WPROTO001, WUH003, WUH013, WUH019, WUH020, WUH021, WUH023."
+    },
+    {
+      "project": "editor",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH021\nWUH023"
+      },
+      "output": "editor analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "editor",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH021\nWUH023"
+      },
+      "output": "editor analyzers: the build failed but never reported WUH019. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins. Reported: WPROTO001, WUH003, WUH013, WUH020, WUH021, WUH023, WUH026."
+    },
+    {
+      "project": "editor",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH023"
+      },
+      "output": "editor analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "editor",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH023"
+      },
+      "output": "editor analyzers: the build failed but never reported WUH021. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins. Reported: WPROTO001, WUH003, WUH013, WUH019, WUH020, WUH023, WUH026."
+    },
+    {
+      "project": "editor",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021"
+      },
+      "output": "editor analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "editor",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021"
+      },
+      "output": "editor analyzers: the build failed but never reported WUH023. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins. Reported: WPROTO001, WUH003, WUH013, WUH019, WUH020, WUH021, WUH026."
+    },
+    {
+      "project": "editor",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023\nCS9999"
+      },
+      "output": "editor analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "editor",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023\nCS9999"
+      },
+      "output": "editor analyzers: the control fired, but the build also reported CS9999. Either Editor/ does not type-check on its own -- run the ordinary gate and fix that first -- or the anchor WallstopStudios.UnityHelpers.Editor.Validation.SerializableDictionaryAssetValidator no longer resolves, which means this project has stopped compiling that tree."
+    },
+    {
+      "project": "editor",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023\nWUH999\nCS9999"
+      },
+      "output": "editor analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "editor",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023\nWUH999\nCS9999"
+      },
+      "output": "editor analyzers: the control fired, but the build also reported CS9999, WUH999. Either Editor/ does not type-check on its own -- run the ordinary gate and fix that first -- or the anchor WallstopStudios.UnityHelpers.Editor.Validation.SerializableDictionaryAssetValidator no longer resolves, which means this project has stopped compiling that tree."
+    },
+    {
+      "project": "editor",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023\nWPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023"
+      },
+      "output": "editor analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "editor",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023\nWPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023"
+      },
+      "output": null
+    },
+    {
+      "project": "editor",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 0,
+        "output": "CS0246"
+      },
+      "output": "editor compiler: the build SUCCEEDED with a control defect in it. Expected CS0246 so that the compiler itself is reporting, and the project is not silencing its errors."
+    },
+    {
+      "project": "editor",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 1,
+        "output": "CS0246"
+      },
+      "output": null
+    },
+    {
+      "project": "editor",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 0,
+        "output": ""
+      },
+      "output": "editor compiler: the build SUCCEEDED with a control defect in it. Expected CS0246 so that the compiler itself is reporting, and the project is not silencing its errors."
+    },
+    {
+      "project": "editor",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 1,
+        "output": ""
+      },
+      "output": "editor compiler: the build failed but never reported CS0246. Expected CS0246 so that the compiler itself is reporting, and the project is not silencing its errors. Reported: nothing."
+    },
+    {
+      "project": "editor",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 0,
+        "output": ""
+      },
+      "output": "editor compiler: the build SUCCEEDED with a control defect in it. Expected CS0246 so that the compiler itself is reporting, and the project is not silencing its errors."
+    },
+    {
+      "project": "editor",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 1,
+        "output": ""
+      },
+      "output": "editor compiler: the build failed but never reported CS0246. Expected CS0246 so that the compiler itself is reporting, and the project is not silencing its errors. Reported: nothing."
+    },
+    {
+      "project": "editor",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 0,
+        "output": "CS0246\nCS9999"
+      },
+      "output": "editor compiler: the build SUCCEEDED with a control defect in it. Expected CS0246 so that the compiler itself is reporting, and the project is not silencing its errors."
+    },
+    {
+      "project": "editor",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 1,
+        "output": "CS0246\nCS9999"
+      },
+      "output": "editor compiler: the control fired, but the build also reported CS9999. Either Editor/ does not type-check on its own -- run the ordinary gate and fix that first -- or the anchor WallstopStudios.UnityHelpers.Editor.Validation.SerializableDictionaryAssetValidator no longer resolves, which means this project has stopped compiling that tree."
+    },
+    {
+      "project": "editor",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 0,
+        "output": "CS0246\nWUH999\nCS9999"
+      },
+      "output": "editor compiler: the build SUCCEEDED with a control defect in it. Expected CS0246 so that the compiler itself is reporting, and the project is not silencing its errors."
+    },
+    {
+      "project": "editor",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 1,
+        "output": "CS0246\nWUH999\nCS9999"
+      },
+      "output": "editor compiler: the control fired, but the build also reported CS9999, WUH999. Either Editor/ does not type-check on its own -- run the ordinary gate and fix that first -- or the anchor WallstopStudios.UnityHelpers.Editor.Validation.SerializableDictionaryAssetValidator no longer resolves, which means this project has stopped compiling that tree."
+    },
+    {
+      "project": "editor",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 0,
+        "output": "CS0246\nCS0246"
+      },
+      "output": "editor compiler: the build SUCCEEDED with a control defect in it. Expected CS0246 so that the compiler itself is reporting, and the project is not silencing its errors."
+    },
+    {
+      "project": "editor",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 1,
+        "output": "CS0246\nCS0246"
+      },
+      "output": null
+    },
+    {
+      "project": "editor",
+      "control": "excluded-loops",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WUH013\nWUH019\nWUH021\nWUH023\nWUH026\nWUH028"
+      },
+      "output": "editor excluded-loops: the build SUCCEEDED with a control defect in it. Expected WUH013 and WUH019 and WUH021 and WUH023 and WUH026 and WUH028 so that the persistent audit rejects collection-size reads and missing struct equality in sources outside normal compilation."
+    },
+    {
+      "project": "editor",
+      "control": "excluded-loops",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WUH013\nWUH019\nWUH021\nWUH023\nWUH026\nWUH028"
+      },
+      "output": null
+    },
+    {
+      "project": "editor",
+      "control": "excluded-loops",
+      "attempt": {
+        "exitCode": 0,
+        "output": ""
+      },
+      "output": "editor excluded-loops: the build SUCCEEDED with a control defect in it. Expected WUH013 and WUH019 and WUH021 and WUH023 and WUH026 and WUH028 so that the persistent audit rejects collection-size reads and missing struct equality in sources outside normal compilation."
+    },
+    {
+      "project": "editor",
+      "control": "excluded-loops",
+      "attempt": {
+        "exitCode": 1,
+        "output": ""
+      },
+      "output": "editor excluded-loops: the build failed but never reported WUH013, WUH019, WUH021, WUH023, WUH026, WUH028. Expected WUH013 and WUH019 and WUH021 and WUH023 and WUH026 and WUH028 so that the persistent audit rejects collection-size reads and missing struct equality in sources outside normal compilation. Reported: nothing."
+    },
+    {
+      "project": "editor",
+      "control": "excluded-loops",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WUH019\nWUH021\nWUH023\nWUH026\nWUH028"
+      },
+      "output": "editor excluded-loops: the build SUCCEEDED with a control defect in it. Expected WUH013 and WUH019 and WUH021 and WUH023 and WUH026 and WUH028 so that the persistent audit rejects collection-size reads and missing struct equality in sources outside normal compilation."
+    },
+    {
+      "project": "editor",
+      "control": "excluded-loops",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WUH019\nWUH021\nWUH023\nWUH026\nWUH028"
+      },
+      "output": "editor excluded-loops: the build failed but never reported WUH013. Expected WUH013 and WUH019 and WUH021 and WUH023 and WUH026 and WUH028 so that the persistent audit rejects collection-size reads and missing struct equality in sources outside normal compilation. Reported: WUH019, WUH021, WUH023, WUH026, WUH028."
+    },
+    {
+      "project": "editor",
+      "control": "excluded-loops",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WUH013\nWUH021\nWUH023\nWUH026\nWUH028"
+      },
+      "output": "editor excluded-loops: the build SUCCEEDED with a control defect in it. Expected WUH013 and WUH019 and WUH021 and WUH023 and WUH026 and WUH028 so that the persistent audit rejects collection-size reads and missing struct equality in sources outside normal compilation."
+    },
+    {
+      "project": "editor",
+      "control": "excluded-loops",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WUH013\nWUH021\nWUH023\nWUH026\nWUH028"
+      },
+      "output": "editor excluded-loops: the build failed but never reported WUH019. Expected WUH013 and WUH019 and WUH021 and WUH023 and WUH026 and WUH028 so that the persistent audit rejects collection-size reads and missing struct equality in sources outside normal compilation. Reported: WUH013, WUH021, WUH023, WUH026, WUH028."
+    },
+    {
+      "project": "editor",
+      "control": "excluded-loops",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WUH013\nWUH019\nWUH023\nWUH026\nWUH028"
+      },
+      "output": "editor excluded-loops: the build SUCCEEDED with a control defect in it. Expected WUH013 and WUH019 and WUH021 and WUH023 and WUH026 and WUH028 so that the persistent audit rejects collection-size reads and missing struct equality in sources outside normal compilation."
+    },
+    {
+      "project": "editor",
+      "control": "excluded-loops",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WUH013\nWUH019\nWUH023\nWUH026\nWUH028"
+      },
+      "output": "editor excluded-loops: the build failed but never reported WUH021. Expected WUH013 and WUH019 and WUH021 and WUH023 and WUH026 and WUH028 so that the persistent audit rejects collection-size reads and missing struct equality in sources outside normal compilation. Reported: WUH013, WUH019, WUH023, WUH026, WUH028."
+    },
+    {
+      "project": "editor",
+      "control": "excluded-loops",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WUH013\nWUH019\nWUH021\nWUH026\nWUH028"
+      },
+      "output": "editor excluded-loops: the build SUCCEEDED with a control defect in it. Expected WUH013 and WUH019 and WUH021 and WUH023 and WUH026 and WUH028 so that the persistent audit rejects collection-size reads and missing struct equality in sources outside normal compilation."
+    },
+    {
+      "project": "editor",
+      "control": "excluded-loops",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WUH013\nWUH019\nWUH021\nWUH026\nWUH028"
+      },
+      "output": "editor excluded-loops: the build failed but never reported WUH023. Expected WUH013 and WUH019 and WUH021 and WUH023 and WUH026 and WUH028 so that the persistent audit rejects collection-size reads and missing struct equality in sources outside normal compilation. Reported: WUH013, WUH019, WUH021, WUH026, WUH028."
+    },
+    {
+      "project": "editor",
+      "control": "excluded-loops",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WUH013\nWUH019\nWUH021\nWUH023\nWUH028"
+      },
+      "output": "editor excluded-loops: the build SUCCEEDED with a control defect in it. Expected WUH013 and WUH019 and WUH021 and WUH023 and WUH026 and WUH028 so that the persistent audit rejects collection-size reads and missing struct equality in sources outside normal compilation."
+    },
+    {
+      "project": "editor",
+      "control": "excluded-loops",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WUH013\nWUH019\nWUH021\nWUH023\nWUH028"
+      },
+      "output": "editor excluded-loops: the build failed but never reported WUH026. Expected WUH013 and WUH019 and WUH021 and WUH023 and WUH026 and WUH028 so that the persistent audit rejects collection-size reads and missing struct equality in sources outside normal compilation. Reported: WUH013, WUH019, WUH021, WUH023, WUH028."
+    },
+    {
+      "project": "editor",
+      "control": "excluded-loops",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WUH013\nWUH019\nWUH021\nWUH023\nWUH026"
+      },
+      "output": "editor excluded-loops: the build SUCCEEDED with a control defect in it. Expected WUH013 and WUH019 and WUH021 and WUH023 and WUH026 and WUH028 so that the persistent audit rejects collection-size reads and missing struct equality in sources outside normal compilation."
+    },
+    {
+      "project": "editor",
+      "control": "excluded-loops",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WUH013\nWUH019\nWUH021\nWUH023\nWUH026"
+      },
+      "output": "editor excluded-loops: the build failed but never reported WUH028. Expected WUH013 and WUH019 and WUH021 and WUH023 and WUH026 and WUH028 so that the persistent audit rejects collection-size reads and missing struct equality in sources outside normal compilation. Reported: WUH013, WUH019, WUH021, WUH023, WUH026."
+    },
+    {
+      "project": "editor",
+      "control": "excluded-loops",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WUH013\nWUH019\nWUH021\nWUH023\nWUH026\nWUH028\nCS9999"
+      },
+      "output": "editor excluded-loops: the build SUCCEEDED with a control defect in it. Expected WUH013 and WUH019 and WUH021 and WUH023 and WUH026 and WUH028 so that the persistent audit rejects collection-size reads and missing struct equality in sources outside normal compilation."
+    },
+    {
+      "project": "editor",
+      "control": "excluded-loops",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WUH013\nWUH019\nWUH021\nWUH023\nWUH026\nWUH028\nCS9999"
+      },
+      "output": "editor excluded-loops: the control fired, but the build also reported CS9999. Either Editor/ does not type-check on its own -- run the ordinary gate and fix that first -- or the anchor WallstopStudios.UnityHelpers.Editor.Validation.SerializableDictionaryAssetValidator no longer resolves, which means this project has stopped compiling that tree."
+    },
+    {
+      "project": "editor",
+      "control": "excluded-loops",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WUH013\nWUH019\nWUH021\nWUH023\nWUH026\nWUH028\nWUH999\nCS9999"
+      },
+      "output": "editor excluded-loops: the build SUCCEEDED with a control defect in it. Expected WUH013 and WUH019 and WUH021 and WUH023 and WUH026 and WUH028 so that the persistent audit rejects collection-size reads and missing struct equality in sources outside normal compilation."
+    },
+    {
+      "project": "editor",
+      "control": "excluded-loops",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WUH013\nWUH019\nWUH021\nWUH023\nWUH026\nWUH028\nWUH999\nCS9999"
+      },
+      "output": "editor excluded-loops: the control fired, but the build also reported CS9999, WUH999. Either Editor/ does not type-check on its own -- run the ordinary gate and fix that first -- or the anchor WallstopStudios.UnityHelpers.Editor.Validation.SerializableDictionaryAssetValidator no longer resolves, which means this project has stopped compiling that tree."
+    },
+    {
+      "project": "editor",
+      "control": "excluded-loops",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WUH013\nWUH019\nWUH021\nWUH023\nWUH026\nWUH028\nWUH013\nWUH019\nWUH021\nWUH023\nWUH026\nWUH028"
+      },
+      "output": "editor excluded-loops: the build SUCCEEDED with a control defect in it. Expected WUH013 and WUH019 and WUH021 and WUH023 and WUH026 and WUH028 so that the persistent audit rejects collection-size reads and missing struct equality in sources outside normal compilation."
+    },
+    {
+      "project": "editor",
+      "control": "excluded-loops",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WUH013\nWUH019\nWUH021\nWUH023\nWUH026\nWUH028\nWUH013\nWUH019\nWUH021\nWUH023\nWUH026\nWUH028"
+      },
+      "output": null
+    },
+    {
+      "project": "tests",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026"
+      },
+      "output": "tests analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "tests",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026"
+      },
+      "output": null
+    },
+    {
+      "project": "tests",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": ""
+      },
+      "output": "tests analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "tests",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": ""
+      },
+      "output": "tests analyzers: the build failed but never reported WPROTO001, WUH003, WUH013, WUH020, WUH026. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins. Reported: nothing."
+    },
+    {
+      "project": "tests",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WUH003\nWUH013\nWUH020\nWUH026"
+      },
+      "output": "tests analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "tests",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WUH003\nWUH013\nWUH020\nWUH026"
+      },
+      "output": "tests analyzers: the build failed but never reported WPROTO001. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins. Reported: WUH003, WUH013, WUH020, WUH026."
+    },
+    {
+      "project": "tests",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH013\nWUH020\nWUH026"
+      },
+      "output": "tests analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "tests",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH013\nWUH020\nWUH026"
+      },
+      "output": "tests analyzers: the build failed but never reported WUH003. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins. Reported: WPROTO001, WUH013, WUH020, WUH026."
+    },
+    {
+      "project": "tests",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH020\nWUH026"
+      },
+      "output": "tests analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "tests",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH020\nWUH026"
+      },
+      "output": "tests analyzers: the build failed but never reported WUH013. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins. Reported: WPROTO001, WUH003, WUH020, WUH026."
+    },
+    {
+      "project": "tests",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH026"
+      },
+      "output": "tests analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "tests",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH026"
+      },
+      "output": "tests analyzers: the build failed but never reported WUH020. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins. Reported: WPROTO001, WUH003, WUH013, WUH026."
+    },
+    {
+      "project": "tests",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020"
+      },
+      "output": "tests analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "tests",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020"
+      },
+      "output": "tests analyzers: the build failed but never reported WUH026. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins. Reported: WPROTO001, WUH003, WUH013, WUH020."
+    },
+    {
+      "project": "tests",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nCS9999"
+      },
+      "output": "tests analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "tests",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nCS9999"
+      },
+      "output": "tests analyzers: the control fired, but the build also reported CS9999. Either Tests/Runtime/ does not type-check on its own -- run the ordinary gate and fix that first -- or the anchor WallstopStudios.UnityHelpers.Tests.Tags.TagHandlerTests no longer resolves, which means this project has stopped compiling that tree."
+    },
+    {
+      "project": "tests",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH999\nCS9999"
+      },
+      "output": "tests analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "tests",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH999\nCS9999"
+      },
+      "output": "tests analyzers: the control fired, but the build also reported CS9999, WUH999. Either Tests/Runtime/ does not type-check on its own -- run the ordinary gate and fix that first -- or the anchor WallstopStudios.UnityHelpers.Tests.Tags.TagHandlerTests no longer resolves, which means this project has stopped compiling that tree."
+    },
+    {
+      "project": "tests",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWPROTO001\nWUH003\nWUH013\nWUH020\nWUH026"
+      },
+      "output": "tests analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "tests",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWPROTO001\nWUH003\nWUH013\nWUH020\nWUH026"
+      },
+      "output": null
+    },
+    {
+      "project": "tests",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 0,
+        "output": "CS0246"
+      },
+      "output": "tests compiler: the build SUCCEEDED with a control defect in it. Expected CS0246 so that the compiler itself is reporting, and the project is not silencing its errors."
+    },
+    {
+      "project": "tests",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 1,
+        "output": "CS0246"
+      },
+      "output": null
+    },
+    {
+      "project": "tests",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 0,
+        "output": ""
+      },
+      "output": "tests compiler: the build SUCCEEDED with a control defect in it. Expected CS0246 so that the compiler itself is reporting, and the project is not silencing its errors."
+    },
+    {
+      "project": "tests",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 1,
+        "output": ""
+      },
+      "output": "tests compiler: the build failed but never reported CS0246. Expected CS0246 so that the compiler itself is reporting, and the project is not silencing its errors. Reported: nothing."
+    },
+    {
+      "project": "tests",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 0,
+        "output": ""
+      },
+      "output": "tests compiler: the build SUCCEEDED with a control defect in it. Expected CS0246 so that the compiler itself is reporting, and the project is not silencing its errors."
+    },
+    {
+      "project": "tests",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 1,
+        "output": ""
+      },
+      "output": "tests compiler: the build failed but never reported CS0246. Expected CS0246 so that the compiler itself is reporting, and the project is not silencing its errors. Reported: nothing."
+    },
+    {
+      "project": "tests",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 0,
+        "output": "CS0246\nCS9999"
+      },
+      "output": "tests compiler: the build SUCCEEDED with a control defect in it. Expected CS0246 so that the compiler itself is reporting, and the project is not silencing its errors."
+    },
+    {
+      "project": "tests",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 1,
+        "output": "CS0246\nCS9999"
+      },
+      "output": "tests compiler: the control fired, but the build also reported CS9999. Either Tests/Runtime/ does not type-check on its own -- run the ordinary gate and fix that first -- or the anchor WallstopStudios.UnityHelpers.Tests.Tags.TagHandlerTests no longer resolves, which means this project has stopped compiling that tree."
+    },
+    {
+      "project": "tests",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 0,
+        "output": "CS0246\nWUH999\nCS9999"
+      },
+      "output": "tests compiler: the build SUCCEEDED with a control defect in it. Expected CS0246 so that the compiler itself is reporting, and the project is not silencing its errors."
+    },
+    {
+      "project": "tests",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 1,
+        "output": "CS0246\nWUH999\nCS9999"
+      },
+      "output": "tests compiler: the control fired, but the build also reported CS9999, WUH999. Either Tests/Runtime/ does not type-check on its own -- run the ordinary gate and fix that first -- or the anchor WallstopStudios.UnityHelpers.Tests.Tags.TagHandlerTests no longer resolves, which means this project has stopped compiling that tree."
+    },
+    {
+      "project": "tests",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 0,
+        "output": "CS0246\nCS0246"
+      },
+      "output": "tests compiler: the build SUCCEEDED with a control defect in it. Expected CS0246 so that the compiler itself is reporting, and the project is not silencing its errors."
+    },
+    {
+      "project": "tests",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 1,
+        "output": "CS0246\nCS0246"
+      },
+      "output": null
+    },
+    {
+      "project": "editor-tests",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026"
+      },
+      "output": "editor-tests analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "editor-tests",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026"
+      },
+      "output": null
+    },
+    {
+      "project": "editor-tests",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": ""
+      },
+      "output": "editor-tests analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "editor-tests",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": ""
+      },
+      "output": "editor-tests analyzers: the build failed but never reported WPROTO001, WUH003, WUH013, WUH020, WUH026. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins. Reported: nothing."
+    },
+    {
+      "project": "editor-tests",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WUH003\nWUH013\nWUH020\nWUH026"
+      },
+      "output": "editor-tests analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "editor-tests",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WUH003\nWUH013\nWUH020\nWUH026"
+      },
+      "output": "editor-tests analyzers: the build failed but never reported WPROTO001. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins. Reported: WUH003, WUH013, WUH020, WUH026."
+    },
+    {
+      "project": "editor-tests",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH013\nWUH020\nWUH026"
+      },
+      "output": "editor-tests analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "editor-tests",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH013\nWUH020\nWUH026"
+      },
+      "output": "editor-tests analyzers: the build failed but never reported WUH003. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins. Reported: WPROTO001, WUH013, WUH020, WUH026."
+    },
+    {
+      "project": "editor-tests",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH020\nWUH026"
+      },
+      "output": "editor-tests analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "editor-tests",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH020\nWUH026"
+      },
+      "output": "editor-tests analyzers: the build failed but never reported WUH013. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins. Reported: WPROTO001, WUH003, WUH020, WUH026."
+    },
+    {
+      "project": "editor-tests",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH026"
+      },
+      "output": "editor-tests analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "editor-tests",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH026"
+      },
+      "output": "editor-tests analyzers: the build failed but never reported WUH020. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins. Reported: WPROTO001, WUH003, WUH013, WUH026."
+    },
+    {
+      "project": "editor-tests",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020"
+      },
+      "output": "editor-tests analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "editor-tests",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020"
+      },
+      "output": "editor-tests analyzers: the build failed but never reported WUH026. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins. Reported: WPROTO001, WUH003, WUH013, WUH020."
+    },
+    {
+      "project": "editor-tests",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nCS9999"
+      },
+      "output": "editor-tests analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "editor-tests",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nCS9999"
+      },
+      "output": "editor-tests analyzers: the control fired, but the build also reported CS9999. Either Tests/Editor/ does not type-check on its own -- run the ordinary gate and fix that first -- or the anchor WallstopStudios.UnityHelpers.Tests.Windows.PrefabCheckerTests no longer resolves, which means this project has stopped compiling that tree."
+    },
+    {
+      "project": "editor-tests",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH999\nCS9999"
+      },
+      "output": "editor-tests analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "editor-tests",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH999\nCS9999"
+      },
+      "output": "editor-tests analyzers: the control fired, but the build also reported CS9999, WUH999. Either Tests/Editor/ does not type-check on its own -- run the ordinary gate and fix that first -- or the anchor WallstopStudios.UnityHelpers.Tests.Windows.PrefabCheckerTests no longer resolves, which means this project has stopped compiling that tree."
+    },
+    {
+      "project": "editor-tests",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWPROTO001\nWUH003\nWUH013\nWUH020\nWUH026"
+      },
+      "output": "editor-tests analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "editor-tests",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWPROTO001\nWUH003\nWUH013\nWUH020\nWUH026"
+      },
+      "output": null
+    },
+    {
+      "project": "editor-tests",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 0,
+        "output": "CS0246"
+      },
+      "output": "editor-tests compiler: the build SUCCEEDED with a control defect in it. Expected CS0246 so that the compiler itself is reporting, and the project is not silencing its errors."
+    },
+    {
+      "project": "editor-tests",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 1,
+        "output": "CS0246"
+      },
+      "output": null
+    },
+    {
+      "project": "editor-tests",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 0,
+        "output": ""
+      },
+      "output": "editor-tests compiler: the build SUCCEEDED with a control defect in it. Expected CS0246 so that the compiler itself is reporting, and the project is not silencing its errors."
+    },
+    {
+      "project": "editor-tests",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 1,
+        "output": ""
+      },
+      "output": "editor-tests compiler: the build failed but never reported CS0246. Expected CS0246 so that the compiler itself is reporting, and the project is not silencing its errors. Reported: nothing."
+    },
+    {
+      "project": "editor-tests",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 0,
+        "output": ""
+      },
+      "output": "editor-tests compiler: the build SUCCEEDED with a control defect in it. Expected CS0246 so that the compiler itself is reporting, and the project is not silencing its errors."
+    },
+    {
+      "project": "editor-tests",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 1,
+        "output": ""
+      },
+      "output": "editor-tests compiler: the build failed but never reported CS0246. Expected CS0246 so that the compiler itself is reporting, and the project is not silencing its errors. Reported: nothing."
+    },
+    {
+      "project": "editor-tests",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 0,
+        "output": "CS0246\nCS9999"
+      },
+      "output": "editor-tests compiler: the build SUCCEEDED with a control defect in it. Expected CS0246 so that the compiler itself is reporting, and the project is not silencing its errors."
+    },
+    {
+      "project": "editor-tests",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 1,
+        "output": "CS0246\nCS9999"
+      },
+      "output": "editor-tests compiler: the control fired, but the build also reported CS9999. Either Tests/Editor/ does not type-check on its own -- run the ordinary gate and fix that first -- or the anchor WallstopStudios.UnityHelpers.Tests.Windows.PrefabCheckerTests no longer resolves, which means this project has stopped compiling that tree."
+    },
+    {
+      "project": "editor-tests",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 0,
+        "output": "CS0246\nWUH999\nCS9999"
+      },
+      "output": "editor-tests compiler: the build SUCCEEDED with a control defect in it. Expected CS0246 so that the compiler itself is reporting, and the project is not silencing its errors."
+    },
+    {
+      "project": "editor-tests",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 1,
+        "output": "CS0246\nWUH999\nCS9999"
+      },
+      "output": "editor-tests compiler: the control fired, but the build also reported CS9999, WUH999. Either Tests/Editor/ does not type-check on its own -- run the ordinary gate and fix that first -- or the anchor WallstopStudios.UnityHelpers.Tests.Windows.PrefabCheckerTests no longer resolves, which means this project has stopped compiling that tree."
+    },
+    {
+      "project": "editor-tests",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 0,
+        "output": "CS0246\nCS0246"
+      },
+      "output": "editor-tests compiler: the build SUCCEEDED with a control defect in it. Expected CS0246 so that the compiler itself is reporting, and the project is not silencing its errors."
+    },
+    {
+      "project": "editor-tests",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 1,
+        "output": "CS0246\nCS0246"
+      },
+      "output": null
+    },
+    {
+      "project": "integrations",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023"
+      },
+      "output": "integrations analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "integrations",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023"
+      },
+      "output": null
+    },
+    {
+      "project": "integrations",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": ""
+      },
+      "output": "integrations analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "integrations",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": ""
+      },
+      "output": "integrations analyzers: the build failed but never reported WPROTO001, WUH003, WUH013, WUH020, WUH026, WUH019, WUH021, WUH023. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins. Reported: nothing."
+    },
+    {
+      "project": "integrations",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023"
+      },
+      "output": "integrations analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "integrations",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023"
+      },
+      "output": "integrations analyzers: the build failed but never reported WPROTO001. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins. Reported: WUH003, WUH013, WUH019, WUH020, WUH021, WUH023, WUH026."
+    },
+    {
+      "project": "integrations",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023"
+      },
+      "output": "integrations analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "integrations",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023"
+      },
+      "output": "integrations analyzers: the build failed but never reported WUH003. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins. Reported: WPROTO001, WUH013, WUH019, WUH020, WUH021, WUH023, WUH026."
+    },
+    {
+      "project": "integrations",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023"
+      },
+      "output": "integrations analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "integrations",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023"
+      },
+      "output": "integrations analyzers: the build failed but never reported WUH013. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins. Reported: WPROTO001, WUH003, WUH019, WUH020, WUH021, WUH023, WUH026."
+    },
+    {
+      "project": "integrations",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH026\nWUH019\nWUH021\nWUH023"
+      },
+      "output": "integrations analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "integrations",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH026\nWUH019\nWUH021\nWUH023"
+      },
+      "output": "integrations analyzers: the build failed but never reported WUH020. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins. Reported: WPROTO001, WUH003, WUH013, WUH019, WUH021, WUH023, WUH026."
+    },
+    {
+      "project": "integrations",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH019\nWUH021\nWUH023"
+      },
+      "output": "integrations analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "integrations",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH019\nWUH021\nWUH023"
+      },
+      "output": "integrations analyzers: the build failed but never reported WUH026. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins. Reported: WPROTO001, WUH003, WUH013, WUH019, WUH020, WUH021, WUH023."
+    },
+    {
+      "project": "integrations",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH021\nWUH023"
+      },
+      "output": "integrations analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "integrations",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH021\nWUH023"
+      },
+      "output": "integrations analyzers: the build failed but never reported WUH019. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins. Reported: WPROTO001, WUH003, WUH013, WUH020, WUH021, WUH023, WUH026."
+    },
+    {
+      "project": "integrations",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH023"
+      },
+      "output": "integrations analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "integrations",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH023"
+      },
+      "output": "integrations analyzers: the build failed but never reported WUH021. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins. Reported: WPROTO001, WUH003, WUH013, WUH019, WUH020, WUH023, WUH026."
+    },
+    {
+      "project": "integrations",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021"
+      },
+      "output": "integrations analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "integrations",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021"
+      },
+      "output": "integrations analyzers: the build failed but never reported WUH023. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins. Reported: WPROTO001, WUH003, WUH013, WUH019, WUH020, WUH021, WUH026."
+    },
+    {
+      "project": "integrations",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023\nCS9999"
+      },
+      "output": "integrations analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "integrations",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023\nCS9999"
+      },
+      "output": "integrations analyzers: the control fired, but the build also reported CS9999. Either Runtime/Integrations/ does not type-check on its own -- run the ordinary gate and fix that first -- or the anchor WallstopStudios.UnityHelpers.Integrations.Zenject.RelationalComponentSceneInitializer no longer resolves, which means this project has stopped compiling that tree."
+    },
+    {
+      "project": "integrations",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023\nWUH999\nCS9999"
+      },
+      "output": "integrations analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "integrations",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023\nWUH999\nCS9999"
+      },
+      "output": "integrations analyzers: the control fired, but the build also reported CS9999, WUH999. Either Runtime/Integrations/ does not type-check on its own -- run the ordinary gate and fix that first -- or the anchor WallstopStudios.UnityHelpers.Integrations.Zenject.RelationalComponentSceneInitializer no longer resolves, which means this project has stopped compiling that tree."
+    },
+    {
+      "project": "integrations",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 0,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023\nWPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023"
+      },
+      "output": "integrations analyzers: the build SUCCEEDED with a control defect in it. Expected WPROTO001 and WUH003 and WUH013 and WUH020 and WUH026 and WUH019 and WUH021 and WUH023 so that the shipped generators and analyzers report, including the production collection-size and struct equality opt-ins."
+    },
+    {
+      "project": "integrations",
+      "control": "analyzers",
+      "attempt": {
+        "exitCode": 1,
+        "output": "WPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023\nWPROTO001\nWUH003\nWUH013\nWUH020\nWUH026\nWUH019\nWUH021\nWUH023"
+      },
+      "output": null
+    },
+    {
+      "project": "integrations",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 0,
+        "output": "CS0246"
+      },
+      "output": "integrations compiler: the build SUCCEEDED with a control defect in it. Expected CS0246 so that the compiler itself is reporting, and the project is not silencing its errors."
+    },
+    {
+      "project": "integrations",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 1,
+        "output": "CS0246"
+      },
+      "output": null
+    },
+    {
+      "project": "integrations",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 0,
+        "output": ""
+      },
+      "output": "integrations compiler: the build SUCCEEDED with a control defect in it. Expected CS0246 so that the compiler itself is reporting, and the project is not silencing its errors."
+    },
+    {
+      "project": "integrations",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 1,
+        "output": ""
+      },
+      "output": "integrations compiler: the build failed but never reported CS0246. Expected CS0246 so that the compiler itself is reporting, and the project is not silencing its errors. Reported: nothing."
+    },
+    {
+      "project": "integrations",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 0,
+        "output": ""
+      },
+      "output": "integrations compiler: the build SUCCEEDED with a control defect in it. Expected CS0246 so that the compiler itself is reporting, and the project is not silencing its errors."
+    },
+    {
+      "project": "integrations",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 1,
+        "output": ""
+      },
+      "output": "integrations compiler: the build failed but never reported CS0246. Expected CS0246 so that the compiler itself is reporting, and the project is not silencing its errors. Reported: nothing."
+    },
+    {
+      "project": "integrations",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 0,
+        "output": "CS0246\nCS9999"
+      },
+      "output": "integrations compiler: the build SUCCEEDED with a control defect in it. Expected CS0246 so that the compiler itself is reporting, and the project is not silencing its errors."
+    },
+    {
+      "project": "integrations",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 1,
+        "output": "CS0246\nCS9999"
+      },
+      "output": "integrations compiler: the control fired, but the build also reported CS9999. Either Runtime/Integrations/ does not type-check on its own -- run the ordinary gate and fix that first -- or the anchor WallstopStudios.UnityHelpers.Integrations.Zenject.RelationalComponentSceneInitializer no longer resolves, which means this project has stopped compiling that tree."
+    },
+    {
+      "project": "integrations",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 0,
+        "output": "CS0246\nWUH999\nCS9999"
+      },
+      "output": "integrations compiler: the build SUCCEEDED with a control defect in it. Expected CS0246 so that the compiler itself is reporting, and the project is not silencing its errors."
+    },
+    {
+      "project": "integrations",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 1,
+        "output": "CS0246\nWUH999\nCS9999"
+      },
+      "output": "integrations compiler: the control fired, but the build also reported CS9999, WUH999. Either Runtime/Integrations/ does not type-check on its own -- run the ordinary gate and fix that first -- or the anchor WallstopStudios.UnityHelpers.Integrations.Zenject.RelationalComponentSceneInitializer no longer resolves, which means this project has stopped compiling that tree."
+    },
+    {
+      "project": "integrations",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 0,
+        "output": "CS0246\nCS0246"
+      },
+      "output": "integrations compiler: the build SUCCEEDED with a control defect in it. Expected CS0246 so that the compiler itself is reporting, and the project is not silencing its errors."
+    },
+    {
+      "project": "integrations",
+      "control": "compiler",
+      "attempt": {
+        "exitCode": 1,
+        "output": "CS0246\nCS0246"
+      },
+      "output": null
+    }
+  ],
+  "argumentsCases": [
+    {
+      "args": [],
+      "output": {
+        "requested": [],
+        "verbose": false,
+        "jobs": 2
+      }
+    },
+    {
+      "args": ["--verbose"],
+      "output": {
+        "requested": [],
+        "verbose": true,
+        "jobs": 2
+      }
+    },
+    {
+      "args": ["--only=runtime,tests"],
+      "output": {
+        "requested": ["runtime", "tests"],
+        "verbose": false,
+        "jobs": 2
+      }
+    },
+    {
+      "args": ["--only=,,runtime,"],
+      "output": {
+        "requested": ["runtime"],
+        "verbose": false,
+        "jobs": 2
+      }
+    },
+    {
+      "args": ["--only=missing"],
+      "output": {
+        "requested": ["missing"],
+        "verbose": false,
+        "jobs": 2
+      }
+    },
+    {
+      "args": ["--jobs=1"],
+      "output": {
+        "requested": [],
+        "verbose": false,
+        "jobs": 1
+      }
+    },
+    {
+      "args": ["--jobs=2.0"],
+      "output": {
+        "requested": [],
+        "verbose": false,
+        "jobs": 2
+      }
+    },
+    {
+      "args": ["--jobs=0x2"],
+      "output": {
+        "requested": [],
+        "verbose": false,
+        "jobs": 2
+      }
+    },
+    {
+      "args": ["--jobs=2e0"],
+      "output": {
+        "requested": [],
+        "verbose": false,
+        "jobs": 2
+      }
+    },
+    {
+      "args": ["--jobs= 2 "],
+      "output": {
+        "requested": [],
+        "verbose": false,
+        "jobs": 2
+      }
+    },
+    {
+      "args": ["--jobs=0"],
+      "error": "--jobs must be a positive integer, got --jobs=0."
+    },
+    {
+      "args": ["--jobs=-1"],
+      "error": "--jobs must be a positive integer, got --jobs=-1."
+    },
+    {
+      "args": ["--jobs=1.5"],
+      "error": "--jobs must be a positive integer, got --jobs=1.5."
+    },
+    {
+      "args": ["--jobs=nan"],
+      "error": "--jobs must be a positive integer, got --jobs=nan."
+    },
+    {
+      "args": ["--jobs=Infinity"],
+      "error": "--jobs must be a positive integer, got --jobs=Infinity."
+    },
+    {
+      "args": ["--jobs="],
+      "error": "--jobs must be a positive integer, got --jobs=."
+    },
+    {
+      "args": ["--unknown"],
+      "error": "Unknown option --unknown. Use --only=<id>[,<id>], --jobs=<count>, or --verbose."
+    }
+  ],
+  "diagnosticsCases": [
+    {
+      "input": "",
+      "output": []
+    },
+    {
+      "input": "CS0246 CS0246 WUH003 WPROTO001",
+      "output": ["CS0246", "WPROTO001", "WUH003"]
+    },
+    {
+      "input": "XCS0246 CS02460 aWUH003 WUH003x _CS0246_",
+      "output": []
+    },
+    {
+      "input": "warning CS1000: text; error WUH999; WPROTO999",
+      "output": ["CS1000", "WPROTO999", "WUH999"]
+    },
+    {
+      "input": "NuGet-Migrations errno == EEXIST",
+      "output": []
+    },
+    {
+      "input": "éCS0246 漢WUH003 βWPROTO001",
+      "output": ["CS0246", "WPROTO001", "WUH003"]
+    }
+  ],
+  "startupCases": [
+    {
+      "attempt": {
+        "exitCode": 1,
+        "output": "'NuGet-Migrations' errno == EEXIST"
+      },
+      "output": true
+    },
+    {
+      "attempt": {
+        "exitCode": 0,
+        "output": "'NuGet-Migrations' errno == EEXIST"
+      },
+      "output": false
+    },
+    {
+      "attempt": {
+        "exitCode": 1,
+        "output": "'NuGet-Migrations' errno == EEXIST CS0246"
+      },
+      "output": false
+    },
+    {
+      "attempt": {
+        "exitCode": 1,
+        "output": "'NuGet-Migrations'"
+      },
+      "output": false
+    },
+    {
+      "attempt": {
+        "exitCode": 1,
+        "output": "errno == EEXIST"
+      },
+      "output": false
+    }
+  ]
+}

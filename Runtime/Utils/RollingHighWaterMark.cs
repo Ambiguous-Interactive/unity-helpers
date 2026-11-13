@@ -105,7 +105,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         }
 
         private readonly Bucket[] _buckets = new Bucket[RingLength];
-        private readonly object _lock = new object();
+        private readonly object _lock;
         private float _windowSeconds;
         private float _bucketSeconds;
         private long _newestEpoch;
@@ -119,7 +119,11 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </summary>
         /// <param name="windowSeconds">The rolling window duration in seconds.</param>
         public RollingHighWaterMark(float windowSeconds)
+            : this(windowSeconds, new object()) { }
+
+        internal RollingHighWaterMark(float windowSeconds, object synchronizationRoot)
         {
+            _lock = synchronizationRoot ?? new object();
             _windowSeconds =
                 0f < windowSeconds ? windowSeconds : PoolPurgeSettings.DefaultRollingWindowSeconds;
             _bucketSeconds = _windowSeconds / WindowBucketCount;
@@ -171,8 +175,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             lock (_lock)
             {
-                RecordCore(currentTime, value);
-                return AverageCore();
+                return RecordAndGetAverageCore(currentTime, value);
             }
         }
 
@@ -201,7 +204,15 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
         }
 
-        private void RecordCore(float currentTime, int value)
+        /// <summary>Records a sample while the owner holds the shared synchronization lock.</summary>
+        internal float RecordAndGetAverageCore(float currentTime, int value)
+        {
+            RecordCore(currentTime, value);
+            return AverageCore();
+        }
+
+        /// <summary>Records a sample while the owner holds the shared synchronization lock.</summary>
+        internal void RecordCore(float currentTime, int value)
         {
             long epoch = EpochFor(currentTime);
             AdvanceTo(epoch);
@@ -624,7 +635,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         }
 
         private readonly RollingHighWaterMark _rollingHighWaterMark;
-        private readonly object _lock = new object();
+        private readonly object _lock;
 
         private int _currentlyRented;
         private int _peakConcurrentRentals;
@@ -656,8 +667,24 @@ namespace WallstopStudios.UnityHelpers.Utils
             float spikeThresholdMultiplier,
             float bufferMultiplier
         )
+            : this(
+                rollingWindowSeconds,
+                hysteresisSeconds,
+                spikeThresholdMultiplier,
+                bufferMultiplier,
+                null
+            ) { }
+
+        internal PoolUsageTracker(
+            float rollingWindowSeconds,
+            float hysteresisSeconds,
+            float spikeThresholdMultiplier,
+            float bufferMultiplier,
+            object synchronizationRoot
+        )
         {
-            _rollingHighWaterMark = new RollingHighWaterMark(rollingWindowSeconds);
+            _lock = synchronizationRoot ?? new object();
+            _rollingHighWaterMark = new RollingHighWaterMark(rollingWindowSeconds, _lock);
             _hysteresisSeconds = hysteresisSeconds;
             _spikeThresholdMultiplier = spikeThresholdMultiplier;
             _bufferMultiplier = bufferMultiplier;
@@ -671,37 +698,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             lock (_lock)
             {
-                ++_currentlyRented;
-                ++_totalRentalCount;
-
-                if (0f < _previousRentalTime && _previousRentalTime <= currentTime)
-                {
-                    float interRentalTime = currentTime - _previousRentalTime;
-                    _totalInterRentalTimeSeconds += interRentalTime;
-                    ++_interRentalCount;
-                }
-
-                _previousRentalTime = currentTime;
-                _lastRentalTime = currentTime;
-
-                if (_peakConcurrentRentals < _currentlyRented)
-                {
-                    _peakConcurrentRentals = _currentlyRented;
-                }
-
-                float average = _rollingHighWaterMark.RecordAndGetAverage(
-                    currentTime,
-                    _currentlyRented
-                );
-                if (
-                    0f < _spikeThresholdMultiplier
-                    && average * _spikeThresholdMultiplier < _currentlyRented
-                )
-                {
-                    _lastSpikeTime = currentTime;
-                }
-
-                UpdateFrequencyTracking(currentTime);
+                RecordRentCore(currentTime);
             }
         }
 
@@ -713,13 +710,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             lock (_lock)
             {
-                if (0 < _currentlyRented)
-                {
-                    _currentlyRented--;
-                }
-
-                _lastReturnTime = currentTime;
-                _rollingHighWaterMark.Record(currentTime, _currentlyRented);
+                RecordReturnCore(currentTime);
             }
         }
 
@@ -1169,6 +1160,55 @@ namespace WallstopStudios.UnityHelpers.Utils
                 _previousRentalTime = 0f;
                 _rollingHighWaterMark.Clear();
             }
+        }
+
+        /// <summary>Records usage while the owner holds the shared synchronization lock.</summary>
+        internal int RecordRentCore(float currentTime)
+        {
+            ++_currentlyRented;
+            ++_totalRentalCount;
+
+            if (0f < _previousRentalTime && _previousRentalTime <= currentTime)
+            {
+                float interRentalTime = currentTime - _previousRentalTime;
+                _totalInterRentalTimeSeconds += interRentalTime;
+                ++_interRentalCount;
+            }
+
+            _previousRentalTime = currentTime;
+            _lastRentalTime = currentTime;
+
+            if (_peakConcurrentRentals < _currentlyRented)
+            {
+                _peakConcurrentRentals = _currentlyRented;
+            }
+
+            float average = _rollingHighWaterMark.RecordAndGetAverageCore(
+                currentTime,
+                _currentlyRented
+            );
+            if (
+                0f < _spikeThresholdMultiplier
+                && average * _spikeThresholdMultiplier < _currentlyRented
+            )
+            {
+                _lastSpikeTime = currentTime;
+            }
+
+            UpdateFrequencyTracking(currentTime);
+            return _currentlyRented;
+        }
+
+        /// <summary>Records usage while the owner holds the shared synchronization lock.</summary>
+        internal void RecordReturnCore(float currentTime)
+        {
+            if (0 < _currentlyRented)
+            {
+                _currentlyRented--;
+            }
+
+            _lastReturnTime = currentTime;
+            _rollingHighWaterMark.RecordCore(currentTime, _currentlyRented);
         }
 
         private void UpdateFrequencyTracking(float currentTime)

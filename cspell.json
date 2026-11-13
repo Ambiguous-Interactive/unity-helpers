@@ -1281,7 +1281,8 @@
     "RLIMIT",
     "SIGXFSZ",
     "PTH",
-    "axb"
+    "axb",
+    "XCS"
   ],
   "flagWords": [],
   "minWordLength": 3,

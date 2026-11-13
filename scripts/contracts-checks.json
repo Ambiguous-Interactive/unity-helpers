@@ -631,5 +631,10 @@
     "name": "Documentation link test compatibility launcher",
     "run": "npm run test:doc-links-launcher",
     "completionPattern": "^1 passed(?:, [0-9]+ deselected)? in "
+  },
+  {
+    "id": "node-bin",
+    "name": "Node tool launcher controls",
+    "run": "npm run test:node-bin"
   }
 ]

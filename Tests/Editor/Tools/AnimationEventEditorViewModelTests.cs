@@ -16,7 +16,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
     [TestFixture]
     [NUnit.Framework.Category("Slow")]
     [NUnit.Framework.Category("Integration")]
-    public sealed class AnimationEventEditorViewModelTests : BatchedEditorTestBase
+    public sealed class AnimationEventEditorViewModelTests : SynchronousEditorTestBase
     {
         private static readonly TestCaseData[] MoveEventCases =
         {
@@ -33,18 +33,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 "MoveEvent.ClampsHighIndexToEnd"
             ),
         };
-
-        [SetUp]
-        public void SetUp()
-        {
-            base.BaseSetUp();
-        }
-
-        [TearDown]
-        public override void TearDown()
-        {
-            base.TearDown();
-        }
 
         [Test]
         public void LoadClipCopiesEventsAndBaseline()

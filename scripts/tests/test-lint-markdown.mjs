@@ -59,9 +59,19 @@ try {
   git("add", "deleted.md");
   rmSync(path.join(root, "deleted.md"));
   mkdirSync(path.join(root, "scripts"), { recursive: true });
-  for (const file of ["lint-markdown.mjs", "run-node-bin.js"]) {
+  for (const file of [
+    "lint-markdown.mjs",
+    "run-node-bin.js",
+    "run_node_bin.py",
+    "cli_encoding.py"
+  ]) {
     copyFileSync(path.join(repoRoot, "scripts", file), path.join(root, "scripts", file));
   }
+  symlinkSync(
+    path.join(repoRoot, "scripts", "python~"),
+    path.join(root, "scripts", "python~"),
+    process.platform === "win32" ? "junction" : "dir"
+  );
   symlinkSync(
     path.join(repoRoot, "node_modules"),
     path.join(root, "node_modules"),

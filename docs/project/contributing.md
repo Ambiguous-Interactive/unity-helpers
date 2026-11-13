@@ -98,6 +98,14 @@ results, process receipts, source hashes and the complete case inventory.
 
 ### Typed Python scripts
 
+Repository-local Prettier, cspell and markdownlint launch through
+`scripts/run_node_bin.py` in locked uv. The existing Node launchers remain compatible.
+The launcher selects the installed package's declared binary, preserves argument boundaries
+without a shell, inherits standard input without reading it, and propagates child exit status.
+`--check-install` validates the package and binary without starting Node. Run
+`npm run test:node-bin` for the frozen original CLI observations and process controls.
+Invalid package metadata fails with a diagnostic; JSON parser wording can differ from Node.
+
 `npm run lint:comparison-direction` and its `:fix` variant run the typed Python comparison
 checker. The Node entry points remain compatibility launchers. The port retains token handling
 for generics, shifts, patterns, strings and interpolation holes, along with the existing cautious
@@ -210,10 +218,10 @@ Complete struct and interface examples remain at type scope when compilation uni
 Generation is a heuristic convenience; the standalone documentation compiler checks remain the
 separate compilation gate.
 
-Release payload staging, archive creation, and Unity metadata generation run through uv. Install uv 0.13.7, then use:
+Release payload staging, archive creation, and Unity metadata generation run through uv. Install uv 0.13.8, then use:
 
 ```bash
-python -m pip install --disable-pip-version-check uv==0.13.7
+python -m pip install --disable-pip-version-check uv==0.13.8
 uv sync --project scripts/python~ --locked
 npm run lint:python
 npm run test:create-unitypackage
@@ -595,7 +603,7 @@ write failures fail validation; an execution failure cannot be mistaken for a cl
 
 ## Python Tooling
 
-Use Python 3.11.8 or newer for the repository's Python checks. The dev container pins `uv==0.13.7` and
+Use Python 3.11.8 or newer for the repository's Python checks. The dev container pins `uv==0.13.8` and
 exposes it as `uv`. Documentation CI installs that same version with pip, then installs the
 fully pinned `requirements-docs.lock` with uv. `requirements-docs.txt` lists the direct
 constraints; the lock records their transitive versions. Run locally with:
@@ -842,3 +850,24 @@ fetch or modify either checkout. Git reads discard inherited `GIT_*` overrides a
 replacement objects so a pinned definition refers to its physical commit. Controls exercise both
 environment redirection and a real replacement object. Python and uv setup precede the workflow
 step that resolves the policy checkout pin.
+
+### Compiler gate controls
+
+`npm run typecheck:controls` runs the typed Python control runner through the locked toolchain.
+The five real build projects must report the exact expected compiler or analyzer diagnostics;
+missing anchors, extra diagnostics and an empty or unassigned project group fail the gate. Runtime
+and integration controls share a serial lane. At most two local groups run at once; CI can use
+`-- --jobs=1`. Only the known NuGet migration startup collision receives one retry.
+
+`npm run test:typecheck-controls` checks the frozen observations from the original Node runner,
+including 200 diagnostic verdicts, argument handling, rendered source bodies and SDK setup
+guards. Additional controls cover subprocess bytes, retry bounds and group scheduling. These
+controls supplement the real negative builds; they do not replace them. The Node entry points
+remain compatibility launchers.
+
+The [launcher and compiler-control replay archive](./tool-launcher-control-qualification.zip)
+retains the original executables, frozen observations, migrated sources, all eleven real
+negative-build results and native Windows qualification. The uv 0.13.8 Windows runs cover 346 passing controls, including malformed paths and
+metadata access failures, plus strict analysis over 143 Python sources with UTF-8 mode disabled. The initial 306-control
+proof and the failed Windows Bash-selection and formatting captures remain in the archive.
+No timing improvement is claimed for these ports.

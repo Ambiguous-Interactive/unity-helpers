@@ -210,3 +210,30 @@ A favorable timing report does not establish source compatibility, allocation co
 startup cost or build size. Check the properties your application needs before adopting a change.
 See [enumeration](./enumeration-audit.md), [pooled resource ownership](./ownership-audit.md) and
 [random generation](./random-performance.md) for feature-specific choices and limits.
+
+## Transient Editor fixture cleanup
+
+Two animation fixtures now use synchronous cleanup for their transient Unity objects. Their
+175 existing cases and assertions remain. Neither fixture imports or creates assets; the
+animation-creation fixture's unsafe-name asset request is rejected before asset I/O. Tests that
+exercise import, asset deletion or deferred lifecycle behavior retain their existing lifecycle.
+
+Six fresh Unity 6000.6.7f1 Windows Editor Mono processes per fixture alternate A–B–B–A–A–B. The rule
+requires every paired fixture duration to improve, identical case identities, passing cases and
+suites, raw exit zero, both stream ends, stable sources and a loaded test module matching the
+captured DLL. All twelve accepted processes meet these conditions. A further fresh process passes all 175
+cases from the final sources after removing the measurement reporters.
+
+| Fixture                    | Cases | Baseline median | Candidate median | Paired ratios          |
+| -------------------------- | ----: | --------------: | ---------------: | ---------------------- |
+| Animation event view model |    25 |       89.411 ms |        49.863 ms | 0.5303, 0.5674, 0.5850 |
+| Animation creation         |   150 |      137.543 ms |       117.086 ms | 0.8637, 0.9680, 0.8080 |
+
+A separate seven-case singleton cleanup candidate failed the same rule: paired ratios were
+1.0040, 1.1101 and 0.7615. Its median fixture duration changed from 7.996 to 8.027 seconds, so
+the original fixture was restored. All six failed-candidate captures are preserved alongside
+the accepted campaigns in the [lifecycle replay archive](./editor-lifecycle-qualification.zip).
+
+These are local fixture measurements. They do not establish the cause of earlier CI delays or
+prove a whole-suite time below seven minutes. The archive retains all NUnit trees, receipts,
+variant sources, module hashes and acceptance rules, including the rejected experiment.
