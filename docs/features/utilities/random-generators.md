@@ -408,6 +408,31 @@ The float and double siblings also answer the low bound when either bound is `Na
 `NextFloat` and `NextDouble` overloads reject `NaN` bounds with `ArgumentException` before drawing.
 Infinite two-bound ranges remain supported; exhausted rejection sampling returns the documented biased fallback.
 
+#### Repeated weighted draws and continuous distributions
+
+Build a `WeightedIndexTable` once when a distribution stays fixed. `TryCreate` copies a
+`ReadOnlySpan<float>` or `ReadOnlySpan<double>` and rejects empty inputs, nonfinite weights, and inputs without a positive
+weight. Finite negative weights and zero disable their slots. The table owns its data, so changing
+the source later is safe. Construction allocates and the float overload uses pooled conversion storage; subsequent draws allocate no managed storage.
+
+`Next(random)` consumes one `NextDouble()` draw. It scans tables of up to 16 slots and uses binary
+search for larger tables. Weights are scaled before summation so even several `double.MaxValue`
+weights remain usable. A positive weight too small to affect the cumulative sum can have no
+representable interval. Use `NextByRace(random)` when that distinction matters: it compares
+logarithmic clocks and consumes one double per original slot, including disabled slots. Equal
+clocks choose the first positive slot. Both methods return `-1` for a null generator or a sample
+outside `[0, 1)`; race sampling stops on the first invalid sample.
+
+`NextBoolSparing(p)` consumes no draw for `p <= 0` or `p >= 1`. It returns false for NaN or a null
+generator. Values inside `(0, 1)` consume one double draw. These stream rules differ from
+`NextBool(float)`; changing between the APIs changes later seeded results.
+
+`NextExponential(rate)` uses `-log(1-u)/rate` for a single double `u` in `[0, 1)`.
+A nonpositive or nonfinite rate returns NaN without drawing. A zero sample produces zero; tiny
+rates can produce infinity. `NextGumbel()` uses `-log(-log(u))`, replacing a zero sample with
+`2^-53` to keep the result finite. Both return NaN for a null generator or an invalid sample.
+The formulas and draw counts are fixed; transcendental rounding can differ across platforms.
+
 #### Weighted span selection
 
 Weighted selection rejects `NaN` and infinite weights before drawing. Array and tuple overloads also
