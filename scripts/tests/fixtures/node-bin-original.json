@@ -1,0 +1,155 @@
+{
+  "source": "scripts/run-node-bin.js",
+  "commit": "587d3de6fde16c76a0ba256872cfe8c800bf1287",
+  "sha256": "1d9cec117407d103086846cc759b0d3a9d7b042e5133d2576d1ea72bcc150bf0",
+  "cases": [
+    {
+      "name": "missing-tool",
+      "args": [],
+      "manifest": null,
+      "body": null,
+      "input": "",
+      "code": 2,
+      "stdout": "",
+      "stderr": "Usage: node scripts/run-node-bin.js <prettier, cspell, markdownlint> [args...]\n"
+    },
+    {
+      "name": "unknown-tool",
+      "args": ["unknown"],
+      "manifest": null,
+      "body": null,
+      "input": "",
+      "code": 2,
+      "stdout": "",
+      "stderr": "Usage: node scripts/run-node-bin.js <prettier, cspell, markdownlint> [args...]\n"
+    },
+    {
+      "name": "missing-package",
+      "args": ["prettier"],
+      "manifest": null,
+      "body": null,
+      "input": "",
+      "code": 127,
+      "stdout": "",
+      "stderr": "prettier is not installed in this repository. Run `npm install` on the same host that runs git hooks.\n"
+    },
+    {
+      "name": "invalid-json",
+      "args": ["prettier"],
+      "manifest": "{",
+      "body": null,
+      "input": "",
+      "code": 1,
+      "stdout": "",
+      "stderr": "Failed to read $ROOT/node_modules/prettier/package.json: Expected property name or '}' in JSON at position 1 (line 1 column 2)\n"
+    },
+    {
+      "name": "no-bin",
+      "args": ["prettier"],
+      "manifest": {},
+      "body": null,
+      "input": "",
+      "code": 1,
+      "stdout": "",
+      "stderr": "prettier does not declare a 'prettier' bin entry.\n"
+    },
+    {
+      "name": "null-bin",
+      "args": ["prettier"],
+      "manifest": {
+        "bin": null
+      },
+      "body": null,
+      "input": "",
+      "code": 1,
+      "stdout": "",
+      "stderr": "prettier does not declare a 'prettier' bin entry.\n"
+    },
+    {
+      "name": "missing-entry",
+      "args": ["prettier"],
+      "manifest": {
+        "bin": {}
+      },
+      "body": null,
+      "input": "",
+      "code": 1,
+      "stdout": "",
+      "stderr": "prettier does not declare a 'prettier' bin entry.\n"
+    },
+    {
+      "name": "missing-file",
+      "args": ["prettier"],
+      "manifest": {
+        "bin": "absent.js"
+      },
+      "body": null,
+      "input": "",
+      "code": 127,
+      "stdout": "",
+      "stderr": "prettier bin entry does not exist at $ROOT/node_modules/prettier/absent.js. Run `npm install`.\n"
+    },
+    {
+      "name": "string-bin",
+      "args": ["prettier", "a b", "--", "quote\"x"],
+      "manifest": {
+        "bin": "cli.js"
+      },
+      "body": "echo",
+      "input": "",
+      "code": 0,
+      "stdout": "{\"args\":[\"a b\",\"--\",\"quote\\\"x\"],\"cwd\":\"$ROOT\"}\n",
+      "stderr": ""
+    },
+    {
+      "name": "map-bin",
+      "args": ["prettier", "--version"],
+      "manifest": {
+        "bin": {
+          "prettier": "cli.js"
+        }
+      },
+      "body": "echo",
+      "input": "",
+      "code": 0,
+      "stdout": "{\"args\":[\"--version\"],\"cwd\":\"$ROOT\"}\n",
+      "stderr": ""
+    },
+    {
+      "name": "check-install",
+      "args": ["prettier", "--check-install", "ignored"],
+      "manifest": {
+        "bin": "cli.js"
+      },
+      "body": "echo",
+      "input": "",
+      "code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "return-seven",
+      "args": ["prettier"],
+      "manifest": {
+        "bin": "cli.js"
+      },
+      "body": "seven",
+      "input": "",
+      "code": 7,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "stdin",
+      "args": ["prettier", "--stdin"],
+      "manifest": {
+        "bin": "cli.js"
+      },
+      "body": "stdin",
+      "input": "stdin bytes\n",
+      "code": 0,
+      "stdout": "stdin bytes\n",
+      "stderr": ""
+    }
+  ]
+}

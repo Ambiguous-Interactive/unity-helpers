@@ -39,12 +39,14 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
     /// </example>
     public sealed class SingleThreadedThreadPool : IDisposable
     {
+        private const int MaximumCallbackFailures = 64;
+
         private static readonly TimeSpan DefaultNoWorkWaitTime = TimeSpan.FromSeconds(1);
 
         private static readonly TimeSpan DrainPollInterval = TimeSpan.FromMilliseconds(1);
 
         /// <summary>
-        /// Exceptions thrown by work items, in the order they were caught.
+        /// Work failures when no callback is supplied, or the last 64 callback failures, in catch order.
         /// </summary>
         public ConcurrentQueue<Exception> Exceptions => _exceptions;
 
@@ -70,6 +72,7 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
         private readonly ConcurrentQueue<WorkItem> _work;
         private readonly SemaphoreSlim _workAvailable;
         private readonly ConcurrentQueue<Exception> _exceptions;
+        private readonly Action<Exception> _onException;
         private readonly TimeSpan _noWorkWaitTime;
         private readonly CancellationTokenSource _cancellationTokenSource;
 
@@ -89,7 +92,20 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
             bool runInBackground = true,
             TimeSpan? noWorkWaitTime = null
         )
+            : this(runInBackground, noWorkWaitTime, null) { }
+
+        /// <summary>Starts a worker that delivers failures to a callback instead of retaining them.</summary>
+        /// <param name="onException">Receives each work failure on the worker; null retains the original exception-queue behavior.</param>
+        /// <param name="runInBackground">Use a thread-pool worker instead of a dedicated long-running thread.</param>
+        /// <param name="noWorkWaitTime">The idle signal wait, with the same validation as the original constructor.</param>
+        /// <remarks>Do not wait synchronously for this worker from its callback. Callback failures retain both exceptions in a bounded queue and processing continues.</remarks>
+        public SingleThreadedThreadPool(
+            bool runInBackground,
+            TimeSpan? noWorkWaitTime,
+            Action<Exception> onException
+        )
         {
+            _onException = onException;
             _work = new ConcurrentQueue<WorkItem>();
             _exceptions = new ConcurrentQueue<Exception>();
             _workAvailable = new SemaphoreSlim(0);
@@ -141,7 +157,12 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
         /// <remarks>Acceptance does not prevent later disposal from discarding queued work; drain before disposal when execution is required.</remarks>
         public bool TryEnqueue(Action work)
         {
-            return work != null && EnqueueWork(WorkItem.FromAction(work));
+            if (work == null)
+            {
+                return false;
+            }
+            WorkItem item = WorkItem.FromAction(work);
+            return EnqueueWork(item);
         }
 
         /// <summary>
@@ -150,7 +171,12 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
         /// <remarks>Acceptance does not prevent later disposal from discarding queued work; drain before disposal when execution is required.</remarks>
         public bool TryEnqueue(Func<Task> work)
         {
-            return work != null && EnqueueWork(WorkItem.FromTask(work));
+            if (work == null)
+            {
+                return false;
+            }
+            WorkItem item = WorkItem.FromTask(work);
+            return EnqueueWork(item);
         }
 
         /// <summary>
@@ -159,7 +185,12 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
         /// <remarks>Acceptance does not prevent later disposal from discarding queued work; drain before disposal when execution is required.</remarks>
         public bool TryEnqueue(Func<ValueTask> work)
         {
-            return work != null && EnqueueWork(WorkItem.FromValueTask(work));
+            if (work == null)
+            {
+                return false;
+            }
+            WorkItem item = WorkItem.FromValueTask(work);
+            return EnqueueWork(item);
         }
 
         /// <summary>
@@ -349,6 +380,28 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
             catch { }
         }
 
+        private void ReportException(Exception error)
+        {
+            if (_onException == null)
+            {
+                _exceptions.Enqueue(error);
+                return;
+            }
+            try
+            {
+                _onException(error);
+            }
+            catch (Exception callbackError)
+            {
+                AggregateException failure = new AggregateException(error, callbackError);
+                _exceptions.Enqueue(failure);
+                while (MaximumCallbackFailures < _exceptions.Count)
+                {
+                    _exceptions.TryDequeue(out _);
+                }
+            }
+        }
+
         private async Task DoWorkAsync()
         {
             CancellationToken cancellationToken = _cancellationTokenSource.Token;
@@ -365,7 +418,7 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
                         }
                         catch (Exception e)
                         {
-                            _exceptions.Enqueue(e);
+                            ReportException(e);
                         }
                         finally
                         {

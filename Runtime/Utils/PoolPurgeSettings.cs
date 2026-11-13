@@ -1560,6 +1560,8 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </summary>
         public const float DefaultBudgetEnforcementIntervalSeconds = 30f;
 
+        internal const float BudgetNotYetEnforcedTime = float.NegativeInfinity;
+
         /// <summary>
         /// Gets or sets the global maximum number of pooled items across all pools.
         /// When the total exceeds this limit, <see cref="EnforceBudget"/> purges from least-recently-used pools.
@@ -1648,7 +1650,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         internal static readonly object RegistryLock = new object();
         internal static readonly List<WeakReference<IPurgeable>> RegisteredPools =
             new List<WeakReference<IPurgeable>>();
-        internal static float _lastBudgetEnforcementTime;
+        internal static float _lastBudgetEnforcementTime = BudgetNotYetEnforcedTime;
         private static readonly List<IPoolStatistics> BudgetEnforcementPools =
             new List<IPoolStatistics>();
 
@@ -1858,7 +1860,9 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// <summary>
         /// Tries to enforce the budget if the enforcement interval has elapsed.
         /// Called automatically during pool operations when <see cref="BudgetEnforcementEnabled"/> is true.
+        /// The first check after initialization or reset runs immediately; subsequent checks observe the interval.
         /// </summary>
+        /// <remarks>A named floating-point sentinel preserves atomic timestamp reads and claims without an additional lock.</remarks>
         /// <returns>The number of items purged, or 0 if enforcement was not needed or not due.</returns>
         public static int TryEnforceBudgetIfNeeded()
         {
@@ -1960,7 +1964,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             GlobalMaxPooledItems = DefaultGlobalMaxPooledItems;
             BudgetEnforcementEnabled = true;
             BudgetEnforcementIntervalSeconds = DefaultBudgetEnforcementIntervalSeconds;
-            Volatile.Write(ref _lastBudgetEnforcementTime, 0f);
+            Volatile.Write(ref _lastBudgetEnforcementTime, BudgetNotYetEnforcedTime);
         }
 
         internal static void RunMaintenance()

@@ -55,7 +55,7 @@ remains a separate acceptance criterion.
 
 ## Replay
 
-The [replay archive](./native-runtime-qualification.zip) contains the experiment and consumer controls.
+The [replay archive](https://raw.githubusercontent.com/Ambiguous-Interactive/unity-helpers/587d3de6fde16c76a0ba256872cfe8c800bf1287/docs/performance/native-runtime-qualification.zip) contains the experiment and consumer controls.
 
 The archive retains frozen C# inputs, source hashes, both instrumented fixture variants, final
 restore sources, controllers, complete NUnit trees and process receipts. Overlay the named arm's
@@ -100,5 +100,5 @@ tracks that unknown cause; later successful
 captures do not resolve it. Compiler failures during harness preparation are retained separately
 from timing observations.
 
-The [additional replay archive](./local-pool-runtime-qualification.zip) retains these attempts,
+The [additional replay archive](https://raw.githubusercontent.com/Ambiguous-Interactive/unity-helpers/587d3de6fde16c76a0ba256872cfe8c800bf1287/docs/performance/local-pool-runtime-qualification.zip) retains these attempts,
 exact instrumented inputs, final source snapshots, process receipts and complete NUnit trees.

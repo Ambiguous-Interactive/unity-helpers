@@ -38,7 +38,7 @@ passes its six cases, returns raw exit zero and reaches both output stream ends
 without a drain stop. Source hashes remain stable within each process. Loaded
 module identities and production assembly hashes distinguish the two variants.
 
-The [replay archive](./sprite-region-read.zip) contains the two implementations,
+The [replay archive](https://raw.githubusercontent.com/Ambiguous-Interactive/unity-helpers/587d3de6fde16c76a0ba256872cfe8c800bf1287/docs/performance/sprite-region-read.zip) contains the two implementations,
 timing and correctness sources, all six complete NUnit trees, all 21-round output
 sets, process receipts, credential-checked logs, a hash inventory, analysis and the
 native controller. Its README records the base checkout and replay steps. The final XML-doc addition changes no executable statements in the measured reader. New
@@ -83,7 +83,7 @@ sprite correctness cohort passes 190 cases. All six accepted timing processes pa
 return raw exit zero and reach both stream ends without a drain stop. Source and production
 assembly hashes stay stable per arm; loaded runtime module IDs are distinct between arms.
 
-The [native replay archive](./native-runtime-qualification.zip) retains the frozen source snapshot,
+The [native replay archive](https://raw.githubusercontent.com/Ambiguous-Interactive/unity-helpers/587d3de6fde16c76a0ba256872cfe8c800bf1287/docs/performance/native-runtime-qualification.zip) retains the frozen source snapshot,
 both reader variants, all six complete NUnit trees with every raw sample, loaded identities,
 process receipts, controllers and analysis. An earlier campaign overlapped a host benchmark and
 is excluded from timing acceptance; its raw captures remain retained separately.
@@ -107,5 +107,5 @@ passes 224 cases, with zero failures and 72 existing skips. It exits zero with b
 complete and stable source hashes. This establishes scoped storage and conversion behavior,
 not new timing or allocation-byte measurements for these formats.
 
-The [additional replay archive](./local-pool-runtime-qualification.zip) retains the new format
+The [additional replay archive](https://raw.githubusercontent.com/Ambiguous-Interactive/unity-helpers/587d3de6fde16c76a0ba256872cfe8c800bf1287/docs/performance/local-pool-runtime-qualification.zip) retains the new format
 correctness results, the initial Alpha8 mismatch and the original reader source.

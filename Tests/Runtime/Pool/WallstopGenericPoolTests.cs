@@ -1801,6 +1801,31 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
 #if !SINGLE_THREADED
         [Test]
+        public void ProducerCanQueryPoolFromWorker()
+        {
+            WallstopGenericPool<TestPoolItem> pool = null;
+            pool = new WallstopGenericPool<TestPoolItem>(
+                () =>
+                {
+                    Task<int> read = Task.Run(() => pool.Count);
+                    Assert.That(read.Wait(TimeSpan.FromSeconds(5)), Is.True);
+                    Assert.That(read.Result, Is.Zero);
+                    return new TestPoolItem();
+                },
+                options: new PoolOptions<TestPoolItem>
+                {
+                    Triggers = PurgeTrigger.Explicit,
+                    TimeProvider = TestTimeProvider,
+                }
+            );
+            using (pool)
+            using (pool.Get())
+            {
+                Assert.That(pool.CurrentlyRented, Is.EqualTo(1));
+            }
+        }
+
+        [Test]
         public void AcquisitionCallbackCanQueryPoolFromWorker()
         {
             bool query = false;

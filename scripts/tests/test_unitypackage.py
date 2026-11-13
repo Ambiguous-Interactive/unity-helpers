@@ -17,9 +17,11 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "unity"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "python~"))
 from check import verify_registry
+from check_runner import resolve_bash
 from create_unitypackage import (
     ASSET_ROOT,
     Asset,
@@ -396,8 +398,7 @@ def test_runtime_metadata_avoids_dev_installs_and_retains_warm_tools(
         }
     )
     if entrypoint == "shell":
-        bash = shutil.which("bash")
-        assert bash is not None
+        bash = resolve_bash()
         command = [bash, str(REPO_ROOT / "scripts/generate-meta.sh")]
     else:
         command = [*npm_command(), "run", "meta:generate", "--"]
@@ -515,5 +516,23 @@ def test_python_bootstrap_uses_native_powershell() -> None:
         "pip",
         "install",
         "--disable-pip-version-check",
-        "uv==0.13.7",
+        "uv==0.13.8",
     ]
+
+
+def test_repository_does_not_track_zip_archives() -> None:
+    git = shutil.which("git")
+    assert git is not None
+    assert (REPO_ROOT / "package.json").is_file()
+    result = subprocess.run(
+        [git, "ls-files", "--cached", "-z"],
+        cwd=REPO_ROOT,
+        check=False,
+        capture_output=True,
+        timeout=COMMAND_TIMEOUT_SECONDS,
+    )
+    assert result.returncode == 0, result.stderr
+    archives = [name for name in result.stdout.split(b"\0") if name.lower().endswith(b".zip")]
+    assert not archives, (
+        "Keep raw archives outside the tracked tree; use readable qualification records."
+    )

@@ -243,11 +243,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             Assert.AreEqual(20, GlobalPoolRegistry.CurrentTotalPooledItems);
         }
 
-        [Test]
-        public void TryEnforceBudgetIfNeededEnforcesInterval()
+        [TestCase(10f)]
+        [TestCase(float.MaxValue)]
+        public void TryEnforceBudgetIfNeededEnforcesInterval(float intervalSeconds)
         {
             GlobalPoolRegistry.GlobalMaxPooledItems = 10;
-            GlobalPoolRegistry.BudgetEnforcementIntervalSeconds = 10f;
+            GlobalPoolRegistry.BudgetEnforcementIntervalSeconds = intervalSeconds;
             using WallstopGenericPool<TestPoolItem> pool = CreateTestPool(preWarmCount: 20);
 
             int purged1 = GlobalPoolRegistry.TryEnforceBudgetIfNeeded();
@@ -719,7 +720,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             GlobalPoolRegistry.GlobalMaxPooledItems = 2;
             GlobalPoolRegistry.BudgetEnforcementEnabled = enabled;
             using WallstopGenericPool<TestPoolItem> pool = CreateTestPool(preWarmCount: 5);
-            GlobalPoolRegistry._lastBudgetEnforcementTime = float.MinValue;
+            GlobalPoolRegistry._lastBudgetEnforcementTime =
+                GlobalPoolRegistry.BudgetNotYetEnforcedTime;
             using (pool.Get()) { }
             Assert.AreEqual(expected, pool.Count);
         }

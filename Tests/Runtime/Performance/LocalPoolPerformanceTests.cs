@@ -65,6 +65,47 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             return sum;
         }
 
+        private static long RunSharedList(int calls)
+        {
+            long sum = 0;
+            for (int index = 0; index < calls; ++index)
+            {
+                using PooledResource<List<int>> lease = Buffers<int>.List.Get(out List<int> items);
+                items.Add(index);
+                sum += items.Count;
+            }
+            return sum;
+        }
+
+        private static long RunSharedHashSet(int calls)
+        {
+            long sum = 0;
+            for (int index = 0; index < calls; ++index)
+            {
+                using PooledResource<HashSet<int>> lease = Buffers<int>.HashSet.Get(
+                    out HashSet<int> items
+                );
+                items.Add(index);
+                sum += items.Count;
+            }
+            return sum;
+        }
+
+        private static long RunSharedDictionary(int calls)
+        {
+            long sum = 0;
+            for (int index = 0; index < calls; ++index)
+            {
+                using PooledResource<Dictionary<int, int>> lease = DictionaryBuffer<
+                    int,
+                    int
+                >.Dictionary.Get(out Dictionary<int, int> items);
+                items.Add(index, index);
+                sum += items.Count;
+            }
+            return sum;
+        }
+
         private static double Measure(Func<int, long> operation, int calls)
         {
             long start = Stopwatch.GetTimestamp();
@@ -103,8 +144,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 count => RunLocal(local, count),
                 count => RunLocalLease(localLease, count),
                 count => RunSharedLease(shared, count),
+                RunSharedList,
+                RunSharedHashSet,
+                RunSharedDictionary,
             };
-            string[] names = { "Stack", "Local", "LocalLease", "SharedLease" };
+            string[] names =
+            {
+                "Stack",
+                "Local",
+                "LocalLease",
+                "SharedLease",
+                "SharedList",
+                "SharedHashSet",
+                "SharedDictionary",
+            };
             foreach (Func<int, long> operation in operations)
             {
                 for (int warm = 0; warm < WarmCalls; ++warm)

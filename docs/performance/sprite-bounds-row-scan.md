@@ -30,6 +30,6 @@ streams, and retained matching source and loaded-method identities. The existing
 bounds fixture plus 72 new pixel-oracle cases passed all 116 cases. No IL2CPP,
 other editor version, arbitrary texture size or universal timing margin is claimed.
 
-[Replay sources, raw rounds and receipts](./sprite-bounds-row-scan.zip) retain every
+[Replay sources, raw rounds and receipts](https://raw.githubusercontent.com/Ambiguous-Interactive/unity-helpers/587d3de6fde16c76a0ba256872cfe8c800bf1287/docs/performance/sprite-bounds-row-scan.zip) retain every
 sample and identify both source variants. Earlier runs whose NUnit progress output
 was discarded remain excluded from the timing result.

@@ -23,7 +23,7 @@ measure the selected fixtures, including their setup and cleanup, and exclude
 editor startup. They establish no whole-suite speed claim. Shared-machine
 variation is visible in the third baseline process.
 
-The [replay archive](./singleton-policy-fixtures.zip) contains exact source
+The [replay archive](https://raw.githubusercontent.com/Ambiguous-Interactive/unity-helpers/587d3de6fde16c76a0ba256872cfe8c800bf1287/docs/performance/singleton-policy-fixtures.zip) contains exact source
 variants, all six complete NUnit trees, process receipts, credential-checked logs,
 the native controller and a SHA-256 inventory. The controller rejects changed
 sources, missing cases and unhealthy process completion. Its README gives replay

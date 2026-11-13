@@ -2379,7 +2379,8 @@ namespace WallstopStudios.UnityHelpers.Utils
                 rollingWindow,
                 hysteresis,
                 spikeThreshold,
-                bufferMult
+                bufferMult,
+                _lock
             );
 
             if (useIntelligent && !(options?.IdleTimeoutSeconds).HasValue)
@@ -2496,12 +2497,11 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             Interlocked.Increment(ref _rentCount);
             Volatile.Write(ref _lastAccessTime, currentTime);
-            _usageTracker.RecordRent(currentTime);
 
             T rented;
             try
             {
-                rented = AcquireValue();
+                rented = AcquireValue(currentTime);
             }
             catch
             {
@@ -2510,21 +2510,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
             try
             {
-                int totalInCirculation = CurrentPooledCount + _usageTracker.CurrentlyRented;
-                int peak = _peakSize;
-                while (peak < totalInCirculation)
-                {
-                    int original = Interlocked.CompareExchange(
-                        ref _peakSize,
-                        totalInCirculation,
-                        peak
-                    );
-                    if (original == peak)
-                    {
-                        break;
-                    }
-                    peak = original;
-                }
                 _onGet?.Invoke(rented);
             }
             catch
@@ -2873,25 +2858,12 @@ namespace WallstopStudios.UnityHelpers.Utils
                 disposeReturnedValue = Volatile.Read(ref _disposed) != 0;
                 if (!disposeReturnedValue)
                 {
-                    _usageTracker.RecordReturn(currentTime);
+                    _usageTracker.RecordReturnCore(currentTime);
                     _pool.Add(new PooledEntry { Value = value, ReturnTime = currentTime });
                     Interlocked.Increment(ref _returnCount);
 
                     int currentCount = _pool.Count;
-                    int peak = _peakSize;
-                    while (peak < currentCount)
-                    {
-                        int original = Interlocked.CompareExchange(
-                            ref _peakSize,
-                            currentCount,
-                            peak
-                        );
-                        if (original == peak)
-                        {
-                            break;
-                        }
-                        peak = original;
-                    }
+                    UpdatePeakSize(currentCount);
                 }
             }
 
@@ -3232,20 +3204,40 @@ namespace WallstopStudios.UnityHelpers.Utils
             catch { }
         }
 
-        private T AcquireValue()
+        private T AcquireValue(float currentTime)
         {
             lock (_lock)
             {
+                int currentlyRented = _usageTracker.RecordRentCore(currentTime);
                 int count = _pool.Count;
                 if (0 < count)
                 {
                     int index = count - 1;
                     T value = _pool[index].Value;
                     _pool.RemoveAt(index);
+                    int totalInCirculation = index + currentlyRented;
+                    UpdatePeakSize(totalInCirculation);
                     return value;
                 }
             }
-            return _producer();
+            T produced = _producer();
+            int producedTotalInCirculation = CurrentPooledCount + _usageTracker.CurrentlyRented;
+            UpdatePeakSize(producedTotalInCirculation);
+            return produced;
+        }
+
+        private void UpdatePeakSize(int totalInCirculation)
+        {
+            int peak = _peakSize;
+            while (peak < totalInCirculation)
+            {
+                int original = Interlocked.CompareExchange(ref _peakSize, totalInCirculation, peak);
+                if (original == peak)
+                {
+                    break;
+                }
+                peak = original;
+            }
         }
 
         private void InvokeOnDispose(T value)

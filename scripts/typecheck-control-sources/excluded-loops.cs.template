@@ -1,0 +1,38 @@
+namespace WallstopStudios.UnityHelpers.CheckControls
+{
+    public struct ControlExcludedMissingEquality { }
+
+    internal static class ControlExcludedCountingLoop
+    {
+        internal static readonly System.Type Anchor = typeof(__CHECK_ANCHOR__);
+        internal static void FreshPool()
+        {
+            using var lease = global::WallstopStudios.UnityHelpers.Utils.Buffers<int>.List.Get(out var items);
+            items.Clear();
+        }
+
+        internal static int Snapshot(System.Collections.Generic.ICollection<int> values)
+        {
+            if (values.Count > 0)
+            {
+                return values.Count;
+            }
+            return 0;
+        }
+
+        internal static bool Logic(bool left, bool right)
+        {
+            return left | right;
+        }
+
+        internal static int Sum(int[] values)
+        {
+            int total = 0;
+            for (int index = 0; index < values.Length; index++)
+            {
+                total += values[index];
+            }
+            return total;
+        }
+    }
+}

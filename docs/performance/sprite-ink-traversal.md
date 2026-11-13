@@ -33,7 +33,7 @@ match across the three baseline runs and across the three candidate runs, and di
 variants. The runner records the production assembly hash after each process. These observations
 identify the measured variants; they are not a full compiler or player qualification.
 
-The [replay archive](./sprite-ink-traversal.zip) retains both implementation variants, both test
+The [replay archive](https://raw.githubusercontent.com/Ambiguous-Interactive/unity-helpers/587d3de6fde16c76a0ba256872cfe8c800bf1287/docs/performance/sprite-ink-traversal.zip) retains both implementation variants, both test
 fixtures, the native controller, complete NUnit results, raw round lines, source hashes, assembly
 identities and process receipts. Run the timing fixture explicitly in an isolated checkout; its
 `Performance` category keeps the repeated measurements out of normal test iteration.

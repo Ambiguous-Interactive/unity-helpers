@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `LatestWriteFile` for coalesced saves and synchronous final flushes, plus optional thread-pool failure callbacks ([#1181](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1181)).
 - Add single-owner managed pools with explicit returns and fixed-length per-thread array pools with clearing on return ([#1173](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1173)).
 - Add a test-only support assembly with allocation controls, synchronous Unity object tracking and managed resource cleanup for consumer test fixtures ([#1180](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1180)).
 - Add region-only reads for readable RGB24, ARGB32, BGRA32 and Alpha8 sprites to reduce temporary pixel storage ([#1113](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1113)).
@@ -43,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Reduce shared buffer rental and return synchronization while retaining usage tracking, purge policies and callback behavior ([#1173](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1173)).
 - Read only the selected rectangle when querying readable RGBA32 sprite masks, art bounds and ink regions ([#1113](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1113)).
 - Compute integer floor logarithms with portable branchless lookups, preserving zero and signed bit-pattern results ([#1170](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1170)).
 - Update bundled JSON and immutable collections to 10.0.15 while retaining Unity assembly constraints ([#1052](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1052)).
@@ -62,6 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix the first global pool-budget check being delayed by the enforcement interval after startup or reset.
 - Apply the Unity 6000.5 in-process import workaround to configure, build, and test launches.
 - Refuse ambiguous comparison rewrites and overlapping edits in the source checker ([#859](https://github.com/Ambiguous-Interactive/unity-helpers/issues/859)).
 - Fix safe attributed-field lookup and field predicates missing private and static base fields ([#1184](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1184)).
