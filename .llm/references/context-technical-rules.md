@@ -58,6 +58,10 @@
 - **Never compare against a magic sentinel; test for the valid range.** `index != -1` becomes
   `0 <= index`, so the comparison says what it means and refuses values the sentinel does not
   cover. Swept to zero across `Runtime/` and `Editor/` (PR #551).
+- **Name semantic numeric sentinels and policy limits.** Reuse the same constant for initialization,
+  reset and tests. Prefer nullable state when it fits the synchronization contract; preserve supported
+  atomic operations when nullable state would require extra locking. Measure competing safe designs
+  before making a performance claim. Sweep the modified class and related call sites.
 - **An auto-property's data is serialized under `<Name>k__BackingField`, not `Name`.** A lookup
   resolving a member the author NAMED must try the source name first and
   `SerializedMemberNames.BackingFieldFor(name)` second, or it falls through to the live C# member
