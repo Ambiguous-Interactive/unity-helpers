@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
 {
+    using System;
     using System.Collections.Generic;
     using NUnit.Framework;
     using UnityEditor;
@@ -19,11 +20,95 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         }
 
         [Test]
+        public void DisposablesRunOnceInReverseOrderBeforeObjectsAreDestroyed()
+        {
+            Texture2D texture = Track(new Texture2D(2, 2));
+            List<int> order = new();
+            SynchronousScopeDisposable first = TrackDisposable(
+                new SynchronousScopeDisposable(() =>
+                {
+                    Assert.IsTrue(texture != null);
+                    order.Add(1);
+                })
+            );
+            SynchronousScopeDisposable second = TrackDisposable(
+                new SynchronousScopeDisposable(() =>
+                {
+                    Assert.IsTrue(texture != null);
+                    order.Add(2);
+                })
+            );
+            Assert.AreNotSame(first, second);
+            Assert.IsTrue(first.Equals(second));
+            Assert.AreSame(first, TrackDisposable(first));
+            Assert.IsTrue(TrackDisposable<SynchronousScopeDisposable>(null) == null);
+            EndObjectTrackingScope();
+            CollectionAssert.AreEqual(new[] { 2, 1 }, order);
+            Assert.That(first.DisposeCount, Is.EqualTo(1));
+            Assert.That(second.DisposeCount, Is.EqualTo(1));
+            Assert.IsTrue(texture == null);
+            EndObjectTrackingScope();
+            Assert.That(first.DisposeCount, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void DisposalFailuresStillCleanEveryResourceAndAllowANewScope()
+        {
+            Texture2D texture = Track(new Texture2D(2, 2));
+            SynchronousScopeDisposable first = TrackDisposable(new SynchronousScopeDisposable());
+            SynchronousScopeDisposable failed = TrackDisposable(
+                new SynchronousScopeDisposable(static () =>
+                    throw new InvalidOperationException(
+                        nameof(DisposalFailuresStillCleanEveryResourceAndAllowANewScope)
+                    )
+                )
+            );
+            SynchronousScopeDisposable last = TrackDisposable(new SynchronousScopeDisposable());
+            AssertionException failure = Assert.Throws<AssertionException>(EndObjectTrackingScope);
+            StringAssert.Contains(
+                nameof(DisposalFailuresStillCleanEveryResourceAndAllowANewScope),
+                failure.Message
+            );
+            Assert.That(first.DisposeCount, Is.EqualTo(1));
+            Assert.That(failed.DisposeCount, Is.EqualTo(1));
+            Assert.That(last.DisposeCount, Is.EqualTo(1));
+            Assert.IsTrue(texture == null);
+            Assert.DoesNotThrow(EndObjectTrackingScope);
+            BeginObjectTrackingScope();
+            Texture2D next = Track(new Texture2D(2, 2));
+            EndObjectTrackingScope();
+            Assert.IsTrue(next == null);
+        }
+
+        [Test]
+        public void DisposalCannotReenterCleanupOrRegisterAnUnownedResource()
+        {
+            SynchronousScopeDisposable unowned = new();
+            int callbacks = 0;
+            SynchronousScopeDisposable resource = TrackDisposable(
+                new SynchronousScopeDisposable(() =>
+                {
+                    if (1 < ++callbacks)
+                    {
+                        return;
+                    }
+                    Assert.DoesNotThrow(EndObjectTrackingScope);
+                    Assert.Throws<AssertionException>(() => TrackDisposable(unowned));
+                    Assert.Throws<AssertionException>(() => Track<GameObject>(null));
+                })
+            );
+            EndObjectTrackingScope();
+            Assert.That(resource.DisposeCount, Is.EqualTo(1));
+            Assert.That(unowned.DisposeCount, Is.Zero);
+            Assert.Throws<AssertionException>(() => TrackDisposable(unowned));
+        }
+
+        [Test]
         public void CleanupDestroysAllTransientObjectKindsAndChildren()
         {
             SynchronousEditorTestAsset asset = CreateScriptableObject<SynchronousEditorTestAsset>();
             Texture2D texture = Track(new Texture2D(2, 2));
-            GameObject parent = Track(new GameObject(nameof(parent)));
+            GameObject parent = NewGameObject(nameof(parent));
             GameObject child = Track(new GameObject(nameof(child)));
             child.transform.SetParent(parent.transform);
             EndObjectTrackingScope();
@@ -56,6 +141,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         {
             EndObjectTrackingScope();
             Assert.Throws<AssertionException>(() => Track<GameObject>(null));
+            Assert.Throws<AssertionException>(() => NewGameObject("Refused"));
             BeginObjectTrackingScope();
             Texture2D texture = Track(new Texture2D(2, 2));
             EndObjectTrackingScope();

@@ -14,7 +14,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
 
     [TestFixture]
     [Category("Fast")]
-    public sealed class OdinMigrationLiveDictionaryTests : CommonTestBase
+    public sealed class OdinMigrationLiveDictionaryTests : SynchronousEditorTestBase
     {
         private static OdinMigrationCompiledField FindField(
             OdinMigrationCompiledBinding binding,

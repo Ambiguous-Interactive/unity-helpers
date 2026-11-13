@@ -279,9 +279,11 @@ A failed move also stops the run without clearing the original project.
 EditMode runs compiler-isolation fixtures in a fresh editor process before the broader suite.
 These cases carry `CompilationIsolation` and must all pass without skips. Their results and log
 remain under the mode's `compilation/` artifact directory.
-On Unity 6000.5, this phase passes `-refreshImportMode InProcess` to avoid the
-import-worker teardown heap corruption recorded as UUM-135237. The same assets and
-all ten compiler cases still execute. Unity fixed this shutdown defect in 6000.6.0f1.
+On Unity 6000.5, observed Editor launches pass `-refreshImportMode InProcess` to avoid
+import-worker failures during assembly reload and the teardown heap corruption recorded as
+UUM-135237. This includes configure, player builds, migration isolation, and regular test phases.
+The same assets and all ten compiler cases still execute. Crash and result gates remain enabled.
+Unity fixed the shutdown defect in 6000.6.0f1.
 [Unity release notes](https://unity.com/releases/editor/whats-new/6000.6.0f1)
 
 `OdinMigrationDictionaryCompilationTests` lives in the dedicated

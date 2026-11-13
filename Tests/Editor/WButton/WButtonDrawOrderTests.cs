@@ -25,7 +25,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
     [TestFixture]
     [NUnit.Framework.Category("Slow")]
     [NUnit.Framework.Category("Integration")]
-    public sealed class WButtonDrawOrderTests : CommonTestBase
+    public sealed class WButtonDrawOrderTests : SynchronousEditorTestBase
     {
         [Test]
         public void MetadataSortedByDrawOrderAscending()

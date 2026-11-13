@@ -136,3 +136,31 @@ consumer source inputs, calibrated raw rounds, complete row sets, receipts, sour
 environment records, analysis and controllers. It preserves the rejected hint and a separate
 unchanged-main replay. Earlier overlapping exploratory captures are excluded from the retention
 decision and remain retained locally.
+
+## Rejected first-probe split
+
+A separate candidate keeps the first `TryGet` probe inline and moves collision continuation to
+a non-inlined helper. Three fresh processes per runtime compare it with unchanged main and
+`Dictionary`, retaining all 195 cells per process. Each workload warms 64 calls, calibrates to
+at least 20 ms and retains 21 rotated rounds. Raw exits are zero, both streams reach EOF, and
+source and compiled payload hashes remain stable.
+
+The preset requirement was a hit/miss geometric mean of at most 0.95 on each runtime and no
+cell above 1.10. Ratios use medians of the three process medians, candidate divided by main.
+
+| Runtime | Hit/miss geometric mean | Cells above 1.10 | Decision |
+| ------- | ----------------------: | ---------------: | -------- |
+| .NET 10 |                  1.2123 |               23 | Reject   |
+| Mono    |                  0.8370 |                1 | Reject   |
+
+The .NET regression is clear: dense eight-key misses cost 1.585 times main, with paired ratios
+1.589, 1.582 and 1.565. Mono improves lookup cost overall, but its sparse 1024-entry iteration
+cell also exceeds the limit: aggregate 1.171, with paired ratios 1.171, 1.012 and 1.041. That
+iteration observation varies substantially and does not establish a repeatable iteration defect.
+The .NET lookup regressions alone reject this candidate. Production `IntMap` remains unchanged.
+
+The [rejected-candidate archive](./intmap-first-probe-rejected.zip) contains exact sources,
+binaries, all calibrated raw rounds, complete results, process receipts, source/payload seals
+and the analysis. This compares with current main, not the original 3.7.1 acceptance baseline;
+[#1131](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1131) remains open under
+the original consumer budgets above.

@@ -15,6 +15,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$UnityVersion = '6000.6.0f1'
 . (Join-Path $PSScriptRoot '../unity/lib/credential-redaction.ps1')
 . (Join-Path $PSScriptRoot '../unity/lib/native-evidence.ps1')
 
@@ -45,6 +46,7 @@ foreach ($name in @(
         'Get-UnityNativeReportSummary',
         'Write-UnityExecutionObservation',
         'New-UnityNativeEvidenceCapture',
+        'New-UnityImportArguments',
         'Invoke-UnityObservedEditor',
         'Invoke-UnityEditor',
         'Get-EditorTestCompletionGraceSeconds',

@@ -87,3 +87,25 @@ The [native replay archive](./native-runtime-qualification.zip) retains the froz
 both reader variants, all six complete NUnit trees with every raw sample, loaded identities,
 process receipts, controllers and analysis. An earlier campaign overlapped a host benchmark and
 is excluded from timing acceptance; its raw captures remain retained separately.
+
+## Other byte formats
+
+Readable ARGB32, BGRA32 and Alpha8 subregions also keep only their selected base-mip pixels.
+Four offsets and sizes per format exercise corners, nonzero offsets and mipmapped inputs.
+All twelve storage controls fail against the earlier full-texture path. The updated reader
+matches Unity's `GetPixels32()` conversion and owns a region-sized copy; changing it cannot
+change the source texture. Full-texture and other-format conversion paths keep their behavior.
+
+ARGB32 and BGRA32 bytes follow Unity's documented
+[ARGB32](https://docs.unity3d.com/2021.3/Documentation/ScriptReference/TextureFormat.ARGB32.html)
+and [BGRA32](https://docs.unity3d.com/2021.3/Documentation/ScriptReference/TextureFormat.BGRA32.html)
+channel order. Alpha8 reads preserve the CPU conversion's black RGB channels and stored alpha;
+this is checked against `GetPixels32()`, independently of shader sampling conventions.
+The first candidate used white RGB and failed all five Alpha8 conversion controls. Correcting
+the conversion preserves those assertions. The final local Unity 6000.6.7f1 PlayMode cohort
+passes 224 cases, with zero failures and 72 existing skips. It exits zero with both streams
+complete and stable source hashes. This establishes scoped storage and conversion behavior,
+not new timing or allocation-byte measurements for these formats.
+
+The [additional replay archive](./local-pool-runtime-qualification.zip) retains the new format
+correctness results, the initial Alpha8 mismatch and the original reader source.

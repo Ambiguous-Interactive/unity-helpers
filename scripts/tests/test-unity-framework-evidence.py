@@ -144,12 +144,15 @@ class FrameworkEvidenceTests(unittest.TestCase):
             Set-StrictMode -Version Latest
             $ErrorActionPreference = 'Stop'
             $script:ArtifactsPath = $ArtifactsPath
+            $UnityVersion = '6000.6.0f1'
             . (Join-Path $Root 'scripts/unity/lib/test-framework-evidence.ps1')
             $tokens = $null
             $errors = $null
             $ast = [Management.Automation.Language.Parser]::ParseFile((Join-Path $Root 'scripts/unity/run-ci-tests.ps1'), [ref]$tokens, [ref]$errors)
-            $definition = $ast.Find({ param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Invoke-UnityObservedEditor' }, $true)
-            Invoke-Expression $definition.Extent.Text
+            foreach ($name in @('New-UnityImportArguments', 'Invoke-UnityObservedEditor')) {
+                $definition = $ast.Find({ param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name }, $true)
+                Invoke-Expression $definition.Extent.Text
+            }
             function Get-UnityNativeEvidence { param($Capture, $LogPath) return @{ State = 'HOST-SHIM-NOT-UNITY' } }
             function Write-UnityExecutionObservation {
                 param($LogPath, $ProcessObservation, $Label)

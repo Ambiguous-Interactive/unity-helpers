@@ -1256,15 +1256,22 @@ function New-UnityEditorTestPhases {
     }
 }
 
+function New-UnityImportArguments {
+    param([string[]]$Arguments, [string]$UnityVersion)
+
+    # CI observed 6000.5 worker crashes during assembly reload; UUM-135237 also
+    # affects worker teardown during Editor shutdown.
+    # Keep importing the same assets, without starting the failing worker process.
+    if ($UnityVersion -match '^6000\.5\.' -and [Array]::IndexOf($Arguments, '-refreshImportMode') -lt 0) {
+        return @($Arguments) + @('-refreshImportMode', 'InProcess')
+    }
+    return $Arguments
+}
+
 function New-UnityEditorPhaseArguments {
     param([string[]]$Arguments, [string]$TestCategory, [string]$TestFilter, [string]$UnityVersion)
 
-    $phaseArguments = @($Arguments)
-    # UUM-135237 corrupts the heap when 6000.5 tears down an import worker
-    # after the compilation-isolation fixture. Import the same assets in-process.
-    if ($UnityVersion -match '^6000\.5\.' -and $TestCategory -ceq 'CompilationIsolation') {
-        $phaseArguments += @('-refreshImportMode', 'InProcess')
-    }
+    $phaseArguments = @(New-UnityImportArguments -Arguments $Arguments -UnityVersion $UnityVersion)
     if (-not [string]::IsNullOrWhiteSpace($TestCategory)) {
         $phaseArguments += @('-testCategory', $TestCategory)
     }
@@ -4058,6 +4065,7 @@ function Invoke-UnityObservedEditor {
         [hashtable]$ProcessObservation
     )
 
+    $Arguments = @(New-UnityImportArguments -Arguments $Arguments -UnityVersion $UnityVersion)
     if ($null -eq $ProcessObservation) { $ProcessObservation = @{} }
     $frameworkEvidence = $null
     $projectArgument = [Array]::IndexOf($Arguments, '-projectPath')

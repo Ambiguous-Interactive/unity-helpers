@@ -26,7 +26,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// Alpha zero is always transparent; other pixels are opaque at or above the threshold.
         /// Editor PNG masks honor the texture importer's alpha source.
         /// Separate alpha textures require original PNG pixels in the Editor.
-        /// Readable RGBA32 and RGB24 subregions copy only their selected base-mip pixels.
+        /// Readable RGBA32, RGB24, ARGB32, BGRA32 and Alpha8 subregions copy only their selected base-mip pixels.
         /// </remarks>
         public static bool TryRead(
             Sprite sprite,
@@ -317,6 +317,67 @@ namespace WallstopStudios.UnityHelpers.Utils
                             raw[sourceIndex + 1],
                             raw[sourceIndex + 2],
                             byte.MaxValue
+                        );
+                    }
+                }
+                textureWidth = width;
+                sourceRegion = new RectInt(0, 0, width, height);
+            }
+            else if (
+                (long)width * height < (long)sourceTextureWidth * sourceTextureHeight
+                && (
+                    texture.format == TextureFormat.ARGB32 || texture.format == TextureFormat.BGRA32
+                )
+            )
+            {
+                NativeArray<Color32> raw = texture.GetPixelData<Color32>(0);
+                if ((long)sourceTextureWidth * sourceTextureHeight != raw.Length)
+                {
+                    error = "The texture pixels do not match its dimensions.";
+                    region = default;
+                    return false;
+                }
+                bool alphaFirst = texture.format == TextureFormat.ARGB32;
+                pixels = new Color32[width * height];
+                for (int row = 0; row < height; ++row)
+                {
+                    int sourceOffset = (yStart + row) * sourceTextureWidth + xStart;
+                    int destinationOffset = row * width;
+                    for (int column = 0; column < width; ++column)
+                    {
+                        Color32 encoded = raw[sourceOffset + column];
+                        pixels[destinationOffset + column] = alphaFirst
+                            ? new Color32(encoded.g, encoded.b, encoded.a, encoded.r)
+                            : new Color32(encoded.b, encoded.g, encoded.r, encoded.a);
+                    }
+                }
+                textureWidth = width;
+                sourceRegion = new RectInt(0, 0, width, height);
+            }
+            else if (
+                (long)width * height < (long)sourceTextureWidth * sourceTextureHeight
+                && texture.format == TextureFormat.Alpha8
+            )
+            {
+                NativeArray<byte> raw = texture.GetPixelData<byte>(0);
+                if ((long)sourceTextureWidth * sourceTextureHeight != raw.Length)
+                {
+                    error = "The texture pixels do not match its dimensions.";
+                    region = default;
+                    return false;
+                }
+                pixels = new Color32[width * height];
+                for (int row = 0; row < height; ++row)
+                {
+                    int sourceOffset = (yStart + row) * sourceTextureWidth + xStart;
+                    int destinationOffset = row * width;
+                    for (int column = 0; column < width; ++column)
+                    {
+                        pixels[destinationOffset + column] = new Color32(
+                            0,
+                            0,
+                            0,
+                            raw[sourceOffset + column]
                         );
                     }
                 }

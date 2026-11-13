@@ -98,6 +98,28 @@ results, process receipts, source hashes and the complete case inventory.
 
 ### Typed Python scripts
 
+`npm run lint:comparison-direction` and its `:fix` variant run the typed Python comparison
+checker. The Node entry points remain compatibility launchers. The port retains token handling
+for generics, shifts, patterns, strings and interpolation holes, along with the existing cautious
+rewrite rules. `npm run test:lint-comparison-direction` replays 56 frozen original findings and
+rewrites and exercises CLI failures, source ownership, build-output exclusions and line endings.
+The original 41 controls passed before capture. Reports retain UTF-16 columns and physical line
+numbers; rewrites preserve CRLF bytes. These observations establish parity for the retained corpus,
+not a complete C# parser or permission to reorder arbitrary property getters.
+
+The original observations include unsafe rewrites. Current controls retain that historical data
+but require manual changes for generic or shift operands and comparisons without a literal
+constant on either side. A literal boundary avoids reordering two potentially dependent reads
+or effects. Overlapping edits are refused, including edits surrounding interpolation holes;
+disjoint edits can still apply, with a failing exit status for unresolved comparisons. The replay
+archive captures the initial port at `7390d47d`, before these safety corrections.
+
+A local full-tree comparison over the same 2915 files used three alternating pairs. Median
+process times were 7.001 seconds for the original Node checker and 10.014 seconds for Python.
+The port is slower in all three pairs; this change establishes typed tooling and retained behavior,
+not a startup-speed improvement. The [replay data](../performance/local-pool-runtime-qualification.zip)
+retains the commands, source hashes, coverage validation and all six observations.
+
 Documentation links run through `scripts/lint_doc_links.py` in locked uv. The `doc-links`
 and `doc-links-test` Repo Lint subjects and both npm link commands use Python directly. The Node
 and PowerShell commands remain compatibility entry points. `--mode Targets` checks local file and directory targets;
@@ -801,3 +823,22 @@ Use Python 3.11.8 or later within the 3.11 series for the documentation lock. An
 existing environment may build successfully with stale plugins while failing to install the
 current lock. Create a supported environment and sync `requirements-docs.lock` before running
 `mkdocs build --strict`; the repository's documentation CI uses that lock.
+
+### Pinned build-lock input checks
+
+`npm run test:build-lock-action-inputs` runs the typed Python validator against
+`BUILD_LOCK_POLICY_ROOT`, a full-history checkout of the central policy repository. Every call
+is checked against its own pinned action definition. The validator refuses missing required
+inputs, unknown supplied inputs, unreadable pins and zero-call scans. A missing policy checkout
+is an explicit local skip and a failure under GitHub Actions.
+
+The Node entry points remain compatibility launchers, including the exported pin resolver. The
+resolver reads live `uses:` lines and refuses absent, conflicting or non-commit references. Its
+twelve original observations accompany twelve parser observations captured after the earlier
+seventeen parser assertions passed. Additional controls create
+real local Git commits to check different pinned contracts, declaration caching, missing history,
+output bounds, timeouts and full CLI execution. The checker reads local Git objects and does not
+fetch or modify either checkout. Git reads discard inherited `GIT_*` overrides and disable
+replacement objects so a pinned definition refers to its physical commit. Controls exercise both
+environment redirection and a real replacement object. Python and uv setup precede the workflow
+step that resolves the policy checkout pin.

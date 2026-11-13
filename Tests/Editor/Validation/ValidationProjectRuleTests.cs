@@ -13,7 +13,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     using WallstopStudios.UnityHelpers.Tests.Editor.Validation.TestTypes;
 
     [TestFixture]
-    public sealed class ValidationProjectRuleTests : CommonTestBase
+    public sealed class ValidationProjectRuleTests : SynchronousEditorTestBase
     {
         private static ValidationWorkspaceSettings.RuleDefinition Definition()
         {

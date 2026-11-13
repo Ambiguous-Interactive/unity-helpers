@@ -22,7 +22,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
     [TestFixture]
     [NUnit.Framework.Category("Slow")]
     [NUnit.Framework.Category("Integration")]
-    public sealed class WValueDropDownSerializableTypeTests : CommonTestBase
+    public sealed class WValueDropDownSerializableTypeTests : SynchronousEditorTestBase
     {
         [Test]
         public void SerializableTypePropertyIsRecognizedAsSupported()

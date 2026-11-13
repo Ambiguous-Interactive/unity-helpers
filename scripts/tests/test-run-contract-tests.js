@@ -190,7 +190,8 @@ runTest("direct mode runs a selected contract and refuses an unknown id", () => 
     { cwd: repoRoot, encoding: "utf8" }
   );
   assert.strictEqual(selected.status, 0, selected.stdout + selected.stderr);
-  assert.match(selected.stdout, /41 passed, 0 failed/);
+  assert.match(selected.stdout, /pytest scripts\/tests\/test_comparison_direction\.py -q/);
+  assert.match(selected.stdout, /\b[1-9]\d* passed\b/);
   assert.match(selected.stdout, /1\/1 checks passed/);
 
   const refused = spawnSync(process.execPath, [runnerPath, "--direct", "--only", "unknown"], {
@@ -366,6 +367,8 @@ runTest("no contract test in scripts/tests/ has been left unreachable", () => {
   // consolidation trades a loud failure (a chain that visibly lost an entry) for a quiet one (a
   // suite that still exists and no longer runs). The excuse is a PREDICATE, not prose.
   const runElsewhere = new Map([
+    ["scripts/tests/test-lint-comparison-direction.js", "comparison-controls"],
+    ["scripts/tests/test-build-lock-action-input-parser.js", "policy-controls"],
     ["scripts/tests/test-check-code-fence-syntax.sh", "fence-controls"],
     ["scripts/tests/test-sync-readme-mirror.js", "readme-controls"],
     ["scripts/tests/test-lint-dependabot.ps1", "dependabot-controls"],
@@ -396,6 +399,14 @@ runTest("no contract test in scripts/tests/ has been left unreachable", () => {
     ["scripts/tests/test-sync-issue-template-versions.ps1", "workflow"]
   ]);
   const owners = new Map([
+    [
+      "comparison-controls",
+      (file) => registeredControlsInvoke(file, "scripts/tests/test_comparison_direction.py")
+    ],
+    [
+      "policy-controls",
+      (file) => registeredControlsInvoke(file, "scripts/tests/test_build_lock_inputs.py")
+    ],
     [
       "fence-controls",
       (file) => registeredControlsInvoke(file, "scripts/tests/test_code_fence_syntax.py")

@@ -20,7 +20,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
     [TestFixture]
     [NUnit.Framework.Category("Slow")]
     [NUnit.Framework.Category("Integration")]
-    public sealed class WButtonDeclarationOrderTests : CommonTestBase
+    public sealed class WButtonDeclarationOrderTests : SynchronousEditorTestBase
     {
         private static string FormatMetadataDiagnostics(
             IReadOnlyList<WButtonMethodMetadata> metadata

@@ -18,7 +18,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     using Object = UnityEngine.Object;
 
     [TestFixture]
-    public sealed class ValidationWorkspaceReportTests : CommonTestBase
+    public sealed class ValidationWorkspaceReportTests : SynchronousEditorTestBase
     {
         private static ValidationFinding Finding(ValidationSeverity severity)
         {
