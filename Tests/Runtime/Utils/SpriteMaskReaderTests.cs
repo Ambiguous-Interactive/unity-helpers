@@ -12,22 +12,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     [Category("Fast")]
     public sealed class SpriteMaskReaderTests : CommonTestBase
     {
-        [TestCase(0, 0, 4, 3, false)]
-        [TestCase(1, 2, 3, 2, false)]
-        [TestCase(4, 5, 4, 3, true)]
-        [TestCase(7, 7, 1, 1, true)]
-        public void RgbaSubregionCopiesOnlyItsBaseMipPixels(
+        [TestCase(0, 0, 4, 3, false, TextureFormat.RGBA32)]
+        [TestCase(0, 0, 4, 3, false, TextureFormat.RGB24)]
+        [TestCase(1, 2, 3, 2, false, TextureFormat.RGBA32)]
+        [TestCase(1, 2, 3, 2, false, TextureFormat.RGB24)]
+        [TestCase(4, 5, 4, 3, true, TextureFormat.RGBA32)]
+        [TestCase(4, 5, 4, 3, true, TextureFormat.RGB24)]
+        [TestCase(7, 7, 1, 1, true, TextureFormat.RGBA32)]
+        [TestCase(7, 7, 1, 1, true, TextureFormat.RGB24)]
+        public void ReadableSubregionCopiesOnlyItsBaseMipPixels(
             int x,
             int y,
             int width,
             int height,
-            bool mipmaps
+            bool mipmaps,
+            TextureFormat format
         )
         {
             const int textureSize = 8;
-            Texture2D texture = Track(
-                new Texture2D(textureSize, textureSize, TextureFormat.RGBA32, mipmaps)
-            );
+            Texture2D texture = Track(new Texture2D(textureSize, textureSize, format, mipmaps));
             Color32[] original = new Color32[textureSize * textureSize];
             for (int index = 0; index < original.Length; ++index)
             {
@@ -40,6 +43,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             }
             texture.SetPixels32(original);
             texture.Apply();
+            original = texture.GetPixels32();
             Sprite sprite = Track(
                 Sprite.Create(texture, new Rect(x, y, width, height), new Vector2(0.25f, 0.75f), 2f)
             );

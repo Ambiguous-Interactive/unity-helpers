@@ -34,17 +34,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             return watch.Elapsed.TotalMilliseconds;
         }
 
-        [TestCase(1024, 16, false)]
-        [TestCase(1024, 256, false)]
-        [TestCase(32, 32, false)]
-        [TestCase(1024, 16, true)]
-        [TestCase(1024, 256, true)]
-        [TestCase(32, 32, true)]
-        public void MeasureOpaqueRgbaRegionRead(int textureSize, int spriteSize, bool bounds)
+        [TestCase(1024, 16, false, TextureFormat.RGBA32)]
+        [TestCase(1024, 256, false, TextureFormat.RGBA32)]
+        [TestCase(32, 32, false, TextureFormat.RGBA32)]
+        [TestCase(1024, 16, true, TextureFormat.RGBA32)]
+        [TestCase(1024, 256, true, TextureFormat.RGBA32)]
+        [TestCase(32, 32, true, TextureFormat.RGBA32)]
+        [TestCase(1024, 16, false, TextureFormat.RGB24)]
+        [TestCase(1024, 256, false, TextureFormat.RGB24)]
+        [TestCase(32, 32, false, TextureFormat.RGB24)]
+        [TestCase(1024, 16, true, TextureFormat.RGB24)]
+        [TestCase(1024, 256, true, TextureFormat.RGB24)]
+        [TestCase(32, 32, true, TextureFormat.RGB24)]
+        public void MeasureOpaqueRegionRead(
+            int textureSize,
+            int spriteSize,
+            bool bounds,
+            TextureFormat format
+        )
         {
-            Texture2D texture = Track(
-                new Texture2D(textureSize, textureSize, TextureFormat.RGBA32, false)
-            );
+            Texture2D texture = Track(new Texture2D(textureSize, textureSize, format, false));
             Color32[] pixels = new Color32[textureSize * textureSize];
             for (int index = 0; index < pixels.Length; ++index)
             {
@@ -118,7 +127,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 $"SPRITE_REGION_ID|{typeof(SpriteMaskReader).Assembly.ManifestModule.ModuleVersionId}"
             );
             TestContext.WriteLine(
-                $"SPRITE_REGION|{textureSize}|{spriteSize}|{bounds}|{iterations}"
+                $"SPRITE_REGION|{textureSize}|{spriteSize}|{bounds}|{iterations}|{format}"
             );
             foreach (double sample in samples)
             {

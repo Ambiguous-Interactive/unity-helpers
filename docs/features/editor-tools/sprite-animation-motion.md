@@ -101,8 +101,9 @@ Related: [Animation tools](./editor-tools-guide.md#animation-tools).
 ### Reading small sprite regions
 
 `SpriteMaskReader`, the sprite-art bounds queries and ink-region queries read only
-the selected base-mip rectangle into managed pixel storage for readable RGBA32
+the selected base-mip rectangle into managed pixel storage for readable RGBA32 and RGB24
 subregions. They preserve colours, alpha policy and local coordinates. Full-image
-queries and other readable formats keep their existing conversion path. This does
+queries and other readable formats keep their existing conversion path. RGB24 reads
+return opaque alpha and preserve the byte channels in Unity's converted pixels. This does
 not add packed-player or unreadable-texture support. See the
 [measured sizes and platform limits](../../performance/sprite-region-read.md).
