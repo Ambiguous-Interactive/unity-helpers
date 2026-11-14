@@ -97,8 +97,7 @@ function isTerminalExit(statement) {
 
 function maskNonCode(text) {
   const masked = text.split("");
-  let quoted = null;
-  let verbatim = false;
+  const frames = [];
   let comment = null;
   const hide = (index) => {
     if (text[index] !== "\n" && text[index] !== "\r") masked[index] = " ";
@@ -106,6 +105,7 @@ function maskNonCode(text) {
   for (let index = 0; index < text.length; index += 1) {
     const char = text[index];
     const next = text[index + 1];
+    const frame = frames[frames.length - 1];
     if (comment !== null) {
       if (comment === "line" && (char === "\n" || char === "\r")) {
         comment = null;
@@ -117,30 +117,46 @@ function maskNonCode(text) {
           comment = null;
         }
       }
-    } else if (quoted !== null) {
+    } else if (frame?.kind === "string") {
       hide(index);
-      if (!verbatim && char === "\\") {
+      if (!frame.verbatim && char === "\\") {
         hide(index + 1);
         index += 1;
-      } else if (char === quoted) {
-        if (verbatim && next === quoted) {
+      } else if (char === frame.quote) {
+        if (frame.verbatim && next === frame.quote) {
           hide(index + 1);
           index += 1;
         } else {
-          quoted = null;
+          frames.pop();
+        }
+      } else if (frame.interpolated && char === "{") {
+        if (next === "{") {
+          hide(index + 1);
+          index += 1;
+        } else {
+          frames.push({ kind: "expression", depth: 1 });
         }
       }
-    } else if (char === "/" && (next === "/" || next === "*")) {
-      comment = next === "/" ? "line" : "block";
-      hide(index);
-      hide(index + 1);
-      index += 1;
-    } else if (char === '"' || char === "'") {
-      quoted = char;
-      verbatim =
-        char === '"' &&
-        (text[index - 1] === "@" || (text[index - 1] === "$" && text[index - 2] === "@"));
-      hide(index);
+    } else {
+      if (frame?.kind === "expression") hide(index);
+      if (char === "/" && (next === "/" || next === "*")) {
+        comment = next === "/" ? "line" : "block";
+        hide(index);
+        hide(index + 1);
+        index += 1;
+      } else if (char === '"' || char === "'") {
+        const prefix = text.slice(Math.max(0, index - 2), index);
+        frames.push({
+          kind: "string",
+          quote: char,
+          verbatim: char === '"' && (prefix.endsWith("@") || prefix === "@$"),
+          interpolated: char === '"' && (prefix.endsWith("$") || prefix === "$@")
+        });
+        hide(index);
+      } else if (frame?.kind === "expression") {
+        if (char === "{") frame.depth += 1;
+        else if (char === "}" && --frame.depth === 0) frames.pop();
+      }
     }
   }
   return masked.join("");
@@ -212,6 +228,20 @@ return false;`,
   if (terminal !== expected) {
     throw new Error(`Out-parameter assignment-group control failed: ${body}`);
   }
+}
+
+for (const [body, expected] of [
+  [`value = $"{Get("can't")}";\nDoWork();\nreturn false;`, false],
+  [`value = $"{Get("can't")}";\nreturn false;`, true],
+  [`value = $@"{Get("can't")}";\nDoWork();\nreturn false;`, false],
+  [`value = @$"{Get("can't")}";\nDoWork();\nreturn false;`, false],
+  ['value = $"{Get($"{1}")}";\nDoWork();\nreturn false;', false],
+  ["value = $\"{{literal}} {Get('}')}\";\nDoWork();\nreturn false;", false]
+]) {
+  const lines = maskNonCode(body.replaceAll("\\n", "\n")).split("\n");
+  const next = nextStatementAfterOutAssignment(lines, 0, /^\s*(?:value|error)\s*=(?!=)/);
+  const terminal = next >= lines.length || isTerminalExit(lines[next].trim());
+  if (terminal !== expected) throw new Error(`Interpolated out-parameter control failed: ${body}`);
 }
 
 for (const [statement, expected] of [

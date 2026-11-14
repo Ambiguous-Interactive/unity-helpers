@@ -386,6 +386,82 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 );
                 Assert.AreSame(original, persisted);
                 Assert.AreEqual(42, original.value);
+                Resources.UnloadAsset(original);
+                DummyScriptableObject reloaded = Track(
+                    AssetDatabase.LoadAssetAtPath<DummyScriptableObject>(path)
+                );
+                Assert.AreEqual(42, reloaded.value);
+            });
+        }
+
+        [TestCase("File Assets/Data.asset couldn't be written.", true)]
+        [TestCase("File ASSETS/DATA.ASSET couldn't be written.", true)]
+        [TestCase("File C:/Project/Assets/Data.asset couldn't be written.", true)]
+        [TestCase("Could not save 'Assets/Data.asset'.", true)]
+        [TestCase("File Assets/Data.asset.backup.asset couldn't be written.", false)]
+        [TestCase("File Assets/Data.asset backup.asset couldn't be written.", false)]
+        [TestCase("File Assets/Data.asset).asset couldn't be written.", false)]
+        [TestCase("Could not save 'Assets/Data.asset.backup.asset'.", false)]
+        public void AssetSaveErrorsMatchCompletePaths(string message, bool expected)
+        {
+            Assert.AreEqual(expected, Helpers.HasAssetPathToken(message, "Assets/Data.asset"));
+        }
+
+        [Test]
+        public void UnrelatedPrefixWriteFailureDoesNotAbortSuccessfulReplacement()
+        {
+            if (SystemInfo.operatingSystemFamily != OperatingSystemFamily.Windows)
+            {
+                Assert.Ignore("The native Windows file-sharing failure control requires Windows.");
+            }
+            string path = _scriptableFolder + "/Data.asset";
+            string otherPath = path + ".backup.asset";
+            TrackAssetPath(path);
+            TrackAssetPath(otherPath);
+            DummyScriptableObject original = CreateScriptableObject<DummyScriptableObject>();
+            DummyScriptableObject other = CreateScriptableObject<DummyScriptableObject>();
+            DummyScriptableObject replacement = CreateScriptableObject<DummyScriptableObject>();
+            replacement.value = 42;
+            ExecuteWithImmediateImport(() =>
+            {
+                AssetDatabase.CreateAsset(original, path);
+                AssetDatabase.CreateAsset(other, otherPath);
+                AssetDatabase.SaveAssets();
+                byte[] before = File.ReadAllBytes(otherPath);
+                other.value = 99;
+                EditorUtility.SetDirty(other);
+                Regex saveError = new(
+                    "^File " + Regex.Escape(otherPath) + " couldn't be written\\..*failed\\.$"
+                );
+                LogAssert.Expect(LogType.Error, saveError);
+                LogAssert.Expect(LogType.Error, saveError);
+                using (
+                    FileStream locked = new(
+                        otherPath,
+                        FileMode.Open,
+                        FileAccess.Read,
+                        FileShare.Read
+                    )
+                )
+                {
+                    Assert.IsTrue(
+                        Helpers.TryCreateOrReplaceAsset(
+                            replacement,
+                            path,
+                            out UnityEngine.Object saved,
+                            out string error
+                        ),
+                        error
+                    );
+                    Assert.AreSame(original, saved);
+                }
+                CollectionAssert.AreEqual(before, File.ReadAllBytes(otherPath));
+                Assert.IsFalse(EditorUtility.IsDirty(original));
+                Resources.UnloadAsset(original);
+                DummyScriptableObject reloaded = Track(
+                    AssetDatabase.LoadAssetAtPath<DummyScriptableObject>(path)
+                );
+                Assert.AreEqual(42, reloaded.value);
             });
         }
 

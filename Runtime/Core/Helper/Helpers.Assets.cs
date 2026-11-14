@@ -184,9 +184,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                             || type == LogType.Assert
                         )
                         && message != null
-                        && message
-                            .Replace('\\', '/')
-                            .IndexOf(path, StringComparison.OrdinalIgnoreCase) >= 0
+                        && HasAssetPathToken(message.Replace('\\', '/'), path)
                     )
                     {
                         Interlocked.CompareExchange(ref nativeSaveError, message, null);
@@ -273,6 +271,43 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 error = exception.Message;
                 return false;
             }
+        }
+
+        internal static bool HasAssetPathToken(string message, string path)
+        {
+            int start = 0;
+            while (start < message.Length)
+            {
+                int index = message.IndexOf(path, start, StringComparison.OrdinalIgnoreCase);
+                if (index < 0)
+                {
+                    return false;
+                }
+                int end = index + path.Length;
+                bool startsToken =
+                    index == 0
+                    || char.IsWhiteSpace(message[index - 1])
+                    || message[index - 1] == '/'
+                    || message[index - 1] == '\''
+                    || message[index - 1] == '"';
+                bool quoted =
+                    index != 0 && (message[index - 1] == '\'' || message[index - 1] == '"');
+                bool endsToken =
+                    end == message.Length
+                    || (quoted && message[end] == message[index - 1])
+                    || message[end] == ':'
+                    || message.IndexOf(
+                        " couldn't be written.",
+                        end,
+                        StringComparison.OrdinalIgnoreCase
+                    ) == end;
+                if (startsToken && endsToken)
+                {
+                    return true;
+                }
+                start = index + 1;
+            }
+            return false;
         }
 
         private static string[] ExistingAssetSearchFolders(string[] requested)

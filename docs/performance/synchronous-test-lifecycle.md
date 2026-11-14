@@ -163,3 +163,20 @@ The [strict durations](./dropdown-scopes-strict-20261114.csv) and
 case identity, source and assembly identity, logging witness and receipt summary.
 
 The IMGUI executor restores its caller's log policy after every default and strict run, including mouse events and exhausted budgets. It does not enable broad log suppression while pumping events. Default offscreen passes tolerate only the exact native cursor-rectangle error from that pass; strict passes tolerate none. Native controls cover both incoming flag values and confirm unexpected errors remain visible on default and strict runs.
+
+### Native log-scope qualification
+
+The November 14 inspection used Unity **6000.6.7f1** with the actually loaded Test Framework **1.8.0**.
+Its schema-3 framework snapshot identifies `UnityEngine.TestRunner` by module ID
+`fca9cbc6-e5dc-46b6-8b76-59f7d0825373`. `LogScope.Current` and its private `m_Lock` are present;
+`AllLogs` and `FailingLogs` are lists implementing `IList`, and `LogEvent.IsHandled` is writable.
+The retained source digests are `a274f8220926da3f0165fa4848c3a851c43f945c8f0d0c9ec627198dd9d24a42`
+for `LogScope.cs` and `731b21dde017bc5acc2e69f040bc65580ee59f74dfb5646cf4d0528d757034a6`
+for `LogEvent.cs`.
+
+All 1,624 custom-drawer cases pass with the scoped cursor-error handling. The 21 executor controls
+cover both incoming policies, mouse events, exhausted budgets, unrelated unexpected errors, and
+strict rejection of the cursor message itself. The final 89-case asset/framework cohort also passes,
+including real blocked writes, persisted retries, and unrelated failures for similarly named assets.
+These observations qualify the loaded framework above; other supported editor/framework combinations
+remain checked by their own CI runs.
