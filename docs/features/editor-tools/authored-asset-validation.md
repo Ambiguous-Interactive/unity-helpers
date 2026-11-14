@@ -113,7 +113,9 @@ to it. The reported set is slots an author saw and left empty.
 
 Required fields on nested serializable values are checked through their carrier script, including
 arrays, lists, and serialized dictionary keys and values. The scan follows the serialized field
-path and reports each empty authored slot at its own line. Former field names remain supported.
+path and reports each empty authored slot at its own line. Closed generic values and inherited
+generic fields use their constructed field types, and findings retain that declaring type.
+Former field names remain supported.
 It does not load the asset or run its validation callbacks.
 
 An annotated field the check cannot read is reported as a **budget** rather than skipped. Nested

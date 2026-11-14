@@ -59,6 +59,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation.TestTypes
         [SerializeReference]
         public NestedRequirementTestValue managedNested;
 
+        public GenericRequirementTestValue<Material> genericMaterial;
+        public GenericRequirementTestValue<string> genericText;
+        public ClosedGenericRequirementTestValue inheritedGeneric;
+
         public NestedRequirementTestValue nested;
         public List<NestedRequirementTestValue> nestedList;
         public NestedRequirementTestValue[] nestedArray;

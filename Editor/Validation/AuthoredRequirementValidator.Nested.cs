@@ -15,10 +15,49 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
     public static partial class AuthoredRequirementValidator
     {
+        private static void AddNestedDeclaration(
+            Dictionary<Type, List<FieldInfo>> nested,
+            FieldInfo field
+        )
+        {
+            if (!nested.TryGetValue(field.DeclaringType, out List<FieldInfo> fields))
+            {
+                fields = new List<FieldInfo>();
+                nested.Add(field.DeclaringType, fields);
+            }
+            fields.Add(field);
+        }
+
+        private static bool TryBindNestedRequirement(
+            Type type,
+            FieldInfo declaration,
+            AuthoredRequirementKind kind,
+            out AuthoredRequirementField required
+        )
+        {
+            if (declaration.DeclaringType == type)
+            {
+                return TryClassify(declaration, out required, kind);
+            }
+            foreach (FieldInfo field in ReflectionHelpers.GetInstanceFieldsIncludingBaseTypes(type))
+            {
+                if (
+                    field.DeclaringType == type
+                    && string.Equals(field.Name, declaration.Name, StringComparison.Ordinal)
+                )
+                {
+                    return TryClassify(field, out required, kind);
+                }
+            }
+            required = default;
+            return false;
+        }
+
         private static void AddNestedCarriers(
-            Dictionary<Type, List<AuthoredRequirementField>> nested,
+            Dictionary<Type, List<FieldInfo>> nested,
             Dictionary<string, List<AuthoredRequirementField>> byScriptGuid,
-            List<AuthoredRequirementExemption> exemptions
+            List<AuthoredRequirementExemption> exemptions,
+            AuthoredRequirementKind kind
         )
         {
             if (nested.Count == 0)
@@ -45,7 +84,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 }
                 visited.Clear();
                 reachable.Clear();
-                CollectReachableRequirements(carrier, nested, visited, reachable, 0);
+                CollectReachableRequirements(
+                    carrier,
+                    nested,
+                    visited,
+                    reachable,
+                    exemptions,
+                    kind,
+                    0
+                );
                 if (
                     reachable.Count == 0
                     || !MonoScriptIndex.TryGetScriptGuid(carrier, out string guid)
@@ -61,16 +108,20 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 foreach (AuthoredRequirementField field in reachable)
                 {
                     fields.Add(field);
-                    bound.Add(field.DeclaringType);
+                    bound.Add(
+                        field.DeclaringType.IsGenericType
+                            ? field.DeclaringType.GetGenericTypeDefinition()
+                            : field.DeclaringType
+                    );
                 }
             }
-            foreach (KeyValuePair<Type, List<AuthoredRequirementField>> pair in nested)
+            foreach (KeyValuePair<Type, List<FieldInfo>> pair in nested)
             {
                 if (bound.Contains(pair.Key))
                 {
                     continue;
                 }
-                foreach (AuthoredRequirementField field in pair.Value)
+                foreach (FieldInfo field in pair.Value)
                 {
                     exemptions.Add(
                         new AuthoredRequirementExemption(
@@ -85,9 +136,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
         private static void CollectReachableRequirements(
             Type type,
-            Dictionary<Type, List<AuthoredRequirementField>> nested,
+            Dictionary<Type, List<FieldInfo>> nested,
             HashSet<Type> visited,
             List<AuthoredRequirementField> reachable,
+            List<AuthoredRequirementExemption> exemptions,
+            AuthoredRequirementKind kind,
             int depth
         )
         {
@@ -97,10 +150,50 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             }
             for (Type current = type; current != null; current = current.BaseType)
             {
-                if (nested.TryGetValue(current, out List<AuthoredRequirementField> fields))
+                Type declarationType = current.IsGenericType
+                    ? current.GetGenericTypeDefinition()
+                    : current;
+                if (nested.TryGetValue(declarationType, out List<FieldInfo> fields))
                 {
-                    foreach (AuthoredRequirementField field in fields)
+                    foreach (FieldInfo declaration in fields)
                     {
+                        if (
+                            !TryBindNestedRequirement(
+                                current,
+                                declaration,
+                                kind,
+                                out AuthoredRequirementField field
+                            )
+                        )
+                        {
+                            bool alreadyExempt = false;
+                            foreach (AuthoredRequirementExemption exemption in exemptions)
+                            {
+                                if (
+                                    exemption.DeclaringType == current
+                                    && string.Equals(
+                                        exemption.FieldName,
+                                        declaration.Name,
+                                        StringComparison.Ordinal
+                                    )
+                                )
+                                {
+                                    alreadyExempt = true;
+                                    break;
+                                }
+                            }
+                            if (!alreadyExempt)
+                            {
+                                exemptions.Add(
+                                    new AuthoredRequirementExemption(
+                                        current,
+                                        declaration.Name,
+                                        AuthoredRequirementExemptionReason.ValueNotReadableAsText
+                                    )
+                                );
+                            }
+                            continue;
+                        }
                         bool present = false;
                         foreach (AuthoredRequirementField existing in reachable)
                         {
@@ -129,7 +222,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 Type valueType = SerializedNestedType(field, out bool _);
                 if (valueType != null)
                 {
-                    CollectReachableRequirements(valueType, nested, visited, reachable, depth + 1);
+                    CollectReachableRequirements(
+                        valueType,
+                        nested,
+                        visited,
+                        reachable,
+                        exemptions,
+                        kind,
+                        depth + 1
+                    );
                 }
             }
         }

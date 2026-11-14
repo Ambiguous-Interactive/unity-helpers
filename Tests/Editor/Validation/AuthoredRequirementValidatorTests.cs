@@ -475,6 +475,84 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             }
         }
 
+        [TestCase(nameof(AuthoredRequirementTestAsset.genericMaterial), false, false)]
+        [TestCase(nameof(AuthoredRequirementTestAsset.genericMaterial), true, false)]
+        [TestCase(nameof(AuthoredRequirementTestAsset.genericMaterial), false, true)]
+        [TestCase(nameof(AuthoredRequirementTestAsset.genericText), false, false)]
+        [TestCase(nameof(AuthoredRequirementTestAsset.genericText), true, false)]
+        [TestCase(nameof(AuthoredRequirementTestAsset.inheritedGeneric), false, false)]
+        [TestCase(nameof(AuthoredRequirementTestAsset.inheritedGeneric), true, false)]
+        [TestCase(nameof(AuthoredRequirementTestAsset.inheritedGeneric), false, true)]
+        public void ClosedGenericValuesUseTheirConstructedFieldTypes(
+            string field,
+            bool emptyValue,
+            bool emptyMaterial
+        )
+        {
+            Assert.IsTrue(
+                MonoScriptIndex.TryGetScriptGuid(
+                    typeof(AuthoredRequirementTestAsset),
+                    out string guid
+                )
+            );
+            bool text = string.Equals(
+                field,
+                nameof(AuthoredRequirementTestAsset.genericText),
+                StringComparison.Ordinal
+            );
+            string value = text
+                ? (emptyValue ? "''" : "assigned")
+                : (emptyValue ? "{fileID: 0}" : "{fileID: 12}");
+            string material = emptyMaterial ? "{fileID: 0}" : "{fileID: 12}";
+            string path = Path.Combine(
+                Path.GetTempPath(),
+                $"generic-requirement-{Guid.NewGuid():N}.asset"
+            );
+            try
+            {
+                File.WriteAllText(
+                    path,
+                    $"%YAML 1.1\n--- !u!114 &11400000\nMonoBehaviour:\n  m_Script: {{fileID: 11500000, guid: {guid}, type: 3}}\n  {field}:\n    material: {material}\n    value: {value}\n"
+                );
+                List<AuthoredRequirementFinding> findings = new();
+                List<AuthoredRequirementExemption> exemptions = new();
+                Assert.IsTrue(
+                    AuthoredRequirementValidator.TryScan(
+                        new[] { path },
+                        findings,
+                        exemptions,
+                        out int inspected
+                    )
+                );
+                Assert.AreEqual(1, inspected);
+                Assert.AreEqual(emptyValue || emptyMaterial ? 1 : 0, findings.Count);
+                Assert.IsFalse(
+                    exemptions.Any(exemption =>
+                        exemption.DeclaringType == typeof(GenericRequirementTestValue<>)
+                    )
+                );
+                if (findings.Count != 0)
+                {
+                    Assert.AreEqual(
+                        text
+                            ? typeof(GenericRequirementTestValue<string>)
+                            : typeof(GenericRequirementTestValue<Material>),
+                        findings[0].DeclaringType
+                    );
+                    Assert.AreEqual(
+                        emptyMaterial
+                            ? nameof(GenericRequirementTestValue<Material>.material)
+                            : nameof(GenericRequirementTestValue<Material>.value),
+                        findings[0].FieldName
+                    );
+                }
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
+
         [Test]
         public void AScanWithNothingToReadIsRefusedRatherThanReportedClean()
         {

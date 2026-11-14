@@ -346,12 +346,21 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 StringComparer.Ordinal
             );
             List<string> guids = new();
-            Dictionary<Type, List<AuthoredRequirementField>> nested = new();
+            Dictionary<Type, List<FieldInfo>> nested = new();
             foreach (FieldInfo field in TypeCache.GetFieldsWithAttribute(requirementAttributeType))
             {
                 Type declaringType = field.DeclaringType;
                 if (declaringType == null)
                 {
+                    continue;
+                }
+
+                if (
+                    !typeof(Object).IsAssignableFrom(declaringType)
+                    && declaringType.ContainsGenericParameters
+                )
+                {
+                    AddNestedDeclaration(nested, field);
                     continue;
                 }
 
@@ -369,17 +378,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
                 if (!typeof(Object).IsAssignableFrom(declaringType))
                 {
-                    if (
-                        !nested.TryGetValue(
-                            declaringType,
-                            out List<AuthoredRequirementField> fields
-                        )
-                    )
-                    {
-                        fields = new List<AuthoredRequirementField>();
-                        nested.Add(declaringType, fields);
-                    }
-                    fields.Add(required);
+                    AddNestedDeclaration(nested, field);
                     continue;
                 }
 
@@ -408,7 +407,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 }
             }
 
-            AddNestedCarriers(nested, byScriptGuid, exemptions);
+            AddNestedCarriers(nested, byScriptGuid, exemptions, kind);
             return byScriptGuid;
         }
 

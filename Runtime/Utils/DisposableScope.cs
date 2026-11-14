@@ -50,16 +50,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             return new DisposableScope(cleanup, onError);
         }
 
-        /// <summary>
-        /// Adds a cleanup that runs before this scope's cleanup.
-        /// </summary>
-        /// <param name="cleanup">The action to run first.</param>
-        /// <returns>A scope containing both cleanups.</returns>
-        public DisposableScope<DisposableScope> WithCleanup(Action cleanup)
-        {
-            return new DisposableScope<DisposableScope>(this, cleanup, _onError);
-        }
-
         internal static void ReportFailure(Exception error, Action<Exception> onError)
         {
             try
@@ -70,6 +60,16 @@ namespace WallstopStudios.UnityHelpers.Utils
             {
                 // Reporting must not replace an exception already in flight.
             }
+        }
+
+        /// <summary>
+        /// Adds a cleanup that runs before this scope's cleanup.
+        /// </summary>
+        /// <param name="cleanup">The action to run first.</param>
+        /// <returns>A scope containing both cleanups.</returns>
+        public DisposableScope<DisposableScope> WithCleanup(Action cleanup)
+        {
+            return new DisposableScope<DisposableScope>(this, cleanup, _onError);
         }
 
         /// <summary>
