@@ -237,7 +237,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
         private static Type SerializedNestedType(FieldInfo field, out bool collection)
         {
-            collection = false;
             if (
                 field.IsStatic
                 || field.IsInitOnly
@@ -247,21 +246,24 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 || (!field.IsPublic && !field.IsDefined(typeof(SerializeField), false))
             )
             {
+                collection = false;
                 return null;
             }
+            bool isCollection = false;
             Type type = field.FieldType;
             if (type.IsArray)
             {
                 if (type.GetArrayRank() != 1)
                 {
+                    collection = false;
                     return null;
                 }
-                collection = true;
+                isCollection = true;
                 type = type.GetElementType();
             }
             else if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(List<>))
             {
-                collection = true;
+                isCollection = true;
                 type = type.GetGenericArguments()[0];
             }
             if (
@@ -274,8 +276,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 || !type.IsDefined(typeof(SerializableAttribute), false)
             )
             {
+                collection = isCollection;
                 return null;
             }
+            collection = isCollection;
             return type;
         }
 
