@@ -175,6 +175,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
                 Object existing = AssetDatabase.LoadMainAssetAtPath(path);
                 string nativeSaveError = null;
+                string normalizedAbsolutePath = absolutePath.SanitizePath();
                 Application.LogCallback captureSaveError = (message, _, type) =>
                 {
                     if (
@@ -184,7 +185,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                             || type == LogType.Assert
                         )
                         && message != null
-                        && HasAssetPathToken(message.Replace('\\', '/'), path)
+                        && (
+                            HasAssetPathToken(message.Replace('\\', '/'), path)
+                            || HasAssetPathToken(message.Replace('\\', '/'), normalizedAbsolutePath)
+                        )
                     )
                     {
                         Interlocked.CompareExchange(ref nativeSaveError, message, null);
@@ -275,6 +279,18 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         internal static bool HasAssetPathToken(string message, string path)
         {
+            int expectedStart = -1;
+            if (message.StartsWith("File ", StringComparison.OrdinalIgnoreCase))
+            {
+                expectedStart = "File ".Length;
+                if (
+                    expectedStart < message.Length
+                    && (message[expectedStart] == '\'' || message[expectedStart] == '"')
+                )
+                {
+                    ++expectedStart;
+                }
+            }
             int start = 0;
             while (start < message.Length)
             {
@@ -285,11 +301,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
                 int end = index + path.Length;
                 bool startsToken =
-                    index == 0
-                    || char.IsWhiteSpace(message[index - 1])
-                    || message[index - 1] == '/'
-                    || message[index - 1] == '\''
-                    || message[index - 1] == '"';
+                    index == expectedStart
+                    || (
+                        expectedStart < 0
+                        && (index == 0 || message[index - 1] == '\'' || message[index - 1] == '"')
+                    );
                 bool quoted =
                     index != 0 && (message[index - 1] == '\'' || message[index - 1] == '"');
                 bool endsToken =

@@ -396,7 +396,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
         [TestCase("File Assets/Data.asset couldn't be written.", true)]
         [TestCase("File ASSETS/DATA.ASSET couldn't be written.", true)]
-        [TestCase("File C:/Project/Assets/Data.asset couldn't be written.", true)]
+        [TestCase("File C:/Project/Assets/Data.asset couldn't be written.", false)]
+        [TestCase("File Assets/Backup/Assets/Data.asset couldn't be written.", false)]
+        [TestCase("File Assets/Backup Assets/Data.asset couldn't be written.", false)]
         [TestCase("Could not save 'Assets/Data.asset'.", true)]
         [TestCase("File Assets/Data.asset.backup.asset couldn't be written.", false)]
         [TestCase("File Assets/Data.asset backup.asset couldn't be written.", false)]
@@ -405,6 +407,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         public void AssetSaveErrorsMatchCompletePaths(string message, bool expected)
         {
             Assert.AreEqual(expected, Helpers.HasAssetPathToken(message, "Assets/Data.asset"));
+        }
+
+        [Test]
+        public void AbsoluteAssetSaveErrorMatchesOnlyTheCompleteAbsolutePath()
+        {
+            const string path = "C:/Project/Assets/Data.asset";
+            Assert.IsTrue(
+                Helpers.HasAssetPathToken("File " + path + " couldn't be written.", path)
+            );
+            Assert.IsTrue(Helpers.HasAssetPathToken("Could not save '" + path + "'.", path));
+            Assert.IsFalse(
+                Helpers.HasAssetPathToken(
+                    "File C:/OtherProject/Assets/Data.asset couldn't be written.",
+                    path
+                )
+            );
         }
 
         [Test]

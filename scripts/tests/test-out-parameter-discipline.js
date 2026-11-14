@@ -117,6 +117,14 @@ function maskNonCode(text) {
           comment = null;
         }
       }
+    } else if (frame?.kind === "format") {
+      hide(index);
+      if (!frame.verbatim && char === "\\") {
+        hide(index + 1);
+        index += 1;
+      } else if (char === "}") {
+        frames.pop();
+      }
     } else if (frame?.kind === "string") {
       hide(index);
       if (!frame.verbatim && char === "\\") {
@@ -134,7 +142,7 @@ function maskNonCode(text) {
           hide(index + 1);
           index += 1;
         } else {
-          frames.push({ kind: "expression", depth: 1 });
+          frames.push({ kind: "expression", depth: 1, groupDepth: 0, verbatim: frame.verbatim });
         }
       }
     } else {
@@ -154,8 +162,18 @@ function maskNonCode(text) {
         });
         hide(index);
       } else if (frame?.kind === "expression") {
-        if (char === "{") frame.depth += 1;
+        if (char === "(" || char === "[") frame.groupDepth += 1;
+        else if (char === ")" || char === "]") frame.groupDepth -= 1;
+        else if (char === "{") frame.depth += 1;
         else if (char === "}" && --frame.depth === 0) frames.pop();
+        else if (
+          char === ":" &&
+          frame.depth === 1 &&
+          frame.groupDepth === 0 &&
+          next !== ":" &&
+          text[index - 1] !== ":"
+        )
+          frame.kind = "format";
       }
     }
   }
@@ -244,6 +262,39 @@ for (const [body, expected] of [
   if (terminal !== expected) throw new Error(`Interpolated out-parameter control failed: ${body}`);
 }
 
+for (const body of [
+  'value = "}";\nDoWork();\nreturn false;',
+  "value = $\"{Get('}')}\";\nDoWork();\nreturn false;",
+  "value = null; /* } */\nDoWork();\nreturn false;"
+]) {
+  const code = maskNonCode(`{${body.replaceAll("\\n", "\n")}}`);
+  const extracted = bodyOf(code, 0);
+  if (extracted === null || !extracted.includes("DoWork")) {
+    throw new Error(`Literal/comment braces changed the method boundary: ${body}`);
+  }
+  const lines = extracted.split("\n");
+  const next = nextStatementAfterOutAssignment(lines, 0, /^\s*value\s*=(?!=)/);
+  if (next >= lines.length || isTerminalExit(lines[next].trim())) {
+    throw new Error(`Extracted out-parameter body lost intervening work: ${body}`);
+  }
+}
+
+for (const [body, expected] of [
+  ['value = $"{42:0//}";\nDoWork();\nreturn false;', false],
+  ['value = $"{42:0/*}";\nDoWork();\nreturn false;', false],
+  ['value = $"{Get(value: 42):0//}";\nDoWork();\nreturn false;', false],
+  ['value = $"{(flag ? 1 : 2):0//}";\nDoWork();\nreturn false;', false],
+  ['value = $@"{42:0//}";\nreturn false;', true]
+]) {
+  const code = maskNonCode(`{${body.replaceAll("\\n", "\n")}}`);
+  const extracted = bodyOf(code, 0);
+  if (extracted === null) throw new Error(`Format text changed the method boundary: ${body}`);
+  const lines = extracted.split("\n");
+  const next = nextStatementAfterOutAssignment(lines, 0, /^\s*value\s*=(?!=)/);
+  const terminal = next >= lines.length || isTerminalExit(lines[next].trim());
+  if (terminal !== expected) throw new Error(`Formatted interpolation control failed: ${body}`);
+}
+
 for (const [statement, expected] of [
   ["return false;", true],
   ["return;", true],
@@ -284,12 +335,13 @@ function scanRoot(rootName) {
       continue;
     }
     result.files += 1;
+    const code = maskNonCode(text);
 
     const signature =
       /\b(?:public|private|internal|protected)[^\n;(]*\(([^)]*)\)\s*(?:where[^\n{]*)?\s*\{/g;
 
     let match;
-    while ((match = signature.exec(text)) !== null) {
+    while ((match = signature.exec(code)) !== null) {
       const outNames = [...match[1].matchAll(/\bout\s+[\w<>[\],.?\s]*?(\w+)\s*(?:,|$)/g)].map(
         (m) => m[1]
       );
@@ -297,8 +349,8 @@ function scanRoot(rootName) {
         continue;
       }
 
-      const openBrace = text.lastIndexOf("{", signature.lastIndex);
-      const body = bodyOf(text, openBrace);
+      const openBrace = code.lastIndexOf("{", signature.lastIndex);
+      const body = bodyOf(code, openBrace);
       if (body === null) {
         continue;
       }
