@@ -201,6 +201,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     selectedExplanation =
                         "Keep properties before fields and nested types last. Review static initializer dependencies before moving declarations. This rule reports order; it does not rewrite code.";
                     break;
+                case "WUH030":
+                    selectedBadCode = "bool matches = \"text\".StartsWith(\"t\");";
+                    selectedGoodCode =
+                        "bool matches = \"text\".StartsWith(\"t\", StringComparison.Ordinal);";
+                    selectedExplanation =
+                        "Choose an explicit StringComparison or CultureInfo policy. Preserve culture-sensitive behavior when required; invariant casing is a separate deliberate choice. This rule is opt-in.";
+                    break;
                 case "WUH028":
                     selectedBadCode =
                         "using var lease = Buffers<int>.List.Get(out List<int> items);\nitems.Clear();";

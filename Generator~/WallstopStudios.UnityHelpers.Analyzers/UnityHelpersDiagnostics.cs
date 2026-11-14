@@ -614,5 +614,16 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 DiagnosticSeverity.Warning,
                 isEnabledByDefault: false
             );
+
+        /// <summary>A string method without an explicit comparison or culture policy.</summary>
+        internal static readonly DiagnosticDescriptor StringMethodHasImplicitComparison =
+            new DiagnosticDescriptor(
+                "WUH030",
+                "State the string comparison or culture policy",
+                "'{0}' leaves its comparison or culture policy implicit. Choose an overload with StringComparison or CultureInfo, or use invariant casing when appropriate.",
+                "Correctness",
+                DiagnosticSeverity.Warning,
+                isEnabledByDefault: false
+            );
     }
 }

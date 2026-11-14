@@ -28,6 +28,10 @@ inputs:
     description: "Require separate compilation/results.xml with every case from this fixture passed."
     required: false
     default: ""
+  unity-version:
+    description: "Unity version used to select required idle-editor fixtures."
+    required: false
+    default: ""
 runs:
   using: composite
   steps:
@@ -57,6 +61,7 @@ runs:
         UH_LABEL: ${{ inputs.label }}
         UH_REQUIRED_TEST_NAME: ${{ inputs.required-test-name }}
         UH_REQUIRED_COMPILATION_FIXTURE: ${{ inputs.required-compilation-fixture }}
+        UH_UNITY_VERSION: ${{ inputs.unity-version }}
       run: |
         $repoRoot = if ($env:GITHUB_WORKSPACE) { $env:GITHUB_WORKSPACE } else { (Get-Location).Path }
         . (Join-Path $repoRoot 'scripts/unity/lib/credential-redaction.ps1')
@@ -735,6 +740,11 @@ runs:
           Assert-UnityCompilationFixtureResults `
             -Path (Join-Path $dir 'compilation/results.xml') `
             -FixtureName $env:UH_REQUIRED_COMPILATION_FIXTURE
+          foreach ($idleFixture in @(Get-UnityIdleEditorIsolationFixtures -UnityVersion $env:UH_UNITY_VERSION)) {
+            Assert-UnityCompilationFixtureResults `
+              -Path (Join-Path $dir ('idle-editor/' + $idleFixture + '/results.xml')) `
+              -FixtureName $idleFixture
+          }
           foreach ($group in @(Get-UnityMigrationIsolationGroups)) {
             Assert-UnityCompilationFixtureResults `
               -Path (Join-Path $dir ('migration/' + $group.Name + '/results.xml')) `

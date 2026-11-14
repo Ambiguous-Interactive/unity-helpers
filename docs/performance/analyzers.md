@@ -70,20 +70,21 @@ command after resolving the failure. Temporary directories are excluded from Uni
 | [`WUH027`](#wuh027-implicit-caller-names)                                | Explicit caller names the compiler can provide                        |
 | [`WUH028`](#wuh028-fresh-pooled-collection-clears)                       | Redundant clears immediately after known Buffers rentals              |
 | [`WUH029`](#wuh029-member-declaration-order-opt-in)                      | Member order and nested-type placement (**off by default**)           |
+| [`WUH030`](#wuh030-explicit-string-comparison-and-culture-opt-in)        | Explicit string comparison and culture (**off by default**)           |
 
 These are a different family from the `WPROTO###` serialization diagnostics, and they follow a
 different policy on purpose:
 
-|                     | `WPROTO###`                                                  | `WUH###`                                                                                      |
-| ------------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
-| Reports             | A serialization contract that cannot be honoured             | An allocation or footgun in correct code                                                      |
-| Severity            | Error: the alternative is an exception from a shipped player | Warning by default; project overrides supported                                               |
-| Can fail your build | Yes, and it should                                           | Only when explicitly promoted to Error                                                        |
-| Default             | On                                                           | On, except `WUH010`, `WUH013`, `WUH018`, `WUH019`, `WUH021`, `WUH023`, `WUH024`, and `WUH029` |
+|                     | `WPROTO###`                                                  | `WUH###`                                                                                                |
+| ------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| Reports             | A serialization contract that cannot be honoured             | An allocation or footgun in correct code                                                                |
+| Severity            | Error: the alternative is an exception from a shipped player | Warning by default; project overrides supported                                                         |
+| Can fail your build | Yes, and it should                                           | Only when explicitly promoted to Error                                                                  |
+| Default             | On                                                           | On, except `WUH010`, `WUH013`, `WUH018`, `WUH019`, `WUH021`, `WUH023`, `WUH024`, `WUH029`, and `WUH030` |
 
 **A `WUH###` diagnostic defaults to a warning.** Taking a package upgrade does not promote it to
 a build error; an explicit Error override does. If your project treats warnings as errors, see
-[Turning one off](#turning-one-off). `WUH010`, `WUH013`, `WUH018`, `WUH019`, `WUH021`, `WUH023`, `WUH024`, and `WUH029` go further and are off until you ask for them, because
+[Turning one off](#turning-one-off). `WUH010`, `WUH013`, `WUH018`, `WUH019`, `WUH021`, `WUH023`, `WUH024`, `WUH029`, and `WUH030` go further and are off until you ask for them, because
 their shapes are correct code far more often than they are defects.
 
 The compact policy list offers a severity selector beside each diagnostic:
@@ -1345,3 +1346,40 @@ null handling: `false & null` is `false`, `true | null` is `true`, and `null ^ f
 is `null`. `left != right` does not preserve nullable exclusive-or semantics.
 There is no automatic fix because the analyzer cannot choose which evaluations
 and null states the application needs.
+
+## `WUH030`: explicit string comparison and culture (opt-in)
+
+Enable this suppressible warning through Analyzer Policies or a ruleset:
+
+```xml
+<Rule Id="WUH030" Action="Warning" />
+```
+
+The rule reports `string.Equals`, `Compare`, `StartsWith`, `EndsWith`, string-based
+`IndexOf` and `LastIndexOf`, and parameterless `ToLower` and `ToUpper` when the
+selected overload has no `StringComparison` or `CultureInfo` parameter. A Boolean
+ignore-case argument alone does not specify culture. Character-only searches,
+`Equals(object)`, `CompareOrdinal`, and invariant casing are unchanged. Calls on
+other types are excluded.
+
+Choose a policy for the data. For identifiers, an ordinal comparison is often
+appropriate; user-facing text may require the current culture. The analyzer
+provides no automatic rewrite because changing culture can change behavior.
+
+```csharp
+bool startsWithPrefix = "prefix-value".StartsWith("prefix", System.StringComparison.Ordinal);
+string lower = "TEXT".ToLower(System.Globalization.CultureInfo.CurrentCulture);
+```
+
+This is separate from `WUH018`, which covers string equality operators. Both are
+off by default for consumers. Explicit arguments are accepted as the caller's
+policy, including values selected at runtime.
+
+The real Analyzer Policy UI exposes the opt-in string rule. Both native Unity
+6000.6.7 light-skin captures pass without render errors or ruleset writes; the
+[qualification record](./analyzer-policy-string-policy-20261114.json) retains the
+fixture, controller, image/source hashes and process receipts.
+
+| Before                                                                           | After                                                                        |
+| -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| ![No matching string policy](../images/analyzer-policy-string-policy-before.png) | ![Explicit string policy](../images/analyzer-policy-string-policy-after.png) |

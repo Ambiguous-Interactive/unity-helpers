@@ -26,7 +26,8 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// Alpha zero is always transparent; other pixels are opaque at or above the threshold.
         /// Editor PNG masks honor the texture importer's alpha source.
         /// Separate alpha textures require original PNG pixels in the Editor.
-        /// Readable RGBA32, RGB24, ARGB32, BGRA32, Alpha8, RGB565 and RGBA4444 subregions copy only their selected base-mip pixels.
+        /// Readable RGBA32, RGB24, ARGB32, BGRA32, Alpha8, RGB565 and RGBA4444 textures are scanned directly.
+        /// The returned mask owns its Boolean array; source PNGs and other formats may need temporary pixels.
         /// </remarks>
         public static bool TryRead(
             Sprite sprite,
@@ -37,7 +38,14 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             try
             {
-                if (!TryReadPixels(sprite, out SpritePixelRegion region, out string failure))
+                if (
+                    !TryReadPixels(
+                        sprite,
+                        out SpritePixelRegion region,
+                        out string failure,
+                        borrowReadableTexture: true
+                    )
+                )
                 {
                     error = failure;
                     mask = default;
@@ -52,7 +60,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                     int offset = y * width;
                     for (int x = 0; x < width; ++x)
                     {
-                        byte alpha = region.GetPixel(x, y).a;
+                        byte alpha = region.GetAlpha(x, y);
                         opaque[offset + x] = alpha != 0 && alphaThreshold <= alpha;
                     }
                 }
@@ -74,10 +82,13 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
         }
 
+        /// <summary>Reads an owned snapshot, or borrows readable texture memory for a synchronous query.</summary>
+        /// <remarks>Borrowed views must not cross texture changes, destruction or user callbacks. Source PNGs always return owned pixels.</remarks>
         internal static bool TryReadPixels(
             Sprite sprite,
             out SpritePixelRegion region,
-            out string error
+            out string error,
+            bool borrowReadableTexture = false
         )
         {
             if (sprite == null)
@@ -181,7 +192,8 @@ namespace WallstopStudios.UnityHelpers.Utils
                     texture.width,
                     texture.height,
                     out region,
-                    out error
+                    out error,
+                    borrowReadableTexture: borrowReadableTexture
                 );
             }
             catch (Exception exception)
@@ -200,7 +212,8 @@ namespace WallstopStudios.UnityHelpers.Utils
             out SpritePixelRegion region,
             out string error,
             bool ignoreSourceAlpha = false,
-            bool alphaFromGrayscale = false
+            bool alphaFromGrayscale = false,
+            bool borrowReadableTexture = false
         )
         {
             int sourceTextureWidth = texture.width;
@@ -265,175 +278,44 @@ namespace WallstopStudios.UnityHelpers.Utils
             Color32[] pixels;
             int textureWidth;
             RectInt sourceRegion;
-            if (
-                (long)width * height < (long)sourceTextureWidth * sourceTextureHeight
-                && texture.format == TextureFormat.RGBA32
-            )
-            {
-                NativeArray<Color32> raw = texture.GetPixelData<Color32>(0);
-                if ((long)sourceTextureWidth * sourceTextureHeight != raw.Length)
-                {
-                    error = "The texture pixels do not match its dimensions.";
-                    region = default;
-                    return false;
-                }
-                pixels = new Color32[width * height];
-                int sourceWidth = sourceTextureWidth;
-                for (int row = 0; row < height; ++row)
-                {
-                    NativeArray<Color32>.Copy(
-                        raw,
-                        (yStart + row) * sourceWidth + xStart,
-                        pixels,
-                        row * width,
-                        width
-                    );
-                }
-                textureWidth = width;
-                sourceRegion = new RectInt(0, 0, width, height);
-            }
-            else if (
-                (long)width * height < (long)sourceTextureWidth * sourceTextureHeight
-                && texture.format == TextureFormat.RGB24
-            )
+            int bytesPerPixel = SpritePixelRegion.GetBytesPerPixel(texture.format);
+            if (0 < bytesPerPixel)
             {
                 NativeArray<byte> raw = texture.GetPixelData<byte>(0);
-                if ((long)sourceTextureWidth * sourceTextureHeight * 3 != raw.Length)
+                if ((long)sourceTextureWidth * sourceTextureHeight * bytesPerPixel != raw.Length)
                 {
                     error = "The texture pixels do not match its dimensions.";
                     region = default;
                     return false;
                 }
-                pixels = new Color32[width * height];
-                for (int row = 0; row < height; ++row)
+                SpritePixelRegion readable = new(
+                    raw,
+                    texture.format,
+                    sourceTextureWidth,
+                    new RectInt(xStart, yStart, width, height),
+                    maskPivot,
+                    unitsPerPixel,
+                    ignoreSourceAlpha,
+                    alphaFromGrayscale
+                );
+                if (borrowReadableTexture)
                 {
-                    int sourceOffset = ((yStart + row) * sourceTextureWidth + xStart) * 3;
-                    int destinationOffset = row * width;
-                    for (int column = 0; column < width; ++column)
+                    region = readable;
+                    error = null;
+                    return true;
+                }
+                pixels = new Color32[width * height];
+                for (int y = 0; y < height; ++y)
+                {
+                    for (int x = 0; x < width; ++x)
                     {
-                        int sourceIndex = sourceOffset + column * 3;
-                        pixels[destinationOffset + column] = new Color32(
-                            raw[sourceIndex],
-                            raw[sourceIndex + 1],
-                            raw[sourceIndex + 2],
-                            byte.MaxValue
-                        );
+                        pixels[y * width + x] = readable.GetPixel(x, y);
                     }
                 }
                 textureWidth = width;
                 sourceRegion = new RectInt(0, 0, width, height);
-            }
-            else if (
-                (long)width * height < (long)sourceTextureWidth * sourceTextureHeight
-                && (
-                    texture.format == TextureFormat.ARGB32 || texture.format == TextureFormat.BGRA32
-                )
-            )
-            {
-                NativeArray<Color32> raw = texture.GetPixelData<Color32>(0);
-                if ((long)sourceTextureWidth * sourceTextureHeight != raw.Length)
-                {
-                    error = "The texture pixels do not match its dimensions.";
-                    region = default;
-                    return false;
-                }
-                bool alphaFirst = texture.format == TextureFormat.ARGB32;
-                pixels = new Color32[width * height];
-                for (int row = 0; row < height; ++row)
-                {
-                    int sourceOffset = (yStart + row) * sourceTextureWidth + xStart;
-                    int destinationOffset = row * width;
-                    for (int column = 0; column < width; ++column)
-                    {
-                        Color32 encoded = raw[sourceOffset + column];
-                        pixels[destinationOffset + column] = alphaFirst
-                            ? new Color32(encoded.g, encoded.b, encoded.a, encoded.r)
-                            : new Color32(encoded.b, encoded.g, encoded.r, encoded.a);
-                    }
-                }
-                textureWidth = width;
-                sourceRegion = new RectInt(0, 0, width, height);
-            }
-            else if (
-                (long)width * height < (long)sourceTextureWidth * sourceTextureHeight
-                && (
-                    texture.format == TextureFormat.RGB565
-                    || texture.format == TextureFormat.RGBA4444
-                )
-            )
-            {
-                NativeArray<ushort> raw = texture.GetPixelData<ushort>(0);
-                if ((long)sourceTextureWidth * sourceTextureHeight != raw.Length)
-                {
-                    error = "The texture pixels do not match its dimensions.";
-                    region = default;
-                    return false;
-                }
-                bool rgb565 = texture.format == TextureFormat.RGB565;
-                pixels = new Color32[width * height];
-                for (int row = 0; row < height; ++row)
-                {
-                    int sourceOffset = (yStart + row) * sourceTextureWidth + xStart;
-                    int destinationOffset = row * width;
-                    for (int column = 0; column < width; ++column)
-                    {
-                        ushort encoded = raw[sourceOffset + column];
-                        byte red;
-                        byte green;
-                        byte blue;
-                        byte alpha;
-                        if (rgb565)
-                        {
-                            int redBits = encoded >> 11;
-                            int greenBits = (encoded >> 5) & 63;
-                            int blueBits = encoded & 31;
-                            red = (byte)((redBits << 3) | (redBits >> 2));
-                            green = (byte)((greenBits << 2) | (greenBits >> 4));
-                            blue = (byte)((blueBits << 3) | (blueBits >> 2));
-                            alpha = byte.MaxValue;
-                        }
-                        else
-                        {
-                            red = (byte)((encoded >> 12) * 17);
-                            green = (byte)(((encoded >> 8) & 15) * 17);
-                            blue = (byte)(((encoded >> 4) & 15) * 17);
-                            alpha = (byte)((encoded & 15) * 17);
-                        }
-                        pixels[destinationOffset + column] = new Color32(red, green, blue, alpha);
-                    }
-                }
-                textureWidth = width;
-                sourceRegion = new RectInt(0, 0, width, height);
-            }
-            else if (
-                (long)width * height < (long)sourceTextureWidth * sourceTextureHeight
-                && texture.format == TextureFormat.Alpha8
-            )
-            {
-                NativeArray<byte> raw = texture.GetPixelData<byte>(0);
-                if ((long)sourceTextureWidth * sourceTextureHeight != raw.Length)
-                {
-                    error = "The texture pixels do not match its dimensions.";
-                    region = default;
-                    return false;
-                }
-                pixels = new Color32[width * height];
-                for (int row = 0; row < height; ++row)
-                {
-                    int sourceOffset = (yStart + row) * sourceTextureWidth + xStart;
-                    int destinationOffset = row * width;
-                    for (int column = 0; column < width; ++column)
-                    {
-                        pixels[destinationOffset + column] = new Color32(
-                            0,
-                            0,
-                            0,
-                            raw[sourceOffset + column]
-                        );
-                    }
-                }
-                textureWidth = width;
-                sourceRegion = new RectInt(0, 0, width, height);
+                ignoreSourceAlpha = false;
+                alphaFromGrayscale = false;
             }
             else
             {

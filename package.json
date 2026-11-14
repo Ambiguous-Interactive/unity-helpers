@@ -204,6 +204,7 @@
     "test:configure-git-defaults": "bash scripts/tests/test-configure-git-defaults.sh",
     "test:github-token": "bash scripts/tests/test-github-token.sh",
     "test:agent-skill-migration": "node scripts/tests/test-agent-skill-migration.mjs",
+    "test:skill-stubs": "uv run --project scripts/python~ --locked pytest scripts/tests/test_skill_stubs.py -q",
     "test:normalize-container-git-config": "bash scripts/tests/test-normalize-container-git-config.sh",
     "validate:tests:native-build-readback": "pwsh -NoProfile -File scripts/tests/test-native-build-readback.ps1",
     "test:native-fault-capture": "pwsh -NoProfile -File scripts/tests/test-native-fault-capture.ps1",

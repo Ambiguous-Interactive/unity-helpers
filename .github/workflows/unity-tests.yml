@@ -1180,6 +1180,7 @@ jobs:
           label: Unity ${{ matrix.unity-version }} editmode
           expected-empty: false
           required-compilation-fixture: WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration.OdinMigrationDictionaryCompilationTests
+          unity-version: ${{ matrix.unity-version }}
 
       - name: Verify PlayMode tests actually ran
         id: verify_playmode
@@ -1884,6 +1885,7 @@ jobs:
           label: Unity ${{ matrix.unity-version }} editmode (SINGLE_THREADED)
           expected-empty: false
           required-compilation-fixture: WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration.OdinMigrationDictionaryCompilationTests
+          unity-version: ${{ matrix.unity-version }}
 
       - name: Verify PlayMode tests actually ran (SINGLE_THREADED)
         id: verify_playmode

@@ -1320,13 +1320,10 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         private static float DefaultTimeProvider()
         {
-            long timestamp = Stopwatch.GetTimestamp();
-            long elapsed = unchecked(timestamp - PoolStartTimestamp);
-            double seconds =
-                global::WallstopStudios.UnityHelpers.Core.Helper.StopwatchTimestamp.ToSeconds(
-                    elapsed
+            return (float)
+                global::WallstopStudios.UnityHelpers.Core.Helper.StopwatchTimestamp.SecondsSince(
+                    PoolStartTimestamp
                 );
-            return (float)seconds;
         }
 
         /// <summary>
@@ -2431,13 +2428,10 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         private static float DefaultTimeProvider()
         {
-            long timestamp = Stopwatch.GetTimestamp();
-            long elapsed = unchecked(timestamp - PoolStartTimestamp);
-            double seconds =
-                global::WallstopStudios.UnityHelpers.Core.Helper.StopwatchTimestamp.ToSeconds(
-                    elapsed
+            return (float)
+                global::WallstopStudios.UnityHelpers.Core.Helper.StopwatchTimestamp.SecondsSince(
+                    PoolStartTimestamp
                 );
-            return (float)seconds;
         }
 
         /// <summary>

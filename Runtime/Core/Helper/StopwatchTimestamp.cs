@@ -24,6 +24,14 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return TimeSpan.FromTicks(ticks);
         }
 
+        /// <summary>Returns signed seconds since a Stopwatch timestamp without allocating a timer.</summary>
+        /// <remarks>Uses wrapping counter subtraction and approximate floating-point conversion.</remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static double SecondsSince(long start)
+        {
+            return ToSeconds(unchecked(Stopwatch.GetTimestamp() - start));
+        }
+
         /// <summary>Converts signed Stopwatch ticks to seconds.</summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static double ToSeconds(long ticks)

@@ -1,0 +1,907 @@
+{
+  "environment": "Windows Unity 6000.6.7f1 Editor Mono, headless fresh processes. No player, contention, ARM, or native allocation-byte qualification.",
+  "preregistration": {
+    "sequence": ["baseline", "candidate", "candidate", "baseline", "baseline", "candidate"],
+    "baseline": "Existing PR clock conversion and pixel readers, with an ignored internal optional flag only for compiling the frozen view controls.",
+    "candidate": "Shared SecondsSince helper and synchronous texture views for masks and bounds; ink keeps owned snapshots.",
+    "controls": "No control workload may regress above 1.10 in two or more pairs. Publish all observations, including individual subject regressions.",
+    "boundsGate": "Across all 3 pairs and 3 actual-sprite patterns, geometric candidate/baseline ratio <= 0.95. Mask-overload patterns and all 4 ink patterns are controls.",
+    "poolHelperGate": "Across all 3 pairs and 4 shared paths, geometric candidate/baseline ratio <=1.05. This is reuse, not an extra speedup claim. Stack, Local and LocalLease are controls.",
+    "allocationGate": "All seven selected readable formats require a positive owned-array event control and no pixel-array events in the borrowed path. No byte or IL2CPP allocation claim."
+  },
+  "summary": {
+    "boundsGeometricRatio": 0.31698950377372626,
+    "poolHelperGeometricRatio": 0.9887738800614801,
+    "controlGate": true,
+    "boundsGate": true,
+    "poolHelperGate": true,
+    "ratios": {
+      "pool:Stack": [0.9762769838856795, 1.0295621103292376, 1.0118361977314274],
+      "pool:Local": [0.9979511228984781, 1.0505596396242582, 1.0163980847448901],
+      "pool:LocalLease": [0.9835261919623566, 1.0340616012617125, 1.012831435360047],
+      "pool:SharedLease": [0.9899041936426407, 0.9675065186041204, 0.9922798672018235],
+      "pool:SharedList": [0.9943676578396838, 0.9861105001002057, 0.9594257360366659],
+      "pool:SharedHashSet": [1.017076876908347, 0.9954439326628692, 0.9949089133179142],
+      "pool:SharedDictionary": [0.9977176148369153, 0.9714340388415188, 1.0005154051403682],
+      "bounds:False:0": [0.9998372733751185, 0.9888297976396415, 0.9947287814658053],
+      "bounds:False:1": [0.9591853970748616, 0.9839126977312013, 0.958225237810151],
+      "bounds:False:2": [0.981439681984059, 0.982572541745441, 0.9938354761454591],
+      "bounds:True:0": [0.030948552232885843, 0.03692196719147422, 0.03652498082199517],
+      "bounds:True:1": [0.9726147548971835, 0.9945340142210052, 0.9204518663061635],
+      "bounds:True:2": [0.9531598156740914, 1.0108544689216041, 0.9025532498579351],
+      "ink:0": [0.9727367832031725, 0.9984608184199988, 0.9936171245510145],
+      "ink:1": [0.9846692217963673, 1.0057446423545495, 0.9955955388377286],
+      "ink:2": [0.9707927973489133, 0.996820961997615, 1.0071690657634773],
+      "ink:3": [1.0695809602644804, 1.086428810105847, 1.0872285609127714]
+    },
+    "controls": {
+      "pool:Stack": [0.9762769838856795, 1.0295621103292376, 1.0118361977314274],
+      "pool:Local": [0.9979511228984781, 1.0505596396242582, 1.0163980847448901],
+      "pool:LocalLease": [0.9835261919623566, 1.0340616012617125, 1.012831435360047],
+      "bounds:False:0": [0.9998372733751185, 0.9888297976396415, 0.9947287814658053],
+      "bounds:False:1": [0.9591853970748616, 0.9839126977312013, 0.958225237810151],
+      "bounds:False:2": [0.981439681984059, 0.982572541745441, 0.9938354761454591],
+      "ink:0": [0.9727367832031725, 0.9984608184199988, 0.9936171245510145],
+      "ink:1": [0.9846692217963673, 1.0057446423545495, 0.9955955388377286],
+      "ink:2": [0.9707927973489133, 0.996820961997615, 1.0071690657634773],
+      "ink:3": [1.0695809602644804, 1.086428810105847, 1.0872285609127714]
+    },
+    "processMedians": [
+      {
+        "index": 1,
+        "variant": "baseline",
+        "medians": {
+          "pool:Stack": 25.09307861328125,
+          "pool:Local": 25.134944915771484,
+          "pool:LocalLease": 79.44869995117188,
+          "pool:SharedLease": 297.66998291015625,
+          "pool:SharedList": 298.6824035644531,
+          "pool:SharedHashSet": 320.33233642578125,
+          "pool:SharedDictionary": 324.24468994140625,
+          "bounds:False:0": 543.8629150390625,
+          "bounds:False:1": 26594.62890625,
+          "bounds:False:2": 24271.58203125,
+          "bounds:True:0": 95526.953125,
+          "bounds:True:1": 288590.625,
+          "bounds:True:2": 293467.96875,
+          "ink:0": 2568937.5,
+          "ink:1": 2475412.5,
+          "ink:2": 2348093.75,
+          "ink:3": 615357.8125
+        }
+      },
+      {
+        "index": 2,
+        "variant": "candidate",
+        "medians": {
+          "pool:Stack": 24.49779510498047,
+          "pool:Local": 25.083446502685547,
+          "pool:LocalLease": 78.13987731933594,
+          "pool:SharedLease": 294.6647644042969,
+          "pool:SharedList": 297.0001220703125,
+          "pool:SharedHashSet": 325.8026123046875,
+          "pool:SharedDictionary": 323.504638671875,
+          "bounds:False:0": 543.7744140625,
+          "bounds:False:1": 25509.1796875,
+          "bounds:False:2": 23821.09375,
+          "bounds:True:0": 2956.4208984375,
+          "bounds:True:1": 280687.5,
+          "bounds:True:2": 279721.875,
+          "ink:0": 2498900.0,
+          "ink:1": 2437462.5,
+          "ink:2": 2279512.5,
+          "ink:3": 658175.0
+        }
+      },
+      {
+        "index": 3,
+        "variant": "candidate",
+        "medians": {
+          "pool:Stack": 26.929664611816406,
+          "pool:Local": 30.514717102050778,
+          "pool:LocalLease": 85.03837585449219,
+          "pool:SharedLease": 304.04205322265625,
+          "pool:SharedList": 307.8269958496094,
+          "pool:SharedHashSet": 334.38568115234375,
+          "pool:SharedDictionary": 333.08258056640625,
+          "bounds:False:0": 539.9017333984375,
+          "bounds:False:1": 25736.5234375,
+          "bounds:False:2": 24209.5703125,
+          "bounds:True:0": 3059.1796875,
+          "bounds:True:1": 296236.71875,
+          "bounds:True:2": 295681.25,
+          "ink:0": 2586675.0,
+          "ink:1": 2501387.5,
+          "ink:2": 2345825.0,
+          "ink:3": 675668.75
+        }
+      },
+      {
+        "index": 4,
+        "variant": "baseline",
+        "medians": {
+          "pool:Stack": 26.15642547607422,
+          "pool:Local": 29.046154022216797,
+          "pool:LocalLease": 82.23724365234375,
+          "pool:SharedLease": 314.25323486328125,
+          "pool:SharedList": 312.16278076171875,
+          "pool:SharedHashSet": 335.9161376953125,
+          "pool:SharedDictionary": 342.877197265625,
+          "bounds:False:0": 546.0006713867188,
+          "bounds:False:1": 26157.32421875,
+          "bounds:False:2": 24638.96484375,
+          "bounds:True:0": 82855.2734375,
+          "bounds:True:1": 297864.84375,
+          "bounds:True:2": 292506.25,
+          "ink:0": 2590662.5,
+          "ink:1": 2487100.0,
+          "ink:2": 2353306.25,
+          "ink:3": 621917.1875
+        }
+      },
+      {
+        "index": 5,
+        "variant": "baseline",
+        "medians": {
+          "pool:Stack": 24.93724822998047,
+          "pool:Local": 25.93250274658203,
+          "pool:LocalLease": 80.59616088867188,
+          "pool:SharedLease": 307.9376220703125,
+          "pool:SharedList": 314.2822265625,
+          "pool:SharedHashSet": 331.1859130859375,
+          "pool:SharedDictionary": 334.54132080078125,
+          "bounds:False:0": 547.9736328125,
+          "bounds:False:1": 26425.1953125,
+          "bounds:False:2": 24792.1875,
+          "bounds:True:0": 83001.171875,
+          "bounds:True:1": 311485.9375,
+          "bounds:True:2": 318956.25,
+          "ink:0": 2575250.0,
+          "ink:1": 2469087.5,
+          "ink:2": 2325093.75,
+          "ink:3": 615570.3125
+        }
+      },
+      {
+        "index": 6,
+        "variant": "candidate",
+        "medians": {
+          "pool:Stack": 25.232410430908203,
+          "pool:Local": 26.357746124267578,
+          "pool:LocalLease": 81.63032531738281,
+          "pool:SharedLease": 305.560302734375,
+          "pool:SharedList": 301.53045654296875,
+          "pool:SharedHashSet": 329.49981689453125,
+          "pool:SharedDictionary": 334.7137451171875,
+          "bounds:False:0": 545.0851440429688,
+          "bounds:False:1": 25321.2890625,
+          "bounds:False:2": 24639.35546875,
+          "bounds:True:0": 3031.6162109375,
+          "bounds:True:1": 286707.8125,
+          "bounds:True:2": 287875.0,
+          "ink:0": 2558812.5,
+          "ink:1": 2458212.5,
+          "ink:2": 2341762.5,
+          "ink:3": 669265.625
+        }
+      }
+    ]
+  },
+  "processes": [
+    {
+      "index": 1,
+      "variant": "baseline",
+      "cases": 43,
+      "healthy": true,
+      "module": "c2747f6c-9b3a-4fdf-9d03-e5ec3c896627",
+      "dllSha256": "6FF943851B470B4F1F14B5EF6315674A569E87A715544EA586EBE07F01B2C955",
+      "before": {
+        "Tests/Runtime/Pool/GlobalPoolRegistryTests.cs": "633918268082A50659011937E636286CC8120E0FAEA97DA33740611A9F1F6A91",
+        "Runtime/Utils/Buffers.cs": "A5C33C717AEFB19665B48CDA128EB6DE1387E22E195012AF7E23ECF4D5A5C86E",
+        "Runtime/Utils/DisposalLease.cs": "9B4189DE89CC520FACD67E05BD22A3BB999167E59FD963CD952EA60B8768D24D",
+        "Runtime/Utils/LocalPool.cs": "710868F78F189026095E324E69292884C081D2E5A086C2179DEA8F3CFA97E38D",
+        "Runtime/Core/Helper/StopwatchTimestamp.cs": "E2E8680863989DCBC5FC81B9178396BB6C3C103AA8FCEEA031809F1261297840",
+        "Tests/Runtime/Utils/SpriteArtBoundsTimingTests.cs": "6D4E8DF43A04A77CCB24596A19FC2508F07B69D7A0FB04434C36226A7F98F4BC",
+        "Runtime/Utils/SpriteArtBounds.Ink.cs": "97DD70D7B65171233A035D6578AA06AE9594FC65CD09E6D78B39B8C56C18F66E",
+        "Tests/Runtime/Helper/StopwatchTimestampTests.cs": "A016AE5DA7867A034644FEF319D4421A7E189AB416DC4B47EF986A2BFFF7CA9B",
+        "Runtime/Utils/SpritePixelRegion.cs": "7638D0AF938453246D2C5F2E3517DF19243B5FD45B1DFCDB942FDB6EAF565517",
+        "Tests/Runtime/Utils/SpritePixelViewTests.cs": "7172D72E7ED68DCA90B1D27A0D4CF257A1F4D52E7B0EBE1044D8556DDEF649E2",
+        "Tests/Runtime/Pool/WallstopGenericPoolTests.cs": "A6B63A268690DC1197DC726846AEF0D371CC348ECEDDA1FE048BA3F0457575E2",
+        "Runtime/Utils/SpriteMaskReader.cs": "1A58B543C4D31C3B60B17FC1AE888B2F143A2C2775F264DD05956A78BF00FEC2",
+        "Runtime/Utils/ThreadLocalArrayPool.cs": "071ADECDBCA85D65CD66A69F80951A612DA8BE88F1C6707679B8C13A26AC1841",
+        "Tests/Runtime/Utils/SpriteInkRegionTimingTests.cs": "3AE822D08460FC9ED163A02897750192389CEE1AB516490107294D13FD1FC8F6",
+        "Runtime/Utils/PoolPurgeSettings.cs": "4FA35560B7C13346118D4A69249B552780137A1E576043F27C6436205173AD21",
+        "Tests/Runtime/Performance/LocalPoolPerformanceTests.cs": "7D52AA71F6D4348DBBD1C7A4CD7439B4CCEF075E5F0F07C7AA1E9F432E2974FE",
+        "Runtime/Utils/SpriteArtBounds.cs": "72A1D12D7D12E9D8F76BA86414AB51AF897788119D0D28ED2BDAA4238BA6449F"
+      },
+      "after": {
+        "Tests/Runtime/Pool/GlobalPoolRegistryTests.cs": "633918268082A50659011937E636286CC8120E0FAEA97DA33740611A9F1F6A91",
+        "Runtime/Utils/Buffers.cs": "A5C33C717AEFB19665B48CDA128EB6DE1387E22E195012AF7E23ECF4D5A5C86E",
+        "Runtime/Utils/DisposalLease.cs": "9B4189DE89CC520FACD67E05BD22A3BB999167E59FD963CD952EA60B8768D24D",
+        "Runtime/Utils/LocalPool.cs": "710868F78F189026095E324E69292884C081D2E5A086C2179DEA8F3CFA97E38D",
+        "Runtime/Core/Helper/StopwatchTimestamp.cs": "E2E8680863989DCBC5FC81B9178396BB6C3C103AA8FCEEA031809F1261297840",
+        "Tests/Runtime/Utils/SpriteArtBoundsTimingTests.cs": "6D4E8DF43A04A77CCB24596A19FC2508F07B69D7A0FB04434C36226A7F98F4BC",
+        "Runtime/Utils/SpriteArtBounds.Ink.cs": "97DD70D7B65171233A035D6578AA06AE9594FC65CD09E6D78B39B8C56C18F66E",
+        "Tests/Runtime/Helper/StopwatchTimestampTests.cs": "A016AE5DA7867A034644FEF319D4421A7E189AB416DC4B47EF986A2BFFF7CA9B",
+        "Runtime/Utils/SpritePixelRegion.cs": "7638D0AF938453246D2C5F2E3517DF19243B5FD45B1DFCDB942FDB6EAF565517",
+        "Tests/Runtime/Utils/SpritePixelViewTests.cs": "7172D72E7ED68DCA90B1D27A0D4CF257A1F4D52E7B0EBE1044D8556DDEF649E2",
+        "Tests/Runtime/Pool/WallstopGenericPoolTests.cs": "A6B63A268690DC1197DC726846AEF0D371CC348ECEDDA1FE048BA3F0457575E2",
+        "Runtime/Utils/SpriteMaskReader.cs": "1A58B543C4D31C3B60B17FC1AE888B2F143A2C2775F264DD05956A78BF00FEC2",
+        "Runtime/Utils/ThreadLocalArrayPool.cs": "071ADECDBCA85D65CD66A69F80951A612DA8BE88F1C6707679B8C13A26AC1841",
+        "Tests/Runtime/Utils/SpriteInkRegionTimingTests.cs": "3AE822D08460FC9ED163A02897750192389CEE1AB516490107294D13FD1FC8F6",
+        "Runtime/Utils/PoolPurgeSettings.cs": "4FA35560B7C13346118D4A69249B552780137A1E576043F27C6436205173AD21",
+        "Tests/Runtime/Performance/LocalPoolPerformanceTests.cs": "7D52AA71F6D4348DBBD1C7A4CD7439B4CCEF075E5F0F07C7AA1E9F432E2974FE",
+        "Runtime/Utils/SpriteArtBounds.cs": "72A1D12D7D12E9D8F76BA86414AB51AF897788119D0D28ED2BDAA4238BA6449F"
+      },
+      "boundsLoadedMethodIdentities": [
+        [
+          "False",
+          "c2747f6c-9b3a-4fdf-9d03-e5ec3c896627",
+          "F9E245E93E57FC59B86C57D2BFE7033C2F00BC9B1DC1F254F087F16B18DF5321"
+        ],
+        [
+          "False",
+          "c2747f6c-9b3a-4fdf-9d03-e5ec3c896627",
+          "F9E245E93E57FC59B86C57D2BFE7033C2F00BC9B1DC1F254F087F16B18DF5321"
+        ],
+        [
+          "False",
+          "c2747f6c-9b3a-4fdf-9d03-e5ec3c896627",
+          "F9E245E93E57FC59B86C57D2BFE7033C2F00BC9B1DC1F254F087F16B18DF5321"
+        ],
+        [
+          "True",
+          "c2747f6c-9b3a-4fdf-9d03-e5ec3c896627",
+          "95265954FD72D82998680ED5B794E2CC75D42AD63E35FA9BE3801DB77F59D8D4"
+        ],
+        [
+          "True",
+          "c2747f6c-9b3a-4fdf-9d03-e5ec3c896627",
+          "95265954FD72D82998680ED5B794E2CC75D42AD63E35FA9BE3801DB77F59D8D4"
+        ],
+        [
+          "True",
+          "c2747f6c-9b3a-4fdf-9d03-e5ec3c896627",
+          "95265954FD72D82998680ED5B794E2CC75D42AD63E35FA9BE3801DB77F59D8D4"
+        ]
+      ],
+      "processReceipt": {
+        "ProcessId": 28136,
+        "RawExitCode": 0,
+        "StandardOutputEndObserved": true,
+        "StandardErrorEndObserved": true,
+        "OutputDrainStopped": false,
+        "State": "observed",
+        "ExecutablePath": "C:\\Program Files\\Unity\\Hub\\Editor\\6000.6.7f1\\Editor\\Unity.exe",
+        "MachineName": "SPICY"
+      }
+    },
+    {
+      "index": 2,
+      "variant": "candidate",
+      "cases": 43,
+      "healthy": true,
+      "module": "d2f99c7a-9e89-4da9-9af7-d2ce6349f21c",
+      "dllSha256": "85714F6A2A73A4C7CB6223F8CA0573A591886B6E2E21D689CE402CC054F43B87",
+      "before": {
+        "Tests/Runtime/Pool/GlobalPoolRegistryTests.cs": "633918268082A50659011937E636286CC8120E0FAEA97DA33740611A9F1F6A91",
+        "Runtime/Utils/Buffers.cs": "14BC8A9143683B9F4DCF6957292E19C1A2E9AF805F543108645DCFDDA961BA62",
+        "Runtime/Utils/DisposalLease.cs": "9B4189DE89CC520FACD67E05BD22A3BB999167E59FD963CD952EA60B8768D24D",
+        "Runtime/Utils/LocalPool.cs": "710868F78F189026095E324E69292884C081D2E5A086C2179DEA8F3CFA97E38D",
+        "Runtime/Core/Helper/StopwatchTimestamp.cs": "E2E8680863989DCBC5FC81B9178396BB6C3C103AA8FCEEA031809F1261297840",
+        "Tests/Runtime/Utils/SpriteArtBoundsTimingTests.cs": "6D4E8DF43A04A77CCB24596A19FC2508F07B69D7A0FB04434C36226A7F98F4BC",
+        "Runtime/Utils/SpriteArtBounds.Ink.cs": "97DD70D7B65171233A035D6578AA06AE9594FC65CD09E6D78B39B8C56C18F66E",
+        "Tests/Runtime/Helper/StopwatchTimestampTests.cs": "A016AE5DA7867A034644FEF319D4421A7E189AB416DC4B47EF986A2BFFF7CA9B",
+        "Runtime/Utils/SpritePixelRegion.cs": "F1F4C02D2F233825E409690B211239D0B63418D58AFB8BB8682B45EA3847A437",
+        "Tests/Runtime/Utils/SpritePixelViewTests.cs": "7172D72E7ED68DCA90B1D27A0D4CF257A1F4D52E7B0EBE1044D8556DDEF649E2",
+        "Tests/Runtime/Pool/WallstopGenericPoolTests.cs": "A6B63A268690DC1197DC726846AEF0D371CC348ECEDDA1FE048BA3F0457575E2",
+        "Runtime/Utils/SpriteMaskReader.cs": "3A8F4059F2FA222C512B31DCED436519222A813695770788F5F60473A7463DE3",
+        "Runtime/Utils/ThreadLocalArrayPool.cs": "071ADECDBCA85D65CD66A69F80951A612DA8BE88F1C6707679B8C13A26AC1841",
+        "Tests/Runtime/Utils/SpriteInkRegionTimingTests.cs": "3AE822D08460FC9ED163A02897750192389CEE1AB516490107294D13FD1FC8F6",
+        "Runtime/Utils/PoolPurgeSettings.cs": "4FA35560B7C13346118D4A69249B552780137A1E576043F27C6436205173AD21",
+        "Tests/Runtime/Performance/LocalPoolPerformanceTests.cs": "7D52AA71F6D4348DBBD1C7A4CD7439B4CCEF075E5F0F07C7AA1E9F432E2974FE",
+        "Runtime/Utils/SpriteArtBounds.cs": "6CAC2B767E01734A9DA7D4EE189E6B724A51590E2F14EFAF9929ECEDC6648F4E"
+      },
+      "after": {
+        "Tests/Runtime/Pool/GlobalPoolRegistryTests.cs": "633918268082A50659011937E636286CC8120E0FAEA97DA33740611A9F1F6A91",
+        "Runtime/Utils/Buffers.cs": "14BC8A9143683B9F4DCF6957292E19C1A2E9AF805F543108645DCFDDA961BA62",
+        "Runtime/Utils/DisposalLease.cs": "9B4189DE89CC520FACD67E05BD22A3BB999167E59FD963CD952EA60B8768D24D",
+        "Runtime/Utils/LocalPool.cs": "710868F78F189026095E324E69292884C081D2E5A086C2179DEA8F3CFA97E38D",
+        "Runtime/Core/Helper/StopwatchTimestamp.cs": "E2E8680863989DCBC5FC81B9178396BB6C3C103AA8FCEEA031809F1261297840",
+        "Tests/Runtime/Utils/SpriteArtBoundsTimingTests.cs": "6D4E8DF43A04A77CCB24596A19FC2508F07B69D7A0FB04434C36226A7F98F4BC",
+        "Runtime/Utils/SpriteArtBounds.Ink.cs": "97DD70D7B65171233A035D6578AA06AE9594FC65CD09E6D78B39B8C56C18F66E",
+        "Tests/Runtime/Helper/StopwatchTimestampTests.cs": "A016AE5DA7867A034644FEF319D4421A7E189AB416DC4B47EF986A2BFFF7CA9B",
+        "Runtime/Utils/SpritePixelRegion.cs": "F1F4C02D2F233825E409690B211239D0B63418D58AFB8BB8682B45EA3847A437",
+        "Tests/Runtime/Utils/SpritePixelViewTests.cs": "7172D72E7ED68DCA90B1D27A0D4CF257A1F4D52E7B0EBE1044D8556DDEF649E2",
+        "Tests/Runtime/Pool/WallstopGenericPoolTests.cs": "A6B63A268690DC1197DC726846AEF0D371CC348ECEDDA1FE048BA3F0457575E2",
+        "Runtime/Utils/SpriteMaskReader.cs": "3A8F4059F2FA222C512B31DCED436519222A813695770788F5F60473A7463DE3",
+        "Runtime/Utils/ThreadLocalArrayPool.cs": "071ADECDBCA85D65CD66A69F80951A612DA8BE88F1C6707679B8C13A26AC1841",
+        "Tests/Runtime/Utils/SpriteInkRegionTimingTests.cs": "3AE822D08460FC9ED163A02897750192389CEE1AB516490107294D13FD1FC8F6",
+        "Runtime/Utils/PoolPurgeSettings.cs": "4FA35560B7C13346118D4A69249B552780137A1E576043F27C6436205173AD21",
+        "Tests/Runtime/Performance/LocalPoolPerformanceTests.cs": "7D52AA71F6D4348DBBD1C7A4CD7439B4CCEF075E5F0F07C7AA1E9F432E2974FE",
+        "Runtime/Utils/SpriteArtBounds.cs": "6CAC2B767E01734A9DA7D4EE189E6B724A51590E2F14EFAF9929ECEDC6648F4E"
+      },
+      "boundsLoadedMethodIdentities": [
+        [
+          "False",
+          "d2f99c7a-9e89-4da9-9af7-d2ce6349f21c",
+          "BC4CFA4BCC57DCD4971A3D35489FAAE018B1801F5A981F5E9233928CC05B7656"
+        ],
+        [
+          "False",
+          "d2f99c7a-9e89-4da9-9af7-d2ce6349f21c",
+          "BC4CFA4BCC57DCD4971A3D35489FAAE018B1801F5A981F5E9233928CC05B7656"
+        ],
+        [
+          "False",
+          "d2f99c7a-9e89-4da9-9af7-d2ce6349f21c",
+          "BC4CFA4BCC57DCD4971A3D35489FAAE018B1801F5A981F5E9233928CC05B7656"
+        ],
+        [
+          "True",
+          "d2f99c7a-9e89-4da9-9af7-d2ce6349f21c",
+          "D51068F0C62B374B07EBD1D6C8CBA51ECE1566A7C1E346D8C072403812B55323"
+        ],
+        [
+          "True",
+          "d2f99c7a-9e89-4da9-9af7-d2ce6349f21c",
+          "D51068F0C62B374B07EBD1D6C8CBA51ECE1566A7C1E346D8C072403812B55323"
+        ],
+        [
+          "True",
+          "d2f99c7a-9e89-4da9-9af7-d2ce6349f21c",
+          "D51068F0C62B374B07EBD1D6C8CBA51ECE1566A7C1E346D8C072403812B55323"
+        ]
+      ],
+      "processReceipt": {
+        "ProcessId": 64728,
+        "RawExitCode": 0,
+        "StandardOutputEndObserved": true,
+        "StandardErrorEndObserved": true,
+        "OutputDrainStopped": false,
+        "State": "observed",
+        "ExecutablePath": "C:\\Program Files\\Unity\\Hub\\Editor\\6000.6.7f1\\Editor\\Unity.exe",
+        "MachineName": "SPICY"
+      }
+    },
+    {
+      "index": 3,
+      "variant": "candidate",
+      "cases": 43,
+      "healthy": true,
+      "module": "d2f99c7a-9e89-4da9-9af7-d2ce6349f21c",
+      "dllSha256": "85714F6A2A73A4C7CB6223F8CA0573A591886B6E2E21D689CE402CC054F43B87",
+      "before": {
+        "Tests/Runtime/Pool/GlobalPoolRegistryTests.cs": "633918268082A50659011937E636286CC8120E0FAEA97DA33740611A9F1F6A91",
+        "Runtime/Utils/Buffers.cs": "14BC8A9143683B9F4DCF6957292E19C1A2E9AF805F543108645DCFDDA961BA62",
+        "Runtime/Utils/DisposalLease.cs": "9B4189DE89CC520FACD67E05BD22A3BB999167E59FD963CD952EA60B8768D24D",
+        "Runtime/Utils/LocalPool.cs": "710868F78F189026095E324E69292884C081D2E5A086C2179DEA8F3CFA97E38D",
+        "Runtime/Core/Helper/StopwatchTimestamp.cs": "E2E8680863989DCBC5FC81B9178396BB6C3C103AA8FCEEA031809F1261297840",
+        "Tests/Runtime/Utils/SpriteArtBoundsTimingTests.cs": "6D4E8DF43A04A77CCB24596A19FC2508F07B69D7A0FB04434C36226A7F98F4BC",
+        "Runtime/Utils/SpriteArtBounds.Ink.cs": "97DD70D7B65171233A035D6578AA06AE9594FC65CD09E6D78B39B8C56C18F66E",
+        "Tests/Runtime/Helper/StopwatchTimestampTests.cs": "A016AE5DA7867A034644FEF319D4421A7E189AB416DC4B47EF986A2BFFF7CA9B",
+        "Runtime/Utils/SpritePixelRegion.cs": "F1F4C02D2F233825E409690B211239D0B63418D58AFB8BB8682B45EA3847A437",
+        "Tests/Runtime/Utils/SpritePixelViewTests.cs": "7172D72E7ED68DCA90B1D27A0D4CF257A1F4D52E7B0EBE1044D8556DDEF649E2",
+        "Tests/Runtime/Pool/WallstopGenericPoolTests.cs": "A6B63A268690DC1197DC726846AEF0D371CC348ECEDDA1FE048BA3F0457575E2",
+        "Runtime/Utils/SpriteMaskReader.cs": "3A8F4059F2FA222C512B31DCED436519222A813695770788F5F60473A7463DE3",
+        "Runtime/Utils/ThreadLocalArrayPool.cs": "071ADECDBCA85D65CD66A69F80951A612DA8BE88F1C6707679B8C13A26AC1841",
+        "Tests/Runtime/Utils/SpriteInkRegionTimingTests.cs": "3AE822D08460FC9ED163A02897750192389CEE1AB516490107294D13FD1FC8F6",
+        "Runtime/Utils/PoolPurgeSettings.cs": "4FA35560B7C13346118D4A69249B552780137A1E576043F27C6436205173AD21",
+        "Tests/Runtime/Performance/LocalPoolPerformanceTests.cs": "7D52AA71F6D4348DBBD1C7A4CD7439B4CCEF075E5F0F07C7AA1E9F432E2974FE",
+        "Runtime/Utils/SpriteArtBounds.cs": "6CAC2B767E01734A9DA7D4EE189E6B724A51590E2F14EFAF9929ECEDC6648F4E"
+      },
+      "after": {
+        "Tests/Runtime/Pool/GlobalPoolRegistryTests.cs": "633918268082A50659011937E636286CC8120E0FAEA97DA33740611A9F1F6A91",
+        "Runtime/Utils/Buffers.cs": "14BC8A9143683B9F4DCF6957292E19C1A2E9AF805F543108645DCFDDA961BA62",
+        "Runtime/Utils/DisposalLease.cs": "9B4189DE89CC520FACD67E05BD22A3BB999167E59FD963CD952EA60B8768D24D",
+        "Runtime/Utils/LocalPool.cs": "710868F78F189026095E324E69292884C081D2E5A086C2179DEA8F3CFA97E38D",
+        "Runtime/Core/Helper/StopwatchTimestamp.cs": "E2E8680863989DCBC5FC81B9178396BB6C3C103AA8FCEEA031809F1261297840",
+        "Tests/Runtime/Utils/SpriteArtBoundsTimingTests.cs": "6D4E8DF43A04A77CCB24596A19FC2508F07B69D7A0FB04434C36226A7F98F4BC",
+        "Runtime/Utils/SpriteArtBounds.Ink.cs": "97DD70D7B65171233A035D6578AA06AE9594FC65CD09E6D78B39B8C56C18F66E",
+        "Tests/Runtime/Helper/StopwatchTimestampTests.cs": "A016AE5DA7867A034644FEF319D4421A7E189AB416DC4B47EF986A2BFFF7CA9B",
+        "Runtime/Utils/SpritePixelRegion.cs": "F1F4C02D2F233825E409690B211239D0B63418D58AFB8BB8682B45EA3847A437",
+        "Tests/Runtime/Utils/SpritePixelViewTests.cs": "7172D72E7ED68DCA90B1D27A0D4CF257A1F4D52E7B0EBE1044D8556DDEF649E2",
+        "Tests/Runtime/Pool/WallstopGenericPoolTests.cs": "A6B63A268690DC1197DC726846AEF0D371CC348ECEDDA1FE048BA3F0457575E2",
+        "Runtime/Utils/SpriteMaskReader.cs": "3A8F4059F2FA222C512B31DCED436519222A813695770788F5F60473A7463DE3",
+        "Runtime/Utils/ThreadLocalArrayPool.cs": "071ADECDBCA85D65CD66A69F80951A612DA8BE88F1C6707679B8C13A26AC1841",
+        "Tests/Runtime/Utils/SpriteInkRegionTimingTests.cs": "3AE822D08460FC9ED163A02897750192389CEE1AB516490107294D13FD1FC8F6",
+        "Runtime/Utils/PoolPurgeSettings.cs": "4FA35560B7C13346118D4A69249B552780137A1E576043F27C6436205173AD21",
+        "Tests/Runtime/Performance/LocalPoolPerformanceTests.cs": "7D52AA71F6D4348DBBD1C7A4CD7439B4CCEF075E5F0F07C7AA1E9F432E2974FE",
+        "Runtime/Utils/SpriteArtBounds.cs": "6CAC2B767E01734A9DA7D4EE189E6B724A51590E2F14EFAF9929ECEDC6648F4E"
+      },
+      "boundsLoadedMethodIdentities": [
+        [
+          "False",
+          "d2f99c7a-9e89-4da9-9af7-d2ce6349f21c",
+          "BC4CFA4BCC57DCD4971A3D35489FAAE018B1801F5A981F5E9233928CC05B7656"
+        ],
+        [
+          "False",
+          "d2f99c7a-9e89-4da9-9af7-d2ce6349f21c",
+          "BC4CFA4BCC57DCD4971A3D35489FAAE018B1801F5A981F5E9233928CC05B7656"
+        ],
+        [
+          "False",
+          "d2f99c7a-9e89-4da9-9af7-d2ce6349f21c",
+          "BC4CFA4BCC57DCD4971A3D35489FAAE018B1801F5A981F5E9233928CC05B7656"
+        ],
+        [
+          "True",
+          "d2f99c7a-9e89-4da9-9af7-d2ce6349f21c",
+          "D51068F0C62B374B07EBD1D6C8CBA51ECE1566A7C1E346D8C072403812B55323"
+        ],
+        [
+          "True",
+          "d2f99c7a-9e89-4da9-9af7-d2ce6349f21c",
+          "D51068F0C62B374B07EBD1D6C8CBA51ECE1566A7C1E346D8C072403812B55323"
+        ],
+        [
+          "True",
+          "d2f99c7a-9e89-4da9-9af7-d2ce6349f21c",
+          "D51068F0C62B374B07EBD1D6C8CBA51ECE1566A7C1E346D8C072403812B55323"
+        ]
+      ],
+      "processReceipt": {
+        "ProcessId": 14284,
+        "RawExitCode": 0,
+        "StandardOutputEndObserved": true,
+        "StandardErrorEndObserved": true,
+        "OutputDrainStopped": false,
+        "State": "observed",
+        "ExecutablePath": "C:\\Program Files\\Unity\\Hub\\Editor\\6000.6.7f1\\Editor\\Unity.exe",
+        "MachineName": "SPICY"
+      }
+    },
+    {
+      "index": 4,
+      "variant": "baseline",
+      "cases": 43,
+      "healthy": true,
+      "module": "c2747f6c-9b3a-4fdf-9d03-e5ec3c896627",
+      "dllSha256": "6FF943851B470B4F1F14B5EF6315674A569E87A715544EA586EBE07F01B2C955",
+      "before": {
+        "Tests/Runtime/Pool/GlobalPoolRegistryTests.cs": "633918268082A50659011937E636286CC8120E0FAEA97DA33740611A9F1F6A91",
+        "Runtime/Utils/Buffers.cs": "A5C33C717AEFB19665B48CDA128EB6DE1387E22E195012AF7E23ECF4D5A5C86E",
+        "Runtime/Utils/DisposalLease.cs": "9B4189DE89CC520FACD67E05BD22A3BB999167E59FD963CD952EA60B8768D24D",
+        "Runtime/Utils/LocalPool.cs": "710868F78F189026095E324E69292884C081D2E5A086C2179DEA8F3CFA97E38D",
+        "Runtime/Core/Helper/StopwatchTimestamp.cs": "E2E8680863989DCBC5FC81B9178396BB6C3C103AA8FCEEA031809F1261297840",
+        "Tests/Runtime/Utils/SpriteArtBoundsTimingTests.cs": "6D4E8DF43A04A77CCB24596A19FC2508F07B69D7A0FB04434C36226A7F98F4BC",
+        "Runtime/Utils/SpriteArtBounds.Ink.cs": "97DD70D7B65171233A035D6578AA06AE9594FC65CD09E6D78B39B8C56C18F66E",
+        "Tests/Runtime/Helper/StopwatchTimestampTests.cs": "A016AE5DA7867A034644FEF319D4421A7E189AB416DC4B47EF986A2BFFF7CA9B",
+        "Runtime/Utils/SpritePixelRegion.cs": "7638D0AF938453246D2C5F2E3517DF19243B5FD45B1DFCDB942FDB6EAF565517",
+        "Tests/Runtime/Utils/SpritePixelViewTests.cs": "7172D72E7ED68DCA90B1D27A0D4CF257A1F4D52E7B0EBE1044D8556DDEF649E2",
+        "Tests/Runtime/Pool/WallstopGenericPoolTests.cs": "A6B63A268690DC1197DC726846AEF0D371CC348ECEDDA1FE048BA3F0457575E2",
+        "Runtime/Utils/SpriteMaskReader.cs": "1A58B543C4D31C3B60B17FC1AE888B2F143A2C2775F264DD05956A78BF00FEC2",
+        "Runtime/Utils/ThreadLocalArrayPool.cs": "071ADECDBCA85D65CD66A69F80951A612DA8BE88F1C6707679B8C13A26AC1841",
+        "Tests/Runtime/Utils/SpriteInkRegionTimingTests.cs": "3AE822D08460FC9ED163A02897750192389CEE1AB516490107294D13FD1FC8F6",
+        "Runtime/Utils/PoolPurgeSettings.cs": "4FA35560B7C13346118D4A69249B552780137A1E576043F27C6436205173AD21",
+        "Tests/Runtime/Performance/LocalPoolPerformanceTests.cs": "7D52AA71F6D4348DBBD1C7A4CD7439B4CCEF075E5F0F07C7AA1E9F432E2974FE",
+        "Runtime/Utils/SpriteArtBounds.cs": "72A1D12D7D12E9D8F76BA86414AB51AF897788119D0D28ED2BDAA4238BA6449F"
+      },
+      "after": {
+        "Tests/Runtime/Pool/GlobalPoolRegistryTests.cs": "633918268082A50659011937E636286CC8120E0FAEA97DA33740611A9F1F6A91",
+        "Runtime/Utils/Buffers.cs": "A5C33C717AEFB19665B48CDA128EB6DE1387E22E195012AF7E23ECF4D5A5C86E",
+        "Runtime/Utils/DisposalLease.cs": "9B4189DE89CC520FACD67E05BD22A3BB999167E59FD963CD952EA60B8768D24D",
+        "Runtime/Utils/LocalPool.cs": "710868F78F189026095E324E69292884C081D2E5A086C2179DEA8F3CFA97E38D",
+        "Runtime/Core/Helper/StopwatchTimestamp.cs": "E2E8680863989DCBC5FC81B9178396BB6C3C103AA8FCEEA031809F1261297840",
+        "Tests/Runtime/Utils/SpriteArtBoundsTimingTests.cs": "6D4E8DF43A04A77CCB24596A19FC2508F07B69D7A0FB04434C36226A7F98F4BC",
+        "Runtime/Utils/SpriteArtBounds.Ink.cs": "97DD70D7B65171233A035D6578AA06AE9594FC65CD09E6D78B39B8C56C18F66E",
+        "Tests/Runtime/Helper/StopwatchTimestampTests.cs": "A016AE5DA7867A034644FEF319D4421A7E189AB416DC4B47EF986A2BFFF7CA9B",
+        "Runtime/Utils/SpritePixelRegion.cs": "7638D0AF938453246D2C5F2E3517DF19243B5FD45B1DFCDB942FDB6EAF565517",
+        "Tests/Runtime/Utils/SpritePixelViewTests.cs": "7172D72E7ED68DCA90B1D27A0D4CF257A1F4D52E7B0EBE1044D8556DDEF649E2",
+        "Tests/Runtime/Pool/WallstopGenericPoolTests.cs": "A6B63A268690DC1197DC726846AEF0D371CC348ECEDDA1FE048BA3F0457575E2",
+        "Runtime/Utils/SpriteMaskReader.cs": "1A58B543C4D31C3B60B17FC1AE888B2F143A2C2775F264DD05956A78BF00FEC2",
+        "Runtime/Utils/ThreadLocalArrayPool.cs": "071ADECDBCA85D65CD66A69F80951A612DA8BE88F1C6707679B8C13A26AC1841",
+        "Tests/Runtime/Utils/SpriteInkRegionTimingTests.cs": "3AE822D08460FC9ED163A02897750192389CEE1AB516490107294D13FD1FC8F6",
+        "Runtime/Utils/PoolPurgeSettings.cs": "4FA35560B7C13346118D4A69249B552780137A1E576043F27C6436205173AD21",
+        "Tests/Runtime/Performance/LocalPoolPerformanceTests.cs": "7D52AA71F6D4348DBBD1C7A4CD7439B4CCEF075E5F0F07C7AA1E9F432E2974FE",
+        "Runtime/Utils/SpriteArtBounds.cs": "72A1D12D7D12E9D8F76BA86414AB51AF897788119D0D28ED2BDAA4238BA6449F"
+      },
+      "boundsLoadedMethodIdentities": [
+        [
+          "False",
+          "c2747f6c-9b3a-4fdf-9d03-e5ec3c896627",
+          "F9E245E93E57FC59B86C57D2BFE7033C2F00BC9B1DC1F254F087F16B18DF5321"
+        ],
+        [
+          "False",
+          "c2747f6c-9b3a-4fdf-9d03-e5ec3c896627",
+          "F9E245E93E57FC59B86C57D2BFE7033C2F00BC9B1DC1F254F087F16B18DF5321"
+        ],
+        [
+          "False",
+          "c2747f6c-9b3a-4fdf-9d03-e5ec3c896627",
+          "F9E245E93E57FC59B86C57D2BFE7033C2F00BC9B1DC1F254F087F16B18DF5321"
+        ],
+        [
+          "True",
+          "c2747f6c-9b3a-4fdf-9d03-e5ec3c896627",
+          "95265954FD72D82998680ED5B794E2CC75D42AD63E35FA9BE3801DB77F59D8D4"
+        ],
+        [
+          "True",
+          "c2747f6c-9b3a-4fdf-9d03-e5ec3c896627",
+          "95265954FD72D82998680ED5B794E2CC75D42AD63E35FA9BE3801DB77F59D8D4"
+        ],
+        [
+          "True",
+          "c2747f6c-9b3a-4fdf-9d03-e5ec3c896627",
+          "95265954FD72D82998680ED5B794E2CC75D42AD63E35FA9BE3801DB77F59D8D4"
+        ]
+      ],
+      "processReceipt": {
+        "ProcessId": 50048,
+        "RawExitCode": 0,
+        "StandardOutputEndObserved": true,
+        "StandardErrorEndObserved": true,
+        "OutputDrainStopped": false,
+        "State": "observed",
+        "ExecutablePath": "C:\\Program Files\\Unity\\Hub\\Editor\\6000.6.7f1\\Editor\\Unity.exe",
+        "MachineName": "SPICY"
+      }
+    },
+    {
+      "index": 5,
+      "variant": "baseline",
+      "cases": 43,
+      "healthy": true,
+      "module": "c2747f6c-9b3a-4fdf-9d03-e5ec3c896627",
+      "dllSha256": "6FF943851B470B4F1F14B5EF6315674A569E87A715544EA586EBE07F01B2C955",
+      "before": {
+        "Tests/Runtime/Pool/GlobalPoolRegistryTests.cs": "633918268082A50659011937E636286CC8120E0FAEA97DA33740611A9F1F6A91",
+        "Runtime/Utils/Buffers.cs": "A5C33C717AEFB19665B48CDA128EB6DE1387E22E195012AF7E23ECF4D5A5C86E",
+        "Runtime/Utils/DisposalLease.cs": "9B4189DE89CC520FACD67E05BD22A3BB999167E59FD963CD952EA60B8768D24D",
+        "Runtime/Utils/LocalPool.cs": "710868F78F189026095E324E69292884C081D2E5A086C2179DEA8F3CFA97E38D",
+        "Runtime/Core/Helper/StopwatchTimestamp.cs": "E2E8680863989DCBC5FC81B9178396BB6C3C103AA8FCEEA031809F1261297840",
+        "Tests/Runtime/Utils/SpriteArtBoundsTimingTests.cs": "6D4E8DF43A04A77CCB24596A19FC2508F07B69D7A0FB04434C36226A7F98F4BC",
+        "Runtime/Utils/SpriteArtBounds.Ink.cs": "97DD70D7B65171233A035D6578AA06AE9594FC65CD09E6D78B39B8C56C18F66E",
+        "Tests/Runtime/Helper/StopwatchTimestampTests.cs": "A016AE5DA7867A034644FEF319D4421A7E189AB416DC4B47EF986A2BFFF7CA9B",
+        "Runtime/Utils/SpritePixelRegion.cs": "7638D0AF938453246D2C5F2E3517DF19243B5FD45B1DFCDB942FDB6EAF565517",
+        "Tests/Runtime/Utils/SpritePixelViewTests.cs": "7172D72E7ED68DCA90B1D27A0D4CF257A1F4D52E7B0EBE1044D8556DDEF649E2",
+        "Tests/Runtime/Pool/WallstopGenericPoolTests.cs": "A6B63A268690DC1197DC726846AEF0D371CC348ECEDDA1FE048BA3F0457575E2",
+        "Runtime/Utils/SpriteMaskReader.cs": "1A58B543C4D31C3B60B17FC1AE888B2F143A2C2775F264DD05956A78BF00FEC2",
+        "Runtime/Utils/ThreadLocalArrayPool.cs": "071ADECDBCA85D65CD66A69F80951A612DA8BE88F1C6707679B8C13A26AC1841",
+        "Tests/Runtime/Utils/SpriteInkRegionTimingTests.cs": "3AE822D08460FC9ED163A02897750192389CEE1AB516490107294D13FD1FC8F6",
+        "Runtime/Utils/PoolPurgeSettings.cs": "4FA35560B7C13346118D4A69249B552780137A1E576043F27C6436205173AD21",
+        "Tests/Runtime/Performance/LocalPoolPerformanceTests.cs": "7D52AA71F6D4348DBBD1C7A4CD7439B4CCEF075E5F0F07C7AA1E9F432E2974FE",
+        "Runtime/Utils/SpriteArtBounds.cs": "72A1D12D7D12E9D8F76BA86414AB51AF897788119D0D28ED2BDAA4238BA6449F"
+      },
+      "after": {
+        "Tests/Runtime/Pool/GlobalPoolRegistryTests.cs": "633918268082A50659011937E636286CC8120E0FAEA97DA33740611A9F1F6A91",
+        "Runtime/Utils/Buffers.cs": "A5C33C717AEFB19665B48CDA128EB6DE1387E22E195012AF7E23ECF4D5A5C86E",
+        "Runtime/Utils/DisposalLease.cs": "9B4189DE89CC520FACD67E05BD22A3BB999167E59FD963CD952EA60B8768D24D",
+        "Runtime/Utils/LocalPool.cs": "710868F78F189026095E324E69292884C081D2E5A086C2179DEA8F3CFA97E38D",
+        "Runtime/Core/Helper/StopwatchTimestamp.cs": "E2E8680863989DCBC5FC81B9178396BB6C3C103AA8FCEEA031809F1261297840",
+        "Tests/Runtime/Utils/SpriteArtBoundsTimingTests.cs": "6D4E8DF43A04A77CCB24596A19FC2508F07B69D7A0FB04434C36226A7F98F4BC",
+        "Runtime/Utils/SpriteArtBounds.Ink.cs": "97DD70D7B65171233A035D6578AA06AE9594FC65CD09E6D78B39B8C56C18F66E",
+        "Tests/Runtime/Helper/StopwatchTimestampTests.cs": "A016AE5DA7867A034644FEF319D4421A7E189AB416DC4B47EF986A2BFFF7CA9B",
+        "Runtime/Utils/SpritePixelRegion.cs": "7638D0AF938453246D2C5F2E3517DF19243B5FD45B1DFCDB942FDB6EAF565517",
+        "Tests/Runtime/Utils/SpritePixelViewTests.cs": "7172D72E7ED68DCA90B1D27A0D4CF257A1F4D52E7B0EBE1044D8556DDEF649E2",
+        "Tests/Runtime/Pool/WallstopGenericPoolTests.cs": "A6B63A268690DC1197DC726846AEF0D371CC348ECEDDA1FE048BA3F0457575E2",
+        "Runtime/Utils/SpriteMaskReader.cs": "1A58B543C4D31C3B60B17FC1AE888B2F143A2C2775F264DD05956A78BF00FEC2",
+        "Runtime/Utils/ThreadLocalArrayPool.cs": "071ADECDBCA85D65CD66A69F80951A612DA8BE88F1C6707679B8C13A26AC1841",
+        "Tests/Runtime/Utils/SpriteInkRegionTimingTests.cs": "3AE822D08460FC9ED163A02897750192389CEE1AB516490107294D13FD1FC8F6",
+        "Runtime/Utils/PoolPurgeSettings.cs": "4FA35560B7C13346118D4A69249B552780137A1E576043F27C6436205173AD21",
+        "Tests/Runtime/Performance/LocalPoolPerformanceTests.cs": "7D52AA71F6D4348DBBD1C7A4CD7439B4CCEF075E5F0F07C7AA1E9F432E2974FE",
+        "Runtime/Utils/SpriteArtBounds.cs": "72A1D12D7D12E9D8F76BA86414AB51AF897788119D0D28ED2BDAA4238BA6449F"
+      },
+      "boundsLoadedMethodIdentities": [
+        [
+          "False",
+          "c2747f6c-9b3a-4fdf-9d03-e5ec3c896627",
+          "F9E245E93E57FC59B86C57D2BFE7033C2F00BC9B1DC1F254F087F16B18DF5321"
+        ],
+        [
+          "False",
+          "c2747f6c-9b3a-4fdf-9d03-e5ec3c896627",
+          "F9E245E93E57FC59B86C57D2BFE7033C2F00BC9B1DC1F254F087F16B18DF5321"
+        ],
+        [
+          "False",
+          "c2747f6c-9b3a-4fdf-9d03-e5ec3c896627",
+          "F9E245E93E57FC59B86C57D2BFE7033C2F00BC9B1DC1F254F087F16B18DF5321"
+        ],
+        [
+          "True",
+          "c2747f6c-9b3a-4fdf-9d03-e5ec3c896627",
+          "95265954FD72D82998680ED5B794E2CC75D42AD63E35FA9BE3801DB77F59D8D4"
+        ],
+        [
+          "True",
+          "c2747f6c-9b3a-4fdf-9d03-e5ec3c896627",
+          "95265954FD72D82998680ED5B794E2CC75D42AD63E35FA9BE3801DB77F59D8D4"
+        ],
+        [
+          "True",
+          "c2747f6c-9b3a-4fdf-9d03-e5ec3c896627",
+          "95265954FD72D82998680ED5B794E2CC75D42AD63E35FA9BE3801DB77F59D8D4"
+        ]
+      ],
+      "processReceipt": {
+        "ProcessId": 70004,
+        "RawExitCode": 0,
+        "StandardOutputEndObserved": true,
+        "StandardErrorEndObserved": true,
+        "OutputDrainStopped": false,
+        "State": "observed",
+        "ExecutablePath": "C:\\Program Files\\Unity\\Hub\\Editor\\6000.6.7f1\\Editor\\Unity.exe",
+        "MachineName": "SPICY"
+      }
+    },
+    {
+      "index": 6,
+      "variant": "candidate",
+      "cases": 43,
+      "healthy": true,
+      "module": "d2f99c7a-9e89-4da9-9af7-d2ce6349f21c",
+      "dllSha256": "85714F6A2A73A4C7CB6223F8CA0573A591886B6E2E21D689CE402CC054F43B87",
+      "before": {
+        "Tests/Runtime/Pool/GlobalPoolRegistryTests.cs": "633918268082A50659011937E636286CC8120E0FAEA97DA33740611A9F1F6A91",
+        "Runtime/Utils/Buffers.cs": "14BC8A9143683B9F4DCF6957292E19C1A2E9AF805F543108645DCFDDA961BA62",
+        "Runtime/Utils/DisposalLease.cs": "9B4189DE89CC520FACD67E05BD22A3BB999167E59FD963CD952EA60B8768D24D",
+        "Runtime/Utils/LocalPool.cs": "710868F78F189026095E324E69292884C081D2E5A086C2179DEA8F3CFA97E38D",
+        "Runtime/Core/Helper/StopwatchTimestamp.cs": "E2E8680863989DCBC5FC81B9178396BB6C3C103AA8FCEEA031809F1261297840",
+        "Tests/Runtime/Utils/SpriteArtBoundsTimingTests.cs": "6D4E8DF43A04A77CCB24596A19FC2508F07B69D7A0FB04434C36226A7F98F4BC",
+        "Runtime/Utils/SpriteArtBounds.Ink.cs": "97DD70D7B65171233A035D6578AA06AE9594FC65CD09E6D78B39B8C56C18F66E",
+        "Tests/Runtime/Helper/StopwatchTimestampTests.cs": "A016AE5DA7867A034644FEF319D4421A7E189AB416DC4B47EF986A2BFFF7CA9B",
+        "Runtime/Utils/SpritePixelRegion.cs": "F1F4C02D2F233825E409690B211239D0B63418D58AFB8BB8682B45EA3847A437",
+        "Tests/Runtime/Utils/SpritePixelViewTests.cs": "7172D72E7ED68DCA90B1D27A0D4CF257A1F4D52E7B0EBE1044D8556DDEF649E2",
+        "Tests/Runtime/Pool/WallstopGenericPoolTests.cs": "A6B63A268690DC1197DC726846AEF0D371CC348ECEDDA1FE048BA3F0457575E2",
+        "Runtime/Utils/SpriteMaskReader.cs": "3A8F4059F2FA222C512B31DCED436519222A813695770788F5F60473A7463DE3",
+        "Runtime/Utils/ThreadLocalArrayPool.cs": "071ADECDBCA85D65CD66A69F80951A612DA8BE88F1C6707679B8C13A26AC1841",
+        "Tests/Runtime/Utils/SpriteInkRegionTimingTests.cs": "3AE822D08460FC9ED163A02897750192389CEE1AB516490107294D13FD1FC8F6",
+        "Runtime/Utils/PoolPurgeSettings.cs": "4FA35560B7C13346118D4A69249B552780137A1E576043F27C6436205173AD21",
+        "Tests/Runtime/Performance/LocalPoolPerformanceTests.cs": "7D52AA71F6D4348DBBD1C7A4CD7439B4CCEF075E5F0F07C7AA1E9F432E2974FE",
+        "Runtime/Utils/SpriteArtBounds.cs": "6CAC2B767E01734A9DA7D4EE189E6B724A51590E2F14EFAF9929ECEDC6648F4E"
+      },
+      "after": {
+        "Tests/Runtime/Pool/GlobalPoolRegistryTests.cs": "633918268082A50659011937E636286CC8120E0FAEA97DA33740611A9F1F6A91",
+        "Runtime/Utils/Buffers.cs": "14BC8A9143683B9F4DCF6957292E19C1A2E9AF805F543108645DCFDDA961BA62",
+        "Runtime/Utils/DisposalLease.cs": "9B4189DE89CC520FACD67E05BD22A3BB999167E59FD963CD952EA60B8768D24D",
+        "Runtime/Utils/LocalPool.cs": "710868F78F189026095E324E69292884C081D2E5A086C2179DEA8F3CFA97E38D",
+        "Runtime/Core/Helper/StopwatchTimestamp.cs": "E2E8680863989DCBC5FC81B9178396BB6C3C103AA8FCEEA031809F1261297840",
+        "Tests/Runtime/Utils/SpriteArtBoundsTimingTests.cs": "6D4E8DF43A04A77CCB24596A19FC2508F07B69D7A0FB04434C36226A7F98F4BC",
+        "Runtime/Utils/SpriteArtBounds.Ink.cs": "97DD70D7B65171233A035D6578AA06AE9594FC65CD09E6D78B39B8C56C18F66E",
+        "Tests/Runtime/Helper/StopwatchTimestampTests.cs": "A016AE5DA7867A034644FEF319D4421A7E189AB416DC4B47EF986A2BFFF7CA9B",
+        "Runtime/Utils/SpritePixelRegion.cs": "F1F4C02D2F233825E409690B211239D0B63418D58AFB8BB8682B45EA3847A437",
+        "Tests/Runtime/Utils/SpritePixelViewTests.cs": "7172D72E7ED68DCA90B1D27A0D4CF257A1F4D52E7B0EBE1044D8556DDEF649E2",
+        "Tests/Runtime/Pool/WallstopGenericPoolTests.cs": "A6B63A268690DC1197DC726846AEF0D371CC348ECEDDA1FE048BA3F0457575E2",
+        "Runtime/Utils/SpriteMaskReader.cs": "3A8F4059F2FA222C512B31DCED436519222A813695770788F5F60473A7463DE3",
+        "Runtime/Utils/ThreadLocalArrayPool.cs": "071ADECDBCA85D65CD66A69F80951A612DA8BE88F1C6707679B8C13A26AC1841",
+        "Tests/Runtime/Utils/SpriteInkRegionTimingTests.cs": "3AE822D08460FC9ED163A02897750192389CEE1AB516490107294D13FD1FC8F6",
+        "Runtime/Utils/PoolPurgeSettings.cs": "4FA35560B7C13346118D4A69249B552780137A1E576043F27C6436205173AD21",
+        "Tests/Runtime/Performance/LocalPoolPerformanceTests.cs": "7D52AA71F6D4348DBBD1C7A4CD7439B4CCEF075E5F0F07C7AA1E9F432E2974FE",
+        "Runtime/Utils/SpriteArtBounds.cs": "6CAC2B767E01734A9DA7D4EE189E6B724A51590E2F14EFAF9929ECEDC6648F4E"
+      },
+      "boundsLoadedMethodIdentities": [
+        [
+          "False",
+          "d2f99c7a-9e89-4da9-9af7-d2ce6349f21c",
+          "BC4CFA4BCC57DCD4971A3D35489FAAE018B1801F5A981F5E9233928CC05B7656"
+        ],
+        [
+          "False",
+          "d2f99c7a-9e89-4da9-9af7-d2ce6349f21c",
+          "BC4CFA4BCC57DCD4971A3D35489FAAE018B1801F5A981F5E9233928CC05B7656"
+        ],
+        [
+          "False",
+          "d2f99c7a-9e89-4da9-9af7-d2ce6349f21c",
+          "BC4CFA4BCC57DCD4971A3D35489FAAE018B1801F5A981F5E9233928CC05B7656"
+        ],
+        [
+          "True",
+          "d2f99c7a-9e89-4da9-9af7-d2ce6349f21c",
+          "D51068F0C62B374B07EBD1D6C8CBA51ECE1566A7C1E346D8C072403812B55323"
+        ],
+        [
+          "True",
+          "d2f99c7a-9e89-4da9-9af7-d2ce6349f21c",
+          "D51068F0C62B374B07EBD1D6C8CBA51ECE1566A7C1E346D8C072403812B55323"
+        ],
+        [
+          "True",
+          "d2f99c7a-9e89-4da9-9af7-d2ce6349f21c",
+          "D51068F0C62B374B07EBD1D6C8CBA51ECE1566A7C1E346D8C072403812B55323"
+        ]
+      ],
+      "processReceipt": {
+        "ProcessId": 65440,
+        "RawExitCode": 0,
+        "StandardOutputEndObserved": true,
+        "StandardErrorEndObserved": true,
+        "OutputDrainStopped": false,
+        "State": "observed",
+        "ExecutablePath": "C:\\Program Files\\Unity\\Hub\\Editor\\6000.6.7f1\\Editor\\Unity.exe",
+        "MachineName": "SPICY"
+      }
+    }
+  ],
+  "fixedSourceHashes": {
+    "Tests/Runtime/Pool/GlobalPoolRegistryTests.cs": "633918268082A50659011937E636286CC8120E0FAEA97DA33740611A9F1F6A91",
+    "Runtime/Utils/DisposalLease.cs": "9B4189DE89CC520FACD67E05BD22A3BB999167E59FD963CD952EA60B8768D24D",
+    "Runtime/Utils/PoolPurgeSettings.cs": "4FA35560B7C13346118D4A69249B552780137A1E576043F27C6436205173AD21",
+    "Runtime/Utils/LocalPool.cs": "710868F78F189026095E324E69292884C081D2E5A086C2179DEA8F3CFA97E38D",
+    "Runtime/Core/Helper/StopwatchTimestamp.cs": "E2E8680863989DCBC5FC81B9178396BB6C3C103AA8FCEEA031809F1261297840",
+    "Runtime/Utils/SpriteArtBounds.Ink.cs": "97DD70D7B65171233A035D6578AA06AE9594FC65CD09E6D78B39B8C56C18F66E",
+    "Tests/Runtime/Helper/StopwatchTimestampTests.cs": "A016AE5DA7867A034644FEF319D4421A7E189AB416DC4B47EF986A2BFFF7CA9B",
+    "Tests/Runtime/Utils/SpritePixelViewTests.cs": "7172D72E7ED68DCA90B1D27A0D4CF257A1F4D52E7B0EBE1044D8556DDEF649E2",
+    "Tests/Runtime/Pool/WallstopGenericPoolTests.cs": "A6B63A268690DC1197DC726846AEF0D371CC348ECEDDA1FE048BA3F0457575E2",
+    "Runtime/Utils/ThreadLocalArrayPool.cs": "071ADECDBCA85D65CD66A69F80951A612DA8BE88F1C6707679B8C13A26AC1841",
+    "Tests/Runtime/Utils/SpriteInkRegionTimingTests.cs": "3AE822D08460FC9ED163A02897750192389CEE1AB516490107294D13FD1FC8F6",
+    "Tests/Runtime/Utils/SpriteArtBoundsTimingTests.cs": "6D4E8DF43A04A77CCB24596A19FC2508F07B69D7A0FB04434C36226A7F98F4BC",
+    "Tests/Runtime/Performance/LocalPoolPerformanceTests.cs": "7D52AA71F6D4348DBBD1C7A4CD7439B4CCEF075E5F0F07C7AA1E9F432E2974FE"
+  },
+  "observations": 2142,
+  "csvSha256": "6398f91eea074fcec0890baae62f0079f8323bb4cbb7f59123c7542952ae88d2",
+  "functionalQualification": {
+    "nativeResult": "Final runtime 626 passed/four existing skips of 630, including all 43 view controls; separate Build Profile fixture passes 23/23.",
+    "ownedArrayControl": "16 allocation events per 16 reads for every format at source sizes 8 and 32 (selected rectangles 6x6 and 30x30).",
+    "textureView": "Zero events in each corresponding view read. This is event evidence, not allocated-byte measurement.",
+    "reentrancy": "A real dictionary-pool purge callback changed a texture during ink traversal. Borrowing returned the changed center; the retained implementation uses an owned ink snapshot and passes the regression.",
+    "scope": "Runtime production source bytes remain equal to the candidate timing inputs. Later test-case additions have separate final native validation.",
+    "finalNativeResults": {
+      "runtime": {
+        "total": 630,
+        "passed": 626,
+        "skipped": 4,
+        "viewControlsPassed": 43
+      },
+      "buildProfiles": {
+        "total": 23,
+        "passed": 23
+      },
+      "allProcessesRawZeroAndBothStreamsComplete": true,
+      "beforeSourceHashes": {
+        "Editor/Settings/UnityHelpersSettings.cs": "1FE807EC5A92C3AC60DB8DB771FE0250A2CC6576ABD2549BEFF6FD2F4AED4067",
+        "Editor/Tools/AnalyzerPolicyExamples.cs": "3AF87B9E3CF77E2A77641C868443F6D69D72CE53D37340BB5CA1F235A9234172",
+        "Runtime/Utils/SpriteArtBounds.cs": "6CAC2B767E01734A9DA7D4EE189E6B724A51590E2F14EFAF9929ECEDC6648F4E",
+        "Editor/Tools/BuildProfileSceneSync.cs": "67B55DB74CE6335F5D7E52F23DACF170EC8B659B99363028B8050E2F1FD5894D",
+        "Runtime/Utils/SpritePixelRegion.cs": "F1F4C02D2F233825E409690B211239D0B63418D58AFB8BB8682B45EA3847A437",
+        "Runtime/Utils/SpriteArtBounds.Ink.cs": "97DD70D7B65171233A035D6578AA06AE9594FC65CD09E6D78B39B8C56C18F66E",
+        "scripts/unity/run-ci-tests.ps1": "962EDD57AB316411A228BEDD048383BA187C77324CEAFD1302DD737CC3C5B47A",
+        "Runtime/Utils/Buffers.cs": "14BC8A9143683B9F4DCF6957292E19C1A2E9AF805F543108645DCFDDA961BA62",
+        "scripts/unity/lib/compilation-fixture-results.ps1": "7A90E7D087A7D2676C92DCEA921A5BEF072B3A1802CBC863058D0D5D2B75E541",
+        "Editor/Tools/AnalyzerPolicyAPI.cs": "66F1F4819B9337D25AB03C0F4A34804CB5D48C024122EE64292C786293EB8506",
+        "Tests/Runtime/Utils/SpritePixelViewTests.cs": "127780D66F542E628BD4C53E4DDA22FD6C131337DB2F565461C9623EE0690E4B",
+        "Tests/Editor/Tools/BuildProfileSceneSyncTests.cs": "C775DFF1F0446D355CAFB300841A57DC28079E147FAA0F3682C106E2510BF3CD",
+        "Tests/Runtime/Helper/StopwatchTimestampTests.cs": "A016AE5DA7867A034644FEF319D4421A7E189AB416DC4B47EF986A2BFFF7CA9B",
+        "Runtime/Analyzers/WallstopStudios.UnityHelpers.Analyzers.dll": "19C1010F2BFD617887DF3FB12D0AA0A9FB9F7B25E6164A72DF53F3E0126C0B5F",
+        "Runtime/Utils/SpriteMaskReader.cs": "3A8F4059F2FA222C512B31DCED436519222A813695770788F5F60473A7463DE3",
+        "Runtime/Core/Helper/StopwatchTimestamp.cs": "E2E8680863989DCBC5FC81B9178396BB6C3C103AA8FCEEA031809F1261297840"
+      },
+      "afterSourceHashes": {
+        "Editor/Settings/UnityHelpersSettings.cs": "1FE807EC5A92C3AC60DB8DB771FE0250A2CC6576ABD2549BEFF6FD2F4AED4067",
+        "Editor/Tools/AnalyzerPolicyExamples.cs": "3AF87B9E3CF77E2A77641C868443F6D69D72CE53D37340BB5CA1F235A9234172",
+        "Runtime/Utils/SpriteArtBounds.cs": "6CAC2B767E01734A9DA7D4EE189E6B724A51590E2F14EFAF9929ECEDC6648F4E",
+        "Editor/Tools/BuildProfileSceneSync.cs": "67B55DB74CE6335F5D7E52F23DACF170EC8B659B99363028B8050E2F1FD5894D",
+        "Runtime/Utils/SpritePixelRegion.cs": "F1F4C02D2F233825E409690B211239D0B63418D58AFB8BB8682B45EA3847A437",
+        "Runtime/Utils/SpriteArtBounds.Ink.cs": "97DD70D7B65171233A035D6578AA06AE9594FC65CD09E6D78B39B8C56C18F66E",
+        "scripts/unity/run-ci-tests.ps1": "962EDD57AB316411A228BEDD048383BA187C77324CEAFD1302DD737CC3C5B47A",
+        "Runtime/Utils/Buffers.cs": "14BC8A9143683B9F4DCF6957292E19C1A2E9AF805F543108645DCFDDA961BA62",
+        "scripts/unity/lib/compilation-fixture-results.ps1": "7A90E7D087A7D2676C92DCEA921A5BEF072B3A1802CBC863058D0D5D2B75E541",
+        "Editor/Tools/AnalyzerPolicyAPI.cs": "66F1F4819B9337D25AB03C0F4A34804CB5D48C024122EE64292C786293EB8506",
+        "Tests/Runtime/Utils/SpritePixelViewTests.cs": "127780D66F542E628BD4C53E4DDA22FD6C131337DB2F565461C9623EE0690E4B",
+        "Tests/Editor/Tools/BuildProfileSceneSyncTests.cs": "C775DFF1F0446D355CAFB300841A57DC28079E147FAA0F3682C106E2510BF3CD",
+        "Tests/Runtime/Helper/StopwatchTimestampTests.cs": "A016AE5DA7867A034644FEF319D4421A7E189AB416DC4B47EF986A2BFFF7CA9B",
+        "Runtime/Analyzers/WallstopStudios.UnityHelpers.Analyzers.dll": "19C1010F2BFD617887DF3FB12D0AA0A9FB9F7B25E6164A72DF53F3E0126C0B5F",
+        "Runtime/Utils/SpriteMaskReader.cs": "3A8F4059F2FA222C512B31DCED436519222A813695770788F5F60473A7463DE3",
+        "Runtime/Core/Helper/StopwatchTimestamp.cs": "E2E8680863989DCBC5FC81B9178396BB6C3C103AA8FCEEA031809F1261297840"
+      },
+      "allocationEventControls": [
+        {
+          "format": "RGBA32",
+          "sourceSize": 8,
+          "selectedSize": 6,
+          "calls": 16,
+          "ownedEvents": 16,
+          "viewEvents": 0
+        },
+        {
+          "format": "RGBA32",
+          "sourceSize": 32,
+          "selectedSize": 30,
+          "calls": 16,
+          "ownedEvents": 16,
+          "viewEvents": 0
+        },
+        {
+          "format": "RGB24",
+          "sourceSize": 8,
+          "selectedSize": 6,
+          "calls": 16,
+          "ownedEvents": 16,
+          "viewEvents": 0
+        },
+        {
+          "format": "RGB24",
+          "sourceSize": 32,
+          "selectedSize": 30,
+          "calls": 16,
+          "ownedEvents": 16,
+          "viewEvents": 0
+        },
+        {
+          "format": "ARGB32",
+          "sourceSize": 8,
+          "selectedSize": 6,
+          "calls": 16,
+          "ownedEvents": 16,
+          "viewEvents": 0
+        },
+        {
+          "format": "ARGB32",
+          "sourceSize": 32,
+          "selectedSize": 30,
+          "calls": 16,
+          "ownedEvents": 16,
+          "viewEvents": 0
+        },
+        {
+          "format": "BGRA32",
+          "sourceSize": 8,
+          "selectedSize": 6,
+          "calls": 16,
+          "ownedEvents": 16,
+          "viewEvents": 0
+        },
+        {
+          "format": "BGRA32",
+          "sourceSize": 32,
+          "selectedSize": 30,
+          "calls": 16,
+          "ownedEvents": 16,
+          "viewEvents": 0
+        },
+        {
+          "format": "Alpha8",
+          "sourceSize": 8,
+          "selectedSize": 6,
+          "calls": 16,
+          "ownedEvents": 16,
+          "viewEvents": 0
+        },
+        {
+          "format": "Alpha8",
+          "sourceSize": 32,
+          "selectedSize": 30,
+          "calls": 16,
+          "ownedEvents": 16,
+          "viewEvents": 0
+        },
+        {
+          "format": "RGB565",
+          "sourceSize": 8,
+          "selectedSize": 6,
+          "calls": 16,
+          "ownedEvents": 16,
+          "viewEvents": 0
+        },
+        {
+          "format": "RGB565",
+          "sourceSize": 32,
+          "selectedSize": 30,
+          "calls": 16,
+          "ownedEvents": 16,
+          "viewEvents": 0
+        },
+        {
+          "format": "RGBA4444",
+          "sourceSize": 8,
+          "selectedSize": 6,
+          "calls": 16,
+          "ownedEvents": 16,
+          "viewEvents": 0
+        },
+        {
+          "format": "RGBA4444",
+          "sourceSize": 32,
+          "selectedSize": 30,
+          "calls": 16,
+          "ownedEvents": 16,
+          "viewEvents": 0
+        }
+      ]
+    }
+  }
+}

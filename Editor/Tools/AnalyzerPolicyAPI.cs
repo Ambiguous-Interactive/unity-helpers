@@ -162,6 +162,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 "Member declaration order",
                 "Reports member order and nested types before ordinary members. This policy is opt-in; review initializer and conditional-compilation dependencies before moving code."
             ),
+            new(
+                "WUH030",
+                "Explicit string comparison and culture",
+                "Reports string comparisons, searches and casing without an explicit comparison or culture policy. This policy is opt-in; preserve required culture-sensitive behavior."
+            ),
         };
 
         /// <summary>Enables or disables every Unity Helpers analyzer in the default ruleset.</summary>

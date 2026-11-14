@@ -2518,7 +2518,8 @@ foreach (string varName in Helpers.CiEnvironmentVariables.All)
 Added in the next release. Use `StopwatchTimestamp` from
 `WallstopStudios.UnityHelpers.Core.Helper` when you need elapsed time without creating a
 `Stopwatch` object. `Since` accepts a timestamp from `Stopwatch.GetTimestamp()` and returns a
-signed `TimeSpan`. `ToSeconds`, `ToMilliseconds` and `ToNanoseconds` accept counter ticks, not `TimeSpan` ticks.
+signed `TimeSpan`. Use `SecondsSince(start)` to get signed elapsed seconds directly;
+it shares the allocation-free counter conversion used by both shared pools. `ToSeconds`, `ToMilliseconds` and `ToNanoseconds` accept counter ticks, not `TimeSpan` ticks.
 
 <!-- doc-sample: compiles -->
 

@@ -87,7 +87,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random {
 
         private static IEnumerable<TestCaseData> Cases()
         {
-            for (int number = 1; number <= 29; ++number)
+            for (int number = 1; number <= 30; ++number)
             {
                 string id = $"WUH{number:000}";
                 yield return new TestCaseData(id).SetName(id + "ExamplesMatchTheActualDiagnostic");
@@ -148,6 +148,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random {
                     return new RedundantPooledClearAnalyzer();
                 case "WUH029":
                     return new MemberOrderAnalyzer();
+                case "WUH030":
+                    return new StringComparisonPolicyAnalyzer();
                 case "WUH027":
                     return new RedundantCallerNameAnalyzer();
                 case "WUH025":

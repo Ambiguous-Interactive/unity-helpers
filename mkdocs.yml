@@ -232,6 +232,7 @@ nav:
       - Editor Tools:
           - Tools Guide: features/editor-tools/editor-tools-guide.md
           - Scene Canonicalization: features/editor-tools/scene-canonicalization.md
+          - Build Profile Scenes: features/editor-tools/build-profile-scenes.md
           - Sprite Animation Motion: features/editor-tools/sprite-animation-motion.md
           - Unity Method Analyzer: features/editor-tools/unity-method-analyzer.md
           - Asset Validation: features/editor-tools/asset-validation.md

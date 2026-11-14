@@ -170,6 +170,11 @@
     "run": "npm run test:agent-skill-migration"
   },
   {
+    "id": "skill-stubs",
+    "name": "Typed discovery stubs and ownership controls",
+    "run": "npm run test:skill-stubs"
+  },
+  {
     "id": "lint-changelog",
     "name": "Changelog linter self-test",
     "run": "npm run test:lint-changelog"

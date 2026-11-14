@@ -117,3 +117,18 @@ ARM or whole-application timing qualification.
 [All 882 observations](./local-pools-clock-20261114.csv) and the
 [selection criteria, pair ratios and source/module/process identities](./local-pools-clock-20261114.json)
 are retained. Raw NUnit trees, process receipts and runtime DLLs remain in ignored session evidence.
+
+### Shared elapsed-seconds helper
+
+Both pool types now call `StopwatchTimestamp.SecondsSince`, which combines the
+wrapping subtraction and counter conversion. A separate six-process A B B A A B
+comparison against the direct conversion above has a geometric ratio of 0.98877
+across the four shared paths and three pairs. It passes the preregistered 1.05
+nonregression limit; this refactor does not claim another 5% speedup. Every process
+passes 43 selected cases with raw-zero exits, complete output streams, and matching
+loaded-module/DLL identities.
+
+The [combined observations](./sprite-view-clock-20261114.csv) and
+[qualification record](./sprite-view-clock-20261114.json) retain every pool, bounds
+and ink control. This is the helper refactor's measurement; the earlier clock
+optimization retains its separate baseline and qualification above.

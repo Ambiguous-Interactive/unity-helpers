@@ -14,7 +14,7 @@ no native window capture, and no programmatic skin switching.
 
 | Format         | Status                                                                         |
 | -------------- | ------------------------------------------------------------------------------ |
-| PNG (still)    | 13 catalog-generated PNGs and two qualified comparison captures.               |
+| PNG (still)    | 13 catalog-generated PNGs and six qualified comparison captures.               |
 | GIF (animated) | **Out of scope.** The harness captures single frames; it cannot record a GIF.  |
 | WebP           | **Out of scope.** Unity's `EncodeToPNG` has no WebP counterpart in the editor. |
 | SVG (diagram)  | Not applicable. Diagrams are authored, not captured.                           |
@@ -68,6 +68,22 @@ preferences. The [qualification record](../performance/analyzer-policy-member-or
 retains the temporary fixture, controller, PNG hashes, native metadata and process receipts.
 The fixture is removed after capture; these historical comparisons are separate from the
 catalog regeneration command below. The [analyzer guide](../performance/analyzers.md) shows both.
+
+The string-policy comparison pair, `analyzer-policy-string-policy-before.png` and
+`analyzer-policy-string-policy-after.png`, uses the same real UI with a `WUH030`
+query. Its [qualification record](../performance/analyzer-policy-string-policy-20261114.json)
+retains the removed temporary fixture, controller, hashes, and healthy receipts.
+
+## Build Profile settings comparison captures
+
+`editor-tools/build-profile-settings-before.png` and
+`editor-tools/build-profile-settings-after.png` show the real Unity Helpers
+SettingsProvider before and after adding the Build Profiles group. The native
+Unity 6000.6.7 light-skin captures use the strict IMGUI executor to provide a real
+Repaint context. The temporary fixture has been removed; its source, controller,
+PNG hashes and healthy process receipts remain in the
+[qualification record](../features/editor-tools/build-profile-settings-20261114.json).
+These historical comparisons are separate from catalog regeneration.
 
 ## Generated images
 

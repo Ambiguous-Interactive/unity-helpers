@@ -1,4 +1,4 @@
-# Sprite rectangle pixel copies
+# Sprite rectangle pixel reads
 
 Readable RGBA32 sprite queries now copy the selected rectangle from the base mip,
 rather than copying the entire texture. The intermediate pixel array holds only
@@ -112,10 +112,10 @@ correctness results, the initial Alpha8 mismatch and the original reader source.
 
 ## Packed 16-bit subregions
 
-Readable RGB565 and RGBA4444 subregions decode selected base-mip words directly into
-an owned region-sized `Color32` array. RGB565 expands five- and six-bit channels with
-bit replication and opaque alpha; RGBA4444 expands each nibble to eight bits.
-Full-texture reads retain their existing conversion path.
+The initial RGB565 and RGBA4444 subregion implementation decoded selected base-mip
+words into an owned region-sized `Color32` array. RGB565 expands five- and six-bit
+channels with bit replication and opaque alpha; RGBA4444 expands each nibble to
+eight bits. The synchronous view below now avoids that copy for query callers.
 
 Four native cases compare every one of the 65,536 packed encodings against Unity's own
 `GetPixels32`, for both formats with and without mipmaps. They also check returned storage,
@@ -124,3 +124,50 @@ vertical offset. The original reader fails the four region-storage assertions; t
 passes the native colour comparisons. These are correctness and storage-size observations,
 with no new timing or total allocation-byte claim. Consumer adoption remains tracked in
 [#1113](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1113).
+
+## Synchronous readable texture views
+
+For readable unpacked RGBA32, RGB24, ARGB32, BGRA32, Alpha8, RGB565 and RGBA4444
+textures, alpha-mask and art-bounds queries now read the selected base
+mip directly from texture memory. They do not allocate an intermediate `Color32`
+array, for either a complete texture or a sprite subregion. Alpha-only scans read
+alpha directly without decoding unused color channels.
+
+The view stays inside the synchronous query. Public alpha masks still own their
+Boolean arrays. Ink traversal keeps an owned color snapshot across pooled work:
+a user pool callback can change the texture before traversal reads it. A real
+purge-callback regression verifies the original colors determine the result.
+Editor source-PNG reads keep an owned pixel copy because their
+temporary decoded texture is released before the query continues. Other texture
+formats retain Unity's conversion fallback. Internal callers that need a snapshot
+can still request owned pixels; those copies remain independent of the texture.
+
+Six fresh Unity 6000.6.7f1 Editor Mono processes in A B B A A B order qualify
+the view change. Each passes all 43 selected cases, with raw-zero exits and both
+streams drained. The geometric candidate/baseline ratio across three pairs and
+three 256 × 256 sprite patterns is 0.31699. The win is concentrated in dense
+bounds; narrow and transparent scans remain near baseline.
+
+Median process medians, microseconds per bounds query:
+
+| Sprite pattern    | Owned pixels | Texture view |
+| ----------------- | -----------: | -----------: |
+| Fully opaque      |       83.001 |        3.032 |
+| One opaque column |      297.865 |      286.708 |
+| Fully transparent |      293.468 |      287.875 |
+
+All mask-overload and ink controls pass the preregistered regression guard. The
+single-pixel ink control is 6.9–8.7% slower in all three pairs; the other ink
+controls remain near baseline. That cost is retained in the record. These are
+headless Editor Mono measurements, with no player, ARM or total application claim.
+
+Fourteen positive-control-backed allocation cases cover all seven formats at
+6 × 6 and 30 × 30 selected rectangles. Each observes 16 events for 16 owned pixel
+reads and zero for the corresponding texture views. The native thread byte
+counter did not qualify, so this establishes event removal rather than a total
+allocation-byte bound.
+
+The [2,142 raw observations](./sprite-view-clock-20261114.csv) include the pool
+helper, bounds and ink controls. The [qualification record](./sprite-view-clock-20261114.json)
+retains all ratios, selection criteria, source hashes, loaded method identities,
+DLL hashes and healthy process receipts.

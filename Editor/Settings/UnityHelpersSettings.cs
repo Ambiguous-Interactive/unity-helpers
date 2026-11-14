@@ -933,6 +933,26 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
         [Range(MinWGroupAutoIncludeRowCount, MaxWGroupAutoIncludeRowCount)]
         internal int _wgroupAutoIncludeRowCount = DefaultWGroupAutoIncludeRowCount;
 
+#if UNITY_6000_0_OR_NEWER
+        [SerializeField]
+        [Tooltip(
+            "Keep inherited build profile scene lists in step with global scenes after scene-list changes. Custom scene lists are preserved."
+        )]
+        [WGroup(
+            "Build Profiles",
+            displayName: "Build Profiles",
+            autoIncludeCount: 1,
+            collapsible: true
+        )]
+        internal bool _autoSynchronizeBuildProfileScenes;
+
+        [SerializeField]
+        [Tooltip(
+            "Existing folders below Assets to search for build profiles. An empty list synchronizes no profiles."
+        )]
+        internal string[] _buildProfileSceneFolders = { "Assets" };
+#endif
+
         [FormerlySerializedAs("waitInstructionBufferApplyOnLoad")]
         [SerializeField]
         [Tooltip(
@@ -1337,6 +1357,24 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
 
         [NonSerialized]
         private bool _saveAfterLoadQueued;
+
+#if UNITY_6000_0_OR_NEWER
+        /// <summary>Returns whether inherited build profiles synchronize after global scene-list changes.</summary>
+        public static bool GetAutoSynchronizeBuildProfileScenes()
+        {
+            UnityHelpersSettings settings = instance;
+            return settings != null && settings._autoSynchronizeBuildProfileScenes;
+        }
+
+        /// <summary>Returns the configured build-profile search folders.</summary>
+        public static IReadOnlyList<string> GetBuildProfileSceneFolders()
+        {
+            UnityHelpersSettings settings = instance;
+            return settings == null
+                ? Array.Empty<string>()
+                : settings._buildProfileSceneFolders ?? Array.Empty<string>();
+        }
+#endif
 
         /// <summary>
         /// Returns the configured page size, falling back to defaults if unset.
