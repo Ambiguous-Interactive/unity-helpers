@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Tests.TestUtils;
+    using ThreadAllocationCounter = WallstopStudios.UnityHelpers.Tests.Core.ThreadAllocationCounter;
 
     [TestFixture]
     public sealed class ValueDictionaryEnumerableTests
@@ -53,12 +54,12 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             {
                 operation();
             }
-            long before = GC.GetAllocatedBytesForCurrentThread();
+            long before = ThreadAllocationCounter.Read();
             for (int repetition = 0; repetition < 128; ++repetition)
             {
                 operation();
             }
-            return GC.GetAllocatedBytesForCurrentThread() - before;
+            return ThreadAllocationCounter.Read() - before;
 #endif
         }
 

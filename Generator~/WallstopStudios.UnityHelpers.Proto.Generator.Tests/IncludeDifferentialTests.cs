@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     using System.Text;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+    using ThreadAllocationCounter = WallstopStudios.UnityHelpers.Tests.Core.ThreadAllocationCounter;
 
     /// <summary>
     /// Pins <c>[WProtoInclude]</c> polymorphism against protobuf-net 3.2.56.
@@ -89,7 +90,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         )
         {
             PolyListBase restored = null;
-            long before = GC.GetAllocatedBytesForCurrentThread();
+            long before = ThreadAllocationCounter.Read();
             for (int iteration = 0; iteration < iterations; ++iteration)
             {
                 WProtoReader reader = new WProtoReader(payload);
@@ -98,7 +99,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     Assert.Fail("The polymorphic list payload must decode.");
                 }
             }
-            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            long allocated = ThreadAllocationCounter.Read() - before;
             GC.KeepAlive(restored);
             return allocated;
         }
@@ -400,13 +401,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             const int iterations = 1024;
             long presentBytes = ReadListAllocations(formatter, payload, iterations);
             long absentBytes = ReadListAllocations(formatter, absent, iterations);
-            long before = GC.GetAllocatedBytesForCurrentThread();
+            long before = ThreadAllocationCounter.Read();
             List<int> materialized = null;
             for (int iteration = 0; iteration < iterations; ++iteration)
             {
                 materialized = new List<int>(count);
             }
-            long collectionBytes = GC.GetAllocatedBytesForCurrentThread() - before;
+            long collectionBytes = ThreadAllocationCounter.Read() - before;
             GC.KeepAlive(materialized);
             Assert.Greater(collectionBytes, 0, "The allocation counter must observe fresh lists.");
             TestContext.WriteLine(

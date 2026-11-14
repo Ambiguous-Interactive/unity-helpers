@@ -25,7 +25,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
     /// scan cannot read is a printed exemption, not a silent skip. See
     /// <see href="https://github.com/Ambiguous-Interactive/unity-helpers/blob/main/docs/features/editor-tools/authored-asset-validation.md">Authored Asset Validation</see>.
     /// </remarks>
-    public static class AuthoredRequirementValidator
+    public static partial class AuthoredRequirementValidator
     {
         private const int MaximumDefaultValueDepth = 64;
 
@@ -300,7 +300,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 }
 
                 ++inspected;
-                Judge(assetPath, lines, candidate, required, findings);
+                JudgeWithNestedValues(assetPath, lines, candidate, required, findings);
             }
 
             return inspected;
@@ -346,6 +346,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 StringComparer.Ordinal
             );
             List<string> guids = new();
+            Dictionary<Type, List<AuthoredRequirementField>> nested = new();
             foreach (FieldInfo field in TypeCache.GetFieldsWithAttribute(requirementAttributeType))
             {
                 Type declaringType = field.DeclaringType;
@@ -363,6 +364,22 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                             AuthoredRequirementExemptionReason.ValueNotReadableAsText
                         )
                     );
+                    continue;
+                }
+
+                if (!typeof(Object).IsAssignableFrom(declaringType))
+                {
+                    if (
+                        !nested.TryGetValue(
+                            declaringType,
+                            out List<AuthoredRequirementField> fields
+                        )
+                    )
+                    {
+                        fields = new List<AuthoredRequirementField>();
+                        nested.Add(declaringType, fields);
+                    }
+                    fields.Add(required);
                     continue;
                 }
 
@@ -391,6 +408,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 }
             }
 
+            AddNestedCarriers(nested, byScriptGuid, exemptions);
             return byScriptGuid;
         }
 

@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Tests.TestUtils;
+    using ThreadAllocationCounter = WallstopStudios.UnityHelpers.Tests.Core.ThreadAllocationCounter;
 #if UNITY_5_3_OR_NEWER
     using WallstopStudios.UnityHelpers.Tests.Core;
 #endif
@@ -59,12 +60,12 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             {
                 action();
             }
-            long before = GC.GetAllocatedBytesForCurrentThread();
+            long before = ThreadAllocationCounter.Read();
             for (int index = 0; index < 128; ++index)
             {
                 action();
             }
-            return GC.GetAllocatedBytesForCurrentThread() - before;
+            return ThreadAllocationCounter.Read() - before;
 #endif
         }
 

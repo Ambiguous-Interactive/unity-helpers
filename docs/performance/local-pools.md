@@ -63,3 +63,23 @@ snapshot precedes the unrelated coalesced-file-writer addition. The pool impleme
 unchanged in the final runtime validation, which passes 866 cases with four existing skips.
 Raw NUnit trees, controllers and frozen source inputs remain in ignored `progress/`.
 These results do not qualify contention, player builds or another runtime.
+
+## November 14 follow-up
+
+Two further shared-pool experiments were rejected. Caching the current rolling-history bucket
+produced a candidate/baseline geometric ratio of 0.9994 across shared paths; moving statistics
+increments under the existing pool lock produced 1.0058. Neither met the preregistered 0.95
+threshold, so neither implementation is retained. These results do not establish a speedup.
+
+Each experiment used six fresh Unity 6000.6.7f1 Editor Mono processes in A B B A A B order, 64 warmups,
+21 rotated rounds and calibrated samples of at least 20 ms. All processes completed their 33
+functional/allocation cases and all 147 timing observations, with source identity checks,
+loaded-module and DLL identities, zero process exits and both output streams drained. The
+[full observations](./local-pools-20261114.csv) and [identities and all paired ratios](./local-pools-20261114.json)
+include controls: the bucket-cache experiment's first Stack control ratio was about 1.136,
+so its apparently faster individual paths should not be isolated as evidence of improvement.
+
+The statistics review also found a correctness defect: a reentrant time-provider callback could
+rent an item after the pool size was captured. Statistics now invoke that callback before
+capturing the size, preserving a coherent snapshot for that callback's completed rental.
+Further performance work remains tracked in [#1173](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1173).

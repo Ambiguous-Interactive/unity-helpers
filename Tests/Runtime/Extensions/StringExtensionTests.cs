@@ -1060,6 +1060,40 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.AreEqual(expected, input.Slugify());
         }
 
+        [TestCase(null, false)]
+        [TestCase("", false)]
+        [TestCase(" ", false)]
+        [TestCase("a", true)]
+        [TestCase("0", true)]
+        [TestCase("alpha-123", true)]
+        [TestCase("alpha-beta-gamma", true)]
+        [TestCase("-alpha", false)]
+        [TestCase("alpha-", false)]
+        [TestCase("alpha--beta", false)]
+        [TestCase("Alpha", false)]
+        [TestCase("alpha_beta", false)]
+        [TestCase("alpha beta", false)]
+        [TestCase("alpha/beta", false)]
+        [TestCase("caf\u00e9", false)]
+        [TestCase("a\ud800", false)]
+        public void SlugValidationRefusesInvalidIdentifiersWithoutRewriting(
+            string value,
+            bool expected
+        )
+        {
+            Assert.AreEqual(expected, value.IsSlug());
+            Assert.AreEqual(expected, value.TryValidateSlug(out string reason));
+            if (expected)
+            {
+                Assert.IsTrue(reason == null);
+                Assert.AreEqual(value, value.Slugify());
+            }
+            else
+            {
+                Assert.IsFalse(string.IsNullOrWhiteSpace(reason));
+            }
+        }
+
         [Test]
         public void SlugifyIsAlwaysWellFormedOrEmpty()
         {
@@ -1078,6 +1112,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 string input = new(characters);
                 string slug = input.Slugify();
                 Assert.IsTrue(slug != null, $"Slugify returned null for [{input}]");
+                Assert.AreEqual(0 < slug.Length, slug.IsSlug());
                 if (slug.Length == 0)
                 {
                     continue;

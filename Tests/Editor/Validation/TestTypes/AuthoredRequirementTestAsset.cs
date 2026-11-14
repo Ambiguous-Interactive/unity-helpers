@@ -3,9 +3,11 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation.TestTypes
 {
+    using System.Collections.Generic;
     using UnityEngine;
     using UnityEngine.Serialization;
     using WallstopStudios.UnityHelpers.Core.Attributes;
+    using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
 
     /// <summary>
     /// The subject of the committed authored-requirement fixtures, one field per shape the gate
@@ -50,6 +52,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation.TestTypes
 
         /// <summary>A number, which has no empty state the inspector reports.</summary>
         public int weight;
+
+        [System.NonSerialized]
+        public NestedRequirementTestValue ignoredNested;
+
+        [SerializeReference]
+        public NestedRequirementTestValue managedNested;
+
+        public NestedRequirementTestValue nested;
+        public List<NestedRequirementTestValue> nestedList;
+        public NestedRequirementTestValue[] nestedArray;
+        public SerializableDictionary<string, NestedRequirementTestValue> nestedDictionary;
+#pragma warning disable WUH002 // Authored tests exercise the dictionary's boxed collection values.
+        public SerializableDictionary<string, List<NestedRequirementTestValue>> boxedDictionary;
+#pragma warning restore WUH002
 
         [SerializeReference]
         private object _managed;

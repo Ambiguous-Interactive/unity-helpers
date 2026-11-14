@@ -89,6 +89,60 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Utils
         }
 
         [Test]
+        public void CleanupFailureIsReportedOnceAcrossCopies()
+        {
+            InvalidOperationException expected = new("cleanup");
+            List<Exception> errors = new();
+            DisposableScope original = DisposableScope.Create(() => throw expected, errors.Add);
+            DisposableScope copy = original;
+            copy.Dispose();
+            original.Dispose();
+            CollectionAssert.AreEqual(new[] { expected }, errors);
+        }
+
+        [Test]
+        public void ChainedCleanupsInheritTheErrorReporter()
+        {
+            InvalidOperationException first = new("first");
+            InvalidOperationException second = new("second");
+            List<Exception> errors = new();
+            DisposableScope<DisposableScope> scope = DisposableScope
+                .Create(() => throw first, errors.Add)
+                .WithCleanup(() => throw second);
+            scope.Dispose();
+            scope.Dispose();
+            CollectionAssert.AreEqual(new[] { second, first }, errors);
+        }
+
+        [Test]
+        public void AThrowingErrorReporterDoesNotReplaceTheOriginalException()
+        {
+            InvalidOperationException expected = new("original");
+            int cleanupCalls = 0;
+            int reportCalls = 0;
+            try
+            {
+                using DisposableScope<DisposableScope> scope = DisposableScope
+                    .Create(
+                        () => ++cleanupCalls,
+                        _ =>
+                        {
+                            ++reportCalls;
+                            throw new InvalidOperationException("reporter");
+                        }
+                    )
+                    .WithCleanup(() => throw new InvalidOperationException("cleanup"));
+                throw expected;
+            }
+            catch (InvalidOperationException actual)
+            {
+                Assert.AreSame(expected, actual);
+            }
+            Assert.AreEqual(1, cleanupCalls);
+            Assert.AreEqual(1, reportCalls);
+        }
+
+        [Test]
         public void ScopeCreationAndDisposalDoNotAllocateAfterWarmup()
         {
             AllocationProbe.IgnoreWhenUnmeasurable();

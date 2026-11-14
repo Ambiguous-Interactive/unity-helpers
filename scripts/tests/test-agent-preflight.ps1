@@ -103,6 +103,7 @@ function New-TestRepo {
     # whose C# is written to exercise .meta and staging behavior, not formatting. agent-preflight
     # passes -SkipWhenUnavailable, so the CSharpier step reports a skip here instead of failing.
     Copy-Item (Join-Path $repoRoot 'scripts/lint-csharp-format.ps1') (Join-Path $scriptsDir 'lint-csharp-format.ps1') -Force
+    Copy-Item (Join-Path $repoRoot 'scripts/lint_csharp_format.py') (Join-Path $scriptsDir 'lint_csharp_format.py') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/comment-stripping.ps1') (Join-Path $scriptsDir 'comment-stripping.ps1') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/check-eol.ps1') (Join-Path $scriptsDir 'check-eol.ps1') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/normalize-eol.ps1') (Join-Path $scriptsDir 'normalize-eol.ps1') -Force

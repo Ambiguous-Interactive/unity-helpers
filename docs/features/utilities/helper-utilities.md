@@ -1463,6 +1463,16 @@ order, including when one throws:
 using var scope = DisposableScope.Create(RestoreSetting).WithCleanup(DeleteTempFolder);
 ```
 
+Pass a reporter when cleanup failures must be visible:
+
+```csharp
+using DisposableScope scope = DisposableScope.Create(RestoreSetting, UnityEngine.Debug.LogException);
+```
+
+The reporter receives the original exception on the disposing thread. Chained cleanups inherit it,
+and later cleanup failures do not prevent earlier actions. Reporter exceptions are ignored so they
+cannot replace an exception already in flight. The one-argument overload retains silent cleanup.
+
 Each layer is a value type. Copies share a disposal lease, so each action runs at most once even if
 several copies are disposed. Disposing a default scope or passing a null action is harmless, and
 `Dispose` never throws. For reverse ordering, keep the final scope and let its `using` block dispose
@@ -2092,6 +2102,12 @@ Conventions, chosen once so callers do not have to guess:
   overflow. Integral data returns `double`, matching `Enumerable.Average`.
 - `StandardDeviation` is the population standard deviation by default; pass `sample: true` for
   Bessel's correction when the data is a sample of a larger population.
+
+For unsorted byte channels, `WallMath.TryMedian` accepts arrays, read-only spans, and
+`IReadOnlyList<byte>`. It counts values in a fixed 256-bin stack histogram, taking O(n + 256)
+time without copying, sorting, or mutating the input. Even counts return the average of both middle
+values as a `double`. Null or empty byte input returns false and NaN. The existing double-span
+overload still requires ascending sorted input.
 
 For a binary outcome, use an exact Clopper-Pearson interval when the sample is small or the observed
 rate is close to zero or one:

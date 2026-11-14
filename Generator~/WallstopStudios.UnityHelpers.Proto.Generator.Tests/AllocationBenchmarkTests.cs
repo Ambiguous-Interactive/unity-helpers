@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     using NUnit.Framework;
     using ProtoBuf;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+    using ThreadAllocationCounter = WallstopStudios.UnityHelpers.Tests.Core.ThreadAllocationCounter;
 
     [TestFixture]
     [Category("Performance")]
@@ -60,7 +61,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         {
             using AllocationMeasurementScope scope = AllocationMeasurementScope.Start();
             long started = timestamp();
-            long before = GC.GetAllocatedBytesForCurrentThread();
+            long before = ThreadAllocationCounter.Read();
             for (int iteration = 0; iteration < MeasuredIterations; ++iteration)
             {
                 WProtoWriteResult result = WProtoFacade.Serialize(value, ref buffer);
@@ -70,7 +71,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 }
             }
 
-            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            long allocated = ThreadAllocationCounter.Read() - before;
             long elapsed = timestamp() - started;
             return new Measurement(allocated, elapsed);
         }
@@ -82,7 +83,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         {
             using AllocationMeasurementScope scope = AllocationMeasurementScope.Start();
             long started = Stopwatch.GetTimestamp();
-            long before = GC.GetAllocatedBytesForCurrentThread();
+            long before = ThreadAllocationCounter.Read();
             for (int iteration = 0; iteration < MeasuredIterations; ++iteration)
             {
                 destination.Position = 0;
@@ -90,7 +91,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 ProtoBuf.Serializer.Serialize(destination, value);
             }
 
-            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            long allocated = ThreadAllocationCounter.Read() - before;
             long elapsed = Stopwatch.GetTimestamp() - started;
             return new Measurement(allocated, elapsed);
         }
@@ -100,7 +101,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             AllocationContract restored = null;
             using AllocationMeasurementScope scope = AllocationMeasurementScope.Start();
             long started = Stopwatch.GetTimestamp();
-            long before = GC.GetAllocatedBytesForCurrentThread();
+            long before = ThreadAllocationCounter.Read();
             for (int iteration = 0; iteration < MeasuredIterations; ++iteration)
             {
                 if (!WProtoFacade.TryDeserialize(payload, out restored))
@@ -109,7 +110,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 }
             }
 
-            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            long allocated = ThreadAllocationCounter.Read() - before;
             long elapsed = Stopwatch.GetTimestamp() - started;
             GC.KeepAlive(restored);
             return new Measurement(allocated, elapsed);
@@ -120,14 +121,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             AllocationContract restored = null;
             using AllocationMeasurementScope scope = AllocationMeasurementScope.Start();
             long started = Stopwatch.GetTimestamp();
-            long before = GC.GetAllocatedBytesForCurrentThread();
+            long before = ThreadAllocationCounter.Read();
             for (int iteration = 0; iteration < MeasuredIterations; ++iteration)
             {
                 source.Position = 0;
                 restored = ProtoBuf.Serializer.Deserialize<AllocationContract>(source);
             }
 
-            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            long allocated = ThreadAllocationCounter.Read() - before;
             long elapsed = Stopwatch.GetTimestamp() - started;
             GC.KeepAlive(restored);
             return new Measurement(allocated, elapsed);
@@ -160,9 +161,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ClockAllocationsRemainOutsideTheSerializationAllocationBound()
         {
-            long controlBefore = GC.GetAllocatedBytesForCurrentThread();
+            long controlBefore = ThreadAllocationCounter.Read();
             GC.KeepAlive(new byte[1024]);
-            long controlBytes = GC.GetAllocatedBytesForCurrentThread() - controlBefore;
+            long controlBytes = ThreadAllocationCounter.Read() - controlBefore;
             Assert.GreaterOrEqual(controlBytes, 1024);
             AllocationContract original = CreateRepresentativeContract();
             byte[] buffer = null;
@@ -174,9 +175,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             int clockCalls = 0;
             long ReadAllocatingClock()
             {
-                long before = GC.GetAllocatedBytesForCurrentThread();
+                long before = ThreadAllocationCounter.Read();
                 GC.KeepAlive(new byte[1024]);
-                clockBytes += GC.GetAllocatedBytesForCurrentThread() - before;
+                clockBytes += ThreadAllocationCounter.Read() - before;
                 ++clockCalls;
                 return Stopwatch.GetTimestamp();
             }
@@ -508,7 +509,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 }
 
                 T restored = null;
-                long before = GC.GetAllocatedBytesForCurrentThread();
+                long before = ThreadAllocationCounter.Read();
                 for (int iteration = 0; iteration < ShapeIterations; ++iteration)
                 {
                     if (!WProtoFacade.TryDeserialize(exact, out restored))
@@ -517,15 +518,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     }
                 }
 
-                long wallstopProtoBytes = GC.GetAllocatedBytesForCurrentThread() - before;
-                before = GC.GetAllocatedBytesForCurrentThread();
+                long wallstopProtoBytes = ThreadAllocationCounter.Read() - before;
+                before = ThreadAllocationCounter.Read();
                 for (int iteration = 0; iteration < ShapeIterations; ++iteration)
                 {
                     protobufNetPayload.Position = 0;
                     restored = ProtoBuf.Serializer.Deserialize<T>(protobufNetPayload);
                 }
 
-                long protobufNetBytes = GC.GetAllocatedBytesForCurrentThread() - before;
+                long protobufNetBytes = ThreadAllocationCounter.Read() - before;
                 GC.KeepAlive(restored);
                 return new ShapeComparison(
                     wallstopProtoBytes / (double)ShapeIterations,

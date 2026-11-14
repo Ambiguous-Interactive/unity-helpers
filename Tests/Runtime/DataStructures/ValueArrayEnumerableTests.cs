@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Tests.TestUtils;
+    using ThreadAllocationCounter = WallstopStudios.UnityHelpers.Tests.Core.ThreadAllocationCounter;
 
     [TestFixture]
     public sealed class ValueArrayEnumerableTests
@@ -182,22 +183,22 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Array source = new[] { "first", "second" };
             Consume(source, false);
             Consume(source, true);
-            long before = GC.GetAllocatedBytesForCurrentThread();
+            long before = ThreadAllocationCounter.Read();
             for (int repetition = 0; repetition < 128; ++repetition)
             {
                 Consume(source, false);
             }
-            long control = GC.GetAllocatedBytesForCurrentThread() - before;
+            long control = ThreadAllocationCounter.Read() - before;
             if (control <= 0)
             {
                 Assert.Ignore("The control did not observe Array enumerator allocation.");
             }
-            before = GC.GetAllocatedBytesForCurrentThread();
+            before = ThreadAllocationCounter.Read();
             for (int repetition = 0; repetition < 128; ++repetition)
             {
                 Consume(source, true);
             }
-            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            long allocated = ThreadAllocationCounter.Read() - before;
             Assert.AreEqual(0, allocated);
             Assert.AreEqual(2, _observedCount);
 #endif

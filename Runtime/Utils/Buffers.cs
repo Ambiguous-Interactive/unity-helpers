@@ -2735,13 +2735,13 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// <returns>A snapshot of pool statistics.</returns>
         public PoolStatistics GetStatistics()
         {
+            float currentTime = _timeProvider();
             int currentSize;
             lock (_lock)
             {
                 currentSize = _pool.Count;
             }
 
-            float currentTime = _timeProvider();
             PoolFrequencyStatistics freqStats = _usageTracker.GetFrequencyStatistics(currentTime);
 
             return new PoolStatistics(

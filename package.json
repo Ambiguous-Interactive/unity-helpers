@@ -279,7 +279,7 @@
     "lint:csharp-syntax": "dotnet run --project \"Generator~/WallstopStudios.UnityHelpers.SyntaxPolicy/WallstopStudios.UnityHelpers.SyntaxPolicy.csproj\" --no-launch-profile",
     "lint:csharp-syntax:fix": "npm run lint:csharp-syntax -- --fix",
     "typecheck:unity": "npm run typecheck:unity:legacy && npm run typecheck:unity:odin && npm run typecheck:unity:singlethreaded && npm run typecheck:unity:proto-only && npm run typecheck:unity:default && npm run typecheck:editor && npm run typecheck:tests && npm run typecheck:editor-tests && npm run typecheck:integrations && npm run typecheck:random-quality && npm run lint:doc-samples:reuse-checks && npm run typecheck:unity:odin-bases-disabled",
-    "typecheck:unity:clean": "node scripts/typecheck-clean.js",
+    "typecheck:unity:clean": "uv run --quiet --project scripts/python~ --locked --no-dev python scripts/typecheck_clean.py",
     "typecheck:controls": "uv run --quiet --project scripts/python~ --locked --no-dev python scripts/typecheck_controls.py",
     "typecheck:iterate": "uv run --quiet --project scripts/python~ --locked --no-dev python scripts/typecheck_iterate.py",
     "test:typecheck-iterate": "uv run --quiet --project scripts/python~ --locked pytest scripts/tests/test_typecheck_iterate.py -q",

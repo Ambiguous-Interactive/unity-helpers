@@ -33,6 +33,14 @@
       >$(DefineConstants);PROTOBUF_NET_ORACLE_CANDIDATE</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
+    <Compile
+      Include="../../Tests/Runtime/Core/ThreadAllocationCounterTests.cs"
+      Link="ThreadAllocationCounterTests.cs"
+    />
+    <Compile
+      Include="../../Tests/Core/ThreadAllocationCounter.cs"
+      Link="ThreadAllocationCounter.cs"
+    />
     <InternalsVisibleTo Include="WallstopStudios.UnityHelpers.SchemaConformance.Tests" />
   </ItemGroup>
 

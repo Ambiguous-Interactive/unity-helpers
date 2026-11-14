@@ -366,6 +366,115 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             );
         }
 
+        [TestCase(nameof(AuthoredRequirementTestAsset.nested), "    material: {fileID: 0}", 1)]
+        [TestCase(nameof(AuthoredRequirementTestAsset.nested), "    material: {fileID: 12}", 0)]
+        [TestCase(nameof(AuthoredRequirementTestAsset.nested), "    oldMaterial: {fileID: 0}", 1)]
+        [TestCase(
+            nameof(AuthoredRequirementTestAsset.nested),
+            "    material: {fileID: 12}\n    oldMaterial: {fileID: 0}",
+            0
+        )]
+        [TestCase(
+            nameof(AuthoredRequirementTestAsset.nested),
+            "    child:\n      material: {fileID: 0}",
+            1
+        )]
+        [TestCase(
+            nameof(AuthoredRequirementTestAsset.nestedList),
+            "  - material: {fileID: 0}\n  - material: {fileID: 12}\n  - material: {fileID: 0}",
+            2
+        )]
+        [TestCase(
+            nameof(AuthoredRequirementTestAsset.nestedArray),
+            "  - child:\n      material: {fileID: 0}\n    material: {fileID: 12}",
+            1
+        )]
+        [TestCase(
+            nameof(AuthoredRequirementTestAsset.nestedDictionary),
+            "    _keys:\n    - first\n    _values:\n    - material: {fileID: 0}\n    _boxedValues: []",
+            1
+        )]
+        [TestCase(
+            nameof(AuthoredRequirementTestAsset.boxedDictionary),
+            "    _keys:\n    - first\n    _boxedValues:\n    - Data:\n      - material: {fileID: 0}\n      - material: {fileID: 12}",
+            1
+        )]
+        [TestCase(
+            nameof(AuthoredRequirementTestAsset.nestedList),
+            "  - other:\n      material: {fileID: 0}\n    material: {fileID: 12}",
+            0
+        )]
+        [TestCase(
+            nameof(AuthoredRequirementTestAsset.ignoredNested),
+            "    material: {fileID: 0}",
+            0
+        )]
+        [TestCase(
+            nameof(AuthoredRequirementTestAsset.managedNested),
+            "    material: {fileID: 0}",
+            0
+        )]
+        public void NestedRequirementsFollowTheirTypedCarrier(
+            string field,
+            string value,
+            int expected
+        )
+        {
+            Assert.IsTrue(
+                MonoScriptIndex.TryGetScriptGuid(
+                    typeof(AuthoredRequirementTestAsset),
+                    out string guid
+                )
+            );
+            string path = Path.Combine(
+                Path.GetTempPath(),
+                $"nested-requirement-{Guid.NewGuid():N}.asset"
+            );
+            try
+            {
+                File.WriteAllText(
+                    path,
+                    $"%YAML 1.1\n--- !u!114 &11400000\nMonoBehaviour:\n  m_Script: {{fileID: 11500000, guid: {guid}, type: 3}}\n  {field}:\n{value}\n"
+                );
+                List<AuthoredRequirementFinding> findings = new();
+                List<AuthoredRequirementExemption> exemptions = new();
+                Assert.IsTrue(
+                    AuthoredRequirementValidator.TryScan(
+                        new[] { path },
+                        findings,
+                        exemptions,
+                        out int inspected
+                    )
+                );
+                Assert.AreEqual(1, inspected);
+                Assert.AreEqual(expected, findings.Count, string.Join("\n", findings));
+                Assert.IsFalse(
+                    exemptions.Any(exemption =>
+                        exemption.DeclaringType == typeof(NestedRequirementTestValue)
+                    )
+                );
+                string[] authored = File.ReadAllLines(path);
+                foreach (AuthoredRequirementFinding finding in findings)
+                {
+                    StringAssert.EndsWith("{fileID: 0}", authored[finding.LineNumber - 1]);
+                }
+                Assert.IsTrue(
+                    findings.All(finding =>
+                        finding.DeclaringType == typeof(NestedRequirementTestValue)
+                        && string.Equals(
+                            finding.FieldName,
+                            nameof(NestedRequirementTestValue.material),
+                            StringComparison.Ordinal
+                        )
+                    )
+                );
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
+
         [Test]
         public void AScanWithNothingToReadIsRefusedRatherThanReportedClean()
         {

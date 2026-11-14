@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Tests.TestUtils;
+    using ThreadAllocationCounter = WallstopStudios.UnityHelpers.Tests.Core.ThreadAllocationCounter;
 
     [TestFixture]
     [Category("Fast")]
@@ -187,15 +188,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             EnumValues<ULongValues>.IsDefined(ULongValues.High);
             EnumNameCache<AliasedValues>.TryParse("Alias".AsSpan(), out _);
             GCAssert.IgnoreIfAllocationMeasurementUnavailable();
-            long controlBefore = GC.GetAllocatedBytesForCurrentThread();
+            long controlBefore = ThreadAllocationCounter.Read();
             byte[] control = new byte[128];
-            long controlBytes = GC.GetAllocatedBytesForCurrentThread() - controlBefore;
+            long controlBytes = ThreadAllocationCounter.Read() - controlBefore;
             GC.KeepAlive(control);
             if (controlBytes == 0)
             {
                 Assert.Ignore("The allocation counter did not observe a retained allocation.");
             }
-            long before = GC.GetAllocatedBytesForCurrentThread();
+            long before = ThreadAllocationCounter.Read();
             bool matched = true;
             for (int i = 0; i < 256; ++i)
             {
@@ -204,7 +205,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 bool parsed = EnumNameCache<AliasedValues>.TryParse("Alias".AsSpan(), out _);
                 matched = matched && dense && sparse && parsed;
             }
-            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            long allocated = ThreadAllocationCounter.Read() - before;
             Assert.That(matched, Is.True);
             Assert.That(allocated, Is.Zero);
         }

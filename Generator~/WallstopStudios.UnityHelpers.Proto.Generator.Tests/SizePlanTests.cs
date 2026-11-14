@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     using System.Diagnostics;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+    using ThreadAllocationCounter = WallstopStudios.UnityHelpers.Tests.Core.ThreadAllocationCounter;
 
     [TestFixture]
     public sealed class SizePlanTests
@@ -21,9 +22,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             long minimum = long.MaxValue;
             for (int reading = 0; reading < readings; ++reading)
             {
-                long allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+                long allocatedBefore = ThreadAllocationCounter.Read();
                 _ = MeasurePlanned(value, ref buffer, iterations);
-                long allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+                long allocated = ThreadAllocationCounter.Read() - allocatedBefore;
                 if (allocated < minimum)
                 {
                     minimum = allocated;
@@ -49,9 +50,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             long minimum = long.MaxValue;
             for (int reading = 0; reading < readings; ++reading)
             {
-                long allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+                long allocatedBefore = ThreadAllocationCounter.Read();
                 _ = MeasureBackpatched(formatter, value, buffer, iterations);
-                long allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+                long allocated = ThreadAllocationCounter.Read() - allocatedBefore;
                 if (allocated < minimum)
                 {
                     minimum = allocated;

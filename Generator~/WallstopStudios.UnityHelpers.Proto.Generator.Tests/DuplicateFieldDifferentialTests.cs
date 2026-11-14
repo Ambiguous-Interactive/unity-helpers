@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     using System.IO;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+    using ThreadAllocationCounter = WallstopStudios.UnityHelpers.Tests.Core.ThreadAllocationCounter;
 
     /// <summary>
     /// Pins what a field that appears more than once decodes to, against protobuf-net 2.4.9 and
@@ -163,12 +164,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             byte[] occurrence = Parse("0801");
             WProtoMessageAccumulator warmup = default;
             Assert.IsTrue(warmup.TryAdd(occurrence));
-            long controlStart = GC.GetAllocatedBytesForCurrentThread();
+            long controlStart = ThreadAllocationCounter.Read();
             GC.KeepAlive(new byte[32]);
-            Assert.Less(controlStart, GC.GetAllocatedBytesForCurrentThread());
+            Assert.Less(controlStart, ThreadAllocationCounter.Read());
 
             int checksum = 0;
-            long before = GC.GetAllocatedBytesForCurrentThread();
+            long before = ThreadAllocationCounter.Read();
             for (int index = 0; index < 128; ++index)
             {
                 WProtoMessageAccumulator accumulator = default;
@@ -177,7 +178,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     checksum += accumulator.Payload[1];
                 }
             }
-            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            long allocated = ThreadAllocationCounter.Read() - before;
             Assert.AreEqual(128, checksum);
             Assert.AreEqual(0, allocated);
         }
