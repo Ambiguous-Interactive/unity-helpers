@@ -23,7 +23,7 @@ Three npm commands, no PowerShell: `unity:mcp:bridge` on the host,
 
 ## The config files are machine-local (never commit)
 
-The bridge `host:port` is per-developer, so all four generated client configs are
+The bridge `host:port` is per-developer, so all five generated client configs are
 **gitignored** and regenerated locally:
 
 | Client            | File                 | Ignored by     |
@@ -32,6 +32,7 @@ The bridge `host:port` is per-developer, so all four generated client configs ar
 | Cursor            | `.cursor/mcp.json`   | explicit entry |
 | VS Code / Copilot | `.vscode/mcp.json`   | `.vscode/**`   |
 | Codex             | `.codex/config.toml` | `.codex/*`     |
+| OpenCode          | `opencode.json`      | explicit entry |
 
 `.env.local` holds the values they are generated from and is ignored too.
 
@@ -40,6 +41,10 @@ Generate/refresh them all:
 ```bash
 npm run unity:mcp:configure
 ```
+
+`.devcontainer/sync-mcp.sh` runs on create, start, and attach, then mirrors the generated files into
+persistent git worktrees and merges the OpenCode server map into `~/.config/opencode`. Run
+`opencode reload` after a refresh to bind the running agent.
 
 ## ALWAYS confirm which project answered
 

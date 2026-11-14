@@ -358,6 +358,7 @@
     "test:github-mcp": "node --test scripts/tests/test-github-mcp.mjs",
     "test:unity-mcp": "node --test scripts/tests/test-unity-mcp.mjs",
     "test:zai-mcp": "node --test scripts/tests/test-zai-mcp.mjs",
+    "test:sync-mcp": "node --test scripts/tests/test-sync-client-configs.mjs",
     "test:sync-script-contracts": "pwsh -NoProfile -File scripts/tests/test-sync-script-contracts.ps1",
     "test:agent-preflight": "pwsh -NoProfile -File scripts/tests/test-agent-preflight.ps1",
     "test:git-staging-helpers": "bash scripts/tests/test-git-staging-helpers.sh",

@@ -175,6 +175,16 @@ entry carries **both** keys, so one file configures both agents; each ignores th
 `npm run validate:mcp-config` fails if any of them stops being ignored, if a present config is
 malformed or does not target `/mcp`, or if these docs reference a script that does not exist.
 
+`sync-client-configs.mjs` mirrors these generated files into every persistent git worktree under
+the home directory or repository, and merges the OpenCode server map into the global OpenCode
+config under `~/.config/opencode`. Every copy is mode `0600`; the script prints counts only.
+Run it from `.devcontainer/sync-mcp.sh` or directly after refreshing the project config:
+
+```bash
+node scripts/mcp/sync-client-configs.mjs
+opencode reload
+```
+
 Writes are transactional: files are staged as `0600` temporaries and renamed, and a failure part-way
 rolls every already-committed file back. Only the six repository-owned server entries are replaced,
 so unrelated MCP servers in the same file survive. JSON configs are read as JSONC, since VS Code's
