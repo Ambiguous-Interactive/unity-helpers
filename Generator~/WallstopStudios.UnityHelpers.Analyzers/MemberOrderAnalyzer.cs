@@ -16,19 +16,29 @@ namespace WallstopStudios.UnityHelpers.Analyzers
     {
         private const int AccessibilityStride = 8;
 
-        /// <inheritdoc />
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
+        private static readonly ImmutableArray<DiagnosticDescriptor> SupportedRules =
             ImmutableArray.Create(UnityHelpersDiagnostics.MemberDeclarationsOutOfOrder);
+
+        /// <inheritdoc />
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => SupportedRules;
 
         private static void AnalyzeType(SyntaxNodeAnalysisContext context)
         {
             TypeDeclarationSyntax declaration = (TypeDeclarationSyntax)context.Node;
             List<DirectiveTriviaSyntax> directives = new List<DirectiveTriviaSyntax>();
-            foreach (SyntaxTrivia trivia in declaration.DescendantTrivia(descendIntoTrivia: true))
+            if (declaration.ContainsDirectives)
             {
-                if (trivia.IsDirective && trivia.GetStructure() is DirectiveTriviaSyntax directive)
+                foreach (
+                    SyntaxTrivia trivia in declaration.DescendantTrivia(descendIntoTrivia: true)
+                )
                 {
-                    directives.Add(directive);
+                    if (
+                        trivia.IsDirective
+                        && trivia.GetStructure() is DirectiveTriviaSyntax directive
+                    )
+                    {
+                        directives.Add(directive);
+                    }
                 }
             }
             Stack<int> regions = new Stack<int>();

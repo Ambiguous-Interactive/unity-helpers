@@ -3,7 +3,10 @@
 
 namespace WallstopStudios.UnityHelpers.Analyzers
 {
+    using System;
+    using System.Collections.Generic;
     using System.Collections.Immutable;
+    using System.Threading;
     using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.CSharp;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -46,9 +49,13 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         private const string EngineWrapperTypeName =
             "WallstopStudios.UnityHelpers.Core.Random.UnityRandom";
 
-        /// <inheritdoc />
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
+        private static readonly ImmutableArray<DiagnosticDescriptor> SupportedRules =
             ImmutableArray.Create(UnityHelpersDiagnostics.UnityRandomIsNotReplayable);
+
+        private static readonly Func<SyntaxNode, bool> NamespaceDescent = DescendIntoNamespaces;
+
+        /// <inheritdoc />
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => SupportedRules;
 
         private static void OnCompilationStart(CompilationStartAnalysisContext context)
         {
@@ -68,10 +75,18 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 OperationKind.ObjectCreation
             );
 
-            context.RegisterSyntaxNodeAction(
-                syntaxContext => OnName(syntaxContext, unityRandom),
-                SyntaxKind.IdentifierName
+            HashSet<string> candidateNames = CandidateTypeNames(
+                context.Compilation,
+                unityRandom,
+                context.CancellationToken
             );
+            if (candidateNames.Count != 0)
+            {
+                context.RegisterSyntaxNodeAction(
+                    syntaxContext => OnName(syntaxContext, unityRandom, candidateNames),
+                    SyntaxKind.IdentifierName
+                );
+            }
         }
 
         private static void OnOperation(
@@ -118,8 +133,58 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             );
         }
 
-        private static void OnName(SyntaxNodeAnalysisContext context, INamedTypeSymbol unityRandom)
+        private static HashSet<string> CandidateTypeNames(
+            Compilation compilation,
+            INamedTypeSymbol unityRandom,
+            CancellationToken cancellationToken
+        )
         {
+            HashSet<string> names = new HashSet<string>(StringComparer.Ordinal);
+            foreach (INamedTypeSymbol nested in unityRandom.GetTypeMembers())
+            {
+                names.Add(nested.Name);
+            }
+            if (names.Count == 0)
+            {
+                return names;
+            }
+            foreach (SyntaxTree tree in compilation.SyntaxTrees)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                foreach (
+                    SyntaxNode node in tree.GetRoot(cancellationToken)
+                        .DescendantNodes(NamespaceDescent)
+                )
+                {
+                    if (node is UsingDirectiveSyntax directive && directive.Alias != null)
+                    {
+                        names.Add(directive.Alias.Name.Identifier.ValueText);
+                    }
+                }
+            }
+            return names;
+        }
+
+        private static bool DescendIntoNamespaces(SyntaxNode node)
+        {
+            return node is CompilationUnitSyntax
+                || (
+                    node is MemberDeclarationSyntax
+                    && !(node is BaseTypeDeclarationSyntax)
+                    && !(node is DelegateDeclarationSyntax)
+                );
+        }
+
+        private static void OnName(
+            SyntaxNodeAnalysisContext context,
+            INamedTypeSymbol unityRandom,
+            HashSet<string> candidateNames
+        )
+        {
+            if (!candidateNames.Contains(((IdentifierNameSyntax)context.Node).Identifier.ValueText))
+            {
+                return;
+            }
             // Nested types in type positions have no operation node.
             if (
                 !(

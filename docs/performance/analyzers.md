@@ -33,11 +33,61 @@ compilation. The window reports these files as needing repair; choose **Enable A
 All** to repair the namespace while keeping other rules and includes. API writes also repair the
 namespace. Reading or refreshing a file does not change it.
 
-For package development, `npm run verify:shipped-analyzers` compares all three shipped compiler-input DLLs with fresh
+For package development, `npm run verify:shipped-analyzers` compares all four shipped compiler-input DLLs with fresh
 Release builds. `npm run verify:shipped-analyzers:fix` stages each replacement in a hidden directory
 before publishing it. A failed copy or replacement leaves that DLL and its importer metadata intact
 and returns failure. Earlier successful replacements in the same run remain published; retry the
 command after resolving the failure. Temporary directories are excluded from Unity imports.
+
+## Compiler work and measurements
+
+Compiler analysis now reuses each analyzer's immutable diagnostic catalog instead of allocating an
+array on every read. Unity random-state analysis checks candidate nested-type and alias names before
+semantic binding; ordinary identifiers no longer need a symbol lookup for that rule. Global aliases,
+file-scoped namespaces and nested-state aliases retain semantic coverage. Member-order analysis skips
+trivia traversal when a type contains no directives.
+
+WProto retains its stable sort for shallow hierarchies. Deep hierarchies use stable depth buckets and
+cache shared base depths, preserving discovery order within a level. A bounded hierarchy probe picks
+the path. Unconditional buckets were rejected: a 256-contract caller regressed even though isolated
+ordering was faster. Odin migration scans declarations without descending through method expressions,
+and avoids formatting names for unrelated attributes. The enum generator remains byte-identical to
+the baseline after its name-check candidate failed qualification.
+
+The excluded-source audit removes its LINQ queries, normalizes each subject once and streams manifest
+paths while preserving first occurrence. The former membership term was `sources × subjects`; the
+current nine subjects bound that factor, while larger sets expose the scaling problem. The accepted
+path uses a bounded scan for at most 16 subjects and hash membership above that threshold. Its nine
+required suffix anchors remain fixed. Large-set temporary storage scales with subjects, not sources.
+
+The [qualification record](./compiler-analysis-20261114.json) and
+[2,274 raw observations](./compiler-analysis-20261114.csv) include accepted and rejected variants,
+payload hashes, source hashes, exact generated-source digests and reproducible probe sources.
+Measurements use .NET 9 / Roslyn 5.9 on the host; they are not Unity editor or player build-time claims.
+The analysis capture has known host API gaps, so its unchanged diagnostic set is a parity control,
+not proof that those sources compile against every Unity API.
+
+| Workload                                              | Observed result                                                                                                                                                                                                 |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| All 28 analyzers, 865-source census                   | Median analysis 12.543 → 11.906 seconds; all 250 diagnostics retain the same digest. Three fresh processes per variant in ABBAAB order.                                                                         |
+| 100,000 diagnostic-catalog reads per analyzer         | Exactly 91,200,000 fewer allocated bytes per complete sweep; both variants retain the same 176-byte probe residual. Separate positive-control-backed policy tests measure zero getter allocations after warmup. |
+| Audit membership, up to 16,384 sources / 512 subjects | Largest controls take about 1–3% of the former time. All measured cells stay within a 1.05 ratio. The hash path uses more temporary bytes for large slash-only subject sets; see the raw data.                  |
+| WProto ordering, 512-contract chain                   | About 0.009 of the prior expression's time, with stable ordering. Shallow ordering stays close to the original path.                                                                                            |
+| Odin generation, 16 / 64 / 256 types                  | Warm ratios 0.542 / 0.570 / 0.526, with identical emitted text.                                                                                                                                                 |
+| WProto generation, 16 / 64 / 256 contracts            | Warm ratios 1.055 / 0.979 / 0.935. The small control regresses about 0.37 ms warm and 9.7% on first execution; this tradeoff remains explicit.                                                                  |
+| Rejected enum name checks, 256 enums                  | About 5.5% slower warm and 31.8% slower on first execution. The original implementation and DLL are retained.                                                                                                   |
+
+Generation captures warm each corpus for at least 1.5 seconds before seven observations in each of
+three fresh processes. First-execution records follow validation of the input compilation and do not
+measure an entire build. Shared semantic binding can move between analyzer telemetry callbacks;
+per-rule timing reductions must not be read as whole-compiler savings. Earlier analysis traces that
+overlap owned builds are retained locally and excluded from these results.
+
+Correctness qualification passes 1,357 analyzer and 2,258 WProto/Odin cases, plus 70 enum cases with
+one existing unsupported-boolean skip. Eight ordering controls cover both path boundaries, deep
+chains, branching, reversed discovery order and preservation of the input list. Native Unity
+qualification passes 25 profile and 57 analyzer-policy cases with clean raw exits and stable input
+hashes. The broader compiler/tooling work in issue #1200 remains open.
 
 | Id                                                                       | Reports                                                               |
 | ------------------------------------------------------------------------ | --------------------------------------------------------------------- |

@@ -1,0 +1,97 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using WallstopStudios.UnityHelpers.Core.Helper;
+using Audit = WallstopStudios.UnityHelpers.CountingLoopAudit.Program;
+
+internal static class AdmissionControls
+{
+    private static int _controls;
+
+    private static bool Original(string[] sources, string[] subjects, string[] required)
+    {
+        return !required.Any(r =>
+                !subjects.Any(s => s.SanitizePath().EndsWith(r, StringComparison.Ordinal))
+            ) && !subjects.Any(s => !sources.Contains(s));
+    }
+
+    private static void Check(
+        string name,
+        string[] sources,
+        string[] subjects,
+        string[] required,
+        bool expected
+    )
+    {
+        if (
+            Original(sources, subjects, required) != expected
+            || Audit.HasRequiredSubjects(sources, subjects, required) != expected
+        )
+        {
+            throw new InvalidOperationException("Admission control failed: " + name);
+        }
+        ++_controls;
+    }
+
+    private static int Main()
+    {
+        string[] required =
+        {
+            "/Editor/A.cs",
+            "/Editor/B.cs",
+            "/Editor/C.cs",
+            "/Editor/D.cs",
+            "/Editor/E.cs",
+            "/Editor/F.cs",
+            "/Runtime/A.cs",
+            "/Runtime/B.cs",
+            "/Runtime/C.cs",
+        };
+        string[] valid = required.Select(s => "/repo" + s).ToArray();
+        string[] foreignSmall = valid.Concat(new[] { "/foreign/Other.cs" }).ToArray();
+        string[] large = valid
+            .Concat(Enumerable.Range(0, 32).Select(i => "/repo/Extra" + i + ".cs"))
+            .ToArray();
+        Check("valid-small", valid, valid, required, true);
+        Check("foreign-small-preserves-every-anchor", valid, foreignSmall, required, false);
+        Check("valid-large", large, large, required, true);
+        Check(
+            "foreign-large-preserves-every-anchor",
+            large,
+            large.Concat(new[] { "/foreign/Other.cs" }).ToArray(),
+            required,
+            false
+        );
+        string[] wrongRoot = (string[])valid.Clone();
+        wrongRoot[0] = "/different-root" + required[0];
+        Check("same-suffix-other-root-is-not-a-source", valid, wrongRoot, required, false);
+        string[] prefix = (string[])valid.Clone();
+        prefix[0] += ".backup";
+        Check("members-present-but-anchor-is-only-a-prefix", prefix, prefix, required, false);
+        string[] caseChanged = (string[])valid.Clone();
+        caseChanged[0] = caseChanged[0].ToLowerInvariant();
+        Check("anchor-comparison-remains-ordinal", caseChanged, caseChanged, required, false);
+        Check("duplicate-subjects", valid, valid.Concat(valid).ToArray(), required, true);
+        Check("missing-required-subjects", valid, Array.Empty<string>(), required, false);
+        Check("empty-sources", Array.Empty<string>(), valid, required, false);
+        Check(
+            "empty-policy-and-census",
+            Array.Empty<string>(),
+            Array.Empty<string>(),
+            Array.Empty<string>(),
+            true
+        );
+        Check(
+            "empty-policy-still-rejects-foreign-members",
+            valid,
+            foreignSmall,
+            Array.Empty<string>(),
+            false
+        );
+        string[] windows = valid.Select(p => p.Replace('/', '\\')).ToArray();
+        Check("windows-separators", windows, windows, required, true);
+        Check("membership-remains-raw-ordinal", windows, valid, required, false);
+        Console.WriteLine("Admission semantic controls passed: " + _controls);
+        return 0;
+    }
+}

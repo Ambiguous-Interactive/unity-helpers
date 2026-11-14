@@ -18,9 +18,11 @@ namespace WallstopStudios.UnityHelpers.Analyzers
     {
         private const string PoolNamespace = "WallstopStudios.UnityHelpers.Utils.";
 
-        /// <inheritdoc />
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
+        private static readonly ImmutableArray<DiagnosticDescriptor> SupportedRules =
             ImmutableArray.Create(UnityHelpersDiagnostics.RedundantPooledClear);
+
+        /// <inheritdoc />
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => SupportedRules;
 
         private static void Analyze(SyntaxNodeAnalysisContext context)
         {

@@ -16,8 +16,10 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         /// <summary>
         /// Gets the lifecycle signature diagnostic.
         /// </summary>
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
+        private static readonly ImmutableArray<DiagnosticDescriptor> SupportedRules =
             ImmutableArray.Create(UnityHelpersDiagnostics.InvalidUnityLifecycleSignature);
+
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => SupportedRules;
 
         internal static bool DerivesFrom(INamedTypeSymbol candidate, INamedTypeSymbol expected)
         {

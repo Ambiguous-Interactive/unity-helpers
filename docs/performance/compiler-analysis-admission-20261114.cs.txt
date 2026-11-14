@@ -1,0 +1,105 @@
+using System;
+using System.Diagnostics;
+using System.Linq;
+using System.Text.Json;
+using WallstopStudios.UnityHelpers.Core.Helper;
+using Audit = WallstopStudios.UnityHelpers.CountingLoopAudit.Program;
+
+internal static class AdmissionProbe
+{
+    static bool Original(string[] sources, string[] subjects, string[] required)
+    {
+        return !required.Any(r =>
+                !subjects.Any(s => s.SanitizePath().EndsWith(r, StringComparison.Ordinal))
+            ) && !subjects.Any(s => !sources.Contains(s));
+    }
+
+    static int Main()
+    {
+        string[] required =
+        {
+            "/Editor/A.cs",
+            "/Editor/B.cs",
+            "/Editor/C.cs",
+            "/Editor/D.cs",
+            "/Editor/E.cs",
+            "/Editor/F.cs",
+            "/Runtime/A.cs",
+            "/Runtime/B.cs",
+            "/Runtime/C.cs",
+        };
+        foreach (int count in new[] { 32, 512, 4096, 16384 })
+        foreach (int subjectCount in new[] { 9, Math.Min(count, 512) })
+        foreach (bool windows in new[] { false, true })
+        {
+            string[] sources = new string[count];
+            for (int i = 0; i < count; i++)
+                sources[i] = "/repo/Sources/Subject" + i + ".cs";
+            for (int i = 0; i < required.Length; i++)
+                sources[count - required.Length + i] = "/repo" + required[i];
+            if (windows)
+                for (int i = 0; i < count; i++)
+                    sources[i] = sources[i].Replace('/', '\\');
+            string[] subjects = new string[subjectCount];
+            Array.Copy(sources, count - subjectCount, subjects, 0, subjectCount);
+            if (
+                !Original(sources, subjects, required)
+                || !Audit.HasRequiredSubjects(sources, subjects, required)
+            )
+                throw new InvalidOperationException("Valid input rejected");
+            string[] invalid = (string[])subjects.Clone();
+            invalid[invalid.Length - 1] = "/foreign/Other.cs";
+            if (
+                Original(sources, invalid, required)
+                || Audit.HasRequiredSubjects(sources, invalid, required)
+            )
+                throw new InvalidOperationException("Foreign input accepted");
+            for (int round = 0; round < 7; round++)
+            {
+                foreach (
+                    bool candidate in round % 2 == 0 ? new[] { false, true } : new[] { true, false }
+                )
+                {
+                    Func<bool> action = candidate
+                        ? () => Audit.HasRequiredSubjects(sources, subjects, required)
+                        : () => Original(sources, subjects, required);
+                    int iterations = 1;
+                    var timer = new Stopwatch();
+                    do
+                    {
+                        timer.Restart();
+                        for (int i = 0; i < iterations; i++)
+                            if (!action())
+                                throw new InvalidOperationException();
+                        timer.Stop();
+                        if (timer.Elapsed.TotalMilliseconds < 20)
+                            iterations *= 2;
+                    } while (timer.Elapsed.TotalMilliseconds < 20);
+                    long begin = GC.GetAllocatedBytesForCurrentThread();
+                    timer.Restart();
+                    for (int i = 0; i < iterations; i++)
+                        if (!action())
+                            throw new InvalidOperationException();
+                    timer.Stop();
+                    Console.WriteLine(
+                        JsonSerializer.Serialize(
+                            new
+                            {
+                                count,
+                                subjectCount,
+                                windows,
+                                round,
+                                candidate,
+                                iterations,
+                                nanoseconds = timer.Elapsed.TotalNanoseconds / iterations,
+                                bytes = (GC.GetAllocatedBytesForCurrentThread() - begin)
+                                    / (double)iterations,
+                            }
+                        )
+                    );
+                }
+            }
+        }
+        return 0;
+    }
+}

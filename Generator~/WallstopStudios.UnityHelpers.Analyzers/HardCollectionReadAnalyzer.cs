@@ -14,9 +14,11 @@ namespace WallstopStudios.UnityHelpers.Analyzers
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
     public sealed class HardCollectionReadAnalyzer : DiagnosticAnalyzer
     {
-        /// <inheritdoc />
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
+        private static readonly ImmutableArray<DiagnosticDescriptor> SupportedRules =
             ImmutableArray.Create(UnityHelpersDiagnostics.HardCollectionRead);
+
+        /// <inheritdoc />
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => SupportedRules;
 
         private static bool IsKnownCollection(INamedTypeSymbol type, Compilation compilation)
         {

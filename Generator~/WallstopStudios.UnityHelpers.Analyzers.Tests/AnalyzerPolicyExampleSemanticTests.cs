@@ -350,6 +350,30 @@ namespace WallstopStudios.UnityHelpers.Core.Random {
         }
 
         [TestCaseSource(nameof(Cases))]
+        public void SupportedDiagnosticReadsAllocateNothingAfterWarmup(string id)
+        {
+            DiagnosticAnalyzer analyzer = AnalyzerFor(id);
+            int observed = 0;
+            for (int index = 0; index < 32; ++index)
+            {
+                observed += analyzer.SupportedDiagnostics.Length;
+            }
+            long controlStart = GC.GetAllocatedBytesForCurrentThread();
+            byte[] control = new byte[1024];
+            long controlBytes = GC.GetAllocatedBytesForCurrentThread() - controlStart;
+            GC.KeepAlive(control);
+            Assert.LessOrEqual(1024, controlBytes);
+            long start = GC.GetAllocatedBytesForCurrentThread();
+            for (int index = 0; index < 1000; ++index)
+            {
+                observed += analyzer.SupportedDiagnostics.Length;
+            }
+            long allocated = GC.GetAllocatedBytesForCurrentThread() - start;
+            Assert.AreEqual(0, allocated, id);
+            Assert.Less(0, observed);
+        }
+
+        [TestCaseSource(nameof(Cases))]
         public void EveryExampleReportsItsPolicyAndItsCorrectionDoesNot(string id)
         {
             Assert.IsTrue(AnalyzerPolicyExamples.TryGet(id, out string bad, out string good));

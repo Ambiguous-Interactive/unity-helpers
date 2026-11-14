@@ -56,6 +56,11 @@ namespace WallstopStudios.UnityHelpers.OdinMigration.Generator
             {
                 if (
                     string.Equals(
+                        attribute.AttributeClass?.Name,
+                        "SerializeField",
+                        StringComparison.Ordinal
+                    )
+                    && string.Equals(
                         attribute.AttributeClass?.ToDisplayString(),
                         "UnityEngine.SerializeField",
                         StringComparison.Ordinal
@@ -63,11 +68,26 @@ namespace WallstopStudios.UnityHelpers.OdinMigration.Generator
                 )
                 {
                     serialized = true;
+                    break;
                 }
             }
             foreach (AttributeData attribute in field.GetAttributes())
             {
-                string name = attribute.AttributeClass?.ToDisplayString();
+                string shortName = attribute.AttributeClass?.Name;
+                if (
+                    !string.Equals(
+                        shortName,
+                        nameof(NonSerializedAttribute),
+                        StringComparison.Ordinal
+                    )
+                    && !string.Equals(shortName, "SerializeReference", StringComparison.Ordinal)
+                    && !string.Equals(shortName, "SerializeField", StringComparison.Ordinal)
+                    && !string.Equals(shortName, "OdinSerializeAttribute", StringComparison.Ordinal)
+                )
+                {
+                    continue;
+                }
+                string name = attribute.AttributeClass.ToDisplayString();
                 if (
                     string.Equals(name, "System.NonSerializedAttribute", StringComparison.Ordinal)
                     || string.Equals(

@@ -7,7 +7,6 @@ namespace WallstopStudios.UnityHelpers.CountingLoopAudit
     using System.Collections.Generic;
     using System.Collections.Immutable;
     using System.IO;
-    using System.Linq;
     using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.CSharp;
     using Microsoft.CodeAnalysis.Diagnostics;
@@ -16,7 +15,60 @@ namespace WallstopStudios.UnityHelpers.CountingLoopAudit
 
     internal static class Program
     {
+        private const int MaxLinearSubjectCount = 16;
         private const string ControlPath = "CountingLoopAuditReportingControl.cs";
+
+        internal static bool HasRequiredSubjects(
+            string[] sources,
+            string[] subjects,
+            string[] requiredSubjects
+        )
+        {
+            if (subjects.Length <= MaxLinearSubjectCount)
+            {
+                foreach (string subject in subjects)
+                {
+                    if (Array.IndexOf(sources, subject) < 0)
+                    {
+                        return false;
+                    }
+                }
+            }
+            else
+            {
+                HashSet<string> unmatched = new HashSet<string>(subjects, StringComparer.Ordinal);
+                foreach (string source in sources)
+                {
+                    unmatched.Remove(source);
+                    if (unmatched.Count == 0)
+                    {
+                        break;
+                    }
+                }
+                if (unmatched.Count != 0)
+                {
+                    return false;
+                }
+            }
+            bool[] found = new bool[requiredSubjects.Length];
+            int remaining = requiredSubjects.Length;
+            foreach (string subject in subjects)
+            {
+                string normalized = subject.SanitizePath();
+                for (int index = 0; index < requiredSubjects.Length; ++index)
+                {
+                    if (
+                        !found[index]
+                        && normalized.EndsWith(requiredSubjects[index], StringComparison.Ordinal)
+                    )
+                    {
+                        found[index] = true;
+                        --remaining;
+                    }
+                }
+            }
+            return remaining == 0;
+        }
 
         private static int Main(string[] arguments)
         {
@@ -32,6 +84,11 @@ namespace WallstopStudios.UnityHelpers.CountingLoopAudit
                 string[] sources = ReadPaths(arguments[0]);
                 string[] references = ReadPaths(arguments[1]);
                 string[] subjects = ReadPaths(arguments[3]);
+                HashSet<string> referenceNames = new HashSet<string>(StringComparer.Ordinal);
+                foreach (string reference in references)
+                {
+                    referenceNames.Add(Path.GetFileName(reference));
+                }
                 foreach (
                     string requiredReference in new[]
                     {
@@ -41,15 +98,7 @@ namespace WallstopStudios.UnityHelpers.CountingLoopAudit
                     }
                 )
                 {
-                    if (
-                        !references.Any(reference =>
-                            string.Equals(
-                                Path.GetFileName(reference),
-                                requiredReference,
-                                System.StringComparison.Ordinal
-                            )
-                        )
-                    )
+                    if (!referenceNames.Contains(requiredReference))
                     {
                         throw new InvalidOperationException(
                             "Missing required audit reference: " + requiredReference
@@ -69,13 +118,7 @@ namespace WallstopStudios.UnityHelpers.CountingLoopAudit
                     "/Runtime/Utils/MatchColliderToSprite.cs",
                     "/Runtime/Visuals/UGUI/EnhancedImage.cs",
                 };
-                if (
-                    requiredSubjects.Any(required =>
-                        !subjects.Any(subject =>
-                            subject.SanitizePath().EndsWith(required, StringComparison.Ordinal)
-                        )
-                    ) || subjects.Any(subject => !sources.Contains(subject))
-                )
+                if (!HasRequiredSubjects(sources, subjects, requiredSubjects))
                 {
                     throw new InvalidOperationException(
                         "The nine excluded production sources must all be audit subjects."
@@ -84,7 +127,7 @@ namespace WallstopStudios.UnityHelpers.CountingLoopAudit
 
                 string[] symbols = File.ReadAllText(arguments[2])
                     .Split(new[] { ';', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-                if (!symbols.Contains("UNITY_EDITOR", StringComparer.Ordinal))
+                if (Array.IndexOf(symbols, "UNITY_EDITOR") < 0)
                 {
                     throw new InvalidOperationException(
                         "Missing required audit symbol: UNITY_EDITOR"
@@ -95,11 +138,20 @@ namespace WallstopStudios.UnityHelpers.CountingLoopAudit
                     LanguageVersion.CSharp9,
                     preprocessorSymbols: symbols
                 );
-                List<SyntaxTree> trees = sources
-                    .Select(source =>
+                List<SyntaxTree> trees = new List<SyntaxTree>(sources.Length + 1);
+                foreach (string source in sources)
+                {
+                    trees.Add(
                         CSharpSyntaxTree.ParseText(File.ReadAllText(source), parseOptions, source)
-                    )
-                    .ToList();
+                    );
+                }
+                List<MetadataReference> metadataReferences = new List<MetadataReference>(
+                    references.Length
+                );
+                foreach (string reference in references)
+                {
+                    metadataReferences.Add(MetadataReference.CreateFromFile(reference));
+                }
                 /*
                     Known host API gaps leave compiler errors. Require each enabled policy to report a control
                     beside an unresolved API in this same compilation before certifying subjects.
@@ -114,7 +166,7 @@ namespace WallstopStudios.UnityHelpers.CountingLoopAudit
                 CSharpCompilation compilation = CSharpCompilation.Create(
                     "CountingLoopAudit",
                     trees,
-                    references.Select(path => MetadataReference.CreateFromFile(path)),
+                    metadataReferences,
                     new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
                         .WithAllowUnsafe(true)
                         .WithSpecificDiagnosticOptions(
@@ -141,6 +193,29 @@ namespace WallstopStudios.UnityHelpers.CountingLoopAudit
                     .GetAnalyzerDiagnosticsAsync()
                     .GetAwaiter()
                     .GetResult();
+                Dictionary<string, int> controlCounts = new Dictionary<string, int>(
+                    StringComparer.Ordinal
+                );
+                foreach (Diagnostic diagnostic in diagnostics)
+                {
+                    if (
+                        string.Equals(
+                            diagnostic.Location.SourceTree?.FilePath,
+                            ControlPath,
+                            StringComparison.Ordinal
+                        )
+                    )
+                    {
+                        if (controlCounts.TryGetValue(diagnostic.Id, out int count))
+                        {
+                            controlCounts[diagnostic.Id] = count + 1;
+                        }
+                        else
+                        {
+                            controlCounts.Add(diagnostic.Id, 1);
+                        }
+                    }
+                }
                 foreach (
                     string diagnosticId in new[]
                     {
@@ -153,16 +228,7 @@ namespace WallstopStudios.UnityHelpers.CountingLoopAudit
                     }
                 )
                 {
-                    if (
-                        diagnostics.Count(diagnostic =>
-                            string.Equals(diagnostic.Id, diagnosticId, StringComparison.Ordinal)
-                            && string.Equals(
-                                diagnostic.Location.SourceTree?.FilePath,
-                                ControlPath,
-                                StringComparison.Ordinal
-                            )
-                        ) != 1
-                    )
+                    if (!controlCounts.TryGetValue(diagnosticId, out int count) || count != 1)
                     {
                         throw new InvalidOperationException(
                             diagnosticId
@@ -222,17 +288,31 @@ namespace WallstopStudios.UnityHelpers.CountingLoopAudit
 
         private static string[] ReadPaths(string manifest)
         {
-            string[] paths = File.ReadAllLines(manifest)
-                .Where(path => !string.IsNullOrWhiteSpace(path))
-                .Select(Path.GetFullPath)
-                .Distinct(StringComparer.Ordinal)
-                .ToArray();
-            if (paths.Length == 0 || paths.Any(path => !File.Exists(path)))
+            List<string> paths = new List<string>();
+            HashSet<string> unique = new HashSet<string>(StringComparer.Ordinal);
+            foreach (string line in File.ReadLines(manifest))
+            {
+                if (string.IsNullOrWhiteSpace(line))
+                {
+                    continue;
+                }
+                string path = Path.GetFullPath(line);
+                if (unique.Add(path))
+                {
+                    if (!File.Exists(path))
+                    {
+                        throw new InvalidOperationException(
+                            "Missing or empty audit input: " + manifest
+                        );
+                    }
+                    paths.Add(path);
+                }
+            }
+            if (paths.Count == 0)
             {
                 throw new InvalidOperationException("Missing or empty audit input: " + manifest);
             }
-
-            return paths;
+            return paths.ToArray();
         }
     }
 }

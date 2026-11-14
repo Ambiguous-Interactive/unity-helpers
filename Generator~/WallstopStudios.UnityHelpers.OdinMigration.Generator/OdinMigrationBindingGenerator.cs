@@ -30,6 +30,13 @@ namespace WallstopStudios.UnityHelpers.OdinMigration.Generator
         private const string LiveDictionary =
             "global::" + BindingNamespace + ".OdinMigrationLiveDictionary";
 
+        private static readonly Func<SyntaxNode, bool> DeclarationDescent = DescendIntoDeclarations;
+
+        private static bool DescendIntoDeclarations(SyntaxNode node)
+        {
+            return node is CompilationUnitSyntax || node is MemberDeclarationSyntax;
+        }
+
         private static string Literal(string value)
         {
             return SymbolDisplay.FormatLiteral(value, true);
@@ -464,6 +471,11 @@ namespace WallstopStudios.UnityHelpers.OdinMigration.Generator
                     if (
                         attribute.AttributeClass != null
                         && string.Equals(
+                            attribute.AttributeClass.Name,
+                            "OdinMigrationBindingAttribute",
+                            StringComparison.Ordinal
+                        )
+                        && string.Equals(
                             MetadataName(attribute.AttributeClass),
                             BindingNamespace + ".OdinMigrationBindingAttribute",
                             StringComparison.Ordinal
@@ -500,6 +512,11 @@ namespace WallstopStudios.UnityHelpers.OdinMigration.Generator
                 {
                     if (
                         attribute.AttributeClass != null
+                        && string.Equals(
+                            attribute.AttributeClass.Name,
+                            nameof(ObsoleteAttribute),
+                            StringComparison.Ordinal
+                        )
                         && string.Equals(
                             MetadataName(attribute.AttributeClass),
                             "System.ObsoleteAttribute",
@@ -577,7 +594,7 @@ namespace WallstopStudios.UnityHelpers.OdinMigration.Generator
             foreach (SyntaxTree tree in context.Compilation.SyntaxTrees)
             {
                 SemanticModel model = null;
-                foreach (SyntaxNode node in tree.GetRoot().DescendantNodes())
+                foreach (SyntaxNode node in tree.GetRoot().DescendantNodes(DeclarationDescent))
                 {
                     if (!(node is ClassDeclarationSyntax declaration))
                     {

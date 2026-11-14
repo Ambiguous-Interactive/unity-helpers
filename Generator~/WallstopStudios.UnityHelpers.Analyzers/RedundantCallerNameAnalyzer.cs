@@ -15,9 +15,11 @@ namespace WallstopStudios.UnityHelpers.Analyzers
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
     public sealed class RedundantCallerNameAnalyzer : DiagnosticAnalyzer
     {
-        /// <inheritdoc />
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
+        private static readonly ImmutableArray<DiagnosticDescriptor> SupportedRules =
             ImmutableArray.Create(UnityHelpersDiagnostics.RedundantCallerName);
+
+        /// <inheritdoc />
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => SupportedRules;
 
         private static void Analyze(OperationAnalysisContext context)
         {

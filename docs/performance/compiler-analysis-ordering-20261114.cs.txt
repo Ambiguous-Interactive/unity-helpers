@@ -1,0 +1,117 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Text;
+using System.Text.Json;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using WallstopStudios.UnityHelpers.Proto.Generator;
+
+internal static class Program
+{
+    static int Depth(INamedTypeSymbol contract)
+    {
+        int depth = 0;
+        for (
+            var current = contract.BaseType;
+            current != null && Shape.IsContract(current);
+            current = current.BaseType
+        )
+            depth++;
+        return depth;
+    }
+
+    static List<INamedTypeSymbol> Original(List<INamedTypeSymbol> contracts)
+    {
+        return contracts.OrderByDescending(Depth).ToList();
+    }
+
+    static int Main()
+    {
+        var references = new List<MetadataReference>();
+        foreach (
+            string path in ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")).Split(
+                System.IO.Path.PathSeparator
+            )
+        )
+            references.Add(MetadataReference.CreateFromFile(path));
+        foreach (int count in new[] { 32, 128, 512 })
+        foreach (int branching in new[] { 1, 4, 16 })
+        {
+            var text = new StringBuilder(
+                "namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto {public sealed class WProtoContractAttribute:System.Attribute{}} namespace Cases {public class Plain{}"
+            );
+            for (int i = 0; i < count; i++)
+            {
+                text.Append(
+                        "[WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoContract] public class C"
+                    )
+                    .Append(i)
+                    .Append(" : ")
+                    .Append(i == 0 ? "Plain" : "C" + ((i - 1) / branching))
+                    .Append("{}");
+            }
+            text.Append('}');
+            var compilation = CSharpCompilation.Create(
+                "Cases",
+                new[] { CSharpSyntaxTree.ParseText(text.ToString()) },
+                references,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+            );
+            foreach (var d in compilation.GetDiagnostics())
+                if (d.Severity == DiagnosticSeverity.Error)
+                    throw new InvalidOperationException(d.ToString());
+            var contracts = new List<INamedTypeSymbol>();
+            for (int i = count - 1; 0 <= i; i--)
+                contracts.Add(compilation.GetTypeByMetadataName("Cases.C" + i));
+            var expected = Original(contracts);
+            var actual = WProtoGenerator.DeepestFirst(contracts);
+            if (!expected.SequenceEqual(actual))
+                throw new InvalidOperationException("Changed stable ordering");
+            for (int round = 0; round < 7; round++)
+                foreach (
+                    bool candidate in round % 2 == 0 ? new[] { false, true } : new[] { true, false }
+                )
+                {
+                    Func<List<INamedTypeSymbol>> action = candidate
+                        ? () => WProtoGenerator.DeepestFirst(contracts)
+                        : () => Original(contracts);
+                    for (int warm = 0; warm < 3; warm++)
+                        GC.KeepAlive(action());
+                    int iterations = 1;
+                    var timer = new Stopwatch();
+                    do
+                    {
+                        timer.Restart();
+                        for (int i = 0; i < iterations; i++)
+                            GC.KeepAlive(action());
+                        timer.Stop();
+                        if (timer.Elapsed.TotalMilliseconds < 20)
+                            iterations *= 2;
+                    } while (timer.Elapsed.TotalMilliseconds < 20);
+                    long begin = GC.GetAllocatedBytesForCurrentThread();
+                    timer.Restart();
+                    for (int i = 0; i < iterations; i++)
+                        GC.KeepAlive(action());
+                    timer.Stop();
+                    Console.WriteLine(
+                        JsonSerializer.Serialize(
+                            new
+                            {
+                                count,
+                                branching,
+                                round,
+                                candidate,
+                                iterations,
+                                nanoseconds = timer.Elapsed.TotalNanoseconds / iterations,
+                                bytes = (GC.GetAllocatedBytesForCurrentThread() - begin)
+                                    / (double)iterations,
+                            }
+                        )
+                    );
+                }
+        }
+        return 0;
+    }
+}

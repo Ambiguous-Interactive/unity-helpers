@@ -15,9 +15,11 @@ namespace WallstopStudios.UnityHelpers.Analyzers
     {
         private const string DisposableMetadataName = "System.IDisposable";
 
-        /// <inheritdoc />
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
+        private static readonly ImmutableArray<DiagnosticDescriptor> SupportedRules =
             ImmutableArray.Create(UnityHelpersDiagnostics.DisposableStructBoxing);
+
+        /// <inheritdoc />
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => SupportedRules;
 
         private static void AnalyzeConversion(OperationAnalysisContext context)
         {

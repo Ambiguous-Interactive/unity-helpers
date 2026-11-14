@@ -1,0 +1,228 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using WallstopStudios.UnityHelpers.Enum.Generator;
+using WallstopStudios.UnityHelpers.OdinMigration.Generator;
+using WallstopStudios.UnityHelpers.Proto.Generator;
+
+internal static class Program
+{
+    static int Main(string[] args)
+    {
+        string root = args[0];
+        var references = new List<MetadataReference>();
+        foreach (
+            string path in ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")).Split(
+                Path.PathSeparator
+            )
+        )
+            references.Add(MetadataReference.CreateFromFile(path));
+        var options = new CSharpParseOptions(
+            LanguageVersion.CSharp9,
+            preprocessorSymbols: new[] { "UNITY_EDITOR" }
+        );
+        foreach (string family in new[] { "enum", "proto", "odin" })
+        foreach (int count in new[] { 16, 64, 256 })
+        {
+            if (args.Length > 1 && family != args[1])
+                continue;
+            if (args.Length > 2 && count != int.Parse(args[2]))
+                continue;
+            var trees = new List<SyntaxTree>();
+            void Add(string path)
+            {
+                trees.Add(
+                    CSharpSyntaxTree.ParseText(
+                        File.ReadAllText(Path.Combine(root, path)),
+                        options,
+                        path
+                    )
+                );
+            }
+            var source = new StringBuilder();
+            ISourceGenerator generator;
+            if (family == "enum")
+            {
+                generator = new EnumHelpersGenerator();
+                Add("Runtime/Core/Attributes/WEnumHelpersAttribute.cs");
+                Add("Runtime/Core/Attributes/EnumDisplayNameAttribute.cs");
+                source.Append(
+                    "using WallstopStudios.UnityHelpers.Core.Attributes; namespace Cases {"
+                );
+                for (int i = 0; i < count; i++)
+                {
+                    source.Append("[WEnumHelpers] public enum E").Append(i).Append(" {");
+                    for (int j = 0; j < 16; j++)
+                        source
+                            .Append("[System.Obsolete(\"old\")] [EnumDisplayName(\"Shown")
+                            .Append(j)
+                            .Append("\")] V")
+                            .Append(j)
+                            .Append('=')
+                            .Append(j)
+                            .Append(',');
+                    source.Append('}');
+                }
+                source.Append('}');
+            }
+            else if (family == "proto")
+            {
+                generator = new WProtoGenerator();
+                foreach (
+                    string path in Directory
+                        .GetFiles(
+                            Path.Combine(root, "Runtime/Core/Serialization/WallstopProto"),
+                            "*Attribute.cs"
+                        )
+                        .OrderBy(p => p, StringComparer.Ordinal)
+                )
+                    Add(Path.GetRelativePath(root, path));
+                Add("Runtime/Core/Serialization/WallstopProto/WProtoDataFormat.cs");
+                source.Append(
+                    "using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto; namespace Cases {"
+                );
+                for (int i = 0; i < count; i++)
+                {
+                    source.Append("[WProtoContract] ");
+                    if (i != 0)
+                        source
+                            .Append("[WProtoSubtype(typeof(C")
+                            .Append((i - 1) / 4)
+                            .Append("),")
+                            .Append(i + 1)
+                            .Append(")] ");
+                    source.Append("public partial class C").Append(i);
+                    if (i != 0)
+                        source.Append(" : C").Append((i - 1) / 4);
+                    source.Append(" {[WProtoMember(1)] public int V").Append(i).Append(";}");
+                }
+                source.Append('}');
+            }
+            else
+            {
+                generator = new OdinMigrationBindingGenerator();
+                trees.Add(
+                    CSharpSyntaxTree.ParseText(
+                        File.ReadAllText(
+                            Path.Combine(
+                                root,
+                                "progress/.artifacts/session-20261114-evening/generator-performance/odin-unity-types.txt"
+                            )
+                        ),
+                        options,
+                        "UnityTypes.cs"
+                    )
+                );
+                foreach (
+                    string name in new[]
+                    {
+                        "OdinMigrationCompiledSource",
+                        "OdinMigrationBindingAttribute",
+                        "OdinMigrationCompiledField",
+                        "OdinMigrationCompiledBinding",
+                        "OdinMigrationCompiledBindings",
+                        "OdinMigrationCompiledSourceEdit",
+                        "OdinMigrationDictionaryCapture",
+                        "OdinMigrationDictionaryRestore",
+                        "OdinMigrationLiveDictionary",
+                    }
+                )
+                    Add("Runtime/Core/Serialization/OdinMigration/" + name + ".cs");
+                Add("Runtime/Core/Helper/ReferenceIdentityComparer.cs");
+                source.Append("namespace Cases {");
+                for (int i = 0; i < count; i++)
+                {
+                    source
+                        .Append("public partial class O")
+                        .Append(i)
+                        .Append(
+                            " : UnityEngine.ScriptableObject {[Sirenix.Serialization.OdinSerialize] private System.Collections.Generic.Dictionary<int,System.Collections.Generic.List<UnityEngine.Texture>> Values = new();"
+                        );
+                    for (int j = 0; j < 10; j++)
+                    {
+                        source.Append("public int M").Append(j).Append("(int x){int total=0;");
+                        for (int k = 0; k < 16; k++)
+                            source.Append("total += x;");
+                        source.Append("return total;}");
+                    }
+                    source.Append('}');
+                }
+                source.Append('}');
+            }
+            trees.Add(CSharpSyntaxTree.ParseText(source.ToString(), options, "Assets/Subjects.cs"));
+            var compilation = CSharpCompilation.Create(
+                "GenerationCases",
+                trees,
+                references,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+            );
+            foreach (var d in compilation.GetDiagnostics())
+                if (d.Severity == DiagnosticSeverity.Error)
+                    throw new InvalidOperationException(d.ToString());
+            GeneratorDriverRunResult Run()
+            {
+                return CSharpGeneratorDriver
+                    .Create(new[] { generator }, parseOptions: options)
+                    .RunGenerators(compilation)
+                    .GetRunResult();
+            }
+            var firstTimer = Stopwatch.StartNew();
+            var expected = Run();
+            firstTimer.Stop();
+            if (expected.GeneratedTrees.Length == 0)
+                throw new InvalidOperationException("Empty output " + family);
+            foreach (var d in expected.Diagnostics)
+                if (d.Severity == DiagnosticSeverity.Error)
+                    throw new InvalidOperationException(d.ToString());
+            var output = new List<string>();
+            foreach (var result in expected.Results)
+            foreach (var item in result.GeneratedSources)
+                output.Add(item.HintName + "\n" + item.SourceText.ToString());
+            output.Sort(StringComparer.Ordinal);
+            string digest = Convert.ToHexString(
+                SHA256.HashData(Encoding.UTF8.GetBytes(string.Join("\n", output)))
+            );
+            var warmTimer = Stopwatch.StartNew();
+            int warmIterations = 0;
+            do
+            {
+                GC.KeepAlive(Run());
+                warmIterations++;
+            } while (warmTimer.ElapsedMilliseconds < 1500);
+            for (int round = 0; round < 7; round++)
+            {
+                long begin = GC.GetTotalAllocatedBytes(true);
+                var timer = Stopwatch.StartNew();
+                var result = Run();
+                timer.Stop();
+                long bytes = GC.GetTotalAllocatedBytes(true) - begin;
+                if (result.GeneratedTrees.Length != expected.GeneratedTrees.Length)
+                    throw new InvalidOperationException("Lost outputs");
+                Console.WriteLine(
+                    JsonSerializer.Serialize(
+                        new
+                        {
+                            family,
+                            count,
+                            round,
+                            warmIterations,
+                            firstRunNanoseconds = firstTimer.Elapsed.TotalNanoseconds,
+                            outputs = result.GeneratedTrees.Length,
+                            digest,
+                            nanoseconds = timer.Elapsed.TotalNanoseconds,
+                            bytes,
+                        }
+                    )
+                );
+            }
+        }
+        return 0;
+    }
+}

@@ -50,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Reduce analyzer allocations and repeated compiler work while preserving diagnostics and generated output ([qualification](./docs/performance/analyzers.md#compiler-work-and-measurements)).
 - Reduce shared buffer clock-conversion overhead while preserving custom time providers ([#1173](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1173)).
 - Reduce enum helper startup allocations and keep membership checks correct for enums with unsupported underlying types.
 - Reduce shared buffer rental and return synchronization while retaining usage tracking, purge policies and callback behavior ([#1173](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1173)).

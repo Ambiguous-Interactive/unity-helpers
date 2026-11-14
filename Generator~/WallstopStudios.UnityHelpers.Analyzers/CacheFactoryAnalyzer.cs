@@ -84,9 +84,11 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 "WallstopStudios.UnityHelpers.Core.Extension.DictionaryExtensions"
             );
 
-        /// <inheritdoc />
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
+        private static readonly ImmutableArray<DiagnosticDescriptor> SupportedRules =
             ImmutableArray.Create(UnityHelpersDiagnostics.CacheFactoryAllocatesPerCall);
+
+        /// <inheritdoc />
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => SupportedRules;
 
         private static void OnCompilationStart(CompilationStartAnalysisContext context)
         {

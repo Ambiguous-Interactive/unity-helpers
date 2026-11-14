@@ -34,9 +34,11 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         private const string DisposableMetadataName = "System.IDisposable";
         private const string AsyncDisposableMetadataName = "System.IAsyncDisposable";
 
-        /// <inheritdoc />
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
+        private static readonly ImmutableArray<DiagnosticDescriptor> SupportedRules =
             ImmutableArray.Create(UnityHelpersDiagnostics.DisposableStructDisposeAssigns);
+
+        /// <inheritdoc />
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => SupportedRules;
 
         private static void AnalyzeAssignment(OperationAnalysisContext context)
         {

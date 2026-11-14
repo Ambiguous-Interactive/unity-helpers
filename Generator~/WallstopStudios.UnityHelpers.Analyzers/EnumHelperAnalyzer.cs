@@ -18,9 +18,11 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         private const string FlagMethodName = "HasFlagNoAlloc";
         private const string NameMethodName = "ToCachedName";
 
-        /// <inheritdoc />
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
+        private static readonly ImmutableArray<DiagnosticDescriptor> SupportedRules =
             ImmutableArray.Create(UnityHelpersDiagnostics.EnumHelperAvailable);
+
+        /// <inheritdoc />
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => SupportedRules;
 
         private static void Analyze(
             OperationAnalysisContext context,
