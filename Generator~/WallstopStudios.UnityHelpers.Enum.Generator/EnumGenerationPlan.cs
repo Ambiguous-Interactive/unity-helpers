@@ -457,9 +457,9 @@ namespace WallstopStudios.UnityHelpers.Enum.Generator
         )
         {
             string name = enumType.Name;
-            for (int index = owners.Count - 1; index >= 0; --index)
+            for (int index = 0; index < owners.Count; ++index)
             {
-                name = owners[index].Name + "_" + name;
+                name = owners[owners.Count - 1 - index].Name + "_" + name;
             }
             return name + "WEnumHelpers";
         }
@@ -472,9 +472,9 @@ namespace WallstopStudios.UnityHelpers.Enum.Generator
             {
                 char character = fullName[index];
                 characters[index] =
-                    (character >= 'a' && character <= 'z')
-                    || (character >= 'A' && character <= 'Z')
-                    || (character >= '0' && character <= '9')
+                    ('a' <= character && character <= 'z')
+                    || ('A' <= character && character <= 'Z')
+                    || ('0' <= character && character <= '9')
                         ? character
                         : '_';
             }
