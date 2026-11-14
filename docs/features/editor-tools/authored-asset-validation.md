@@ -121,6 +121,13 @@ It does not load the asset or run its validation callbacks.
 An annotated field the check cannot read is reported as a **budget** rather than skipped. Nested
 types with no reachable carrier script remain `NoBoundScript` exemptions. Managed-reference
 contents are not traversed; their runtime type requires a separate representation reader.
+A concrete serializable class may implement interfaces, but an interface-typed field does not
+identify the concrete fields to inspect. `NotEmpty` can still judge the length of a managed-reference
+array or list without inspecting its elements.
+
+Discovery reuses temporary lists, sets and its declaration map through `Buffers`. The returned
+requirement index, its field lists and retained aliases own their storage, so later scans cannot
+clear an earlier result. Immutable nested document views remain ordinary allocations.
 
 `AuthoredRequirementValidator.TryScan` takes the attribute type, so a project's own "author must
 fill this" attribute gets the same treatment.

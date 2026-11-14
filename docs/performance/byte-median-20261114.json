@@ -1,0 +1,157 @@
+{
+  "scope": ".NET9 Linux single-threaded helper comparison; not Unity or player qualification",
+  "roundsPerCellPerProcess": 21,
+  "processes": 3,
+  "minimumCalibratedCellNanoseconds": 20000000,
+  "tieredCompilation": false,
+  "sourceSha256": {
+    "Baseline.cs": "ebce7d64b2fd771d019332b25708622a4777270ff9a384fc005072b1e2f9fccb",
+    "Candidate.cs": "0bcee14ca5e28ec7de2ce6914e9b459e766bdb34d7606ee528d8e733ecbea31e",
+    "Program.cs": "0dff84b97df6c5c8aa9834ed74ac507bdd250ba536e24c829632b04c1fc26f88"
+  },
+  "runs": [
+    {
+      "process": 1,
+      "sha256": "c01aba12ff91289bc50a1f09c98236ae612d1a2828db2fca9c991b9ef0aa8738",
+      "rows": 315,
+      "allocationControlBytes": 4120,
+      "runtime": "runtime,.NET 9.0.10"
+    },
+    {
+      "process": 2,
+      "sha256": "c010c4ef7eb68a8a6234dd1cc039321ad9f99745191af644045e9836b7340094",
+      "rows": 315,
+      "allocationControlBytes": 4120,
+      "runtime": "runtime,.NET 9.0.10"
+    },
+    {
+      "process": 3,
+      "sha256": "157a3d3579ff3180f3ddc566e6db0c46776f0c5e91a194f28c37d98b84e63998",
+      "rows": 315,
+      "allocationControlBytes": 4120,
+      "runtime": "runtime,.NET 9.0.10"
+    }
+  ],
+  "summary": [
+    {
+      "shape": "array",
+      "size": 8,
+      "baselineNs": 68.39517593383789,
+      "candidateNs": 69.51109886169434,
+      "pairedMedianRatio": 1.0186639506656852
+    },
+    {
+      "shape": "list",
+      "size": 8,
+      "baselineNs": 77.65402221679688,
+      "candidateNs": 72.47397232055664,
+      "pairedMedianRatio": 0.9366029109647894
+    },
+    {
+      "shape": "interface-array",
+      "size": 8,
+      "baselineNs": 80.72682762145996,
+      "candidateNs": 71.35445976257324,
+      "pairedMedianRatio": 0.8864875814976328
+    },
+    {
+      "shape": "interface-list",
+      "size": 8,
+      "baselineNs": 78.42973709106445,
+      "candidateNs": 72.33732604980469,
+      "pairedMedianRatio": 0.9229605111667172
+    },
+    {
+      "shape": "wrapped-control",
+      "size": 8,
+      "baselineNs": 84.54611206054688,
+      "candidateNs": 86.95123672485352,
+      "pairedMedianRatio": 1.0291666262809889
+    },
+    {
+      "shape": "array",
+      "size": 256,
+      "baselineNs": 139.9648666381836,
+      "candidateNs": 140.42568969726562,
+      "pairedMedianRatio": 0.9982803576007154
+    },
+    {
+      "shape": "list",
+      "size": 256,
+      "baselineNs": 340.0489273071289,
+      "candidateNs": 169.33897399902344,
+      "pairedMedianRatio": 0.49649109714537865
+    },
+    {
+      "shape": "interface-array",
+      "size": 256,
+      "baselineNs": 352.8999938964844,
+      "candidateNs": 142.52376556396484,
+      "pairedMedianRatio": 0.40289358678498216
+    },
+    {
+      "shape": "interface-list",
+      "size": 256,
+      "baselineNs": 327.3958053588867,
+      "candidateNs": 166.89488220214844,
+      "pairedMedianRatio": 0.5096876165846062
+    },
+    {
+      "shape": "wrapped-control",
+      "size": 256,
+      "baselineNs": 460.9839630126953,
+      "candidateNs": 437.2596435546875,
+      "pairedMedianRatio": 0.9457062340715755
+    },
+    {
+      "shape": "array",
+      "size": 4096,
+      "baselineNs": 1233.2883605957031,
+      "candidateNs": 1236.140625,
+      "pairedMedianRatio": 0.999981905190678
+    },
+    {
+      "shape": "list",
+      "size": 4096,
+      "baselineNs": 4589.780944824219,
+      "candidateNs": 1621.458740234375,
+      "pairedMedianRatio": 0.35585931102875823
+    },
+    {
+      "shape": "interface-array",
+      "size": 4096,
+      "baselineNs": 4732.814758300781,
+      "candidateNs": 1232.0090942382812,
+      "pairedMedianRatio": 0.26196841557318723
+    },
+    {
+      "shape": "interface-list",
+      "size": 4096,
+      "baselineNs": 4672.815856933594,
+      "candidateNs": 1647.4461669921875,
+      "pairedMedianRatio": 0.356867821162712
+    },
+    {
+      "shape": "wrapped-control",
+      "size": 4096,
+      "baselineNs": 6532.513916015625,
+      "candidateNs": 6054.21923828125,
+      "pairedMedianRatio": 0.9281973334095158
+    }
+  ],
+  "baselineCommit": "40ec0861e11124a8e6ff399c6e06ea66f12854ea",
+  "seed": 9127,
+  "sizes": [8, 256, 4096],
+  "warmupCallsPerVariant": 256,
+  "csvSha256": "7afd048f30b15e177a4773579b8d11d422755a79ca6fcff6bd80423ce44c95af",
+  "benchmarkSource": "using System;\nusing System.Collections.Generic;\nusing System.Diagnostics;\nusing WallstopStudios.UnityHelpers.Core.Helper;\ninternal static class Program\n{\n    private static double sink;\n    private static void Main(string[] args)\n    {\n        if(args.Length>0) {\n            IReadOnlyList<byte> reimplemented = new InterfaceList();\n            BaselineMath.TryMedian(reimplemented,out double expected);\n            CandidateMath.TryMedian(reimplemented,out double actual);\n            Console.WriteLine($\"interface-control,expected={expected},actual={actual}\");\n            if(expected!=42 || actual!=expected)Environment.Exit(1);\n            return;\n        }\n        long controlBefore=GC.GetAllocatedBytesForCurrentThread(); byte[] retained=new byte[4096]; long controlBytes=GC.GetAllocatedBytesForCurrentThread()-controlBefore; GC.KeepAlive(retained); if(controlBytes<4096)throw new Exception(\"Inert allocation counter\");\n        Console.WriteLine(\"allocation_control,\"+controlBytes);\n        Console.WriteLine(\"runtime,\"+System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription);\n        Console.WriteLine(\"shape,size,round,baseline_ns,candidate_ns,baseline_bytes,candidate_bytes\");\n        foreach(int size in new[]{8,256,4096}) {\n            byte[] bytes=new byte[size];new Random(9127).NextBytes(bytes);\n            List<byte> list=new List<byte>(bytes);IReadOnlyList<byte> arrayInterface=bytes,listInterface=list,wrapped=Array.AsReadOnly(bytes);\n            byte[] sorted=(byte[])bytes.Clone();Array.Sort(sorted);double expected=(sorted[(size-1)/2]+sorted[size/2])*.5;\n            var cases=new (string,Func<double>,Func<double>)[]{\n                (\"array\",()=>{BaselineMath.TryMedian(bytes,out double v);return v;},()=>{CandidateMath.TryMedian(bytes,out double v);return v;}),\n                (\"list\",()=>{BaselineMath.TryMedian(list,out double v);return v;},()=>{CandidateMath.TryMedian(list,out double v);return v;}),\n                (\"interface-array\",()=>{BaselineMath.TryMedian(arrayInterface,out double v);return v;},()=>{CandidateMath.TryMedian(arrayInterface,out double v);return v;}),\n                (\"interface-list\",()=>{BaselineMath.TryMedian(listInterface,out double v);return v;},()=>{CandidateMath.TryMedian(listInterface,out double v);return v;}),\n                (\"wrapped-control\",()=>{BaselineMath.TryMedian(wrapped,out double v);return v;},()=>{CandidateMath.TryMedian(wrapped,out double v);return v;})};\n            foreach(var c in cases) {\n                if(c.Item2()!=expected||c.Item3()!=expected)throw new Exception(\"Incorrect median\");\n                for(int i=0;i<256;++i){sink=c.Item2()+c.Item3();}\n                int n=1;while(Math.Min(Measure(c.Item2,n),Measure(c.Item3,n))<20000000)n*=2;\n                for(int round=0;round<21;++round){double a,b;if(round%2==0){a=Measure(c.Item2,n);b=Measure(c.Item3,n);}else{b=Measure(c.Item3,n);a=Measure(c.Item2,n);}\n                    long before=GC.GetAllocatedBytesForCurrentThread();for(int i=0;i<n;++i)sink=c.Item2();long ab=GC.GetAllocatedBytesForCurrentThread()-before;\n                    before=GC.GetAllocatedBytesForCurrentThread();for(int i=0;i<n;++i)sink=c.Item3();long bb=GC.GetAllocatedBytesForCurrentThread()-before;\n                    Console.WriteLine($\"{c.Item1},{size},{round},{a/n:R},{b/n:R},{ab},{bb}\");}\n            }\n        }\n        GC.KeepAlive(sink);\n    }\n    private static double Measure(Func<double> action,int n){long start=Stopwatch.GetTimestamp();for(int i=0;i<n;++i)sink=action();return (Stopwatch.GetTimestamp()-start)*1e9/Stopwatch.Frequency;}\n}\n\ninternal sealed class InterfaceList : List<byte>, IReadOnlyList<byte>\n{\n    public InterfaceList() : base(new byte[]{1,2,3}) { }\n    int IReadOnlyCollection<byte>.Count => 3;\n    byte IReadOnlyList<byte>.this[int index] => 42;\n}\n",
+  "candidateSource": "// MIT License - Copyright (c) 2026 wallstop\n// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE\n\nnamespace WallstopStudios.UnityHelpers.Core.Helper\n{\n    using System;\n    using System.Collections.Generic;\n\n    public static partial class CandidateMath\n    {\n        private const int ByteValueCount = byte.MaxValue + 1;\n\n        /// <summary>Finds the median of unsorted bytes without copying or sorting them.</summary>\n        /// <remarks>Null or empty input returns false and NaN.</remarks>\n        public static bool TryMedian(byte[] values, out double median)\n        {\n            ReadOnlySpan<byte> span = values;\n            return TryMedian(span, out median);\n        }\n\n        /// <summary>Finds the median of unsorted byte values without copying or sorting them.</summary>\n        /// <remarks>Uses a fixed 256-bin stack histogram in O(n + 256) time. Empty input returns false and NaN.</remarks>\n        public static bool TryMedian(ReadOnlySpan<byte> values, out double median)\n        {\n            if (values.IsEmpty)\n            {\n                median = double.NaN;\n                return false;\n            }\n            Span<int> counts = stackalloc int[ByteValueCount];\n            counts.Clear();\n            foreach (byte value in values)\n            {\n                ++counts[value];\n            }\n            median = ByteMedianFromCounts(counts, values.Length);\n            return true;\n        }\n\n        private static bool TryMedianList(List<byte> values, out double median)\n        {\n            if (values == null || values.Count == 0) { median = double.NaN; return false; }\n            int count = values.Count;\n            Span<int> counts = stackalloc int[ByteValueCount];\n            counts.Clear();\n            for (int index = 0; index < count; ++index) { ++counts[values[index]]; }\n            median = ByteMedianFromCounts(counts, count);\n            return true;\n        }\n\n        /// <summary>Finds the median of unsorted byte values without copying or sorting them.</summary>\n        /// <remarks>Uses a fixed 256-bin stack histogram in O(n + 256) time. Null or empty input returns false and NaN.</remarks>\n        public static bool TryMedian(IReadOnlyList<byte> values, out double median)\n        {\n            if (values is byte[] array) { return TryMedian(array, out median); }\n            if (values is List<byte> list && list.GetType() == typeof(List<byte>)) { return TryMedianList(list, out median); }\n            if (values == null)\n            {\n                median = double.NaN;\n                return false;\n            }\n            int count = values.Count;\n            if (count <= 0)\n            {\n                median = double.NaN;\n                return false;\n            }\n            Span<int> counts = stackalloc int[ByteValueCount];\n            counts.Clear();\n            for (int index = 0; index < count; ++index)\n            {\n                ++counts[values[index]];\n            }\n            median = ByteMedianFromCounts(counts, count);\n            return true;\n        }\n\n        private static double ByteMedianFromCounts(ReadOnlySpan<int> counts, int count)\n        {\n            int lowerRank = (count - 1) / 2;\n            int upperRank = count / 2;\n            int seen = 0;\n            int lower = 0;\n            for (int value = 0; value < ByteValueCount; ++value)\n            {\n                int next = seen + counts[value];\n                if (seen <= lowerRank && lowerRank < next)\n                {\n                    lower = value;\n                }\n                if (upperRank < next)\n                {\n                    return (lower + value) * 0.5d;\n                }\n                seen = next;\n            }\n            return 0d;\n        }\n    }\n}\n",
+  "baselineSource": "// MIT License - Copyright (c) 2026 wallstop\n// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE\n\nnamespace WallstopStudios.UnityHelpers.Core.Helper\n{\n    using System;\n    using System.Collections.Generic;\n\n    public static partial class BaselineMath\n    {\n        private const int ByteValueCount = byte.MaxValue + 1;\n\n        /// <summary>Finds the median of unsorted bytes without copying or sorting them.</summary>\n        /// <remarks>Null or empty input returns false and NaN.</remarks>\n        public static bool TryMedian(byte[] values, out double median)\n        {\n            ReadOnlySpan<byte> span = values;\n            return TryMedian(span, out median);\n        }\n\n        /// <summary>Finds the median of unsorted byte values without copying or sorting them.</summary>\n        /// <remarks>Uses a fixed 256-bin stack histogram in O(n + 256) time. Empty input returns false and NaN.</remarks>\n        public static bool TryMedian(ReadOnlySpan<byte> values, out double median)\n        {\n            if (values.IsEmpty)\n            {\n                median = double.NaN;\n                return false;\n            }\n            Span<int> counts = stackalloc int[ByteValueCount];\n            counts.Clear();\n            foreach (byte value in values)\n            {\n                ++counts[value];\n            }\n            median = ByteMedianFromCounts(counts, values.Length);\n            return true;\n        }\n\n        /// <summary>Finds the median of unsorted byte values without copying or sorting them.</summary>\n        /// <remarks>Uses a fixed 256-bin stack histogram in O(n + 256) time. Null or empty input returns false and NaN.</remarks>\n        public static bool TryMedian(IReadOnlyList<byte> values, out double median)\n        {\n            if (values == null)\n            {\n                median = double.NaN;\n                return false;\n            }\n            int count = values.Count;\n            if (count <= 0)\n            {\n                median = double.NaN;\n                return false;\n            }\n            Span<int> counts = stackalloc int[ByteValueCount];\n            counts.Clear();\n            for (int index = 0; index < count; ++index)\n            {\n                ++counts[values[index]];\n            }\n            median = ByteMedianFromCounts(counts, count);\n            return true;\n        }\n\n        private static double ByteMedianFromCounts(ReadOnlySpan<int> counts, int count)\n        {\n            int lowerRank = (count - 1) / 2;\n            int upperRank = count / 2;\n            int seen = 0;\n            int lower = 0;\n            for (int value = 0; value < ByteValueCount; ++value)\n            {\n                int next = seen + counts[value];\n                if (seen <= lowerRank && lowerRank < next)\n                {\n                    lower = value;\n                }\n                if (upperRank < next)\n                {\n                    return (lower + value) * 0.5d;\n                }\n                seen = next;\n            }\n            return 0d;\n        }\n    }\n}\n",
+  "adopted": "Array dispatch and exact-List dispatch through a private loop; subclasses retain their IReadOnlyList contract; no new public overload.",
+  "subclassControl": {
+    "baseline": 42,
+    "unguardedCandidate": 2,
+    "guardedCandidate": 42
+  },
+  "csvEncoding": "UTF-8 with canonical LF line endings"
+}

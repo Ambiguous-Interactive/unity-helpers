@@ -475,6 +475,43 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             }
         }
 
+        [Test]
+        public void DiscoveryResultsSurviveLaterScans()
+        {
+            List<AuthoredRequirementExemption> exemptions = new();
+            Dictionary<string, List<AuthoredRequirementField>> first =
+                AuthoredRequirementValidator.FieldsByScriptGuid(
+                    typeof(WallstopStudios.UnityHelpers.Core.Attributes.WNotNullAttribute),
+                    exemptions
+                );
+            Dictionary<string, AuthoredRequirementField[]> snapshots = new();
+            foreach (KeyValuePair<string, List<AuthoredRequirementField>> pair in first)
+            {
+                snapshots.Add(pair.Key, pair.Value.ToArray());
+            }
+            Assert.IsNotEmpty(snapshots);
+            for (int iteration = 0; iteration < 3; ++iteration)
+            {
+                Dictionary<string, List<AuthoredRequirementField>> next =
+                    AuthoredRequirementValidator.FieldsByScriptGuid(
+                        typeof(WallstopStudios.UnityHelpers.Core.Attributes.WNotNullAttribute),
+                        exemptions
+                    );
+                foreach (KeyValuePair<string, AuthoredRequirementField[]> pair in snapshots)
+                {
+                    Assert.IsTrue(
+                        first.TryGetValue(pair.Key, out List<AuthoredRequirementField> retained)
+                    );
+                    Assert.IsTrue(
+                        next.TryGetValue(pair.Key, out List<AuthoredRequirementField> current)
+                    );
+                    Assert.AreNotSame(retained, current);
+                    CollectionAssert.AreEqual(pair.Value, retained);
+                    Assert.AreEqual(pair.Value.Length, current.Count);
+                }
+            }
+        }
+
         [TestCase(nameof(AuthoredRequirementTestAsset.genericMaterial), false, false)]
         [TestCase(nameof(AuthoredRequirementTestAsset.genericMaterial), true, false)]
         [TestCase(nameof(AuthoredRequirementTestAsset.genericMaterial), false, true)]

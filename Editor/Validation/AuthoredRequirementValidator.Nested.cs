@@ -16,16 +16,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
     public static partial class AuthoredRequirementValidator
     {
         private static void AddNestedDeclaration(
-            Dictionary<Type, List<FieldInfo>> nested,
+            Dictionary<Type, PooledResource<List<FieldInfo>>> nested,
             FieldInfo field
         )
         {
-            if (!nested.TryGetValue(field.DeclaringType, out List<FieldInfo> fields))
+            if (!nested.TryGetValue(field.DeclaringType, out PooledResource<List<FieldInfo>> lease))
             {
-                fields = new List<FieldInfo>();
-                nested.Add(field.DeclaringType, fields);
+                lease = Buffers<FieldInfo>.List.Get();
+                nested.Add(field.DeclaringType, lease);
             }
-            fields.Add(field);
+            lease.resource.Add(field);
         }
 
         private static bool TryBindNestedRequirement(
@@ -54,7 +54,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         }
 
         private static void AddNestedCarriers(
-            Dictionary<Type, List<FieldInfo>> nested,
+            Dictionary<Type, PooledResource<List<FieldInfo>>> nested,
             Dictionary<string, List<AuthoredRequirementField>> byScriptGuid,
             List<AuthoredRequirementExemption> exemptions,
             AuthoredRequirementKind kind
@@ -64,10 +64,19 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             {
                 return;
             }
-            HashSet<Type> bound = new();
-            HashSet<Type> visited = new();
-            List<AuthoredRequirementField> reachable = new();
-            List<Type> carriers = new();
+            using PooledResource<HashSet<Type>> boundLease = Buffers<Type>.HashSet.Get(
+                out HashSet<Type> bound
+            );
+            using PooledResource<HashSet<Type>> visitedLease = Buffers<Type>.HashSet.Get(
+                out HashSet<Type> visited
+            );
+            using PooledResource<List<AuthoredRequirementField>> reachableLease =
+                Buffers<AuthoredRequirementField>.List.Get(
+                    out List<AuthoredRequirementField> reachable
+                );
+            using PooledResource<List<Type>> carriersLease = Buffers<Type>.List.Get(
+                out List<Type> carriers
+            );
             foreach (Type type in TypeCache.GetTypesDerivedFrom<MonoBehaviour>())
             {
                 carriers.Add(type);
@@ -115,13 +124,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                     );
                 }
             }
-            foreach (KeyValuePair<Type, List<FieldInfo>> pair in nested)
+            foreach (KeyValuePair<Type, PooledResource<List<FieldInfo>>> pair in nested)
             {
                 if (bound.Contains(pair.Key))
                 {
                     continue;
                 }
-                foreach (FieldInfo field in pair.Value)
+                foreach (FieldInfo field in pair.Value.resource)
                 {
                     exemptions.Add(
                         new AuthoredRequirementExemption(
@@ -136,7 +145,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
         private static void CollectReachableRequirements(
             Type type,
-            Dictionary<Type, List<FieldInfo>> nested,
+            Dictionary<Type, PooledResource<List<FieldInfo>>> nested,
             HashSet<Type> visited,
             List<AuthoredRequirementField> reachable,
             List<AuthoredRequirementExemption> exemptions,
@@ -153,9 +162,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 Type declarationType = current.IsGenericType
                     ? current.GetGenericTypeDefinition()
                     : current;
-                if (nested.TryGetValue(declarationType, out List<FieldInfo> fields))
+                if (nested.TryGetValue(declarationType, out PooledResource<List<FieldInfo>> fields))
                 {
-                    foreach (FieldInfo declaration in fields)
+                    foreach (FieldInfo declaration in fields.resource)
                     {
                         if (
                             !TryBindNestedRequirement(

@@ -38,9 +38,17 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
         /// <summary>Finds the median of unsorted byte values without copying or sorting them.</summary>
-        /// <remarks>Uses a fixed 256-bin stack histogram in O(n + 256) time. Null or empty input returns false and NaN.</remarks>
+        /// <remarks>Uses a fixed 256-bin stack histogram in O(n + 256) time and dispatches arrays and exact lists to concrete loops. Derived lists retain interface indexing. Null or empty input returns false and NaN.</remarks>
         public static bool TryMedian(IReadOnlyList<byte> values, out double median)
         {
+            if (values is byte[] array)
+            {
+                return TryMedian(array, out median);
+            }
+            if (values is List<byte> list && list.GetType() == typeof(List<byte>))
+            {
+                return TryMedianList(list, out median);
+            }
             if (values == null)
             {
                 median = double.NaN;
@@ -52,6 +60,24 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 median = double.NaN;
                 return false;
             }
+            Span<int> counts = stackalloc int[ByteValueCount];
+            counts.Clear();
+            for (int index = 0; index < count; ++index)
+            {
+                ++counts[values[index]];
+            }
+            median = ByteMedianFromCounts(counts, count);
+            return true;
+        }
+
+        private static bool TryMedianList(List<byte> values, out double median)
+        {
+            if (values == null || values.Count == 0)
+            {
+                median = double.NaN;
+                return false;
+            }
+            int count = values.Count;
             Span<int> counts = stackalloc int[ByteValueCount];
             counts.Clear();
             for (int index = 0; index < count; ++index)

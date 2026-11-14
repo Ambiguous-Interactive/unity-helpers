@@ -2104,10 +2104,19 @@ Conventions, chosen once so callers do not have to guess:
   Bessel's correction when the data is a sample of a larger population.
 
 For unsorted byte channels, `WallMath.TryMedian` accepts arrays, read-only spans, and
-`IReadOnlyList<byte>`. It counts values in a fixed 256-bin stack histogram, taking O(n + 256)
+`IReadOnlyList<byte>`. Arrays and exact `List<byte>` instances use concrete loops even through the read-only
+interface. Derived lists and other implementations retain interface indexing. It counts values in a fixed 256-bin
+stack histogram, taking O(n + 256)
 time without copying, sorting, or mutating the input. Even counts return the average of both middle
 values as a `double`. Null or empty byte input returns false and NaN. The existing double-span
 overload still requires ascending sorted input.
+
+A three-process .NET 9 Linux helper comparison at 8, 256 and 4,096 elements supports this dispatch:
+paired median candidate/baseline ratios for interface arrays were 0.886, 0.403 and 0.262; list ratios
+were 0.937, 0.496 and 0.356. The smallest unchanged-array and wrapped-list controls regressed about
+3%. These observations do not qualify Unity or player throughput. All timed calls allocated zero
+bytes under a working 4,120-byte positive control. See the [raw samples](../../performance/byte-median-20261114.csv)
+and [method, sources and process records](../../performance/byte-median-20261114.json).
 
 For a binary outcome, use an exact Clopper-Pearson interval when the sample is small or the observed
 rate is close to zero or one:

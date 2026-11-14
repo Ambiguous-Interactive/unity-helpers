@@ -599,6 +599,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.AreEqual(expected, listMedian);
             Assert.IsTrue(WallMath.TryMedian(values, out double arrayMedian));
             Assert.AreEqual(expected, arrayMedian);
+            IReadOnlyList<byte> concreteList = new List<byte>(values);
+            Assert.IsTrue(WallMath.TryMedian(concreteList, out double concreteMedian));
+            Assert.AreEqual(expected, concreteMedian);
+            Assert.IsTrue(
+                WallMath.TryMedian((IReadOnlyList<byte>)values, out double interfaceArrayMedian)
+            );
+            Assert.AreEqual(expected, interfaceArrayMedian);
+            CollectionAssert.AreEqual(original, concreteList);
             CollectionAssert.AreEqual(original, values);
         }
 
@@ -628,6 +636,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 WallMath.TryMedian((IReadOnlyList<byte>)Array.Empty<byte>(), out double emptyList)
             );
             Assert.IsTrue(double.IsNaN(emptyList));
+            Assert.IsFalse(WallMath.TryMedian(new List<byte>(), out double emptyConcreteList));
+            Assert.IsTrue(double.IsNaN(emptyConcreteList));
+        }
+
+        [Test]
+        public void ByteMedianPreservesReimplementedListInterfaces()
+        {
+            IReadOnlyList<byte> values = new ByteMedianInterfaceList();
+            Assert.IsTrue(WallMath.TryMedian(values, out double median));
+            Assert.AreEqual(42d, median);
         }
 
         [Test]
@@ -636,11 +654,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             AllocationProbe.IgnoreWhenUnmeasurable();
             byte[] values = { 255, 4, 0, 18 };
             IReadOnlyList<byte> list = Array.AsReadOnly(values);
+            IReadOnlyList<byte> concreteList = new List<byte>(values);
+            IReadOnlyList<byte> arrayInterface = values;
             for (int iteration = 0; iteration < AllocationProbe.Iterations; ++iteration)
             {
                 WallMath.TryMedian((ReadOnlySpan<byte>)values, out _);
                 WallMath.TryMedian(values, out _);
                 WallMath.TryMedian(list, out _);
+                WallMath.TryMedian(concreteList, out _);
+                WallMath.TryMedian(arrayInterface, out _);
             }
             Assert.That(
                 () =>
@@ -660,6 +682,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 () =>
                 {
                     WallMath.TryMedian(list, out _);
+                    WallMath.TryMedian(concreteList, out _);
+                    WallMath.TryMedian(arrayInterface, out _);
+                },
+                UnityIs.Not.AllocatingGCMemory()
+            );
+            Assert.That(
+                () =>
+                {
+                    WallMath.TryMedian(concreteList, out _);
+                },
+                UnityIs.Not.AllocatingGCMemory()
+            );
+            Assert.That(
+                () =>
+                {
+                    WallMath.TryMedian(arrayInterface, out _);
                 },
                 UnityIs.Not.AllocatingGCMemory()
             );
