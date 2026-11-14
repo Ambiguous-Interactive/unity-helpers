@@ -7,7 +7,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
     using System;
     using System.Collections.Generic;
     using System.IO;
-    using System.Security.Cryptography;
+    using System.Threading;
     using UnityEditor;
     using UnityEditor.Build.Profile;
     using UnityEngine;
@@ -204,16 +204,52 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             try
             {
                 string path = AssetDatabase.GetAssetPath(profile);
-                byte[] previousDigest = ReadFileDigest(path);
+                string absolutePath = Path.Combine(
+                        Path.GetDirectoryName(Application.dataPath),
+                        path
+                    )
+                    .SanitizePath();
                 Undo.RecordObject(profile, UndoName);
                 WriteScenes(scenes, globalScenes);
                 serialized.ApplyModifiedProperties();
                 EditorUtility.SetDirty(profile);
                 Undo.FlushUndoRecordObjects();
-                AssetDatabase.SaveAssetIfDirty(profile);
+                string nativeSaveError = null;
+                Application.LogCallback captureSaveError = (message, _, type) =>
+                {
+                    if (
+                        (
+                            type == LogType.Error
+                            || type == LogType.Exception
+                            || type == LogType.Assert
+                        )
+                        && message != null
+                    )
+                    {
+                        string normalizedMessage = message.Replace('\\', '/');
+                        if (
+                            Helpers.HasAssetPathToken(normalizedMessage, path)
+                            || Helpers.HasAssetPathToken(normalizedMessage, absolutePath)
+                        )
+                        {
+                            Interlocked.CompareExchange(ref nativeSaveError, message, null);
+                        }
+                    }
+                };
+                Application.logMessageReceivedThreaded += captureSaveError;
+                try
+                {
+                    AssetDatabase.SaveAssetIfDirty(profile);
+                }
+                finally
+                {
+                    Application.logMessageReceivedThreaded -= captureSaveError;
+                }
+                string saveFailure = Volatile.Read(ref nativeSaveError);
                 if (
                     EditorUtility.IsDirty(profile)
-                    || previousDigest.AsSpan().SequenceEqual(ReadFileDigest(path))
+                    || saveFailure != null
+                    || !File.Exists(absolutePath)
                 )
                 {
                     serialized.Update();
@@ -222,8 +258,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     EditorUtility.SetDirty(profile);
                     changed = false;
                     error =
-                        "Unity did not persist the changed build profile: "
-                        + AssetDatabase.GetAssetPath(profile);
+                        saveFailure ?? "Unity did not persist the changed build profile: " + path;
                     return false;
                 }
             }
@@ -249,13 +284,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             changed = true;
             error = null;
             return true;
-        }
-
-        private static byte[] ReadFileDigest(string path)
-        {
-            using FileStream stream = File.OpenRead(path);
-            using SHA256 hash = SHA256.Create();
-            return hash.ComputeHash(stream);
         }
 
         private static void WriteScenes(

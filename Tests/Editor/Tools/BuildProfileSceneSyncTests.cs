@@ -311,6 +311,33 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         }
 
         [Test]
+        public void SynchronizesUnsavedScenesWhenDiskAlreadyMatchesGlobalScenes()
+        {
+            SetScenes(_inherited, _scenes, custom: false);
+            string path = AssetDatabase.GetAssetPath(_inherited);
+            byte[] before = File.ReadAllBytes(path);
+            SetScenes(
+                _inherited,
+                Array.Empty<EditorBuildSettingsScene>(),
+                custom: false,
+                save: false
+            );
+
+            Assert.IsTrue(
+                BuildProfileSceneSync.TrySynchronize(
+                    new[] { _profilesFolder },
+                    out int updated,
+                    out string error
+                ),
+                error
+            );
+            Assert.AreEqual(1, updated);
+            AssertScenes(_scenes, _inherited);
+            Assert.IsFalse(EditorUtility.IsDirty(_inherited));
+            CollectionAssert.AreEqual(before, File.ReadAllBytes(path));
+        }
+
+        [Test]
         public void RepeatedSynchronizationDoesNotRewriteMatchingProfiles()
         {
             string[] folders = { _profilesFolder };
