@@ -33,6 +33,7 @@
       >$(DefineConstants);PROTOBUF_NET_ORACLE_CANDIDATE</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../../Runtime/Core/Helper/PathHelper.cs" Link="PathHelper.cs" />
     <Compile
       Include="../../Tests/Runtime/Core/ThreadAllocationCounterTests.cs"
       Link="ThreadAllocationCounterTests.cs"

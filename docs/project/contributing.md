@@ -933,3 +933,5 @@ uses `IdleEditorIsolation`; the main phase excludes that category, and the resul
 verifier requires the separate fixture's passing results. Ruleset imports can
 leave compilation pending until the current Test Runner invocation completes,
 so waiting inside a later test cannot make that process idle.
+
+Use `SanitizePath()` or `PathHelper.Sanitize` for separator normalization in Runtime, Editor, Tests and Generator~, and reuse the result when checking multiple paths. `npm run lint:path-normalization` enforces the rule and `npm run test:lint-path-normalization` checks reporting and empty-scope rejection. The shared helper implementation is the only exception within those trees; standalone Generator tools link the same Unity-free helper source.

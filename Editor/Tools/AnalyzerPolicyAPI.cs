@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
     using System.IO;
     using UnityEditor;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     /// <summary>Writes compiler-readable Unity Helpers analyzer policies without opening a window.</summary>
     /// <remarks>Writes repair legacy XML namespaces while preserving other rules and includes.</remarks>
@@ -211,7 +212,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             out string message
         )
         {
-            string normalizedPath = rulesetAssetPath?.Replace('\\', '/');
+            string normalizedPath = rulesetAssetPath?.SanitizePath();
             if (
                 string.IsNullOrWhiteSpace(normalizedPath)
                 || !normalizedPath.StartsWith("Assets/", StringComparison.Ordinal)
@@ -243,7 +244,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             string folder;
             try
             {
-                folder = Path.GetDirectoryName(normalizedPath)?.Replace('\\', '/');
+                folder = Path.GetDirectoryName(normalizedPath)?.SanitizePath();
                 if (string.IsNullOrWhiteSpace(folder) || !AssetDatabase.IsValidFolder(folder))
                 {
                     message = "The ruleset asset folder does not exist.";

@@ -13,6 +13,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     using Microsoft.CodeAnalysis.CSharp.Syntax;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Extension;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     /// <summary>
     /// Asserts that every protobuf-net contract this package ships has an exactly-corresponding
@@ -623,7 +624,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 ? file.Substring(root.Length).TrimStart('/', '\\')
                 : file;
             int line = node.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
-            return relative.Replace('\\', '/') + ":" + line + ": ";
+            return relative.SanitizePath() + ":" + line + ": ";
         }
 
         [Test]

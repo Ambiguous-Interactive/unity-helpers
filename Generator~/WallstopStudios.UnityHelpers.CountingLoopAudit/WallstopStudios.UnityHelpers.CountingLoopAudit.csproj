@@ -8,6 +8,7 @@
     <EnableNETAnalyzers>false</EnableNETAnalyzers>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../../Runtime/Core/Helper/PathHelper.cs" Link="PathHelper.cs" />
     <ProjectReference
       Include="../WallstopStudios.UnityHelpers.Analyzers/WallstopStudios.UnityHelpers.Analyzers.csproj"
       AdditionalProperties="CopyAnalyzerPayload=false"

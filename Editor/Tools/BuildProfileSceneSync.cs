@@ -226,7 +226,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                         && message != null
                     )
                     {
-                        string normalizedMessage = message.Replace('\\', '/');
+                        string normalizedMessage = message.SanitizePath();
                         if (
                             Helpers.HasAssetPathToken(normalizedMessage, path)
                             || Helpers.HasAssetPathToken(normalizedMessage, absolutePath)

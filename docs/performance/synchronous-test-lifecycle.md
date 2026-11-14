@@ -176,7 +176,7 @@ for `LogEvent.cs`.
 
 All 1,624 custom-drawer cases pass with the scoped cursor-error handling. The 21 executor controls
 cover both incoming policies, mouse events, exhausted budgets, unrelated unexpected errors, and
-strict rejection of the cursor message itself. The final 92-case asset/framework cohort also passes,
+strict rejection of the cursor message itself. The final 149-case asset/framework cohort also passes,
 including real blocked writes, persisted retries, and unrelated failures for similarly named assets.
 These observations qualify the loaded framework above; other supported editor/framework combinations
 remain checked by their own CI runs.

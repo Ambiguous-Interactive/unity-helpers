@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
     using System;
     using System.Collections.Generic;
     using UnityEditor;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     public static partial class SceneCanonicalizer
     {
@@ -37,7 +38,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                         );
                         return false;
                     }
-                    string path = folder.Trim().Replace('\\', '/').TrimEnd('/');
+                    string path = folder.Trim().SanitizePath().TrimEnd('/');
                     if (
                         (
                             !string.Equals(path, "Assets", StringComparison.Ordinal)

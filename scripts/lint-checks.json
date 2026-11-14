@@ -438,5 +438,15 @@
     "id": "license-years",
     "name": "License year audit",
     "run": "bash scripts/audit-license-years.sh --summary"
+  },
+  {
+    "id": "path-normalization-test",
+    "name": "Path normalization gate controls",
+    "run": "npm run test:lint-path-normalization"
+  },
+  {
+    "id": "path-normalization",
+    "name": "Shared path normalization",
+    "run": "npm run lint:path-normalization"
   }
 ]

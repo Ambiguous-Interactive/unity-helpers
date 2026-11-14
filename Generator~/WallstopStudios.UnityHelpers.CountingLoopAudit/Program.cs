@@ -12,6 +12,7 @@ namespace WallstopStudios.UnityHelpers.CountingLoopAudit
     using Microsoft.CodeAnalysis.CSharp;
     using Microsoft.CodeAnalysis.Diagnostics;
     using WallstopStudios.UnityHelpers.Analyzers;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     internal static class Program
     {
@@ -71,7 +72,7 @@ namespace WallstopStudios.UnityHelpers.CountingLoopAudit
                 if (
                     requiredSubjects.Any(required =>
                         !subjects.Any(subject =>
-                            subject.Replace('\\', '/').EndsWith(required, StringComparison.Ordinal)
+                            subject.SanitizePath().EndsWith(required, StringComparison.Ordinal)
                         )
                     ) || subjects.Any(subject => !sources.Contains(subject))
                 )

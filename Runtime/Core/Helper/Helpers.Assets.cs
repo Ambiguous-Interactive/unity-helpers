@@ -185,13 +185,16 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                             || type == LogType.Assert
                         )
                         && message != null
-                        && (
-                            HasAssetPathToken(message.Replace('\\', '/'), path)
-                            || HasAssetPathToken(message.Replace('\\', '/'), normalizedAbsolutePath)
-                        )
                     )
                     {
-                        Interlocked.CompareExchange(ref nativeSaveError, message, null);
+                        string normalizedMessage = message.SanitizePath();
+                        if (
+                            HasAssetPathToken(normalizedMessage, path)
+                            || HasAssetPathToken(normalizedMessage, normalizedAbsolutePath)
+                        )
+                        {
+                            Interlocked.CompareExchange(ref nativeSaveError, message, null);
+                        }
                     }
                 };
                 Application.logMessageReceivedThreaded += captureSaveError;
@@ -283,12 +286,13 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             if (message.StartsWith("File ", StringComparison.OrdinalIgnoreCase))
             {
                 expectedStart = "File ".Length;
-                if (
-                    expectedStart < message.Length
-                    && (message[expectedStart] == '\'' || message[expectedStart] == '"')
-                )
+                if (expectedStart < message.Length)
                 {
-                    ++expectedStart;
+                    char first = message[expectedStart];
+                    if (first == '\'' || first == '"')
+                    {
+                        ++expectedStart;
+                    }
                 }
             }
             int start = 0;
@@ -300,18 +304,15 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     return false;
                 }
                 int end = index + path.Length;
+                char preceding = index == 0 ? '\0' : message[index - 1];
+                char following = end == message.Length ? '\0' : message[end];
+                bool quoted = preceding == '\'' || preceding == '"';
                 bool startsToken =
-                    index == expectedStart
-                    || (
-                        expectedStart < 0
-                        && (index == 0 || message[index - 1] == '\'' || message[index - 1] == '"')
-                    );
-                bool quoted =
-                    index != 0 && (message[index - 1] == '\'' || message[index - 1] == '"');
+                    index == expectedStart || (expectedStart < 0 && (index == 0 || quoted));
                 bool endsToken =
                     end == message.Length
-                    || (quoted && message[end] == message[index - 1])
-                    || message[end] == ':'
+                    || (quoted && following == preceding)
+                    || following == ':'
                     || message.IndexOf(
                         " couldn't be written.",
                         end,

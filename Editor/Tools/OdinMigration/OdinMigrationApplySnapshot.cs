@@ -495,7 +495,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                     "Migration source apply requires writable project Assets scripts."
                 );
             }
-            string path = full.Substring(prefix.Length).Replace('\\', '/');
+            string path = full.Substring(prefix.Length).SanitizePath();
             OdinMigrationTool.GetValidatedAssetPath(path);
             return path;
         }

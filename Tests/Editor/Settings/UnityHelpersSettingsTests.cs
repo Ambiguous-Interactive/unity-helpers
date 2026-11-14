@@ -16,6 +16,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
     using UnityEditor;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.CustomDrawers;
     using WallstopStudios.UnityHelpers.Editor.Extensions;
     using WallstopStudios.UnityHelpers.Editor.Settings;
@@ -413,17 +414,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                     File.Exists(filePath),
                     "Preserve an existing unreadable settings asset."
                 );
-                string folder = Path.GetDirectoryName(assetPath).Replace('\\', '/');
+                string folder = Path.GetDirectoryName(assetPath).SanitizePath();
                 List<string> missingFolders = new();
                 for (string candidate = folder; !AssetDatabase.IsValidFolder(candidate); )
                 {
                     missingFolders.Add(candidate);
-                    candidate = Path.GetDirectoryName(candidate).Replace('\\', '/');
+                    candidate = Path.GetDirectoryName(candidate).SanitizePath();
                 }
                 for (int index = missingFolders.Count - 1; 0 <= index; --index)
                 {
                     string candidate = missingFolders[index];
-                    string parent = Path.GetDirectoryName(candidate).Replace('\\', '/');
+                    string parent = Path.GetDirectoryName(candidate).SanitizePath();
                     string name = Path.GetFileName(candidate);
                     Assert.IsFalse(string.IsNullOrEmpty(AssetDatabase.CreateFolder(parent, name)));
                     _ownedBufferSettingsFolders.Add(candidate);

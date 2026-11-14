@@ -741,7 +741,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                         string relativePath = file.Substring(
                             Application.dataPath.Length - "Assets".Length
                         );
-                        relativePath = relativePath.Replace('\\', '/');
+                        relativePath = relativePath.SanitizePath();
                         AssetDatabase.DeleteAsset(relativePath);
                     }
                 }

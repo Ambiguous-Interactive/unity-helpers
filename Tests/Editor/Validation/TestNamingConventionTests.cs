@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     using System.Text;
     using System.Text.RegularExpressions;
     using NUnit.Framework;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     /// <summary>
     /// Validates that test files follow naming conventions.
@@ -239,8 +240,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 return fullPath;
             }
 
-            string normalizedFull = Path.GetFullPath(fullPath).Replace('\\', '/');
-            string normalizedBase = Path.GetFullPath(basePath).Replace('\\', '/');
+            string normalizedFull = Path.GetFullPath(fullPath).SanitizePath();
+            string normalizedBase = Path.GetFullPath(basePath).SanitizePath();
 
             if (!normalizedBase.EndsWith("/"))
             {

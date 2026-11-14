@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     using System;
     using System.IO;
     using NUnit.Framework;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     [TestFixture]
     public sealed class TestPackageRootTests
@@ -62,7 +63,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             Directory.CreateDirectory(Path.Combine(root, "Tests"));
             WriteManifest(root);
 
-            Assert.IsFalse(TestPackageRoot.IsPackageRoot(root.Replace('\\', '/')));
+            Assert.IsFalse(TestPackageRoot.IsPackageRoot(root.SanitizePath()));
             Assert.IsFalse(TestPackageRoot.IsPackageRoot(root.Replace('/', '\\')));
         }
 
