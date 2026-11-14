@@ -47,7 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Reuse declared enum names during sparse name-cache initialization, skip the unused dictionary on the array path, and fall back to `Enum.IsDefined` when an enum's underlying type has no supported numeric conversion.
+- Reduce enum helper startup allocations and keep membership checks correct for enums with unsupported underlying types.
 - Reduce shared buffer rental and return synchronization while retaining usage tracking, purge policies and callback behavior ([#1173](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1173)).
 - Read only the selected rectangle when querying readable RGBA32 sprite masks, art bounds and ink regions ([#1113](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1113)).
 - Compute integer floor logarithms with portable branchless lookups, preserving zero and signed bit-pattern results ([#1170](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1170)).

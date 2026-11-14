@@ -1477,9 +1477,11 @@ public static class FastStateExample
 }
 ```
 
-The generated class lands in the enum's namespace, so the existing `using` directive that makes
-the enum visible also makes the overload visible. Generation is optional: without the attribute,
-and for every unsupported shape, the generalized helpers remain the fallback.
+The generated class lands in the enum's namespace, so import that namespace to bring the overloads
+into scope. A type alias such as `using FastState = MyGame.FastState;` makes the enum visible but
+does not import `MyGame`'s extension methods, so the call falls back to the generalized path.
+Generation is optional: without the attribute, and for every unsupported shape, the generalized
+helpers remain the fallback.
 
 Generation applies to enums the compiler can see in your compilation. It does **not** apply to
 enums in already-compiled assemblies or enums created at runtime through `Reflection.Emit`; those

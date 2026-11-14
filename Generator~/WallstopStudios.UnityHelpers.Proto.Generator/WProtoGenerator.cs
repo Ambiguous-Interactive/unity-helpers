@@ -4525,7 +4525,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 emissions.Add(new Emission(contract, source, registration));
             }
 
-            HashSet<string> hintNames = new HashSet<string>(StringComparer.Ordinal);
+            HashSet<string> hintNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             List<IArrayTypeSymbol> arrayTypes = new List<IArrayTypeSymbol>();
             List<ClosureScan.TypeUse> typeUses = ClosureScan.Types(
                 context.Compilation,

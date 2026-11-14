@@ -21,7 +21,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         {
             const string source =
                 "using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;\n"
-                + "namespace Consumer { [WProtoContract] public partial class A_B { [WProtoMember(1)] public int Value; } public partial class A { [WProtoContract] public partial class B { [WProtoMember(1)] public int Value; } } }";
+                + "namespace Consumer { [WProtoContract] public partial class A_B { [WProtoMember(1)] public int Value; } public partial class A { [WProtoContract] public partial class B { [WProtoMember(1)] public int Value; } } [WProtoContract] public partial class C_D { [WProtoMember(1)] public int Value; } public partial class C { [WProtoContract] public partial class d { [WProtoMember(1)] public int Value; } } }";
             List<MetadataReference> references = new();
             foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
             {
@@ -56,7 +56,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     tree.FilePath.Contains(".WProtoFormatter", StringComparison.Ordinal)
                     && tree.FilePath.EndsWith(".g.cs", StringComparison.Ordinal)
                 ),
-                Is.EqualTo(2)
+                Is.EqualTo(4)
             );
         }
     }

@@ -64,8 +64,10 @@ Compute the generated type's visibility from the enum and **every** containing t
   the per-item allocation without shared state.
 - Match the attribute by resolved symbol, not by syntax text. If the attribute type is unresolved,
   emit nothing.
-- Generator diagnostics are warnings at most; taking a package upgrade must never fail a consumer
-  build. Name skip reasons concretely.
+- Follow the package's diagnostic policy. `WPROTO###` reports a serialization contract that cannot
+  be honoured, so it is an error -- the alternative is throwing from a shipped player. `WUH###`
+  and new optimization/skip diagnostics are warnings and must never fail a consumer build. Name
+  skip reasons concretely.
 
 ## Tests that prove the contract
 
