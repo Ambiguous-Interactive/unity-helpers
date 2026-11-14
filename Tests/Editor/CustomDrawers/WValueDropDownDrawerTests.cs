@@ -22,8 +22,10 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
     [TestFixture]
     [NUnit.Framework.Category("Slow")]
     [NUnit.Framework.Category("Integration")]
-    public sealed class WValueDropDownDrawerTests : SynchronousEditorTestBase
+    public sealed class WValueDropDownDrawerTests : CommonTestBase
     {
+        private bool _initialLogPolicy;
+
         private static IEnumerable<TestCaseData> CustomOptionLabelData()
         {
             string[] labels = { null, "", " ", "\t\r\n", "\u2003\u00a0", "  Visible option  " };
@@ -74,7 +76,22 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [OneTimeSetUp]
         public void InitializeEditorStylesInGuiContext()
         {
+            _initialLogPolicy = UnityEngine.TestTools.LogAssert.ignoreFailingMessages;
             TestIMGUIExecutor.InitializeEditorStyles();
+            UnityEngine.TestTools.LogAssert.ignoreFailingMessages = false;
+        }
+
+        [OneTimeTearDown]
+        public void RestoreLoggingPolicy()
+        {
+            try
+            {
+                Assert.That(UnityEngine.TestTools.LogAssert.ignoreFailingMessages, Is.False);
+            }
+            finally
+            {
+                UnityEngine.TestTools.LogAssert.ignoreFailingMessages = _initialLogPolicy;
+            }
         }
 
         [Test]

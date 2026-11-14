@@ -212,6 +212,13 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
 
                 AssetDatabase.SaveAssets();
+                Object written = existing != null ? existing : asset;
+                if (EditorUtility.IsDirty(written))
+                {
+                    savedAsset = null;
+                    error = "Unity left the asset dirty; saving may have been blocked.";
+                    return false;
+                }
                 AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
                 Object loaded = AssetDatabase.LoadMainAssetAtPath(path);
                 if (loaded == null || loaded.GetType() != asset.GetType())

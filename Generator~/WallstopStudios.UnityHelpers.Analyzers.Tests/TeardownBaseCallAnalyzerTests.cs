@@ -368,6 +368,14 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
             "a call in a catch before cleanup",
             "protected override void OnDestroy() { try { Release(); } catch (Exception) { base.OnDestroy(); Release(); } }"
         )]
+        [TestCase(
+            "a rethrow before enclosing cleanup",
+            "protected override void OnDestroy() { try { throw new Exception(); } catch { base.OnDestroy(); throw; } finally { Release(); } }"
+        )]
+        [TestCase(
+            "a finally call before its normal continuation",
+            "protected override void OnDestroy() { try { Release(); } finally { base.OnDestroy(); } Release(); }"
+        )]
         public void NestedTeardownWithReachableFollowingWorkIsReported(string shape, string body)
         {
             Diagnostic reported = Single(body);
@@ -394,6 +402,18 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
         [TestCase(
             "an empty finally",
             "protected override void OnDestroy() { try { Release(); base.OnDestroy(); } finally { } }"
+        )]
+        [TestCase(
+            "a final call inside finally",
+            "protected override void OnDestroy() { try { Release(); } finally { base.OnDestroy(); } }"
+        )]
+        [TestCase(
+            "a rethrow without enclosing cleanup",
+            "protected override void OnDestroy() { try { throw new Exception(); } catch { base.OnDestroy(); throw; } }"
+        )]
+        [TestCase(
+            "an exceptional finally cannot reach outer work",
+            "protected override void OnDestroy() { try { throw new Exception(); } finally { base.OnDestroy(); } Release(); }"
         )]
         public void NestedTeardownWithoutFollowingWorkIsNotReported(string shape, string body)
         {

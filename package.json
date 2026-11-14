@@ -217,6 +217,7 @@
     "test:validate-hook-sync-calls": "pwsh -NoProfile -File scripts/tests/test-validate-hook-sync-calls.ps1",
     "test:validate-github-pages-css": "bash scripts/tests/test-validate-github-pages-css.sh",
     "test:check-code-fence-syntax": "uv run --quiet --project scripts/python~ --locked pytest scripts/tests/test_code_fence_syntax.py -q",
+    "test:markdown-fence-repair": "uv run --quiet --project scripts/python~ --locked pytest scripts/tests/test_markdown_fence_languages.py -q",
     "test:lint-doc-identifiers": "uv run --project scripts/python~ --locked pytest scripts/tests/test_doc_identifiers.py -q",
     "test:lint-dependabot": "uv run --quiet --project scripts/python~ --locked pytest scripts/tests/test_dependabot.py -q",
     "test:lint-duplicate-usings": "uv run --project scripts/python~ --locked pytest scripts/tests/test_duplicate_usings.py -q",

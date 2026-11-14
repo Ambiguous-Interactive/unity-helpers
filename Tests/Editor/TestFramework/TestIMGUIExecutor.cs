@@ -56,11 +56,15 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
 
         internal static void InitializeEditorStyles()
         {
-            IEnumerator initialization = Run(() =>
-            {
-                Assert.That(EditorStyles.helpBox, Is.Not.Null);
-                Assert.That(EditorStyles.miniButtonLeft, Is.Not.Null);
-            });
+            IEnumerator initialization = Run(
+                () =>
+                {
+                    Assert.That(EditorStyles.helpBox, Is.Not.Null);
+                    Assert.That(EditorStyles.miniButtonLeft, Is.Not.Null);
+                },
+                TestIMGUIExecutorBudget.Default,
+                strictLogs: true
+            );
             Assert.That(initialization.MoveNext(), Is.False);
         }
 
@@ -73,7 +77,11 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
             Keep the iterator contract while executing the pass on its first MoveNext so caller assertions
             observe failures synchronously.
         */
-        internal static IEnumerator Run(Action action, TestIMGUIExecutorBudget budget)
+        internal static IEnumerator Run(
+            Action action,
+            TestIMGUIExecutorBudget budget,
+            bool strictLogs = false
+        )
         {
             if (action != null)
             {
@@ -82,7 +90,8 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
                     budget,
                     CreateLayoutRepaintEvents(),
                     overrideMouseDownPosition: false,
-                    mouseDownPosition: default
+                    mouseDownPosition: default,
+                    strictLogs: strictLogs
                 );
             }
 
@@ -107,7 +116,8 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
                     budget,
                     CreateLayoutMouseDownRepaintEvents(mousePosition),
                     overrideMouseDownPosition: true,
-                    mouseDownPosition: mousePosition
+                    mouseDownPosition: mousePosition,
+                    strictLogs: false
                 );
             }
 
@@ -119,7 +129,42 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
             TestIMGUIExecutorBudget budget,
             Event[] events,
             bool overrideMouseDownPosition,
-            Vector2 mouseDownPosition
+            Vector2 mouseDownPosition,
+            bool strictLogs
+        )
+        {
+            bool previous = LogAssert.ignoreFailingMessages;
+            try
+            {
+                if (strictLogs)
+                {
+                    LogAssert.ignoreFailingMessages = false;
+                }
+                ExecuteCore(
+                    action,
+                    budget,
+                    events,
+                    overrideMouseDownPosition,
+                    mouseDownPosition,
+                    strictLogs
+                );
+            }
+            finally
+            {
+                if (strictLogs)
+                {
+                    LogAssert.ignoreFailingMessages = previous;
+                }
+            }
+        }
+
+        private static void ExecuteCore(
+            Action action,
+            TestIMGUIExecutorBudget budget,
+            Event[] events,
+            bool overrideMouseDownPosition,
+            Vector2 mouseDownPosition,
+            bool strictLogs
         )
         {
             if (!TryResolveMechanism(out string resolveError))
@@ -214,7 +259,10 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
                     bypass managed log handlers. Keep suppression active through framework log evaluation;
                     action and assertion exceptions still propagate.
                 */
-                LogAssert.ignoreFailingMessages = true;
+                if (!strictLogs)
+                {
+                    LogAssert.ignoreFailingMessages = true;
+                }
 
                 // The pass budget turns a pathological IMGUI pump into a bounded test failure.
                 int passes = 0;

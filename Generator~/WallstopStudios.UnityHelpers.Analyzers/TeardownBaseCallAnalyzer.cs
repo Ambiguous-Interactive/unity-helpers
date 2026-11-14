@@ -223,28 +223,147 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             }
             foreach (ControlFlowRegion region in branch.FinallyRegions)
             {
-                for (
-                    int index = region.FirstBlockOrdinal;
-                    index <= region.LastBlockOrdinal;
-                    ++index
-                )
+                if (HasRegionWork(graph, region))
                 {
-                    BasicBlock cleanup = graph.Blocks[index];
-                    if (cleanup.Operations.Length != 0 || cleanup.BranchValue != null)
+                    return true;
+                }
+            }
+            if (
+                branch.Semantics == ControlFlowBranchSemantics.Rethrow
+                || branch.Semantics == ControlFlowBranchSemantics.StructuredExceptionHandling
+            )
+            {
+                if (HasUnwindingCleanup(graph, branch.Source))
+                {
+                    return true;
+                }
+                if (branch.Semantics == ControlFlowBranchSemantics.StructuredExceptionHandling)
+                {
+                    for (
+                        ControlFlowRegion region = branch.Source.EnclosingRegion;
+                        region != null;
+                        region = region.EnclosingRegion
+                    )
+                    {
+                        if (region.Kind == ControlFlowRegionKind.Finally)
+                        {
+                            return HasFinallyContinuationWork(graph, region, pending);
+                        }
+                    }
+                }
+            }
+            return QueueDestination(branch.Destination, pending);
+        }
+
+        private static bool HasRegionWork(ControlFlowGraph graph, ControlFlowRegion region)
+        {
+            for (int index = region.FirstBlockOrdinal; index <= region.LastBlockOrdinal; ++index)
+            {
+                BasicBlock cleanup = graph.Blocks[index];
+                if (cleanup.Operations.Length != 0 || cleanup.BranchValue != null)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static bool HasUnwindingCleanup(ControlFlowGraph graph, BasicBlock source)
+        {
+            for (
+                ControlFlowRegion region = source.EnclosingRegion;
+                region != null;
+                region = region.EnclosingRegion
+            )
+            {
+                if (region.Kind != ControlFlowRegionKind.TryAndFinally)
+                {
+                    continue;
+                }
+                foreach (ControlFlowRegion nested in region.NestedRegions)
+                {
+                    if (
+                        nested.Kind == ControlFlowRegionKind.Finally
+                        && (
+                            source.Ordinal < nested.FirstBlockOrdinal
+                            || nested.LastBlockOrdinal < source.Ordinal
+                        )
+                        && HasRegionWork(graph, nested)
+                    )
                     {
                         return true;
                     }
                 }
             }
-            BasicBlock destination = branch.Destination;
-            if (destination != null && destination.IsReachable)
+            return false;
+        }
+
+        private static bool HasFinallyContinuationWork(
+            ControlFlowGraph graph,
+            ControlFlowRegion region,
+            Queue<BasicBlock> pending
+        )
+        {
+            foreach (BasicBlock block in graph.Blocks)
             {
-                if (destination.Operations.Length != 0 || destination.BranchValue != null)
+                if (
+                    block.IsReachable
+                    && (
+                        ContinueAfterFinally(graph, block.FallThroughSuccessor, region, pending)
+                        || ContinueAfterFinally(graph, block.ConditionalSuccessor, region, pending)
+                    )
+                )
                 {
                     return true;
                 }
-                pending.Enqueue(destination);
             }
+            return false;
+        }
+
+        private static bool ContinueAfterFinally(
+            ControlFlowGraph graph,
+            ControlFlowBranch branch,
+            ControlFlowRegion region,
+            Queue<BasicBlock> pending
+        )
+        {
+            if (branch == null)
+            {
+                return false;
+            }
+            for (int index = 0; index < branch.FinallyRegions.Length; ++index)
+            {
+                if (branch.FinallyRegions[index] != region)
+                {
+                    continue;
+                }
+                for (
+                    int following = index + 1;
+                    following < branch.FinallyRegions.Length;
+                    ++following
+                )
+                {
+                    if (HasRegionWork(graph, branch.FinallyRegions[following]))
+                    {
+                        return true;
+                    }
+                }
+                return QueueDestination(branch.Destination, pending);
+            }
+            return false;
+        }
+
+        private static bool QueueDestination(BasicBlock destination, Queue<BasicBlock> pending)
+        {
+            if (destination == null || !destination.IsReachable)
+            {
+                return false;
+            }
+            if (destination.Operations.Length != 0 || destination.BranchValue != null)
+            {
+                return true;
+            }
+            pending.Enqueue(destination);
             return false;
         }
 

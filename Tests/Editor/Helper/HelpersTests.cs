@@ -335,6 +335,60 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 
         [Test]
+        public void CreateOrReplaceAssetReportsBlockedWrites()
+        {
+            string path = _scriptableFolder + "/Blocked.asset";
+            TrackAssetPath(path);
+            DummyScriptableObject original = Track(
+                ScriptableObject.CreateInstance<DummyScriptableObject>()
+            );
+            DummyScriptableObject replacement = Track(
+                ScriptableObject.CreateInstance<DummyScriptableObject>()
+            );
+            original.value = 7;
+            replacement.value = 42;
+            ExecuteWithImmediateImport(() =>
+            {
+                AssetDatabase.CreateAsset(original, path);
+                AssetDatabase.SaveAssets();
+                byte[] before = File.ReadAllBytes(path);
+                int filteredBefore = HelpersAssetSaveFilter.FilteredSaves;
+                HelpersAssetSaveFilter.BlockedPath = path;
+                try
+                {
+                    Assert.That(
+                        Helpers.TryCreateOrReplaceAsset(
+                            replacement,
+                            path,
+                            out UnityEngine.Object saved,
+                            out string error
+                        ),
+                        Is.False
+                    );
+                    Assert.That(saved, Is.Null);
+                    Assert.That(error, Is.Not.Empty);
+                    Assert.That(
+                        HelpersAssetSaveFilter.FilteredSaves,
+                        Is.GreaterThan(filteredBefore)
+                    );
+                    Assert.That(EditorUtility.IsDirty(original), Is.True);
+                    Assert.That(original.value, Is.EqualTo(42));
+                    CollectionAssert.AreEqual(before, File.ReadAllBytes(path));
+                }
+                finally
+                {
+                    HelpersAssetSaveFilter.BlockedPath = null;
+                }
+                Assert.That(Helpers.CreateOrReplaceAsset(replacement, path), Is.SameAs(original));
+                Resources.UnloadAsset(original);
+                DummyScriptableObject reloaded = Track(
+                    AssetDatabase.LoadAssetAtPath<DummyScriptableObject>(path)
+                );
+                Assert.That(reloaded.value, Is.EqualTo(42));
+            });
+        }
+
+        [Test]
         public void CreateOrReplaceAssetRefusesImportedSources()
         {
             string importedPath = _scriptableFolder + "/Imported.png";

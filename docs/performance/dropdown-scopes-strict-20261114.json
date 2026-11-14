@@ -1,0 +1,433 @@
+{
+  "identities": [
+    "WallstopStudios.UnityHelpers.Tests.Core.TestUtils.SynchronousEditorTestBaseTests.CleanupDestroysAllTransientObjectKindsAndChildren",
+    "WallstopStudios.UnityHelpers.Tests.Core.TestUtils.SynchronousEditorTestBaseTests.CleanupHandlesDuplicateAndAlreadyDestroyedObjects",
+    "WallstopStudios.UnityHelpers.Tests.Core.TestUtils.SynchronousEditorTestBaseTests.DisposablesRunOnceInReverseOrderBeforeObjectsAreDestroyed",
+    "WallstopStudios.UnityHelpers.Tests.Core.TestUtils.SynchronousEditorTestBaseTests.DisposalCannotReenterCleanupOrRegisterAnUnownedResource",
+    "WallstopStudios.UnityHelpers.Tests.Core.TestUtils.SynchronousEditorTestBaseTests.DisposalFailuresStillCleanEveryResourceAndAllowANewScope",
+    "WallstopStudios.UnityHelpers.Tests.Core.TestUtils.SynchronousEditorTestBaseTests.NullTrackingDoesNotCreateCleanupWork",
+    "WallstopStudios.UnityHelpers.Tests.Core.TestUtils.SynchronousEditorTestBaseTests.ObjectScopePreservesTheCallersLogPolicy",
+    "WallstopStudios.UnityHelpers.Tests.Core.TestUtils.SynchronousEditorTestBaseTests.PersistentAssetRefusalLeavesTheAssetIntact",
+    "WallstopStudios.UnityHelpers.Tests.Core.TestUtils.SynchronousEditorTestBaseTests.RangeTrackingCleansIndexedAndEnumeratedInputs",
+    "WallstopStudios.UnityHelpers.Tests.Core.TestUtils.SynchronousEditorTestBaseTests.TrackingRequiresAnActiveScope",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.StringInListDrawerTests.BackingAttributeIsWValueDropDown",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.StringInListDrawerTests.CalculateRowsOnPage.EmptyList.Returns1",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.StringInListDrawerTests.CalculateRowsOnPage.ExactlyOnePage.ReturnsPageSize",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.StringInListDrawerTests.CalculateRowsOnPage.FirstFullPage.ReturnsPageSize",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.StringInListDrawerTests.CalculateRowsOnPage.LastPage.Returns2",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.StringInListDrawerTests.CalculateRowsOnPage.LastPageExactFit.ReturnsPageSize",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.StringInListDrawerTests.CalculateRowsOnPage.NegativePage.ClampsToFirst",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.StringInListDrawerTests.CalculateRowsOnPage.PartialLastPage.ReturnsRemaining",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.StringInListDrawerTests.CalculateRowsOnPage.SecondFullPage.ReturnsPageSize",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.StringInListDrawerTests.CalculateRowsOnPage.SingleItem.Returns1",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.StringInListDrawerTests.CalculateRowsOnPage.ZeroPageSize.Returns1",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.StringInListDrawerTests.CreatePropertyGUIWithoutOptionsReturnsHelpBox",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.StringInListDrawerTests.EmptyListReturnsEmptyArray",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.StringInListDrawerTests.EmptySearchHeightLeavesRoomForHelpBox",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.StringInListDrawerTests.EmptySearchHeightPrefersMeasuredHelpBoxHeight",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.StringInListDrawerTests.InlineListReturnsCorrectOptions",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.StringInListDrawerTests.InstanceMethodProviderReturnsValues",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.StringInListDrawerTests.InstanceMethodProviderWithNoContextReturnsEmpty",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.StringInListDrawerTests.InstanceMethodSetsProviderMethodNameButNotType",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.StringInListDrawerTests.OptionRowHeightMatchesControlPlusEffectiveMargin",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.StringInListDrawerTests.PopupChromeAddsPaginationHeightWhenRequired",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.StringInListDrawerTests.PopupChromeIncludesFooterPadding",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.StringInListDrawerTests.PopupTargetHeightAggregatesChromeAndRows",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.StringInListDrawerTests.PopupTargetHeightFitsSingleRowWithoutMinimumClamp",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.StringInListDrawerTests.PopupTargetHeightScalesWithLargePageSizes",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.StringInListDrawerTests.PopupTargetHeightTreatsNonPositivePageSizesAsSingleRow",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.StringInListDrawerTests.ProviderTypeAndMethodNameAreStoredCorrectly",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.StringInListDrawerTests.RequiresInstanceContextIsFalseForInlineList",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.StringInListDrawerTests.RequiresInstanceContextIsFalseForStaticProvider",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.StringInListDrawerTests.RequiresInstanceContextIsTrueForInstanceProvider",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.StringInListDrawerTests.SelectorUpdatesStringSerializedProperty",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.StringInListDrawerTests.SelectorWithOutOfRangeIntegerDefaultsToFirstOption",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.StringInListDrawerTests.SelectorWithUnmatchedStringDefaultsToFirstOption",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.StringInListDrawerTests.SelectorWritesSelectedIndexToIntegerProperty",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.StringInListDrawerTests.StaticProviderReturnsCorrectOptions",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.ApplyOptionUpdatesDoubleSerializedProperty",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.ApplyOptionUpdatesFloatSerializedProperty",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.BuildDisplayLabelsHandlesEmptyToStringWithFallback",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.BuildDisplayLabelsProducesNoEmptyStrings",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CalculateRowsOnPage.EmptyList.Returns1",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CalculateRowsOnPage.ExactlyOnePage.ReturnsPageSize",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CalculateRowsOnPage.FirstFullPage.ReturnsPageSize",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CalculateRowsOnPage.LastPage.Returns2",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CalculateRowsOnPage.LastPageExactFit.ReturnsPageSize",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CalculateRowsOnPage.NegativePage.ClampsToFirst",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CalculateRowsOnPage.PartialLastPage.ReturnsRemaining",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CalculateRowsOnPage.SecondFullPage.ReturnsPageSize",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CalculateRowsOnPage.SingleItem.Returns1",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CalculateRowsOnPage.ZeroPageSize.Returns1",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CreatePropertyGUIWithoutOptionsReturnsHelpBox",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CustomOptionLabelsUseVisibleFallbackWithoutChangingValues(\"\u2003\u00a0\",False,False)",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CustomOptionLabelsUseVisibleFallbackWithoutChangingValues(\"\u2003\u00a0\",False,True)",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CustomOptionLabelsUseVisibleFallbackWithoutChangingValues(\"\u2003\u00a0\",True,False)",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CustomOptionLabelsUseVisibleFallbackWithoutChangingValues(\"\u2003\u00a0\",True,True)",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CustomOptionLabelsUseVisibleFallbackWithoutChangingValues(\"  Visible option  \",False,False)",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CustomOptionLabelsUseVisibleFallbackWithoutChangingValues(\"  Visible option  \",False,True)",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CustomOptionLabelsUseVisibleFallbackWithoutChangingValues(\"  Visible option  \",True,False)",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CustomOptionLabelsUseVisibleFallbackWithoutChangingValues(\"  Visible option  \",True,True)",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CustomOptionLabelsUseVisibleFallbackWithoutChangingValues(\" \",False,False)",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CustomOptionLabelsUseVisibleFallbackWithoutChangingValues(\" \",False,True)",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CustomOptionLabelsUseVisibleFallbackWithoutChangingValues(\" \",True,False)",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CustomOptionLabelsUseVisibleFallbackWithoutChangingValues(\" \",True,True)",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CustomOptionLabelsUseVisibleFallbackWithoutChangingValues(\"\",False,False)",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CustomOptionLabelsUseVisibleFallbackWithoutChangingValues(\"\",False,True)",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CustomOptionLabelsUseVisibleFallbackWithoutChangingValues(\"\",True,False)",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CustomOptionLabelsUseVisibleFallbackWithoutChangingValues(\"\",True,True)",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CustomOptionLabelsUseVisibleFallbackWithoutChangingValues(\"\\t\\r\\n\",False,False)",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CustomOptionLabelsUseVisibleFallbackWithoutChangingValues(\"\\t\\r\\n\",False,True)",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CustomOptionLabelsUseVisibleFallbackWithoutChangingValues(\"\\t\\r\\n\",True,False)",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CustomOptionLabelsUseVisibleFallbackWithoutChangingValues(\"\\t\\r\\n\",True,True)",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CustomOptionLabelsUseVisibleFallbackWithoutChangingValues(null,False,False)",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CustomOptionLabelsUseVisibleFallbackWithoutChangingValues(null,False,True)",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CustomOptionLabelsUseVisibleFallbackWithoutChangingValues(null,True,False)",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CustomOptionLabelsUseVisibleFallbackWithoutChangingValues(null,True,True)",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.EmptySearchHeightLeavesRoomForHelpBox",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.EmptySearchHeightPrefersMeasuredHelpBoxHeight",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.FormatOptionCachedHandlesNullOption",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.FormatOptionCachedReturnsNonEmptyForNullToString",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.FormatOptionCachedReturnsTypeNameForEmptyToString",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.InstanceMethodProviderReturnsValues",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.InstanceMethodProviderWithNoContextReturnsEmpty",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.InstanceMethodSetsProviderMethodNameButNotType",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.ObjectLabel.ControlWhitespace.Drawer.UsesType",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.ObjectLabel.ControlWhitespace.Shared.UsesType",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.ObjectLabel.Empty.Drawer.UsesType",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.ObjectLabel.Empty.Shared.UsesType",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.ObjectLabel.Padded.Drawer.RemainsExact",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.ObjectLabel.Padded.Shared.RemainsExact",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.ObjectLabel.Space.Drawer.UsesType",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.ObjectLabel.Space.Shared.UsesType",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.ObjectLabel.UnicodeWhitespace.Drawer.UsesType",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.ObjectLabel.UnicodeWhitespace.Shared.UsesType",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.Option.EmptyToString",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.Option.Integer",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.Option.Null",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.Option.NullToString",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.Option.String",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.OptionRowHeightMatchesControlPlusEffectiveMargin",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.PopupChromeAddsPaginationHeightWhenRequired",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.PopupChromeIncludesFooterPadding",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.PopupTargetHeightAggregatesChromeAndRows",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.PopupTargetHeightFitsSingleRowWithoutMinimumClamp",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.PopupTargetHeightScalesWithLargePageSizes",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.PopupTargetHeightTreatsNonPositivePageSizesAsSingleRow",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.ProviderTypeAndMethodNameAreStoredCorrectly",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.ResolveSelectedIndexReturnsCorrectIndexForMatchedValue",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.ResolveSelectedIndexReturnsNegativeOneForUnmatchedValue",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.SelectorUpdatesIntSerializedProperty",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.SelectorUpdatesStringSerializedProperty",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.SelectorWithUnmatchedValueDefaultsToFirstOption",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.StaticMethodProviderReturnsValues",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.StringLabel.ControlWhitespace.Drawer.RemainsLiteral",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.StringLabel.ControlWhitespace.Shared.RemainsLiteral",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.StringLabel.Space.Drawer.RemainsLiteral",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.StringLabel.Space.Shared.RemainsLiteral",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.StringLabel.UnicodeWhitespace.Drawer.RemainsLiteral",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.StringLabel.UnicodeWhitespace.Shared.RemainsLiteral",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.StringPropertyWithStringOptions",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.StringPropertyWithStringOptionsIsSupported",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.TypedInlineConstructorsSetsValueType"
+  ],
+  "completedUtc": "2026-11-14T09:51:34.7146072Z",
+  "exitCode": 0,
+  "records": [
+    {
+      "module": "d8a6d039-a860-45dd-83dd-4e18ca55846f",
+      "before": {
+        "Tests/Core/Editor/SynchronousEditorTestBaseTests.cs": "91BE7F2D2AF20507750180956831FEB2D6614A60603058A60EB5C8D3695F8826",
+        "Tests/Core/SynchronousEditorTestBase.cs": "CF95118D7D539811C231BCCFFCEECEC5E28E3BDF6395600B1407718C2E26D4AA",
+        "Tests/Editor/CustomDrawers/WValueDropDownDrawerTests.cs": "FD02AB4AB23B0252C30DA7FAF86B2DA8C56EB8E18C6AA820A3A298259FDA3437",
+        "Tests/Editor/CustomDrawers/StringInListDrawerTests.cs": "0352456A0BB74288CCA58E17EFFB285A1F18BA8B3BA247FF316D91AB610E3B22",
+        "Tests/Core/CommonTestBase.cs": "4D929AB542AE5EDC6B721AF9EF9FE89FEAA5B6CFF248C83336F64797F1FD648E",
+        "Tests/Editor/TestFramework/TestIMGUIExecutor.cs": "264FCAD2EE8858F01FC85DEFCF9627174AF1BFCAD1C2108EEC7FF56EA04E1749",
+        "Runtime/TestSupport/UnityObjectTrackingTestBase.cs": "6CDABC9C6815DFDC0662F6CE2670D2F40F84FB58D3A9D8C11A3155B7CA291A11"
+      },
+      "fixtures": {
+        "SynchronousEditorTestBaseTests": 0.135421,
+        "StringInListDrawerTests": 0.293814,
+        "WValueDropDownDrawerTests": 0.083415
+      },
+      "healthy": true,
+      "index": 1,
+      "cases": 130,
+      "variant": "baseline",
+      "after": {
+        "Tests/Core/Editor/SynchronousEditorTestBaseTests.cs": "91BE7F2D2AF20507750180956831FEB2D6614A60603058A60EB5C8D3695F8826",
+        "Tests/Core/SynchronousEditorTestBase.cs": "CF95118D7D539811C231BCCFFCEECEC5E28E3BDF6395600B1407718C2E26D4AA",
+        "Tests/Editor/CustomDrawers/WValueDropDownDrawerTests.cs": "FD02AB4AB23B0252C30DA7FAF86B2DA8C56EB8E18C6AA820A3A298259FDA3437",
+        "Tests/Editor/CustomDrawers/StringInListDrawerTests.cs": "0352456A0BB74288CCA58E17EFFB285A1F18BA8B3BA247FF316D91AB610E3B22",
+        "Tests/Core/CommonTestBase.cs": "4D929AB542AE5EDC6B721AF9EF9FE89FEAA5B6CFF248C83336F64797F1FD648E",
+        "Tests/Editor/TestFramework/TestIMGUIExecutor.cs": "264FCAD2EE8858F01FC85DEFCF9627174AF1BFCAD1C2108EEC7FF56EA04E1749",
+        "Runtime/TestSupport/UnityObjectTrackingTestBase.cs": "6CDABC9C6815DFDC0662F6CE2670D2F40F84FB58D3A9D8C11A3155B7CA291A11"
+      },
+      "dllSha256": "2194A82BE2F2085F4DB3675B63F5A94265232E5C2EEB7E51AF68E04635BCA898",
+      "process": {
+        "ProcessId": 214964,
+        "RawExitCode": 0,
+        "StandardOutputEndObserved": true,
+        "StandardErrorEndObserved": true,
+        "OutputDrainStopped": false
+      },
+      "processReceiptSha256": "f9afb804703d51ef058a2bf09ba64ae72fdc64aee35c7a693f8c6c69090cbb04",
+      "identityReports": {
+        "StringInListDrawerTests.identity.txt": "DRAWER_SCOPE,StringInListDrawerTests,False,d8a6d039-a860-45dd-83dd-4e18ca55846f,True",
+        "WValueDropDownDrawerTests.identity.txt": "DRAWER_SCOPE,WValueDropDownDrawerTests,False,d8a6d039-a860-45dd-83dd-4e18ca55846f,True"
+      },
+      "resultsSha256": "7fd64f9d8de501e6003fa8cf9d981100a484028167019020845964672c8c0d5a"
+    },
+    {
+      "module": "245c682d-6b73-451f-bec0-ae7797e0d5d0",
+      "before": {
+        "Tests/Core/Editor/SynchronousEditorTestBaseTests.cs": "91BE7F2D2AF20507750180956831FEB2D6614A60603058A60EB5C8D3695F8826",
+        "Tests/Core/SynchronousEditorTestBase.cs": "CF95118D7D539811C231BCCFFCEECEC5E28E3BDF6395600B1407718C2E26D4AA",
+        "Tests/Editor/CustomDrawers/WValueDropDownDrawerTests.cs": "B59BAB4AD3CEC6DD18745333BA5817750BC32461ADA0ACA50ED5D4F2449DD9DE",
+        "Tests/Editor/CustomDrawers/StringInListDrawerTests.cs": "10C526BB7B80720CAE2D0AEE4EBD911F21ECE6ED796ECDCF68E609E4E7639604",
+        "Tests/Core/CommonTestBase.cs": "4D929AB542AE5EDC6B721AF9EF9FE89FEAA5B6CFF248C83336F64797F1FD648E",
+        "Tests/Editor/TestFramework/TestIMGUIExecutor.cs": "264FCAD2EE8858F01FC85DEFCF9627174AF1BFCAD1C2108EEC7FF56EA04E1749",
+        "Runtime/TestSupport/UnityObjectTrackingTestBase.cs": "6CDABC9C6815DFDC0662F6CE2670D2F40F84FB58D3A9D8C11A3155B7CA291A11"
+      },
+      "fixtures": {
+        "SynchronousEditorTestBaseTests": 0.613832,
+        "StringInListDrawerTests": 0.300125,
+        "WValueDropDownDrawerTests": 0.087945
+      },
+      "healthy": true,
+      "index": 2,
+      "cases": 130,
+      "variant": "candidate",
+      "after": {
+        "Tests/Core/Editor/SynchronousEditorTestBaseTests.cs": "91BE7F2D2AF20507750180956831FEB2D6614A60603058A60EB5C8D3695F8826",
+        "Tests/Core/SynchronousEditorTestBase.cs": "CF95118D7D539811C231BCCFFCEECEC5E28E3BDF6395600B1407718C2E26D4AA",
+        "Tests/Editor/CustomDrawers/WValueDropDownDrawerTests.cs": "B59BAB4AD3CEC6DD18745333BA5817750BC32461ADA0ACA50ED5D4F2449DD9DE",
+        "Tests/Editor/CustomDrawers/StringInListDrawerTests.cs": "10C526BB7B80720CAE2D0AEE4EBD911F21ECE6ED796ECDCF68E609E4E7639604",
+        "Tests/Core/CommonTestBase.cs": "4D929AB542AE5EDC6B721AF9EF9FE89FEAA5B6CFF248C83336F64797F1FD648E",
+        "Tests/Editor/TestFramework/TestIMGUIExecutor.cs": "264FCAD2EE8858F01FC85DEFCF9627174AF1BFCAD1C2108EEC7FF56EA04E1749",
+        "Runtime/TestSupport/UnityObjectTrackingTestBase.cs": "6CDABC9C6815DFDC0662F6CE2670D2F40F84FB58D3A9D8C11A3155B7CA291A11"
+      },
+      "dllSha256": "0E6CDAB80989E94B39384FFC45C493FCB29983EDF2007872D4265875C0F23748",
+      "process": {
+        "ProcessId": 44796,
+        "RawExitCode": 0,
+        "StandardOutputEndObserved": true,
+        "StandardErrorEndObserved": true,
+        "OutputDrainStopped": false
+      },
+      "processReceiptSha256": "2c5bbd61a8da8f0d84a2512f1e1a0adcf6cd115af5f18bd3314bb610140121d6",
+      "identityReports": {
+        "StringInListDrawerTests.identity.txt": "DRAWER_SCOPE,StringInListDrawerTests,True,245c682d-6b73-451f-bec0-ae7797e0d5d0,True",
+        "WValueDropDownDrawerTests.identity.txt": "DRAWER_SCOPE,WValueDropDownDrawerTests,True,245c682d-6b73-451f-bec0-ae7797e0d5d0,True"
+      },
+      "resultsSha256": "17aa64b6768fcece753388a5c958761be294bf90c588dea49c1dab63d9ebbb06"
+    },
+    {
+      "module": "245c682d-6b73-451f-bec0-ae7797e0d5d0",
+      "before": {
+        "Tests/Core/Editor/SynchronousEditorTestBaseTests.cs": "91BE7F2D2AF20507750180956831FEB2D6614A60603058A60EB5C8D3695F8826",
+        "Tests/Core/SynchronousEditorTestBase.cs": "CF95118D7D539811C231BCCFFCEECEC5E28E3BDF6395600B1407718C2E26D4AA",
+        "Tests/Editor/CustomDrawers/WValueDropDownDrawerTests.cs": "B59BAB4AD3CEC6DD18745333BA5817750BC32461ADA0ACA50ED5D4F2449DD9DE",
+        "Tests/Editor/CustomDrawers/StringInListDrawerTests.cs": "10C526BB7B80720CAE2D0AEE4EBD911F21ECE6ED796ECDCF68E609E4E7639604",
+        "Tests/Core/CommonTestBase.cs": "4D929AB542AE5EDC6B721AF9EF9FE89FEAA5B6CFF248C83336F64797F1FD648E",
+        "Tests/Editor/TestFramework/TestIMGUIExecutor.cs": "264FCAD2EE8858F01FC85DEFCF9627174AF1BFCAD1C2108EEC7FF56EA04E1749",
+        "Runtime/TestSupport/UnityObjectTrackingTestBase.cs": "6CDABC9C6815DFDC0662F6CE2670D2F40F84FB58D3A9D8C11A3155B7CA291A11"
+      },
+      "fixtures": {
+        "SynchronousEditorTestBaseTests": 0.192078,
+        "StringInListDrawerTests": 0.282311,
+        "WValueDropDownDrawerTests": 0.065704
+      },
+      "healthy": true,
+      "index": 3,
+      "cases": 130,
+      "variant": "candidate",
+      "after": {
+        "Tests/Core/Editor/SynchronousEditorTestBaseTests.cs": "91BE7F2D2AF20507750180956831FEB2D6614A60603058A60EB5C8D3695F8826",
+        "Tests/Core/SynchronousEditorTestBase.cs": "CF95118D7D539811C231BCCFFCEECEC5E28E3BDF6395600B1407718C2E26D4AA",
+        "Tests/Editor/CustomDrawers/WValueDropDownDrawerTests.cs": "B59BAB4AD3CEC6DD18745333BA5817750BC32461ADA0ACA50ED5D4F2449DD9DE",
+        "Tests/Editor/CustomDrawers/StringInListDrawerTests.cs": "10C526BB7B80720CAE2D0AEE4EBD911F21ECE6ED796ECDCF68E609E4E7639604",
+        "Tests/Core/CommonTestBase.cs": "4D929AB542AE5EDC6B721AF9EF9FE89FEAA5B6CFF248C83336F64797F1FD648E",
+        "Tests/Editor/TestFramework/TestIMGUIExecutor.cs": "264FCAD2EE8858F01FC85DEFCF9627174AF1BFCAD1C2108EEC7FF56EA04E1749",
+        "Runtime/TestSupport/UnityObjectTrackingTestBase.cs": "6CDABC9C6815DFDC0662F6CE2670D2F40F84FB58D3A9D8C11A3155B7CA291A11"
+      },
+      "dllSha256": "0E6CDAB80989E94B39384FFC45C493FCB29983EDF2007872D4265875C0F23748",
+      "process": {
+        "ProcessId": 35160,
+        "RawExitCode": 0,
+        "StandardOutputEndObserved": true,
+        "StandardErrorEndObserved": true,
+        "OutputDrainStopped": false
+      },
+      "processReceiptSha256": "d7f86efe142b5c2377ef7c5d6e54dbad1f1444bece73412a015ccd16af246a97",
+      "identityReports": {
+        "StringInListDrawerTests.identity.txt": "DRAWER_SCOPE,StringInListDrawerTests,True,245c682d-6b73-451f-bec0-ae7797e0d5d0,True",
+        "WValueDropDownDrawerTests.identity.txt": "DRAWER_SCOPE,WValueDropDownDrawerTests,True,245c682d-6b73-451f-bec0-ae7797e0d5d0,True"
+      },
+      "resultsSha256": "a7907d86aa5670eb884054a63fccd7c8ad5aba57ff901efbbd5768703a6d0d4d"
+    },
+    {
+      "module": "d8a6d039-a860-45dd-83dd-4e18ca55846f",
+      "before": {
+        "Tests/Core/Editor/SynchronousEditorTestBaseTests.cs": "91BE7F2D2AF20507750180956831FEB2D6614A60603058A60EB5C8D3695F8826",
+        "Tests/Core/SynchronousEditorTestBase.cs": "CF95118D7D539811C231BCCFFCEECEC5E28E3BDF6395600B1407718C2E26D4AA",
+        "Tests/Editor/CustomDrawers/WValueDropDownDrawerTests.cs": "FD02AB4AB23B0252C30DA7FAF86B2DA8C56EB8E18C6AA820A3A298259FDA3437",
+        "Tests/Editor/CustomDrawers/StringInListDrawerTests.cs": "0352456A0BB74288CCA58E17EFFB285A1F18BA8B3BA247FF316D91AB610E3B22",
+        "Tests/Core/CommonTestBase.cs": "4D929AB542AE5EDC6B721AF9EF9FE89FEAA5B6CFF248C83336F64797F1FD648E",
+        "Tests/Editor/TestFramework/TestIMGUIExecutor.cs": "264FCAD2EE8858F01FC85DEFCF9627174AF1BFCAD1C2108EEC7FF56EA04E1749",
+        "Runtime/TestSupport/UnityObjectTrackingTestBase.cs": "6CDABC9C6815DFDC0662F6CE2670D2F40F84FB58D3A9D8C11A3155B7CA291A11"
+      },
+      "fixtures": {
+        "SynchronousEditorTestBaseTests": 0.124569,
+        "StringInListDrawerTests": 0.290631,
+        "WValueDropDownDrawerTests": 0.080828
+      },
+      "healthy": true,
+      "index": 4,
+      "cases": 130,
+      "variant": "baseline",
+      "after": {
+        "Tests/Core/Editor/SynchronousEditorTestBaseTests.cs": "91BE7F2D2AF20507750180956831FEB2D6614A60603058A60EB5C8D3695F8826",
+        "Tests/Core/SynchronousEditorTestBase.cs": "CF95118D7D539811C231BCCFFCEECEC5E28E3BDF6395600B1407718C2E26D4AA",
+        "Tests/Editor/CustomDrawers/WValueDropDownDrawerTests.cs": "FD02AB4AB23B0252C30DA7FAF86B2DA8C56EB8E18C6AA820A3A298259FDA3437",
+        "Tests/Editor/CustomDrawers/StringInListDrawerTests.cs": "0352456A0BB74288CCA58E17EFFB285A1F18BA8B3BA247FF316D91AB610E3B22",
+        "Tests/Core/CommonTestBase.cs": "4D929AB542AE5EDC6B721AF9EF9FE89FEAA5B6CFF248C83336F64797F1FD648E",
+        "Tests/Editor/TestFramework/TestIMGUIExecutor.cs": "264FCAD2EE8858F01FC85DEFCF9627174AF1BFCAD1C2108EEC7FF56EA04E1749",
+        "Runtime/TestSupport/UnityObjectTrackingTestBase.cs": "6CDABC9C6815DFDC0662F6CE2670D2F40F84FB58D3A9D8C11A3155B7CA291A11"
+      },
+      "dllSha256": "2194A82BE2F2085F4DB3675B63F5A94265232E5C2EEB7E51AF68E04635BCA898",
+      "process": {
+        "ProcessId": 52340,
+        "RawExitCode": 0,
+        "StandardOutputEndObserved": true,
+        "StandardErrorEndObserved": true,
+        "OutputDrainStopped": false
+      },
+      "processReceiptSha256": "06140929865e21162a51f5d9113ba9a4df089d18566b80790f49e69d35a26474",
+      "identityReports": {
+        "StringInListDrawerTests.identity.txt": "DRAWER_SCOPE,StringInListDrawerTests,False,d8a6d039-a860-45dd-83dd-4e18ca55846f,True",
+        "WValueDropDownDrawerTests.identity.txt": "DRAWER_SCOPE,WValueDropDownDrawerTests,False,d8a6d039-a860-45dd-83dd-4e18ca55846f,True"
+      },
+      "resultsSha256": "37b46641d944a3657a0b6d937e88c123b081140a5f8be073dc9e0cb6de387fc2"
+    },
+    {
+      "module": "d8a6d039-a860-45dd-83dd-4e18ca55846f",
+      "before": {
+        "Tests/Core/Editor/SynchronousEditorTestBaseTests.cs": "91BE7F2D2AF20507750180956831FEB2D6614A60603058A60EB5C8D3695F8826",
+        "Tests/Core/SynchronousEditorTestBase.cs": "CF95118D7D539811C231BCCFFCEECEC5E28E3BDF6395600B1407718C2E26D4AA",
+        "Tests/Editor/CustomDrawers/WValueDropDownDrawerTests.cs": "FD02AB4AB23B0252C30DA7FAF86B2DA8C56EB8E18C6AA820A3A298259FDA3437",
+        "Tests/Editor/CustomDrawers/StringInListDrawerTests.cs": "0352456A0BB74288CCA58E17EFFB285A1F18BA8B3BA247FF316D91AB610E3B22",
+        "Tests/Core/CommonTestBase.cs": "4D929AB542AE5EDC6B721AF9EF9FE89FEAA5B6CFF248C83336F64797F1FD648E",
+        "Tests/Editor/TestFramework/TestIMGUIExecutor.cs": "264FCAD2EE8858F01FC85DEFCF9627174AF1BFCAD1C2108EEC7FF56EA04E1749",
+        "Runtime/TestSupport/UnityObjectTrackingTestBase.cs": "6CDABC9C6815DFDC0662F6CE2670D2F40F84FB58D3A9D8C11A3155B7CA291A11"
+      },
+      "fixtures": {
+        "SynchronousEditorTestBaseTests": 0.202397,
+        "StringInListDrawerTests": 0.304052,
+        "WValueDropDownDrawerTests": 0.093055
+      },
+      "healthy": true,
+      "index": 5,
+      "cases": 130,
+      "variant": "baseline",
+      "after": {
+        "Tests/Core/Editor/SynchronousEditorTestBaseTests.cs": "91BE7F2D2AF20507750180956831FEB2D6614A60603058A60EB5C8D3695F8826",
+        "Tests/Core/SynchronousEditorTestBase.cs": "CF95118D7D539811C231BCCFFCEECEC5E28E3BDF6395600B1407718C2E26D4AA",
+        "Tests/Editor/CustomDrawers/WValueDropDownDrawerTests.cs": "FD02AB4AB23B0252C30DA7FAF86B2DA8C56EB8E18C6AA820A3A298259FDA3437",
+        "Tests/Editor/CustomDrawers/StringInListDrawerTests.cs": "0352456A0BB74288CCA58E17EFFB285A1F18BA8B3BA247FF316D91AB610E3B22",
+        "Tests/Core/CommonTestBase.cs": "4D929AB542AE5EDC6B721AF9EF9FE89FEAA5B6CFF248C83336F64797F1FD648E",
+        "Tests/Editor/TestFramework/TestIMGUIExecutor.cs": "264FCAD2EE8858F01FC85DEFCF9627174AF1BFCAD1C2108EEC7FF56EA04E1749",
+        "Runtime/TestSupport/UnityObjectTrackingTestBase.cs": "6CDABC9C6815DFDC0662F6CE2670D2F40F84FB58D3A9D8C11A3155B7CA291A11"
+      },
+      "dllSha256": "2194A82BE2F2085F4DB3675B63F5A94265232E5C2EEB7E51AF68E04635BCA898",
+      "process": {
+        "ProcessId": 925800,
+        "RawExitCode": 0,
+        "StandardOutputEndObserved": true,
+        "StandardErrorEndObserved": true,
+        "OutputDrainStopped": false
+      },
+      "processReceiptSha256": "f4f4aba7571288d6bab41faeb2ab677f5afada278f3d09f249e0ce08cd23233a",
+      "identityReports": {
+        "StringInListDrawerTests.identity.txt": "DRAWER_SCOPE,StringInListDrawerTests,False,d8a6d039-a860-45dd-83dd-4e18ca55846f,True",
+        "WValueDropDownDrawerTests.identity.txt": "DRAWER_SCOPE,WValueDropDownDrawerTests,False,d8a6d039-a860-45dd-83dd-4e18ca55846f,True"
+      },
+      "resultsSha256": "3e69e11071b7da94090343a29f81230b03c087b3efb58a0ee8f5ae2c1b22fcbb"
+    },
+    {
+      "module": "245c682d-6b73-451f-bec0-ae7797e0d5d0",
+      "before": {
+        "Tests/Core/Editor/SynchronousEditorTestBaseTests.cs": "91BE7F2D2AF20507750180956831FEB2D6614A60603058A60EB5C8D3695F8826",
+        "Tests/Core/SynchronousEditorTestBase.cs": "CF95118D7D539811C231BCCFFCEECEC5E28E3BDF6395600B1407718C2E26D4AA",
+        "Tests/Editor/CustomDrawers/WValueDropDownDrawerTests.cs": "B59BAB4AD3CEC6DD18745333BA5817750BC32461ADA0ACA50ED5D4F2449DD9DE",
+        "Tests/Editor/CustomDrawers/StringInListDrawerTests.cs": "10C526BB7B80720CAE2D0AEE4EBD911F21ECE6ED796ECDCF68E609E4E7639604",
+        "Tests/Core/CommonTestBase.cs": "4D929AB542AE5EDC6B721AF9EF9FE89FEAA5B6CFF248C83336F64797F1FD648E",
+        "Tests/Editor/TestFramework/TestIMGUIExecutor.cs": "264FCAD2EE8858F01FC85DEFCF9627174AF1BFCAD1C2108EEC7FF56EA04E1749",
+        "Runtime/TestSupport/UnityObjectTrackingTestBase.cs": "6CDABC9C6815DFDC0662F6CE2670D2F40F84FB58D3A9D8C11A3155B7CA291A11"
+      },
+      "fixtures": {
+        "SynchronousEditorTestBaseTests": 0.13805,
+        "StringInListDrawerTests": 0.291606,
+        "WValueDropDownDrawerTests": 0.078954
+      },
+      "healthy": true,
+      "index": 6,
+      "cases": 130,
+      "variant": "candidate",
+      "after": {
+        "Tests/Core/Editor/SynchronousEditorTestBaseTests.cs": "91BE7F2D2AF20507750180956831FEB2D6614A60603058A60EB5C8D3695F8826",
+        "Tests/Core/SynchronousEditorTestBase.cs": "CF95118D7D539811C231BCCFFCEECEC5E28E3BDF6395600B1407718C2E26D4AA",
+        "Tests/Editor/CustomDrawers/WValueDropDownDrawerTests.cs": "B59BAB4AD3CEC6DD18745333BA5817750BC32461ADA0ACA50ED5D4F2449DD9DE",
+        "Tests/Editor/CustomDrawers/StringInListDrawerTests.cs": "10C526BB7B80720CAE2D0AEE4EBD911F21ECE6ED796ECDCF68E609E4E7639604",
+        "Tests/Core/CommonTestBase.cs": "4D929AB542AE5EDC6B721AF9EF9FE89FEAA5B6CFF248C83336F64797F1FD648E",
+        "Tests/Editor/TestFramework/TestIMGUIExecutor.cs": "264FCAD2EE8858F01FC85DEFCF9627174AF1BFCAD1C2108EEC7FF56EA04E1749",
+        "Runtime/TestSupport/UnityObjectTrackingTestBase.cs": "6CDABC9C6815DFDC0662F6CE2670D2F40F84FB58D3A9D8C11A3155B7CA291A11"
+      },
+      "dllSha256": "0E6CDAB80989E94B39384FFC45C493FCB29983EDF2007872D4265875C0F23748",
+      "process": {
+        "ProcessId": 739532,
+        "RawExitCode": 0,
+        "StandardOutputEndObserved": true,
+        "StandardErrorEndObserved": true,
+        "OutputDrainStopped": false
+      },
+      "processReceiptSha256": "45ea54b1fff6ba266c371d9d7b9c542c9b714a44a2e965120899033fc4f62ad8",
+      "identityReports": {
+        "StringInListDrawerTests.identity.txt": "DRAWER_SCOPE,StringInListDrawerTests,True,245c682d-6b73-451f-bec0-ae7797e0d5d0,True",
+        "WValueDropDownDrawerTests.identity.txt": "DRAWER_SCOPE,WValueDropDownDrawerTests,True,245c682d-6b73-451f-bec0-ae7797e0d5d0,True"
+      },
+      "resultsSha256": "068fc94aa4a979e3742c2273cc6426c016dd36d83c0b3fcf28309a6ee273568e"
+    }
+  ],
+  "fixedHashes": {
+    "Tests/Editor/TestFramework/TestIMGUIExecutor.cs": "264FCAD2EE8858F01FC85DEFCF9627174AF1BFCAD1C2108EEC7FF56EA04E1749",
+    "Tests/Core/Editor/SynchronousEditorTestBaseTests.cs": "91BE7F2D2AF20507750180956831FEB2D6614A60603058A60EB5C8D3695F8826",
+    "Tests/Core/CommonTestBase.cs": "4D929AB542AE5EDC6B721AF9EF9FE89FEAA5B6CFF248C83336F64797F1FD648E",
+    "Tests/Core/SynchronousEditorTestBase.cs": "CF95118D7D539811C231BCCFFCEECEC5E28E3BDF6395600B1407718C2E26D4AA",
+    "Runtime/TestSupport/UnityObjectTrackingTestBase.cs": "6CDABC9C6815DFDC0662F6CE2670D2F40F84FB58D3A9D8C11A3155B7CA291A11"
+  },
+  "pairs": [
+    {
+      "SynchronousEditorTestBaseTests": 4.532768182187401,
+      "StringInListDrawerTests": 1.0214795755137602,
+      "WValueDropDownDrawerTests": 1.0543067793562308,
+      "combined": 1.0287385116202623
+    },
+    {
+      "SynchronousEditorTestBaseTests": 1.5419406112275125,
+      "StringInListDrawerTests": 0.9713726340273405,
+      "WValueDropDownDrawerTests": 0.8128866234473202,
+      "combined": 0.9368867088965404
+    },
+    {
+      "SynchronousEditorTestBaseTests": 0.6820753272034665,
+      "StringInListDrawerTests": 0.9590662123584124,
+      "WValueDropDownDrawerTests": 0.8484659609908118,
+      "combined": 0.9331490001435382
+    }
+  ],
+  "geometricFixtureRatio": 0.9404793345699932,
+  "decision": "Reject",
+  "preregistration": "Strict logging requalification of the existing scope hypothesis. Six serial fresh Unity6000.6.7f1 EditorMono processes ABBAAB. Keep all original130caseidentities:120drawer+10ownershipcontrols; the new normal-inspector case is retained in final source but excluded equally from both timed profiles. Both arms initialize with strict logs, enforce false ignoreFailingMessages during fixture cases and restore incoming policy at fixture exit. Actual per-fixture reporter must observe strict=true, expected base and loaded module matching captured PE MVID. Require all130cases passed, no failedsuites, raw0, bothEOFs,noDrainStop,stable7inputs. Same performance gate as original: all three combined target duration ratios <1, geometric mean of six target per-fixture ratios <=.95. Retain only if all gates pass; otherwise restore CommonTestBase and preserve rejection. Controls timings reported without extrapolating whole-suite/CI savings. No other owned builds/tests/timings overlap.\n",
+  "environment": "Windows x64 Unity 6000.6.7f1 Editor Mono, six serial fresh ABBAAB processes; both arms strict logs, original130identities. Normal-inspector regression is retained in final source and excluded equally from timed arms."
+}

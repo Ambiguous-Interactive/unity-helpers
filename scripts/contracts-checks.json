@@ -225,6 +225,11 @@
     "run": "npm run test:check-code-fence-syntax"
   },
   {
+    "id": "markdown-fence-repair",
+    "name": "Markdown fence inference and compatibility",
+    "run": "npm run test:markdown-fence-repair"
+  },
+  {
     "id": "lint-doc-identifiers",
     "name": "Documentation identifier linter self-test",
     "run": "npm run test:lint-doc-identifiers"

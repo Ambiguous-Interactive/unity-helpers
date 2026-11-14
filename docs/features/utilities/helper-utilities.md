@@ -49,7 +49,8 @@ path through this helper.
 Replacement keeps the destination GUID and local file ID. Copying a distinct source records in-memory
 Undo. When saving an object you already edited, record Undo before your edit. File creation, saving
 and reimporting cannot be fully reversed with Undo. A failed save can leave an unsaved
-in-memory change; inspect the error and destination before retrying. This API does not coordinate
+in-memory change; inspect the error and destination before retrying. A save that leaves the asset dirty,
+including a write blocked by `OnWillSaveAssets`, reports failure before reimporting. This API does not coordinate
 with external writers and never deletes a destination as failure cleanup. Saving uses `AssetDatabase.SaveAssets`,
 which also flushes other dirty project assets.
 

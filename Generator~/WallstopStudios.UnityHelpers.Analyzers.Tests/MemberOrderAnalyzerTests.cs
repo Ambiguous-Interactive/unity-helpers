@@ -107,6 +107,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
 
         [TestCase("public int A; protected int B; internal int C; private int D; int E;", 0)]
         [TestCase("private int A; public int B;", 1)]
+        [TestCase("int A; private int B;", 1)]
         [TestCase("internal const int A=0; protected const int B=0;", 1)]
         [TestCase("public int A, B; public int Property => A+B;", 1)]
         [TestCase("private class Nested { } public int Value;", 1)]

@@ -95,6 +95,45 @@ function isTerminalExit(statement) {
   return /^(?:return\b|throw\b)/.test(statement);
 }
 
+function lineAfterStatement(lines, start) {
+  let end = start;
+  while (end < lines.length && !lines[end].trimEnd().endsWith(";")) {
+    end += 1;
+  }
+  return end + 1;
+}
+
+function nextStatementAfterOutAssignment(lines, start, siblingAssignment) {
+  let next = lineAfterStatement(lines, start);
+  while (next < lines.length) {
+    const line = lines[next].trim();
+    if (line === "" || line.startsWith("//") || line.startsWith("/*") || line.startsWith("*")) {
+      next += 1;
+    } else if (siblingAssignment.test(lines[next])) {
+      next = lineAfterStatement(lines, next);
+    } else {
+      break;
+    }
+  }
+  return next;
+}
+
+for (const [body, expected] of [
+  ['value = null;\nerror =\n    "failure";\nreturn false;', true],
+  ["value = Compute(\n    first,\n    second);\nerror = null;\nreturn true;", true],
+  ['value = null;\n// explanation\nerror =\n    "failure";\nreturn false;', true],
+  ['value = null;\nerror =\n    "failure";\nDoWork();\nreturn false;', false],
+  ['value = null;\nerror =\n    "failure";\nreturnValue = 1;\nreturn false;', false],
+  ['value = null;\nerror =\n    "failure";\nif (condition) return false;', false]
+]) {
+  const lines = body.split("\n");
+  const next = nextStatementAfterOutAssignment(lines, 0, /^\s*(?:value|error)\s*=(?!=)/);
+  const terminal = next >= lines.length || isTerminalExit(lines[next].trim());
+  if (terminal !== expected) {
+    throw new Error(`Out-parameter assignment-group control failed: ${body}`);
+  }
+}
+
 for (const [statement, expected] of [
   ["return false;", true],
   ["return;", true],
@@ -165,7 +204,7 @@ function scanRoot(rootName) {
 
       const lines = body.split("\n");
       for (const name of outNames) {
-        const assignment = new RegExp(`^\\s*${name}\\s*=[^=]`);
+        const assignment = new RegExp(`^\\s*${name}\\s*=(?!=)`);
         for (let index = 0; index < lines.length; index += 1) {
           if (!assignment.test(lines[index])) {
             continue;
@@ -175,26 +214,9 @@ function scanRoot(rootName) {
           // assignments to the method's OTHER out parameters: a method with two of them writes both
           // and then returns, which satisfies the rule jointly even though only the last assignment
           // literally touches the return.
-          const siblingAssignment = new RegExp(`^\\s*(?:${outNames.join("|")})\\s*=[^=]`);
+          const siblingAssignment = new RegExp(`^\\s*(?:${outNames.join("|")})\\s*=(?!=)`);
 
-          // An assignment may span lines. Walk to the one that actually ends the statement before
-          // asking what follows it, or a wrapped expression reads as "followed by its own second
-          // line" and is reported forever.
-          let index2 = index;
-          while (index2 < lines.length && !lines[index2].trimEnd().endsWith(";")) {
-            index2 += 1;
-          }
-          let next = index2 + 1;
-          while (
-            next < lines.length &&
-            (lines[next].trim() === "" ||
-              lines[next].trim().startsWith("//") ||
-              lines[next].trim().startsWith("/*") ||
-              lines[next].trim().startsWith("*") ||
-              siblingAssignment.test(lines[next]))
-          ) {
-            next += 1;
-          }
+          const next = nextStatementAfterOutAssignment(lines, index, siblingAssignment);
 
           // Falling off the end of the body IS the exit, and for a `void` method carrying an `out`
           // it is the only one there is. Requiring a literal `return;` there would be code shaped

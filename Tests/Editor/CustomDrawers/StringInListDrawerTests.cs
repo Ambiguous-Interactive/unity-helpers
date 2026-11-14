@@ -21,8 +21,10 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
     [TestFixture]
     [NUnit.Framework.Category("Slow")]
     [NUnit.Framework.Category("Integration")]
-    public sealed class StringInListDrawerTests : SynchronousEditorTestBase
+    public sealed class StringInListDrawerTests : CommonTestBase
     {
+        private bool _initialLogPolicy;
+
         private static T GetAttributeFromProperty<T>(SerializedProperty property)
             where T : Attribute
         {
@@ -48,7 +50,22 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [OneTimeSetUp]
         public void InitializeEditorStylesInGuiContext()
         {
+            _initialLogPolicy = UnityEngine.TestTools.LogAssert.ignoreFailingMessages;
             TestIMGUIExecutor.InitializeEditorStyles();
+            UnityEngine.TestTools.LogAssert.ignoreFailingMessages = false;
+        }
+
+        [OneTimeTearDown]
+        public void RestoreLoggingPolicy()
+        {
+            try
+            {
+                Assert.That(UnityEngine.TestTools.LogAssert.ignoreFailingMessages, Is.False);
+            }
+            finally
+            {
+                UnityEngine.TestTools.LogAssert.ignoreFailingMessages = _initialLogPolicy;
+            }
         }
 
         [Test]
@@ -60,11 +77,15 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             UnityEditor.Editor inspector = Track(UnityEditor.Editor.CreateEditor(asset));
             Assert.That(inspector, Is.Not.Null);
             bool drawn = false;
-            System.Collections.IEnumerator rendering = TestIMGUIExecutor.Run(() =>
-            {
-                inspector.OnInspectorGUI();
-                drawn = true;
-            });
+            System.Collections.IEnumerator rendering = TestIMGUIExecutor.Run(
+                () =>
+                {
+                    inspector.OnInspectorGUI();
+                    drawn = true;
+                },
+                TestIMGUIExecutorBudget.Default,
+                strictLogs: true
+            );
             Assert.That(rendering.MoveNext(), Is.False);
             Assert.That(drawn, Is.True);
             Assert.That(asset.state, Is.EqualTo("Run"));

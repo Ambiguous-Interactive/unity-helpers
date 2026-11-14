@@ -103,9 +103,10 @@ from timing observations.
 The [additional replay archive](https://raw.githubusercontent.com/Ambiguous-Interactive/unity-helpers/587d3de6fde16c76a0ba256872cfe8c800bf1287/docs/performance/local-pool-runtime-qualification.zip) retains these attempts,
 exact instrumented inputs, final source snapshots, process receipts and complete NUnit trees.
 
-## Dropdown fixture comparison
+## Dropdown fixture comparison (withdrawn)
 
-`StringInListDrawerTests` and `WValueDropDownDrawerTests` now use synchronous object scopes.
+`StringInListDrawerTests` and `WValueDropDownDrawerTests` were evaluated with synchronous object scopes.
+The migration was not retained after the strict requalification below; both keep `CommonTestBase`.
 All 120 case identities and assertions remain, alongside ten unchanged scope ownership controls.
 Both fixtures initialize real IMGUI styles before their style-dependent assertions, including in
 an isolated cold batch process. Production drawers are unchanged.
@@ -122,7 +123,10 @@ ends and no drain stop. Temporary reporters are absent from the shipped fixtures
 | 3    |       0.9349 |         0.6919 |         0.8736 |                  0.6820 |
 
 Ratios are candidate/baseline fixture durations. The geometric mean of the six target ratios
-is 0.8919, meeting the preregistered 0.95 threshold; every combined pair improves.
+is 0.8919 and every combined pair improves, but these observations are withdrawn.
+Review found that the setup helper leaked `LogAssert.ignoreFailingMessages`: the common
+base reset it after cases while the synchronous base preserved it. The arms therefore
+used different logging policies. The numeric threshold alone does not qualify this change.
 The absolute savings are tens of milliseconds. The unchanged control varies substantially:
 these captures establish no whole-suite speedup or CI wall-clock target.
 
@@ -132,3 +136,28 @@ source hash, assembly identity and process receipt. Two preparation attempts are
 one failed compilation because the extracted setup helper lacked its NUnit import; another
 passed 130 cases but omitted required identity reports from its output. Neither contributes
 timing observations.
+
+## Strict dropdown requalification (rejected)
+
+A new six-process ABBAAB campaign uses identical strict logging in both arms. Each fixture
+asserts that `LogAssert.ignoreFailingMessages` stays false, then restores its caller's policy.
+All 130 original timed identities pass in every process. The additional normal-inspector
+regression remains in final source and is excluded equally from the timed arms.
+Loaded scope, strict-policy and module witnesses match captured assemblies; selected sources
+remain stable and every process returns raw zero with both stream ends and no drain stop.
+
+| Pair | String ratio | Dropdown ratio | Combined ratio | Unchanged control ratio |
+| ---- | -----------: | -------------: | -------------: | ----------------------: |
+| 1    |       1.0215 |         1.0543 |         1.0287 |                  4.5328 |
+| 2    |       0.9714 |         0.8129 |         0.9369 |                  1.5419 |
+| 3    |       0.9591 |         0.8485 |         0.9331 |                  0.6821 |
+
+The geometric mean of the six target ratios is 0.9405, but the first combined pair regresses.
+The preregistered gate required every combined pair to improve, so the migration is rejected.
+The unchanged control also varies substantially. Neither this campaign nor the withdrawn one
+establishes a whole-suite speedup. The fixtures retain their original common base, all original
+assertions, real style initialization, strict logging and the normal-inspector regression.
+
+The [strict durations](./dropdown-scopes-strict-20261114.csv) and
+[qualification record](./dropdown-scopes-strict-20261114.json) retain every process,
+case identity, source and assembly identity, logging witness and receipt summary.

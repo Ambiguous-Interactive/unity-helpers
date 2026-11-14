@@ -318,8 +318,8 @@ labeled blocks and the document's newline style. Without paths it selects staged
 it changes the worktree and does not stage the repair. The locked JSON5 parser preserves the old
 PowerShell reader's accepted comments and trailing commas, with explicit compatibility controls for
 its object and numeric rules. Frozen original-source observations cover inference and fence shapes.
-Run `uv run --project scripts/python~ --locked pytest scripts/tests/test_markdown_fence_languages.py -q`
-for the focused controls, including multi-path launcher and staged UTF-8 filename coverage.
+Run `npm run test:markdown-fence-repair` for the focused controls, including multi-path launcher
+and staged UTF-8 filename coverage. The contract registry runs this suite in CI.
 
 All repository Python sources now belong to the strict scope, including the standard-library-only
 agent-state tool that runs before uv is available during container startup. The source registry

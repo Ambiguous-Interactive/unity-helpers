@@ -69,10 +69,10 @@
     "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CalculateRowsOnPage.SingleItem.Returns1",
     "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CalculateRowsOnPage.ZeroPageSize.Returns1",
     "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CreatePropertyGUIWithoutOptionsReturnsHelpBox",
-    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CustomOptionLabelsUseVisibleFallbackWithoutChangingValues(\"\u2003\u00a0\",False,False)",
-    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CustomOptionLabelsUseVisibleFallbackWithoutChangingValues(\"\u2003\u00a0\",False,True)",
-    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CustomOptionLabelsUseVisibleFallbackWithoutChangingValues(\"\u2003\u00a0\",True,False)",
-    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CustomOptionLabelsUseVisibleFallbackWithoutChangingValues(\"\u2003\u00a0\",True,True)",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CustomOptionLabelsUseVisibleFallbackWithoutChangingValues(\"  \",False,False)",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CustomOptionLabelsUseVisibleFallbackWithoutChangingValues(\"  \",False,True)",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CustomOptionLabelsUseVisibleFallbackWithoutChangingValues(\"  \",True,False)",
+    "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CustomOptionLabelsUseVisibleFallbackWithoutChangingValues(\"  \",True,True)",
     "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CustomOptionLabelsUseVisibleFallbackWithoutChangingValues(\"  Visible option  \",False,False)",
     "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CustomOptionLabelsUseVisibleFallbackWithoutChangingValues(\"  Visible option  \",False,True)",
     "WallstopStudios.UnityHelpers.Tests.CustomDrawers.WValueDropDownDrawerTests.CustomOptionLabelsUseVisibleFallbackWithoutChangingValues(\"  Visible option  \",True,False)",
@@ -782,5 +782,7 @@
   ],
   "geometricFixtureRatio": 0.8918517439531529,
   "criteria": "Every combined pair improves; geometric mean of six target fixture ratios <= 0.95; identical 130 identities; loaded scope and MVID verified; all process receipts healthy.",
-  "environment": "Windows x64 Unity 6000.6.7f1 Editor Mono; six serial fresh processes, ABBAAB; identical GUI initialization and temporary metadata reporters in both arms."
+  "environment": "Windows x64 Unity 6000.6.7f1 Editor Mono; six serial fresh processes, ABBAAB; identical GUI initialization and temporary metadata reporters in both arms.",
+  "qualificationStatus": "Withdrawn after review: the setup helper leaked LogAssert.ignoreFailingMessages. CommonTestBase reset it after cases while the synchronous base preserved it, so logging policy differed between arms. Numeric observations remain historical evidence and do not qualify the migration.",
+  "decision": "Withdrawn"
 }
