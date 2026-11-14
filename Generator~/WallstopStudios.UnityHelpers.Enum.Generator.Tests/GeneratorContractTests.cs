@@ -66,7 +66,12 @@ namespace WallstopStudios.UnityHelpers.Enum.Generator.Tests
 
         private static RunResult Run(string source)
         {
-            CSharpCompilation compilation = CreateCompilation(source);
+            return Run("FixtureAssembly", source);
+        }
+
+        private static RunResult Run(string assemblyName, string source)
+        {
+            CSharpCompilation compilation = CreateCompilation(assemblyName, source);
             GeneratorDriver driver = CSharpGeneratorDriver.Create(
                 new[] { new EnumHelpersGenerator() },
                 parseOptions: ParseOptions
@@ -99,7 +104,11 @@ namespace WallstopStudios.UnityHelpers.Enum.Generator.Tests
             );
         }
 
-        private static CSharpCompilation CreateCompilation(string source)
+        private static CSharpCompilation CreateCompilation(
+            string assemblyName,
+            string source,
+            MetadataReference extraReference = null
+        )
         {
             SyntaxTree tree = CSharpSyntaxTree.ParseText(source, ParseOptions, "Fixture.cs");
             List<MetadataReference> references = new();
@@ -111,8 +120,12 @@ namespace WallstopStudios.UnityHelpers.Enum.Generator.Tests
             references.Add(
                 MetadataReference.CreateFromFile(typeof(GeneratorContractTests).Assembly.Location)
             );
+            if (extraReference != null)
+            {
+                references.Add(extraReference);
+            }
             return CSharpCompilation.Create(
-                "FixtureAssembly",
+                assemblyName,
                 new[] { tree },
                 references,
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
@@ -155,6 +168,44 @@ namespace WallstopStudios.UnityHelpers.Enum.Generator.Tests
             Assert.That(first.Errors, Is.Empty);
             Assert.That(second.Errors, Is.Empty);
             Assert.That(first.GeneratedText, Is.EqualTo(second.GeneratedText));
+        }
+
+        [Test]
+        public void GeneratedPublicOverloadIsUsableFromAnotherAssembly()
+        {
+            const string producer =
+                "namespace Producer { using WallstopStudios.UnityHelpers.Core.Attributes; [WEnumHelpers] public enum ExternalEnum { None = 0, First = 1 } }";
+            RunResult generated = Run("ProducerAssembly", producer);
+            Assert.That(generated.Errors, Is.Empty);
+
+            byte[] producerImage;
+            using (MemoryStream stream = new MemoryStream())
+            {
+                Microsoft.CodeAnalysis.Emit.EmitResult emitted = generated.Updated.Emit(stream);
+                Assert.That(emitted.Success, Is.True, string.Join("\n", emitted.Diagnostics));
+                producerImage = stream.ToArray();
+            }
+
+            const string consumer =
+                "namespace Consumer { using Producer; public static class Probe { public static string Get(ExternalEnum value) { return value.ToCachedName(); } } }";
+            CSharpCompilation consumerCompilation = CreateCompilation(
+                "ConsumerAssembly",
+                consumer,
+                MetadataReference.CreateFromImage(producerImage)
+            );
+            List<string> errors = new();
+            foreach (Diagnostic diagnostic in consumerCompilation.GetDiagnostics())
+            {
+                if (diagnostic.Severity == DiagnosticSeverity.Error)
+                {
+                    errors.Add(diagnostic.ToString());
+                }
+            }
+            Assert.That(errors, Is.Empty);
+            IMethodSymbol target = FindInvocationTarget(consumerCompilation, "ToCachedName");
+            Assert.That(target, Is.Not.Null);
+            Assert.That(target.ContainingType.Name, Is.EqualTo("ExternalEnumWEnumHelpers"));
+            Assert.That(target.ContainingAssembly.Name, Is.EqualTo("ProducerAssembly"));
         }
 
         [Test]
