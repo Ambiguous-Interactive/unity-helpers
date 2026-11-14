@@ -12,6 +12,96 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     [Category("Fast")]
     public sealed class SpriteMaskReaderTests : CommonTestBase
     {
+        [TestCase(TextureFormat.RGB565, false)]
+        [TestCase(TextureFormat.RGB565, true)]
+        [TestCase(TextureFormat.RGBA4444, false)]
+        [TestCase(TextureFormat.RGBA4444, true)]
+        public void PackedSixteenBitRegionsMatchEveryNativePixelEncoding(
+            TextureFormat format,
+            bool mipmaps
+        )
+        {
+            const int regionWidth = 256;
+            const int regionHeight = 256;
+            const int sourceWidth = regionWidth + 1;
+            ushort[] encoded = new ushort[sourceWidth * regionHeight];
+            for (int row = 0; row < regionHeight; ++row)
+            {
+                for (int column = 0; column < regionWidth; ++column)
+                {
+                    encoded[row * sourceWidth + column + 1] = (ushort)(row * regionWidth + column);
+                }
+            }
+            Texture2D texture = Track(new Texture2D(sourceWidth, regionHeight, format, mipmaps));
+            texture.SetPixelData(encoded, 0);
+            texture.Apply();
+            Color32[] expected = texture.GetPixels32();
+            Sprite sprite = Track(
+                Sprite.Create(
+                    texture,
+                    new Rect(1, 0, regionWidth, regionHeight),
+                    new Vector2(0.25f, 0.75f),
+                    2f
+                )
+            );
+            Assert.That(
+                SpriteMaskReader.TryReadPixels(
+                    sprite,
+                    out SpritePixelRegion region,
+                    out string error
+                ),
+                Is.True,
+                error
+            );
+            Assert.That(region.Pixels.Length, Is.EqualTo(regionWidth * regionHeight));
+            Assert.That(region.TextureWidth, Is.EqualTo(regionWidth));
+            Assert.That(region.Region, Is.EqualTo(new RectInt(0, 0, regionWidth, regionHeight)));
+            Assert.That(
+                region.Pivot,
+                Is.EqualTo(new Vector2(regionWidth * 0.25f, regionHeight * 0.75f))
+            );
+            Assert.That(region.UnitsPerPixel, Is.EqualTo(new Vector2(0.5f, 0.5f)));
+            for (int row = 0; row < regionHeight; ++row)
+            {
+                for (int column = 0; column < regionWidth; ++column)
+                {
+                    Color32 original = expected[row * sourceWidth + column + 1];
+                    Color32 actual = region.GetPixel(column, row);
+                    if (
+                        actual.r != original.r
+                        || actual.g != original.g
+                        || actual.b != original.b
+                        || actual.a != original.a
+                    )
+                    {
+                        Assert.Fail(
+                            $"{format} encoding {row * regionWidth + column}: expected {original}, got {actual}."
+                        );
+                    }
+                }
+            }
+            Sprite corner = Track(
+                Sprite.Create(
+                    texture,
+                    new Rect(sourceWidth - 1, regionHeight - 1, 1, 1),
+                    Vector2.zero
+                )
+            );
+            Assert.That(
+                SpriteMaskReader.TryReadPixels(
+                    corner,
+                    out SpritePixelRegion cornerRegion,
+                    out error
+                ),
+                Is.True,
+                error
+            );
+            Assert.That(cornerRegion.Pixels.Length, Is.EqualTo(1));
+            Assert.That(cornerRegion.GetPixel(0, 0), Is.EqualTo(expected[expected.Length - 1]));
+            region.Pixels[0] = default;
+            CollectionAssert.AreEqual(expected, texture.GetPixels32());
+        }
+
         [TestCase(0, 0, 4, 3, false, TextureFormat.RGBA32)]
         [TestCase(0, 0, 4, 3, false, TextureFormat.RGB24)]
         [TestCase(1, 2, 3, 2, false, TextureFormat.RGBA32)]

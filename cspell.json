@@ -983,7 +983,9 @@
         "gtimeout",
         "unpadded",
         "PGO",
-        "Bruijn"
+        "Bruijn",
+        "ABBAAB",
+        "MVID"
       ]
     }
   ],
@@ -1313,6 +1315,18 @@
     {
       "filename": ["scripts/unity/wproto-corpus.v1.json"],
       "ignoreRegExpList": ["/\"sha256\":\\s*\"[A-Za-z0-9+/]{43}=\"/g"]
+    },
+    {
+      "filename": [
+        "docs/performance/analyzer-policy-member-order-20261114.json",
+        "docs/performance/dropdown-scopes-20261114.json",
+        "cspell.json"
+      ],
+      "words": ["dbfsi"]
+    },
+    {
+      "filename": ["scripts/tests/fixtures/markdown-fence-original.json", "cspell.json"],
+      "words": ["ceq"]
     }
   ]
 }

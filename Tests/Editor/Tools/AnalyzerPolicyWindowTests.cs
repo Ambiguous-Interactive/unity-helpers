@@ -248,7 +248,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
                 Path.GetFullPath(Path.Combine(Application.dataPath, "Default.ruleset")),
                 AnalyzerPolicyWindow.GetRulesetPath()
             );
-            Assert.AreEqual(28, policies.Count);
+            Assert.AreEqual(29, policies.Count);
             for (int index = 0; index < policies.Count; ++index)
             {
                 Assert.AreEqual($"WUH{index + 1:000}", policies[index].Id);

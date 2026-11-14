@@ -5,5 +5,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 {
     using UnityEngine;
 
-    public sealed class DummyScriptableObject : ScriptableObject { }
+    public sealed class DummyScriptableObject : ScriptableObject
+    {
+        public int value;
+        public Object reference;
+    }
 }

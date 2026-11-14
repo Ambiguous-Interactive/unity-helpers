@@ -146,6 +146,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random {
                     return new BooleanBitwiseAnalyzer();
                 case "WUH028":
                     return new RedundantPooledClearAnalyzer();
+                case "WUH029":
+                    return new MemberOrderAnalyzer();
                 case "WUH027":
                     return new RedundantCallerNameAnalyzer();
                 case "WUH025":
@@ -160,6 +162,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random {
 
         private static string SourceFor(string id, string code)
         {
+            if (string.Equals(id, "WUH029", StringComparison.Ordinal))
+            {
+                return code;
+            }
             if (string.Equals(id, "WUH028", StringComparison.Ordinal))
             {
                 return "using System.Collections.Generic; using WallstopStudios.UnityHelpers.Utils; public class Subject { public void Run() { "

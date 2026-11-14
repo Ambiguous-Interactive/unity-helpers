@@ -11,11 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add editor asset enumeration, including subassets, and native asset replacement that keeps existing references intact ([#1182](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1182)).
+- Add opt-in `WUH029` member-order warnings, asynchronous cleanup checks in `WUH014`, and nested teardown checks in `WUH009` ([#1200](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1200)).
 - Add allocation-free counting medians for unsorted byte channels, slug identifier validation, and optional cleanup failure reporting for `DisposableScope`. [#1200](https://github.com/wallstop/unity-helpers/issues/1200)
 - Add `LatestWriteFile` for coalesced saves and synchronous final flushes, plus optional thread-pool failure callbacks ([#1181](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1181)).
 - Add single-owner managed pools with explicit returns and fixed-length per-thread array pools with clearing on return ([#1173](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1173)).
 - Add a test-only support assembly with allocation controls, synchronous Unity object tracking and managed resource cleanup for consumer test fixtures ([#1180](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1180)).
-- Add region-only reads for readable RGB24, ARGB32, BGRA32 and Alpha8 sprites to reduce temporary pixel storage ([#1113](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1113)).
+- Add region-only reads for readable RGB24, ARGB32, BGRA32, Alpha8, RGB565 and RGBA4444 sprites to reduce temporary pixel storage ([#1113](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1113)).
 - Add reusable weighted index tables, draw-sparing probability checks, and exponential and Gumbel samples ([#1176](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1176)).
 - Add stable score distributions, sorted-span percentiles, tie-averaged ranks and rank correlations ([#1177](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1177)).
 - Add CSS cubic Bézier evaluation and weighted animation-curve conversion ([#1186](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1186)).
@@ -45,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Reduce shared buffer clock-conversion overhead while preserving custom time providers ([#1173](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1173)).
 - Reduce shared buffer rental and return synchronization while retaining usage tracking, purge policies and callback behavior ([#1173](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1173)).
 - Read only the selected rectangle when querying readable RGBA32 sprite masks, art bounds and ink regions ([#1113](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1113)).
 - Compute integer floor logarithms with portable branchless lookups, preserving zero and signed bit-pattern results ([#1170](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1170)).

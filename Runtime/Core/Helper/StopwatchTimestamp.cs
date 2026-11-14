@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     /// <summary>Measures elapsed time and converts Stopwatch counter ticks without allocating a timer.</summary>
     public static class StopwatchTimestamp
     {
+        private static readonly double SecondsPerTick = 1.0 / Stopwatch.Frequency;
         private static readonly double MillisecondsPerTick = 1000.0 / Stopwatch.Frequency;
         private static readonly double NanosecondsPerTick = 1000000000.0 / Stopwatch.Frequency;
 
@@ -21,6 +22,13 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             long elapsed = unchecked(end - start);
             long ticks = ScaleTicks(elapsed, TimeSpan.TicksPerSecond, Stopwatch.Frequency);
             return TimeSpan.FromTicks(ticks);
+        }
+
+        /// <summary>Converts signed Stopwatch ticks to seconds.</summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static double ToSeconds(long ticks)
+        {
+            return ticks * SecondsPerTick;
         }
 
         /// <summary>Converts signed Stopwatch ticks to milliseconds.</summary>

@@ -1,0 +1,311 @@
+{
+  "unity": "6000.6.7f1",
+  "backend": "Windows Editor Mono",
+  "baseCommit": "10138d86f0773d4a2ae7536510f5abfe1bc148d6",
+  "schedule": "A B B A A B",
+  "pairs": [
+    [1, 2],
+    [4, 3],
+    [5, 6]
+  ],
+  "rounds": 21,
+  "warmCalls": 64,
+  "calibrationMinimumSeconds": 0.02,
+  "minimumObservedSeconds": 0.0197063,
+  "sharedGeometricRatioAcrossAllPairedProcessMedians": 0.9465657853788615,
+  "acceptanceMaximum": 0.95,
+  "pairedRatios": [
+    {
+      "Stack": 0.9728775694213759,
+      "Local": 0.9829858011001987,
+      "LocalLease": 0.9712023070699217,
+      "SharedLease": 0.9083553946111043,
+      "SharedList": 0.9125169637202569,
+      "SharedHashSet": 0.9220926458998014,
+      "SharedDictionary": 0.9262040644414026
+    },
+    {
+      "Stack": 1.003097418817652,
+      "Local": 0.9778076834266582,
+      "LocalLease": 0.8928481775795162,
+      "SharedLease": 0.9757025361448903,
+      "SharedList": 0.931313149928816,
+      "SharedHashSet": 0.9634091440345607,
+      "SharedDictionary": 0.9611371320583307
+    },
+    {
+      "Stack": 0.9768775547556586,
+      "Local": 1.0456266726880352,
+      "LocalLease": 0.9595488477909235,
+      "SharedLease": 0.9769130748856248,
+      "SharedList": 0.9705871097972811,
+      "SharedHashSet": 0.9392936309808891,
+      "SharedDictionary": 0.9752827288285424
+    }
+  ],
+  "processMedians": [
+    {
+      "Stack": 26.125240325927734,
+      "Local": 26.490020751953125,
+      "LocalLease": 84.39369201660156,
+      "SharedLease": 333.72344970703125,
+      "SharedList": 337.310791015625,
+      "SharedHashSet": 362.04376220703125,
+      "SharedDictionary": 362.28179931640625
+    },
+    {
+      "Stack": 25.41666030883789,
+      "Local": 26.03931427001953,
+      "LocalLease": 81.96334838867188,
+      "SharedLease": 303.1394958496094,
+      "SharedList": 307.80181884765625,
+      "SharedHashSet": 333.837890625,
+      "SharedDictionary": 335.546875
+    },
+    {
+      "Stack": 25.850486755371094,
+      "Local": 25.846195220947266,
+      "LocalLease": 82.76481628417969,
+      "SharedLease": 316.2353515625,
+      "SharedList": 308.43353271484375,
+      "SharedHashSet": 339.60113525390625,
+      "SharedDictionary": 342.2393798828125
+    },
+    {
+      "Stack": 25.77066421508789,
+      "Local": 26.43280029296875,
+      "LocalLease": 92.69752502441406,
+      "SharedLease": 324.11041259765625,
+      "SharedList": 331.18133544921875,
+      "SharedHashSet": 352.4993896484375,
+      "SharedDictionary": 356.07757568359375
+    },
+    {
+      "Stack": 26.573848724365234,
+      "Local": 25.763416290283203,
+      "LocalLease": 87.02354431152344,
+      "SharedLease": 316.8487548828125,
+      "SharedList": 318.9971923828125,
+      "SharedHashSet": 360.01434326171875,
+      "SharedDictionary": 350.39825439453125
+    },
+    {
+      "Stack": 25.959396362304688,
+      "Local": 26.938915252685547,
+      "LocalLease": 83.50334167480469,
+      "SharedLease": 309.53369140625,
+      "SharedList": 309.61456298828125,
+      "SharedHashSet": 338.1591796875,
+      "SharedDictionary": 341.73736572265625
+    }
+  ],
+  "medianOfProcessMedians": {
+    "Stack": {
+      "before": 26.125240325927734,
+      "after": 25.850486755371094
+    },
+    "Local": {
+      "before": 26.43280029296875,
+      "after": 26.03931427001953
+    },
+    "LocalLease": {
+      "before": 87.02354431152344,
+      "after": 82.76481628417969
+    },
+    "SharedLease": {
+      "before": 324.11041259765625,
+      "after": 309.53369140625
+    },
+    "SharedList": {
+      "before": 331.18133544921875,
+      "after": 308.43353271484375
+    },
+    "SharedHashSet": {
+      "before": 360.01434326171875,
+      "after": 338.1591796875
+    },
+    "SharedDictionary": {
+      "before": 356.07757568359375,
+      "after": 341.73736572265625
+    }
+  },
+  "decision": "Retain the direct counter conversion; the preregistered shared-path and control gates pass. No player or ARM timing qualification.",
+  "preregistration": "Hypothesis: replace per-generic Stopwatch.Elapsed/TimeSpan.TotalSeconds with a static start timestamp plus direct signed counter-to-seconds conversion. Preserve custom time provider use and per-type time origins. Before selection require functional timestamp/pool suite; six fresh Unity6000.6.7f1 EditorMono processes in ABBAAB order, same147rows/33cases. Retain only if geometric mean candidate/baseline across four shared paths is <=0.95, every shared cell paired median <=1.10, no repeated control-cell regression above1.10; exact source+module identity, healthy process completion required. No overlapping owned builds/tests/timing captures. No player timing claims. If gate fails restore original Buffers and unused helper addition and preserve rejection evidence.\n",
+  "csvSha256": "f0c07100236c1f4ee5942c362eb74857828071b00df63f91aa85b70473bf7aaf",
+  "captures": [
+    {
+      "index": 1,
+      "variant": "baseline",
+      "caseCount": 33,
+      "timingRowCount": 147,
+      "loadedRuntimeMvid": "1dab5017-1377-40b6-84e1-72898686d239",
+      "runtimeDllSha256": "1a117211557080aa43565697e4bcafc057b8116aa2b45ec80b99e5cd6d03436c",
+      "sources": {
+        "Tests/Runtime/Helper/StopwatchTimestampTests.cs": "366c701aa734a434b0ef28891c50c2b9475a840f1c47e406c76e18765ac31d79",
+        "Tests/Runtime/Pool/GlobalPoolRegistryTests.cs": "633918268082a50659011937e636286cc8120e0faea97da33740611a9f1f6a91",
+        "Runtime/Utils/ThreadLocalArrayPool.cs": "071adecdbca85d65cd66a69f80951a612da8be88f1c6707679b8c13a26ac1841",
+        "Tests/Runtime/Pool/WallstopGenericPoolTests.cs": "a6b63a268690dc1197dc726846aef0d371cc348ecedda1fe048ba3f0457575e2",
+        "Runtime/Utils/LocalPool.cs": "710868f78f189026095e324e69292884c081d2e5a086c2179dea8f3cfa97e38d",
+        "Tests/Runtime/Performance/LocalPoolPerformanceTests.cs": "7d52aa71f6d4348dbbd1c7a4cd7439b4ccef075e5f0f07c7aa1e9f432e2974fe",
+        "Runtime/Utils/Buffers.cs": "967eda9fb544ae57f470dfde8ab27e8eb85110d405be27cd5ec159dd483c79e9",
+        "Runtime/Utils/PoolPurgeSettings.cs": "4fa35560b7c13346118d4a69249b552780137a1e576043f27c6436205173ad21",
+        "Runtime/Core/Helper/StopwatchTimestamp.cs": "9d2433157bbfc7cfc4cd2a8c55052909ca2a284bb75c5da60b869d1bb14587d6",
+        "Runtime/Utils/DisposalLease.cs": "9b4189de89cc520facd67e05bd22a3bb999167e59fd963cd952ea60b8768d24d"
+      },
+      "process": {
+        "ProcessId": 52468,
+        "RawExitCode": 0,
+        "StandardOutputEndObserved": true,
+        "StandardErrorEndObserved": true,
+        "OutputDrainStopped": false
+      },
+      "caseResultsSha256": "0060fe3bcf8ef0168e343f06a1c520049043cc959c2eb39336591a31f9c61aed",
+      "processReceiptSha256": "cdd075b654e3ab705a3c7727888d6ed6959e80e8a191464a1e079b51f4979080"
+    },
+    {
+      "index": 2,
+      "variant": "candidate",
+      "caseCount": 33,
+      "timingRowCount": 147,
+      "loadedRuntimeMvid": "d3f67ef0-f752-451e-a077-be11107eab18",
+      "runtimeDllSha256": "a40f61c2ba182f06ba490a9bb769e41f235ecd5f116a74daff442ae7e28fa92d",
+      "sources": {
+        "Tests/Runtime/Helper/StopwatchTimestampTests.cs": "366c701aa734a434b0ef28891c50c2b9475a840f1c47e406c76e18765ac31d79",
+        "Tests/Runtime/Pool/GlobalPoolRegistryTests.cs": "633918268082a50659011937e636286cc8120e0faea97da33740611a9f1f6a91",
+        "Runtime/Utils/ThreadLocalArrayPool.cs": "071adecdbca85d65cd66a69f80951a612da8be88f1c6707679b8c13a26ac1841",
+        "Tests/Runtime/Pool/WallstopGenericPoolTests.cs": "a6b63a268690dc1197dc726846aef0d371cc348ecedda1fe048ba3f0457575e2",
+        "Runtime/Utils/LocalPool.cs": "710868f78f189026095e324e69292884c081d2e5a086c2179dea8f3cfa97e38d",
+        "Tests/Runtime/Performance/LocalPoolPerformanceTests.cs": "7d52aa71f6d4348dbbd1c7a4cd7439b4ccef075e5f0f07c7aa1e9f432e2974fe",
+        "Runtime/Utils/Buffers.cs": "a5c33c717aefb19665b48cda128eb6de1387e22e195012af7e23ecf4d5a5c86e",
+        "Runtime/Utils/PoolPurgeSettings.cs": "4fa35560b7c13346118d4a69249b552780137a1e576043f27c6436205173ad21",
+        "Runtime/Core/Helper/StopwatchTimestamp.cs": "9d2433157bbfc7cfc4cd2a8c55052909ca2a284bb75c5da60b869d1bb14587d6",
+        "Runtime/Utils/DisposalLease.cs": "9b4189de89cc520facd67e05bd22a3bb999167e59fd963cd952ea60b8768d24d"
+      },
+      "process": {
+        "ProcessId": 449336,
+        "RawExitCode": 0,
+        "StandardOutputEndObserved": true,
+        "StandardErrorEndObserved": true,
+        "OutputDrainStopped": false
+      },
+      "caseResultsSha256": "306a12d4272b7a334168c3929f17c2113c917e56b0712f67b6d3e47a8f8d8ee1",
+      "processReceiptSha256": "1759102702cadd489dcb9a7903c85d59b86d36a93dcbaeb087d57f4d79e23ea0"
+    },
+    {
+      "index": 3,
+      "variant": "candidate",
+      "caseCount": 33,
+      "timingRowCount": 147,
+      "loadedRuntimeMvid": "d3f67ef0-f752-451e-a077-be11107eab18",
+      "runtimeDllSha256": "a40f61c2ba182f06ba490a9bb769e41f235ecd5f116a74daff442ae7e28fa92d",
+      "sources": {
+        "Tests/Runtime/Helper/StopwatchTimestampTests.cs": "366c701aa734a434b0ef28891c50c2b9475a840f1c47e406c76e18765ac31d79",
+        "Tests/Runtime/Pool/GlobalPoolRegistryTests.cs": "633918268082a50659011937e636286cc8120e0faea97da33740611a9f1f6a91",
+        "Runtime/Utils/ThreadLocalArrayPool.cs": "071adecdbca85d65cd66a69f80951a612da8be88f1c6707679b8c13a26ac1841",
+        "Tests/Runtime/Pool/WallstopGenericPoolTests.cs": "a6b63a268690dc1197dc726846aef0d371cc348ecedda1fe048ba3f0457575e2",
+        "Runtime/Utils/LocalPool.cs": "710868f78f189026095e324e69292884c081d2e5a086c2179dea8f3cfa97e38d",
+        "Tests/Runtime/Performance/LocalPoolPerformanceTests.cs": "7d52aa71f6d4348dbbd1c7a4cd7439b4ccef075e5f0f07c7aa1e9f432e2974fe",
+        "Runtime/Utils/Buffers.cs": "a5c33c717aefb19665b48cda128eb6de1387e22e195012af7e23ecf4d5a5c86e",
+        "Runtime/Utils/PoolPurgeSettings.cs": "4fa35560b7c13346118d4a69249b552780137a1e576043f27c6436205173ad21",
+        "Runtime/Core/Helper/StopwatchTimestamp.cs": "9d2433157bbfc7cfc4cd2a8c55052909ca2a284bb75c5da60b869d1bb14587d6",
+        "Runtime/Utils/DisposalLease.cs": "9b4189de89cc520facd67e05bd22a3bb999167e59fd963cd952ea60b8768d24d"
+      },
+      "process": {
+        "ProcessId": 722360,
+        "RawExitCode": 0,
+        "StandardOutputEndObserved": true,
+        "StandardErrorEndObserved": true,
+        "OutputDrainStopped": false
+      },
+      "caseResultsSha256": "055edfd5e7f62bb45fccd55a77c4171024c2f0e0f2643b8a7515fb9091f3a66a",
+      "processReceiptSha256": "0dfface16d3ecd524aa2dd087980c214b53e6b2f95b053ceef9f914f255434f7"
+    },
+    {
+      "index": 4,
+      "variant": "baseline",
+      "caseCount": 33,
+      "timingRowCount": 147,
+      "loadedRuntimeMvid": "1dab5017-1377-40b6-84e1-72898686d239",
+      "runtimeDllSha256": "1a117211557080aa43565697e4bcafc057b8116aa2b45ec80b99e5cd6d03436c",
+      "sources": {
+        "Tests/Runtime/Helper/StopwatchTimestampTests.cs": "366c701aa734a434b0ef28891c50c2b9475a840f1c47e406c76e18765ac31d79",
+        "Tests/Runtime/Pool/GlobalPoolRegistryTests.cs": "633918268082a50659011937e636286cc8120e0faea97da33740611a9f1f6a91",
+        "Runtime/Utils/ThreadLocalArrayPool.cs": "071adecdbca85d65cd66a69f80951a612da8be88f1c6707679b8c13a26ac1841",
+        "Tests/Runtime/Pool/WallstopGenericPoolTests.cs": "a6b63a268690dc1197dc726846aef0d371cc348ecedda1fe048ba3f0457575e2",
+        "Runtime/Utils/LocalPool.cs": "710868f78f189026095e324e69292884c081d2e5a086c2179dea8f3cfa97e38d",
+        "Tests/Runtime/Performance/LocalPoolPerformanceTests.cs": "7d52aa71f6d4348dbbd1c7a4cd7439b4ccef075e5f0f07c7aa1e9f432e2974fe",
+        "Runtime/Utils/Buffers.cs": "967eda9fb544ae57f470dfde8ab27e8eb85110d405be27cd5ec159dd483c79e9",
+        "Runtime/Utils/PoolPurgeSettings.cs": "4fa35560b7c13346118d4a69249b552780137a1e576043f27c6436205173ad21",
+        "Runtime/Core/Helper/StopwatchTimestamp.cs": "9d2433157bbfc7cfc4cd2a8c55052909ca2a284bb75c5da60b869d1bb14587d6",
+        "Runtime/Utils/DisposalLease.cs": "9b4189de89cc520facd67e05bd22a3bb999167e59fd963cd952ea60b8768d24d"
+      },
+      "process": {
+        "ProcessId": 588932,
+        "RawExitCode": 0,
+        "StandardOutputEndObserved": true,
+        "StandardErrorEndObserved": true,
+        "OutputDrainStopped": false
+      },
+      "caseResultsSha256": "cca0fd19d6dec138da08fe75e4301a38276ccfb90b548b4c6c748825be7d51bf",
+      "processReceiptSha256": "a00fec1717f3d2d3763e535afdd133365dc29e4694772755c3dc6ed49ad5642c"
+    },
+    {
+      "index": 5,
+      "variant": "baseline",
+      "caseCount": 33,
+      "timingRowCount": 147,
+      "loadedRuntimeMvid": "1dab5017-1377-40b6-84e1-72898686d239",
+      "runtimeDllSha256": "1a117211557080aa43565697e4bcafc057b8116aa2b45ec80b99e5cd6d03436c",
+      "sources": {
+        "Tests/Runtime/Helper/StopwatchTimestampTests.cs": "366c701aa734a434b0ef28891c50c2b9475a840f1c47e406c76e18765ac31d79",
+        "Tests/Runtime/Pool/GlobalPoolRegistryTests.cs": "633918268082a50659011937e636286cc8120e0faea97da33740611a9f1f6a91",
+        "Runtime/Utils/ThreadLocalArrayPool.cs": "071adecdbca85d65cd66a69f80951a612da8be88f1c6707679b8c13a26ac1841",
+        "Tests/Runtime/Pool/WallstopGenericPoolTests.cs": "a6b63a268690dc1197dc726846aef0d371cc348ecedda1fe048ba3f0457575e2",
+        "Runtime/Utils/LocalPool.cs": "710868f78f189026095e324e69292884c081d2e5a086c2179dea8f3cfa97e38d",
+        "Tests/Runtime/Performance/LocalPoolPerformanceTests.cs": "7d52aa71f6d4348dbbd1c7a4cd7439b4ccef075e5f0f07c7aa1e9f432e2974fe",
+        "Runtime/Utils/Buffers.cs": "967eda9fb544ae57f470dfde8ab27e8eb85110d405be27cd5ec159dd483c79e9",
+        "Runtime/Utils/PoolPurgeSettings.cs": "4fa35560b7c13346118d4a69249b552780137a1e576043f27c6436205173ad21",
+        "Runtime/Core/Helper/StopwatchTimestamp.cs": "9d2433157bbfc7cfc4cd2a8c55052909ca2a284bb75c5da60b869d1bb14587d6",
+        "Runtime/Utils/DisposalLease.cs": "9b4189de89cc520facd67e05bd22a3bb999167e59fd963cd952ea60b8768d24d"
+      },
+      "process": {
+        "ProcessId": 99568,
+        "RawExitCode": 0,
+        "StandardOutputEndObserved": true,
+        "StandardErrorEndObserved": true,
+        "OutputDrainStopped": false
+      },
+      "caseResultsSha256": "b75ba1b0b58f3c099bf6bca618cabc597713ec4bc1b975b2a8053ba6fce9e5f3",
+      "processReceiptSha256": "362abd3497ba062ff77954acedb8729bf38ffd3f32d5325a045e059a6f6eac67"
+    },
+    {
+      "index": 6,
+      "variant": "candidate",
+      "caseCount": 33,
+      "timingRowCount": 147,
+      "loadedRuntimeMvid": "d3f67ef0-f752-451e-a077-be11107eab18",
+      "runtimeDllSha256": "a40f61c2ba182f06ba490a9bb769e41f235ecd5f116a74daff442ae7e28fa92d",
+      "sources": {
+        "Tests/Runtime/Helper/StopwatchTimestampTests.cs": "366c701aa734a434b0ef28891c50c2b9475a840f1c47e406c76e18765ac31d79",
+        "Tests/Runtime/Pool/GlobalPoolRegistryTests.cs": "633918268082a50659011937e636286cc8120e0faea97da33740611a9f1f6a91",
+        "Runtime/Utils/ThreadLocalArrayPool.cs": "071adecdbca85d65cd66a69f80951a612da8be88f1c6707679b8c13a26ac1841",
+        "Tests/Runtime/Pool/WallstopGenericPoolTests.cs": "a6b63a268690dc1197dc726846aef0d371cc348ecedda1fe048ba3f0457575e2",
+        "Runtime/Utils/LocalPool.cs": "710868f78f189026095e324e69292884c081d2e5a086c2179dea8f3cfa97e38d",
+        "Tests/Runtime/Performance/LocalPoolPerformanceTests.cs": "7d52aa71f6d4348dbbd1c7a4cd7439b4ccef075e5f0f07c7aa1e9f432e2974fe",
+        "Runtime/Utils/Buffers.cs": "a5c33c717aefb19665b48cda128eb6de1387e22e195012af7e23ecf4d5a5c86e",
+        "Runtime/Utils/PoolPurgeSettings.cs": "4fa35560b7c13346118d4a69249b552780137a1e576043f27c6436205173ad21",
+        "Runtime/Core/Helper/StopwatchTimestamp.cs": "9d2433157bbfc7cfc4cd2a8c55052909ca2a284bb75c5da60b869d1bb14587d6",
+        "Runtime/Utils/DisposalLease.cs": "9b4189de89cc520facd67e05bd22a3bb999167e59fd963cd952ea60b8768d24d"
+      },
+      "process": {
+        "ProcessId": 47908,
+        "RawExitCode": 0,
+        "StandardOutputEndObserved": true,
+        "StandardErrorEndObserved": true,
+        "OutputDrainStopped": false
+      },
+      "caseResultsSha256": "fa1db9285345847f9b65d3382c703e7ecf227cd43814a03a51c0411383ef25c3",
+      "processReceiptSha256": "9713a0771c833864459a5a2b86ccd7b3f0890e8f03160dbd5e6de3bf0e10627c"
+    }
+  ]
+}

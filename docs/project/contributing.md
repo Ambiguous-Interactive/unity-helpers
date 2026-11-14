@@ -306,6 +306,21 @@ folder. The release CLI still accepts `--output`; staging still accepts `--proje
 `UNITY_VERSION`, with the same safe scratch-directory restrictions. Invalid framework and module policies fail
 before an existing export project is removed. Archive checksums support UTF-8 output filenames.
 
+The Markdown fence repairer also runs in typed Python:
+
+```bash
+uv run --project scripts/python~ --locked --no-dev --group documentation python scripts/fix_markdown_fence_languages.py --paths README.md
+```
+
+The compatible PowerShell launcher preserves its existing path arguments.
+It repairs only closed, unlabeled fences, preserving
+labeled blocks and the document's newline style. Without paths it selects staged Markdown files;
+it changes the worktree and does not stage the repair. The locked JSON5 parser preserves the old
+PowerShell reader's accepted comments and trailing commas, with explicit compatibility controls for
+its object and numeric rules. Frozen original-source observations cover inference and fence shapes.
+Run `uv run --project scripts/python~ --locked pytest scripts/tests/test_markdown_fence_languages.py -q`
+for the focused controls, including multi-path launcher and staged UTF-8 filename coverage.
+
 All repository Python sources now belong to the strict scope, including the standard-library-only
 agent-state tool that runs before uv is available during container startup. The source registry
 also covers Python stubs. The bounded-random proof uses the locked `proof` group and a narrow

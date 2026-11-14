@@ -50,5 +50,6 @@
     <Rule Id="WUH021" Action="None" />
     <Rule Id="WUH023" Action="None" />
     <Rule Id="WUH024" Action="None" />
+    <Rule Id="WUH029" Action="None" />
   </Rules>
 </RuleSet>

@@ -3,11 +3,15 @@
 
 namespace WallstopStudios.UnityHelpers.Analyzers
 {
+    using System;
+    using System.Collections.Generic;
     using System.Collections.Immutable;
     using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.CSharp;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
     using Microsoft.CodeAnalysis.Diagnostics;
+    using Microsoft.CodeAnalysis.FlowAnalysis;
+    using Microsoft.CodeAnalysis.Operations;
 
     /// <summary>
     /// Reports a teardown override -- <c>OnDestroy</c>, <c>OnDisable</c>,
@@ -25,10 +29,8 @@ namespace WallstopStudios.UnityHelpers.Analyzers
     /// the call where it is.
     /// </para>
     /// <para>
-    /// Only a <c>base</c> call that is a DIRECT top-level statement of the method body is
-    /// considered. One nested inside an <c>if</c>, <c>try</c> or <c>using</c> is genuinely harder to
-    /// judge -- what follows it at its own nesting level may or may not be what follows it on the
-    /// executed path -- so it is left alone rather than reported on a guess.
+    /// Nested calls use the method's control-flow graph, including normal successors and finally
+    /// regions, so work on another branch is not mistaken for work after the call.
     /// </para>
     /// </remarks>
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
@@ -106,6 +108,144 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                     )
                 );
             }
+
+            ControlFlowGraph graph = null;
+            bool graphAttempted = false;
+            foreach (SyntaxNode node in body.DescendantNodes(DescendIntoTeardownBody))
+            {
+                if (!(node is StatementSyntax statement) || statement.Parent == body)
+                {
+                    continue;
+                }
+                InvocationExpressionSyntax invocation = AsBaseCall(statement, name);
+                if (invocation == null)
+                {
+                    continue;
+                }
+                if (!graphAttempted)
+                {
+                    graphAttempted = true;
+                    try
+                    {
+                        graph = ControlFlowGraph.Create(
+                            method,
+                            context.SemanticModel,
+                            context.CancellationToken
+                        );
+                    }
+                    catch (ArgumentException) { }
+                    catch (InvalidOperationException) { }
+                }
+                if (graph != null && HasFollowingWork(graph, invocation))
+                {
+                    context.ReportDiagnostic(
+                        Diagnostic.Create(
+                            UnityHelpersDiagnostics.TeardownBaseCallIsNotLast,
+                            invocation.GetLocation(),
+                            invocation.ToString(),
+                            1
+                        )
+                    );
+                }
+            }
+        }
+
+        private static bool DescendIntoTeardownBody(SyntaxNode node)
+        {
+            return !(node is AnonymousFunctionExpressionSyntax)
+                && !(node is LocalFunctionStatementSyntax);
+        }
+
+        private static bool HasFollowingWork(
+            ControlFlowGraph graph,
+            InvocationExpressionSyntax invocation
+        )
+        {
+            foreach (BasicBlock block in graph.Blocks)
+            {
+                if (!block.IsReachable)
+                {
+                    continue;
+                }
+                for (int index = 0; index < block.Operations.Length; ++index)
+                {
+                    foreach (IOperation operation in block.Operations[index].DescendantsAndSelf())
+                    {
+                        if (
+                            operation is IInvocationOperation
+                            && operation.Syntax.Span == invocation.Span
+                        )
+                        {
+                            if (index + 1 < block.Operations.Length || block.BranchValue != null)
+                            {
+                                return true;
+                            }
+                            return HasReachableWork(graph, block);
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        private static bool HasReachableWork(ControlFlowGraph graph, BasicBlock start)
+        {
+            Queue<BasicBlock> pending = new Queue<BasicBlock>();
+            HashSet<int> visited = new HashSet<int>();
+            pending.Enqueue(start);
+            while (0 < pending.Count)
+            {
+                BasicBlock block = pending.Dequeue();
+                if (!visited.Add(block.Ordinal))
+                {
+                    continue;
+                }
+                if (
+                    VisitSuccessor(graph, block.FallThroughSuccessor, pending)
+                    || VisitSuccessor(graph, block.ConditionalSuccessor, pending)
+                )
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static bool VisitSuccessor(
+            ControlFlowGraph graph,
+            ControlFlowBranch branch,
+            Queue<BasicBlock> pending
+        )
+        {
+            if (branch == null)
+            {
+                return false;
+            }
+            foreach (ControlFlowRegion region in branch.FinallyRegions)
+            {
+                for (
+                    int index = region.FirstBlockOrdinal;
+                    index <= region.LastBlockOrdinal;
+                    ++index
+                )
+                {
+                    BasicBlock cleanup = graph.Blocks[index];
+                    if (cleanup.Operations.Length != 0 || cleanup.BranchValue != null)
+                    {
+                        return true;
+                    }
+                }
+            }
+            BasicBlock destination = branch.Destination;
+            if (destination != null && destination.IsReachable)
+            {
+                if (destination.Operations.Length != 0 || destination.BranchValue != null)
+                {
+                    return true;
+                }
+                pending.Enqueue(destination);
+            }
+            return false;
         }
 
         /// <summary>

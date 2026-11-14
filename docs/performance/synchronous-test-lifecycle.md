@@ -102,3 +102,33 @@ from timing observations.
 
 The [additional replay archive](https://raw.githubusercontent.com/Ambiguous-Interactive/unity-helpers/587d3de6fde16c76a0ba256872cfe8c800bf1287/docs/performance/local-pool-runtime-qualification.zip) retains these attempts,
 exact instrumented inputs, final source snapshots, process receipts and complete NUnit trees.
+
+## Dropdown fixture comparison
+
+`StringInListDrawerTests` and `WValueDropDownDrawerTests` now use synchronous object scopes.
+All 120 case identities and assertions remain, alongside ten unchanged scope ownership controls.
+Both fixtures initialize real IMGUI styles before their style-dependent assertions, including in
+an isolated cold batch process. Production drawers are unchanged.
+
+Six serial fresh Windows x64 Unity 6000.6.7f1 Editor Mono processes use ABBAAB order.
+Each passes all 130 cases. Actual per-fixture scope reports match the captured assembly module
+identity; selected sources remain stable and all process receipts return raw zero, both stream
+ends and no drain stop. Temporary reporters are absent from the shipped fixtures.
+
+| Pair | String ratio | Dropdown ratio | Combined ratio | Unchanged control ratio |
+| ---- | -----------: | -------------: | -------------: | ----------------------: |
+| 1    |       0.9776 |         0.8273 |         0.9451 |                  1.0118 |
+| 2    |       0.9893 |         0.9722 |         0.9857 |                  1.7310 |
+| 3    |       0.9349 |         0.6919 |         0.8736 |                  0.6820 |
+
+Ratios are candidate/baseline fixture durations. The geometric mean of the six target ratios
+is 0.8919, meeting the preregistered 0.95 threshold; every combined pair improves.
+The absolute savings are tens of milliseconds. The unchanged control varies substantially:
+these captures establish no whole-suite speedup or CI wall-clock target.
+
+The [complete durations](./dropdown-scopes-20261114.csv) and
+[qualification record](./dropdown-scopes-20261114.json) retain every process, case identity,
+source hash, assembly identity and process receipt. Two preparation attempts are excluded:
+one failed compilation because the extracted setup helper lacked its NUnit import; another
+passed 130 cases but omitted required identity reports from its output. Neither contributes
+timing observations.

@@ -1,0 +1,376 @@
+{
+  "source": "# PositionalBinding = $false so a stray value cannot be captured by a named parameter before\r\n# the ValueFromRemainingArguments sibling sees it. With it on -- the default -- the sibling\r\n# only works when every other parameter is a switch, which is an accident of this param list\r\n# rather than a property of it (#556).\r\n[CmdletBinding(PositionalBinding = $false)]\r\nParam(\r\n    [string[]]$Paths,\r\n    [switch]$VerboseOutput,\r\n    # `pwsh -File <script> -Paths a b c` binds ONLY `a` to -Paths and silently drops the rest, so a\r\n    # multi-file invocation scans one file and reports success. This catches the remainder; see\r\n    # .llm/skills/bash-pwsh-invocation.md.\r\n    [Parameter(ValueFromRemainingArguments = $true)]\r\n    [string[]]$AdditionalPaths\r\n)\r\n\r\nSet-StrictMode -Version Latest\r\n$ErrorActionPreference = 'Stop'\r\n\r\n# The remaining-args catch above is only half of it: the two have to be merged before anything\r\n# reads $Paths, or the extra files are collected and ignored.\r\nif ($AdditionalPaths) {\r\n  $Paths = @($Paths) + @($AdditionalPaths)\r\n}\r\n\r\nfunction Write-Info {\r\n    param([string]$Message)\r\n\r\n    if ($VerboseOutput) {\r\n        Write-Host \"[markdown-fence-fix] $Message\" -ForegroundColor Cyan\r\n    }\r\n}\r\n\r\nfunction Get-RepoRoot {\r\n    $repoRoot = & git rev-parse --show-toplevel 2>$null\r\n    if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($repoRoot)) {\r\n        return ([string]$repoRoot).Trim()\r\n    }\r\n\r\n    return (Get-Location).Path\r\n}\r\n\r\nfunction Get-MarkdownPaths {\r\n    param(\r\n        [Parameter(Mandatory = $true)]\r\n        [string]$RepoRoot,\r\n        [string[]]$CandidatePaths\r\n    )\r\n\r\n    $results = New-Object System.Collections.Generic.List[string]\r\n    if ($null -eq $CandidatePaths -or $CandidatePaths.Count -eq 0) {\r\n        Push-Location $RepoRoot\r\n        try {\r\n            $CandidatePaths = @(& git diff --cached --name-only --diff-filter=ACM -- '*.md' '*.markdown' 2>$null)\r\n        }\r\n        finally {\r\n            Pop-Location\r\n        }\r\n    }\r\n\r\n    foreach ($path in $CandidatePaths) {\r\n        if ([string]::IsNullOrWhiteSpace($path)) {\r\n            continue\r\n        }\r\n\r\n        $normalizedPath = $path.Replace('\\', '/')\r\n        if ($normalizedPath -notlike '*.md' -and $normalizedPath -notlike '*.markdown') {\r\n            continue\r\n        }\r\n\r\n        $fullPath = if ([System.IO.Path]::IsPathRooted($path)) {\r\n            $path\r\n        }\r\n        else {\r\n            Join-Path -Path $RepoRoot -ChildPath $path\r\n        }\r\n\r\n        if (Test-Path -LiteralPath $fullPath -PathType Leaf) {\r\n            $results.Add($fullPath) | Out-Null\r\n        }\r\n    }\r\n\r\n    return @($results | Sort-Object -Unique)\r\n}\r\n\r\nfunction Test-LooksLikeJson {\r\n    param([string]$Text)\r\n\r\n    $trimmed = $Text.Trim()\r\n    if (-not (($trimmed.StartsWith('{') -and $trimmed.EndsWith('}')) -or ($trimmed.StartsWith('[') -and $trimmed.EndsWith(']')))) {\r\n        return $false\r\n    }\r\n\r\n    try {\r\n        $null = $trimmed | ConvertFrom-Json -ErrorAction Stop\r\n        return $true\r\n    }\r\n    catch {\r\n        return $false\r\n    }\r\n}\r\n\r\nfunction Test-LooksLikeYaml {\r\n    param([string[]]$Lines)\r\n\r\n    $keyValueCount = 0\r\n    $contentCount = 0\r\n    foreach ($line in $Lines) {\r\n        $trimmed = $line.Trim()\r\n        if ([string]::IsNullOrWhiteSpace($trimmed) -or $trimmed.StartsWith('#')) {\r\n            continue\r\n        }\r\n\r\n        $contentCount++\r\n        if ($trimmed -match '^[-]?\\s*[A-Za-z0-9_.-]+:\\s*[^:]*$' -or $trimmed -match '^-\\s+[A-Za-z0-9_.-]+:\\s*') {\r\n            $keyValueCount++\r\n        }\r\n    }\r\n\r\n    return ($contentCount -gt 0 -and $keyValueCount -eq $contentCount)\r\n}\r\n\r\nfunction Get-InferredFenceLanguage {\r\n    param([string[]]$Lines)\r\n\r\n    $contentLines = @($Lines | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })\r\n    if ($contentLines.Count -eq 0) {\r\n        return 'text'\r\n    }\r\n\r\n    $trimmedLines = @($contentLines | ForEach-Object { $_.Trim() })\r\n    $text = ($contentLines -join \"`n\")\r\n    $first = $trimmedLines[0]\r\n\r\n    if ($first -match '^(graph|flowchart)\\s+' -or $first -match '^(sequenceDiagram|classDiagram|stateDiagram|erDiagram|journey|gantt|pie)\\b') {\r\n        return 'mermaid'\r\n    }\r\n\r\n    if ($first -match '^diff --git ' -or $first -match '^(---|\\+\\+\\+) ' -or $first -match '^@@ ') {\r\n        return 'diff'\r\n    }\r\n\r\n    if (Test-LooksLikeJson -Text $text) {\r\n        return 'json'\r\n    }\r\n\r\n    if ($first -match '^<\\?xml\\b' -or ($first -match '^</?[A-Za-z!][^>]*>' -and $text -match '</?[A-Za-z!][^>]*>')) {\r\n        return 'xml'\r\n    }\r\n\r\n    if ($text -match '(?m)^\\s*(Param\\s*\\(|function\\s+[A-Za-z0-9_-]+\\s*\\{|Write-Host\\b|Get-[A-Za-z]+\\b|Set-[A-Za-z]+\\b|Invoke-[A-Za-z]+\\b|\\$env:|\\$LASTEXITCODE\\b)') {\r\n        return 'powershell'\r\n    }\r\n\r\n    if ($text -match '(?m)^\\s*(#!/usr/bin/env bash|#!/bin/(ba)?sh|npm\\s+run\\b|git\\s+\\S+|bash\\s+\\S+|pwsh\\s+|dotnet\\s+|node\\s+|export\\s+[A-Za-z_][A-Za-z0-9_]*=|cd\\s+|chmod\\s+|curl\\s+|UNITY_[A-Z0-9_]+=)' -or\r\n        $text -match '(?m)^\\s*(if\\s+\\[|for\\s+\\S+\\s+in\\s+.+;\\s+do|while\\s+.+;\\s+do)') {\r\n        return 'bash'\r\n    }\r\n\r\n    if ($text -match '(?m)^\\s*(using\\s+[A-Za-z0-9_.]+;|namespace\\s+[A-Za-z0-9_.]+|public\\s+(sealed\\s+|static\\s+|partial\\s+)?(class|struct|enum|interface)\\b|private\\s+|protected\\s+|internal\\s+)' -or\r\n        $text -match '\\b(UnityEngine|MonoBehaviour|ScriptableObject|IEnumerable<|List<|Dictionary<)\\b') {\r\n        return 'csharp'\r\n    }\r\n\r\n    if ($text -match '(?m)^\\s*(const|let|var)\\s+[A-Za-z_$][A-Za-z0-9_$]*\\s*=' -or\r\n        $text -match '(?m)^\\s*(async\\s+)?function\\s+[A-Za-z_$][A-Za-z0-9_$]*\\s*\\(' -or\r\n        $text -match '\\b(console\\.log|require\\(|process\\.argv|module\\.exports|=>)\\b') {\r\n        return 'javascript'\r\n    }\r\n\r\n    if (Test-LooksLikeYaml -Lines $contentLines) {\r\n        return 'yaml'\r\n    }\r\n\r\n    return 'text'\r\n}\r\n\r\nfunction Repair-MarkdownFenceLanguages {\r\n    param([string]$Content)\r\n\r\n    $newline = if ($Content.Contains(\"`r`n\")) { \"`r`n\" } else { \"`n\" }\r\n    $lines = [regex]::Split($Content, '\\r\\n|\\n|\\r')\r\n    $inFence = $false\r\n    $openingIndex = -1\r\n    $openingIndent = ''\r\n    $openingFence = ''\r\n    $openingChar = ''\r\n    $openingLength = 0\r\n    $openingMissingLanguage = $false\r\n    $bodyLines = New-Object System.Collections.Generic.List[string]\r\n    $fixCount = 0\r\n\r\n    for ($i = 0; $i -lt $lines.Count; $i++) {\r\n        $line = $lines[$i]\r\n        if (-not $inFence) {\r\n            if ($line -match '^([ \\t]{0,3})(`{3,}|~{3,})([ \\t]*)(.*)$') {\r\n                $info = ([string]$Matches[4]).Trim()\r\n                $inFence = $true\r\n                $openingIndex = $i\r\n                $openingIndent = $Matches[1]\r\n                $openingFence = $Matches[2]\r\n                $openingChar = $openingFence.Substring(0, 1)\r\n                $openingLength = $openingFence.Length\r\n                $openingMissingLanguage = [string]::IsNullOrWhiteSpace($info)\r\n                $bodyLines.Clear()\r\n            }\r\n            continue\r\n        }\r\n\r\n        if ($line -match '^([ \\t]{0,3})(`{3,}|~{3,})[ \\t]*$') {\r\n            $closingFence = $Matches[2]\r\n            if ($closingFence.Substring(0, 1) -eq $openingChar -and $closingFence.Length -ge $openingLength) {\r\n                if ($openingMissingLanguage) {\r\n                    $language = Get-InferredFenceLanguage -Lines @($bodyLines)\r\n                    $lines[$openingIndex] = \"$openingIndent$openingFence$language\"\r\n                    $fixCount++\r\n                }\r\n\r\n                $inFence = $false\r\n                $openingIndex = -1\r\n                $openingIndent = ''\r\n                $openingFence = ''\r\n                $openingChar = ''\r\n                $openingLength = 0\r\n                $openingMissingLanguage = $false\r\n                $bodyLines.Clear()\r\n                continue\r\n            }\r\n        }\r\n\r\n        if ($openingMissingLanguage) {\r\n            $bodyLines.Add($line) | Out-Null\r\n        }\r\n    }\r\n\r\n    return [pscustomobject]@{\r\n        Content  = [string]::Join($newline, $lines)\r\n        FixCount = $fixCount\r\n    }\r\n}\r\n\r\n$repoRoot = Get-RepoRoot\r\n$markdownPaths = Get-MarkdownPaths -RepoRoot $repoRoot -CandidatePaths $Paths\r\n$changedFiles = 0\r\n$changedFences = 0\r\n$utf8NoBom = [System.Text.UTF8Encoding]::new($false)\r\n\r\nforeach ($path in $markdownPaths) {\r\n    $content = [System.IO.File]::ReadAllText($path, [System.Text.Encoding]::UTF8)\r\n    $repair = Repair-MarkdownFenceLanguages -Content $content\r\n    if ($repair.FixCount -eq 0 -or $repair.Content -ceq $content) {\r\n        continue\r\n    }\r\n\r\n    [System.IO.File]::WriteAllText($path, $repair.Content, $utf8NoBom)\r\n    $changedFiles++\r\n    $changedFences += $repair.FixCount\r\n    Write-Info \"Added language specifiers to $($repair.FixCount) fenced code block(s): $path\"\r\n}\r\n\r\nif ($changedFences -gt 0) {\r\n    Write-Host \"[markdown-fence-fix] Added language specifiers to $changedFences fenced code block(s) across $changedFiles file(s).\" -ForegroundColor Green\r\n}\r\n\r\nexit 0\r\n",
+  "observations": [
+    {
+      "output": "```text\n\n```\n",
+      "count": 1,
+      "input": "```\n\n```\n"
+    },
+    {
+      "output": "```mermaid\ngraph TD; A-->B\n```\n",
+      "count": 1,
+      "input": "```\ngraph TD; A-->B\n```\n"
+    },
+    {
+      "output": "```mermaid\nsequenceDiagram\n```\n",
+      "count": 1,
+      "input": "```\nsequenceDiagram\n```\n"
+    },
+    {
+      "output": "```diff\ndiff --git a/x b/x\n```\n",
+      "count": 1,
+      "input": "```\ndiff --git a/x b/x\n```\n"
+    },
+    {
+      "output": "```diff\n--- old\n```\n",
+      "count": 1,
+      "input": "```\n--- old\n```\n"
+    },
+    {
+      "output": "```diff\n@@ x\n```\n",
+      "count": 1,
+      "input": "```\n@@ x\n```\n"
+    },
+    {
+      "output": "```json\n{\"x\":2}\n```\n",
+      "count": 1,
+      "input": "```\n{\"x\":2}\n```\n"
+    },
+    {
+      "output": "```json\n[1,true]\n```\n",
+      "count": 1,
+      "input": "```\n[1,true]\n```\n"
+    },
+    {
+      "output": "```json\n{ // hi\n\"x\": 2,\n}\n```\n",
+      "count": 1,
+      "input": "```\n{ // hi\n\"x\": 2,\n}\n```\n"
+    },
+    {
+      "output": "```text\n{ \"x\": 1, \"X\": 2 }\n```\n",
+      "count": 1,
+      "input": "```\n{ \"x\": 1, \"X\": 2 }\n```\n"
+    },
+    {
+      "output": "```xml\n<root />\n```\n",
+      "count": 1,
+      "input": "```\n<root />\n```\n"
+    },
+    {
+      "output": "```xml\n<?xml version=\"1.0\"?>\n```\n",
+      "count": 1,
+      "input": "```\n<?xml version=\"1.0\"?>\n```\n"
+    },
+    {
+      "output": "```powershell\nParam([string]$Name)\n```\n",
+      "count": 1,
+      "input": "```\nParam([string]$Name)\n```\n"
+    },
+    {
+      "output": "```powershell\nfunction hello { }\n```\n",
+      "count": 1,
+      "input": "```\nfunction hello { }\n```\n"
+    },
+    {
+      "output": "```powershell\nwrite-host hi\n```\n",
+      "count": 1,
+      "input": "```\nwrite-host hi\n```\n"
+    },
+    {
+      "output": "```powershell\n$env:HOME\n```\n",
+      "count": 1,
+      "input": "```\n$env:HOME\n```\n"
+    },
+    {
+      "output": "```bash\n#!/bin/sh\n```\n",
+      "count": 1,
+      "input": "```\n#!/bin/sh\n```\n"
+    },
+    {
+      "output": "```bash\nnpm run lint\n```\n",
+      "count": 1,
+      "input": "```\nnpm run lint\n```\n"
+    },
+    {
+      "output": "```bash\ngit status\n```\n",
+      "count": 1,
+      "input": "```\ngit status\n```\n"
+    },
+    {
+      "output": "```bash\nUNITY_A=1\n```\n",
+      "count": 1,
+      "input": "```\nUNITY_A=1\n```\n"
+    },
+    {
+      "output": "```bash\nif [ yes ]; then\n```\n",
+      "count": 1,
+      "input": "```\nif [ yes ]; then\n```\n"
+    },
+    {
+      "output": "```csharp\nusing System;\n```\n",
+      "count": 1,
+      "input": "```\nusing System;\n```\n"
+    },
+    {
+      "output": "```csharp\nnamespace Foo\n```\n",
+      "count": 1,
+      "input": "```\nnamespace Foo\n```\n"
+    },
+    {
+      "output": "```csharp\npublic sealed class X {}\n```\n",
+      "count": 1,
+      "input": "```\npublic sealed class X {}\n```\n"
+    },
+    {
+      "output": "```csharp\nUnityEngine.Vector2 x;\n```\n",
+      "count": 1,
+      "input": "```\nUnityEngine.Vector2 x;\n```\n"
+    },
+    {
+      "output": "```javascript\nconst x = 2;\n```\n",
+      "count": 1,
+      "input": "```\nconst x = 2;\n```\n"
+    },
+    {
+      "output": "```javascript\nfunction hello() {}\n```\n",
+      "count": 1,
+      "input": "```\nfunction hello() {}\n```\n"
+    },
+    {
+      "output": "```javascript\nconsole.log(2)\n```\n",
+      "count": 1,
+      "input": "```\nconsole.log(2)\n```\n"
+    },
+    {
+      "output": "```yaml\nx: 2\n- y: 3\n```\n",
+      "count": 1,
+      "input": "```\nx: 2\n- y: 3\n```\n"
+    },
+    {
+      "output": "```yaml\n# hi\nx: y\n```\n",
+      "count": 1,
+      "input": "```\n# hi\nx: y\n```\n"
+    },
+    {
+      "output": "```text\narbitrary\n```\n",
+      "count": 1,
+      "input": "```\narbitrary\n```\n"
+    },
+    {
+      "output": "```text\n   \n```\n",
+      "count": 1,
+      "input": "```\n   \n```\n"
+    },
+    {
+      "output": "```mermaid\nCLASSDIAGRAM\n```\n",
+      "count": 1,
+      "input": "```\nCLASSDIAGRAM\n```\n"
+    },
+    {
+      "output": "```mermaid\nFLOWCHART LR\n```\n",
+      "count": 1,
+      "input": "```\nFLOWCHART LR\n```\n"
+    },
+    {
+      "output": "```text\nconst π = 2;\n```\n",
+      "count": 1,
+      "input": "```\nconst π = 2;\n```\n"
+    },
+    {
+      "output": "```json\n[NaN]\n```\n",
+      "count": 1,
+      "input": "```\n[NaN]\n```\n"
+    },
+    {
+      "output": "```json\n[Infinity]\n```\n",
+      "count": 1,
+      "input": "```\n[Infinity]\n```\n"
+    },
+    {
+      "output": "```json\n[1,]\n```\n",
+      "count": 1,
+      "input": "```\n[1,]\n```\n"
+    },
+    {
+      "output": "```json\n[/*comment*/1]\n```\n",
+      "count": 1,
+      "input": "```\n[/*comment*/1]\n```\n"
+    },
+    {
+      "output": "```json\n{ \"x\":1, \"x\":2 }\n```\n",
+      "count": 1,
+      "input": "```\n{ \"x\":1, \"x\":2 }\n```\n"
+    },
+    {
+      "output": "```text\nusing x = \"a\";\n```\n",
+      "count": 1,
+      "input": "```\nusing x = \"a\";\n```\n"
+    },
+    {
+      "output": "```text\nfoo: a:b\n```\n",
+      "count": 1,
+      "input": "```\nfoo: a:b\n```\n"
+    },
+    {
+      "output": "```yaml\nfoo:\n  bar: 1\n```\n",
+      "count": 1,
+      "input": "```\nfoo:\n  bar: 1\n```\n"
+    },
+    {
+      "output": "~~~csharp\r\nusing System;\r\n~~~\r\n",
+      "count": 1,
+      "input": "~~~\r\nusing System;\r\n~~~\r\n"
+    },
+    {
+      "output": "````text\n```\ntext\n```\n````\n",
+      "count": 1,
+      "input": "````\n```\ntext\n```\n````\n"
+    },
+    {
+      "output": "```json\n{}\n```\n",
+      "count": 0,
+      "input": "```json\n{}\n```\n"
+    },
+    {
+      "output": "```\nunterminated",
+      "count": 0,
+      "input": "```\nunterminated"
+    },
+    {
+      "output": "    ```\nx: 1\n    ```\n",
+      "count": 0,
+      "input": "    ```\nx: 1\n    ```\n"
+    },
+    {
+      "output": "```text\r\nx: 1\r\n~~~\r\n```\r\n",
+      "count": 1,
+      "input": "```   \r\nx: 1\r\n~~~\r\n```\r\n"
+    },
+    {
+      "output": "before\n```yaml\nx: 1\n```\nafter",
+      "count": 1,
+      "input": "before\r```\rx: 1\r```\rafter"
+    },
+    {
+      "output": "```yaml\nx: 1\n```\n\n```bash\ngit status\n```\n",
+      "count": 2,
+      "input": "```\nx: 1\n```\n\n```\ngit status\n```\n"
+    },
+    {
+      "output": "```json\n[1, // trailing\n]\n```\n",
+      "count": 1,
+      "input": "```\n[1, // trailing\n]\n```\n"
+    },
+    {
+      "output": "```json\n{ \"x\":1, /* trailing */ }\n```\n",
+      "count": 1,
+      "input": "```\n{ \"x\":1, /* trailing */ }\n```\n"
+    },
+    {
+      "output": "```json\n{'x':1}\n```\n",
+      "count": 1,
+      "input": "```\n{'x':1}\n```\n"
+    },
+    {
+      "output": "```json\n{unquoted:2}\n```\n",
+      "count": 1,
+      "input": "```\n{unquoted:2}\n```\n"
+    },
+    {
+      "output": "```text\n[+Infinity]\n```\n",
+      "count": 1,
+      "input": "```\n[+Infinity]\n```\n"
+    },
+    {
+      "output": "```json\n[undefined]\n```\n",
+      "count": 1,
+      "input": "```\n[undefined]\n```\n"
+    },
+    {
+      "output": "```json\n[01]\n```\n",
+      "count": 1,
+      "input": "```\n[01]\n```\n"
+    },
+    {
+      "output": "```json\n[0x10]\n```\n",
+      "count": 1,
+      "input": "```\n[0x10]\n```\n"
+    },
+    {
+      "output": "```json\n{\"quote\":\"//not a comment\",}\n```\n",
+      "count": 1,
+      "input": "```\n{\"quote\":\"//not a comment\",}\n```\n"
+    },
+    {
+      "output": "```json\n['escaped\\'quote']\n```\n",
+      "count": 1,
+      "input": "```\n['escaped\\'quote']\n```\n"
+    },
+    {
+      "output": "```text\n{\"a\":1,\"A\":2}\n```\n",
+      "count": 1,
+      "input": "```\n{\"a\":1,\"A\":2}\n```\n"
+    },
+    {
+      "output": "```text\n{\"\":\"empty key\"}\n```\n",
+      "count": 1,
+      "input": "```\n{\"\":\"empty key\"}\n```\n"
+    },
+    {
+      "output": "```json\n[.5]\n```\n",
+      "count": 1,
+      "input": "```\n[.5]\n```\n"
+    },
+    {
+      "output": "```json\n[1.]\n```\n",
+      "count": 1,
+      "input": "```\n[1.]\n```\n"
+    },
+    {
+      "output": "```text\n[-NaN]\n```\n",
+      "count": 1,
+      "input": "```\n[-NaN]\n```\n"
+    },
+    {
+      "output": "```json\n{\"ß\": 1, \"SS\": 2}\n```\n",
+      "count": 1,
+      "input": "```\n{\"ß\": 1, \"SS\": 2}\n```\n"
+    },
+    {
+      "output": "```json\n{\"ß\": 1, \"ẞ\": 2}\n```\n",
+      "count": 1,
+      "input": "```\n{\"ß\": 1, \"ẞ\": 2}\n```\n"
+    },
+    {
+      "output": "```json\n{\"K\": 1, \"k\": 2}\n```\n",
+      "count": 1,
+      "input": "```\n{\"K\": 1, \"k\": 2}\n```\n"
+    },
+    {
+      "output": "```json\n{\"ı\": 1, \"I\": 2}\n```\n",
+      "count": 1,
+      "input": "```\n{\"ı\": 1, \"I\": 2}\n```\n"
+    },
+    {
+      "output": "```json\n{\"İ\": 1, \"i\": 2}\n```\n",
+      "count": 1,
+      "input": "```\n{\"İ\": 1, \"i\": 2}\n```\n"
+    },
+    {
+      "output": "```json\n{\"ſ\": 1, \"S\": 2}\n```\n",
+      "count": 1,
+      "input": "```\n{\"ſ\": 1, \"S\": 2}\n```\n"
+    },
+    {
+      "output": "```text\n{\"Σ\": 1, \"σ\": 2}\n```\n",
+      "count": 1,
+      "input": "```\n{\"Σ\": 1, \"σ\": 2}\n```\n"
+    },
+    {
+      "output": "```text\n{\"Σ\": 1, \"ς\": 2}\n```\n",
+      "count": 1,
+      "input": "```\n{\"Σ\": 1, \"ς\": 2}\n```\n"
+    }
+  ],
+  "sourceSha256": "32e21b4b5dbd3470bbecd45ed75da45ed37a320cea39a99e0b4bd629a0923138"
+}
