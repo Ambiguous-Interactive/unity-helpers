@@ -137,6 +137,24 @@ Then check it:
 npm run unity:mcp:probe
 ```
 
+### Worktrees and container restarts
+
+`.devcontainer/sync-mcp.sh` runs on create, start, and attach. After regenerating the project
+configs it mirrors them into every persistent git worktree under your home directory or the
+repository, and merges the OpenCode server map into `~/.config/opencode`. That directory is a
+volume, so the global config survives a container rebuild. Every copied config keeps mode `0600`,
+and the sync prints counts rather than credential values.
+
+After regenerating or copying configs, restart the OpenCode CLI so it loads them. OpenCode
+versions that expose the `reload` command can run it instead:
+
+```bash
+opencode reload # when supported; otherwise restart the CLI
+opencode mcp list
+```
+
+`opencode mcp list` confirms each server is `connected`.
+
 ## The endpoint is a port; the editor behind it is not
 
 This is the failure that [#333](https://github.com/Ambiguous-Interactive/unity-helpers/issues/333)

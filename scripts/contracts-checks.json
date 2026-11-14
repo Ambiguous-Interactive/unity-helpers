@@ -551,6 +551,11 @@
     "run": "npm run test:zai-mcp"
   },
   {
+    "id": "sync-mcp",
+    "name": "MCP worktree and global config sync",
+    "run": "npm run test:sync-mcp"
+  },
+  {
     "id": "accelerator",
     "name": "Unity Accelerator configuration",
     "run": "npm run test:accelerator"

@@ -52,6 +52,15 @@ Every validator in `Editor/Validation` returns its subject counts as `out` param
 this purpose. Returning them and then asserting the weaker thing is the failure mode to watch for —
 the design was right and the assertion was not.
 
+## A skip must name the limitation, not hide a fixture bug
+
+`Assert.Ignore` converts a test into evidence that says nothing. Catch only the exact runtime
+limitation the case is about, and make the fixture construct valid inputs first. A boxed `int`
+passed to `EnumBuilder.DefineLiteral` for a `char`/`bool`-backed enum is a fixture bug; convert it
+to the underlying type. If the runtime then refuses to enumerate that enum, that refusal is the
+limitation and may be skipped. The rule: if fixing the fixture could make the test run, the skip is
+in the wrong place.
+
 ## Unity defines belong to each assembly
 
 A flat host project can define a symbol for both runtime and tests while Unity defines it only in

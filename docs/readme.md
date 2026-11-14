@@ -1028,6 +1028,7 @@ See the guide: [Core Math & Extensions](./features/utilities/math-and-extensions
 - `Color.GetAverageColor`: LAB/HSV/Weighted/Dominant color averaging.
 - `IEnumerable.Infinite`: Cycle sequences without extra allocations.
 - `StringExtensions.LevenshteinDistance`: Edit distance for fuzzy matching.
+- `[WEnumHelpers]`: Generate concrete enum fast paths for flag checks, names and span formatting; generic and runtime-generated enums keep the cached fallback.
 
 ---
 

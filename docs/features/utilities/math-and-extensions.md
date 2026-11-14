@@ -1446,6 +1446,85 @@ It preserves signed extension for all eight underlying integer types, including 
 aliases, and flag combinations. Cached names and `HasFlagNoAlloc` use the same conversion.
 The implementation does not use unchecked memory-access helpers.
 
+### Opt-In Generated Fast Path
+
+Add `[WEnumHelpers]` to a source enum and the package's enum generator emits concrete overloads
+for the same helper names. Concrete call sites then bind to typed casts and literal name tables;
+no registry, reflection, or call-site rewrite is involved.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using WallstopStudios.UnityHelpers.Core.Attributes;
+using WallstopStudios.UnityHelpers.Core.Extension;
+
+[WEnumHelpers]
+public enum FastState
+{
+    None = 0,
+    MainMenu = 1,
+    Playing = 2,
+    Paused = 3
+}
+
+public static class FastStateExample
+{
+    public static string Describe()
+    {
+        FastState state = FastState.Playing;
+        return state.ToCachedName();
+    }
+}
+```
+
+The generated class lands in the enum's namespace, so import that namespace to bring the overloads
+into scope. A type alias such as `using FastState = MyGame.FastState;` makes the enum visible but
+does not import `MyGame`'s extension methods, so the call falls back to the generalized path.
+Generation is optional: without the attribute, and for every unsupported shape, the generalized
+helpers remain the fallback.
+
+Generation applies to enums the compiler can see in your compilation. It does **not** apply to
+enums in already-compiled assemblies or enums created at runtime through `Reflection.Emit`; those
+continue through the generalized path. The generator also skips and reports `WENUM001` for enums
+nested in generic types, private or protected nested enums, and obsolete-error enum types.
+
+Generic call sites cannot select a concrete overload:
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using System;
+using WallstopStudios.UnityHelpers.Core.Extension;
+
+static string Describe<T>(T value) where T : unmanaged, Enum
+{
+    return value.ToCachedName();
+}
+```
+
+That call keeps using `EnumNameCache<T>`; use a concrete call site where the fast path matters.
+For the measured hot-path and cold-start differences, see
+[Enum Helper Performance](../../performance/enum-helpers-performance.md).
+
+### Formatting Into a Span
+
+`TryFormatCachedName` writes the same cached name into a caller-owned buffer. After an enum's
+generated or cached table is initialized, declared values reuse that text without allocating; an
+undefined value or an uncached flag combination may allocate its first formatted string.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using System;
+using WallstopStudios.UnityHelpers.Core.Extension;
+
+Span<char> buffer = stackalloc char[32];
+if (DayOfWeek.Monday.TryFormatCachedName(buffer, out int written))
+{
+    string text = buffer.Slice(0, written).ToString();
+}
+```
+
 ### Zero-Allocation Flag Checking
 
 **The problem:** Standard `HasFlag()` boxes both enums, causing GC pressure.
