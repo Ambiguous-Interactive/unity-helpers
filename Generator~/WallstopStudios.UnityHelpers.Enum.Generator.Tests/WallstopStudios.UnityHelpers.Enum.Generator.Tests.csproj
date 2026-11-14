@@ -53,6 +53,10 @@
       Link="Runtime/EnumNameComparerTests.cs"
     />
     <Compile Include="$(RepoRoot)/Tests/Runtime/TestUtils/GCAssert.cs" Link="Runtime/GCAssert.cs" />
+    <Compile
+      Include="$(RepoRoot)/Tests/Core/ThreadAllocationCounter.cs"
+      Link="Runtime/ThreadAllocationCounter.cs"
+    />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference
