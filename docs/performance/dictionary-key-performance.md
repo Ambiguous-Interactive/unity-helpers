@@ -183,3 +183,22 @@ process receipts, sealed source/binary hashes and the decision rule. Raw per-rou
 the frozen harness remain in ignored `progress/`. This experiment does not replace the original
 consumer lookup, insertion and iteration budgets tracked in
 [the open acceptance issue](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1131).
+
+## November 14 rebuild experiment
+
+A further candidate walked the existing dense occupied-slot index during table growth instead
+of scanning all old key slots. It was rejected: the median paired insertion geometric ratios
+were 0.988 on .NET 10 and 0.992 on Mono, missing the preregistered 0.95 threshold. Mono's
+16,384-entry shifted-key iteration cell regressed by 12.4%. Production `IntMap` is unchanged.
+
+Three fresh processes per runtime used the existing 198-cell comparison, 64 warmups, at least
+20 ms calibrated samples and 21 rotated rounds. Every process returned zero, drained both
+output streams, retained all 198 distinct cells and kept source and payload hashes unchanged.
+No other owned build, test or timing capture overlapped. The [complete cell summaries](./intmap-rebuild-20261114.csv)
+include Dictionary controls; the [qualification record](./intmap-rebuild-20261114.json) retains
+all paired ratios, process receipts, environment lines, source/payload hashes and the rejected diff.
+Raw round observations remain in ignored session evidence.
+
+This experiment compares commit `635bd87f` with the candidate. It does not replace the original
+consumer baseline or resolve the remaining lookup/insertion budgets in
+[#1131](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1131).

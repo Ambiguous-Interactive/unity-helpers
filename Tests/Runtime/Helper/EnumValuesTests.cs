@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Random;
     using WallstopStudios.UnityHelpers.Tests.TestUtils;
+    using ThreadAllocationCounter = WallstopStudios.UnityHelpers.Tests.Core.ThreadAllocationCounter;
 
     [TestFixture]
     [Category("Fast")]
@@ -202,15 +203,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             EnumNameComparer<DayOfWeek> comparer = EnumNameComparer<DayOfWeek>.Instance;
             int total = comparer.Compare(DayOfWeek.Monday, DayOfWeek.Friday);
             total += EnumValues<DayOfWeek>.Values.Length;
-            long controlStart = GC.GetAllocatedBytesForCurrentThread();
+            long controlStart = ThreadAllocationCounter.Read();
             GC.KeepAlive(new byte[1024]);
-            long controlBytes = GC.GetAllocatedBytesForCurrentThread() - controlStart;
+            long controlBytes = ThreadAllocationCounter.Read() - controlStart;
             if (controlBytes == 0)
             {
                 Assert.Ignore("The runtime cannot measure managed allocations.");
             }
 
-            long before = GC.GetAllocatedBytesForCurrentThread();
+            long before = ThreadAllocationCounter.Read();
             for (int iteration = 0; iteration < 256; ++iteration)
             {
                 foreach (DayOfWeek day in EnumValues<DayOfWeek>.Values)
@@ -219,7 +220,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 }
                 total += comparer.Compare(DayOfWeek.Monday, DayOfWeek.Friday);
             }
-            long bytes = GC.GetAllocatedBytesForCurrentThread() - before;
+            long bytes = ThreadAllocationCounter.Read() - before;
             Assert.That(bytes, Is.Zero);
             Assert.That(total, Is.Not.Zero);
         }
@@ -338,15 +339,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Array warm = EnumValues.Of(enumType);
             Assert.That(EnumValues.TryGetValues(enumType, out Array cached), Is.True);
             Assert.That(cached, Is.SameAs(warm));
-            long controlStart = GC.GetAllocatedBytesForCurrentThread();
+            long controlStart = ThreadAllocationCounter.Read();
             GC.KeepAlive(new byte[1024]);
-            long controlBytes = GC.GetAllocatedBytesForCurrentThread() - controlStart;
+            long controlBytes = ThreadAllocationCounter.Read() - controlStart;
             if (controlBytes == 0)
             {
                 Assert.Ignore("The runtime cannot measure managed allocations.");
             }
             int total = 0;
-            long before = GC.GetAllocatedBytesForCurrentThread();
+            long before = ThreadAllocationCounter.Read();
             for (int iteration = 0; iteration < 1000; ++iteration)
             {
                 total += EnumValues.Of(enumType).Length;
@@ -355,7 +356,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                     total += values.Length;
                 }
             }
-            long bytes = GC.GetAllocatedBytesForCurrentThread() - before;
+            long bytes = ThreadAllocationCounter.Read() - before;
             Assert.That(bytes, Is.Zero);
             Assert.That(total, Is.EqualTo(warm.Length * 2000));
         }

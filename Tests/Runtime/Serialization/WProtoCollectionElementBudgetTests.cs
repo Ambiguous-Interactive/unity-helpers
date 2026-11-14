@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Serialization;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+    using ThreadAllocationCounter = WallstopStudios.UnityHelpers.Tests.Core.ThreadAllocationCounter;
 
     [TestFixture]
     [Category("Fast")]
@@ -520,23 +521,28 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.IsFalse(prior.TryChargeCollectionElements(1));
         }
 
-        [TestCase(false)]
-        [TestCase(true)]
-        public void DisabledAllowanceAllocatesNoAccountingState(bool explicitUnlimited)
+        [TestCase(false, false)]
+        [TestCase(true, false)]
+        [TestCase(false, true)]
+        [TestCase(true, true)]
+        public void DisabledAllowanceAllocatesNoAccountingState(
+            bool explicitUnlimited,
+            bool measureAllocations
+        )
         {
             WProtoReadLimits limits = explicitUnlimited
                 ? new WProtoReadLimits().WithCollectionElementCount(int.MaxValue)
                 : new WProtoReadLimits();
             Assert.IsTrue(ExerciseDisabledAllowance(limits));
-#if ENABLE_IL2CPP && !UNITY_6000_0_OR_NEWER
-            Assert.Inconclusive(
-                "The legacy IL2CPP allocation counter is unsafe to call. Functional default reads were checked; the allocation bound is unqualified."
-            );
-#else
-            long before = GC.GetAllocatedBytesForCurrentThread();
+            if (!measureAllocations)
+            {
+                return;
+            }
+
+            long before = ThreadAllocationCounter.Read();
             byte[] positive = new byte[65536];
             positive[0] = 1;
-            long sensitivity = GC.GetAllocatedBytesForCurrentThread() - before;
+            long sensitivity = ThreadAllocationCounter.Read() - before;
             GC.KeepAlive(positive);
             if (sensitivity < positive.Length)
             {
@@ -545,17 +551,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 );
             }
             Assert.IsTrue(ExerciseDisabledAllowance(limits));
-            before = GC.GetAllocatedBytesForCurrentThread();
+            before = ThreadAllocationCounter.Read();
             bool completed = ExerciseDisabledAllowance(limits);
-            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            long allocated = ThreadAllocationCounter.Read() - before;
             Assert.IsTrue(completed);
             Assert.AreEqual(0, allocated);
-#endif
         }
 
-        [TestCase(false)]
-        [TestCase(true)]
-        public void RefusalPrecedesCollectionMaterialization(bool text)
+        [TestCase(false, false)]
+        [TestCase(true, false)]
+        [TestCase(false, true)]
+        [TestCase(true, true)]
+        public void RefusalPrecedesCollectionMaterialization(bool text, bool measureAllocations)
         {
             const int length = 1 << 16;
             WProtoCollectionBudgetContract original = text
@@ -567,15 +574,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             byte[] bytes = WProtoFacade.Serialize(original);
             WProtoReadLimits limits = new WProtoReadLimits().WithCollectionElementCount(0);
             Assert.IsTrue(RefusesContract(bytes, limits));
-#if ENABLE_IL2CPP && !UNITY_6000_0_OR_NEWER
-            Assert.Inconclusive(
-                "The legacy IL2CPP allocation counter is unsafe to call. Functional refusal was checked; the allocation bound is unqualified."
-            );
-#else
-            long before = GC.GetAllocatedBytesForCurrentThread();
+            if (!measureAllocations)
+            {
+                return;
+            }
+
+            long before = ThreadAllocationCounter.Read();
             byte[] positive = new byte[length];
             positive[0] = 1;
-            long sensitivity = GC.GetAllocatedBytesForCurrentThread() - before;
+            long sensitivity = ThreadAllocationCounter.Read() - before;
             GC.KeepAlive(positive);
             if (sensitivity < length)
             {
@@ -584,12 +591,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 );
             }
             Assert.IsTrue(RefusesContract(bytes, limits));
-            before = GC.GetAllocatedBytesForCurrentThread();
+            before = ThreadAllocationCounter.Read();
             bool refused = RefusesContract(bytes, limits);
-            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            long allocated = ThreadAllocationCounter.Read() - before;
             Assert.IsTrue(refused);
             Assert.Less(allocated, length / 16);
-#endif
         }
 
         private readonly struct ChargingFormatter

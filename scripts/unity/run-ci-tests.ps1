@@ -3985,12 +3985,15 @@ function Invoke-StandaloneTestPlayer {
     # deliberately scoped to the in-editor -runTests pass, whose silent-hang class -- a
     # wedged PlayMode-test coroutine -- it exists to catch. A standalone player can
     # legitimately run a batch of IL2CPP tests with little interleaved stdout.
+    $playerObservation = @{}
     $result = Invoke-ProcessWithTreeKillTimeout `
         -FilePath $EditorBuiltExePath `
         -Arguments $playerArgs `
         -TimeoutSeconds $TimeoutSeconds `
         -LogPath $LogPath `
-        -Label 'Run standalone test player'
+        -Label 'Run standalone test player' `
+        -ProcessObservation $playerObservation
+    Write-UnityExecutionObservation -LogPath $LogPath -ProcessObservation $playerObservation -Label 'Run standalone test player'
 
     # Exit 2 means the player received no -uhTestResults arg (a harness-contract
     # violation -- the harness always passes it), so no file can exist: fail fast.

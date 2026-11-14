@@ -15,6 +15,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Tests.Extensions;
+    using ThreadAllocationCounter = WallstopStudios.UnityHelpers.Tests.Core.ThreadAllocationCounter;
 
     [TestFixture]
     [Category("Performance")]
@@ -88,59 +89,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 && maximumTicks * microsecondsPerTick <= MaximumEmptyBracketMicroseconds;
         }
 
-        private static bool IsSupportedIl2CppCounterVersion(string version)
-        {
-            if (string.IsNullOrEmpty(version) || 0 <= version.IndexOf('\0'))
-            {
-                return false;
-            }
-            string[] components = version.Split('.');
-            if (
-                components.Length != 3
-                || !string.Equals(components[0], "6000", StringComparison.Ordinal)
-                || !int.TryParse(
-                    components[1],
-                    NumberStyles.None,
-                    CultureInfo.InvariantCulture,
-                    out int minor
-                )
-                || minor < 2
-            )
-            {
-                return false;
-            }
-            string patchAndBuild = components[2];
-            int suffixIndex = patchAndBuild.IndexOf('f');
-            if (suffixIndex < 0)
-            {
-                suffixIndex = patchAndBuild.IndexOf('p');
-            }
-            return 0 < suffixIndex
-                && int.TryParse(
-                    patchAndBuild.Substring(0, suffixIndex),
-                    NumberStyles.None,
-                    CultureInfo.InvariantCulture,
-                    out int patch
-                )
-                && 0 <= patch
-                && int.TryParse(
-                    patchAndBuild.Substring(suffixIndex + 1),
-                    NumberStyles.None,
-                    CultureInfo.InvariantCulture,
-                    out int build
-                )
-                && 0 < build;
-        }
-
         private static bool CanCaptureThreadAllocations()
         {
-#if ENABLE_IL2CPP && !UNITY_6000_2_OR_NEWER
-            return false;
-#elif ENABLE_IL2CPP
-            return IsSupportedIl2CppCounterVersion(Application.unityVersion);
-#else
-            return true;
-#endif
+            return Core.ThreadAllocationCounter.IsAvailable;
         }
 
         private static AllocationObservation[] CaptureAllocations(int seed, out string counterError)
@@ -268,13 +219,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         private static AllocationObservation MeasureBoxes(int count, int seed)
         {
             _unfinishedBeforeBytes = null;
-            long before = GC.GetAllocatedBytesForCurrentThread();
+            long before = ThreadAllocationCounter.Read();
             _unfinishedBeforeBytes = before;
             for (int index = 0; index < count; ++index)
             {
                 _retainedBoxes[index] = unchecked(seed + index);
             }
-            long after = GC.GetAllocatedBytesForCurrentThread();
+            long after = ThreadAllocationCounter.Read();
             _unfinishedBeforeBytes = null;
             long checksum = 0;
             bool verified = true;
@@ -298,13 +249,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         private static AllocationObservation MeasurePreboxedStores(int seed)
         {
             _unfinishedBeforeBytes = null;
-            long before = GC.GetAllocatedBytesForCurrentThread();
+            long before = ThreadAllocationCounter.Read();
             _unfinishedBeforeBytes = before;
             for (int index = 0; index < LargerBoxCount; ++index)
             {
                 _retainedBoxes[index] = _preboxedValue;
             }
-            long after = GC.GetAllocatedBytesForCurrentThread();
+            long after = ThreadAllocationCounter.Read();
             _unfinishedBeforeBytes = null;
             bool verified = true;
             long checksum = 0;
@@ -414,7 +365,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                     writer.WriteString("AllocatedBytesState", UnsupportedState);
                     writer.WriteString(
                         "AllocatedBytesReason",
-                        "The IL2CPP thread allocation counter requires a supported stable Unity 6.2 or later Unity 6 version; older, prerelease, and unknown versions are skipped before every counter call."
+                        "The thread allocation counter is unsafe in IL2CPP players or failed its retained-allocation control; no counter call is made on an unsafe backend."
                     );
                 }
                 else
@@ -560,28 +511,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 #endif
             Assert.AreEqual(expectedBackend, identity.GetProperty("Backend").GetString());
             Assert.AreEqual(framework, identity.GetProperty("FrameworkDescription").GetString());
-        }
-
-        [TestCase("6000.2.0f1", true)]
-        [TestCase("6000.5.2f1", true)]
-        [TestCase("6000.2.0p1", true)]
-        [TestCase("6000.0.99f1", false)]
-        [TestCase("6000.1.4f1", false)]
-        [TestCase("6000.2.0a1", false)]
-        [TestCase("6000.2.0b6", false)]
-        [TestCase("6000.2.0rc1", false)]
-        [TestCase("6000.2.0f0", false)]
-        [TestCase("6000.2.0f1-extra", false)]
-        [TestCase("6000.2.0f1\0", false)]
-        [TestCase("6000.2.0f1.1", false)]
-        [TestCase("6000.2.0", false)]
-        [TestCase("7000.2.0f1", false)]
-        [TestCase("6000.2147483648.0f1", false)]
-        [TestCase("", false)]
-        [TestCase(null, false)]
-        public void Il2CppCounterVersionRequiresKnownStableRelease(string version, bool expected)
-        {
-            Assert.That(IsSupportedIl2CppCounterVersion(version), Is.EqualTo(expected));
         }
 
         [TestCase(0, true, TestName = "Clock.Qualified.Passed")]

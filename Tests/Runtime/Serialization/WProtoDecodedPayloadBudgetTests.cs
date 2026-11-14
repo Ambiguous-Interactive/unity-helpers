@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Serialization;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+    using ThreadAllocationCounter = WallstopStudios.UnityHelpers.Tests.Core.ThreadAllocationCounter;
 
     [TestFixture]
     [Category("Fast")]
@@ -437,9 +438,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.AreEqual(105, limits.MaximumPackedElementCount);
         }
 
-        [TestCase(false)]
-        [TestCase(true)]
-        public void RefusalPrecedesPayloadSizedMaterialization(bool text)
+        [TestCase(false, false)]
+        [TestCase(true, false)]
+        [TestCase(false, true)]
+        [TestCase(true, true)]
+        public void RefusalPrecedesPayloadSizedMaterialization(bool text, bool measureAllocations)
         {
             const int payloadLength = 1 << 20;
             byte[] bytes = new byte[payloadLength + 3];
@@ -452,15 +455,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             }
             WProtoReadLimits limits = new WProtoReadLimits().WithDecodedPayloadBytes(0);
             Assert.IsTrue(RefusesMaterialization(bytes, text, limits));
-#if ENABLE_IL2CPP && !UNITY_6000_0_OR_NEWER
-            Assert.Inconclusive(
-                "The legacy IL2CPP allocation counter is unsafe to call. Functional refusal was checked; the allocation bound is unqualified."
-            );
-#else
-            long before = GC.GetAllocatedBytesForCurrentThread();
+            if (!measureAllocations)
+            {
+                return;
+            }
+
+            long before = ThreadAllocationCounter.Read();
             byte[] positive = new byte[payloadLength];
             positive[0] = 1;
-            long sensitivity = GC.GetAllocatedBytesForCurrentThread() - before;
+            long sensitivity = ThreadAllocationCounter.Read() - before;
             GC.KeepAlive(positive);
             if (sensitivity < payloadLength)
             {
@@ -469,12 +472,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 );
             }
             Assert.IsTrue(RefusesMaterialization(bytes, text, limits));
-            before = GC.GetAllocatedBytesForCurrentThread();
+            before = ThreadAllocationCounter.Read();
             bool refused = RefusesMaterialization(bytes, text, limits);
-            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            long allocated = ThreadAllocationCounter.Read() - before;
             Assert.IsTrue(refused);
             Assert.Less(allocated, payloadLength / 16);
-#endif
         }
     }
 }

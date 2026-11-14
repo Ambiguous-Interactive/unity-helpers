@@ -843,19 +843,48 @@ def test_windows_workers_have_private_desktops_and_preserve_exit_and_output(
 ) -> None:
     shell = shutil.which("pwsh")
     assert shell is not None
-    payload = """$ErrorActionPreference = 'Stop'
-Add-Type -TypeDefinition @'
-using System;
-using System.Runtime.InteropServices;
-using System.Text;
-public static class DesktopProbe {
- [DllImport("kernel32.dll")] private static extern uint GetCurrentThreadId();
- [DllImport("user32.dll")] private static extern IntPtr GetThreadDesktop(uint id);
- [DllImport("user32.dll", CharSet=CharSet.Unicode, SetLastError=true)] private static extern bool GetUserObjectInformationW(IntPtr handle, int index, StringBuilder output, int length, out int needed);
- public static string Name() { int needed; StringBuilder text = new StringBuilder(256); if (!GetUserObjectInformationW(GetThreadDesktop(GetCurrentThreadId()), 2, text, 512, out needed)) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error()); return text.ToString(); }
-}
-'@
-[Console]::WriteLine([DesktopProbe]::Name())
+    probe = tmp_path / "desktop-probe.py"
+    stages = tmp_path / "desktop-stages.txt"
+    probe.write_text(
+        """import ctypes
+import sys
+from ctypes import wintypes
+from pathlib import Path
+
+stages = Path(sys.argv[2])
+with stages.open("a", encoding="utf-8") as output:
+    output.write("probe-started\\n")
+user = ctypes.WinDLL("user32", use_last_error=True)
+user.GetThreadDesktop.argtypes = (wintypes.DWORD,)
+user.GetThreadDesktop.restype = wintypes.HANDLE
+user.GetUserObjectInformationW.argtypes = (
+    wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p,
+    wintypes.DWORD, ctypes.POINTER(wintypes.DWORD),
+)
+user.GetUserObjectInformationW.restype = wintypes.BOOL
+desktop = user.GetThreadDesktop(int(sys.argv[1]))
+if not desktop:
+    raise ctypes.WinError(ctypes.get_last_error())
+name = ctypes.create_unicode_buffer(256)
+needed = wintypes.DWORD()
+if not user.GetUserObjectInformationW(
+    desktop, 2, name, ctypes.sizeof(name), ctypes.byref(needed)
+):
+    raise ctypes.WinError(ctypes.get_last_error())
+print(name.value)
+with stages.open("a", encoding="utf-8") as output:
+    output.write("probe-completed\\n")
+""",
+        encoding="utf-8",
+    )
+    quoted_python = sys.executable.replace("'", "''")
+    quoted_probe = str(probe).replace("'", "''")
+    quoted_stages = str(stages).replace("'", "''")
+    payload = f"""$ErrorActionPreference = 'Stop'
+[IO.File]::AppendAllText('{quoted_stages}', "shell-started`n")
+& '{quoted_python}' '{quoted_probe}' ([Diagnostics.Process]::GetCurrentProcess().Threads[0].Id) '{quoted_stages}'
+if ($LASTEXITCODE -ne 0) {{ throw 'Desktop probe failed.' }}
+[IO.File]::AppendAllText('{quoted_stages}', "shell-exiting`n")
 [Console]::Error.WriteLine('diagnostic retained')
 exit 37
 """
@@ -864,21 +893,28 @@ exit 37
     encoded = base64.b64encode(payload.encode("utf-16-le")).decode("ascii")
     names: set[str] = set()
     for _ in range(2):
-        result = subprocess.run(
-            [
-                sys.executable,
-                str(ROOT / "scripts/unity/desktop_worker.py"),
-                "--shell",
-                shell,
-                "--encoded-worker",
-                encoded,
-            ],
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=20,
-            cwd=tmp_path,
-        )
+        try:
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/unity/desktop_worker.py"),
+                    "--shell",
+                    shell,
+                    "--encoded-worker",
+                    encoded,
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=20,
+                cwd=tmp_path,
+            )
+        except subprocess.TimeoutExpired as error:
+            observed = stages.read_text(encoding="utf-8-sig") if stages.exists() else "not started"
+            pytest.fail(
+                f"Private desktop worker exceeded 20 seconds; stages={observed!r}; "
+                f"stdout={error.stdout!r}; stderr={error.stderr!r}"
+            )
         assert result.returncode == exit_code, result.stdout + result.stderr
         name = result.stdout.strip()
         assert name.startswith("uh-mode-")

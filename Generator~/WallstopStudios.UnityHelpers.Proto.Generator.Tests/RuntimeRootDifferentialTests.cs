@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     using ProtoBuf.Meta;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
     using WallstopStudios.UnityHelpers.Tests.Serialization;
+    using ThreadAllocationCounter = WallstopStudios.UnityHelpers.Tests.Core.ThreadAllocationCounter;
 
     [TestFixture]
     public sealed class RuntimeRootDifferentialTests
@@ -233,7 +234,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 );
                 writer.Serialize(value, ref buffer);
             }
-            long before = GC.GetAllocatedBytesForCurrentThread();
+            long before = ThreadAllocationCounter.Read();
             int totalWritten = 0;
             for (int index = 0; index < 128; ++index)
             {
@@ -247,7 +248,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     totalWritten += writer.Serialize(value, ref buffer).Length;
                 }
             }
-            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            long allocated = ThreadAllocationCounter.Read() - before;
             Assert.AreEqual(128 * expectedLength, totalWritten);
             Assert.AreEqual(0, allocated);
         }

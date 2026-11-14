@@ -21,11 +21,13 @@ namespace WallstopStudios.UnityHelpers.Utils
         public bool IsHeld => _lease.IsHeld;
 
         private readonly Action _cleanup;
+        private readonly Action<Exception> _onError;
         private readonly DisposalLease _lease;
 
-        private DisposableScope(Action cleanup)
+        private DisposableScope(Action cleanup, Action<Exception> onError)
         {
             _cleanup = cleanup;
+            _onError = onError;
             _lease = cleanup == null ? default : DisposalLeases.Acquire();
         }
 
@@ -36,7 +38,28 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// <returns>A scope, or a harmless default scope when cleanup is null.</returns>
         public static DisposableScope Create(Action cleanup)
         {
-            return new DisposableScope(cleanup);
+            return new DisposableScope(cleanup, null);
+        }
+
+        /// <summary>Creates a scope that reports a cleanup failure without replacing an in-flight exception.</summary>
+        /// <param name="cleanup">The action to run once.</param>
+        /// <param name="onError">Receives cleanup exceptions; exceptions thrown by this callback are ignored.</param>
+        /// <returns>A scope retaining the reporter for chained cleanups; null cleanup runs no action.</returns>
+        public static DisposableScope Create(Action cleanup, Action<Exception> onError)
+        {
+            return new DisposableScope(cleanup, onError);
+        }
+
+        internal static void ReportFailure(Exception error, Action<Exception> onError)
+        {
+            try
+            {
+                onError?.Invoke(error);
+            }
+            catch (Exception)
+            {
+                // Reporting must not replace an exception already in flight.
+            }
         }
 
         /// <summary>
@@ -46,7 +69,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// <returns>A scope containing both cleanups.</returns>
         public DisposableScope<DisposableScope> WithCleanup(Action cleanup)
         {
-            return new DisposableScope<DisposableScope>(this, cleanup);
+            return new DisposableScope<DisposableScope>(this, cleanup, _onError);
         }
 
         /// <summary>
@@ -63,9 +86,9 @@ namespace WallstopStudios.UnityHelpers.Utils
             {
                 _cleanup();
             }
-            catch (Exception)
+            catch (Exception error)
             {
-                // A cleanup failure must not replace an exception already in flight.
+                ReportFailure(error, _onError);
             }
         }
 
@@ -73,7 +96,8 @@ namespace WallstopStudios.UnityHelpers.Utils
         public bool Equals(DisposableScope other)
         {
             return EqualityComparer<Action>.Default.Equals(_cleanup, other._cleanup)
-                && EqualityComparer<DisposalLease>.Default.Equals(_lease, other._lease);
+                && EqualityComparer<DisposalLease>.Default.Equals(_lease, other._lease)
+                && EqualityComparer<Action<Exception>>.Default.Equals(_onError, other._onError);
         }
 
         /// <inheritdoc />
@@ -87,7 +111,8 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
                 _cleanup,
-                _lease
+                _lease,
+                _onError
             );
         }
     }

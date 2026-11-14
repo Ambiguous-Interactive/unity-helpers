@@ -52,6 +52,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             ).SetName("APairedDictionaryIsHealthy");
 
             yield return new TestCaseData(
+                "InlineStructValues",
+                new[]
+                {
+                    "  _map:",
+                    "    _keys:",
+                    "    - Color",
+                    "    - Position",
+                    "    _values:",
+                    "    - {r: 0.23, g: 0.23, b: 0.19, a: 1}",
+                    "    - {x: 0, y: 0}",
+                    "    _boxedValues: []",
+                },
+                1,
+                Array.Empty<SerializableDictionaryAssetProblem>()
+            ).SetName("InlineStructDictionaryValuesAreHealthy");
+
+            yield return new TestCaseData(
                 "BoxedShape",
                 new[]
                 {

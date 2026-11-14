@@ -15,6 +15,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     using WallstopStudios.UnityHelpers.Core.Serialization;
     using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Tests.TestUtils;
+    using ThreadAllocationCounter = WallstopStudios.UnityHelpers.Tests.Core.ThreadAllocationCounter;
 
     [TestFixture]
     [NUnit.Framework.Category("Slow")]
@@ -133,9 +134,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Sample result = null;
 
             GCAssert.IgnoreIfAllocationMeasurementUnavailable();
-            long calibrationBefore = GC.GetAllocatedBytesForCurrentThread();
+            long calibrationBefore = ThreadAllocationCounter.Read();
             byte[] forcedPayloadSizedAllocation = new byte[whitespaceBytes];
-            long calibrationBytes = GC.GetAllocatedBytesForCurrentThread() - calibrationBefore;
+            long calibrationBytes = ThreadAllocationCounter.Read() - calibrationBefore;
             GC.KeepAlive(forcedPayloadSizedAllocation);
             if (calibrationBytes < whitespaceBytes)
             {

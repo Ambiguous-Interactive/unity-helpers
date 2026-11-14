@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     using System.Text;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+    using ThreadAllocationCounter = WallstopStudios.UnityHelpers.Tests.Core.ThreadAllocationCounter;
 
     /// <summary>
     /// Pins the repeated-field encoding against protobuf-net 3.2.56.
@@ -542,9 +543,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             AssertPackedLimit<RectangularBox<int>>("0A080A02010212020102", 4);
 
             const int elementCount = 16384;
-            long controlStart = GC.GetAllocatedBytesForCurrentThread();
+            long controlStart = ThreadAllocationCounter.Read();
             byte[] control = new byte[elementCount];
-            long controlBytes = GC.GetAllocatedBytesForCurrentThread() - controlStart;
+            long controlBytes = ThreadAllocationCounter.Read() - controlStart;
             GC.KeepAlive(control);
             Assert.LessOrEqual(elementCount, controlBytes);
             byte[] payload = new byte[elementCount + 4];
@@ -558,9 +559,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 payload,
                 new WProtoReadLimits(maximumPackedElementCount: 1)
             );
-            long start = GC.GetAllocatedBytesForCurrentThread();
+            long start = ThreadAllocationCounter.Read();
             bool read = formatter.TryRead(ref reader, out _);
-            long allocated = GC.GetAllocatedBytesForCurrentThread() - start;
+            long allocated = ThreadAllocationCounter.Read() - start;
             Assert.IsFalse(read);
             Assert.Less(
                 allocated,

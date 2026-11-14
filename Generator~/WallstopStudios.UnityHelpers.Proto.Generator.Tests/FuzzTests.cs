@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+    using ThreadAllocationCounter = WallstopStudios.UnityHelpers.Tests.Core.ThreadAllocationCounter;
 
     /// <summary>
     /// Reads hostile bytes into every member shape and asserts what a shipped player needs (#437).
@@ -883,7 +884,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Coverage coverage = null
         )
         {
-            long before = GC.GetAllocatedBytesForCurrentThread();
+            long before = ThreadAllocationCounter.Read();
             bool accepted;
             int consumed;
             try
@@ -900,7 +901,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 return;
             }
 
-            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            long allocated = ThreadAllocationCounter.Read() - before;
             long ceiling = AllocationSlackBytes + (AllocationMultiple * payload.Length);
             Assert.LessOrEqual(
                 allocated,

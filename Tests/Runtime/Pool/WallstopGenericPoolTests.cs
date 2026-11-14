@@ -1039,6 +1039,45 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         }
 
         [Test]
+        public void StatisticsIncludeRentalsMadeByTheTimeProvider()
+        {
+            Action duringRead = null;
+            PoolOptions<TestPoolItem> options = new()
+            {
+                Triggers = PurgeTrigger.Explicit,
+                TimeProvider = () =>
+                {
+                    Action callback = duringRead;
+                    duringRead = null;
+                    callback?.Invoke();
+                    return 0f;
+                },
+            };
+            using WallstopGenericPool<TestPoolItem> pool = new(
+                () => new TestPoolItem(),
+                preWarmCount: 1,
+                options: options
+            );
+            PooledResource<TestPoolItem> pending = default;
+            try
+            {
+                duringRead = () => pending = pool.Get(out _);
+                PoolStatistics stats = pool.GetStatistics();
+                Assert.AreEqual(0, stats.CurrentSize);
+                Assert.AreEqual(1, stats.RentCount);
+                Assert.AreEqual(0, stats.ReturnCount);
+            }
+            finally
+            {
+                pending.Dispose();
+            }
+            PoolStatistics returned = pool.GetStatistics();
+            Assert.AreEqual(1, returned.CurrentSize);
+            Assert.AreEqual(1, returned.RentCount);
+            Assert.AreEqual(1, returned.ReturnCount);
+        }
+
+        [Test]
         public void GetStatisticsTracksCurrentSize()
         {
             PoolOptions<TestPoolItem> options = new()

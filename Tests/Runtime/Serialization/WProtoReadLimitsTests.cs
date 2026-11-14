@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     using System;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+    using ThreadAllocationCounter = WallstopStudios.UnityHelpers.Tests.Core.ThreadAllocationCounter;
 #if !UNITY_5_3_OR_NEWER
     using HostContracts = WallstopStudios.UnityHelpers.Proto.Generator.Tests;
 #endif
@@ -73,11 +74,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
         private static long? BeginAllocationMeasurement()
         {
-#if ENABLE_IL2CPP && !UNITY_6000_0_OR_NEWER
-            return null;
-#else
-            return BeginAllocationMeasurement(GC.GetAllocatedBytesForCurrentThread);
-#endif
+            return Core.ThreadAllocationCounter.IsAvailable
+                ? BeginAllocationMeasurement(Core.ThreadAllocationCounter.Read)
+                : null;
         }
 
         private static long? BeginAllocationMeasurement(Func<long> readCounter)
@@ -97,9 +96,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
         private static long? EndAllocationMeasurement(long? before)
         {
-            return before.HasValue
-                ? GC.GetAllocatedBytesForCurrentThread() - before.Value
-                : (long?)null;
+            return before.HasValue ? ThreadAllocationCounter.Read() - before.Value : (long?)null;
         }
 
         private static void AssertNoAllocationWhenMeasured(long? allocated)
