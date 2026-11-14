@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `[WEnumHelpers]` and the enum source generator, which emits concrete overloads for flag checks, numeric conversion, cached names, display names, and span formatting while leaving generic and runtime-generated enums on the generalized path. See [Enum Helpers](./docs/features/utilities/math-and-extensions.md#enum-helpers) and [Enum Helper Performance](./docs/performance/enum-helpers-performance.md).
+- Add `TryFormatCachedName` for writing an enum's cached name into a caller-owned `Span<char>`.
 - Add `LatestWriteFile` for coalesced saves and synchronous final flushes, plus optional thread-pool failure callbacks ([#1181](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1181)).
 - Add single-owner managed pools with explicit returns and fixed-length per-thread array pools with clearing on return ([#1173](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1173)).
 - Add a test-only support assembly with allocation controls, synchronous Unity object tracking and managed resource cleanup for consumer test fixtures ([#1180](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1180)).
@@ -44,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Reuse declared enum names during sparse name-cache initialization, skip the unused dictionary on the array path, and fall back to `Enum.IsDefined` when an enum's underlying type has no supported numeric conversion.
 - Reduce shared buffer rental and return synchronization while retaining usage tracking, purge policies and callback behavior ([#1173](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1173)).
 - Read only the selected rectangle when querying readable RGBA32 sprite masks, art bounds and ink regions ([#1113](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1113)).
 - Compute integer floor logarithms with portable branchless lookups, preserving zero and signed bit-pattern results ([#1170](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1170)).

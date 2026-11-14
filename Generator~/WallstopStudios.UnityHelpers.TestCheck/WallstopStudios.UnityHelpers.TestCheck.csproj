@@ -195,4 +195,9 @@
   <ItemGroup Condition="'$(WallstopCheckControl)' != ''">
     <Compile Include="$(WallstopCheckControl)" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- The PlayMode fixtures include enums annotated with [WEnumHelpers]; compile them with the
+         same generator Unity loads so the fixtures type-check against the generated overloads. -->
+    <Analyzer Include="$(RepoRoot)/Runtime/Analyzers/WallstopStudios.UnityHelpers.Enum.Generator.dll" />
+  </ItemGroup>
 </Project>

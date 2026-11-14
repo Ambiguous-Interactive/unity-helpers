@@ -266,6 +266,7 @@
     "test:reference-upstream-drift": "uv run --quiet --project scripts/python~ --locked pytest scripts/tests/test_reference_upstream_drift.py -q",
     "test:verify-shipped-analyzers": "node scripts/tests/test-verify-shipped-analyzers.js",
     "test:analyzers": "dotnet test \"Generator~/WallstopStudios.UnityHelpers.Analyzers.Tests/WallstopStudios.UnityHelpers.Analyzers.Tests.csproj\" -c Release --nologo",
+    "test:enum-generator": "dotnet test \"Generator~/WallstopStudios.UnityHelpers.Enum.Generator.Tests/WallstopStudios.UnityHelpers.Enum.Generator.Tests.csproj\" -c Release --nologo",
     "test:asset-postprocessor-reachability": "node scripts/tests/test-asset-postprocessor-reachability.js",
     "test:wproto-annotations": "node scripts/tests/test-wproto-annotations.js",
     "test:test-result-evidence": "pwsh -NoProfile -File scripts/tests/test-test-result-evidence.ps1",

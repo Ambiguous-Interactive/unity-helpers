@@ -53,7 +53,22 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         {
             if (!EnumNumericHelper<T>.TryConvertToUInt64(value, out ulong key))
             {
-                return false;
+                try
+                {
+                    return Enum.IsDefined(typeof(T), value);
+                }
+                catch (ArgumentException)
+                {
+                    return false;
+                }
+                catch (InvalidOperationException)
+                {
+                    return false;
+                }
+                catch (NotSupportedException)
+                {
+                    return false;
+                }
             }
             if (Dense != null)
             {

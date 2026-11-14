@@ -1184,6 +1184,11 @@ previously unseen values; keep ordinary `ToString()` when values are numerous an
 repeated. The rule does not promise a speedup on every runtime and provides no automatic
 rewrite. Suppress intentional calls with the normal analyzer policy controls.
 
+For a source enum whose concrete call sites are hot, add `[WEnumHelpers]` to generate per-enum
+overloads for the same methods. Concrete calls then bind to typed casts and literal name tables;
+generic calls and enums from compiled assemblies keep using the generalized helpers. See
+[Enum Helper Performance](./enum-helpers-performance.md).
+
 ## `WUH025`: unsupported relational field
 
 `ParentComponent`, `SiblingComponent`, and `ChildComponent` fields must use a component,
