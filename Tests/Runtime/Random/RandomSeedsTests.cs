@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Random;
     using WallstopStudios.UnityHelpers.Tests.Core;
+    using ThreadAllocationCounter = WallstopStudios.UnityHelpers.Tests.Core.ThreadAllocationCounter;
 
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
@@ -22,18 +23,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         private static void AssertDoesNotAllocate(Action action)
         {
 #if ENABLE_IL2CPP && !UNITY_6000_0_OR_NEWER
-            Assert.Ignore(
-                "GC.GetAllocatedBytesForCurrentThread is unavailable before Unity 6 IL2CPP"
-            );
+            Assert.Ignore("ThreadAllocationCounter.Read is unavailable before Unity 6 IL2CPP");
 #else
-            _ = GC.GetAllocatedBytesForCurrentThread();
-            long controlBefore = GC.GetAllocatedBytesForCurrentThread();
+            _ = ThreadAllocationCounter.Read();
+            long controlBefore = ThreadAllocationCounter.Read();
             byte[] forcedAllocation = new byte[64];
-            long controlAfter = GC.GetAllocatedBytesForCurrentThread();
+            long controlAfter = ThreadAllocationCounter.Read();
             GC.KeepAlive(forcedAllocation);
             if (controlAfter <= controlBefore)
             {
-                Assert.Ignore("GC.GetAllocatedBytesForCurrentThread is inert on this runtime");
+                Assert.Ignore("ThreadAllocationCounter.Read is inert on this runtime");
             }
 
             for (int iteration = 0; iteration < 5; ++iteration)
@@ -41,13 +40,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
                 action();
             }
 
-            long before = GC.GetAllocatedBytesForCurrentThread();
+            long before = ThreadAllocationCounter.Read();
             for (int iteration = 0; iteration < 10; ++iteration)
             {
                 action();
             }
 
-            long after = GC.GetAllocatedBytesForCurrentThread();
+            long after = ThreadAllocationCounter.Read();
             Assert.AreEqual(0L, after - before);
 #endif
         }

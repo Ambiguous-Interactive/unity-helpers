@@ -253,6 +253,27 @@
       "sha256": "58f6fe01c0f45e956cc39d603ae0d26fe9759305412aba2d5fc6c9eaca8a1d1a",
       "purpose": "case-discovery-only",
       "qualification": "none"
+    },
+    {
+      "id": "allocation-split-host-v3-20261114",
+      "label": "host-counter-full/counter-host-full.trx",
+      "sha256": "704c535f6586fcf9a8bf5fcbc5563ff145e77086c641d155786ad3f69d87d2cc",
+      "purpose": "case-discovery-only",
+      "qualification": "none"
+    },
+    {
+      "id": "allocation-split-host-v2-20261114",
+      "label": "host-allocation-split-v2/allocation-split-v2.trx",
+      "sha256": "1315f6c63804fa99511cfe90775880b589b698a7b9a72c184620cd5d208a3f32",
+      "purpose": "case-discovery-only",
+      "qualification": "none"
+    },
+    {
+      "id": "allocation-split-unity-editor-playmode-20261114",
+      "label": "runtime-final-with-recorder/results.xml",
+      "sha256": "62740c2607d850924691868f10da2b124c32fca441295bb7b25a3407893ae490",
+      "purpose": "case-discovery-only",
+      "qualification": "none"
     }
   ],
   "selectors": [
@@ -3865,8 +3886,10 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DirectChargesAreCheckedBeforeSubtraction(2,True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DirectChargesAreCheckedBeforeSubtraction(3,False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DirectChargesAreCheckedBeforeSubtraction(int.MaxValue,False)",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DisabledAllowanceAllocatesNoAccountingState(False)",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DisabledAllowanceAllocatesNoAccountingState(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DisabledAllowanceAllocatesNoAccountingState(False,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DisabledAllowanceAllocatesNoAccountingState(False,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DisabledAllowanceAllocatesNoAccountingState(True,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DisabledAllowanceAllocatesNoAccountingState(True,True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DuplicateOccurrencesSpendAllowanceEvenWhenOutputDeduplicates(False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DuplicateOccurrencesSpendAllowanceEvenWhenOutputDeduplicates(True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.GenericAndRootCollectionsChargeTheirElements",
@@ -3886,15 +3909,17 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.PackedCollectionChargesDeliveredElementsBeforeReturningTheRegion(2,0,0,False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.PackedCollectionChargesDeliveredElementsBeforeReturningTheRegion(5,8,1,False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.PackedCollectionChargesDeliveredElementsBeforeReturningTheRegion(5,8,2,True)",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.RefusalPrecedesCollectionMaterialization(False)",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.RefusalPrecedesCollectionMaterialization(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.RefusalPrecedesCollectionMaterialization(False,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.RefusalPrecedesCollectionMaterialization(False,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.RefusalPrecedesCollectionMaterialization(True,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.RefusalPrecedesCollectionMaterialization(True,True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.RootBudgetsAreIndependentAndAcceptedChargesAreNotRefunded",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.ServedBudgetRefusalKeepsTheDispatchFailureContract",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.SplitPackedAndUnpackedRunsSpendTheSameAllowance",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.UnsupportedNullableRepeatedElementsKeepTheirTypeFailure"
           ],
-          "discoveryArtifact": "collection-elements-host-focused",
-          "reason": "Discovery-only names; passing ordinary execution and matching source receipts are required. Native allocation counter controls may be inconclusive."
+          "discoveryArtifact": "allocation-split-host-v2-20261114",
+          "reason": "Complete 61-case ordinary discovery after separating functional and allocation observations; discovery transfers no qualification. Counter-dependent observations may be unavailable."
         },
         {
           "lane": "host-v3",
@@ -3930,8 +3955,10 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DirectChargesAreCheckedBeforeSubtraction(2,True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DirectChargesAreCheckedBeforeSubtraction(3,False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DirectChargesAreCheckedBeforeSubtraction(int.MaxValue,False)",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DisabledAllowanceAllocatesNoAccountingState(False)",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DisabledAllowanceAllocatesNoAccountingState(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DisabledAllowanceAllocatesNoAccountingState(False,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DisabledAllowanceAllocatesNoAccountingState(False,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DisabledAllowanceAllocatesNoAccountingState(True,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DisabledAllowanceAllocatesNoAccountingState(True,True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DuplicateOccurrencesSpendAllowanceEvenWhenOutputDeduplicates(False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DuplicateOccurrencesSpendAllowanceEvenWhenOutputDeduplicates(True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.GenericAndRootCollectionsChargeTheirElements",
@@ -3951,15 +3978,17 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.PackedCollectionChargesDeliveredElementsBeforeReturningTheRegion(2,0,0,False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.PackedCollectionChargesDeliveredElementsBeforeReturningTheRegion(5,8,1,False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.PackedCollectionChargesDeliveredElementsBeforeReturningTheRegion(5,8,2,True)",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.RefusalPrecedesCollectionMaterialization(False)",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.RefusalPrecedesCollectionMaterialization(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.RefusalPrecedesCollectionMaterialization(False,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.RefusalPrecedesCollectionMaterialization(False,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.RefusalPrecedesCollectionMaterialization(True,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.RefusalPrecedesCollectionMaterialization(True,True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.RootBudgetsAreIndependentAndAcceptedChargesAreNotRefunded",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.ServedBudgetRefusalKeepsTheDispatchFailureContract",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.SplitPackedAndUnpackedRunsSpendTheSameAllowance",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.UnsupportedNullableRepeatedElementsKeepTheirTypeFailure"
           ],
-          "discoveryArtifact": "collection-elements-host-focused",
-          "reason": "Discovery-only names; passing ordinary execution and matching source receipts are required. Native allocation counter controls may be inconclusive."
+          "discoveryArtifact": "allocation-split-host-v3-20261114",
+          "reason": "Complete 61-case ordinary discovery after separating functional and allocation observations; discovery transfers no qualification. Counter-dependent observations may be unavailable."
         },
         {
           "lane": "unity-editor-playmode",
@@ -3995,8 +4024,10 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DirectChargesAreCheckedBeforeSubtraction(2,True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DirectChargesAreCheckedBeforeSubtraction(3,False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DirectChargesAreCheckedBeforeSubtraction(int.MaxValue,False)",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DisabledAllowanceAllocatesNoAccountingState(False)",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DisabledAllowanceAllocatesNoAccountingState(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DisabledAllowanceAllocatesNoAccountingState(False,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DisabledAllowanceAllocatesNoAccountingState(False,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DisabledAllowanceAllocatesNoAccountingState(True,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DisabledAllowanceAllocatesNoAccountingState(True,True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DuplicateOccurrencesSpendAllowanceEvenWhenOutputDeduplicates(False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.DuplicateOccurrencesSpendAllowanceEvenWhenOutputDeduplicates(True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.GenericAndRootCollectionsChargeTheirElements",
@@ -4016,15 +4047,17 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.PackedCollectionChargesDeliveredElementsBeforeReturningTheRegion(2,0,0,False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.PackedCollectionChargesDeliveredElementsBeforeReturningTheRegion(5,8,1,False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.PackedCollectionChargesDeliveredElementsBeforeReturningTheRegion(5,8,2,True)",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.RefusalPrecedesCollectionMaterialization(False)",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.RefusalPrecedesCollectionMaterialization(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.RefusalPrecedesCollectionMaterialization(False,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.RefusalPrecedesCollectionMaterialization(False,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.RefusalPrecedesCollectionMaterialization(True,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.RefusalPrecedesCollectionMaterialization(True,True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.RootBudgetsAreIndependentAndAcceptedChargesAreNotRefunded",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.ServedBudgetRefusalKeepsTheDispatchFailureContract",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.SplitPackedAndUnpackedRunsSpendTheSameAllowance",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCollectionElementBudgetTests.UnsupportedNullableRepeatedElementsKeepTheirTypeFailure"
           ],
-          "discoveryArtifact": "collection-elements-native-focused",
-          "reason": "Discovery-only names; passing ordinary execution and matching source receipts are required. Native allocation counter controls may be inconclusive."
+          "discoveryArtifact": "allocation-split-unity-editor-playmode-20261114",
+          "reason": "Complete 61-case ordinary discovery after separating functional and allocation observations; discovery transfers no qualification. Counter-dependent observations may be unavailable."
         },
         {
           "lane": "unity-editor-editmode",
@@ -13117,8 +13150,10 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.RawUriTextSharesTheDecodedAllowance(2L,False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.RawUriTextSharesTheDecodedAllowance(3L,True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ReaderCopiesSpendTheSameAllowanceAgain",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.RefusalPrecedesPayloadSizedMaterialization(False)",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.RefusalPrecedesPayloadSizedMaterialization(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.RefusalPrecedesPayloadSizedMaterialization(False,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.RefusalPrecedesPayloadSizedMaterialization(False,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.RefusalPrecedesPayloadSizedMaterialization(True,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.RefusalPrecedesPayloadSizedMaterialization(True,True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"\",0L,True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"A\",0L,False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"A\",1L,True)",
@@ -13131,8 +13166,8 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.TruncatedPayloadClaimsCannotSpendUndeliveredBytes",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ZeroLengthValuesDoNotRequirePayloadCredit"
           ],
-          "discoveryArtifact": "decoded-payload-host-focused",
-          "reason": "Complete 40-case ordinary source discovery; artifact identity transfers no lane qualification. Native allocation checks require a responsive counter."
+          "discoveryArtifact": "allocation-split-host-v2-20261114",
+          "reason": "Complete 42-case ordinary discovery after separating functional and allocation observations; discovery transfers no qualification. Counter-dependent observations may be unavailable."
         },
         {
           "lane": "host-v3",
@@ -13165,8 +13200,10 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.RawUriTextSharesTheDecodedAllowance(2L,False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.RawUriTextSharesTheDecodedAllowance(3L,True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ReaderCopiesSpendTheSameAllowanceAgain",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.RefusalPrecedesPayloadSizedMaterialization(False)",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.RefusalPrecedesPayloadSizedMaterialization(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.RefusalPrecedesPayloadSizedMaterialization(False,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.RefusalPrecedesPayloadSizedMaterialization(False,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.RefusalPrecedesPayloadSizedMaterialization(True,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.RefusalPrecedesPayloadSizedMaterialization(True,True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"\",0L,True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"A\",0L,False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"A\",1L,True)",
@@ -13179,8 +13216,8 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.TruncatedPayloadClaimsCannotSpendUndeliveredBytes",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ZeroLengthValuesDoNotRequirePayloadCredit"
           ],
-          "discoveryArtifact": "decoded-payload-host-focused",
-          "reason": "Complete 40-case ordinary source discovery; artifact identity transfers no lane qualification. Native allocation checks require a responsive counter."
+          "discoveryArtifact": "allocation-split-host-v3-20261114",
+          "reason": "Complete 42-case ordinary discovery after separating functional and allocation observations; discovery transfers no qualification. Counter-dependent observations may be unavailable."
         },
         {
           "lane": "unity-editor-playmode",
@@ -13213,8 +13250,10 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.RawUriTextSharesTheDecodedAllowance(2L,False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.RawUriTextSharesTheDecodedAllowance(3L,True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ReaderCopiesSpendTheSameAllowanceAgain",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.RefusalPrecedesPayloadSizedMaterialization(False)",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.RefusalPrecedesPayloadSizedMaterialization(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.RefusalPrecedesPayloadSizedMaterialization(False,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.RefusalPrecedesPayloadSizedMaterialization(False,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.RefusalPrecedesPayloadSizedMaterialization(True,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.RefusalPrecedesPayloadSizedMaterialization(True,True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"\",0L,True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"A\",0L,False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.StringsChargeDeliveredUtf8Bytes(\"A\",1L,True)",
@@ -13227,8 +13266,8 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.TruncatedPayloadClaimsCannotSpendUndeliveredBytes",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoDecodedPayloadBudgetTests.ZeroLengthValuesDoNotRequirePayloadCredit"
           ],
-          "discoveryArtifact": "decoded-payload-native-focused",
-          "reason": "Complete 40-case ordinary source discovery; artifact identity transfers no lane qualification. Native allocation checks require a responsive counter."
+          "discoveryArtifact": "allocation-split-unity-editor-playmode-20261114",
+          "reason": "Complete 42-case ordinary discovery after separating functional and allocation observations; discovery transfers no qualification. Counter-dependent observations may be unavailable."
         },
         {
           "lane": "unity-editor-editmode",
@@ -13272,8 +13311,10 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DirectChargesAreCheckedBeforeSubtraction(2,True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DirectChargesAreCheckedBeforeSubtraction(3,False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DirectChargesAreCheckedBeforeSubtraction(int.MaxValue,False)",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DisabledAllowanceCreatesNoAccountingState(False)",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DisabledAllowanceCreatesNoAccountingState(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DisabledAllowanceCreatesNoAccountingState(False,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DisabledAllowanceCreatesNoAccountingState(False,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DisabledAllowanceCreatesNoAccountingState(True,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DisabledAllowanceCreatesNoAccountingState(True,True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DisabledAllowanceDoesNotAccumulateCharges(False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DisabledAllowanceDoesNotAccumulateCharges(True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DuplicateMessageOccurrencesMergeIntoOneConstructedChild",
@@ -13315,8 +13356,8 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.UnseededImmutableReadChargesOnlyItsFinalInstance(0,False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.UnseededImmutableReadChargesOnlyItsFinalInstance(1,True)"
           ],
-          "discoveryArtifact": "contract-construction-host-focused",
-          "reason": "Complete 60-case source discovery from the shared fixture; discovery transfers no qualification."
+          "discoveryArtifact": "allocation-split-host-v2-20261114",
+          "reason": "Complete 62-case ordinary discovery after separating functional and allocation observations; discovery transfers no qualification. Counter-dependent observations may be unavailable."
         },
         {
           "lane": "host-v3",
@@ -13340,8 +13381,10 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DirectChargesAreCheckedBeforeSubtraction(2,True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DirectChargesAreCheckedBeforeSubtraction(3,False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DirectChargesAreCheckedBeforeSubtraction(int.MaxValue,False)",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DisabledAllowanceCreatesNoAccountingState(False)",
-            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DisabledAllowanceCreatesNoAccountingState(True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DisabledAllowanceCreatesNoAccountingState(False,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DisabledAllowanceCreatesNoAccountingState(False,True)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DisabledAllowanceCreatesNoAccountingState(True,False)",
+            "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DisabledAllowanceCreatesNoAccountingState(True,True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DisabledAllowanceDoesNotAccumulateCharges(False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DisabledAllowanceDoesNotAccumulateCharges(True)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.DuplicateMessageOccurrencesMergeIntoOneConstructedChild",
@@ -13383,8 +13426,8 @@
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.UnseededImmutableReadChargesOnlyItsFinalInstance(0,False)",
             "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoContractConstructionBudgetTests.UnseededImmutableReadChargesOnlyItsFinalInstance(1,True)"
           ],
-          "discoveryArtifact": "contract-construction-host-focused",
-          "reason": "Complete 60-case source discovery from the shared fixture; discovery transfers no qualification."
+          "discoveryArtifact": "allocation-split-host-v3-20261114",
+          "reason": "Complete 62-case ordinary discovery after separating functional and allocation observations; discovery transfers no qualification. Counter-dependent observations may be unavailable."
         },
         {
           "lane": "unity-editor-playmode",

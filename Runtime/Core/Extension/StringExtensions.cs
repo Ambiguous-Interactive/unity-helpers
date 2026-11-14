@@ -467,6 +467,51 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             return builder.ToString();
         }
 
+        /// <summary>Reports whether a value is a nonempty canonical ASCII slug.</summary>
+        /// <remarks>Only lowercase letters, digits, and single interior hyphens are accepted.</remarks>
+        public static bool IsSlug(this string value)
+        {
+            return TryValidateSlug(value, out _);
+        }
+
+        /// <summary>Validates a nonempty canonical ASCII slug without rewriting the value.</summary>
+        /// <param name="value">The identifier to validate.</param>
+        /// <param name="reason">Null on success, otherwise a description of the invalid form.</param>
+        /// <returns>Whether the value is a valid slug identifier.</returns>
+        public static bool TryValidateSlug(this string value, out string reason)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                reason = "A slug must contain at least one lowercase letter or digit.";
+                return false;
+            }
+            bool separator = true;
+            int length = value.Length;
+            for (int index = 0; index < length; ++index)
+            {
+                char character = value[index];
+                if (character is >= 'a' and <= 'z' || character is >= '0' and <= '9')
+                {
+                    separator = false;
+                    continue;
+                }
+                if (character != SlugSeparator)
+                {
+                    reason =
+                        "A slug may contain only lowercase ASCII letters, digits, and hyphens.";
+                    return false;
+                }
+                if (separator || index == length - 1)
+                {
+                    reason = "A slug may contain only single interior hyphens.";
+                    return false;
+                }
+                separator = true;
+            }
+            reason = null;
+            return true;
+        }
+
         public static bool ContainsIgnoreCase(this string input, string value)
         {
             if (input == null || value == null)

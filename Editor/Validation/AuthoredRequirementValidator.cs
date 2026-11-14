@@ -13,6 +13,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
     using UnityEngine;
     using UnityEngine.Serialization;
     using WallstopStudios.UnityHelpers.Core.Attributes;
+    using WallstopStudios.UnityHelpers.Utils;
     using Object = UnityEngine.Object;
 
     /// <summary>
@@ -25,7 +26,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
     /// scan cannot read is a printed exemption, not a silent skip. See
     /// <see href="https://github.com/Ambiguous-Interactive/unity-helpers/blob/main/docs/features/editor-tools/authored-asset-validation.md">Authored Asset Validation</see>.
     /// </remarks>
-    public static class AuthoredRequirementValidator
+    public static partial class AuthoredRequirementValidator
     {
         private const int MaximumDefaultValueDepth = 64;
 
@@ -49,7 +50,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 assetPaths,
                 findings,
                 exemptions,
-                new List<string>(),
                 out documentsInspected
             );
         }
@@ -103,12 +103,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             out int documentsInspected
         )
         {
+            using PooledResource<List<string>> unreadableLease = Buffers<string>.List.Get(
+                out List<string> unreadable
+            );
             return TryScan(
                 requirementAttributeType,
                 assetPaths,
                 findings,
                 exemptions,
-                new List<string>(),
+                unreadable,
                 out documentsInspected
             );
         }
@@ -162,13 +165,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             out int documentsInspected
         )
         {
+            using PooledResource<List<string>> unreadableLease = Buffers<string>.List.Get(
+                out List<string> unreadable
+            );
             return TryScan(
                 requirementAttributeType,
                 kind,
                 assetPaths,
                 findings,
                 exemptions,
-                new List<string>(),
+                unreadable,
                 out documentsInspected
             );
         }
@@ -300,7 +306,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 }
 
                 ++inspected;
-                Judge(assetPath, lines, candidate, required, findings);
+                JudgeWithNestedValues(assetPath, lines, candidate, required, findings);
             }
 
             return inspected;
@@ -345,53 +351,92 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             Dictionary<string, List<AuthoredRequirementField>> byScriptGuid = new(
                 StringComparer.Ordinal
             );
-            List<string> guids = new();
-            foreach (FieldInfo field in TypeCache.GetFieldsWithAttribute(requirementAttributeType))
+            using PooledResource<List<string>> guidsLease = Buffers<string>.List.Get(
+                out List<string> guids
+            );
+            using PooledResource<Dictionary<Type, PooledResource<List<FieldInfo>>>> nestedLease =
+                DictionaryBuffer<Type, PooledResource<List<FieldInfo>>>.Dictionary.Get(
+                    out Dictionary<Type, PooledResource<List<FieldInfo>>> nested
+                );
+            try
             {
-                Type declaringType = field.DeclaringType;
-                if (declaringType == null)
+                foreach (
+                    FieldInfo field in TypeCache.GetFieldsWithAttribute(requirementAttributeType)
+                )
                 {
-                    continue;
-                }
-
-                if (!TryClassify(field, out AuthoredRequirementField required, kind))
-                {
-                    exemptions.Add(
-                        new AuthoredRequirementExemption(
-                            declaringType,
-                            field.Name,
-                            AuthoredRequirementExemptionReason.ValueNotReadableAsText
-                        )
-                    );
-                    continue;
-                }
-
-                CollectCarrierGuids(declaringType, guids);
-                if (guids.Count <= 0)
-                {
-                    exemptions.Add(
-                        new AuthoredRequirementExemption(
-                            declaringType,
-                            field.Name,
-                            AuthoredRequirementExemptionReason.NoBoundScript
-                        )
-                    );
-                    continue;
-                }
-
-                foreach (string guid in guids)
-                {
-                    if (!byScriptGuid.TryGetValue(guid, out List<AuthoredRequirementField> fields))
+                    Type declaringType = field.DeclaringType;
+                    if (declaringType == null)
                     {
-                        fields = new List<AuthoredRequirementField>();
-                        byScriptGuid[guid] = fields;
+                        continue;
                     }
 
-                    fields.Add(required);
+                    if (
+                        !typeof(Object).IsAssignableFrom(declaringType)
+                        && declaringType.ContainsGenericParameters
+                    )
+                    {
+                        AddNestedDeclaration(nested, field);
+                        continue;
+                    }
+
+                    if (!TryClassify(field, out AuthoredRequirementField required, kind))
+                    {
+                        exemptions.Add(
+                            new AuthoredRequirementExemption(
+                                declaringType,
+                                field.Name,
+                                AuthoredRequirementExemptionReason.ValueNotReadableAsText
+                            )
+                        );
+                        continue;
+                    }
+
+                    if (!typeof(Object).IsAssignableFrom(declaringType))
+                    {
+                        AddNestedDeclaration(nested, field);
+                        continue;
+                    }
+
+                    CollectCarrierGuids(declaringType, guids);
+                    if (guids.Count <= 0)
+                    {
+                        exemptions.Add(
+                            new AuthoredRequirementExemption(
+                                declaringType,
+                                field.Name,
+                                AuthoredRequirementExemptionReason.NoBoundScript
+                            )
+                        );
+                        continue;
+                    }
+
+                    foreach (string guid in guids)
+                    {
+                        if (
+                            !byScriptGuid.TryGetValue(
+                                guid,
+                                out List<AuthoredRequirementField> fields
+                            )
+                        )
+                        {
+                            fields = new List<AuthoredRequirementField>();
+                            byScriptGuid[guid] = fields;
+                        }
+
+                        fields.Add(required);
+                    }
+                }
+
+                AddNestedCarriers(nested, byScriptGuid, exemptions, kind);
+                return byScriptGuid;
+            }
+            finally
+            {
+                foreach (PooledResource<List<FieldInfo>> lease in nested.Values)
+                {
+                    lease.Dispose();
                 }
             }
-
-            return byScriptGuid;
         }
 
         internal static bool TryClassify(

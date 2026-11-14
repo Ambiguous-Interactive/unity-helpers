@@ -54,6 +54,16 @@ and test doubles remain included. Each scope accepts files only from its corresp
 These commands retain source generators and compiler errors but omit performance analyzers.
 Run the normal applicable typecheck commands and changed-file preflight before publishing.
 
+When analyzer payloads change, use `npm run typecheck:unity:clean`. Its typed Python runner removes
+owned build outputs before running the full source gates with compiler-server reuse disabled.
+It refuses a linked `Generator~` and does not follow linked project or build directories.
+The former Node entry point remains a compatibility launcher through locked uv.
+
+`npm run format:csharp:check` and `npm run format:csharp` also run a typed Python implementation
+behind their PowerShell launchers. Scoped calls retain `-Paths`, `-Fix`, `-VerboseOutput`, and
+`-SkipWhenUnavailable`. The last flag announces missing-tool skips; normal repository checks
+require the formatter to run.
+
 The analyzer placement check evaluates MSBuild compiler inputs for each owned .NET project with
 both protobuf oracle settings. Each shipped analyzer must appear exactly once at its package
 path. Normal assembly references, including the compiler compatibility test reference, do not
@@ -770,6 +780,18 @@ use the shared locked Python toolchain; the former hyphenated entry point remain
 - Verify Markdown/code links: `npm run lint:doc-links` (locked uv Python)
   - The wrapper lives at `scripts/run-doc-link-lint.js` so you can also run `node ./scripts/run-doc-link-lint.js --verbose` if you are not using npm scripts.
   - The Python checker validates intra-repo Markdown links and `docs/...` references inside source files or scripts. Repo Lint runs it on every PR, so run it locally before pushing large doc updates.
+
+### Thread allocation observations
+
+Package tests use `Tests.Core.ThreadAllocationCounter` for per-thread allocation measurements.
+It excludes the raw GC counter call from IL2CPP player compilation: the installed Unity
+6000.6.7f1 implementation still invokes an unimplemented icall and returns zero. A newer Unity
+version alone does not qualify that backend. Mono and .NET must observe a retained 4096-byte
+allocation before the shared counter becomes available. An unavailable counter skips allocation
+observations; WProto budget fixtures retain separate functional cases. Unity profiler-recorder
+and native-profiler controls remain independent instruments. Editor and standalone-player launches
+save `*.execution-diagnostics.json` beside their logs. Check raw process exits and both output stream
+ends alongside NUnit results when qualifying a backend.
 
 ## Style and Naming
 

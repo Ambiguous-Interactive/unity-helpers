@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add `[WEnumHelpers]` and the enum source generator, which emits concrete overloads for flag checks, numeric conversion, cached names, display names, and span formatting while leaving generic and runtime-generated enums on the generalized path. See [Enum Helpers](./docs/features/utilities/math-and-extensions.md#enum-helpers) and [Enum Helper Performance](./docs/performance/enum-helpers-performance.md).
 - Add `TryFormatCachedName` for writing an enum's cached name into a caller-owned `Span<char>`.
+- Add allocation-free counting medians for unsorted byte channels, slug identifier validation, and optional cleanup failure reporting for `DisposableScope`. [#1200](https://github.com/wallstop/unity-helpers/issues/1200)
 - Add `LatestWriteFile` for coalesced saves and synchronous final flushes, plus optional thread-pool failure callbacks ([#1181](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1181)).
 - Add single-owner managed pools with explicit returns and fixed-length per-thread array pools with clearing on return ([#1173](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1173)).
 - Add a test-only support assembly with allocation controls, synchronous Unity object tracking and managed resource cleanup for consumer test fixtures ([#1180](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1180)).
@@ -67,6 +68,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix pool statistics reporting a stale size when a time-provider callback rents an item.
+- Fix required-field asset validation missing nested serializable values, including list elements and dictionary values. [#1199](https://github.com/wallstop/unity-helpers/issues/1199)
+- Fix authored dictionary validation reporting inline struct values as null object references. [#1198](https://github.com/wallstop/unity-helpers/issues/1198)
 - Fix the first global pool-budget check being delayed by the enforcement interval after startup or reset.
 - Apply the Unity 6000.5 in-process import workaround to configure, build, and test launches.
 - Refuse ambiguous comparison rewrites and overlapping edits in the source checker ([#859](https://github.com/Ambiguous-Interactive/unity-helpers/issues/859)).

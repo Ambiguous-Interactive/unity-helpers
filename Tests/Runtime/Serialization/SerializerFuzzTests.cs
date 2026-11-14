@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     using WallstopStudios.UnityHelpers.Core.Serialization;
     using WallstopStudios.UnityHelpers.Tests.TestUtils;
     using Serializer = WallstopStudios.UnityHelpers.Core.Serialization.Serializer;
+    using ThreadAllocationCounter = WallstopStudios.UnityHelpers.Tests.Core.ThreadAllocationCounter;
 
     /// <summary>
     /// Fuzz tests random byte buffers through every public deserializer. Throwing variants must
@@ -185,14 +186,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             */
             GCAssert.IgnoreIfAllocationMeasurementUnavailable();
 
-            long calibrationBefore = GC.GetAllocatedBytesForCurrentThread();
+            long calibrationBefore = ThreadAllocationCounter.Read();
             string forcedAllocation = new('x', 512);
-            long calibrationAfter = GC.GetAllocatedBytesForCurrentThread();
+            long calibrationAfter = ThreadAllocationCounter.Read();
             GC.KeepAlive(forcedAllocation);
             if (calibrationAfter - calibrationBefore <= 0)
             {
                 Assert.Inconclusive(
-                    "GC.GetAllocatedBytesForCurrentThread is too coarse on this runtime to measure "
+                    "ThreadAllocationCounter.Read is too coarse on this runtime to measure "
                         + "lazy-message composition (a forced 512-byte string allocation reported "
                         + "zero). The lazy-message contract is exercised on runtimes with a reliable "
                         + "allocation counter."
@@ -204,7 +205,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             long minMessageDelta = long.MaxValue;
             for (int i = 0; i < 8; ++i)
             {
-                long before = GC.GetAllocatedBytesForCurrentThread();
+                long before = ThreadAllocationCounter.Read();
                 SerializationInputException captured = null;
                 try
                 {
@@ -214,10 +215,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 {
                     captured = ex;
                 }
-                long afterThrow = GC.GetAllocatedBytesForCurrentThread();
+                long afterThrow = ThreadAllocationCounter.Read();
                 Assert.IsTrue(captured != null);
                 _ = captured.Message;
-                long afterMessage = GC.GetAllocatedBytesForCurrentThread();
+                long afterMessage = ThreadAllocationCounter.Read();
 
                 minThrowAlloc = Math.Min(minThrowAlloc, afterThrow - before);
                 minMessageDelta = Math.Min(minMessageDelta, afterMessage - afterThrow);

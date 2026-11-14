@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Serialization;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+    using ThreadAllocationCounter = WallstopStudios.UnityHelpers.Tests.Core.ThreadAllocationCounter;
 
     [TestFixture]
 #if !UNITY_5_3_OR_NEWER
@@ -677,9 +678,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             AssertBudget(value, 1);
         }
 
-        [TestCase(false)]
-        [TestCase(true)]
-        public void DisabledAllowanceCreatesNoAccountingState(bool explicitMaximum)
+        [TestCase(false, false)]
+        [TestCase(true, false)]
+        [TestCase(false, true)]
+        [TestCase(true, true)]
+        public void DisabledAllowanceCreatesNoAccountingState(
+            bool explicitMaximum,
+            bool measureAllocations
+        )
         {
             WProtoReadLimits limits = new WProtoReadLimits();
             if (explicitMaximum)
@@ -689,15 +695,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             WProtoReadLimits finite = limits.WithContractConstructionCount(1);
             Assert.IsTrue(ExerciseAllowance(limits));
             Assert.IsTrue(ExerciseAllowance(finite));
-#if ENABLE_IL2CPP && !UNITY_6000_0_OR_NEWER
-            Assert.Inconclusive(
-                "The per-thread allocation counter is unavailable on legacy IL2CPP."
-            );
-#else
+            if (!measureAllocations)
+            {
+                return;
+            }
+
             const int length = 4096;
-            long before = GC.GetAllocatedBytesForCurrentThread();
+            long before = ThreadAllocationCounter.Read();
             byte[] control = new byte[length];
-            long sensitivity = GC.GetAllocatedBytesForCurrentThread() - before;
+            long sensitivity = ThreadAllocationCounter.Read() - before;
             GC.KeepAlive(control);
             if (sensitivity < length)
             {
@@ -705,17 +711,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     "The allocation counter missed the positive allocation control."
                 );
             }
-            before = GC.GetAllocatedBytesForCurrentThread();
+            before = ThreadAllocationCounter.Read();
             bool accepted = ExerciseAllowance(limits);
-            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            long allocated = ThreadAllocationCounter.Read() - before;
             Assert.IsTrue(accepted);
             Assert.AreEqual(0, allocated);
-            before = GC.GetAllocatedBytesForCurrentThread();
+            before = ThreadAllocationCounter.Read();
             accepted = ExerciseAllowance(finite);
-            allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            allocated = ThreadAllocationCounter.Read() - before;
             Assert.IsTrue(accepted);
             Assert.Less(0, allocated);
-#endif
         }
     }
 }

@@ -366,6 +366,230 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             );
         }
 
+        [TestCase(nameof(AuthoredRequirementTestAsset.nested), "    material: {fileID: 0}", 1)]
+        [TestCase(nameof(AuthoredRequirementTestAsset.nested), "    material: {fileID: 12}", 0)]
+        [TestCase(nameof(AuthoredRequirementTestAsset.nested), "    oldMaterial: {fileID: 0}", 1)]
+        [TestCase(
+            nameof(AuthoredRequirementTestAsset.nested),
+            "    material: {fileID: 12}\n    oldMaterial: {fileID: 0}",
+            0
+        )]
+        [TestCase(
+            nameof(AuthoredRequirementTestAsset.nested),
+            "    child:\n      material: {fileID: 0}",
+            1
+        )]
+        [TestCase(
+            nameof(AuthoredRequirementTestAsset.nestedList),
+            "  - material: {fileID: 0}\n  - material: {fileID: 12}\n  - material: {fileID: 0}",
+            2
+        )]
+        [TestCase(
+            nameof(AuthoredRequirementTestAsset.nestedArray),
+            "  - child:\n      material: {fileID: 0}\n    material: {fileID: 12}",
+            1
+        )]
+        [TestCase(
+            nameof(AuthoredRequirementTestAsset.nestedDictionary),
+            "    _keys:\n    - first\n    _values:\n    - material: {fileID: 0}\n    _boxedValues: []",
+            1
+        )]
+        [TestCase(
+            nameof(AuthoredRequirementTestAsset.boxedDictionary),
+            "    _keys:\n    - first\n    _boxedValues:\n    - Data:\n      - material: {fileID: 0}\n      - material: {fileID: 12}",
+            1
+        )]
+        [TestCase(
+            nameof(AuthoredRequirementTestAsset.nestedList),
+            "  - other:\n      material: {fileID: 0}\n    material: {fileID: 12}",
+            0
+        )]
+        [TestCase(
+            nameof(AuthoredRequirementTestAsset.ignoredNested),
+            "    material: {fileID: 0}",
+            0
+        )]
+        [TestCase(
+            nameof(AuthoredRequirementTestAsset.managedNested),
+            "    material: {fileID: 0}",
+            0
+        )]
+        public void NestedRequirementsFollowTheirTypedCarrier(
+            string field,
+            string value,
+            int expected
+        )
+        {
+            Assert.IsTrue(
+                MonoScriptIndex.TryGetScriptGuid(
+                    typeof(AuthoredRequirementTestAsset),
+                    out string guid
+                )
+            );
+            string path = Path.Combine(
+                Path.GetTempPath(),
+                $"nested-requirement-{Guid.NewGuid():N}.asset"
+            );
+            try
+            {
+                File.WriteAllText(
+                    path,
+                    $"%YAML 1.1\n--- !u!114 &11400000\nMonoBehaviour:\n  m_Script: {{fileID: 11500000, guid: {guid}, type: 3}}\n  {field}:\n{value}\n"
+                );
+                List<AuthoredRequirementFinding> findings = new();
+                List<AuthoredRequirementExemption> exemptions = new();
+                Assert.IsTrue(
+                    AuthoredRequirementValidator.TryScan(
+                        new[] { path },
+                        findings,
+                        exemptions,
+                        out int inspected
+                    )
+                );
+                Assert.AreEqual(1, inspected);
+                Assert.AreEqual(expected, findings.Count, string.Join("\n", findings));
+                Assert.IsFalse(
+                    exemptions.Any(exemption =>
+                        exemption.DeclaringType == typeof(NestedRequirementTestValue)
+                    )
+                );
+                string[] authored = File.ReadAllLines(path);
+                foreach (AuthoredRequirementFinding finding in findings)
+                {
+                    StringAssert.EndsWith("{fileID: 0}", authored[finding.LineNumber - 1]);
+                }
+                Assert.IsTrue(
+                    findings.All(finding =>
+                        finding.DeclaringType == typeof(NestedRequirementTestValue)
+                        && string.Equals(
+                            finding.FieldName,
+                            nameof(NestedRequirementTestValue.material),
+                            StringComparison.Ordinal
+                        )
+                    )
+                );
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
+
+        [Test]
+        public void DiscoveryResultsSurviveLaterScans()
+        {
+            List<AuthoredRequirementExemption> exemptions = new();
+            Dictionary<string, List<AuthoredRequirementField>> first =
+                AuthoredRequirementValidator.FieldsByScriptGuid(
+                    typeof(WallstopStudios.UnityHelpers.Core.Attributes.WNotNullAttribute),
+                    exemptions
+                );
+            Dictionary<string, AuthoredRequirementField[]> snapshots = new();
+            foreach (KeyValuePair<string, List<AuthoredRequirementField>> pair in first)
+            {
+                snapshots.Add(pair.Key, pair.Value.ToArray());
+            }
+            Assert.IsNotEmpty(snapshots);
+            for (int iteration = 0; iteration < 3; ++iteration)
+            {
+                Dictionary<string, List<AuthoredRequirementField>> next =
+                    AuthoredRequirementValidator.FieldsByScriptGuid(
+                        typeof(WallstopStudios.UnityHelpers.Core.Attributes.WNotNullAttribute),
+                        exemptions
+                    );
+                foreach (KeyValuePair<string, AuthoredRequirementField[]> pair in snapshots)
+                {
+                    Assert.IsTrue(
+                        first.TryGetValue(pair.Key, out List<AuthoredRequirementField> retained)
+                    );
+                    Assert.IsTrue(
+                        next.TryGetValue(pair.Key, out List<AuthoredRequirementField> current)
+                    );
+                    Assert.AreNotSame(retained, current);
+                    CollectionAssert.AreEqual(pair.Value, retained);
+                    Assert.AreEqual(pair.Value.Length, current.Count);
+                }
+            }
+        }
+
+        [TestCase(nameof(AuthoredRequirementTestAsset.genericMaterial), false, false)]
+        [TestCase(nameof(AuthoredRequirementTestAsset.genericMaterial), true, false)]
+        [TestCase(nameof(AuthoredRequirementTestAsset.genericMaterial), false, true)]
+        [TestCase(nameof(AuthoredRequirementTestAsset.genericText), false, false)]
+        [TestCase(nameof(AuthoredRequirementTestAsset.genericText), true, false)]
+        [TestCase(nameof(AuthoredRequirementTestAsset.inheritedGeneric), false, false)]
+        [TestCase(nameof(AuthoredRequirementTestAsset.inheritedGeneric), true, false)]
+        [TestCase(nameof(AuthoredRequirementTestAsset.inheritedGeneric), false, true)]
+        public void ClosedGenericValuesUseTheirConstructedFieldTypes(
+            string field,
+            bool emptyValue,
+            bool emptyMaterial
+        )
+        {
+            Assert.IsTrue(
+                MonoScriptIndex.TryGetScriptGuid(
+                    typeof(AuthoredRequirementTestAsset),
+                    out string guid
+                )
+            );
+            bool text = string.Equals(
+                field,
+                nameof(AuthoredRequirementTestAsset.genericText),
+                StringComparison.Ordinal
+            );
+            string value = text
+                ? (emptyValue ? "''" : "assigned")
+                : (emptyValue ? "{fileID: 0}" : "{fileID: 12}");
+            string material = emptyMaterial ? "{fileID: 0}" : "{fileID: 12}";
+            string path = Path.Combine(
+                Path.GetTempPath(),
+                $"generic-requirement-{Guid.NewGuid():N}.asset"
+            );
+            try
+            {
+                File.WriteAllText(
+                    path,
+                    $"%YAML 1.1\n--- !u!114 &11400000\nMonoBehaviour:\n  m_Script: {{fileID: 11500000, guid: {guid}, type: 3}}\n  {field}:\n    material: {material}\n    value: {value}\n"
+                );
+                List<AuthoredRequirementFinding> findings = new();
+                List<AuthoredRequirementExemption> exemptions = new();
+                Assert.IsTrue(
+                    AuthoredRequirementValidator.TryScan(
+                        new[] { path },
+                        findings,
+                        exemptions,
+                        out int inspected
+                    )
+                );
+                Assert.AreEqual(1, inspected);
+                Assert.AreEqual(emptyValue || emptyMaterial ? 1 : 0, findings.Count);
+                Assert.IsFalse(
+                    exemptions.Any(exemption =>
+                        exemption.DeclaringType == typeof(GenericRequirementTestValue<>)
+                    )
+                );
+                if (findings.Count != 0)
+                {
+                    Assert.AreEqual(
+                        text
+                            ? typeof(GenericRequirementTestValue<string>)
+                            : typeof(GenericRequirementTestValue<Material>),
+                        findings[0].DeclaringType
+                    );
+                    Assert.AreEqual(
+                        emptyMaterial
+                            ? nameof(GenericRequirementTestValue<Material>.material)
+                            : nameof(GenericRequirementTestValue<Material>.value),
+                        findings[0].FieldName
+                    );
+                }
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
+
         [Test]
         public void AScanWithNothingToReadIsRefusedRatherThanReportedClean()
         {

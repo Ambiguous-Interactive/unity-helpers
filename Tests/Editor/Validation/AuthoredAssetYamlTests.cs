@@ -238,7 +238,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         [TestCase("7")]
         [TestCase("[]")]
         [TestCase("some text")]
-        public void AValueThatIsNotAnInlineMappingIsRefused(string value)
+        [TestCase("{}")]
+        [TestCase("{r: 0.23, g: 0.23, b: 0.19, a: 1}")]
+        [TestCase("{x: 0, y: 0}")]
+        [TestCase("{guid: abc}")]
+        [TestCase("{fileID: nope}")]
+        public void AValueWithoutAValidObjectReferenceIsRefused(string value)
         {
             Assert.IsFalse(
                 AuthoredAssetYaml.TryParseObjectReference(value, out long _, out string _)
@@ -250,6 +255,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         [TestCase("{fileID: 11500000, guid: abc, type: 3}", false)]
         [TestCase("{fileID: 0, guid: abc, type: 3}", false)]
         [TestCase("[]", false)]
+        [TestCase("{}", false)]
+        [TestCase("{r: 0.23, g: 0.23, b: 0.19, a: 1}", false)]
+        [TestCase("{x: 0, y: 0}", false)]
+        [TestCase("{guid: 00000000000000000000000000000000}", false)]
+        [TestCase("{fileID: nope}", false)]
         [TestCase(null, false)]
         public void AnEmptySlotIsTheReferenceThatNamesNoObject(string value, bool expected)
         {

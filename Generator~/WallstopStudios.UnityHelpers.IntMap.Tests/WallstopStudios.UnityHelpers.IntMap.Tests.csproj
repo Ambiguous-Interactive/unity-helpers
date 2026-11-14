@@ -12,6 +12,10 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile
+      Include="../../Tests/Core/ThreadAllocationCounter.cs"
+      Link="ThreadAllocationCounter.cs"
+    />
+    <Compile
       Include="../WallstopStudios.UnityHelpers.Proto.Generator.Tests/ObjectsHashCodeStub.cs"
       Link="ObjectsHashCodeStub.cs"
     />

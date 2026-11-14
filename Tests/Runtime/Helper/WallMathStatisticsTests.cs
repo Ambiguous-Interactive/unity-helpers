@@ -7,8 +7,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     using System.Collections;
     using System.Collections.Generic;
     using NUnit.Framework;
+    using UnityEngine.TestTools.Constraints;
     using WallstopStudios.UnityHelpers.Core.Helper;
+    using WallstopStudios.UnityHelpers.Tests.Core;
+    using WallstopStudios.UnityHelpers.Tests.TestUtils;
     using WallstopStudios.UnityHelpers.Utils;
+    using Is = NUnit.Framework.Is;
+    using UnityIs = UnityEngine.TestTools.Constraints.Is;
 
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
@@ -568,6 +573,133 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             );
             yield return new TestCaseData(new (int, int, int, int)[] { (1, 1, 1, -1) }).SetName(
                 "MantelHaenszel.NegativeLowerRight.Fails"
+            );
+        }
+
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(3)]
+        [TestCase(255)]
+        [TestCase(256)]
+        [TestCase(257)]
+        [TestCase(10000)]
+        public void ByteMedianMatchesAnIndependentSortedCopy(int count)
+        {
+            byte[] values = new byte[count];
+            System.Random random = new(9127);
+            random.NextBytes(values);
+            byte[] original = (byte[])values.Clone();
+            byte[] sorted = (byte[])values.Clone();
+            Array.Sort(sorted);
+            double expected = (sorted[(count - 1) / 2] + sorted[count / 2]) * 0.5d;
+            Assert.IsTrue(WallMath.TryMedian((ReadOnlySpan<byte>)values, out double spanMedian));
+            Assert.AreEqual(expected, spanMedian);
+            IReadOnlyList<byte> list = Array.AsReadOnly(values);
+            Assert.IsTrue(WallMath.TryMedian(list, out double listMedian));
+            Assert.AreEqual(expected, listMedian);
+            Assert.IsTrue(WallMath.TryMedian(values, out double arrayMedian));
+            Assert.AreEqual(expected, arrayMedian);
+            IReadOnlyList<byte> concreteList = new List<byte>(values);
+            Assert.IsTrue(WallMath.TryMedian(concreteList, out double concreteMedian));
+            Assert.AreEqual(expected, concreteMedian);
+            Assert.IsTrue(
+                WallMath.TryMedian((IReadOnlyList<byte>)values, out double interfaceArrayMedian)
+            );
+            Assert.AreEqual(expected, interfaceArrayMedian);
+            CollectionAssert.AreEqual(original, concreteList);
+            CollectionAssert.AreEqual(original, values);
+        }
+
+        [TestCase((byte)0, (byte)255, 127.5d)]
+        [TestCase((byte)255, (byte)255, 255d)]
+        [TestCase((byte)0, (byte)0, 0d)]
+        [TestCase((byte)11, (byte)12, 11.5d)]
+        public void ByteMedianPreservesExtremeValuesAndHalfSteps(
+            byte first,
+            byte second,
+            double expected
+        )
+        {
+            byte[] values = { first, second };
+            Assert.IsTrue(WallMath.TryMedian((ReadOnlySpan<byte>)values, out double median));
+            Assert.AreEqual(expected, median);
+        }
+
+        [Test]
+        public void ByteMedianRefusesMissingValues()
+        {
+            Assert.IsFalse(WallMath.TryMedian(ReadOnlySpan<byte>.Empty, out double empty));
+            Assert.IsTrue(double.IsNaN(empty));
+            Assert.IsFalse(WallMath.TryMedian((IReadOnlyList<byte>)null, out double missing));
+            Assert.IsTrue(double.IsNaN(missing));
+            Assert.IsFalse(
+                WallMath.TryMedian((IReadOnlyList<byte>)Array.Empty<byte>(), out double emptyList)
+            );
+            Assert.IsTrue(double.IsNaN(emptyList));
+            Assert.IsFalse(WallMath.TryMedian(new List<byte>(), out double emptyConcreteList));
+            Assert.IsTrue(double.IsNaN(emptyConcreteList));
+        }
+
+        [Test]
+        public void ByteMedianPreservesReimplementedListInterfaces()
+        {
+            IReadOnlyList<byte> values = new ByteMedianInterfaceList();
+            Assert.IsTrue(WallMath.TryMedian(values, out double median));
+            Assert.AreEqual(42d, median);
+        }
+
+        [Test]
+        public void ByteMedianDoesNotAllocate()
+        {
+            AllocationProbe.IgnoreWhenUnmeasurable();
+            byte[] values = { 255, 4, 0, 18 };
+            IReadOnlyList<byte> list = Array.AsReadOnly(values);
+            IReadOnlyList<byte> concreteList = new List<byte>(values);
+            IReadOnlyList<byte> arrayInterface = values;
+            for (int iteration = 0; iteration < AllocationProbe.Iterations; ++iteration)
+            {
+                WallMath.TryMedian((ReadOnlySpan<byte>)values, out _);
+                WallMath.TryMedian(values, out _);
+                WallMath.TryMedian(list, out _);
+                WallMath.TryMedian(concreteList, out _);
+                WallMath.TryMedian(arrayInterface, out _);
+            }
+            Assert.That(
+                () =>
+                {
+                    WallMath.TryMedian((ReadOnlySpan<byte>)values, out _);
+                },
+                UnityIs.Not.AllocatingGCMemory()
+            );
+            Assert.That(
+                () =>
+                {
+                    WallMath.TryMedian(values, out _);
+                },
+                UnityIs.Not.AllocatingGCMemory()
+            );
+            Assert.That(
+                () =>
+                {
+                    WallMath.TryMedian(list, out _);
+                    WallMath.TryMedian(concreteList, out _);
+                    WallMath.TryMedian(arrayInterface, out _);
+                },
+                UnityIs.Not.AllocatingGCMemory()
+            );
+            Assert.That(
+                () =>
+                {
+                    WallMath.TryMedian(concreteList, out _);
+                },
+                UnityIs.Not.AllocatingGCMemory()
+            );
+            Assert.That(
+                () =>
+                {
+                    WallMath.TryMedian(arrayInterface, out _);
+                },
+                UnityIs.Not.AllocatingGCMemory()
             );
         }
 

@@ -9,6 +9,10 @@
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
   <ItemGroup>
+    <Compile
+      Include="../../Tests/Core/ThreadAllocationCounter.cs"
+      Link="ThreadAllocationCounter.cs"
+    />
     <Compile Include="ZLinqCoexistenceTests.cs" />
     <Compile
       Include="../WallstopStudios.UnityHelpers.Proto.Generator.Tests/ObjectsHashCodeStub.cs"

@@ -15,6 +15,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Tests.TestUtils;
+    using ThreadAllocationCounter = WallstopStudios.UnityHelpers.Tests.Core.ThreadAllocationCounter;
 
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
@@ -90,9 +91,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             action();
             try
             {
-                long before = GC.GetAllocatedBytesForCurrentThread();
+                long before = ThreadAllocationCounter.Read();
                 action();
-                return GC.GetAllocatedBytesForCurrentThread() - before;
+                return ThreadAllocationCounter.Read() - before;
             }
             catch (PlatformNotSupportedException)
             {
@@ -770,7 +771,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.IsTrue(map.Remove(0, out string removed));
             Assert.AreEqual("original", removed);
 
-            long before = GC.GetAllocatedBytesForCurrentThread();
+            long before = ThreadAllocationCounter.Read();
             bool written = true;
             if (useIndexer)
             {
@@ -780,7 +781,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             {
                 written = map.TrySet(0, null);
             }
-            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            long allocated = ThreadAllocationCounter.Read() - before;
             Assert.IsTrue(written);
             Assert.AreEqual(0L, allocated);
             Assert.AreEqual(capacity, map.Capacity);
@@ -1131,9 +1132,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             const int controlSize = 4096;
             try
             {
-                long beforeControl = GC.GetAllocatedBytesForCurrentThread();
+                long beforeControl = ThreadAllocationCounter.Read();
                 byte[] control = new byte[controlSize];
-                long controlBytes = GC.GetAllocatedBytesForCurrentThread() - beforeControl;
+                long controlBytes = ThreadAllocationCounter.Read() - beforeControl;
                 GC.KeepAlive(control);
                 if (controlBytes < controlSize)
                 {
@@ -1165,7 +1166,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 Assert.IsTrue(map.Remove(key, out _));
             }
 
-            long before = GC.GetAllocatedBytesForCurrentThread();
+            long before = ThreadAllocationCounter.Read();
             bool written = true;
             if (useIndexer)
             {
@@ -1175,7 +1176,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             {
                 written = map.TrySet(0, null);
             }
-            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            long allocated = ThreadAllocationCounter.Read() - before;
             Assert.IsTrue(written);
             Assert.AreEqual(0L, allocated);
             Assert.IsTrue(map.TryGet(0, out string value));

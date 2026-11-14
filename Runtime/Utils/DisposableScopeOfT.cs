@@ -22,12 +22,18 @@ namespace WallstopStudios.UnityHelpers.Utils
     {
         private readonly TPrevious _previous;
         private readonly Action _cleanup;
+        private readonly Action<Exception> _onError;
         private readonly DisposalLease _lease;
 
-        internal DisposableScope(TPrevious previous, Action cleanup)
+        internal DisposableScope(
+            TPrevious previous,
+            Action cleanup,
+            Action<Exception> onError = null
+        )
         {
             _previous = previous;
             _cleanup = cleanup;
+            _onError = onError;
             _lease = cleanup == null ? default : DisposalLeases.Acquire();
         }
 
@@ -38,7 +44,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// <returns>A scope containing every cleanup.</returns>
         public DisposableScope<DisposableScope<TPrevious>> WithCleanup(Action cleanup)
         {
-            return new DisposableScope<DisposableScope<TPrevious>>(this, cleanup);
+            return new DisposableScope<DisposableScope<TPrevious>>(this, cleanup, _onError);
         }
 
         /// <summary>
@@ -52,9 +58,9 @@ namespace WallstopStudios.UnityHelpers.Utils
                 {
                     _cleanup();
                 }
-                catch (Exception)
+                catch (Exception error)
                 {
-                    // Continue to earlier cleanups even if this one fails.
+                    DisposableScope.ReportFailure(error, _onError);
                 }
             }
 
@@ -62,9 +68,9 @@ namespace WallstopStudios.UnityHelpers.Utils
             {
                 _previous.Dispose();
             }
-            catch (Exception)
+            catch (Exception error)
             {
-                // A previous scope may be a caller-defined disposable.
+                DisposableScope.ReportFailure(error, _onError);
             }
         }
 
@@ -73,7 +79,8 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             return EqualityComparer<TPrevious>.Default.Equals(_previous, other._previous)
                 && EqualityComparer<Action>.Default.Equals(_cleanup, other._cleanup)
-                && EqualityComparer<DisposalLease>.Default.Equals(_lease, other._lease);
+                && EqualityComparer<DisposalLease>.Default.Equals(_lease, other._lease)
+                && EqualityComparer<Action<Exception>>.Default.Equals(_onError, other._onError);
         }
 
         /// <inheritdoc />
@@ -88,7 +95,8 @@ namespace WallstopStudios.UnityHelpers.Utils
             return global::WallstopStudios.UnityHelpers.Core.Helper.Objects.HashCode(
                 _previous,
                 _cleanup,
-                _lease
+                _lease,
+                _onError
             );
         }
     }

@@ -13,6 +13,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     using WallstopStudios.UnityHelpers.Tests.TestUtils;
     using WallstopStudios.UnityHelpers.Utils;
     using Object = UnityEngine.Object;
+    using ThreadAllocationCounter = WallstopStudios.UnityHelpers.Tests.Core.ThreadAllocationCounter;
 
     [TestFixture]
     [Category("Fast")]
@@ -297,16 +298,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 sum += pair.Value;
             }
             sum += map.GetOrAdd(live, factory, 4);
-            long controlStart = GC.GetAllocatedBytesForCurrentThread();
+            long controlStart = ThreadAllocationCounter.Read();
             GC.KeepAlive(new byte[1024]);
-            long controlBytes = GC.GetAllocatedBytesForCurrentThread() - controlStart;
+            long controlBytes = ThreadAllocationCounter.Read() - controlStart;
             if (controlBytes == 0)
             {
                 Assert.Ignore(
                     "The allocation counter cannot observe the retained positive control."
                 );
             }
-            long before = GC.GetAllocatedBytesForCurrentThread();
+            long before = ThreadAllocationCounter.Read();
             for (int iteration = 0; iteration < 128; ++iteration)
             {
                 foreach (KeyValuePair<GameObject, int> pair in map)
@@ -315,7 +316,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 }
                 sum += map.GetOrAdd(live, factory, 4);
             }
-            long bytes = GC.GetAllocatedBytesForCurrentThread() - before;
+            long bytes = ThreadAllocationCounter.Read() - before;
             Assert.That(bytes, Is.Zero);
             Assert.That(sum, Is.EqualTo(129 * 6));
         }

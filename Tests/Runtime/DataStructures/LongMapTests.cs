@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Tests.TestUtils;
+    using ThreadAllocationCounter = WallstopStudios.UnityHelpers.Tests.Core.ThreadAllocationCounter;
 
     [TestFixture]
     [Category("Fast")]
@@ -328,9 +329,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 map[key] = (int)key;
             }
             GCAssert.IgnoreIfAllocationMeasurementUnavailable();
-            long controlStart = GC.GetAllocatedBytesForCurrentThread();
+            long controlStart = ThreadAllocationCounter.Read();
             object control = new byte[128];
-            long controlBytes = GC.GetAllocatedBytesForCurrentThread() - controlStart;
+            long controlBytes = ThreadAllocationCounter.Read() - controlStart;
             GC.KeepAlive(control);
             if (controlBytes == 0)
             {

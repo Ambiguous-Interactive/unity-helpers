@@ -45,6 +45,8 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot '../unity/lib/credential-redaction.ps1')
+. (Join-Path $PSScriptRoot '../unity/lib/native-evidence.ps1')
+. (Join-Path $PSScriptRoot '../unity/lib/catastrophic-patterns.ps1')
 
 $scriptRoot = Split-Path -Parent $PSScriptRoot
 $target = Join-Path $scriptRoot 'unity/run-ci-tests.ps1'
@@ -69,7 +71,10 @@ foreach ($name in @(
     'Invoke-ProcessWithTreeKillTimeout',
     'ConvertTo-UnsignedExitHex',
     'Test-NativeCrashExitCode',
-    'Test-BenignStandaloneBuildExit'
+    'Test-BenignStandaloneBuildExit',
+    'Invoke-StandaloneTestPlayer',
+    'Get-UnityNativeReportSummary',
+    'Write-UnityExecutionObservation'
 )) {
     $fn = $ast.FindAll(
         {
@@ -296,6 +301,27 @@ Set-Content -LiteralPath $buildLog -Value 'Build Finished, Result: Failed.'
 Assert-That 'exit 255 without success markers remains rejected' (-not (Test-BenignStandaloneBuildExit -ExitCode 255 -LogPath $buildLog))
 Remove-Item -LiteralPath $buildLog -Force
 Assert-That 'exit 255 without a build log remains rejected' (-not (Test-BenignStandaloneBuildExit -ExitCode 255 -LogPath $buildLog))
+
+$playerLog = Join-Path $tmp ("uh-player-observation-{0}.log" -f [Guid]::NewGuid().ToString('N'))
+$playerResults = [IO.Path]::ChangeExtension($playerLog, 'xml')
+$playerDiagnostic = [IO.Path]::ChangeExtension($playerLog, 'execution-diagnostics.json')
+try {
+    $playerOutcome = Invoke-StandaloneTestPlayer -EditorBuiltExePath $pwshPath -ResultsPath $playerResults -LogPath $playerLog -TimeoutSeconds 20
+    Assert-That 'standalone player control preserves the actual rejected CLI exit' ($playerOutcome.ExitCode -eq 64 -and -not $playerOutcome.TimedOut)
+    Assert-That 'standalone player observation is persisted' (Test-Path -LiteralPath $playerDiagnostic -PathType Leaf)
+    if (Test-Path -LiteralPath $playerDiagnostic -PathType Leaf) {
+        $playerReceipt = Get-Content -LiteralPath $playerDiagnostic -Raw | ConvertFrom-Json
+        Assert-That 'standalone player receipt names the player launch' ($playerReceipt.Label -ceq 'Run standalone test player')
+        Assert-That 'standalone player receipt retains raw failure' ($playerReceipt.Process.RawExitCode -eq 64)
+        Assert-That 'standalone player receipt records normal process exit' ($playerReceipt.Process.ExitOrigin -ceq 'process-exit')
+        Assert-That 'standalone player stdout reaches EOF' ($playerReceipt.Process.StandardOutputEndObserved)
+        Assert-That 'standalone player stderr reaches EOF' ($playerReceipt.Process.StandardErrorEndObserved)
+        Assert-That 'standalone player output is not cut short' (-not $playerReceipt.Process.OutputDrainStopped)
+        Assert-That 'standalone player log was persisted' ($playerReceipt.Process.LogPersistence -ceq 'written')
+    }
+} finally {
+    Remove-Item -LiteralPath @($playerLog, $playerResults, $playerDiagnostic) -Force -ErrorAction SilentlyContinue
+}
 
 Write-Host ""
 Write-Host "Process-watchdog tests: $passed passed, $failed failed."

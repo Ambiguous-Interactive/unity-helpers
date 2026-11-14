@@ -1463,6 +1463,16 @@ order, including when one throws:
 using var scope = DisposableScope.Create(RestoreSetting).WithCleanup(DeleteTempFolder);
 ```
 
+Pass a reporter when cleanup failures must be visible:
+
+```csharp
+using DisposableScope scope = DisposableScope.Create(RestoreSetting, UnityEngine.Debug.LogException);
+```
+
+The reporter receives the original exception on the disposing thread. Chained cleanups inherit it,
+and later cleanup failures do not prevent earlier actions. Reporter exceptions are ignored so they
+cannot replace an exception already in flight. The one-argument overload retains silent cleanup.
+
 Each layer is a value type. Copies share a disposal lease, so each action runs at most once even if
 several copies are disposed. Disposing a default scope or passing a null action is harmless, and
 `Dispose` never throws. For reverse ordering, keep the final scope and let its `using` block dispose
@@ -2092,6 +2102,21 @@ Conventions, chosen once so callers do not have to guess:
   overflow. Integral data returns `double`, matching `Enumerable.Average`.
 - `StandardDeviation` is the population standard deviation by default; pass `sample: true` for
   Bessel's correction when the data is a sample of a larger population.
+
+For unsorted byte channels, `WallMath.TryMedian` accepts arrays, read-only spans, and
+`IReadOnlyList<byte>`. Arrays and exact `List<byte>` instances use concrete loops even through the read-only
+interface. Derived lists and other implementations retain interface indexing. It counts values in a fixed 256-bin
+stack histogram, taking O(n + 256)
+time without copying, sorting, or mutating the input. Even counts return the average of both middle
+values as a `double`. Null or empty byte input returns false and NaN. The existing double-span
+overload still requires ascending sorted input.
+
+A three-process .NET 9 Linux helper comparison at 8, 256 and 4,096 elements supports this dispatch:
+paired median candidate/baseline ratios for interface arrays were 0.886, 0.403 and 0.262; list ratios
+were 0.937, 0.496 and 0.356. The smallest unchanged-array and wrapped-list controls regressed about
+3%. These observations do not qualify Unity or player throughput. All timed calls allocated zero
+bytes under a working 4,120-byte positive control. See the [raw samples](../../performance/byte-median-20261114.csv)
+and [method, sources and process records](../../performance/byte-median-20261114.json).
 
 For a binary outcome, use an exact Clopper-Pearson interval when the sample is small or the observed
 rate is close to zero or one:

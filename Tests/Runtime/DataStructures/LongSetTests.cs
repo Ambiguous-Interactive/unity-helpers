@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Tests.TestUtils;
+    using ThreadAllocationCounter = WallstopStudios.UnityHelpers.Tests.Core.ThreadAllocationCounter;
 
     [TestFixture]
     [Category("Fast")]
@@ -154,12 +155,12 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             GCAssert.IgnoreIfAllocationMeasurementUnavailable();
             _ = new LongSet(8);
             _ = new LongMap<byte>(8);
-            long beforeMap = GC.GetAllocatedBytesForCurrentThread();
+            long beforeMap = ThreadAllocationCounter.Read();
             LongMap<byte> map = new(1024);
-            long mapBytes = GC.GetAllocatedBytesForCurrentThread() - beforeMap;
-            long beforeSet = GC.GetAllocatedBytesForCurrentThread();
+            long mapBytes = ThreadAllocationCounter.Read() - beforeMap;
+            long beforeSet = ThreadAllocationCounter.Read();
             LongSet set = new(1024);
-            long setBytes = GC.GetAllocatedBytesForCurrentThread() - beforeSet;
+            long setBytes = ThreadAllocationCounter.Read() - beforeSet;
             GC.KeepAlive(map);
             GC.KeepAlive(set);
             if (mapBytes == 0)

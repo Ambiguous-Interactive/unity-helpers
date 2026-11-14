@@ -207,12 +207,22 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         /// Splits an inline object reference such as <c>{fileID: 11500000, guid: ..., type: 3}</c>.
         /// </summary>
         /// <param name="value">The inline value to parse.</param>
-        /// <param name="fileId">Receives the <c>fileID</c>, or zero when it declared none.</param>
+        /// <param name="fileId">Receives the <c>fileID</c>, or zero on failure.</param>
         /// <param name="guid">Receives the <c>guid</c>, or <c>null</c> when it declared none.</param>
-        /// <returns><c>false</c> for non-mappings or repeated fileID or GUID keys.</returns>
+        /// <returns><c>false</c> unless the mapping declares a valid fileID without repeated fileID or GUID keys.</returns>
         public static bool TryParseObjectReference(string value, out long fileId, out string guid)
         {
-            return TryParseObjectReference(value, out fileId, out guid, out bool _);
+            if (
+                TryParseObjectReference(value, out fileId, out guid, out bool hasFileId)
+                && hasFileId
+            )
+            {
+                return true;
+            }
+
+            fileId = 0;
+            guid = null;
+            return false;
         }
 
         /// <summary>Resolves an inline object reference, including references within one asset.</summary>

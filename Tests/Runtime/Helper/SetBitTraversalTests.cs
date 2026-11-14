@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Tests.TestUtils;
+    using ThreadAllocationCounter = WallstopStudios.UnityHelpers.Tests.Core.ThreadAllocationCounter;
 
     [TestFixture]
     [Category("Fast")]
@@ -163,15 +164,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         {
             BitOps.TrailingZeroCount(1UL);
             GCAssert.IgnoreIfAllocationMeasurementUnavailable();
-            long controlBefore = GC.GetAllocatedBytesForCurrentThread();
+            long controlBefore = ThreadAllocationCounter.Read();
             byte[] control = new byte[128];
-            long controlBytes = GC.GetAllocatedBytesForCurrentThread() - controlBefore;
+            long controlBytes = ThreadAllocationCounter.Read() - controlBefore;
             GC.KeepAlive(control);
             if (controlBytes == 0)
             {
                 Assert.Ignore("The allocation counter did not observe a retained allocation.");
             }
-            long before = GC.GetAllocatedBytesForCurrentThread();
+            long before = ThreadAllocationCounter.Read();
             int sum = 0;
             for (int sample = 0; sample < 256; ++sample)
             {
@@ -180,7 +181,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                     sum += bit;
                 }
             }
-            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            long allocated = ThreadAllocationCounter.Read() - before;
             Assert.That(sum, Is.EqualTo(256 * 2016));
             Assert.That(allocated, Is.Zero);
         }

@@ -6,6 +6,9 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 & ([Environment]::ProcessPath) -NoProfile -File (Join-Path $PSScriptRoot 'test-wproto-replay-dependencies.ps1')
 if ($LASTEXITCODE -ne 0) { throw 'Fresh-process WProto replay dependency controls failed.' }
+. (Join-Path $PSScriptRoot '../unity/lib/credential-redaction.ps1')
+. (Join-Path $PSScriptRoot '../unity/lib/native-evidence.ps1')
+. (Join-Path $PSScriptRoot '../unity/lib/catastrophic-patterns.ps1')
 . (Join-Path $PSScriptRoot '../unity/lib/test-result-evidence.ps1')
 . (Join-Path $PSScriptRoot '../unity/lib/wproto-player-provenance.ps1')
 $runner = Join-Path $PSScriptRoot '../unity/run-ci-tests.ps1'
@@ -14,7 +17,7 @@ $tokens = $null
 $parseErrors = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseInput($source, [ref]$tokens, [ref]$parseErrors)
 if ($parseErrors.Count -ne 0) { throw 'Unity runner must parse.' }
-foreach ($name in @('Read-FrozenPlayerDeclaration', 'Start-FrozenPlayerProvenance',
+foreach ($name in @('Get-UnityNativeReportSummary', 'Write-UnityExecutionObservation', 'Read-FrozenPlayerDeclaration', 'Start-FrozenPlayerProvenance',
         'New-FrozenPlayerAnchor', 'New-WProtoBuildPreparationSource', 'Get-FrozenPlayerRuntimeJoin', 'Add-FrozenPlayerProvenanceSnapshot', 'Get-FrozenPlayerJointCorrectness', 'Complete-FrozenPlayerProvenance', 'Invoke-StandaloneTestPlayer')) {
     $function = $ast.Find({ param($node)
             $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name
@@ -243,14 +246,14 @@ try {
     Assert-Control ($source.Contains('-BuildCaptureOnly:($StandaloneBuildCapture -ne ''None'')')) 'The existing declaration read derives build-only authority from the actual diagnostic mode'
     $originalAllocatorDiagnostics = $env:UH_NATIVE_ALLOCATOR_DIAGNOSTICS
     function Invoke-ProcessWithTreeKillTimeout {
-        param($FilePath, $Arguments, $TimeoutSeconds, $LogPath, $Label)
+        param($FilePath, $Arguments, $TimeoutSeconds, $LogPath, $Label, $ProcessObservation)
         $script:observedPlayerArguments = $Arguments
         return @{ ExitCode = 0; TimedOut = $false }
     }
     try {
         foreach ($diagnostics in @('', '1', 'unexpected')) {
             $env:UH_NATIVE_ALLOCATOR_DIAGNOSTICS = $diagnostics
-            $outcome = Invoke-StandaloneTestPlayer -EditorBuiltExePath 'never launched.exe' -ResultsPath 'retained results.xml' -LogPath 'never written.log'
+            $outcome = Invoke-StandaloneTestPlayer -EditorBuiltExePath 'never launched.exe' -ResultsPath 'retained results.xml' -LogPath (Join-Path $temporary 'observed-player.log')
             Assert-Control ($outcome.ExitCode -eq 0 -and $script:observedPlayerArguments -contains '-uhTestResults' -and
                 $script:observedPlayerArguments -contains 'retained results.xml' -and
                 (($script:observedPlayerArguments -contains '-diag-job-temp-memory-leak-validation') -eq ($diagnostics -eq '1'))) "allocator stack diagnostics require explicit opt-in: '$diagnostics'"

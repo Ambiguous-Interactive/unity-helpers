@@ -12,6 +12,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
     using WallstopStudios.UnityHelpers.Tests.TestUtils;
     using WallstopStudios.UnityHelpers.Utils;
     using SerializerAlias = WallstopStudios.UnityHelpers.Core.Serialization.Serializer;
+    using ThreadAllocationCounter = WallstopStudios.UnityHelpers.Tests.Core.ThreadAllocationCounter;
 
     [TestFixture]
     [Category("Performance")]
@@ -236,7 +237,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 crash.
             */
             GCAssert.IgnoreIfAllocationMeasurementUnavailable();
-            return GC.GetAllocatedBytesForCurrentThread();
+            return ThreadAllocationCounter.Read();
         }
 
         private static int[] ReadIntArray(byte[] data, JsonSerializerOptions options)

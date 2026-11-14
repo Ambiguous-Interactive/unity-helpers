@@ -30,6 +30,11 @@
     "run": "npm run test:assembly-launchers"
   },
   {
+    "id": "compiler-tooling",
+    "name": "Compiler cleanup and formatter compatibility",
+    "run": "npm run test:compiler-tooling"
+  },
+  {
     "id": "asmdef",
     "name": "Assembly definition contracts",
     "run": "npm run test:asmdef"

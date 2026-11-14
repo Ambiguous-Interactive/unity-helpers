@@ -111,9 +111,23 @@ A key the document does not carry at all is **not** reported: that is a differen
 predates the field — and reporting it would report every asset of a type the moment a field is added
 to it. The reported set is slots an author saw and left empty.
 
-An annotated field the check cannot read is reported as a **budget** rather than skipped: a type
-with no `MonoScript` (an inline-only `[Serializable]` class) appears in no document, and a check
-that quietly cannot see part of its subject is the failure this exists to prevent.
+Required fields on nested serializable values are checked through their carrier script, including
+arrays, lists, and serialized dictionary keys and values. The scan follows the serialized field
+path and reports each empty authored slot at its own line. Closed generic values and inherited
+generic fields use their constructed field types, and findings retain that declaring type.
+Former field names remain supported.
+It does not load the asset or run its validation callbacks.
+
+An annotated field the check cannot read is reported as a **budget** rather than skipped. Nested
+types with no reachable carrier script remain `NoBoundScript` exemptions. Managed-reference
+contents are not traversed; their runtime type requires a separate representation reader.
+A concrete serializable class may implement interfaces, but an interface-typed field does not
+identify the concrete fields to inspect. `NotEmpty` can still judge the length of a managed-reference
+array or list without inspecting its elements.
+
+Discovery reuses temporary lists, sets and its declaration map through `Buffers`. The returned
+requirement index, its field lists and retained aliases own their storage, so later scans cannot
+clear an earlier result. Immutable nested document views remain ordinary allocations.
 
 `AuthoredRequirementValidator.TryScan` takes the attribute type, so a project's own "author must
 fill this" attribute gets the same treatment.
@@ -163,6 +177,9 @@ Two states an authored map can be in:
   what it maps to. It still loads, the dictionary is empty, and every lookup misses.
 - **A key whose value names no object.** The asset is well-formed, so `TryGetValue` returns `true`
   with a null and every caller has to remember a second check.
+
+Inline struct values, including colors and vectors, are valid dictionary values. Only mappings
+with a valid `fileID` are interpreted as object references; `{fileID: 0}` still reports an empty slot.
 
 A dictionary whose value type is itself a collection stores its values in `_boxedValues`, because
 Unity drops an array whose element type is a collection. So "no `_values`" is not by itself a

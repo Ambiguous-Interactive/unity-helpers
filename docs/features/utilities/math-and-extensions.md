@@ -1361,6 +1361,11 @@ and slugs to `"cafe"`. Characters with no ASCII form (emoji, and ideographic scr
 are removed, so **a string written entirely in such a script slugs to empty**. Check for that rather
 than assuming a non-empty input yields a non-empty slug.
 
+Use `IsSlug()` or `TryValidateSlug(out string reason)` to validate an identifier without changing
+it. They accept nonempty lowercase ASCII letters and digits separated by single hyphens. Empty
+results from `Slugify` are not valid identifiers. Validation returns a reason for invalid input and
+null on success; it does not normalize uppercase letters, whitespace, or accents.
+
 ### String Utilities
 
 **Levenshtein Distance (edit distance):**

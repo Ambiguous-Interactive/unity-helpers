@@ -511,6 +511,7 @@ runTest("no linter in scripts/ has been left unreachable", () => {
     ["scripts/lint-unity-test-modules.ps1", "module-controls"],
     ["scripts/lint_unity_test_modules.py", "workflow"],
     ["scripts/lint-csharp-format.ps1", "preflight"],
+    ["scripts/lint_csharp_format.py", "formatter-launcher"],
     ["scripts/lint_meta_files.py", "preflight"],
     ["scripts/validate-git-push-config.ps1", "prepush"]
   ]);
@@ -598,6 +599,12 @@ runTest("no linter in scripts/ has been left unreachable", () => {
     ],
     ["workflow", (file) => filesInvoking(".github/workflows", file).length > 0],
     ["preflight", (file) => fileInvokes("scripts/agent-preflight.ps1", file)],
+    [
+      "formatter-launcher",
+      (file) =>
+        fileInvokes("scripts/agent-preflight.ps1", "scripts/lint-csharp-format.ps1") &&
+        fileInvokes("scripts/lint-csharp-format.ps1", path.posix.basename(file))
+    ],
     ["prepush", (file) => scriptPathsIn(expandNpmScript("validate:prepush")).has(file)]
   ]);
 

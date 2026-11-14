@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     using System;
     using System.Runtime;
     using NUnit.Framework;
+    using ThreadAllocationCounter = WallstopStudios.UnityHelpers.Tests.Core.ThreadAllocationCounter;
 
     [TestFixture]
     [NonParallelizable]
@@ -16,14 +17,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         {
             using AllocationMeasurementScope scope = AllocationMeasurementScope.Start();
             Assert.AreEqual(GCLatencyMode.NoGCRegion, GCSettings.LatencyMode);
-            long before = GC.GetAllocatedBytesForCurrentThread();
+            long before = ThreadAllocationCounter.Read();
             long sum = 0;
             for (int index = 0; index < 10_000; ++index)
             {
                 sum += index;
             }
 
-            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            long allocated = ThreadAllocationCounter.Read() - before;
             Assert.AreEqual(49_995_000, sum);
             Assert.AreEqual(0, allocated);
         }
@@ -32,9 +33,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         public void ScopeKeepsRealAllocationsVisible()
         {
             using AllocationMeasurementScope scope = AllocationMeasurementScope.Start();
-            long before = GC.GetAllocatedBytesForCurrentThread();
+            long before = ThreadAllocationCounter.Read();
             byte[] payload = new byte[4096];
-            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            long allocated = ThreadAllocationCounter.Read() - before;
             GC.KeepAlive(payload);
             Assert.GreaterOrEqual(allocated, payload.Length);
         }
