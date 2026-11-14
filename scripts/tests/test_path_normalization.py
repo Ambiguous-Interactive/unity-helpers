@@ -1,5 +1,7 @@
 """Controls for the package's manual path-normalization ban."""
 
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -73,3 +75,29 @@ def test_shared_implementation_exception_cannot_grow(tmp_path: Path) -> None:
     )
     with pytest.raises(ValueError, match="exactly one"):
         scan(tmp_path)
+
+
+@pytest.mark.parametrize("has_violation", [False, True])
+def test_physical_cli_reports_clean_and_rejected_corpora(
+    tmp_path: Path, has_violation: bool
+) -> None:
+    populate(tmp_path)
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    source_scripts = Path(__file__).resolve().parents[1]
+    for name in ("lint_path_normalization.py", "lint_comparison_direction.py", "cli_encoding.py"):
+        shutil.copyfile(source_scripts / name, scripts / name)
+    if has_violation:
+        (tmp_path / "Editor/New.cs").write_text(r"path.Replace('\\', '/')", encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, str(scripts / "lint_path_normalization.py")],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=30,
+    )
+    assert result.returncode == int(has_violation), result.stdout + result.stderr
+    assert ("Editor/New.cs:1:" in result.stdout) == has_violation
+    for root in ANCHORS:
+        assert f"Path normalization examined {root}:" in result.stdout
