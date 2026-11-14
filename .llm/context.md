@@ -64,7 +64,7 @@ See [create-csharp-file](./skills/create-csharp-file.md) for detailed C# rules.
 14. For forbidden patterns and alternatives, see [forbidden-patterns reference](./references/forbidden-patterns.md)
 15. All editor mutation paths must follow the complete undo policy (see [editor-undo-complete](./skills/editor-undo-complete.md)); classify paths as Tier A/B/C and never claim full reversal for Tier C file/reimport side effects
 16. `AssetPostprocessor` callbacks MUST defer non-trivial work through `AssetPostprocessorDeferral.Schedule` to avoid `SendMessage cannot be called...` warnings during Unity's import phase — and deferral is **necessary, not sufficient**: a deferred `LoadAllAssetsAtPath` still deserializes the asset and still runs the consumer's `OnValidate`, so never answer a metadata question with a load (see [asset-postprocessor-safety](./skills/asset-postprocessor-safety.md))
-17. **The package ships three compiler-input assemblies; diagnostics belong to their matching analyzer.**
+17. **The package ships four compiler-input assemblies; diagnostics belong to their matching analyzer.**
     `WPROTO###` (`Generator~/WallstopStudios.UnityHelpers.Proto.Generator`) reports a serialization
     contract that cannot be honoured, so it is an **error** -- the alternative is an exception from
     inside a shipped player. `WUH###`
@@ -76,10 +76,12 @@ See [create-csharp-file](./skills/create-csharp-file.md) for detailed C# rules.
     because their correct shapes are ubiquitous. **The package opts into WUH010, WUH013, and WUH018
     in its shared check-project ruleset; WUH019, WUH021 and WUH023 are enabled by the production-only ruleset for
     Runtime, Editor, and integration checks. The excluded-source audit covers WUH013,
-    WUH019, WUH021, WUH023, WUH026 and WUH028 with reporting controls.** Every owned `Generator~` project self-hosts all shipped compiler inputs and promotes shared `WUH###` policies; WUH019, WUH021 and WUH023 promotion is limited to production checks; the five Unity source gates cover Runtime, Editor, integrations, and both test trees without changing consumer defaults.
+    WUH019, WUH021, WUH023, WUH026 and WUH028 with reporting controls. The enum generator
+    (`Generator~/WallstopStudios.UnityHelpers.Enum.Generator`) reports `WENUM001` as a warning
+    when an annotated enum cannot receive generated overloads; it never changes a build result.** Every owned `Generator~` project self-hosts all shipped compiler inputs and promotes shared `WUH###` policies; WUH019, WUH021 and WUH023 promotion is limited to production checks; the five Unity source gates cover Runtime, Editor, integrations, and both test trees without changing consumer defaults.
     Retain indexed loops when the index is needed or enumeration changes behavior.
     The independent Odin migration generator emits editor bindings without depending on the protobuf generator DLL.
-    All three DLLs are committed under `Runtime/Analyzers`, byte-compared in CI, and **an edit to
+    All four DLLs are committed under `Runtime/Analyzers`, byte-compared in CI, and **an edit to
     any of them is not finished until you rebuild it**. See [analyzers](../docs/performance/analyzers.md)
 18. NEVER size an allocation from a number a payload states -- only from what it delivers. A length prefix is safe because the reader refuses one longer than the bytes it holds; a capacity is a bare claim, and six bytes can ask for 8 GB. Clamp it with `SerializationCapacityLimits.Clamp` where it is a growth hint, refuse it with `TryAccept` where it is semantic. **A `stackalloc` sized from a caller's argument is the same rule with a worse failure** -- `StackOverflowException` is caught by nothing, so a length must be a compile-time constant or compared against one in the same statement, with a `SystemArrayPool` rent above `StackAllocation.MaxByteBudget`; `npm run lint:unsafe-code` holds it over 56 sites ([#637](https://github.com/Ambiguous-Interactive/unity-helpers/issues/637)). See [untrusted-payload-limits](./skills/untrusted-payload-limits.md). **The same gate refuses `[Il2CppSetOption(Option.NullChecks, false)]`** and the `ArrayBoundsChecks`/`DivideByZeroChecks` forms, however spelled -- deleting IL2CPP's runtime checks reaches the same undefined behaviour as `unsafe` with neither the keyword nor `allowUnsafeCode`, so nothing else can see it. Writing one with `true`, or with no value, leaves the check on and stays green. Zero sites exist and there is no baseline: the first one reds the build, and the gate carries a positive control because a zero-subject scan cannot prove itself
 

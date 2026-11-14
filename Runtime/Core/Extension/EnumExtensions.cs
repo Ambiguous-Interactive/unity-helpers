@@ -99,20 +99,26 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                         }
                     }
                 }
-                namesDict = new ConcurrentDictionary<ulong, string>();
+                namesDict = null;
             }
             else
             {
                 namesDict = new ConcurrentDictionary<ulong, string>();
+                bool hasAliases = HasAliasedValues(values);
 
-                foreach (T value in values)
+                for (int i = 0; i < valueCount; ++i)
                 {
+                    T value = values[i];
                     if (!EnumNumericHelper<T>.TryConvertToUInt64(value, out ulong key))
                     {
                         continue;
                     }
 
-                    string name = value.ToString("G");
+                    /*
+                        Reuse the runtime-provided name unless aliases make the runtime's own
+                        choice the compatibility contract.
+                    */
+                    string name = hasAliases ? value.ToString("G") : names[i];
                     namesDict.TryAdd(key, name);
                 }
                 namesArray = null;
@@ -233,6 +239,23 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             return (int)mask + 1;
         }
+
+        private static bool HasAliasedValues(ReadOnlySpan<T> values)
+        {
+            int valueCount = values.Length;
+            for (int i = 1; i < valueCount; ++i)
+            {
+                if (
+                    !EnumNumericHelper<T>.TryConvertToUInt64(values[i - 1], out ulong previous)
+                    || !EnumNumericHelper<T>.TryConvertToUInt64(values[i], out ulong current)
+                    || previous == current
+                )
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
     }
 
     /// <summary>
@@ -326,10 +349,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                         }
                     }
                 }
-                namesDict = new ConcurrentDictionary<ulong, string>(
-                    Environment.ProcessorCount,
-                    fieldCount
-                );
+                namesDict = null;
             }
             else
             {
@@ -531,6 +551,32 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         /// <summary>
+        /// Writes an enum value's cached name into a character span without returning a string.
+        /// </summary>
+        /// <typeparam name="T">The unmanaged enum type.</typeparam>
+        /// <param name="value">The enum value to format.</param>
+        /// <param name="destination">The buffer that receives the name.</param>
+        /// <param name="charsWritten">The number of characters written, or zero when the buffer is too small.</param>
+        /// <returns>True when the name was written; otherwise, false.</returns>
+        /// <remarks>
+        /// Null handling: Not applicable; <typeparamref name="T"/> is a value type.
+        /// Thread-safe: Yes.
+        /// Performance: O(1) for cached values; formatting an uncached value uses the runtime's general format.
+        /// Allocations: Zero for cached values. An uncached value may allocate its name on first use.
+        /// Edge cases: A destination shorter than the name returns false and leaves the buffer unchanged.
+        /// </remarks>
+        public static bool TryFormatCachedName<T>(
+            this T value,
+            Span<char> destination,
+            out int charsWritten
+        )
+            where T : unmanaged, Enum
+        {
+            string name = EnumNameCache<T>.ToCachedName(value);
+            return TryCopyCachedName(name, destination, out charsWritten);
+        }
+
+        /// <summary>
         /// Converts an enum value to the 64-bit two's-complement pattern of its underlying type,
         /// without boxing.
         /// </summary>
@@ -688,6 +734,23 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             result = unchecked((long)unsigned);
+            return true;
+        }
+
+        private static bool TryCopyCachedName(
+            string name,
+            Span<char> destination,
+            out int charsWritten
+        )
+        {
+            if (name == null || destination.Length < name.Length)
+            {
+                charsWritten = 0;
+                return false;
+            }
+
+            name.AsSpan().CopyTo(destination);
+            charsWritten = name.Length;
             return true;
         }
     }

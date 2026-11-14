@@ -124,7 +124,7 @@ function New-ControlFixture {
     $assembly = Join-Path $binaryRoot 'WallstopStudios.UnityHelpers.Proto.Generator.Tests.dll'
     Write-ControlFile $assembly 'synthetic test assembly; never loaded or executed'
     Write-ControlFile (Join-Path $binaryRoot 'PreservedDependency.dll') 'synthetic optional output dependency'
-    foreach ($name in @('WallstopStudios.UnityHelpers.Proto.Generator.dll', 'WallstopStudios.UnityHelpers.Analyzers.dll', 'WallstopStudios.UnityHelpers.OdinMigration.Generator.dll')) {
+    foreach ($name in @('WallstopStudios.UnityHelpers.Proto.Generator.dll', 'WallstopStudios.UnityHelpers.Analyzers.dll', 'WallstopStudios.UnityHelpers.OdinMigration.Generator.dll', 'WallstopStudios.UnityHelpers.Enum.Generator.dll')) {
         Write-ControlFile (Join-Path $root "Runtime/Analyzers/$name") "synthetic analyzer $name; never loaded or executed"
     }
     foreach ($name in @('protobuf-net.dll', 'protobuf-net.Core.dll')) {

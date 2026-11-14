@@ -226,7 +226,7 @@ function Get-PreflightSafetyPaths {
         if (@($Paths | Where-Object { $_ -like '.llm/*' }).Count -gt 0) {
             foreach ($path in @('.llm/context.md', '.llm/skills/index.md', '.agents/skills', '.claude/skills')) { [void]$scope.Add($path) }
         }
-        if (@($Paths | Where-Object { $_ -like 'Generator~/WallstopStudios.UnityHelpers.Analyzers/*' -or $_ -like 'Generator~/WallstopStudios.UnityHelpers.Proto.Generator/*' -or $_ -like 'Generator~/WallstopStudios.UnityHelpers.OdinMigration.Generator/*' }).Count -gt 0) {
+        if (@($Paths | Where-Object { $_ -like 'Generator~/WallstopStudios.UnityHelpers.Analyzers/*' -or $_ -like 'Generator~/WallstopStudios.UnityHelpers.Proto.Generator/*' -or $_ -like 'Generator~/WallstopStudios.UnityHelpers.OdinMigration.Generator/*' -or $_ -like 'Generator~/WallstopStudios.UnityHelpers.Enum.Generator/*' }).Count -gt 0) {
             [void]$scope.Add('Runtime/Analyzers')
         }
     }
@@ -2635,7 +2635,8 @@ if ($csharpierTargets.Count -gt 0) {
     $analyzerSourceTargets = @($relativePaths | Where-Object {
             $_ -like 'Generator~/WallstopStudios.UnityHelpers.Analyzers/*' -or
             $_ -like 'Generator~/WallstopStudios.UnityHelpers.Proto.Generator/*' -or
-            $_ -like 'Generator~/WallstopStudios.UnityHelpers.OdinMigration.Generator/*'
+            $_ -like 'Generator~/WallstopStudios.UnityHelpers.OdinMigration.Generator/*' -or
+            $_ -like 'Generator~/WallstopStudios.UnityHelpers.Enum.Generator/*'
         })
     if ($analyzerSourceTargets.Count -gt 0 -and $Fix -and -not (Test-CanRunWholeFileAutoFix -Paths @('Runtime/Analyzers') -InitiallyUnstagedPaths $initiallyUnstagedPaths -Context 'shipped analyzer rebuild')) {
         $failureCount++

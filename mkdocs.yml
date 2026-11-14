@@ -257,6 +257,7 @@ nav:
       - Reflection Helpers: performance/reflection-performance.md
       - IList Sorting: performance/ilist-sorting-performance.md
       - Dictionary Key Performance: performance/dictionary-key-performance.md
+      - Enum Helper Performance: performance/enum-helpers-performance.md
       - Custom JSON Converters: performance/json-codegen-performance.md
       - Reading Performance Measurements: performance/baseline-tests-performance.md
       - "Analyzers (WUH###)": performance/analyzers.md

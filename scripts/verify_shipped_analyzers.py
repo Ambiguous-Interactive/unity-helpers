@@ -18,6 +18,7 @@ ANALYZERS = (
     "WallstopStudios.UnityHelpers.Analyzers",
     "WallstopStudios.UnityHelpers.Proto.Generator",
     "WallstopStudios.UnityHelpers.OdinMigration.Generator",
+    "WallstopStudios.UnityHelpers.Enum.Generator",
 )
 
 

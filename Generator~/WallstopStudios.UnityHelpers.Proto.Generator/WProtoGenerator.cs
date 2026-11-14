@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 {
     using System;
     using System.Collections.Generic;
+    using System.Globalization;
     using System.Linq;
     using System.Runtime.Serialization;
     using System.Text;
@@ -3839,6 +3840,30 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 + ".g.cs";
         }
 
+        private static string UniqueHintName(INamedTypeSymbol contract, HashSet<string> reserved)
+        {
+            string hint = FileNameFor(contract);
+            string stem = hint.Substring(0, hint.Length - ".g.cs".Length);
+            int salt = 0;
+            while (!reserved.Add(hint))
+            {
+                string identity =
+                    contract.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                    + (
+                        salt == 0 ? string.Empty : "#" + salt.ToString(CultureInfo.InvariantCulture)
+                    );
+                uint hash = 2166136261;
+                foreach (char character in identity)
+                {
+                    hash ^= character;
+                    hash *= 16777619;
+                }
+                hint = stem + "_" + hash.ToString("x8", CultureInfo.InvariantCulture) + ".g.cs";
+                ++salt;
+            }
+            return hint;
+        }
+
         private static string Sanitize(string value)
         {
             StringBuilder builder = new StringBuilder(value.Length);
@@ -4500,6 +4525,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 emissions.Add(new Emission(contract, source, registration));
             }
 
+            HashSet<string> hintNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             List<IArrayTypeSymbol> arrayTypes = new List<IArrayTypeSymbol>();
             List<ClosureScan.TypeUse> typeUses = ClosureScan.Types(
                 context.Compilation,
@@ -4519,7 +4545,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 }
 
                 context.AddSource(
-                    FileNameFor(emission.Contract),
+                    UniqueHintName(emission.Contract, hintNames),
                     SourceText.From(emission.Source, Encoding.UTF8)
                 );
                 emittedContracts.Add(emission.Contract);

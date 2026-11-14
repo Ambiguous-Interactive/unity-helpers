@@ -28,7 +28,12 @@ VARIANTS: dict[str, tuple[str, ...]] = {
     "proto-only": ("-p:WallstopProtoOnly=true",),
 }
 TEST_TREES = {"tests": "Tests/Runtime", "editor-tests": "Tests/Editor"}
-COMPILER_INPUTS = ("Proto.Generator", "Analyzers", "OdinMigration.Generator")
+COMPILER_INPUTS = (
+    "Proto.Generator",
+    "Analyzers",
+    "OdinMigration.Generator",
+    "Enum.Generator",
+)
 MSBUILD_SPECIAL = re.compile(r'[%;,*?\[\]\r\n\x00"]')
 
 
