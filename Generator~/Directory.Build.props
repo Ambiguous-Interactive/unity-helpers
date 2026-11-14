@@ -31,5 +31,6 @@
     <Analyzer Include="$(MSBuildThisFileDirectory)../Runtime/Analyzers/WallstopStudios.UnityHelpers.Proto.Generator.dll" />
     <Analyzer Include="$(MSBuildThisFileDirectory)../Runtime/Analyzers/WallstopStudios.UnityHelpers.Analyzers.dll" />
     <Analyzer Include="$(MSBuildThisFileDirectory)../Runtime/Analyzers/WallstopStudios.UnityHelpers.OdinMigration.Generator.dll" />
+    <Analyzer Include="$(MSBuildThisFileDirectory)../Runtime/Analyzers/WallstopStudios.UnityHelpers.Enum.Generator.dll" />
   </ItemGroup>
 </Project>
