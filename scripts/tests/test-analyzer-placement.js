@@ -339,7 +339,7 @@ const promotedPolicyIds = [...generatorBuildPolicy.matchAll(/(?:^|;)(WUH\d{3})(?
 check(
   "shared WUH policies are promoted globally and WUH019, WUH021 and WUH023 only in production",
   JSON.stringify([...promotedPolicyIds].sort()) ===
-    JSON.stringify(descriptorIds.filter((id) => id !== "WUH024").sort()),
+    JSON.stringify(descriptorIds.filter((id) => id !== "WUH024" && id !== "WUH029").sort()),
   `descriptors=${descriptorIds.join(",")} promoted=${promotedPolicyIds.join(",")}`
 );
 
@@ -348,6 +348,13 @@ check(
   checkRuleset.includes('<Rule Id="WUH024" Action="None" />') &&
     !promotedPolicyIds.includes("WUH024"),
   "WUH024 can retain enum names; the package must not turn every naming call into a cache"
+);
+
+check(
+  "member order stays an explicit consumer opt-in while repository source gates retain ownership",
+  checkRuleset.includes('<Rule Id="WUH029" Action="None" />') &&
+    !promotedPolicyIds.includes("WUH029"),
+  "WUH029 reports the active compilation; the repository source gate also covers inactive branches"
 );
 
 process.stdout.write(`Analyzer placement contract passed (${passed} checks).\n`);

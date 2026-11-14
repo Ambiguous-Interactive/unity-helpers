@@ -9,7 +9,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
     using Microsoft.CodeAnalysis.Operations;
 
     /// <summary>
-    /// Reports a <c>struct</c> implementing <c>IDisposable</c> whose <c>Dispose</c> assigns to one
+    /// Reports a disposable <c>struct</c> whose <c>Dispose</c> or <c>DisposeAsync</c> assigns to one
     /// of the struct's own fields or to a static.
     /// </summary>
     /// <remarks>
@@ -30,7 +30,9 @@ namespace WallstopStudios.UnityHelpers.Analyzers
     public sealed class DisposableStructAssignmentAnalyzer : DiagnosticAnalyzer
     {
         private const string DisposeName = "Dispose";
+        private const string DisposeAsyncName = "DisposeAsync";
         private const string DisposableMetadataName = "System.IDisposable";
+        private const string AsyncDisposableMetadataName = "System.IAsyncDisposable";
 
         /// <inheritdoc />
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
@@ -71,12 +73,11 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         }
 
         /// <summary>
-        /// Whether <paramref name="containing"/> is the parameterless <c>Dispose</c> of a struct
-        /// that implements <c>IDisposable</c>.
+        /// Whether this method implements synchronous or asynchronous struct disposal.
         /// </summary>
         /// <remarks>
         /// <c>Dispose(bool disposing)</c> is the BCL's own disposal protocol and a class's shape;
-        /// only the release point the <c>using</c> statement calls is in scope here. An explicit
+        /// only the release point that <c>using</c> or <c>await using</c> calls is in scope here. An explicit
         /// <c>void IDisposable.Dispose()</c> is the same method under a different name, so it is
         /// matched through its explicit implementation list rather than by spelling.
         /// </remarks>
@@ -90,14 +91,14 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 return false;
             }
 
-            if (!method.ReturnsVoid || method.Parameters.Length != 0)
+            if (method.IsStatic || method.Parameters.Length != 0)
             {
                 return false;
             }
-
             if (
                 !string.Equals(method.Name, DisposeName, System.StringComparison.Ordinal)
-                && !ImplementsDisposeExplicitly(method)
+                && !string.Equals(method.Name, DisposeAsyncName, System.StringComparison.Ordinal)
+                && method.ExplicitInterfaceImplementations.Length == 0
             )
             {
                 return false;
@@ -110,29 +111,33 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             }
 
             INamedTypeSymbol disposable = compilation.GetTypeByMetadataName(DisposableMetadataName);
-            if (disposable == null)
-            {
-                return false;
-            }
+            INamedTypeSymbol asyncDisposable = compilation.GetTypeByMetadataName(
+                AsyncDisposableMetadataName
+            );
 
             foreach (INamedTypeSymbol implemented in declaring.AllInterfaces)
             {
+                string memberName;
                 if (SymbolEqualityComparer.Default.Equals(implemented, disposable))
                 {
-                    return true;
+                    memberName = DisposeName;
                 }
-            }
-
-            return false;
-        }
-
-        private static bool ImplementsDisposeExplicitly(IMethodSymbol method)
-        {
-            foreach (IMethodSymbol explicitly in method.ExplicitInterfaceImplementations)
-            {
-                if (string.Equals(explicitly.Name, DisposeName, System.StringComparison.Ordinal))
+                else if (SymbolEqualityComparer.Default.Equals(implemented, asyncDisposable))
                 {
-                    return true;
+                    memberName = DisposeAsyncName;
+                }
+                else
+                {
+                    continue;
+                }
+
+                foreach (ISymbol member in implemented.GetMembers(memberName))
+                {
+                    ISymbol implementation = declaring.FindImplementationForInterfaceMember(member);
+                    if (SymbolEqualityComparer.Default.Equals(implementation, method))
+                    {
+                        return true;
+                    }
                 }
             }
 

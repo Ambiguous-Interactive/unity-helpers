@@ -15,13 +15,14 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
     using WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils;
     using WallstopStudios.UnityHelpers.Tests.CustomDrawers.TestTypes;
     using WallstopStudios.UnityHelpers.Tests.Core;
+    using WallstopStudios.UnityHelpers.Tests.EditorFramework;
     using WallstopStudios.UnityHelpers.Tests.TestUtils;
     using PropertyAttribute = UnityEngine.PropertyAttribute;
 
     [TestFixture]
     [NUnit.Framework.Category("Slow")]
     [NUnit.Framework.Category("Integration")]
-    public sealed class WValueDropDownDrawerTests : CommonTestBase
+    public sealed class WValueDropDownDrawerTests : SynchronousEditorTestBase
     {
         private static IEnumerable<TestCaseData> CustomOptionLabelData()
         {
@@ -68,6 +69,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 $"Expected selector to derive from WDropDownSelectorBase<string>, but was {selector?.GetType().FullName ?? "null"}."
             );
             dropDownSelector.ApplySelection(optionIndex);
+        }
+
+        [OneTimeSetUp]
+        public void InitializeEditorStylesInGuiContext()
+        {
+            TestIMGUIExecutor.InitializeEditorStyles();
         }
 
         [Test]

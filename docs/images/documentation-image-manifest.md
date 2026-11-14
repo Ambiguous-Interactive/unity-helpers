@@ -14,7 +14,7 @@ no native window capture, and no programmatic skin switching.
 
 | Format         | Status                                                                         |
 | -------------- | ------------------------------------------------------------------------------ |
-| PNG (still)    | Automatable. 13 of the repository's 70 PNGs are generated today.               |
+| PNG (still)    | 13 catalog-generated PNGs and two qualified comparison captures.               |
 | GIF (animated) | **Out of scope.** The harness captures single frames; it cannot record a GIF.  |
 | WebP           | **Out of scope.** Unity's `EncodeToPNG` has no WebP counterpart in the editor. |
 | SVG (diagram)  | Not applicable. Diagrams are authored, not captured.                           |
@@ -58,6 +58,16 @@ Use it to confirm the fixture's non-capture assertions (catalog, manifest, and d
 cross-checks) still hold.
 
 ---
+
+## Analyzer Policy comparison captures
+
+`analyzer-policy-member-order-before.png` and `analyzer-policy-member-order-after.png`
+show the real Analyzer Policy surface with the same `WUH029` query, before and after its
+catalog entry. Both use a real graphics device and the light editor skin without changing
+preferences. The [qualification record](../performance/analyzer-policy-member-order-20261114.json)
+retains the temporary fixture, controller, PNG hashes, native metadata and process receipts.
+The fixture is removed after capture; these historical comparisons are separate from the
+catalog regeneration command below. The [analyzer guide](../performance/analyzers.md) shows both.
 
 ## Generated images
 

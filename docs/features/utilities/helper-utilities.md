@@ -24,6 +24,35 @@ Static helper classes and utilities that solve common programming problems witho
 
 ---
 
+## Editor Asset Helpers
+
+Use `Helpers.EnumerateAssets<T>(folders)` in editor code to read matching main assets and subassets,
+including animation clips embedded in another asset. `T` can be any `UnityEngine.Object` type.
+Omitting folders searches `Assets`; an empty folder collection returns no results. Enumeration
+loads assets and runs on the Editor main thread. The existing ScriptableObject and prefab helpers
+keep their existing search defaults.
+
+Use `Helpers.CreateOrReplaceAsset(source, path)` to save a generated native asset without breaking
+references to a previous version. It returns the saved object, which is the existing object during
+replacement, or null on failure. `TryCreateOrReplaceAsset` also returns an error message. Always use
+the returned object for subsequent edits: replacement copies source contents into the destination;
+it does not turn a temporary source into that persistent object.
+
+The destination must be below `Assets` in an existing folder. Replacement requires a native main
+asset of the same concrete type. Imported files such as PNGs, subasset sources, type changes, scenes, prefabs,
+components, sources marked `DontSaveInEditor`, missing folders, and relative path traversal are refused. Supported native extensions
+are `.asset`, `.anim`, `.mat`, `.guiskin`, `.cubemap`, `.mask`, `.physicMaterial`,
+`.physicsMaterial2D`, `.renderTexture`, `.controller`, `.overrideController`, `.terrainlayer`,
+and `.flare`. A persistent source can supply replacement contents, but cannot be moved to a new
+path through this helper.
+
+Replacement keeps the destination GUID and local file ID. Copying a distinct source records in-memory
+Undo. When saving an object you already edited, record Undo before your edit. File creation, saving
+and reimporting cannot be fully reversed with Undo. A failed save can leave an unsaved
+in-memory change; inspect the error and destination before retrying. This API does not coordinate
+with external writers and never deletes a destination as failure cleanup. Saving uses `AssetDatabase.SaveAssets`,
+which also flushes other dirty project assets.
+
 ## Live Component Registries
 
 Use `LiveComponents<T>` from `WallstopStudios.UnityHelpers.Utils` to select a component class,
@@ -2488,7 +2517,7 @@ foreach (string varName in Helpers.CiEnvironmentVariables.All)
 Added in the next release. Use `StopwatchTimestamp` from
 `WallstopStudios.UnityHelpers.Core.Helper` when you need elapsed time without creating a
 `Stopwatch` object. `Since` accepts a timestamp from `Stopwatch.GetTimestamp()` and returns a
-signed `TimeSpan`. `ToMilliseconds` and `ToNanoseconds` accept counter ticks, not `TimeSpan` ticks.
+signed `TimeSpan`. `ToSeconds`, `ToMilliseconds` and `ToNanoseconds` accept counter ticks, not `TimeSpan` ticks.
 
 <!-- doc-sample: compiles -->
 

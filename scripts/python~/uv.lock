@@ -166,6 +166,15 @@ wheels = [
 ]
 
 [[package]]
+name = "json5"
+version = "0.17.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/16/1f/58a4d7ee466f81bc3c7337036380fc6d49de3afb7855d74f8121b1e89b32/json5-0.17.3.tar.gz", hash = "sha256:8d0278ad34ebaa9c3af76d9519274811830224a2d1cd5af156dbd067f461b8a4", size = 54234, upload-time = "2026-10-09T21:19:28.335Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ae/39/e689b616c4279a821d5842a8a85c1874540f8d58e35028df93f2182120c2/json5-0.17.3-py3-none-any.whl", hash = "sha256:2c8b22a893c35cd6a3c5ccbf1dd1c7d02c25dc1b5897fea658f9bf08c2e05f9a", size = 34809, upload-time = "2026-10-09T21:19:27.357Z" },
+]
+
+[[package]]
 name = "librt"
 version = "0.16.0"
 source = { registry = "https://pypi.org/simple" }
@@ -662,6 +671,7 @@ browser = [
     { name = "playwright" },
 ]
 dev = [
+    { name = "json5" },
     { name = "markdown-it-py" },
     { name = "mypy" },
     { name = "pillow" },
@@ -675,6 +685,7 @@ dev = [
     { name = "z3-solver" },
 ]
 documentation = [
+    { name = "json5" },
     { name = "markdown-it-py" },
 ]
 fixtures = [
@@ -693,6 +704,7 @@ proof = [
 [package.metadata.requires-dev]
 browser = [{ name = "playwright", specifier = ">=1.64.1" }]
 dev = [
+    { name = "json5", specifier = ">=0.17.3" },
     { name = "markdown-it-py", specifier = ">=4.2.0" },
     { name = "mypy", specifier = ">=2.4.1" },
     { name = "pillow", specifier = ">=13.0.0" },
@@ -705,7 +717,10 @@ dev = [
     { name = "yamllint", specifier = ">=1.38.0" },
     { name = "z3-solver", specifier = "==5.4.1.0" },
 ]
-documentation = [{ name = "markdown-it-py", specifier = ">=4.2.0" }]
+documentation = [
+    { name = "json5", specifier = ">=0.17.3" },
+    { name = "markdown-it-py", specifier = ">=4.2.0" },
+]
 fixtures = [{ name = "pillow", specifier = ">=13.0.0" }]
 metadata = [
     { name = "pyyaml", specifier = ">=6.0.3" },

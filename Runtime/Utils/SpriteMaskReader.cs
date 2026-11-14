@@ -26,7 +26,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// Alpha zero is always transparent; other pixels are opaque at or above the threshold.
         /// Editor PNG masks honor the texture importer's alpha source.
         /// Separate alpha textures require original PNG pixels in the Editor.
-        /// Readable RGBA32, RGB24, ARGB32, BGRA32 and Alpha8 subregions copy only their selected base-mip pixels.
+        /// Readable RGBA32, RGB24, ARGB32, BGRA32, Alpha8, RGB565 and RGBA4444 subregions copy only their selected base-mip pixels.
         /// </remarks>
         public static bool TryRead(
             Sprite sprite,
@@ -349,6 +349,57 @@ namespace WallstopStudios.UnityHelpers.Utils
                         pixels[destinationOffset + column] = alphaFirst
                             ? new Color32(encoded.g, encoded.b, encoded.a, encoded.r)
                             : new Color32(encoded.b, encoded.g, encoded.r, encoded.a);
+                    }
+                }
+                textureWidth = width;
+                sourceRegion = new RectInt(0, 0, width, height);
+            }
+            else if (
+                (long)width * height < (long)sourceTextureWidth * sourceTextureHeight
+                && (
+                    texture.format == TextureFormat.RGB565
+                    || texture.format == TextureFormat.RGBA4444
+                )
+            )
+            {
+                NativeArray<ushort> raw = texture.GetPixelData<ushort>(0);
+                if ((long)sourceTextureWidth * sourceTextureHeight != raw.Length)
+                {
+                    error = "The texture pixels do not match its dimensions.";
+                    region = default;
+                    return false;
+                }
+                bool rgb565 = texture.format == TextureFormat.RGB565;
+                pixels = new Color32[width * height];
+                for (int row = 0; row < height; ++row)
+                {
+                    int sourceOffset = (yStart + row) * sourceTextureWidth + xStart;
+                    int destinationOffset = row * width;
+                    for (int column = 0; column < width; ++column)
+                    {
+                        ushort encoded = raw[sourceOffset + column];
+                        byte red;
+                        byte green;
+                        byte blue;
+                        byte alpha;
+                        if (rgb565)
+                        {
+                            int redBits = encoded >> 11;
+                            int greenBits = (encoded >> 5) & 63;
+                            int blueBits = encoded & 31;
+                            red = (byte)((redBits << 3) | (redBits >> 2));
+                            green = (byte)((greenBits << 2) | (greenBits >> 4));
+                            blue = (byte)((blueBits << 3) | (blueBits >> 2));
+                            alpha = byte.MaxValue;
+                        }
+                        else
+                        {
+                            red = (byte)((encoded >> 12) * 17);
+                            green = (byte)(((encoded >> 8) & 15) * 17);
+                            blue = (byte)(((encoded >> 4) & 15) * 17);
+                            alpha = (byte)((encoded & 15) * 17);
+                        }
+                        pixels[destinationOffset + column] = new Color32(red, green, blue, alpha);
                     }
                 }
                 textureWidth = width;

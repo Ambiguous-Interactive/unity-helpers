@@ -1089,9 +1089,7 @@ namespace WallstopStudios.UnityHelpers.Utils
     {
         private const float MinAutoPurgeIntervalSeconds = 1.0f;
 
-        // Stopwatch avoids Unity timing APIs that can block during early editor initialization.
-        private static readonly System.Diagnostics.Stopwatch PoolStopwatch =
-            System.Diagnostics.Stopwatch.StartNew();
+        private static readonly long PoolStartTimestamp = Stopwatch.GetTimestamp();
 
         /// <inheritdoc />
         public int CurrentPooledCount => _pool.Count;
@@ -1322,7 +1320,13 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         private static float DefaultTimeProvider()
         {
-            return (float)PoolStopwatch.Elapsed.TotalSeconds;
+            long timestamp = Stopwatch.GetTimestamp();
+            long elapsed = unchecked(timestamp - PoolStartTimestamp);
+            double seconds =
+                global::WallstopStudios.UnityHelpers.Core.Helper.StopwatchTimestamp.ToSeconds(
+                    elapsed
+                );
+            return (float)seconds;
         }
 
         /// <summary>
@@ -2134,9 +2138,7 @@ namespace WallstopStudios.UnityHelpers.Utils
     {
         private const float MinAutoPurgeIntervalSeconds = 1.0f;
 
-        // Stopwatch avoids Unity timing APIs that can block during early editor initialization.
-        private static readonly System.Diagnostics.Stopwatch PoolStopwatch =
-            System.Diagnostics.Stopwatch.StartNew();
+        private static readonly long PoolStartTimestamp = Stopwatch.GetTimestamp();
 
         /// <inheritdoc />
         public int CurrentPooledCount
@@ -2429,7 +2431,13 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         private static float DefaultTimeProvider()
         {
-            return (float)PoolStopwatch.Elapsed.TotalSeconds;
+            long timestamp = Stopwatch.GetTimestamp();
+            long elapsed = unchecked(timestamp - PoolStartTimestamp);
+            double seconds =
+                global::WallstopStudios.UnityHelpers.Core.Helper.StopwatchTimestamp.ToSeconds(
+                    elapsed
+                );
+            return (float)seconds;
         }
 
         /// <summary>

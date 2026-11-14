@@ -157,6 +157,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 "Fresh pooled collection clears",
                 "Reports an immediate Clear after a known Buffers rental. Collections are already empty; retain clears after use and custom-pool cleanup."
             ),
+            new(
+                "WUH029",
+                "Member declaration order",
+                "Reports member order and nested types before ordinary members. This policy is opt-in; review initializer and conditional-compilation dependencies before moving code."
+            ),
         };
 
         /// <summary>Enables or disables every Unity Helpers analyzer in the default ruleset.</summary>

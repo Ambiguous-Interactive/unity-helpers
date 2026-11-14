@@ -1,0 +1,153 @@
+{
+  "environment": "Windows Unity 6000.6.7f1, real D3D11 device, light skin, isolated batch project. Offscreen capture host supplies the editor background; shipped controls render themselves. No ruleset writes.",
+  "fixtureSource": "// MIT License - Copyright (c) 2026 wallstop\n// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE\n\nnamespace WallstopStudios.UnityHelpers.Tests.Editor.Capture\n{\n#if UNITY_EDITOR\n    using System;\n    using System.IO;\n    using NUnit.Framework;\n    using UnityEditor;\n    using UnityEditor.UIElements;\n    using UnityEngine;\n    using UnityEngine.UIElements;\n    using WallstopStudios.UnityHelpers.Editor.Tools;\n    using WallstopStudios.UnityHelpers.Tests.Core;\n\n    [TestFixture]\n    public sealed class MemberPolicyCaptureTests : CommonTestBase\n    {\n        [Test]\n        public void CaptureMemberPolicy()\n        {\n            Assert.That(\n                EditorSurfaceCapture.IsSupported,\n                Is.True,\n                EditorSurfaceCapture.UnsupportedReason\n            );\n            string phase = Environment.GetEnvironmentVariable(\"UH_MEMBER_CAPTURE_PHASE\");\n            string output = Environment.GetEnvironmentVariable(\"UH_MEMBER_CAPTURE_OUTPUT\");\n            Assert.That(output, Is.Not.Null.And.Not.Empty);\n            string ruleset = Path.Combine(Application.dataPath, \"MemberPolicyCapture.ruleset\");\n            Assert.That(File.Exists(ruleset), Is.False);\n            AnalyzerPolicyWindow window = Track(\n                ScriptableObject.CreateInstance<AnalyzerPolicyWindow>()\n            );\n            window.RulesetPathOverride = ruleset;\n            window.BuildUserInterface();\n            ToolbarSearchField search = window.rootVisualElement.Q<ToolbarSearchField>();\n            search.RegisterCallback<AttachToPanelEvent>(_ => search.value = \"WUH029\");\n            bool hasRow = window.GetPolicyRow(\"WUH029\") != null;\n            Assert.That(hasRow, Is.EqualTo(phase == \"after\"));\n            VisualElement surface = new VisualElement();\n            surface.style.width = 1000;\n            surface.style.height = 600;\n            surface.style.backgroundColor = EditorGUIUtility.isProSkin\n                ? new Color(0.22f, 0.22f, 0.22f)\n                : new Color(0.76f, 0.76f, 0.76f);\n            window.rootVisualElement.style.flexGrow = 1;\n            surface.Add(window.rootVisualElement);\n            EditorSurfaceCaptureResult result = EditorSurfaceCapture.Capture(\n                surface,\n                1000,\n                600,\n                output\n            );\n            Assert.That(\n                window.GetPolicyRow(\"WUH001\").style.display.value,\n                Is.EqualTo(DisplayStyle.None)\n            );\n            Assert.That(result.DistinctColorCount, Is.GreaterThan(16));\n            Assert.That(result.OnlyCursorRectErrors, Is.True, result.RenderErrorSummary);\n            Assert.That(File.Exists(ruleset), Is.False);\n            File.WriteAllText(\n                output + \".txt\",\n                result\n                    + \"\\nphase=\"\n                    + phase\n                    + \"\\nmodule=\"\n                    + typeof(AnalyzerPolicyWindow).Module.ModuleVersionId\n                    + \"\\nhasRow=\"\n                    + hasRow\n            );\n        }\n    }\n#endif\n}\n",
+  "controllerSource": "$ErrorActionPreference = 'Stop'\n$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../..'))\n$project = Join-Path ([IO.Path]::GetTempPath()) 'uh-session-20261114-morning-validation'\n$pwsh = Join-Path $env:USERPROFILE 'scoop/apps/pwsh/current/pwsh.exe'\n@{pid=$PID;startUtc=[DateTime]::UtcNow}|ConvertTo-Json|Set-Content(Join-Path $PSScriptRoot 'member-policy-identity.json')\n$inputs=@('Runtime/Core/Helper/Helpers.Assets.cs','Tests/Editor/Helper/HelpersTests.cs','Tests/Editor/CustomDrawers/StringInListDrawerTests.cs','Tests/Editor/CustomDrawers/WValueDropDownDrawerTests.cs','Tests/Editor/TestFramework/TestIMGUIExecutor.cs','Editor/Tools/AnalyzerPolicyAPI.cs','Editor/Tools/AnalyzerPolicyExamples.cs')\n$before=@{};foreach($source in $inputs){$before[$source]=(Get-FileHash(Join-Path $repository $source)).Hash}\n$code=1\ntry {\n foreach($phase in @('before','after')) {\n  Copy-Item (Join-Path $PSScriptRoot \"AnalyzerPolicyAPI.$phase.cs.txt\") (Join-Path $repository 'Editor/Tools/AnalyzerPolicyAPI.cs') -Force\n  $env:UH_MEMBER_CAPTURE_PHASE=$phase\n  $env:UH_MEMBER_CAPTURE_OUTPUT=Join-Path $PSScriptRoot \"member-policy-$phase.png\"\n  $artifacts=Join-Path $PSScriptRoot \"member-policy-v4-$phase\"\n  & $pwsh -NoProfile -File (Join-Path $repository 'scripts/unity/run-ci-tests.ps1') -UnityVersion '6000.6.7f1' -TestMode editmode -EnableEditorGraphics -AssemblyNames 'WallstopStudios.UnityHelpers.Tests.Editor.Capture' -TestFilter 'MemberPolicyCaptureTests' -TestCategory '!Performance;!Stress' -RepoRoot $repository -ProjectPath $project -ArtifactsPath $artifacts -UnityEditorPath (Join-Path ${env:ProgramFiles} 'Unity/Hub/Editor/6000.6.7f1/Editor/Unity.exe') *> (Join-Path $PSScriptRoot \"member-policy-v4-$phase-driver.log\")\n  if($LASTEXITCODE -ne 0){throw \"Capture $phase failed $LASTEXITCODE\"}\n  [xml]$xml=Get-Content(Join-Path $artifacts 'results.xml') -Raw\n  $cases=@($xml.SelectNodes('//test-case'))\n  if($cases.Count -ne 1 -or $cases[0].result -ne 'Passed'){throw 'Missing capture case'}\n  $receipt=Get-Content(Join-Path $artifacts 'unity.execution-diagnostics.json') -Raw|ConvertFrom-Json\n  if($receipt.Process.RawExitCode -ne 0 -or -not $receipt.Process.StandardOutputEndObserved -or -not $receipt.Process.StandardErrorEndObserved -or $receipt.Process.OutputDrainStopped){throw 'Unhealthy capture process'}\n }\n $code=0\n} catch { $_|Out-String|Set-Content(Join-Path $PSScriptRoot 'member-policy-controller.log') }\nfinally {\n Copy-Item (Join-Path $PSScriptRoot 'AnalyzerPolicyAPI.after.cs.txt') (Join-Path $repository 'Editor/Tools/AnalyzerPolicyAPI.cs') -Force\n @{exitCode=$code;completedUtc=[DateTime]::UtcNow}|ConvertTo-Json|Set-Content(Join-Path $PSScriptRoot 'member-policy-result.json')\n}\nexit $code\n",
+  "captures": [
+    {
+      "phase": "before",
+      "pngSha256": "61a4321084bf69b5b3fbad5be7f8d859ce731bc6a27ca5ee184d00a36be4999f",
+      "metadata": "D:\\Code\\Packages\\Packages\\com.wallstop-studios.unity-helpers\\progress\\.artifacts\\session-20261114-morning\\member-policy-before.png 1000x600 bytes=22968 pngColorType=2 distinctColors=222 renderErrors=0 isProSkin=False unity=6000.6.7f1\nphase=before\nmodule=866cbf69-4974-4501-9541-ea111a0d6182\nhasRow=False",
+      "catalogSourceSha256": "7138478ff3448392180e669033594723288c7f1f244d1e94f77b95a870e6a171",
+      "processReceipt": {
+        "CapturedUtc": "2026-11-14T08:28:51.8841217Z",
+        "Label": "Run Unity 6000.6.7f1 editmode tests",
+        "Process": {
+          "LogPersistence": "written",
+          "EndObservedUtc": "2026-11-14T08:28:51.7963810Z",
+          "ExitOrigin": "process-exit",
+          "NativeEvidence": {
+            "State": "files-observed",
+            "CaptureId": "f44fdf1670ba4c65b5d1bafd94b6b3e2",
+            "CrashDirectory": "C:\\Users\\dbfsi\\AppData\\Local\\Temp\\unity-helpers-native\\f44fdf1670ba4c65b5d1bafd94b6b3e2",
+            "UpmLogPath": "C:\\Users\\dbfsi\\AppData\\Local\\Temp\\unity-helpers-native\\f44fdf1670ba4c65b5d1bafd94b6b3e2\\upm.log",
+            "UpmLogState": "present-at-capture",
+            "UpmTextArtifact": "native-f44fdf1670ba4c65b5d1bafd94b6b3e2-1.txt",
+            "CapturedUtc": "2026-11-14T08:28:51.8178122Z",
+            "Files": [
+              {
+                "RelativePath": "upm.log",
+                "Length": 1668,
+                "LastWriteUtc": "2026-11-14T08:28:43.5614799Z",
+                "Sha256": "6573370ef2bdfdf5453cdef4ef2bca265837573b3e688d65d27f57690f15f352",
+                "HashState": "observed",
+                "HashBytes": 1668,
+                "HashScope": "bounded-observed-bytes",
+                "TextArtifact": "native-f44fdf1670ba4c65b5d1bafd94b6b3e2-1.txt",
+                "TextTruncated": false
+              }
+            ],
+            "FileLimitReached": false,
+            "MaximumDirectoryDepth": 2,
+            "Qualification": "An isolated folder associates files with this invocation. Dump identity and timing still need verification. Missing or delayed files do not rule out a native failure. Raw dumps stay on the runner."
+          },
+          "RawExitCode": 0,
+          "ProcessExitUtc": null,
+          "ProcessId": 222328,
+          "State": "observed",
+          "LaunchUtc": "2026-11-14T08:28:26.1474056Z",
+          "KillSucceeded": false,
+          "ExecutablePath": "C:\\Program Files\\Unity\\Hub\\Editor\\6000.6.7f1\\Editor\\Unity.exe",
+          "StandardErrorEndObserved": true,
+          "KillReason": null,
+          "ReturnedExitCode": 0,
+          "OutputDrainStopped": false,
+          "MachineName": "SPICY",
+          "ExceptionType": null,
+          "StandardOutputEndObserved": true
+        },
+        "NativeReports": {
+          "State": "observed",
+          "NativeReportHeaderCount": 0,
+          "UnknownNativeConditionCount": 0,
+          "NativeReportHeaderLines": [],
+          "UnknownNativeConditionLines": [],
+          "LocationsTruncated": false
+        },
+        "WindowsEvents": {
+          "CapturedUtc": "2026-11-14T08:28:51.8906351Z",
+          "MatchLimitReached": false,
+          "WindowStartUtc": "2026-11-14T08:28:24.1474056Z",
+          "WindowEndUtc": "2026-11-14T08:28:51.8906351Z",
+          "State": "no-matching-events",
+          "CandidateLimitReached": false,
+          "MalformedEvents": 0,
+          "Events": [],
+          "Qualification": "Only events observed by capture time; missing or delayed events do not rule out a crash."
+        }
+      }
+    },
+    {
+      "phase": "after",
+      "pngSha256": "ebbf7b14a308b3d84f1d75cb4a332fa823e9b366d88141b1d6d0005fdec2f161",
+      "metadata": "D:\\Code\\Packages\\Packages\\com.wallstop-studios.unity-helpers\\progress\\.artifacts\\session-20261114-morning\\member-policy-after.png 1000x600 bytes=24342 pngColorType=2 distinctColors=234 renderErrors=0 isProSkin=False unity=6000.6.7f1\nphase=after\nmodule=f8e5d3a7-3b07-4bd5-92d4-1966321c2e00\nhasRow=True",
+      "catalogSourceSha256": "5698fcc302eec7481183b8d1488ae4561248f88b0a32e81a0d7c3cc3837eded3",
+      "processReceipt": {
+        "CapturedUtc": "2026-11-14T08:29:20.2392100Z",
+        "Label": "Run Unity 6000.6.7f1 editmode tests",
+        "Process": {
+          "State": "observed",
+          "ReturnedExitCode": 0,
+          "ProcessExitUtc": null,
+          "EndObservedUtc": "2026-11-14T08:29:20.1304663Z",
+          "KillSucceeded": false,
+          "RawExitCode": 0,
+          "NativeEvidence": {
+            "State": "files-observed",
+            "CaptureId": "54b2730a284a4ca6aeedf75d3e6e7973",
+            "CrashDirectory": "C:\\Users\\dbfsi\\AppData\\Local\\Temp\\unity-helpers-native\\54b2730a284a4ca6aeedf75d3e6e7973",
+            "UpmLogPath": "C:\\Users\\dbfsi\\AppData\\Local\\Temp\\unity-helpers-native\\54b2730a284a4ca6aeedf75d3e6e7973\\upm.log",
+            "UpmLogState": "present-at-capture",
+            "UpmTextArtifact": "native-54b2730a284a4ca6aeedf75d3e6e7973-1.txt",
+            "CapturedUtc": "2026-11-14T08:29:20.1580492Z",
+            "Files": [
+              {
+                "RelativePath": "upm.log",
+                "Length": 1664,
+                "LastWriteUtc": "2026-11-14T08:29:08.8241917Z",
+                "Sha256": "f43cd37c104d71d6f8586f1333358f524175ec73f2d3fdd483f06c679f5a2b5f",
+                "HashState": "observed",
+                "HashBytes": 1664,
+                "HashScope": "bounded-observed-bytes",
+                "TextArtifact": "native-54b2730a284a4ca6aeedf75d3e6e7973-1.txt",
+                "TextTruncated": false
+              }
+            ],
+            "FileLimitReached": false,
+            "MaximumDirectoryDepth": 2,
+            "Qualification": "An isolated folder associates files with this invocation. Dump identity and timing still need verification. Missing or delayed files do not rule out a native failure. Raw dumps stay on the runner."
+          },
+          "StandardErrorEndObserved": true,
+          "LaunchUtc": "2026-11-14T08:28:53.7439065Z",
+          "ExitOrigin": "process-exit",
+          "StandardOutputEndObserved": true,
+          "ExceptionType": null,
+          "ProcessId": 42196,
+          "MachineName": "SPICY",
+          "KillReason": null,
+          "ExecutablePath": "C:\\Program Files\\Unity\\Hub\\Editor\\6000.6.7f1\\Editor\\Unity.exe",
+          "OutputDrainStopped": false,
+          "LogPersistence": "written"
+        },
+        "NativeReports": {
+          "State": "observed",
+          "NativeReportHeaderCount": 0,
+          "UnknownNativeConditionCount": 0,
+          "NativeReportHeaderLines": [],
+          "UnknownNativeConditionLines": [],
+          "LocationsTruncated": false
+        },
+        "WindowsEvents": {
+          "MatchLimitReached": false,
+          "State": "no-matching-events",
+          "WindowEndUtc": "2026-11-14T08:29:20.2478784Z",
+          "CandidateLimitReached": false,
+          "Events": [],
+          "MalformedEvents": 0,
+          "WindowStartUtc": "2026-11-14T08:28:51.7439065Z",
+          "Qualification": "Only events observed by capture time; missing or delayed events do not rule out a crash.",
+          "CapturedUtc": "2026-11-14T08:29:20.2478784Z"
+        }
+      }
+    }
+  ]
+}

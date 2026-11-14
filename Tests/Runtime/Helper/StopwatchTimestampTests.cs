@@ -116,6 +116,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [TestCase(long.MaxValue)]
         public void FloatingPointConversionsKeepSignAndMagnitude(long ticks)
         {
+            double seconds = (double)ticks / Stopwatch.Frequency;
+            Assert.That(
+                StopwatchTimestamp.ToSeconds(ticks),
+                Is.EqualTo(seconds).Within(Math.Abs(seconds) * 0.000000000001 + double.Epsilon)
+            );
             double milliseconds = (double)ticks / Stopwatch.Frequency * 1000.0;
             double nanoseconds = (double)ticks / Stopwatch.Frequency * 1000000000.0;
             Assert.That(

@@ -325,8 +325,13 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
                   return;
               }"
         )]
+        public void ATeardownThatIsAlreadyCorrectIsNotReported(string shape, string body)
+        {
+            AssertNothingReported(shape, body);
+        }
+
         [TestCase(
-            "a base call nested inside an if, which this rule declines to judge",
+            "a base call nested inside an if, with work after it",
             @"protected override void OnDestroy()
               {
                   if (0 < handles)
@@ -337,7 +342,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
               }"
         )]
         [TestCase(
-            "a base call nested inside a try, which this rule declines to judge",
+            "a base call nested inside a try, with work after it",
             @"protected override void OnDestroy()
               {
                   try
@@ -351,7 +356,46 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
                   }
               }"
         )]
-        public void ATeardownThatIsAlreadyCorrectIsNotReported(string shape, string body)
+        [TestCase(
+            "a nested call before outer cleanup",
+            "protected override void OnDestroy() { if (0 < handles) { base.OnDestroy(); } Release(); }"
+        )]
+        [TestCase(
+            "a nested call before finally cleanup",
+            "protected override void OnDestroy() { try { base.OnDestroy(); return; } finally { Release(); } }"
+        )]
+        [TestCase(
+            "a call in a catch before cleanup",
+            "protected override void OnDestroy() { try { Release(); } catch (Exception) { base.OnDestroy(); Release(); } }"
+        )]
+        public void NestedTeardownWithReachableFollowingWorkIsReported(string shape, string body)
+        {
+            Diagnostic reported = Single(body);
+            Assert.That(reported.Id, Is.EqualTo(DiagnosticId), shape);
+            Assert.That(reported.Severity, Is.EqualTo(DiagnosticSeverity.Warning));
+        }
+
+        [TestCase(
+            "a nested final call",
+            "protected override void OnDestroy() { if (0 < handles) { Release(); base.OnDestroy(); } }"
+        )]
+        [TestCase(
+            "cleanup on another branch",
+            "protected override void OnDestroy() { if (0 < handles) { base.OnDestroy(); } else { Release(); } }"
+        )]
+        [TestCase(
+            "an early return before outer cleanup",
+            "protected override void OnDestroy() { if (0 < handles) { base.OnDestroy(); return; } Release(); }"
+        )]
+        [TestCase(
+            "a local function body",
+            "protected override void OnDestroy() { void Later() { base.OnDestroy(); Release(); } }"
+        )]
+        [TestCase(
+            "an empty finally",
+            "protected override void OnDestroy() { try { Release(); base.OnDestroy(); } finally { } }"
+        )]
+        public void NestedTeardownWithoutFollowingWorkIsNotReported(string shape, string body)
         {
             AssertNothingReported(shape, body);
         }

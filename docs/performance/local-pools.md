@@ -83,3 +83,37 @@ The statistics review also found a correctness defect: a reentrant time-provider
 rent an item after the pool size was captured. Statistics now invoke that callback before
 capturing the size, preserving a coherent snapshot for that callback's completed rental.
 Further performance work remains tracked in [#1173](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1173).
+
+## Direct clock conversion
+
+The shared pools now sample the Stopwatch counter directly and convert elapsed counter ticks to
+seconds. Custom time providers and separate origins for each pool type keep their existing behavior.
+The ordinary native timestamp and pool cohort passes 334 cases with four existing skips.
+
+Six fresh Windows Unity 6000.6.7f1 Editor Mono processes in A B B A A B order retain the change.
+Across all three pairs and the four shared paths, the geometric candidate/baseline ratio is 0.946566,
+meeting the preregistered 0.95 limit. Every shared pair improves; individual ratios range from
+0.90836 to 0.97691. No control repeats a regression above 1.10. All 33 functional cases and 147
+observations pass per process, with matching loaded-module/DLL identities, stable selected sources,
+raw zero exits and both output streams drained.
+
+Median process medians, nanoseconds per rent/return pair:
+
+| Path                |  Before |   After |
+| ------------------- | ------: | ------: |
+| Stack control       |  26.125 |  25.850 |
+| Local control       |  26.433 |  26.039 |
+| Local lease control |  87.024 |  82.765 |
+| Shared lease        | 324.110 | 309.534 |
+| Shared list         | 331.181 | 308.434 |
+| Shared hash set     | 360.014 | 338.159 |
+| Shared dictionary   | 356.078 | 341.737 |
+
+Each cell uses 64 warm calls and 21 rotated rounds. Batches were calibrated for 20 ms; the fastest
+observed batch was 19.7063 ms. The local-lease control also varied, including one 10.7% faster pair;
+these controls remain in the record. This is a warmed helper observation, not player, contention,
+ARM or whole-application timing qualification.
+
+[All 882 observations](./local-pools-clock-20261114.csv) and the
+[selection criteria, pair ratios and source/module/process identities](./local-pools-clock-20261114.json)
+are retained. Raw NUnit trees, process receipts and runtime DLLs remain in ignored session evidence.

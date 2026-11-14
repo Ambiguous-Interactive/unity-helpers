@@ -69,20 +69,21 @@ command after resolving the failure. Temporary directories are excluded from Uni
 | [`WUH026`](#wuh026-boolean-bitwise-operators)                            | Bitwise operators on boolean operands                                 |
 | [`WUH027`](#wuh027-implicit-caller-names)                                | Explicit caller names the compiler can provide                        |
 | [`WUH028`](#wuh028-fresh-pooled-collection-clears)                       | Redundant clears immediately after known Buffers rentals              |
+| [`WUH029`](#wuh029-member-declaration-order-opt-in)                      | Member order and nested-type placement (**off by default**)           |
 
 These are a different family from the `WPROTO###` serialization diagnostics, and they follow a
 different policy on purpose:
 
-|                     | `WPROTO###`                                                  | `WUH###`                                                                            |
-| ------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
-| Reports             | A serialization contract that cannot be honoured             | An allocation or footgun in correct code                                            |
-| Severity            | Error: the alternative is an exception from a shipped player | Warning by default; project overrides supported                                     |
-| Can fail your build | Yes, and it should                                           | Only when explicitly promoted to Error                                              |
-| Default             | On                                                           | On, except `WUH010`, `WUH013`, `WUH018`, `WUH019`, `WUH021`, `WUH023`, and `WUH024` |
+|                     | `WPROTO###`                                                  | `WUH###`                                                                                      |
+| ------------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| Reports             | A serialization contract that cannot be honoured             | An allocation or footgun in correct code                                                      |
+| Severity            | Error: the alternative is an exception from a shipped player | Warning by default; project overrides supported                                               |
+| Can fail your build | Yes, and it should                                           | Only when explicitly promoted to Error                                                        |
+| Default             | On                                                           | On, except `WUH010`, `WUH013`, `WUH018`, `WUH019`, `WUH021`, `WUH023`, `WUH024`, and `WUH029` |
 
 **A `WUH###` diagnostic defaults to a warning.** Taking a package upgrade does not promote it to
 a build error; an explicit Error override does. If your project treats warnings as errors, see
-[Turning one off](#turning-one-off). `WUH010`, `WUH013`, `WUH018`, `WUH019`, `WUH021`, `WUH023`, and `WUH024` go further and are off until you ask for them, because
+[Turning one off](#turning-one-off). `WUH010`, `WUH013`, `WUH018`, `WUH019`, `WUH021`, `WUH023`, `WUH024`, and `WUH029` go further and are off until you ask for them, because
 their shapes are correct code far more often than they are defects.
 
 The compact policy list offers a severity selector beside each diagnostic:
@@ -444,10 +445,10 @@ There is a real asymmetry here, and it is why "always call base first" is wrong 
 - **Teardown chains base-last.** The body has to finish using it before the base takes it away.
 
 Reported in an `override` of `OnDestroy`, `OnDisable`, `OnApplicationQuit` or `Dispose()` when the
-`base` call is a top-level statement with executed statements after it. Local function declarations,
-empty statements and a bare `return;` do not count, because none of them runs anything the base call
-could have been moved ahead of; a `base` call nested inside an `if` or a `try` is left alone rather
-than guessed at. There is deliberately **no** allow-list for a body that "only logs afterwards":
+`base` call has executed statements after it. Top-level checks retain their statement ordering;
+nested calls use control flow to follow reachable successors and `finally` cleanup. Work on another
+branch, or after an early return that bypasses it, does not make a nested call report. Local function
+bodies, empty statements and a bare `return;` do not count. There is deliberately **no** allow-list for a body that "only logs afterwards":
 moving one line is cheaper than a suppression, and an exception list reads as permission.
 
 The message quotes the `base` call exactly as it was written, arguments included, rather than
@@ -673,6 +674,10 @@ that explains the callback path. Negative controls require `WUH013` to fail ever
 
 ## `WUH014`: a disposable `struct`'s `Dispose` that assigns
 
+The same rule covers the actual `IAsyncDisposable.DisposeAsync` implementation, including explicit
+implementations and assignments after an `await`. Classes, unrelated overloads, and deferred local
+functions keep their existing behavior. The warning remains enabled by default and suppressible.
+
 `readonly` on a disposable `struct` settles one half of copy safety and not the other. It stops a
 struct tracking "have I been disposed?" in one of its own fields, where the flag is per **copy** and
 a copy handed to a method cannot see that the original finished. It says nothing about a scope that
@@ -711,8 +716,8 @@ exactly this, at any nesting depth and in any disposal order.
 
 ### Where the line is drawn
 
-The signal is an assignment inside the parameterless `Dispose` of a `struct` that implements
-`IDisposable`, and what decides it is the assignment's **target**:
+The signal is an assignment inside a struct's actual `IDisposable.Dispose` or
+`IAsyncDisposable.DisposeAsync` implementation. What decides it is the assignment's **target**:
 
 | Target                                      | Reported | Why                                                     |
 | ------------------------------------------- | -------- | ------------------------------------------------------- |
@@ -1243,6 +1248,38 @@ clear caller-owned collections, or implement the return callback of a custom poo
 the excluded-editor-source audit includes a reporting control. The Analyzer Policy window
 provides compiled examples and the usual severity controls. The warning makes no claim about
 performance margins for a caller's workload.
+
+## `WUH029`: member declaration order (opt-in)
+
+Enable this consumer rule through the Analyzer Policies window or a ruleset entry:
+
+```xml
+<Rule Id="WUH029" Action="Warning" />
+```
+
+It reports the package's member ordering in each class, struct, interface or record declaration:
+constants, events, delegates, static properties, static fields, properties, fields, constructors,
+static methods and methods. Within a tier, order public, protected, internal and private declarations;
+declarations with no explicit access modifier follow them. Nested classes, structs, interfaces,
+records and enums belong after ordinary members. Nested delegates retain their delegate tier.
+Partial declarations are checked independently.
+
+The analyzer checks the active compilation. Separate conditional branches retain separate member
+ordering; directives wholly inside a method do not reset the surrounding order. Repository CI also
+retains its source gate, which checks inactive conditional branches.
+
+This is a suppressible warning and is off by default. It reports order without rewriting source.
+Review static initializer dependencies and conditional compilation before moving any declaration;
+changing textual initialization order can change program behavior.
+
+The Analyzer Policy search exposes the new opt-in rule. These real offscreen Unity
+6000.6.7f1 Editor captures use the same light skin and query before and after adding
+the catalog entry; neither capture writes a project ruleset. Both native capture
+cases pass without render errors.
+
+| Before                                                                                | After                                                                                |
+| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| ![No matching member-order policy](../images/analyzer-policy-member-order-before.png) | ![Member declaration order policy](../images/analyzer-policy-member-order-after.png) |
 
 ## `WUH027`: implicit caller names
 

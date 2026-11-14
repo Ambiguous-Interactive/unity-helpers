@@ -5,7 +5,7 @@ rather than copying the entire texture. The intermediate pixel array holds only
 that rectangle. Pixel colours, alpha policy, pivots and units per pixel retain
 their existing meaning. The managed copy owns its pixels; changing it does not
 change the texture. Full-texture reads retain their existing conversion path. RGB24 subregions are covered by
-the [later comparison](#rgb24-subregions); other readable formats keep their conversion path.
+the [later comparison](#rgb24-subregions); additional formats are described below.
 
 Three fresh-process pairs on Windows x64 Unity 6000.6.7f1 Editor Mono measure the
 public alpha-mask and local-art-bounds APIs. Every input is fully opaque RGBA32.
@@ -109,3 +109,18 @@ not new timing or allocation-byte measurements for these formats.
 
 The [additional replay archive](https://raw.githubusercontent.com/Ambiguous-Interactive/unity-helpers/587d3de6fde16c76a0ba256872cfe8c800bf1287/docs/performance/local-pool-runtime-qualification.zip) retains the new format
 correctness results, the initial Alpha8 mismatch and the original reader source.
+
+## Packed 16-bit subregions
+
+Readable RGB565 and RGBA4444 subregions decode selected base-mip words directly into
+an owned region-sized `Color32` array. RGB565 expands five- and six-bit channels with
+bit replication and opaque alpha; RGBA4444 expands each nibble to eight bits.
+Full-texture reads retain their existing conversion path.
+
+Four native cases compare every one of the 65,536 packed encodings against Unity's own
+`GetPixels32`, for both formats with and without mipmaps. They also check returned storage,
+pivot mapping, units, source independence and a one-pixel top-right selection with nonzero
+vertical offset. The original reader fails the four region-storage assertions; the decoder
+passes the native colour comparisons. These are correctness and storage-size observations,
+with no new timing or total allocation-byte claim. Consumer adoption remains tracked in
+[#1113](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1113).

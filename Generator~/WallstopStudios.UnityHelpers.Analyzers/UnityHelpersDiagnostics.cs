@@ -380,8 +380,8 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         internal static readonly DiagnosticDescriptor DisposableStructDisposeAssigns =
             new DiagnosticDescriptor(
                 "WUH014",
-                "A disposable struct's Dispose assigns, so every copy re-applies it",
-                "'{0}' is a struct implementing IDisposable, and its Dispose assigns to {1}. A struct is copied by every assignment, argument pass and capture, and nothing outside the struct records that one of those copies has already run -- so this assignment is applied again by the next copy that is disposed, re-imposing a value the world has already moved past. Put the state every copy must agree on outside the struct: borrow the global through 'RestorableGlobal<T>', whose scope hands an id back to its owner, or call the object that issued the claim instead of assigning.",
+                "A disposable struct's cleanup assigns, so every copy re-applies it",
+                "'{0}' is a disposable struct, and its cleanup assigns to {1}. A struct is copied by every assignment, argument pass and capture, and nothing outside the struct records that one of those copies has already run -- so this assignment is applied again by the next copy that is disposed, re-imposing a value the world has already moved past. Put the state every copy must agree on outside the struct: borrow the global through 'RestorableGlobal<T>', whose scope hands an id back to its owner, or call the object that issued the claim instead of assigning.",
                 "Correctness",
                 DiagnosticSeverity.Warning,
                 isEnabledByDefault: true
@@ -602,6 +602,17 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 "Performance",
                 DiagnosticSeverity.Warning,
                 isEnabledByDefault: true
+            );
+
+        /// <summary>Member declarations outside the package's opt-in ordering policy.</summary>
+        internal static readonly DiagnosticDescriptor MemberDeclarationsOutOfOrder =
+            new DiagnosticDescriptor(
+                "WUH029",
+                "Member declarations are out of order",
+                "'{0}' in '{1}' appears after {2}. Order constants, events, delegates, static properties, static fields, properties, fields, constructors, static methods and methods; use public, protected, internal, private order within each tier, and place nested types last. Review initializer and conditional-compilation dependencies before moving declarations.",
+                "Maintainability",
+                DiagnosticSeverity.Warning,
+                isEnabledByDefault: false
             );
     }
 }

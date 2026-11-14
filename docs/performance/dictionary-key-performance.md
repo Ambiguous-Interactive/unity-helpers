@@ -202,3 +202,22 @@ Raw round observations remain in ignored session evidence.
 This experiment compares commit `635bd87f` with the candidate. It does not replace the original
 consumer baseline or resolve the remaining lookup/insertion budgets in
 [#1131](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1131).
+
+## November 14 insertion array-cache experiment
+
+Caching the key-array reference in the nonzero insertion/update probe loop did not meet the
+retention gate. Three fresh processes on each runtime produced median paired insertion geometric
+ratios of 0.99505 on .NET 10 and 0.99401 on Mono, missing the preregistered 0.95 threshold.
+No non-insertion median paired cell exceeds 1.10. The candidate is rejected and production
+`IntMap` is unchanged.
+
+Every process retained all 198 distinct cells, returned zero, drained both output streams and kept
+source and payload hashes stable. Each cell retained 64 warmups, calibration for at least 20 ms
+and 21 rotated rounds. No other owned test, build or timing capture overlapped. The
+[1,188 cell summaries](./intmap-key-cache-20261114.csv) include all Dictionary controls; the
+[qualification record](./intmap-key-cache-20261114.json) contains every paired ratio, process receipt,
+environment line, source/payload seal and the rejected diff. Raw rounds remain in ignored session
+evidence, with hashes in that record.
+
+This compares with commit `10138d86`. It does not replace the original 3.7.1 consumer baseline or
+close [#1131](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1131).

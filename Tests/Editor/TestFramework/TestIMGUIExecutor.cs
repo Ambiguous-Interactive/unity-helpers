@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
     using System.Collections;
     using System.Reflection;
     using System.Runtime.ExceptionServices;
+    using NUnit.Framework;
     using UnityEditor;
     using UnityEngine;
     using UnityEngine.TestTools;
@@ -52,6 +53,16 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
         private static PropertyInfo _visualTreeProperty;
         private static MethodInfo _validateLayout;
         private static MethodInfo _handleIMGUIEvent;
+
+        internal static void InitializeEditorStyles()
+        {
+            IEnumerator initialization = Run(() =>
+            {
+                Assert.That(EditorStyles.helpBox, Is.Not.Null);
+                Assert.That(EditorStyles.miniButtonLeft, Is.Not.Null);
+            });
+            Assert.That(initialization.MoveNext(), Is.False);
+        }
 
         internal static IEnumerator Run(Action action)
         {
