@@ -102,6 +102,7 @@ Invoke these skills for specific tasks.
 | Skill | When to Use |
 | --- | --- |
 | [add-inspector-attribute](./add-inspector-attribute.md) | Improving editor UX with attributes |
+| [create-source-generator](./create-source-generator.md) | Adding or changing a Roslyn source generator |
 | [debug-il2cpp](./debug-il2cpp.md) | IL2CPP build issues or AOT errors |
 | [devcontainer-volume-permissions](./devcontainer-volume-permissions.md) | Docker volume permission fixes for non-root devcontainer users |
 | [discriminated-union-examples](./discriminated-union-examples.md) | Worked OneOf/FastOneOf examples |

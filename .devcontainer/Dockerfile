@@ -308,6 +308,15 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource_setup.sh
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+# The fetch MCP server's ReadabiliPy dependency installs its JavaScript deps at runtime into
+# site-packages, which is root-owned. Warm that directory while the image is built so a normal
+# container user can fetch pages without a failed npm install.
+RUN FETCH_JS_DIR="$(find /opt/mcp-uv-tools/mcp-server-fetch -type d -path '*/readabilipy/javascript' -print -quit)" \
+    && test -n "$FETCH_JS_DIR" \
+    && npm install --prefix "$FETCH_JS_DIR" --no-audit --no-fund --omit=dev \
+    && test -d "$FETCH_JS_DIR/node_modules" \
+    && rm -rf /root/.npm
+
 # Pre-create volume mount target directories with correct ownership.
 # Docker named volumes copy image-layer permissions into empty volumes on
 # first mount, so this ensures new volumes start with vscode ownership.

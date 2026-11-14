@@ -1566,7 +1566,7 @@ function Test-UnityCompilationCacheBehavior {
         Set-Content -LiteralPath (Join-Path $matchingRuntimeRoot 'Existing.cs') -Value 'class Existing {}' -Encoding utf8
         $compilerRoot = Join-Path $matchingRuntimeRoot 'Analyzers'
         New-Item -ItemType Directory -Force -Path $compilerRoot | Out-Null
-        foreach ($compilerName in @('WallstopStudios.UnityHelpers.Analyzers.dll', 'WallstopStudios.UnityHelpers.Proto.Generator.dll', 'WallstopStudios.UnityHelpers.OdinMigration.Generator.dll')) {
+        foreach ($compilerName in @('WallstopStudios.UnityHelpers.Analyzers.dll', 'WallstopStudios.UnityHelpers.Proto.Generator.dll', 'WallstopStudios.UnityHelpers.OdinMigration.Generator.dll', 'WallstopStudios.UnityHelpers.Enum.Generator.dll')) {
             foreach ($suffix in @('', '.meta')) {
                 $compilerPath = Join-Path $compilerRoot "$compilerName$suffix"
                 Set-Content -LiteralPath $compilerPath -Value 'original compiler input' -Encoding utf8

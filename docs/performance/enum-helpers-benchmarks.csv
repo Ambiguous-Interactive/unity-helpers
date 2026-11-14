@@ -1,0 +1,28 @@
+operation,shape,mode,median_ns_per_op,notes
+has_flag,small,generalized,0.505,int32 enum
+has_flag,small,generated,0.405,direct uint bit test
+has_flag,dense,generalized,0.540,int32 flags
+has_flag,dense,generated,0.420,direct uint bit test
+has_flag,wide,generalized,0.420,uint64 flags
+has_flag,wide,generated,0.420,direct ulong bit test
+has_flag,signed,generalized,0.550,sbyte flags
+has_flag,signed,generated,0.480,direct byte bit test
+name,small,generalized,1.070,array cache
+name,small,generated,0.350,literal string array
+name,dense,generalized,1.200,array cache
+name,dense,generated,0.350,literal string array
+name,wide,generalized,2.600,ConcurrentDictionary cache
+name,wide,generated,1.900,switch on numeric key
+name,sparse100,generalized,2.500,ConcurrentDictionary cache
+name,sparse100,generated,2.000,static Dictionary
+name,display,generalized,1.000,array cache
+name,display,generated,0.330,literal string array
+parse,small,generalized,9.000,declared-name scan
+parse,sparse100,generalized,180.000,declared-name scan
+cold,small,generalized,3160,1704 bytes allocated
+cold,small,generated,89,56 bytes allocated
+cold,dense,generalized,3360,4016 bytes allocated
+cold,dense,generated,85,2072 bytes allocated
+cold,sparse100,generalized,4970,31496 bytes allocated
+cold,sparse100,generated,2380,11896 bytes allocated (harness built names at runtime; generated literals are lower)
+cold,wide,generated,90,0 bytes allocated

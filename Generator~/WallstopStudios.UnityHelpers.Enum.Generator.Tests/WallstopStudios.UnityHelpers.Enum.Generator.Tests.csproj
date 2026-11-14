@@ -1,0 +1,73 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <EnableNETAnalyzers>false</EnableNETAnalyzers>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <RepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../..'))</RepoRoot>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="*.cs" />
+    <Compile
+      Include="$(RepoRoot)/Runtime/Core/Extension/EnumExtensions.cs"
+      Link="Runtime/EnumExtensions.cs"
+    />
+    <Compile Include="$(RepoRoot)/Runtime/Core/Helper/EnumValues.cs" Link="Runtime/EnumValues.cs" />
+    <Compile
+      Include="$(RepoRoot)/Runtime/Core/Helper/EnumValuesCache.cs"
+      Link="Runtime/EnumValuesCache.cs"
+    />
+    <Compile
+      Include="$(RepoRoot)/Runtime/Core/Helper/EnumValuesDynamic.cs"
+      Link="Runtime/EnumValuesDynamic.cs"
+    />
+    <Compile
+      Include="$(RepoRoot)/Runtime/Core/Helper/EnumMembershipCache.cs"
+      Link="Runtime/EnumMembershipCache.cs"
+    />
+    <Compile
+      Include="$(RepoRoot)/Runtime/Core/Helper/EnumNameComparer.cs"
+      Link="Runtime/EnumNameComparer.cs"
+    />
+    <Compile
+      Include="$(RepoRoot)/Runtime/Core/Attributes/EnumDisplayNameAttribute.cs"
+      Link="Runtime/EnumDisplayNameAttribute.cs"
+    />
+    <Compile
+      Include="$(RepoRoot)/Runtime/Core/Attributes/WEnumHelpersAttribute.cs"
+      Link="Runtime/WEnumHelpersAttribute.cs"
+    />
+    <Compile
+      Include="$(RepoRoot)/Tests/Runtime/Extensions/EnumFormattingTests.cs"
+      Link="Runtime/EnumFormattingTests.cs"
+    />
+    <Compile
+      Include="$(RepoRoot)/Tests/Runtime/Helper/EnumStrictLookupTests.cs"
+      Link="Runtime/EnumStrictLookupTests.cs"
+    />
+    <Compile
+      Include="$(RepoRoot)/Tests/Runtime/Helper/EnumNameComparerTests.cs"
+      Link="Runtime/EnumNameComparerTests.cs"
+    />
+    <Compile Include="$(RepoRoot)/Tests/Runtime/TestUtils/GCAssert.cs" Link="Runtime/GCAssert.cs" />
+    <Compile
+      Include="$(RepoRoot)/Tests/Core/ThreadAllocationCounter.cs"
+      Link="Runtime/ThreadAllocationCounter.cs"
+    />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference
+      Include="../WallstopStudios.UnityHelpers.Enum.Generator/WallstopStudios.UnityHelpers.Enum.Generator.csproj"
+      ReferenceOutputAssembly="true"
+    />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="3.8.0" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.12.0" />
+    <PackageReference Include="NUnit" Version="3.14.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="6.3.1" />
+  </ItemGroup>
+</Project>
