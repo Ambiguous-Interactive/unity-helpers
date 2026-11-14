@@ -720,6 +720,29 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         [Test]
+        public void SanitizedHintNameCollisionsAreDisambiguated()
+        {
+            const string source =
+                "[WProtoContract] public partial class A_B { [WProtoMember(1)] public int Value; } public partial class A { [WProtoContract] public partial class B { [WProtoMember(1)] public int Value; } }";
+            ImmutableArray<Diagnostic> diagnostics = Run(source, out Compilation generated);
+            Assert.That(diagnostics.Select(diagnostic => diagnostic.Id), Is.Empty);
+            Assert.That(
+                generated
+                    .GetDiagnostics()
+                    .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+                    .Select(diagnostic => diagnostic.ToString()),
+                Is.Empty
+            );
+            Assert.That(
+                generated.SyntaxTrees.Count(tree =>
+                    tree.FilePath.Contains(".WProtoFormatter", StringComparison.Ordinal)
+                    && tree.FilePath.EndsWith(".g.cs", StringComparison.Ordinal)
+                ),
+                Is.EqualTo(2)
+            );
+        }
+
+        [Test]
         public void ANonPartialContractIsAnError()
         {
             AssertDiagnostic(

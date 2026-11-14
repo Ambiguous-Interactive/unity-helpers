@@ -47,6 +47,21 @@ persistent git worktrees and merges the OpenCode server map into `~/.config/open
 Restart the OpenCode CLI after a refresh (or run `opencode reload` on versions that expose it)
 to bind the running agent.
 
+## Sync copies without weakening another checkout
+
+When generated client configs are copied into worktrees or a user-global config:
+
+- Merge `.env.local` **by key**. Replace only keys the source defines and keep unrelated
+  destination keys; never replace the whole file just because one credential changed.
+- Merge the global MCP server map (`{ ...existing.mcp, ...source.mcp }`) so a repository entry
+  replaces a same-named server without deleting unrelated personal servers.
+- Write complete contents to a private temporary file in the destination directory, then rename.
+  A reader must never observe a truncated credential or JSON file.
+- Parse JSONC comments and trailing commas outside strings only. A regex over the whole document
+  corrupts values such as `"Keep ,] unchanged"`.
+- Keep every written file mode `0600`; print counts or server names, never values. After a
+  refresh, restart the client (or use `opencode reload` on versions that expose it).
+
 ## ALWAYS confirm which project answered
 
 An endpoint is a host and port; a bridge is bound to one editor. A successful

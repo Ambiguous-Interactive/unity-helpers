@@ -12081,7 +12081,7 @@
   "diagnosticAssertionSources": [
     {
       "path": "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/DiagnosticTests.cs",
-      "sha256": "b65458c6ee3150a71d668f20647a92e8737b5194b0cf0a66bcb22816f20cba7d"
+      "sha256": "5b6de34183f1284a2e3b8b42cfc03a186c049557ee779ea340c46c9a29244b70"
     },
     {
       "path": "Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests/SubtypeTagManifestTests.cs",

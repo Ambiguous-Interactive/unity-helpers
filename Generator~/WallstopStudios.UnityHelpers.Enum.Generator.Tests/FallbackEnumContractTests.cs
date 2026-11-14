@@ -27,6 +27,20 @@ namespace WallstopStudios.UnityHelpers.Enum.Generator.Tests
         }
 
         [Test]
+        public void DenseWindowMissesMatchTheRuntimeWithoutADictionary()
+        {
+            DenseWindow outside = (DenseWindow)12345;
+            Assert.That(
+                EnumNameCache<DenseWindow>.ToCachedName(outside),
+                Is.EqualTo(outside.ToString("G"))
+            );
+            Assert.That(
+                EnumNameCache<DenseWindow>.ToCachedName(outside),
+                Is.EqualTo(outside.ToString("G"))
+            );
+        }
+
+        [Test]
         public void SparseAliasNamesMatchTheRuntime()
         {
             Assert.That(
@@ -72,6 +86,13 @@ namespace WallstopStudios.UnityHelpers.Enum.Generator.Tests
             char[] buffer = new char[expected.Length];
             Assert.That(SparseAlias.First.TryFormatCachedName(buffer, out int written), Is.True);
             Assert.That(new string(buffer, 0, written), Is.EqualTo(expected));
+        }
+
+        private enum DenseWindow
+        {
+            None = 0,
+            First = 1,
+            Second = 2,
         }
 
         private enum SparseUnique
