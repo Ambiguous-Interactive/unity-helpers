@@ -303,6 +303,29 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                             {
                                 return true;
                             }
+                            ITypeSymbol exceptionType = handler.ExceptionType;
+                            if (
+                                handler.Kind == ControlFlowRegionKind.Catch
+                                && (
+                                    exceptionType == null
+                                    || exceptionType.SpecialType == SpecialType.System_Object
+                                    || (
+                                        string.Equals(
+                                            exceptionType.Name,
+                                            nameof(Exception),
+                                            StringComparison.Ordinal
+                                        )
+                                        && string.Equals(
+                                            exceptionType.ContainingNamespace.ToDisplayString(),
+                                            "System",
+                                            StringComparison.Ordinal
+                                        )
+                                    )
+                                )
+                            )
+                            {
+                                return false;
+                            }
                         }
                     }
                 }
@@ -389,7 +412,19 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             {
                 return false;
             }
-            if (destination.Operations.Length != 0 || destination.BranchValue != null)
+            foreach (IOperation operation in destination.Operations)
+            {
+                if (
+                    operation is ISimpleAssignmentOperation assignment
+                    && assignment.IsImplicit
+                    && assignment.Value.Kind == OperationKind.CaughtException
+                )
+                {
+                    continue;
+                }
+                return true;
+            }
+            if (destination.BranchValue != null)
             {
                 return true;
             }

@@ -161,3 +161,5 @@ assertions, real style initialization, strict logging and the normal-inspector r
 The [strict durations](./dropdown-scopes-strict-20261114.csv) and
 [qualification record](./dropdown-scopes-strict-20261114.json) retain every process,
 case identity, source and assembly identity, logging witness and receipt summary.
+
+The IMGUI executor restores its caller's log policy after every default and strict run, including mouse events and exhausted budgets. It does not enable broad log suppression while pumping events. Default offscreen passes tolerate only the exact native cursor-rectangle error from that pass; strict passes tolerate none. Native controls cover both incoming flag values and confirm unexpected errors remain visible on default and strict runs.

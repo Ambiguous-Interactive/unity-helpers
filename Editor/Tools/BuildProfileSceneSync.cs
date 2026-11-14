@@ -6,6 +6,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 #if UNITY_EDITOR && UNITY_6000_0_OR_NEWER
     using System;
     using System.Collections.Generic;
+    using System.IO;
+    using System.Security.Cryptography;
     using UnityEditor;
     using UnityEditor.Build.Profile;
     using UnityEngine;
@@ -120,7 +122,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                         !TrySynchronizeProfile(
                             profile,
                             globalScenes,
-                            AssetDatabase.SaveAssetIfDirty,
                             out bool changed,
                             out string profileError
                         )
@@ -170,10 +171,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             }
         }
 
-        internal static bool TrySynchronizeProfile(
+        private static bool TrySynchronizeProfile(
             BuildProfile profile,
             EditorBuildSettingsScene[] globalScenes,
-            Action<BuildProfile> save,
             out bool changed,
             out string error
         )
@@ -203,20 +203,26 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             }
             try
             {
+                string path = AssetDatabase.GetAssetPath(profile);
+                byte[] previousDigest = ReadFileDigest(path);
                 Undo.RecordObject(profile, UndoName);
                 WriteScenes(scenes, globalScenes);
                 serialized.ApplyModifiedProperties();
                 EditorUtility.SetDirty(profile);
                 Undo.FlushUndoRecordObjects();
-                save(profile);
-                if (EditorUtility.IsDirty(profile))
+                AssetDatabase.SaveAssetIfDirty(profile);
+                if (
+                    EditorUtility.IsDirty(profile)
+                    || previousDigest.AsSpan().SequenceEqual(ReadFileDigest(path))
+                )
                 {
                     serialized.Update();
                     WriteScenes(scenes, previous);
                     serialized.ApplyModifiedPropertiesWithoutUndo();
+                    EditorUtility.SetDirty(profile);
                     changed = false;
                     error =
-                        "Unity left the build profile unsaved: "
+                        "Unity did not persist the changed build profile: "
                         + AssetDatabase.GetAssetPath(profile);
                     return false;
                 }
@@ -243,6 +249,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             changed = true;
             error = null;
             return true;
+        }
+
+        private static byte[] ReadFileDigest(string path)
+        {
+            using FileStream stream = File.OpenRead(path);
+            using SHA256 hash = SHA256.Create();
+            return hash.ComputeHash(stream);
         }
 
         private static void WriteScenes(

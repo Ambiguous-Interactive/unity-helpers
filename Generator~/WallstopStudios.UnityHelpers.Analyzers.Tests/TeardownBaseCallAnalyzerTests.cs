@@ -431,6 +431,14 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
             "a sibling catch cannot handle its own rethrow",
             "protected override void OnDestroy() { try { throw new Exception(); } catch (InvalidOperationException) { base.OnDestroy(); throw; } catch { Release(); } }"
         )]
+        [TestCase(
+            "a consuming catch blocks outer cleanup",
+            "protected override void OnDestroy() { try { try { try { throw new Exception(); } catch { base.OnDestroy(); throw; } } catch { } } catch { Release(); } }"
+        )]
+        [TestCase(
+            "an empty catch with an exception binding",
+            "protected override void OnDestroy() { try { try { throw new Exception(); } catch { base.OnDestroy(); throw; } } catch (Exception exception) { } }"
+        )]
         public void NestedTeardownWithoutFollowingWorkIsNotReported(string shape, string body)
         {
             AssertNothingReported(shape, body);

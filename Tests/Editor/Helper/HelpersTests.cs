@@ -7,12 +7,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     using System.Collections.Generic;
     using System.IO;
     using System.Linq;
+    using System.Text.RegularExpressions;
     using NUnit.Framework;
     using UnityEditor;
     using UnityEditor.SceneManagement;
     using UnityEditorInternal;
     using UnityEngine;
     using UnityEngine.SceneManagement;
+    using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Utils;
@@ -332,6 +334,59 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             string path = _scriptableFolder + "/Missing/Value.asset";
             Assert.That(Helpers.CreateOrReplaceAsset(source, path), Is.Null);
             Assert.That(AssetDatabase.Contains(source), Is.False);
+        }
+
+        [Test]
+        public void CreateOrReplaceAssetReportsLockedFileWrites()
+        {
+            if (SystemInfo.operatingSystemFamily != OperatingSystemFamily.Windows)
+            {
+                Assert.Ignore("The native Windows file-sharing failure control requires Windows.");
+            }
+            string path = _scriptableFolder + "/Locked.asset";
+            TrackAssetPath(path);
+            DummyScriptableObject original = CreateScriptableObject<DummyScriptableObject>();
+            DummyScriptableObject replacement = CreateScriptableObject<DummyScriptableObject>();
+            original.value = 7;
+            replacement.value = 42;
+            ExecuteWithImmediateImport(() =>
+            {
+                AssetDatabase.CreateAsset(original, path);
+                AssetDatabase.SaveAssets();
+                byte[] before = File.ReadAllBytes(path);
+                Regex saveError = new(
+                    "^File " + Regex.Escape(path) + " couldn't be written\\..*failed\\.$"
+                );
+                LogAssert.Expect(LogType.Error, saveError);
+                LogAssert.Expect(LogType.Error, saveError);
+                using (
+                    FileStream locked = new(path, FileMode.Open, FileAccess.Read, FileShare.Read)
+                )
+                {
+                    Assert.IsFalse(
+                        Helpers.TryCreateOrReplaceAsset(
+                            replacement,
+                            path,
+                            out UnityEngine.Object saved,
+                            out string error
+                        )
+                    );
+                    Assert.IsTrue(saved == null);
+                    Assert.IsNotEmpty(error);
+                }
+                CollectionAssert.AreEqual(before, File.ReadAllBytes(path));
+                Assert.IsTrue(
+                    Helpers.TryCreateOrReplaceAsset(
+                        replacement,
+                        path,
+                        out UnityEngine.Object persisted,
+                        out string retryError
+                    ),
+                    retryError
+                );
+                Assert.AreSame(original, persisted);
+                Assert.AreEqual(42, original.value);
+            });
         }
 
         [Test]

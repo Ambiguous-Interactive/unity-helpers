@@ -95,40 +95,62 @@ function isTerminalExit(statement) {
   return /^(?:return\b|throw\b)/.test(statement);
 }
 
-function lineAfterStatement(lines, start) {
+function maskNonCode(text) {
+  const masked = text.split("");
   let quoted = null;
   let verbatim = false;
-  let blockComment = false;
+  let comment = null;
+  const hide = (index) => {
+    if (text[index] !== "\n" && text[index] !== "\r") masked[index] = " ";
+  };
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    const next = text[index + 1];
+    if (comment !== null) {
+      if (comment === "line" && (char === "\n" || char === "\r")) {
+        comment = null;
+      } else {
+        hide(index);
+        if (comment === "block" && char === "*" && next === "/") {
+          hide(index + 1);
+          index += 1;
+          comment = null;
+        }
+      }
+    } else if (quoted !== null) {
+      hide(index);
+      if (!verbatim && char === "\\") {
+        hide(index + 1);
+        index += 1;
+      } else if (char === quoted) {
+        if (verbatim && next === quoted) {
+          hide(index + 1);
+          index += 1;
+        } else {
+          quoted = null;
+        }
+      }
+    } else if (char === "/" && (next === "/" || next === "*")) {
+      comment = next === "/" ? "line" : "block";
+      hide(index);
+      hide(index + 1);
+      index += 1;
+    } else if (char === '"' || char === "'") {
+      quoted = char;
+      verbatim =
+        char === '"' &&
+        (text[index - 1] === "@" || (text[index - 1] === "$" && text[index - 2] === "@"));
+      hide(index);
+    }
+  }
+  return masked.join("");
+}
+
+function lineAfterStatement(lines, start) {
   let nesting = 0;
   for (let end = start; end < lines.length; end += 1) {
-    const line = lines[end];
-    for (let index = 0; index < line.length; index += 1) {
-      const char = line[index];
-      const next = line[index + 1];
-      if (blockComment) {
-        if (char === "*" && next === "/") {
-          blockComment = false;
-          index += 1;
-        }
-      } else if (quoted !== null) {
-        if (!verbatim && char === "\\") {
-          index += 1;
-        } else if (char === quoted) {
-          if (verbatim && next === quoted) {
-            index += 1;
-          } else {
-            quoted = null;
-          }
-        }
-      } else if (char === "/" && next === "/") {
-        break;
-      } else if (char === "/" && next === "*") {
-        blockComment = true;
-        index += 1;
-      } else if (char === '"' || char === "'") {
-        quoted = char;
-        verbatim = char === '"' && line[index - 1] === "@";
-      } else if ("([{".includes(char)) {
+    for (const char of lines[end]) {
+      if ("([{".includes(char)) {
         nesting += 1;
       } else if (")]}".includes(char)) {
         nesting -= 1;
@@ -167,9 +189,24 @@ for (const [body, expected] of [
   ['value = "/*;*/";\nreturn false;', true],
   ['value = @"first;\n// second";\nDoWork();\nreturn false;', false],
   ["value = () => {\nDoWork();\n}; // assigned\nreturn false;", true],
-  ["value = ';'; // assigned\nDoWork();\nreturn false;", false]
+  ["value = ';'; // assigned\nDoWork();\nreturn false;", false],
+  [
+    String.raw`value = @$"C:\temp\";
+DoWork();
+return false;`,
+    false
+  ],
+  [
+    String.raw`value = $@"C:\temp\";
+DoWork();
+return false;`,
+    false
+  ],
+  ["value = null; /* reason\ncontinued */\nreturn false;", true],
+  ["value = null; /* reason\ncontinued */\nDoWork();\nreturn false;", false],
+  ["value = null; /* reason\ncontinued */ error = null;\nreturn false;", true]
 ]) {
-  const lines = body.split("\n");
+  const lines = maskNonCode(body).split("\n");
   const next = nextStatementAfterOutAssignment(lines, 0, /^\s*(?:value|error)\s*=(?!=)/);
   const terminal = next >= lines.length || isTerminalExit(lines[next].trim());
   if (terminal !== expected) {
@@ -245,7 +282,7 @@ function scanRoot(rootName) {
         result.anchorHits += 1;
       }
 
-      const lines = body.split("\n");
+      const lines = maskNonCode(body).split("\n");
       for (const name of outNames) {
         const assignment = new RegExp(`^\\s*${name}\\s*=(?!=)`);
         for (let index = 0; index < lines.length; index += 1) {

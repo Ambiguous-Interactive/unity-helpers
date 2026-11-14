@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     using System;
     using System.Collections.Generic;
     using System.IO;
+    using System.Threading;
     using UnityEditor;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Extension;
@@ -173,50 +174,84 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     return false;
                 }
                 Object existing = AssetDatabase.LoadMainAssetAtPath(path);
-                if (existing != null)
+                string nativeSaveError = null;
+                Application.LogCallback captureSaveError = (message, _, type) =>
                 {
                     if (
-                        !AssetDatabase.IsNativeAsset(existing)
-                        || existing.GetType() != asset.GetType()
+                        (
+                            type == LogType.Error
+                            || type == LogType.Exception
+                            || type == LogType.Assert
+                        )
+                        && message != null
+                        && message
+                            .Replace('\\', '/')
+                            .IndexOf(path, StringComparison.OrdinalIgnoreCase) >= 0
                     )
                     {
-                        savedAsset = null;
-                        error =
-                            "Only a native main asset of the same concrete type can be replaced.";
-                        return false;
+                        Interlocked.CompareExchange(ref nativeSaveError, message, null);
                     }
-
-                    bool copyContents = existing != asset;
-                    if (copyContents)
-                    {
-                        Undo.RecordObject(existing, "Replace Asset Contents");
-                        EditorUtility.CopySerialized(asset, existing);
-                    }
-                    EditorUtility.SetDirty(existing);
-                    if (copyContents)
-                    {
-                        Undo.FlushUndoRecordObjects();
-                    }
-                }
-                else
+                };
+                Application.logMessageReceivedThreaded += captureSaveError;
+                try
                 {
-                    if (occupied || AssetDatabase.Contains(asset))
+                    if (existing != null)
                     {
-                        savedAsset = null;
-                        error =
-                            "The destination is occupied or the source is already a persistent asset.";
-                        return false;
+                        if (
+                            !AssetDatabase.IsNativeAsset(existing)
+                            || existing.GetType() != asset.GetType()
+                        )
+                        {
+                            savedAsset = null;
+                            error =
+                                "Only a native main asset of the same concrete type can be replaced.";
+                            return false;
+                        }
+
+                        bool copyContents = existing != asset;
+                        if (copyContents)
+                        {
+                            Undo.RecordObject(existing, "Replace Asset Contents");
+                            EditorUtility.CopySerialized(asset, existing);
+                        }
+                        EditorUtility.SetDirty(existing);
+                        if (copyContents)
+                        {
+                            Undo.FlushUndoRecordObjects();
+                        }
+                    }
+                    else
+                    {
+                        if (occupied || AssetDatabase.Contains(asset))
+                        {
+                            savedAsset = null;
+                            error =
+                                "The destination is occupied or the source is already a persistent asset.";
+                            return false;
+                        }
+
+                        AssetDatabase.CreateAsset(asset, path);
                     }
 
-                    AssetDatabase.CreateAsset(asset, path);
+                    AssetDatabase.SaveAssets();
                 }
-
-                AssetDatabase.SaveAssets();
+                finally
+                {
+                    Application.logMessageReceivedThreaded -= captureSaveError;
+                }
                 Object written = existing != null ? existing : asset;
                 if (EditorUtility.IsDirty(written))
                 {
                     savedAsset = null;
                     error = "Unity left the asset dirty; saving may have been blocked.";
+                    return false;
+                }
+                string saveFailure = Volatile.Read(ref nativeSaveError);
+                if (saveFailure != null || !File.Exists(absolutePath))
+                {
+                    EditorUtility.SetDirty(written);
+                    savedAsset = null;
+                    error = saveFailure ?? "Unity did not persist the requested asset contents.";
                     return false;
                 }
                 AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);

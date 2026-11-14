@@ -64,4 +64,4 @@ capture fixture, controller, source hashes, and process receipts.
 | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | ![Settings before Build Profiles](../../images/editor-tools/build-profile-settings-before.png) | ![Settings with Build Profiles](../../images/editor-tools/build-profile-settings-after.png) |
 
-Failed saves restore the previous in-memory scene list so the same synchronization can be retried after correcting the write problem. Profiles whose scene lists already match are not saved.
+Failed saves restore the previous in-memory scene list so the same synchronization can be retried after correcting the write problem. The synchronizer verifies changed file bytes as well as dirty state, because Unity can clear the dirty flag even when the file write fails. Profiles whose scene lists already match are not saved.

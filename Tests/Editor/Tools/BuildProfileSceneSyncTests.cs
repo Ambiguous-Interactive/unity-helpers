@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
     using System.Collections;
     using System.Collections.Generic;
     using System.IO;
+    using System.Text.RegularExpressions;
     using NUnit.Framework;
     using UnityEditor;
     using UnityEditor.Build.Profile;
@@ -237,57 +238,57 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             }
         }
 
-        [TestCase(false)]
-        [TestCase(true)]
-        public void FailedSaveRestoresScenesAndCanBeRetried(bool throws)
+        [Test]
+        public void FailedSaveRestoresScenesAndCanBeRetried()
         {
-            byte[] original = File.ReadAllBytes(AssetDatabase.GetAssetPath(_inherited));
-            Assert.IsFalse(
-                BuildProfileSceneSync.TrySynchronizeProfile(
-                    _inherited,
-                    _scenes,
-                    _ =>
-                    {
-                        if (throws)
-                        {
-                            throw new IOException("Controlled save failure");
-                        }
-                    },
-                    out bool changed,
-                    out string error
-                )
+            if (SystemInfo.operatingSystemFamily != OperatingSystemFamily.Windows)
+            {
+                Assert.Ignore("The native Windows file-sharing failure control requires Windows.");
+            }
+            string path = AssetDatabase.GetAssetPath(_inherited);
+            byte[] original = File.ReadAllBytes(path);
+            Regex saveError = new(
+                "^File " + Regex.Escape(path) + " couldn't be written\\..*failed\\.$"
             );
-            Assert.IsFalse(changed);
-            Assert.IsNotEmpty(error);
+            LogAssert.Expect(LogType.Error, saveError);
+            LogAssert.Expect(LogType.Error, saveError);
+            using (FileStream locked = new(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                Assert.IsFalse(
+                    BuildProfileSceneSync.TrySynchronize(
+                        new[] { _profilesFolder },
+                        out int changed,
+                        out string error
+                    )
+                );
+                Assert.AreEqual(0, changed);
+                Assert.IsNotEmpty(error);
+            }
             AssertScenes(Array.Empty<EditorBuildSettingsScene>(), _inherited);
-            CollectionAssert.AreEqual(
-                original,
-                File.ReadAllBytes(AssetDatabase.GetAssetPath(_inherited))
-            );
+            CollectionAssert.AreEqual(original, File.ReadAllBytes(path));
             Assert.IsTrue(
-                BuildProfileSceneSync.TrySynchronizeProfile(
-                    _inherited,
-                    _scenes,
-                    AssetDatabase.SaveAssetIfDirty,
-                    out changed,
-                    out error
+                BuildProfileSceneSync.TrySynchronize(
+                    new[] { _profilesFolder },
+                    out int updated,
+                    out string retryError
                 ),
-                error
+                retryError
             );
-            Assert.IsTrue(changed);
+            Assert.AreEqual(1, updated);
             AssertScenes(_scenes, _inherited);
             Assert.IsFalse(EditorUtility.IsDirty(_inherited));
-            Assert.IsTrue(
-                BuildProfileSceneSync.TrySynchronizeProfile(
-                    _inherited,
-                    _scenes,
-                    _ => Assert.Fail("Matching profiles must not be saved"),
-                    out changed,
-                    out error
-                ),
-                error
-            );
-            Assert.IsFalse(changed);
+            using (FileStream locked = new(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                Assert.IsTrue(
+                    BuildProfileSceneSync.TrySynchronize(
+                        new[] { _profilesFolder },
+                        out updated,
+                        out retryError
+                    ),
+                    retryError
+                );
+                Assert.AreEqual(0, updated);
+            }
         }
 
         [Test]
