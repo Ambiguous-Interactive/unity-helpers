@@ -182,7 +182,7 @@ Run it from `.devcontainer/sync-mcp.sh` or directly after refreshing the project
 
 ```bash
 node scripts/mcp/sync-client-configs.mjs
-opencode reload
+# Restart OpenCode, or run `opencode reload` on versions that expose that command.
 ```
 
 Writes are transactional: files are staged as `0600` temporaries and renamed, and a failure part-way

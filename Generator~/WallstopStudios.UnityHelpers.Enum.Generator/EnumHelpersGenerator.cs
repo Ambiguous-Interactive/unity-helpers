@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Enum.Generator
 {
+    using System;
     using System.Collections.Generic;
     using System.Text;
     using Microsoft.CodeAnalysis;
@@ -54,6 +55,8 @@ namespace WallstopStudios.UnityHelpers.Enum.Generator
             }
 
             HashSet<INamedTypeSymbol> seen = new(SymbolEqualityComparer.Default);
+            HashSet<string> reservedClassNames = new(StringComparer.Ordinal);
+            StringBuilder sourceBuilder = new();
             foreach (EnumDeclarationSyntax candidate in receiver.Candidates)
             {
                 context.CancellationToken.ThrowIfCancellationRequested();
@@ -75,6 +78,7 @@ namespace WallstopStudios.UnityHelpers.Enum.Generator
                 EnumGenerationPlan plan = EnumGenerationPlan.TryCreate(
                     enumType,
                     context.Compilation,
+                    reservedClassNames,
                     out string reason
                 );
                 if (plan == null)
@@ -90,7 +94,7 @@ namespace WallstopStudios.UnityHelpers.Enum.Generator
                     continue;
                 }
 
-                string source = EnumSourceWriter.Write(plan);
+                string source = EnumSourceWriter.Write(plan, sourceBuilder);
                 context.AddSource(plan.HintName, SourceText.From(source, Encoding.UTF8));
             }
         }

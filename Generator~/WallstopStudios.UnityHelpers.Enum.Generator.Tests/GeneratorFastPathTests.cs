@@ -168,6 +168,7 @@ namespace WallstopStudios.UnityHelpers.Enum.Generator.Tests
             AssertDisplay<SmallEnum>(SmallEnumWEnumHelpers.ToDisplayName);
             AssertDisplay<SignedFlags>(SignedFlagsWEnumHelpers.ToDisplayName);
             AssertDisplay<AliasedEnum>(AliasedEnumWEnumHelpers.ToDisplayName);
+            AssertDisplay<AllAliasedDisplayEnum>(AllAliasedDisplayEnumWEnumHelpers.ToDisplayName);
         }
 
         [Test]

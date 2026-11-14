@@ -1462,8 +1462,14 @@ public enum FastState
     Paused = 3
 }
 
-FastState state = FastState.Playing;
-string name = state.ToCachedName();
+public static class FastStateExample
+{
+    public static string Describe()
+    {
+        FastState state = FastState.Playing;
+        return state.ToCachedName();
+    }
+}
 ```
 
 The generated class lands in the enum's namespace, so the existing `using` directive that makes

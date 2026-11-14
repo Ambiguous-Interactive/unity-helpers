@@ -37,14 +37,15 @@ test("worktree config sync copies private configs and preserves other global set
       path.join(repo, ".mcp.json"),
       '{"mcpServers":{"fixture":{"type":"http","url":"http://example.invalid/mcp"}}}\n'
     );
-    write(path.join(repo, ".env.local"), "FIXTURE_TOKEN=fake-secret-value\n");
+    write(path.join(repo, ".env.local"), "FIXTURE_TOKEN=fake-secret-value\nSOURCE_ONLY=kept\n");
+    write(path.join(worktree, ".env.local"), "CUSTOM=keep\nFIXTURE_TOKEN=stale\n");
     write(
       path.join(repo, "opencode.json"),
       '{"$schema":"https://opencode.ai/config.json","mcp":{"fixture":{"type":"remote","url":"http://example.invalid/mcp","enabled":true}}}\n'
     );
     write(
       path.join(home, ".config/opencode/opencode.jsonc"),
-      '{"$schema":"https://opencode.ai/config.json","theme":"fixture-theme"}\n'
+      '{"$schema":"https://opencode.ai/config.json","theme":"Keep ,] unchanged","mcp":{"personal":{"type":"local"}},}\n'
     );
 
     const output = run(process.execPath, [script, "--repo-root", repo, "--home", home], repo);
@@ -58,18 +59,19 @@ test("worktree config sync copies private configs and preserves other global set
       fs.readFileSync(copiedConfig, "utf8"),
       fs.readFileSync(path.join(repo, ".mcp.json"), "utf8")
     );
-    assert.equal(
-      fs.readFileSync(copiedEnv, "utf8"),
-      fs.readFileSync(path.join(repo, ".env.local"), "utf8")
-    );
+    const envText = fs.readFileSync(copiedEnv, "utf8");
+    assert.match(envText, /CUSTOM=keep/);
+    assert.match(envText, /FIXTURE_TOKEN=fake-secret-value/);
+    assert.match(envText, /SOURCE_ONLY=kept/);
+    assert.doesNotMatch(envText, /FIXTURE_TOKEN=stale/);
     assert.equal(fs.statSync(copiedConfig).mode & 0o777, 0o600);
     assert.equal(fs.statSync(copiedEnv).mode & 0o777, 0o600);
 
     const global = JSON.parse(
       fs.readFileSync(path.join(home, ".config/opencode/opencode.jsonc"), "utf8")
     );
-    assert.equal(global.theme, "fixture-theme");
-    assert.deepEqual(Object.keys(global.mcp), ["fixture"]);
+    assert.equal(global.theme, "Keep ,] unchanged");
+    assert.deepEqual(Object.keys(global.mcp).sort(), ["fixture", "personal"]);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

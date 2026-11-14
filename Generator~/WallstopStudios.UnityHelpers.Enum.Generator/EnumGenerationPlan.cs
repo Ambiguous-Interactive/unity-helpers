@@ -74,10 +74,10 @@ namespace WallstopStudios.UnityHelpers.Enum.Generator
         public static EnumGenerationPlan TryCreate(
             INamedTypeSymbol enumType,
             Compilation compilation,
+            ISet<string> reservedClassNames,
             out string reason
         )
         {
-            reason = null;
             if (enumType.TypeKind != TypeKind.Enum)
             {
                 reason = "the target is not an enum";
@@ -116,14 +116,25 @@ namespace WallstopStudios.UnityHelpers.Enum.Generator
             string namespaceName = enumType.ContainingNamespace.IsGlobalNamespace
                 ? null
                 : enumType.ContainingNamespace.ToDisplayString();
-            string className = BuildClassName(enumType, owners);
+            string baseClassName = BuildClassName(enumType, owners);
+            string className = baseClassName;
             string fullClassName =
                 namespaceName == null ? className : namespaceName + "." + className;
-            if (compilation.GetTypeByMetadataName(fullClassName) != null)
+            int salt = 0;
+            while (
+                compilation.GetTypeByMetadataName(fullClassName) != null
+                || reservedClassNames.Contains(fullClassName)
+            )
             {
-                className += "_" + StableHash(enumType.ToDisplayString());
+                string suffix =
+                    salt == 0
+                        ? StableHash(enumType.ToDisplayString())
+                        : StableHash(enumType.ToDisplayString() + "#" + salt);
+                className = baseClassName + "_" + suffix;
                 fullClassName = namespaceName == null ? className : namespaceName + "." + className;
+                ++salt;
             }
+            reservedClassNames.Add(fullClassName);
 
             EnumNameEntry[] entries = CollectEntries(
                 enumType,
@@ -163,6 +174,7 @@ namespace WallstopStudios.UnityHelpers.Enum.Generator
                 }
             }
 
+            reason = null;
             return new EnumGenerationPlan(
                 enumType,
                 enumType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
@@ -310,9 +322,29 @@ namespace WallstopStudios.UnityHelpers.Enum.Generator
             out string reason
         )
         {
-            reason = null;
             accessibility = "internal";
-            Accessibility effective = enumType.DeclaredAccessibility;
+            Accessibility declared = enumType.DeclaredAccessibility;
+            if (declared == Accessibility.Private)
+            {
+                reason = "the enum is private";
+                return false;
+            }
+            if (declared == Accessibility.Protected)
+            {
+                reason = "the enum is protected";
+                return false;
+            }
+            if (declared == Accessibility.ProtectedAndInternal)
+            {
+                reason = "the enum is private protected";
+                return false;
+            }
+            if (declared == Accessibility.NotApplicable)
+            {
+                reason = "the enum is file-local";
+                return false;
+            }
+            bool isPublic = declared == Accessibility.Public;
             for (
                 INamedTypeSymbol owner = enumType.ContainingType;
                 owner != null;
@@ -321,17 +353,17 @@ namespace WallstopStudios.UnityHelpers.Enum.Generator
             {
                 if (owner.DeclaredAccessibility == Accessibility.Private)
                 {
-                    reason = "the enum or a containing type is private";
+                    reason = "a containing type is private";
                     return false;
                 }
                 if (owner.DeclaredAccessibility == Accessibility.Protected)
                 {
-                    reason = "the enum or a containing type is protected";
+                    reason = "a containing type is protected";
                     return false;
                 }
                 if (owner.DeclaredAccessibility == Accessibility.ProtectedAndInternal)
                 {
-                    reason = "the enum or a containing type is private protected";
+                    reason = "a containing type is private protected";
                     return false;
                 }
                 if (owner.DeclaredAccessibility == Accessibility.NotApplicable)
@@ -341,31 +373,14 @@ namespace WallstopStudios.UnityHelpers.Enum.Generator
                 }
                 if (owner.DeclaredAccessibility != Accessibility.Public)
                 {
-                    effective = Accessibility.Internal;
+                    isPublic = false;
                 }
             }
-            if (effective == Accessibility.Private || effective == Accessibility.Protected)
-            {
-                reason = "the enum is not accessible outside its containing type";
-                return false;
-            }
-            if (effective == Accessibility.ProtectedAndInternal)
-            {
-                reason = "the enum is private protected";
-                return false;
-            }
-            if (effective == Accessibility.NotApplicable)
-            {
-                reason = "the enum is file-local";
-                return false;
-            }
-            if (
-                effective == Accessibility.Public
-                && enumType.DeclaredAccessibility == Accessibility.Public
-            )
+            if (isPublic)
             {
                 accessibility = "public";
             }
+            reason = null;
             return true;
         }
 

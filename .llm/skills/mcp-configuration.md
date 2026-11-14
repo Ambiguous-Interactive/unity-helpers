@@ -44,7 +44,8 @@ npm run unity:mcp:configure
 
 `.devcontainer/sync-mcp.sh` runs on create, start, and attach, then mirrors the generated files into
 persistent git worktrees and merges the OpenCode server map into `~/.config/opencode`. Run
-`opencode reload` after a refresh to bind the running agent.
+Restart the OpenCode CLI after a refresh (or run `opencode reload` on versions that expose it)
+to bind the running agent.
 
 ## ALWAYS confirm which project answered
 

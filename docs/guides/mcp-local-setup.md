@@ -145,14 +145,15 @@ repository, and merges the OpenCode server map into `~/.config/opencode`. That d
 volume, so the global config survives a container rebuild. Every copied config keeps mode `0600`,
 and the sync prints counts rather than credential values.
 
-After regenerating or copying configs, bind a running agent to them:
+After regenerating or copying configs, restart the OpenCode CLI so it loads them. OpenCode
+versions that expose the `reload` command can run it instead:
 
 ```bash
-opencode reload
+opencode reload # when supported; otherwise restart the CLI
 opencode mcp list
 ```
 
-The first line reloads OpenCode's configuration; the second confirms each server is `connected`.
+`opencode mcp list` confirms each server is `connected`.
 
 ## The endpoint is a port; the editor behind it is not
 

@@ -77,7 +77,43 @@ function stripJsonComments(text) {
     }
     result += character;
   }
-  return result.replace(/,\s*([}\]])/g, "$1");
+  return removeTrailingCommas(result);
+}
+
+function removeTrailingCommas(text) {
+  let result = "";
+  let inString = false;
+  let escaped = false;
+  for (let index = 0; index < text.length; ++index) {
+    const character = text[index];
+    if (inString) {
+      result += character;
+      if (escaped) {
+        escaped = false;
+      } else if (character === "\\") {
+        escaped = true;
+      } else if (character === '"') {
+        inString = false;
+      }
+      continue;
+    }
+    if (character === '"') {
+      inString = true;
+      result += character;
+      continue;
+    }
+    if (character === ",") {
+      let next = index + 1;
+      while (next < text.length && /\s/.test(text[next])) {
+        ++next;
+      }
+      if (next < text.length && (text[next] === "}" || text[next] === "]")) {
+        continue;
+      }
+    }
+    result += character;
+  }
+  return result;
 }
 
 function readJsonc(filePath) {
@@ -97,10 +133,47 @@ function writeJson(filePath, value) {
   fs.chmodSync(filePath, 0o600);
 }
 
-function copyConfig(source, target) {
+function writePrivateFile(target, contents) {
   fs.mkdirSync(path.dirname(target), { recursive: true, mode: 0o700 });
-  fs.writeFileSync(target, fs.readFileSync(source), { mode: 0o600 });
-  fs.chmodSync(target, 0o600);
+  const temporary = `${target}.tmp-${process.pid}`;
+  try {
+    fs.writeFileSync(temporary, contents, { mode: 0o600 });
+    fs.chmodSync(temporary, 0o600);
+    fs.renameSync(temporary, target);
+    fs.chmodSync(target, 0o600);
+  } finally {
+    if (fs.existsSync(temporary)) {
+      fs.rmSync(temporary, { force: true });
+    }
+  }
+}
+
+function copyConfig(source, target) {
+  writePrivateFile(target, fs.readFileSync(source));
+}
+
+function mergeEnvFile(source, target) {
+  if (!fs.existsSync(target)) {
+    copyConfig(source, target);
+    return;
+  }
+  const destinations = fs.readFileSync(target, "utf8").split("\n");
+  const sourceLines = fs.readFileSync(source, "utf8").split("\n");
+  for (const line of sourceLines) {
+    const match = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=/.exec(line);
+    if (!match) {
+      continue;
+    }
+    const existing = destinations.findIndex((candidate) =>
+      new RegExp(`^\\s*${match[1]}\\s*=`).test(candidate)
+    );
+    if (existing < 0) {
+      destinations.push(line);
+    } else {
+      destinations[existing] = line;
+    }
+  }
+  writePrivateFile(target, destinations.join("\n"));
 }
 
 function isPersistentWorktree(worktree, repoRoot, home) {
@@ -144,7 +217,7 @@ function syncWorktrees(repoRoot, home) {
     }
     const envSource = path.join(repoRoot, ".env.local");
     if (fs.existsSync(envSource)) {
-      copyConfig(envSource, path.join(worktree, ".env.local"));
+      mergeEnvFile(envSource, path.join(worktree, ".env.local"));
       ++copied;
     }
     if (copied !== 0) {
@@ -182,7 +255,7 @@ function syncGlobalOpenCode(repoRoot, home) {
   if (typeof source.$schema === "string") {
     merged.$schema = source.$schema;
   }
-  merged.mcp = source.mcp;
+  merged.mcp = { ...(existing && existing.mcp ? existing.mcp : {}), ...source.mcp };
   writeJson(globalPath, merged);
   return Object.keys(source.mcp).length;
 }

@@ -219,6 +219,32 @@ namespace WallstopStudios.UnityHelpers.Enum.Generator.Tests
         }
 
         [Test]
+        public void PrivateNestedEnumInInternalHolderIsReportedAndSkipped()
+        {
+            const string source =
+                "namespace Fixture { using WallstopStudios.UnityHelpers.Core.Attributes; internal static class Holder { [WEnumHelpers] private enum Nested { None = 0, Value = 1 } } }";
+            RunResult result = Run(source);
+            Assert.That(result.Errors, Is.Empty);
+            Assert.That(result.GeneratedTrees, Is.Empty);
+            Assert.That(HasDiagnostic(result.Diagnostics, "WENUM001"), Is.True);
+        }
+
+        [Test]
+        public void CollidingGeneratedClassNamesAreDisambiguated()
+        {
+            const string source =
+                "namespace Fixture { using WallstopStudios.UnityHelpers.Core.Attributes; [WEnumHelpers] public enum A_B { None = 0 } internal static class A { [WEnumHelpers] public enum B { None = 0 } } }";
+            RunResult result = Run(source);
+            Assert.That(result.Errors, Is.Empty);
+            Assert.That(result.GeneratedTrees.Length, Is.EqualTo(2));
+            Assert.That(result.GeneratedText, Does.Contain("class A_BWEnumHelpers"));
+            Assert.That(
+                result.GeneratedText,
+                Does.Not.Match("class A_BWEnumHelpers[^{]*\\{[^}]*class A_BWEnumHelpers")
+            );
+        }
+
+        [Test]
         public void ObsoleteErrorEnumIsReportedAndSkipped()
         {
             const string source =

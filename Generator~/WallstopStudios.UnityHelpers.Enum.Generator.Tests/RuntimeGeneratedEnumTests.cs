@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Enum.Generator.Tests
 {
     using System;
+    using System.Globalization;
     using System.Reflection;
     using System.Reflection.Emit;
     using NUnit.Framework;
@@ -41,7 +42,15 @@ namespace WallstopStudios.UnityHelpers.Enum.Generator.Tests
             }
             for (int index = 0; index < values.Length; ++index)
             {
-                builder.DefineLiteral("V" + index, values[index]);
+                object literal =
+                    underlyingType == typeof(bool) ? values[index] != 0
+                    : underlyingType == typeof(char) ? (char)values[index]
+                    : Convert.ChangeType(
+                        values[index],
+                        underlyingType,
+                        CultureInfo.InvariantCulture
+                    );
+                builder.DefineLiteral("V" + index, literal);
             }
             return builder.CreateType();
         }
@@ -138,7 +147,20 @@ namespace WallstopStudios.UnityHelpers.Enum.Generator.Tests
 
             Type valuesType = typeof(EnumValues<>).MakeGenericType(enumType);
             MethodInfo isDefined = valuesType.GetMethod("IsDefined");
-            object[] values = ToObjects((Array)Enum.GetValues(enumType));
+            Array declared;
+            try
+            {
+                declared = Enum.GetValues(enumType);
+            }
+            catch (InvalidOperationException)
+            {
+                Assert.Ignore(
+                    "This runtime cannot enumerate an enum with underlying type "
+                        + underlyingType.Name
+                );
+                return;
+            }
+            object[] values = ToObjects(declared);
             foreach (object value in values)
             {
                 Assert.That(

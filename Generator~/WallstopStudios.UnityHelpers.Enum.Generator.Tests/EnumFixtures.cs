@@ -134,6 +134,16 @@ namespace WallstopStudios.UnityHelpers.Enum.Generator.Tests
     internal enum EmptyEnum { }
 
     [WEnumHelpers]
+    internal enum AllAliasedDisplayEnum
+    {
+        [EnumDisplayName("Shown")]
+        First = 0,
+
+        [EnumDisplayName("Shown")]
+        Alias = 0,
+    }
+
+    [WEnumHelpers]
     internal enum DisplayEnum
     {
         None = 0,
