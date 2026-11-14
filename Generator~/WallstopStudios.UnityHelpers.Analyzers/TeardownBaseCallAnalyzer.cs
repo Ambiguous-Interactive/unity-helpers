@@ -233,7 +233,14 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 || branch.Semantics == ControlFlowBranchSemantics.StructuredExceptionHandling
             )
             {
-                if (HasUnwindingCleanup(graph, branch.Source))
+                if (
+                    HasUnwindingCleanup(
+                        graph,
+                        branch.Source,
+                        branch.Semantics == ControlFlowBranchSemantics.Rethrow,
+                        pending
+                    )
+                )
                 {
                     return true;
                 }
@@ -268,7 +275,12 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             return false;
         }
 
-        private static bool HasUnwindingCleanup(ControlFlowGraph graph, BasicBlock source)
+        private static bool HasUnwindingCleanup(
+            ControlFlowGraph graph,
+            BasicBlock source,
+            bool includeHandlers,
+            Queue<BasicBlock> pending
+        )
         {
             for (
                 ControlFlowRegion region = source.EnclosingRegion;
@@ -276,6 +288,24 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 region = region.EnclosingRegion
             )
             {
+                if (includeHandlers && region.Kind == ControlFlowRegionKind.TryAndCatch)
+                {
+                    ControlFlowRegion body = region.NestedRegions[0];
+                    if (
+                        body.FirstBlockOrdinal <= source.Ordinal
+                        && source.Ordinal <= body.LastBlockOrdinal
+                    )
+                    {
+                        for (int index = 1; index < region.NestedRegions.Length; ++index)
+                        {
+                            ControlFlowRegion handler = region.NestedRegions[index];
+                            if (QueueDestination(graph.Blocks[handler.FirstBlockOrdinal], pending))
+                            {
+                                return true;
+                            }
+                        }
+                    }
+                }
                 if (region.Kind != ControlFlowRegionKind.TryAndFinally)
                 {
                     continue;

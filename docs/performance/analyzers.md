@@ -452,6 +452,8 @@ branch, or after an early return that bypasses it, does not make a nested call r
 bodies, empty statements and a bare `return;` do not count. There is deliberately **no** allow-list for a body that "only logs afterwards":
 moving one line is cheaper than a suppression, and an exception list reads as permission.
 
+WUH009 also follows a bare rethrow into an enclosing catch and its normal continuation. A sibling catch cannot handle a rethrow from another handler in the same try statement.
+
 The message quotes the `base` call exactly as it was written, arguments included, rather than
 reconstructing a parameterless one.
 

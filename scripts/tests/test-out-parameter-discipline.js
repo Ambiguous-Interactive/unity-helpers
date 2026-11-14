@@ -96,11 +96,48 @@ function isTerminalExit(statement) {
 }
 
 function lineAfterStatement(lines, start) {
-  let end = start;
-  while (end < lines.length && !lines[end].trimEnd().endsWith(";")) {
-    end += 1;
+  let quoted = null;
+  let verbatim = false;
+  let blockComment = false;
+  let nesting = 0;
+  for (let end = start; end < lines.length; end += 1) {
+    const line = lines[end];
+    for (let index = 0; index < line.length; index += 1) {
+      const char = line[index];
+      const next = line[index + 1];
+      if (blockComment) {
+        if (char === "*" && next === "/") {
+          blockComment = false;
+          index += 1;
+        }
+      } else if (quoted !== null) {
+        if (!verbatim && char === "\\") {
+          index += 1;
+        } else if (char === quoted) {
+          if (verbatim && next === quoted) {
+            index += 1;
+          } else {
+            quoted = null;
+          }
+        }
+      } else if (char === "/" && next === "/") {
+        break;
+      } else if (char === "/" && next === "*") {
+        blockComment = true;
+        index += 1;
+      } else if (char === '"' || char === "'") {
+        quoted = char;
+        verbatim = char === '"' && line[index - 1] === "@";
+      } else if ("([{".includes(char)) {
+        nesting += 1;
+      } else if (")]}".includes(char)) {
+        nesting -= 1;
+      } else if (char === ";" && nesting === 0) {
+        return end + 1;
+      }
+    }
   }
-  return end + 1;
+  return lines.length;
 }
 
 function nextStatementAfterOutAssignment(lines, start, siblingAssignment) {
@@ -124,7 +161,13 @@ for (const [body, expected] of [
   ['value = null;\n// explanation\nerror =\n    "failure";\nreturn false;', true],
   ['value = null;\nerror =\n    "failure";\nDoWork();\nreturn false;', false],
   ['value = null;\nerror =\n    "failure";\nreturnValue = 1;\nreturn false;', false],
-  ['value = null;\nerror =\n    "failure";\nif (condition) return false;', false]
+  ['value = null;\nerror =\n    "failure";\nif (condition) return false;', false],
+  ["value = null; // unavailable\nDoWork();\nreturn false;", false],
+  ['value = "//;"; /* unavailable */\nDoWork();\nreturn false;', false],
+  ['value = "/*;*/";\nreturn false;', true],
+  ['value = @"first;\n// second";\nDoWork();\nreturn false;', false],
+  ["value = () => {\nDoWork();\n}; // assigned\nreturn false;", true],
+  ["value = ';'; // assigned\nDoWork();\nreturn false;", false]
 ]) {
   const lines = body.split("\n");
   const next = nextStatementAfterOutAssignment(lines, 0, /^\s*(?:value|error)\s*=(?!=)/);

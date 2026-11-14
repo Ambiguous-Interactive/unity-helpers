@@ -116,47 +116,24 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     {
                         continue;
                     }
-                    using SerializedObject serialized = new(profile);
-                    serialized.Update();
-                    using SerializedProperty scenes = serialized.FindProperty(ScenesPropertyName);
-                    if (scenes == null)
+                    if (
+                        !TrySynchronizeProfile(
+                            profile,
+                            globalScenes,
+                            AssetDatabase.SaveAssetIfDirty,
+                            out bool changed,
+                            out string profileError
+                        )
+                    )
                     {
                         updatedProfiles = updated;
-                        error =
-                            "Unity did not expose the build profile scene list: "
-                            + AssetDatabase.GetAssetPath(profile);
+                        error = profileError;
                         return false;
                     }
-                    if (ScenesMatch(scenes, globalScenes))
+                    if (changed)
                     {
-                        continue;
+                        ++updated;
                     }
-                    Undo.RecordObject(profile, UndoName);
-                    scenes.arraySize = globalScenes.Length;
-                    for (int index = 0; index < globalScenes.Length; ++index)
-                    {
-                        EditorBuildSettingsScene source = globalScenes[index];
-                        using SerializedProperty entry = scenes.GetArrayElementAtIndex(index);
-                        entry.boxedValue = new EditorBuildSettingsScene
-                        {
-                            guid = source.guid,
-                            path = source.path ?? string.Empty,
-                            enabled = source.enabled,
-                        };
-                    }
-                    serialized.ApplyModifiedProperties();
-                    EditorUtility.SetDirty(profile);
-                    Undo.FlushUndoRecordObjects();
-                    AssetDatabase.SaveAssetIfDirty(profile);
-                    if (EditorUtility.IsDirty(profile))
-                    {
-                        updatedProfiles = updated;
-                        error =
-                            "Unity left the build profile unsaved: "
-                            + AssetDatabase.GetAssetPath(profile);
-                        return false;
-                    }
-                    ++updated;
                 }
 
                 updatedProfiles = updated;
@@ -190,6 +167,100 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             catch (Exception exception)
             {
                 Debug.LogWarning(exception.Message);
+            }
+        }
+
+        internal static bool TrySynchronizeProfile(
+            BuildProfile profile,
+            EditorBuildSettingsScene[] globalScenes,
+            Action<BuildProfile> save,
+            out bool changed,
+            out string error
+        )
+        {
+            using SerializedObject serialized = new(profile);
+            serialized.Update();
+            using SerializedProperty scenes = serialized.FindProperty(ScenesPropertyName);
+            if (scenes == null)
+            {
+                changed = false;
+                error =
+                    "Unity did not expose the build profile scene list: "
+                    + AssetDatabase.GetAssetPath(profile);
+                return false;
+            }
+            if (ScenesMatch(scenes, globalScenes))
+            {
+                changed = false;
+                error = null;
+                return true;
+            }
+            EditorBuildSettingsScene[] previous = new EditorBuildSettingsScene[scenes.arraySize];
+            for (int index = 0; index < previous.Length; ++index)
+            {
+                using SerializedProperty entry = scenes.GetArrayElementAtIndex(index);
+                previous[index] = entry.boxedValue as EditorBuildSettingsScene;
+            }
+            try
+            {
+                Undo.RecordObject(profile, UndoName);
+                WriteScenes(scenes, globalScenes);
+                serialized.ApplyModifiedProperties();
+                EditorUtility.SetDirty(profile);
+                Undo.FlushUndoRecordObjects();
+                save(profile);
+                if (EditorUtility.IsDirty(profile))
+                {
+                    serialized.Update();
+                    WriteScenes(scenes, previous);
+                    serialized.ApplyModifiedPropertiesWithoutUndo();
+                    changed = false;
+                    error =
+                        "Unity left the build profile unsaved: "
+                        + AssetDatabase.GetAssetPath(profile);
+                    return false;
+                }
+            }
+            catch (Exception exception)
+            {
+                string failure = exception.Message;
+                try
+                {
+                    serialized.Update();
+                    WriteScenes(scenes, previous);
+                    serialized.ApplyModifiedPropertiesWithoutUndo();
+                    EditorUtility.SetDirty(profile);
+                }
+                catch (Exception restoreException)
+                {
+                    failure +=
+                        " Could not restore the previous scene list: " + restoreException.Message;
+                }
+                changed = false;
+                error = failure;
+                return false;
+            }
+            changed = true;
+            error = null;
+            return true;
+        }
+
+        private static void WriteScenes(
+            SerializedProperty scenes,
+            EditorBuildSettingsScene[] values
+        )
+        {
+            scenes.arraySize = values.Length;
+            for (int index = 0; index < values.Length; ++index)
+            {
+                EditorBuildSettingsScene source = values[index];
+                using SerializedProperty entry = scenes.GetArrayElementAtIndex(index);
+                entry.boxedValue = new EditorBuildSettingsScene
+                {
+                    guid = source.guid,
+                    path = source.path ?? string.Empty,
+                    enabled = source.enabled,
+                };
             }
         }
 

@@ -65,6 +65,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             }
         }
 
+        [TestCase(TextureFormat.RGBA32, 4)]
+        [TestCase(TextureFormat.ARGB32, 4)]
+        [TestCase(TextureFormat.BGRA32, 4)]
+        [TestCase(TextureFormat.RGB24, 3)]
+        [TestCase(TextureFormat.RGB565, 2)]
+        [TestCase(TextureFormat.RGBA4444, 2)]
+        [TestCase(TextureFormat.Alpha8, 1)]
+        public void SupportedFormatReportsItsPixelSize(TextureFormat format, int expected)
+        {
+            Assert.IsTrue(SpritePixelRegion.TryGetBytesPerPixel(format, out int actual));
+            Assert.AreEqual(expected, actual);
+        }
+
+        [TestCase(TextureFormat.DXT1)]
+        [TestCase((TextureFormat)(-1))]
+        public void UnsupportedFormatReturnsFalse(TextureFormat format)
+        {
+            Assert.IsFalse(SpritePixelRegion.TryGetBytesPerPixel(format, out _));
+        }
+
         [TestCaseSource(nameof(ReadableViews))]
         public void ReadableViewsMatchIndependentNativePixelsAndOwnedPublicMasks(
             TextureFormat format,

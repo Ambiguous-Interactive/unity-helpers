@@ -278,8 +278,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             Color32[] pixels;
             int textureWidth;
             RectInt sourceRegion;
-            int bytesPerPixel = SpritePixelRegion.GetBytesPerPixel(texture.format);
-            if (0 < bytesPerPixel)
+            if (SpritePixelRegion.TryGetBytesPerPixel(texture.format, out int bytesPerPixel))
             {
                 NativeArray<byte> raw = texture.GetPixelData<byte>(0);
                 if ((long)sourceTextureWidth * sourceTextureHeight * bytesPerPixel != raw.Length)
@@ -291,6 +290,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 SpritePixelRegion readable = new(
                     raw,
                     texture.format,
+                    bytesPerPixel,
                     sourceTextureWidth,
                     new RectInt(xStart, yStart, width, height),
                     maskPivot,

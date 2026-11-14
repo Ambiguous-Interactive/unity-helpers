@@ -31,6 +31,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         private EditorBuildSettingsScene[] _scenes;
         private bool _originalEnabled;
         private string[] _originalFolders;
+        private BuildProfile _originalActiveProfile;
+        private EditorBuildSettingsScene[] _originalActiveScenes;
+        private bool _originalActiveOverride;
+        private bool _originalActiveDirty;
         private BuildProfile _inherited;
         private BuildProfile _custom;
         private BuildProfile _outside;
@@ -58,7 +62,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         private static void SetScenes(
             BuildProfile profile,
             EditorBuildSettingsScene[] scenes,
-            bool custom
+            bool custom,
+            bool save = true
         )
         {
             profile.overrideGlobalScenes = custom;
@@ -78,7 +83,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             }
             serialized.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(profile);
-            AssetDatabase.SaveAssetIfDirty(profile);
+            if (save)
+            {
+                AssetDatabase.SaveAssetIfDirty(profile);
+            }
         }
 
         private static EditorBuildSettingsScene[] ReadScenes(BuildProfile profile)
@@ -114,6 +122,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             base.CommonOneTimeSetUp();
             DeferAssetCleanupToOneTimeTearDown = true;
             _originalScenes = EditorBuildSettings.globalScenes;
+            _originalActiveProfile = BuildProfile.GetActiveBuildProfile();
+            if (_originalActiveProfile != null)
+            {
+                _originalActiveDirty = EditorUtility.IsDirty(_originalActiveProfile);
+                _originalActiveScenes = ReadScenes(_originalActiveProfile);
+                _originalActiveOverride = _originalActiveProfile.overrideGlobalScenes;
+            }
             UnityHelpersSettings settings = UnityHelpersSettings.instance;
             _originalEnabled = settings._autoSynchronizeBuildProfileScenes;
             _originalFolders = settings._buildProfileSceneFolders;
@@ -190,6 +205,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
                 UnityHelpersSettings settings = UnityHelpersSettings.instance;
                 settings._autoSynchronizeBuildProfileScenes = false;
                 EditorBuildSettings.globalScenes = _originalScenes;
+                if (_originalActiveProfile != null)
+                {
+                    SetScenes(
+                        _originalActiveProfile,
+                        _originalActiveScenes,
+                        _originalActiveOverride,
+                        save: false
+                    );
+                    if (!_originalActiveDirty)
+                    {
+                        EditorUtility.ClearDirty(_originalActiveProfile);
+                    }
+                }
                 settings._buildProfileSceneFolders = _originalFolders;
                 settings._autoSynchronizeBuildProfileScenes = _originalEnabled;
             }
@@ -207,6 +235,59 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
                     base.OneTimeTearDown();
                 }
             }
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void FailedSaveRestoresScenesAndCanBeRetried(bool throws)
+        {
+            byte[] original = File.ReadAllBytes(AssetDatabase.GetAssetPath(_inherited));
+            Assert.IsFalse(
+                BuildProfileSceneSync.TrySynchronizeProfile(
+                    _inherited,
+                    _scenes,
+                    _ =>
+                    {
+                        if (throws)
+                        {
+                            throw new IOException("Controlled save failure");
+                        }
+                    },
+                    out bool changed,
+                    out string error
+                )
+            );
+            Assert.IsFalse(changed);
+            Assert.IsNotEmpty(error);
+            AssertScenes(Array.Empty<EditorBuildSettingsScene>(), _inherited);
+            CollectionAssert.AreEqual(
+                original,
+                File.ReadAllBytes(AssetDatabase.GetAssetPath(_inherited))
+            );
+            Assert.IsTrue(
+                BuildProfileSceneSync.TrySynchronizeProfile(
+                    _inherited,
+                    _scenes,
+                    AssetDatabase.SaveAssetIfDirty,
+                    out changed,
+                    out error
+                ),
+                error
+            );
+            Assert.IsTrue(changed);
+            AssertScenes(_scenes, _inherited);
+            Assert.IsFalse(EditorUtility.IsDirty(_inherited));
+            Assert.IsTrue(
+                BuildProfileSceneSync.TrySynchronizeProfile(
+                    _inherited,
+                    _scenes,
+                    _ => Assert.Fail("Matching profiles must not be saved"),
+                    out changed,
+                    out error
+                ),
+                error
+            );
+            Assert.IsFalse(changed);
         }
 
         [Test]

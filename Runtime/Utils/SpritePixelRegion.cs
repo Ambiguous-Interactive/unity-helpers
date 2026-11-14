@@ -47,6 +47,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         internal SpritePixelRegion(
             NativeArray<byte> pixels,
             TextureFormat format,
+            int bytesPerPixel,
             int textureWidth,
             RectInt region,
             Vector2 pivot,
@@ -64,26 +65,31 @@ namespace WallstopStudios.UnityHelpers.Utils
             AlphaFromGrayscale = alphaFromGrayscale;
             _rawPixels = pixels;
             _format = format;
-            _bytesPerPixel = GetBytesPerPixel(format);
+            _bytesPerPixel = bytesPerPixel;
         }
 
-        internal static int GetBytesPerPixel(TextureFormat format)
+        internal static bool TryGetBytesPerPixel(TextureFormat format, out int bytesPerPixel)
         {
             switch (format)
             {
                 case TextureFormat.RGBA32:
                 case TextureFormat.ARGB32:
                 case TextureFormat.BGRA32:
-                    return 4;
+                    bytesPerPixel = 4;
+                    return true;
                 case TextureFormat.RGB24:
-                    return 3;
+                    bytesPerPixel = 3;
+                    return true;
                 case TextureFormat.RGB565:
                 case TextureFormat.RGBA4444:
-                    return 2;
+                    bytesPerPixel = 2;
+                    return true;
                 case TextureFormat.Alpha8:
-                    return 1;
+                    bytesPerPixel = 1;
+                    return true;
                 default:
-                    return 0;
+                    bytesPerPixel = default;
+                    return false;
             }
         }
 
