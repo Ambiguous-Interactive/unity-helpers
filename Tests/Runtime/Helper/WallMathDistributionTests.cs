@@ -249,6 +249,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             CollectionAssert.AreEqual(new[] { 1d, 2d, 3d, 4d }, values);
         }
 
+        [TestCase(1, 4)]
+        [TestCase(2, 4)]
+        [TestCase(3, 4)]
+        [TestCase(1, 8)]
+        public void NearestRanksDistinguishAdjacentBinaryThresholds(int rank, int count)
+        {
+            double[] values = new double[count];
+            for (int index = 0; index < count; ++index)
+            {
+                values[index] = 10d * (index + 1);
+            }
+            double threshold = (double)rank / count;
+            long bits = BitConverter.DoubleToInt64Bits(threshold);
+            double below = BitConverter.Int64BitsToDouble(bits - 1);
+            double above = BitConverter.Int64BitsToDouble(bits + 1);
+
+            Assert.AreEqual(10d * rank, WallMath.PercentileNearestRank(values, below));
+            Assert.AreEqual(10d * rank, WallMath.PercentileNearestRank(values, threshold));
+            Assert.AreEqual(10d * (rank + 1), WallMath.PercentileNearestRank(values, above));
+        }
+
         [TestCase(-0.1d)]
         [TestCase(1.1d)]
         [TestCase(double.NaN)]
