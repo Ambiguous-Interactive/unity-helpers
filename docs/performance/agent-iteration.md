@@ -73,6 +73,9 @@ receipt lookup more expensive. These observations describe instrument cost, not 
 speedups. Prefer normal execution for short checks; use reuse only when its complete lookup saves
 time compared with the command. Normal execution performs no receipt fingerprinting.
 
+Raw-byte hashing alone took 48.0 seconds for 9,053 tracked files in one local observation. It is
+unsuitable as a default cost for short edit loops.
+
 PR lint and contract jobs now use the shared planner's merge-base inventory. Registry entries
 name input groups and required companion checks. Missing metadata runs unconditionally; unknown
 paths select the complete registry. Invalid dependency graphs and missing input groups fail.
@@ -131,6 +134,15 @@ This approach follows [OpenAI harness guidance](https://openai.com/index/harness
 [long-running agent handoff guidance](https://www.anthropic.com/research/effective-harnesses-for-long-running-agents).
 
 ## Qualification still required
+
+Three compiler-command pairs completed with compiler inputs unchanged and verified by a content
+hash before and after. Normal multi-configuration checks took 551.7, 808.1, and 749.0 seconds;
+runtime iteration took 11.7, 4.9, and 16.4 seconds. Medians were 749.0 and 11.7 seconds. These
+compare feedback scopes: normal runs all configurations and analysis, while iteration compiles
+runtime sources. Other tooling work and host I/O continued during capture. Preflight, focused
+tests, native execution, and review are excluded. The [retained measurements](./agent-ci-baseline.json)
+include the input hash, commands, samples, and descriptive nearest-rank p95; three samples do not
+establish tail latency. This is a component probe, not qualification of three complete task pilots.
 
 Measure cold and warm feedback separately with at least three paired local runs. Compare CI
 queue, setup, execution, and cleanup on comparable runners. Report median, p95, runner time,

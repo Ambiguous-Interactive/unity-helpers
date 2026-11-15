@@ -302,5 +302,28 @@
     "Summed job seconds overlap; not CPU time.",
     "Cancelled runs excluded from success latency.",
     "latest30 completed push/PR runs; attempts and runner metadata retained."
-  ]
+  ],
+  "localCompilerScopeProbe": {
+    "capturedUtc": "2026-11-15T06:26:36.298086+00:00",
+    "sourceCommit": "795903adf69d03c4d3a12695766f686d81ffb5a5",
+    "compilerInputSha256": "516d696afcc5c6c2f29c981ed853e4b18b0802fb52b6414a7730c318ca56c46b",
+    "verifiedStable": true,
+    "normalCommand": "npm run typecheck:unity",
+    "iterationCommand": "npm run typecheck:iterate -- runtime",
+    "normalSeconds": [551.7083125740028, 808.0987849920057, 748.9978268389968],
+    "iterationSeconds": [11.66130015499948, 4.936910538002849, 16.415798440997605],
+    "normalMedianSeconds": 748.9978268389968,
+    "iterationMedianSeconds": 11.66130015499948,
+    "normalP95Seconds": 808.0987849920057,
+    "iterationP95Seconds": 16.415798440997605,
+    "percentileMethod": "nearest rank; three observations per command, descriptive only",
+    "caveats": [
+      "Three unchanged-input command pairs with alternating order, not three end-to-end task pilots.",
+      "Compiler inputs were hashed before and after; other tooling edits and host I/O continued.",
+      "Warm workspace; no cold-cache or comparable-runner CI claim.",
+      "Normal checks all configurations with analysis; iteration checks runtime compilation only.",
+      "These figures compare feedback scopes, not equivalent compiler work or algorithm speed.",
+      "Preflight, focused tests, native Unity and review are outside these component timings."
+    ]
+  }
 }
