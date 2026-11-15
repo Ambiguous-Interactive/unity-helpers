@@ -27,7 +27,7 @@ test("compatibility is generated from the canonical licensed jobs and has separa
 
   assert.equal(compatibility.jobs["unity-tests"].strategy["max-parallel"], 1);
   assert.equal(compatibility.jobs["unity-tests-aggregate"].name, "Unity Compatibility Success");
-  assert.match(compatibility.jobs["unity-tests-aggregate"].if, /always\(\)/);
+  assert.equal(compatibility.jobs["unity-tests-aggregate"].if, "${{ always() }}");
   assert.deepEqual(compatibility.jobs["unity-tests-aggregate"].needs, [
     "runner-preflight",
     "unity-tests"

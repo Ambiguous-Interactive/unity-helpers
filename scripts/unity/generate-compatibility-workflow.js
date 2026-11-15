@@ -21,6 +21,8 @@ function renderCompatibilityWorkflow(source) {
     let block = blocks.get(id);
     if (!block) throw new Error(`Canonical Unity workflow is missing ${id}.`);
     block = block.replaceAll(readbackGuard, "");
+    if (id === "unity-tests-aggregate")
+      block = block.replace("if: ${{ (always()) }}", "if: ${{ always() }}");
     block = block.replace(
       /^    name: (.+)$/m,
       (_, name) =>

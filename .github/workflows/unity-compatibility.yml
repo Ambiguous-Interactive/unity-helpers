@@ -1250,7 +1250,7 @@ jobs:
 
   unity-tests-aggregate:
     name: Unity Compatibility Success
-    if: ${{ (always()) }}
+    if: ${{ always() }}
     needs:
       - runner-preflight
       - unity-tests
