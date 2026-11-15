@@ -88,7 +88,24 @@
     "id": "unsafe-code-test",
     "name": "Unsafe-code gate self-test",
     "run": "npm run test:lint-unsafe-code",
-    "inputs": ["@tooling"]
+    "inputs": [
+      "package.json",
+      ".github/**",
+      ".githooks/**",
+      ".config/**",
+      "scripts/python~/**",
+      "scripts/*checks.json",
+      "scripts/check-inputs.json",
+      "scripts/check_runner.py",
+      "scripts/check_registries.py",
+      "scripts/git-staging-helpers.*",
+      "scripts/tests/fixtures/**",
+      "scripts/lint-unsafe-code.js",
+      "scripts/tests/test-lint-unsafe-code.js",
+      "Generator~/WallstopStudios.UnityHelpers.SyntaxPolicy/**",
+      "Generator~/Directory.*",
+      "Runtime/Analyzers/**"
+    ]
   },
   {
     "id": "unsafe-code",
@@ -448,7 +465,22 @@
     "id": "unity-mode-coordinator",
     "name": "Concurrent Unity mode controls",
     "run": "npm run test:unity-modes",
-    "inputs": ["@tooling"]
+    "inputs": [
+      "package.json",
+      ".github/**",
+      ".githooks/**",
+      ".config/**",
+      "scripts/python~/**",
+      "scripts/*checks.json",
+      "scripts/check-inputs.json",
+      "scripts/check_runner.py",
+      "scripts/check_registries.py",
+      "scripts/git-staging-helpers.*",
+      "scripts/tests/fixtures/**",
+      "scripts/unity/**",
+      "scripts/tests/test_ci_modes.py",
+      "scripts/tests/test_editmode_shards.py"
+    ]
   },
   {
     "id": "report-slow-tests",

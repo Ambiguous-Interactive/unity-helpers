@@ -44,7 +44,7 @@ Use the shared selector to inspect the work before launching checks:
 
 ```bash
 npm run agent:check -- --tier iterate --base origin/main --plan --json
-npm run agent:check -- --tier iterate --files Runtime/Utils/WallMath.cs
+npm run agent:check -- --tier iterate --files Runtime/Core/Helper/WallMath.cs
 npm run agent:check -- --tier pr --base origin/main --plan
 npm run agent:check -- --tier full --base origin/main
 ```
@@ -79,6 +79,10 @@ paths select the complete registry. Invalid dependency graphs and missing input 
 Documentation without an applicable contract suite reports that no validation was performed.
 Main retains complete registry execution. The unsafe scanner retains its own positive controls
 and always emits the required safety report. Tooling test suites run when their inputs change.
+The two expensive unsafe-code and Unity mode-controller self-tests name their implementation,
+fixture, configuration, and harness inputs. An unrelated formatter edit no longer selects either
+self-test; changing their own implementation or shared harness still does. Unknown paths still
+select the full registry.
 
 The redundant formatting aggregate no longer runs in Repo Lint: its Prettier and final-newline
 checks already have individual registry entries. Its manual compatibility command remains tested

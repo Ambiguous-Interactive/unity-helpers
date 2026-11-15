@@ -165,6 +165,28 @@ def test_affected_selection_keeps_dependencies_and_unclassified_checks(
     assert affected_checks(checks, []) == []
 
 
+@pytest.mark.parametrize(
+    ("identifier", "owned"),
+    [
+        ("unsafe-code-test", "scripts/lint-unsafe-code.js"),
+        ("unsafe-code-test", "Generator~/WallstopStudios.UnityHelpers.SyntaxPolicy/Program.cs"),
+        ("unity-mode-coordinator", "scripts/unity/run_ci_modes.py"),
+        ("unity-mode-coordinator", "scripts/tests/test_editmode_shards.py"),
+    ],
+)
+def test_expensive_tooling_controls_follow_their_implementation_inputs(
+    identifier: str, owned: str
+) -> None:
+    from check_registries import affected_checks
+
+    checks = load_checks("lint")
+    assert identifier not in {
+        check.id for check in affected_checks(checks, ["scripts/run-prettier.js"])
+    }
+    for file in (owned, "package.json", "scripts/git-staging-helpers.ps1"):
+        assert identifier in {check.id for check in affected_checks(checks, [file])}
+
+
 def test_affected_selection_rejects_missing_dependencies_and_cycles(
     tmp_path: Path,
 ) -> None:
