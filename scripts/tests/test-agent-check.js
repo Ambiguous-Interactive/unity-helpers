@@ -153,9 +153,16 @@ test("native compatibility risk does not force every compiler profile during sou
 });
 test("tooling iteration does not repeat PR aggregates", () => {
   const plan = select(["scripts/agent-check.js"], "iterate");
-  assert.equal(plan.commands.length, 1);
+  assert.equal(plan.commands.length, 2);
   assert.ok(plan.commands[0].includes("scripts/agent-preflight.ps1"));
-  assert.ok(plan.omitted.some((item) => item.includes("focused red/green")));
+  assert.deepEqual(plan.commands[1], [
+    "node",
+    "scripts/run-contract-tests.js",
+    "--only",
+    "agent-check"
+  ]);
+  assert.ok(plan.omitted.some((item) => item.includes("focused behavior")));
+  assert.equal(select(["scripts/run-prettier.js"], "iterate").commands.length, 1);
   assert.ok(
     select(["scripts/agent-check.js"], "pr").commands.some((c) => c.includes("validate:tests"))
   );
@@ -225,4 +232,24 @@ test("missing CLI values fail before repository discovery", () => {
   for (const args of [["--base"], ["--tier"], ["--files"], ["--base", "--plan"]]) {
     assert.throws(() => main(args), /Missing/);
   }
+});
+
+test("iteration follows declared shared-resolver control ownership", () => {
+  const plan = select(["scripts/unity/resolve-test-matrix.js"], "iterate");
+  const controls = plan.commands.find((command) => command[1] === "scripts/run-contract-tests.js");
+  assert.ok(controls, "shared resolver controls must run during iteration");
+  assert.deepEqual(controls.slice(2), [
+    "--only",
+    "unity-acceptance-workflow,nullable-consumer-matrix,unity-grouped-modes"
+  ]);
+  assert.ok(!plan.commands.some((command) => command.includes("validate:tests")));
+});
+
+test("workflow edits include both resolver consumers and matrix wiring", () => {
+  const plan = select([".github/workflows/unity-tests.yml"], "iterate");
+  const controls = plan.commands.find((command) => command[1] === "scripts/run-contract-tests.js");
+  assert.deepEqual(controls.slice(2), [
+    "--only",
+    "unity-workflow-matrix-contract,unity-acceptance-workflow,unity-grouped-modes"
+  ]);
 });

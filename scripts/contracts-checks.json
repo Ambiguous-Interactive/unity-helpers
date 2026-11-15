@@ -9,7 +9,13 @@
     "id": "check-registries",
     "name": "Typed check registry contracts",
     "run": "npm run test:check-registries",
-    "inputs": ["@tooling"]
+    "inputs": [
+      "@tooling",
+      "scripts/contracts-checks.json",
+      "scripts/check-inputs.json",
+      "scripts/check_registries.py",
+      "scripts/tests/test_check_registries.py"
+    ]
   },
   {
     "id": "bounded-sampling-parser",
@@ -440,7 +446,13 @@
     "id": "run-contract-tests",
     "name": "Contract runner contracts",
     "run": "npm run test:run-contract-tests",
-    "inputs": ["@tooling"]
+    "inputs": [
+      "@tooling",
+      "scripts/contracts-checks.json",
+      "package.json",
+      "scripts/run-contract-tests.js",
+      "scripts/tests/test-run-contract-tests.js"
+    ]
   },
   {
     "id": "git-path-helpers",
@@ -518,7 +530,12 @@
     "id": "unity-workflow-matrix-contract",
     "name": "Unity workflow matrix contract",
     "run": "npm run test:unity-workflow-matrix-contract",
-    "inputs": ["@tooling"]
+    "inputs": [
+      "@tooling",
+      ".github/workflows/unity-tests.yml",
+      ".github/unity-versions.json",
+      "scripts/tests/test-unity-workflow-matrix-contract.ps1"
+    ]
   },
   {
     "id": "release-export-only",
@@ -566,14 +583,40 @@
   {
     "id": "unity-acceptance-workflow",
     "name": "Unity optional acceptance workflow",
-    "run": "npm run test:unity-acceptance-workflow",
-    "inputs": ["@tooling"]
+    "run": "npm run test:unity-acceptance-workflow:predicates",
+    "inputs": [
+      "@tooling",
+      "scripts/unity/resolve-test-matrix.js",
+      ".github/workflows/unity-tests.yml",
+      "scripts/tests/test-unity-acceptance-workflow.js"
+    ]
+  },
+  {
+    "id": "nullable-consumer-matrix",
+    "name": "Pinned nullable and WProto acceptance matrix",
+    "run": "npm run test:nullable-consumer-matrix",
+    "inputs": [
+      "@tooling",
+      "scripts/unity/resolve-test-matrix.js",
+      "scripts/tests/test-nullable-consumer-matrix.js"
+    ]
+  },
+  {
+    "id": "il2cpp-conversion-inputs",
+    "name": "IL2CPP conversion input controls",
+    "run": "npm run test:il2cpp-conversion-inputs",
+    "inputs": ["@tooling", "scripts/tests/test-il2cpp-conversion-inputs.ps1"]
   },
   {
     "id": "unity-grouped-modes",
     "name": "Grouped Unity mode dispatch and outcome controls",
     "run": "npm run test:unity-grouped-modes",
-    "inputs": ["@tooling"]
+    "inputs": [
+      "@tooling",
+      "scripts/unity/resolve-test-matrix.js",
+      ".github/workflows/unity-tests.yml",
+      "scripts/tests/test-unity-grouped-modes.js"
+    ]
   },
   {
     "id": "standalone-scene-provision",
@@ -591,7 +634,11 @@
     "id": "build-lock-action-input-parser",
     "name": "Build-lock action input parser",
     "run": "npm run test:build-lock-action-input-parser",
-    "inputs": ["@tooling"]
+    "inputs": [
+      "@tooling",
+      "scripts/build_lock_inputs.py",
+      "scripts/tests/test_build_lock_inputs.py"
+    ]
   },
   {
     "id": "portable-cleanup-classifier",
@@ -797,6 +844,6 @@
     "id": "agent-check",
     "name": "Task validation selection",
     "run": "npm run test:agent-check",
-    "inputs": ["@tooling"]
+    "inputs": ["@tooling", "scripts/agent-check.js", "scripts/tests/test-agent-check.js"]
   }
 ]

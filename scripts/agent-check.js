@@ -1,7 +1,34 @@
 "use strict";
 const { execFileSync, spawnSync } = require("node:child_process");
+const fs = require("node:fs");
 const path = require("node:path");
 const root = path.resolve(__dirname, "..");
+function focusedControlIds(files) {
+  const checks = JSON.parse(
+    fs.readFileSync(path.join(root, "scripts/contracts-checks.json"), "utf8")
+  );
+  if (!Array.isArray(checks)) throw new Error("Contract registry must be a list");
+  const byId = new Map();
+  const selected = new Set();
+  for (const check of checks) {
+    if (
+      typeof check.id !== "string" ||
+      !Array.isArray(check.inputs) ||
+      check.inputs.some((input) => typeof input !== "string")
+    )
+      throw new Error("Invalid contract ownership metadata");
+    byId.set(check.id, check);
+    if (check.inputs.some((input) => !input.startsWith("@") && files.includes(input)))
+      selected.add(check.id);
+  }
+  for (const id of selected) {
+    const check = byId.get(id);
+    if (!check || !Array.isArray(check.dependencies || []))
+      throw new Error(`Invalid focused control dependency: ${id}`);
+    for (const dependency of check.dependencies || []) selected.add(dependency);
+  }
+  return [...selected];
+}
 function changedFiles(base, cwd = root) {
   if (!base || base.startsWith("-")) throw new Error("An explicit base revision is required");
   const git = (...args) =>
@@ -119,7 +146,12 @@ function select(files, tier) {
     if (tier === "pr") {
       for (const name of ["lint:repo", "validate:tests"])
         commands.push(["npm", "run", name, "--", "--files", ...files]);
-    } else if (files.some((f) => f.endsWith(".md"))) commands.push(npm("lint:docs"));
+    } else {
+      if (files.some((f) => f.endsWith(".md"))) commands.push(npm("lint:docs"));
+      const controls = focusedControlIds(files);
+      if (controls.length)
+        commands.push(["node", "scripts/run-contract-tests.js", "--only", controls.join(",")]);
+    }
   }
   return {
     tier,
@@ -135,7 +167,7 @@ function select(files, tier) {
         : [
             "unaffected checks",
             ...(tier === "iterate"
-              ? ["contract suites; run the task's focused red/green witness separately"]
+              ? ["unselected contract suites; retain the task's focused behavior witness"]
               : []),
             "full native compatibility matrix unless escalated"
           ]

@@ -53,8 +53,11 @@ The base uses a merge-base diff, then includes staged, unstaged, and untracked c
 Both sides of renames and deleted paths remain visible. A commit does not erase task scope.
 Explicit files replace discovery. Missing revisions fail rather than silently narrowing coverage.
 
-Iteration runs changed-file preflight and the existing compiler iteration scopes. Run the task's
-focused failing/passing witness separately; iteration does not repeat the PR contract aggregates.
+Iteration runs changed-file preflight and the existing compiler iteration scopes. It also runs
+contract controls whose inputs explicitly name a changed file, including declared dependencies.
+This catches shared-resolver consumers without repeating the full PR aggregate. Broad input groups
+remain CI coverage; they do not select every tooling suite during each edit. Retain the task's
+focused behavior witness for cases outside those declared controls.
 Serialization and threading source edits also use focused compiler iteration; their PR still
 requires full compiler and native compatibility checks. Generator, assembly, and analyzer inputs
 retain compiler escalation.

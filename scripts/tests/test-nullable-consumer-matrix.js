@@ -50,6 +50,7 @@ for (const version of versions) {
 for (const version of ["", "   "]) {
   assert.deepEqual(resolveTestMatrix(versions, version, "standalone", "wproto"), {
     "unity-versions": versions,
+    "unity-exclusions": [],
     "test-modes": ["standalone"]
   });
   controls++;
