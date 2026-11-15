@@ -18,7 +18,7 @@ on:
   workflow_dispatch:
     inputs:
       unity-version:
-        description: "Validate a Unity version; licensed jobs still run the full static matrix."
+        description: "Validate one supported Unity version; empty selects the full matrix."
         required: false
         default: ""
         type: string
