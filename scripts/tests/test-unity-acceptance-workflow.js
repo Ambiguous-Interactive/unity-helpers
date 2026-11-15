@@ -441,8 +441,11 @@ for (const file of fs.readdirSync(workflowDirectory).filter((name) => /\.ya?ml$/
               }
             )
           };
+          const optionalAcceptance = /^        id: redact_acceptance$/m.test(step);
+          const acceptanceAvailable = /^      acceptance:$/m.test(source);
           const expected =
             checkoutOutcome === "success" &&
+            (!optionalAcceptance || acceptanceAvailable) &&
             (action === "redact-unity-artifacts" || status !== "success");
           assert.equal(
             Boolean(evaluate(context)),

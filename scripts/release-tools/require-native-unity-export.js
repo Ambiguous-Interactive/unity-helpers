@@ -98,6 +98,61 @@ async function requireNativeExport(repository, sourceSha, request) {
   return { runId: run.id, jobId: job.id, sourceSha };
 }
 
+async function requireCompatibility(repository, sourceSha, request) {
+  if (
+    !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository ?? "") ||
+    !/^[a-f0-9]{40}$/.test(sourceSha ?? "")
+  )
+    throw new Error(
+      "A repository and complete source SHA are required for compatibility validation."
+    );
+  const runs = await collectPages(
+    request,
+    `/repos/${repository}/actions/workflows/unity-compatibility.yml/runs?head_sha=${sourceSha}`,
+    "workflow_runs"
+  );
+  const candidates = runs.filter(
+    (run) =>
+      run.head_sha === sourceSha &&
+      run.repository?.full_name === repository &&
+      run.head_repository?.full_name === repository &&
+      run.path === ".github/workflows/unity-compatibility.yml" &&
+      ["push", "workflow_dispatch"].includes(run.event) &&
+      run.head_branch === "main" &&
+      Number.isSafeInteger(run.id) &&
+      run.id > 0 &&
+      Number.isSafeInteger(run.run_attempt) &&
+      run.run_attempt > 0
+  );
+  candidates.sort((left, right) => right.id - left.id);
+  const run = candidates[0];
+  if (!run || run.status !== "completed" || run.conclusion !== "success")
+    throw new Error(
+      "Older-editor compatibility has not completed successfully for the selected source commit."
+    );
+  const jobs = await collectPages(
+    request,
+    `/repos/${repository}/actions/runs/${run.id}/jobs?filter=latest`,
+    "jobs"
+  );
+  const expected = require("../../.github/unity-versions.json")
+    .all.slice(0, -1)
+    .map((version) => `Compatibility Unity ${version} (selected modes)`);
+  expected.push("Unity Compatibility Success");
+  for (const name of expected) {
+    const matches = jobs.filter((job) => job.name === name);
+    if (
+      matches.length !== 1 ||
+      matches[0].run_id !== run.id ||
+      matches[0].run_attempt !== run.run_attempt ||
+      matches[0].status !== "completed" ||
+      matches[0].conclusion !== "success"
+    )
+      throw new Error(`Compatibility requires one successful current-attempt '${name}' job.`);
+  }
+  return run.id;
+}
+
 async function requestJson(endpoint, token) {
   const response = await fetch(`https://api.github.com${endpoint}`, {
     headers: {
@@ -124,6 +179,12 @@ async function main() {
     process.env.SOURCE_SHA,
     (endpoint) => requestJson(endpoint, token)
   );
+  const compatibilityRun = await requireCompatibility(
+    process.env.GITHUB_REPOSITORY,
+    process.env.SOURCE_SHA,
+    (endpoint) => requestJson(endpoint, token)
+  );
+  console.log(`Confirmed older-editor compatibility in run ${compatibilityRun}.`);
   console.log(
     `Confirmed native Unity export and cleanup for ${result.sourceSha}: run ${result.runId}, job ${result.jobId}.`
   );
@@ -136,4 +197,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { requireNativeExport };
+module.exports = { requireNativeExport, requireCompatibility };

@@ -616,7 +616,11 @@
       "@tooling",
       "scripts/unity/resolve-test-matrix.js",
       ".github/workflows/unity-tests.yml",
-      "scripts/tests/test-unity-grouped-modes.js"
+      "scripts/tests/test-unity-grouped-modes.js",
+      "scripts/tests/test-unity-compatibility.js",
+      "scripts/unity/generate-compatibility-workflow.js",
+      ".github/workflows/unity-compatibility.yml",
+      "scripts/release-tools/require-native-unity-export.js"
     ]
   },
   {

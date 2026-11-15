@@ -2,7 +2,12 @@
 
 const fs = require("node:fs");
 
-const requiredWorkflows = ["unity-tests.yml", "local-gates.yml", "repo-lint.yml"];
+const requiredWorkflows = [
+  "unity-tests.yml",
+  "unity-compatibility.yml",
+  "local-gates.yml",
+  "repo-lint.yml"
+];
 const independentWorkflows = [
   "build-publish-devcontainer.yml",
   "deploy-pages.yml",
@@ -11,13 +16,21 @@ const independentWorkflows = [
 ];
 const marker = "<!-- unity-helpers:auto-publish -->";
 
+function isValidationEvent(run) {
+  return (
+    run?.event === "push" ||
+    (run?.event === "workflow_dispatch" &&
+      run?.path === ".github/workflows/unity-compatibility.yml")
+  );
+}
+
 function releaseCandidate(event, pulls, version, repository) {
   const run = event.workflow_run;
   const branch = event.repository?.default_branch;
   if (
     event.repository?.fork ||
     event.repository?.full_name !== repository ||
-    run?.event !== "push" ||
+    !isValidationEvent(run) ||
     run?.head_branch !== branch ||
     run?.head_repository?.full_name !== repository ||
     !["success", "skipped"].includes(run?.conclusion) ||
@@ -46,7 +59,7 @@ function validationState(runs, sha, branch, repository) {
   const latest = new Map();
   for (const run of runs) {
     if (
-      run.event !== "push" ||
+      !isValidationEvent(run) ||
       run.head_sha !== sha ||
       run.head_branch !== branch ||
       run.repository?.full_name !== repository ||
@@ -86,7 +99,7 @@ async function autoPublish({
   const sha = event.workflow_run?.head_sha;
   if (
     !/^[a-f0-9]{40}$/.test(sha ?? "") ||
-    event.workflow_run?.event !== "push" ||
+    !isValidationEvent(event.workflow_run) ||
     !["success", "skipped"].includes(event.workflow_run?.conclusion) ||
     event.repository?.fork ||
     event.repository?.full_name !== repository ||
@@ -102,7 +115,7 @@ async function autoPublish({
   const candidate = releaseCandidate(event, pulls, version, repository);
   if (!candidate) return { status: "ineligible" };
   for (let poll = 0; poll < polls; ++poll) {
-    const runs = await api.pages(`actions/runs?event=push&head_sha=${sha}`, "workflow_runs");
+    const runs = await api.pages(`actions/runs?head_sha=${sha}`, "workflow_runs");
     const state = validationState(runs, sha, candidate.branch, repository);
     if (state === "failed") return { status: "validation-failed", ...candidate };
     if (state === "passed") {

@@ -10,9 +10,8 @@ on:
   push:
     # Enrollment contract: licensed Unity work is reachable only through
     # protected branches. `main` is the repository's protected default branch;
-    # scheduled runs are never an eligible trusted trigger, so the weekly cron
-    # was removed (nightly/weekly coverage comes from the protected-branch push
-    # and from manual dispatch).
+    # Older editor coverage runs separately in Unity Compatibility.
+    # Default manual dispatch retains full qualification.
     branches:
       - main
   workflow_dispatch:
@@ -683,7 +682,9 @@ jobs:
 
       - name: Run Unity modes concurrently
         id: run_modes
-        if: ${{ !cancelled() && github.event_name != 'workflow_dispatch' && steps.unity_lock.outputs.acquired == 'true' }}
+        if: >-
+          ${{ !cancelled() && (github.event_name != 'workflow_dispatch' || (inputs.acceptance == 'none' && !inputs.fresh-conversion && !inputs.native-diagnostics &&
+          !inputs.native-loader-snaps-comparison)) && steps.unity_lock.outputs.acquired == 'true' }}
         continue-on-error: true
         timeout-minutes: 35
         shell: pwsh
@@ -724,7 +725,9 @@ jobs:
         timeout-minutes: 40
         shell: pwsh
         env:
-          UH_CONCURRENT_RUN: ${{ github.event_name != 'workflow_dispatch' }}
+          UH_CONCURRENT_RUN: >-
+            ${{ (github.event_name != 'workflow_dispatch' || (inputs.acceptance == 'none' && !inputs.fresh-conversion && !inputs.native-diagnostics &&
+            !inputs.native-loader-snaps-comparison)) }}
           UH_MODE_CONTROLLER_OUTCOME: ${{ steps.run_modes.outcome }}
           UH_MODE_OUTCOME: ${{ steps.run_modes.outputs.editmode }}
           UNITY_EDITOR_PATH: ${{ steps.ensure_unity_editor.outputs.editor-path }}
@@ -829,7 +832,9 @@ jobs:
         timeout-minutes: 40
         shell: pwsh
         env:
-          UH_CONCURRENT_RUN: ${{ github.event_name != 'workflow_dispatch' }}
+          UH_CONCURRENT_RUN: >-
+            ${{ (github.event_name != 'workflow_dispatch' || (inputs.acceptance == 'none' && !inputs.fresh-conversion && !inputs.native-diagnostics &&
+            !inputs.native-loader-snaps-comparison)) }}
           UH_MODE_CONTROLLER_OUTCOME: ${{ steps.run_modes.outcome }}
           UH_MODE_OUTCOME: ${{ steps.run_modes.outputs.playmode }}
           UNITY_EDITOR_PATH: ${{ steps.ensure_unity_editor.outputs.editor-path }}
@@ -884,7 +889,9 @@ jobs:
         timeout-minutes: 60
         shell: pwsh
         env:
-          UH_CONCURRENT_RUN: ${{ github.event_name != 'workflow_dispatch' }}
+          UH_CONCURRENT_RUN: >-
+            ${{ (github.event_name != 'workflow_dispatch' || (inputs.acceptance == 'none' && !inputs.fresh-conversion && !inputs.native-diagnostics &&
+            !inputs.native-loader-snaps-comparison)) }}
           UH_MODE_CONTROLLER_OUTCOME: ${{ steps.run_modes.outcome }}
           UH_MODE_OUTCOME: ${{ steps.run_modes.outputs.standalone }}
           UH_NATIVE_ALLOCATOR_DIAGNOSTICS: ${{ startsWith(matrix.unity-version, '6000.') && '1' || '' }}
@@ -1035,7 +1042,9 @@ jobs:
         timeout-minutes: 60
         shell: pwsh
         env:
-          UH_CONCURRENT_RUN: ${{ github.event_name != 'workflow_dispatch' }}
+          UH_CONCURRENT_RUN: >-
+            ${{ (github.event_name != 'workflow_dispatch' || (inputs.acceptance == 'none' && !inputs.fresh-conversion && !inputs.native-diagnostics &&
+            !inputs.native-loader-snaps-comparison)) }}
           UH_MODE_CONTROLLER_OUTCOME: ${{ steps.run_modes.outcome }}
           UH_MODE_OUTCOME: ${{ steps.run_modes.outputs.proto_only }}
           UH_FORCE_FRESH_COMPILATION_CACHE: ${{ github.event_name == 'workflow_dispatch' && inputs.fresh-conversion && 'true' || 'false' }}
@@ -1601,7 +1610,9 @@ jobs:
 
       - name: Run Unity modes concurrently
         id: run_modes
-        if: ${{ !cancelled() && github.event_name != 'workflow_dispatch' && steps.unity_lock.outputs.acquired == 'true' }}
+        if: >-
+          ${{ !cancelled() && (github.event_name != 'workflow_dispatch' || (inputs.acceptance == 'none' && !inputs.fresh-conversion && !inputs.native-diagnostics &&
+          !inputs.native-loader-snaps-comparison)) && steps.unity_lock.outputs.acquired == 'true' }}
         continue-on-error: true
         timeout-minutes: 35
         shell: pwsh
@@ -1637,7 +1648,9 @@ jobs:
         timeout-minutes: 40
         shell: pwsh
         env:
-          UH_CONCURRENT_RUN: ${{ github.event_name != 'workflow_dispatch' }}
+          UH_CONCURRENT_RUN: >-
+            ${{ (github.event_name != 'workflow_dispatch' || (inputs.acceptance == 'none' && !inputs.fresh-conversion && !inputs.native-diagnostics &&
+            !inputs.native-loader-snaps-comparison)) }}
           UH_MODE_CONTROLLER_OUTCOME: ${{ steps.run_modes.outcome }}
           UH_MODE_OUTCOME: ${{ steps.run_modes.outputs.editmode }}
           UNITY_EDITOR_PATH: ${{ steps.ensure_unity_editor.outputs.editor-path }}
@@ -1694,7 +1707,9 @@ jobs:
         timeout-minutes: 40
         shell: pwsh
         env:
-          UH_CONCURRENT_RUN: ${{ github.event_name != 'workflow_dispatch' }}
+          UH_CONCURRENT_RUN: >-
+            ${{ (github.event_name != 'workflow_dispatch' || (inputs.acceptance == 'none' && !inputs.fresh-conversion && !inputs.native-diagnostics &&
+            !inputs.native-loader-snaps-comparison)) }}
           UH_MODE_CONTROLLER_OUTCOME: ${{ steps.run_modes.outcome }}
           UH_MODE_OUTCOME: ${{ steps.run_modes.outputs.playmode }}
           UNITY_EDITOR_PATH: ${{ steps.ensure_unity_editor.outputs.editor-path }}
@@ -1751,7 +1766,9 @@ jobs:
         timeout-minutes: 60
         shell: pwsh
         env:
-          UH_CONCURRENT_RUN: ${{ github.event_name != 'workflow_dispatch' }}
+          UH_CONCURRENT_RUN: >-
+            ${{ (github.event_name != 'workflow_dispatch' || (inputs.acceptance == 'none' && !inputs.fresh-conversion && !inputs.native-diagnostics &&
+            !inputs.native-loader-snaps-comparison)) }}
           UH_MODE_CONTROLLER_OUTCOME: ${{ steps.run_modes.outcome }}
           UH_MODE_OUTCOME: ${{ steps.run_modes.outputs.standalone }}
           UH_FORCE_FRESH_COMPILATION_CACHE: ${{ github.event_name == 'workflow_dispatch' && inputs.fresh-conversion && 'true' || 'false' }}

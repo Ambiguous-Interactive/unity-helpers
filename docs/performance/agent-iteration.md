@@ -53,8 +53,16 @@ The base uses a merge-base diff, then includes staged, unstaged, and untracked c
 Both sides of renames and deleted paths remain visible. A commit does not erase task scope.
 Explicit files replace discovery. Missing revisions fail rather than silently narrowing coverage.
 
-Iteration runs changed-file preflight and the existing compiler iteration scopes. It also runs
-contract controls whose non-group input paths or patterns match a changed file, including declared dependencies.
+Iteration runs the compiler scope and contract controls needed for the changed task. Format each
+changed file immediately; run changed-file preflight before publication, once the task is ready.
+The `pr` tier includes that preflight. An edit-loop task without a compiler, documentation or owned
+contract check falls back to preflight, so an unowned input cannot silently pass with no checks.
+Fixture-only edits compile the named existing fixtures plus production and shared test sources.
+Mixed production/shared changes and deleted fixtures retain whole-scope compilation; shared test
+changes check both runtime and editor fixtures. If a fixture needs another fixture's declarations,
+use `npm run typecheck:iterate -- tests` or `editor-tests` for the complete tree.
+Iteration also runs contract controls whose non-group input paths or patterns match a changed file,
+including declared dependencies.
 The typed registry selector owns pattern matching and dependency validation for both local iteration and CI.
 This catches shared-resolver consumers without repeating the full PR aggregate. Broad input groups
 remain CI coverage; they do not select every tooling suite during each edit. Retain the task's
@@ -62,7 +70,7 @@ focused behavior witness for cases outside those declared controls.
 Serialization and threading source edits also use focused compiler iteration; their PR still
 requires full compiler and native compatibility checks. Generator, assembly, and analyzer inputs
 retain compiler escalation.
-PR checks enable normal compiler analysis. Compatibility-sensitive and unknown inputs propose full native coverage.
+PR checks enable normal compiler analysis. Compatibility-sensitive and unknown inputs add player coverage on latest 6.x; older versions run asynchronously.
 Full means all configured local lint, contract, source compiler, and compiler-control commands.
 It does not mean Unity ran: native fixture validation and the hosted Unity matrix remain required.
 Every selected command executes and reports its status and elapsed time. Generic result reuse is
@@ -97,16 +105,27 @@ by the existing hook regressions.
 
 Native PR mode selection uses the same merge-base inventory and risk selector. Ordinary C# and
 documentation changes run EditMode and PlayMode; compatibility-sensitive and unknown changes
-retain Standalone and protobuf-only players. SINGLE_THREADED follows PR mode selection. Main and
-default manual qualification retain full coverage. Every selected mode still requires passing native XML,
+retain Standalone and protobuf-only players. SINGLE_THREADED follows PR mode selection. Main runs all modes on latest 6.x;
+default manual qualification retains the full supported matrix. Every selected mode still requires passing native XML,
 redaction, artifact upload, and confirmed cleanup.
 
 The approved organization policy requires a static version axis to prove matching editor setup
 and license return. The workflow retains that literal universe and uses
 [matrix exclusions](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idstrategymatrixexclude)
 to remove complete unselected legs. Ordinary C# PRs run latest stable EditMode and PlayMode;
-compatibility-sensitive and unknown changes retain all versions and players. Main and default
-manual qualification retain the full matrix. An explicit manual version selects that named editor.
+compatibility-sensitive and unknown changes add players on the same latest 6.x editor. Main also
+blocks only on that latest editor. Older versions run independently on each main commit in a separate
+`Unity Compatibility` workflow, one version at a time on the background runner. Its distinct `Unity Compatibility Success`
+check cannot replace the required `Unity CI Success` result. Each immutable main source retains
+its own run, so a later commit cannot cancel compatibility needed by a release. Re-run an existing
+source run to recover a transient failure. Background work uses the DAD-MACHINE runner; the other
+runner remains available for fast validation. Older-version failures remain visible and release
+publication requires all older versions for the same source.
+Default manual Unity Tests qualification retains the full matrix. An explicit manual version selects
+that named editor. Regenerate the compatibility workflow with
+`node scripts/unity/generate-compatibility-workflow.js` after changing canonical Unity jobs; the
+grouped-mode contract tests reject drift. Licensed setup, lock, result and cleanup steps have one
+maintained source in `unity-tests.yml`.
 Documentation retains latest editor validation pending a qualified conditional gate. Job summaries
 report selected versions and modes; a reduced run does not qualify omitted coverage.
 

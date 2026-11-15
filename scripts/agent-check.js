@@ -1,6 +1,7 @@
 "use strict";
 const { execFileSync, spawnSync } = require("node:child_process");
 const path = require("node:path");
+const fs = require("node:fs");
 const root = path.resolve(__dirname, "..");
 function focusedControlIds(files) {
   return JSON.parse(
@@ -108,22 +109,25 @@ function select(files, tier) {
       npm("typecheck:controls")
     ];
   } else if (files.length) {
-    commands.push([
+    const preflight = [
       "pwsh",
       "-NoProfile",
       "-File",
       "scripts/agent-preflight.ps1",
       "-Paths",
       ...files
-    ]);
+    ];
+    if (tier === "pr") commands.push(preflight);
     if (compiler) {
       if (tier === "pr") commands.push(npm("typecheck:unity"));
       else {
         const scopes = new Set();
         for (const file of files) {
           if (file.startsWith("Tests/Editor/")) scopes.add("editor-tests");
-          else if (file.startsWith("Tests/Runtime/") || file.startsWith("Tests/Core/"))
+          else if (file.startsWith("Tests/Core/")) {
             scopes.add("tests");
+            scopes.add("editor-tests");
+          } else if (file.startsWith("Tests/Runtime/")) scopes.add("tests");
           else if (file.startsWith("Editor/")) scopes.add("editor");
           else if (file.startsWith("Runtime/Integrations/")) scopes.add("integrations");
           else if (file.startsWith("Runtime/")) scopes.add("runtime");
@@ -133,9 +137,24 @@ function select(files, tier) {
         );
         if (!scopes.size || (unity === "full" && !sourceOnly))
           commands.push(npm("typecheck:unity"));
-        else
-          for (const scope of scopes)
-            commands.push(["npm", "run", "typecheck:iterate", "--", scope]);
+        else {
+          const fixtures = files.filter((file) => file.endsWith(".cs"));
+          const fixtureOnly =
+            fixtures.length > 0 &&
+            files.every((file) => /^Tests\/(Runtime|Editor)\/.*\.cs(?:\.meta)?$/.test(file)) &&
+            fixtures.every((file) => fs.existsSync(path.join(root, file)));
+          for (const scope of scopes) {
+            const command = ["npm", "run", "typecheck:iterate", "--", scope];
+            if (fixtureOnly)
+              command.push(
+                "--files",
+                ...fixtures.filter((file) =>
+                  file.startsWith(scope === "tests" ? "Tests/Runtime/" : "Tests/Editor/")
+                )
+              );
+            commands.push(command);
+          }
+        }
       }
     }
     if (tier === "pr") {
@@ -147,6 +166,7 @@ function select(files, tier) {
       if (controls.length)
         commands.push(["node", "scripts/run-contract-tests.js", "--only", controls.join(",")]);
     }
+    if (!commands.length) commands.push(preflight);
   }
   return {
     tier,
@@ -162,7 +182,10 @@ function select(files, tier) {
         : [
             "unaffected checks",
             ...(tier === "iterate"
-              ? ["unselected contract suites; retain the task's focused behavior witness"]
+              ? [
+                  "publication preflight; run tier pr before publication",
+                  "unselected contract suites; retain the task's focused behavior witness"
+                ]
               : []),
             "full native compatibility matrix unless escalated"
           ]
