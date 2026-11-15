@@ -1,0 +1,340 @@
+{
+  "capturedUtc": "2026-11-15",
+  "source": "GitHub Actions REST workflow and job timelines",
+  "workflow": "unity-tests.yml",
+  "selection": "Latest 30 completed pull_request or push runs returned on capture; cancellations retained separately",
+  "conclusions": {
+    "success": 11,
+    "cancelled": 19
+  },
+  "successfulMedianSeconds": 4049.0,
+  "successfulP95Seconds": 5756.0,
+  "successfulSummedStepSeconds": {
+    "Run Unity modes concurrently": 32013.0,
+    "Print runner diagnostics": 1861.0,
+    "Export Unity package smoke artifact": 748.0,
+    "Checkout": 374.0,
+    "Acquire organization Unity lock": 294.0,
+    "Release organization Unity lock": 281.0,
+    "Stage release package payload": 270.0,
+    "Return Unity license": 242.0,
+    "Set up job": 220.0,
+    "Upload EditMode artifacts": 217.0,
+    "Verify PlayMode tests actually ran": 159.0,
+    "Verify EditMode tests actually ran": 133.0,
+    "Upload Standalone artifacts": 119.0,
+    "Upload PlayMode artifacts": 117.0,
+    "Upload WProto-only Standalone artifacts": 104.0
+  },
+  "runs": [
+    {
+      "id": 43669278793,
+      "sha": "795903adf69d03c4d3a12695766f686d81ffb5a5",
+      "event": "push",
+      "conclusion": "success",
+      "attempt": 1,
+      "elapsedSeconds": 2430.0,
+      "summedJobSeconds": 3042.0
+    },
+    {
+      "id": 43664823672,
+      "sha": "05c9638d5cb598e29a04250e47ed2d0b4c8628ad",
+      "event": "pull_request",
+      "conclusion": "success",
+      "attempt": 1,
+      "elapsedSeconds": 3323.0,
+      "summedJobSeconds": 3592.0
+    },
+    {
+      "id": 43663799722,
+      "sha": "d5ec77370972111335f49d6e3fefbc0e1dcf0469",
+      "event": "pull_request",
+      "conclusion": "cancelled",
+      "attempt": 1,
+      "elapsedSeconds": 832.0,
+      "summedJobSeconds": 3940.0
+    },
+    {
+      "id": 43661749191,
+      "sha": "985a9de7b375878a6177dcc24f08edbf0a617b88",
+      "event": "pull_request",
+      "conclusion": "cancelled",
+      "attempt": 1,
+      "elapsedSeconds": 1573.0,
+      "summedJobSeconds": 5138.0
+    },
+    {
+      "id": 43659642174,
+      "sha": "3b733e5de8ee316cbf4f00f30bd1c8736550589d",
+      "event": "pull_request",
+      "conclusion": "cancelled",
+      "attempt": 1,
+      "elapsedSeconds": 1590.0,
+      "summedJobSeconds": 7618.0
+    },
+    {
+      "id": 43656098862,
+      "sha": "c2ba347a3b546dfd0e065c79f79256986ab7465e",
+      "event": "pull_request",
+      "conclusion": "cancelled",
+      "attempt": 1,
+      "elapsedSeconds": 2598.0,
+      "summedJobSeconds": 4049.0
+    },
+    {
+      "id": 43648481950,
+      "sha": "dd0893b9a35eb15e37f33a7500c8a867882b5e11",
+      "event": "pull_request",
+      "conclusion": "success",
+      "attempt": 1,
+      "elapsedSeconds": 2061.0,
+      "summedJobSeconds": 3217.0
+    },
+    {
+      "id": 43647523005,
+      "sha": "7d0c744b4d89e526971fec188ec524045054a8ee",
+      "event": "pull_request",
+      "conclusion": "cancelled",
+      "attempt": 1,
+      "elapsedSeconds": 689.0,
+      "summedJobSeconds": 3051.0
+    },
+    {
+      "id": 43646322227,
+      "sha": "d31e7bd43bfbac5b51bb4b10b0b009a933b0c82e",
+      "event": "pull_request",
+      "conclusion": "cancelled",
+      "attempt": 1,
+      "elapsedSeconds": 847.0,
+      "summedJobSeconds": 3872.0
+    },
+    {
+      "id": 43644853310,
+      "sha": "a216aca576e96f8ac6e61707ab3ed8c35a1af09a",
+      "event": "pull_request",
+      "conclusion": "cancelled",
+      "attempt": 1,
+      "elapsedSeconds": 1043.0,
+      "summedJobSeconds": 3722.0
+    },
+    {
+      "id": 43643887826,
+      "sha": "832bc8ce1890bf1dd1ab3810a77bbe8d6cae69f6",
+      "event": "pull_request",
+      "conclusion": "cancelled",
+      "attempt": 1,
+      "elapsedSeconds": 708.0,
+      "summedJobSeconds": 3297.0
+    },
+    {
+      "id": 43641945961,
+      "sha": "db27b4658b6d310dc775ed475cdec1d9a0e13baa",
+      "event": "pull_request",
+      "conclusion": "cancelled",
+      "attempt": 1,
+      "elapsedSeconds": 1351.0,
+      "summedJobSeconds": 5079.0
+    },
+    {
+      "id": 43638273008,
+      "sha": "0b2624203ff9e03d56746e5d4f22cb7bdb97c857",
+      "event": "pull_request",
+      "conclusion": "cancelled",
+      "attempt": 1,
+      "elapsedSeconds": 2531.0,
+      "summedJobSeconds": 3624.0
+    },
+    {
+      "id": 43635324986,
+      "sha": "5bf483790c910db0f9c2747e8283df288b30c120",
+      "event": "pull_request",
+      "conclusion": "cancelled",
+      "attempt": 1,
+      "elapsedSeconds": 2000.0,
+      "summedJobSeconds": 4856.0
+    },
+    {
+      "id": 43620269062,
+      "sha": "7a03016f163f2c79e3b4020c9c7616446362883a",
+      "event": "push",
+      "conclusion": "success",
+      "attempt": 1,
+      "elapsedSeconds": 1391.0,
+      "summedJobSeconds": 2746.0
+    },
+    {
+      "id": 43579740989,
+      "sha": "b512c11c6b305492781ed374dede6659cb8d76e6",
+      "event": "pull_request",
+      "conclusion": "success",
+      "attempt": 1,
+      "elapsedSeconds": 4860.0,
+      "summedJobSeconds": 4657.0
+    },
+    {
+      "id": 43579413111,
+      "sha": "cb55784d6d8b6bd3da6dcb504b44e33f20df545a",
+      "event": "pull_request",
+      "conclusion": "success",
+      "attempt": 1,
+      "elapsedSeconds": 2977.0,
+      "summedJobSeconds": 2782.0
+    },
+    {
+      "id": 43573453970,
+      "sha": "168346ecad24c9aedb4786399eb2eda2583e72ef",
+      "event": "pull_request",
+      "conclusion": "success",
+      "attempt": 1,
+      "elapsedSeconds": 4135.0,
+      "summedJobSeconds": 4141.0
+    },
+    {
+      "id": 43572452023,
+      "sha": "edee566834f1527807f131b3ec9a3a0df5b0d6e7",
+      "event": "pull_request",
+      "conclusion": "cancelled",
+      "attempt": 1,
+      "elapsedSeconds": 794.0,
+      "summedJobSeconds": 4564.0
+    },
+    {
+      "id": 43572117907,
+      "sha": "4f3a89a54339da19ba11bfdd154426668c5bab88",
+      "event": "pull_request",
+      "conclusion": "cancelled",
+      "attempt": 1,
+      "elapsedSeconds": 268.0,
+      "summedJobSeconds": 1487.0
+    },
+    {
+      "id": 43566595296,
+      "sha": "10138d86f0773d4a2ae7536510f5abfe1bc148d6",
+      "event": "push",
+      "conclusion": "success",
+      "attempt": 1,
+      "elapsedSeconds": 5592.0,
+      "summedJobSeconds": 3171.0
+    },
+    {
+      "id": 43564017518,
+      "sha": "56f6b42e5476d6c295e60e8e36b469f3b10635cb",
+      "event": "pull_request",
+      "conclusion": "success",
+      "attempt": 1,
+      "elapsedSeconds": 4134.0,
+      "summedJobSeconds": 4025.0
+    },
+    {
+      "id": 43558775017,
+      "sha": "30a124cb56dc4a2c2e7a7c7a56b6d00ab3d5e301",
+      "event": "pull_request",
+      "conclusion": "success",
+      "attempt": 1,
+      "elapsedSeconds": 5756.0,
+      "summedJobSeconds": 3427.0
+    },
+    {
+      "id": 43558210010,
+      "sha": "886e9169e719628ecc4b007bf99eb98fbdb5f3a2",
+      "event": "pull_request",
+      "conclusion": "success",
+      "attempt": 1,
+      "elapsedSeconds": 4049.0,
+      "summedJobSeconds": 4132.0
+    },
+    {
+      "id": 43557541698,
+      "sha": "43652a79f2678f7e7a152ef9d252fc51881b2017",
+      "event": "pull_request",
+      "conclusion": "cancelled",
+      "attempt": 1,
+      "elapsedSeconds": 936.0,
+      "summedJobSeconds": 5248.0
+    },
+    {
+      "id": 43557046368,
+      "sha": "97e224a650df23213d955cbfcc0a08bf315f8273",
+      "event": "pull_request",
+      "conclusion": "cancelled",
+      "attempt": 1,
+      "elapsedSeconds": 889.0,
+      "summedJobSeconds": 3857.0
+    },
+    {
+      "id": 43556608571,
+      "sha": "d88970c2bb75bd02212dd3fd266c709de0fe7265",
+      "event": "pull_request",
+      "conclusion": "cancelled",
+      "attempt": 1,
+      "elapsedSeconds": 328.0,
+      "summedJobSeconds": 1806.0
+    },
+    {
+      "id": 43554632384,
+      "sha": "40ec0861e11124a8e6ff399c6e06ea66f12854ea",
+      "event": "pull_request",
+      "conclusion": "cancelled",
+      "attempt": 1,
+      "elapsedSeconds": 2119.0,
+      "summedJobSeconds": 3632.0
+    },
+    {
+      "id": 43553504956,
+      "sha": "2fc2dc2aa6ea24f7a953b20858b18e1b24a9c157",
+      "event": "pull_request",
+      "conclusion": "cancelled",
+      "attempt": 1,
+      "elapsedSeconds": 879.0,
+      "summedJobSeconds": 3721.0
+    },
+    {
+      "id": 43550913843,
+      "sha": "db043f66dfba93c91d11cf838e5419776f493636",
+      "event": "pull_request",
+      "conclusion": "cancelled",
+      "attempt": 1,
+      "elapsedSeconds": 1861.0,
+      "summedJobSeconds": 4671.0
+    }
+  ],
+  "caveats": [
+    "Summed job seconds overlap; not CPU time.",
+    "Cancelled runs excluded from success latency.",
+    "latest30 completed push/PR runs; attempts and runner metadata retained."
+  ],
+  "localCompilerScopeProbe": {
+    "capturedUtc": "2026-11-15T06:26:36.298086+00:00",
+    "sourceCommit": "795903adf69d03c4d3a12695766f686d81ffb5a5",
+    "compilerInputSha256": "516d696afcc5c6c2f29c981ed853e4b18b0802fb52b6414a7730c318ca56c46b",
+    "verifiedStable": true,
+    "normalCommand": "npm run typecheck:unity",
+    "iterationCommand": "npm run typecheck:iterate -- runtime",
+    "normalSeconds": [551.7083125740028, 808.0987849920057, 748.9978268389968],
+    "iterationSeconds": [11.66130015499948, 4.936910538002849, 16.415798440997605],
+    "normalMedianSeconds": 748.9978268389968,
+    "iterationMedianSeconds": 11.66130015499948,
+    "normalP95Seconds": 808.0987849920057,
+    "iterationP95Seconds": 16.415798440997605,
+    "percentileMethod": "nearest rank; three observations per command, descriptive only",
+    "caveats": [
+      "Three unchanged-input command pairs with alternating order, not three end-to-end task pilots.",
+      "Compiler inputs were hashed before and after; other tooling edits and host I/O continued.",
+      "Warm workspace; no cold-cache or comparable-runner CI claim.",
+      "Normal checks all configurations with analysis; iteration checks runtime compilation only.",
+      "These figures compare feedback scopes, not equivalent compiler work or algorithm speed.",
+      "Preflight, focused tests, native Unity and review are outside these component timings."
+    ]
+  },
+  "rejectedResultReuse": {
+    "prototypeSourceCommit": "d3d9b3956dcdfb88fd7d7b21986c2d90d462eebc",
+    "rawHashSeconds": 47.97295420100272,
+    "trackedFilesHashed": 9053,
+    "firstCommandStatus": 0,
+    "changedIgnoredSettingExpectedStatus": 7,
+    "changedIgnoredSettingReusedStatus": 0,
+    "gitDiffEmpty": true,
+    "decision": "Reject generic result reuse; execute selected commands and keep existing incremental compiler builds.",
+    "reason": "A Git source snapshot is not a complete input contract for arbitrary validators."
+  }
+}

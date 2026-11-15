@@ -135,13 +135,15 @@ jobs:
       - name: Repository checks
         id: checks
         continue-on-error: true
-        run: uv run --project scripts/python~ --locked --no-dev python scripts/check_registries.py lint --direct
+        env:
+          AGENT_CHECK_BASE: ${{ github.event.pull_request.base.sha }}
+        run: uv run --project scripts/python~ --locked --no-dev python scripts/check_registries.py lint --direct --ci
 
       - name: Report memory safety findings
         id: safety
         if: always()
         continue-on-error: true
-        run: npm run lint:unsafe-code -- --sarif artifacts/unsafe-code.sarif
+        run: test -s artifacts/unsafe-code.sarif
 
       - name: Retain memory safety report
         id: safety_report

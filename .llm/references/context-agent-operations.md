@@ -2,11 +2,18 @@
 
 ## Agent-Specific Rules
 
-- Advance the root plan by driving open issues toward zero in priority order, selecting work from the
-  complete current backlog. Implement substantive improvements and close issues only against their
-  full acceptance criteria; inventory and green-main checks alone are not delivery. Respect the
-  user's session limit, reserve time for validation and PR closeout, and retain remaining scope in
-  canonical issues without counting partial work as closed.
+- Treat the user's explicit task as the active scope. Read its acceptance criteria, affected code,
+  and relevant historical evidence first. Inventory the complete backlog only when selecting work
+  for an open-ended backlog goal; do not repeat that inventory for a bounded implementation task.
+  Implement the full requested outcome and retain unfinished acceptance in canonical issues.
+
+- Keep one bounded task record under ignored `progress/`: objective, acceptance, affected systems,
+  failing witness, implementation, passing evidence, and remaining work. Use one implementation
+  owner by default. Delegate independent investigations or isolated changes when authorized and
+  useful; parallel writers need separate worktrees and explicit ownership. Assign one validation
+  owner to each Unity project and never overlap aggregate builds against shared outputs.
+  Poll a specific live process or job, then report status changes; avoid repeatedly retrieving
+  unchanged CI and review histories. Recheck the submitted revision at completion.
 
 - Keep changes minimal and focused; respect folder boundaries (Runtime vs Editor)
 - Treat every failed test or CI job as unresolved until its cause is classified and fixed. A

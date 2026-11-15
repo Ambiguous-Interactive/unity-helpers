@@ -20,7 +20,17 @@ for (const requestedVersion of ["", ...versions]) {
     const selectedModes = TEST_MODES.includes(requestedMode) ? [requestedMode] : TEST_MODES;
     assert.deepEqual(result["unity-versions"], selectedVersions);
     assert.deepEqual(result["test-modes"], selectedModes);
-    assert.deepEqual(Object.keys(result).sort(), ["test-modes", "unity-versions"]);
+    assert.deepEqual(Object.keys(result).sort(), [
+      "test-modes",
+      "unity-exclusions",
+      "unity-versions"
+    ]);
+    const executed = versions.filter(
+      (version) =>
+        !result["unity-exclusions"].some((excluded) => excluded["unity-version"] === version)
+    );
+    assert.deepEqual(executed, selectedVersions);
+    assert.ok(executed.length > 0);
     cases++;
   }
 }
@@ -73,6 +83,7 @@ try {
       encoding: "utf8",
       env: {
         ...process.env,
+        GITHUB_EVENT_NAME: "workflow_dispatch",
         INPUT_UNITY_VERSION: versions[0],
         INPUT_TEST_MODE: "standalone",
         GITHUB_OUTPUT: output
@@ -102,6 +113,7 @@ try {
       encoding: "utf8",
       env: {
         ...process.env,
+        GITHUB_EVENT_NAME: "workflow_dispatch",
         INPUT_UNITY_VERSION: versions[0],
         INPUT_TEST_MODE: "editmode",
         INPUT_ACCEPTANCE: "serialization",
@@ -134,6 +146,11 @@ try {
 const workflow = fs
   .readFileSync(path.join(repoRoot, ".github/workflows/unity-tests.yml"), "utf8")
   .replace(/\r\n/g, "\n");
+assert.match(workflow, /unity-exclusions: \$\{\{ steps\.resolve\.outputs\.unity-exclusions \}\}/);
+assert.match(
+  workflow,
+  /exclude: \$\{\{ fromJSON\(needs\.matrix-config\.outputs\.unity-exclusions\) \}\}/
+);
 function jobText(id) {
   const start = workflow.indexOf(`\n  ${id}:\n`);
   assert.notEqual(start, -1, `${id}: missing job`);

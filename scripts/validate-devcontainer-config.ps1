@@ -136,7 +136,7 @@ foreach ($workflowFile in (Get-ChildItem -LiteralPath $workflowDir -Filter '*.ym
     $runsValidator = (
         $workflowContent.Contains('validate-devcontainer-config.ps1') -or
         $workflowContent.Contains('run-repo-lint.js') -or
-        $workflowContent -match '(?m)^\s*(?:run:\s*)?uv run --project scripts/python~ --locked --no-dev python scripts/check_registries\.py lint(?: --direct)?\s*$'
+        $workflowContent -match '(?m)^\s*(?:run:\s*)?uv run --project scripts/python~ --locked --no-dev python scripts/check_registries\.py lint(?: --direct)?(?: --ci)?\s*$'
     )
     if (-not $runsValidator) {
         continue

@@ -12,9 +12,7 @@
 // uploads a Unity directory reopens it. This asserts the invariant instead: every upload of a
 // Unity-log-bearing path is preceded, in the same job, by a redaction step that covers that path.
 //
-// The workflows are read with a small line scanner rather than a YAML library. This repository
-// installs no YAML parser, and scripts/validate-build-lock-action-inputs.js already reads workflow
-// and action files the same way. The scanner is held honest by the parser self-tests below: it must
+// The workflows are read with a small line scanner. Its parser self-tests must
 // find the known jobs, steps and uploads, so a scanner that silently stops matching fails loudly
 // instead of reporting a clean repository.
 

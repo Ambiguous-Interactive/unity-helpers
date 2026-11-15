@@ -261,19 +261,16 @@ function Run-AgentValidationContractTests {
     -Passed $localValidationRetainsFullAggregate `
     -Message "validate:local = $validateLocalScript"
 
-  # The requirement is that the full aggregate runs somewhere unconditionally, not that a workflow
-  # called local-gates.yml runs it. Naming the file made this contract fail when the job moved, and
-  # would have let it keep passing if the aggregate had been quietly gated behind an `if:` in a
-  # differently-named workflow (#445).
+  # The entry point is unconditional; --ci scopes PRs and retains the full main aggregate.
   $unconditionalAggregateRunners = @(
     Find-UnconditionalWorkflowSteps `
       -RepoRoot $repoRoot `
-      -RunPattern '(?m)^\s+run: npm run validate:tests\s*$'
+      -RunPattern '(?m)^\s+run: npm run validate:tests(?: -- --ci)?\s*$'
   )
   Write-TestResult `
-    -TestName 'Some workflow runs the full test aggregate unconditionally' `
+    -TestName 'Some workflow runs the CI test entry point unconditionally' `
     -Passed ($unconditionalAggregateRunners.Count -gt 0) `
-    -Message "Expected a workflow job with no if:/continue-on-error: to run 'npm run validate:tests'. Found: $($unconditionalAggregateRunners -join ', ')"
+    -Message "Expected a workflow job with no if:/continue-on-error: to run the full or explicit CI test entry point. Found: $($unconditionalAggregateRunners -join ', ')"
 
   $includesLintSpelling = $validateLocalScript -match 'npm run lint:spelling(?!:config)'
   Write-TestResult `
@@ -1567,7 +1564,7 @@ function Run-DocumentationWorkflowContractTests {
         # Anchored so `test-lint-doc-links.ps1` does not read as an invocation of the linter itself.
         ($candidateText -match '(?<![\w-])(?:lint-doc-links\.ps1|lint_doc_links\.py)') -or
         $candidateText.Contains('run-repo-lint.js') -or
-        $candidateText -match '(?m)^\s*(?:run:\s*)?uv run --project scripts/python~ --locked --no-dev python scripts/check_registries\.py lint(?: --direct)?\s*$'
+        $candidateText -match '(?m)^\s*(?:run:\s*)?uv run --project scripts/python~ --locked --no-dev python scripts/check_registries\.py lint(?: --direct)?(?: --ci)?\s*$'
       }
   )
 
@@ -1583,7 +1580,7 @@ function Run-DocumentationWorkflowContractTests {
     $ownerText = Get-WorkflowContentWithoutComments -Path $workflowFile.FullName
     $docLinkSources += $ownerText
     if ($ownerText.Contains('run-repo-lint.js') -or
-      $ownerText -match '(?m)^\s*(?:run:\s*)?uv run --project scripts/python~ --locked --no-dev python scripts/check_registries\.py lint(?: --direct)?\s*$') {
+      $ownerText -match '(?m)^\s*(?:run:\s*)?uv run --project scripts/python~ --locked --no-dev python scripts/check_registries\.py lint(?: --direct)?(?: --ci)?\s*$') {
       $runnerIsInvoked = $true
     }
   }

@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import fnmatch
 import json
+import os
 import re
+import shutil
+import subprocess
 import sys
 from dataclasses import replace
 from pathlib import Path
@@ -46,6 +50,7 @@ def checks_for(
         checks = [*load_checks("hooks", root), *checks]
     if len({check.id for check in checks}) != len(checks):
         raise ValueError("Selected check registries contain duplicate ids")
+    affected_checks(checks, [])
     if not direct:
         return checks
     scripts = mapping(
@@ -69,6 +74,94 @@ def checks_for(
     return resolved
 
 
+def affected_checks(
+    checks: list[Check], files: list[str], *, direct_inputs_only: bool = False
+) -> list[Check]:
+    """Share pattern and dependency rules; focused iteration omits groups and fallback."""
+    known = {check.id: check for check in checks}
+    visited: set[str] = set()
+    active: set[str] = set()
+
+    def visit(identifier: str) -> None:
+        if identifier not in known or identifier in active:
+            raise ValueError(f"Invalid check dependency: {identifier}")
+        if identifier in visited:
+            return
+        active.add(identifier)
+        for dependency in known[identifier].dependencies:
+            visit(dependency)
+        active.remove(identifier)
+        visited.add(identifier)
+
+    for check in checks:
+        visit(check.id)
+    normalized = [file.replace("\\", "/").removeprefix("./") for file in files]
+    if any(
+        not file or file.startswith(("/", "-")) or ".." in file.split("/") for file in normalized
+    ):
+        raise ValueError("Expected repository-relative affected paths")
+    groups: dict[str, list[str]] = {}
+    if any(pattern.startswith("@") for check in checks for pattern in check.inputs):
+        group_data = mapping(
+            cast(
+                "object",
+                json.loads((ROOT / "scripts/check-inputs.json").read_text(encoding="utf-8")),
+            )
+        )
+        groups = {name: check_runner.strings(value) for name, value in group_data.items()}
+        if any(
+            not values or any(not value or value.startswith("@") for value in values)
+            for values in groups.values()
+        ):
+            raise ValueError("Input groups require nonempty literal patterns")
+
+    def expanded(check: Check) -> tuple[str, ...]:
+        if direct_inputs_only and check.inputs == ("*",):
+            return ()
+        result: list[str] = []
+        for pattern in check.inputs:
+            if pattern.startswith("@"):
+                if pattern[1:] not in groups:
+                    raise ValueError(f"Unknown check input group: {pattern}")
+                if not direct_inputs_only:
+                    result.extend(groups[pattern[1:]])
+            else:
+                result.append(pattern)
+        return tuple(result)
+
+    inputs = {check.id: expanded(check) for check in checks}
+    if not files:
+        return []
+    patterns = [
+        pattern for check in checks if check.inputs != ("*",) for pattern in inputs[check.id]
+    ]
+    if not direct_inputs_only and any(
+        not any(fnmatch.fnmatchcase(file, pattern) for pattern in patterns)
+        and not (
+            re.search(r"\.(?:md|png|jpe?g|svg)(?:\.meta)?$", file)
+            and (file.startswith("docs/") or "/" not in file)
+        )
+        for file in normalized
+    ):
+        return checks
+    selected = {
+        check.id
+        for check in checks
+        if any(
+            fnmatch.fnmatchcase(file, pattern)
+            for file in normalized
+            for pattern in inputs[check.id]
+        )
+    }
+    pending = list(selected)
+    while pending:
+        for dependency in known[pending.pop()].dependencies:
+            if dependency not in selected:
+                selected.add(dependency)
+                pending.append(dependency)
+    return [check for check in checks if check.id in selected]
+
+
 def main(argv: list[str] | None = None) -> int:
     configure_output()
     check_runner.OUTPUT_FORMAT = "text"
@@ -77,9 +170,73 @@ def main(argv: list[str] | None = None) -> int:
         if not arguments or arguments[0] not in {"lint", "contracts"}:
             raise ValueError("Expected lint or contracts registry")
         registry = cast("Registry", arguments.pop(0))
+        if "--focused-ids" in arguments:
+            if arguments[:2] != ["--focused-ids", "--files"] or len(arguments) < 3:
+                raise ValueError("--focused-ids requires --files and affected paths")
+            checks = affected_checks(checks_for(registry), arguments[2:], direct_inputs_only=True)
+            print(json.dumps([check.id for check in checks]))
+            return 0
+        if "--ci" in arguments:
+            arguments.remove("--ci")
+            if "--base" in arguments or "--files" in arguments:
+                raise ValueError("--ci cannot be combined with explicit source selection")
+            if os.environ.get("GITHUB_EVENT_NAME") == "pull_request":
+                base = os.environ.get("AGENT_CHECK_BASE", "")
+                if not base.strip():
+                    raise ValueError("Pull request CI requires AGENT_CHECK_BASE")
+                arguments.extend(["--base", base])
         include_hooks = "--include-hook-regressions" in arguments
         direct = "--direct" in arguments
         checks = checks_for(registry, include_hooks, direct)
+        if "--base" in arguments or "--files" in arguments:
+            requested = check_runner.parse_arguments(arguments)
+            unknown = [
+                identifier
+                for identifier in check_runner.strings(requested["only"])
+                if identifier not in {check.id for check in checks}
+            ]
+            if unknown:
+                raise ValueError(f"::error::Unknown check id(s): {', '.join(unknown)}")
+            if requested["jobsInvalid"] is not None:
+                raise ValueError("::error::--jobs must be a positive integer")
+        if "--base" in arguments:
+            if "--files" in arguments:
+                raise ValueError("Choose --base or --files, not both")
+            index = arguments.index("--base")
+            if index + 1 >= len(arguments) or arguments[index + 1].startswith("--"):
+                raise ValueError("--base requires a revision")
+            base = arguments[index + 1]
+            del arguments[index : index + 2]
+            node = shutil.which("node")
+            if node is None:
+                raise ValueError("Node is required for shared affected-path inventory")
+            inventory = subprocess.run(  # noqa: S603 - fixed local planner, revision passed as a literal argument.
+                [node, str(ROOT / "scripts/agent-check.js"), "--base", base, "--plan", "--json"],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                check=False,
+            )
+            if inventory.returncode != 0:
+                raise ValueError(f"Affected inventory failed: {inventory.stderr.strip()}")
+            selected_files = check_runner.strings(
+                mapping(cast("object", json.loads(inventory.stdout)))["files"]
+            )
+            checks = affected_checks(checks, selected_files)
+            if not checks:
+                print("Not applicable: no affected checks selected; no validation performed.")
+                return 0
+        if "--files" in arguments:
+            index = arguments.index("--files")
+            paths = arguments[index + 1 :]
+            if not paths:
+                raise ValueError("--files requires affected paths")
+            arguments = arguments[:index]
+            checks = affected_checks(checks, paths)
+            if not checks:
+                print("Not applicable: no affected checks selected; no validation performed.")
+                return 0
         options = [
             argument
             for argument in arguments

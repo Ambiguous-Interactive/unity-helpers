@@ -31,6 +31,8 @@ class Check:
     run: str
     exclusive: bool = False
     completion_pattern: str | None = None
+    inputs: tuple[str, ...] = ("*",)
+    dependencies: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -46,7 +48,10 @@ def emit(kind: Literal["output", "result"], value: object) -> None:
         if OUTPUT_FORMAT == "text" and kind == "output":
             print(value, end="", flush=True)
         else:
-            print(json.dumps({"kind": kind, "value": value}, ensure_ascii=True), flush=True)
+            print(
+                json.dumps({"kind": kind, "value": value}, ensure_ascii=True),
+                flush=True,
+            )
 
 
 def write(text: str) -> None:
@@ -69,7 +74,10 @@ def default_jobs(environment: dict[str, str] | None = None) -> int:
             cores = min(cores, math.ceil(int(quota) / int(period)))
     except (OSError, UnicodeError, ValueError):
         pass
-    return max(1, cores if resolved_environment.get("GITHUB_ACTIONS") == "true" else min(4, cores))
+    return max(
+        1,
+        cores if resolved_environment.get("GITHUB_ACTIONS") == "true" else min(4, cores),
+    )
 
 
 def parse_arguments(argv: list[str]) -> dict[str, object]:
@@ -94,7 +102,8 @@ def parse_arguments(argv: list[str]) -> dict[str, object]:
                     if re.fullmatch(r"0[xX][0-9a-fA-F]+|0[bB][01]+|0[oO][0-7]+", numeric):
                         number = float(int(numeric, 0))
                     elif re.fullmatch(
-                        r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?", numeric
+                        r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?",
+                        numeric,
                     ):
                         number = float(numeric)
                     else:
@@ -324,13 +333,25 @@ def read_checks(value: object) -> list[Check]:
     checks: list[Check] = []
     for item in cast("list[object]", value):
         fields = mapping(item)
-        if fields.keys() - {"id", "name", "run", "exclusive", "completionPattern"}:
+        if fields.keys() - {
+            "id",
+            "name",
+            "run",
+            "exclusive",
+            "completionPattern",
+            "inputs",
+            "dependencies",
+        }:
             raise ValueError("Unknown check configuration field")
         if "exclusive" in fields and not isinstance(fields["exclusive"], bool):
             raise ValueError("Check exclusive policy must be a boolean")
         pattern = fields.get("completionPattern")
         if pattern is not None:
             re.compile(string(pattern))
+        inputs = tuple(strings(fields.get("inputs", ["*"])))
+        dependencies = tuple(strings(fields.get("dependencies", [])))
+        if not inputs or any(not value.strip() for value in (*inputs, *dependencies)):
+            raise ValueError("Check inputs and dependency names must be nonempty")
         checks.append(
             Check(
                 string(fields["id"]),
@@ -338,6 +359,8 @@ def read_checks(value: object) -> list[Check]:
                 string(fields["run"]),
                 fields.get("exclusive") is True,
                 None if pattern is None else string(pattern),
+                inputs,
+                dependencies,
             )
         )
     return checks

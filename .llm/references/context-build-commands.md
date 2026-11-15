@@ -7,6 +7,10 @@
 npm run hooks:install                                   # Install git hooks
 dotnet tool restore                                     # Restore .NET tools (CSharpier, etc.)
 
+# Task selection (local feedback tiers; CI selects affected checks and native coverage)
+npm run agent:check -- --tier iterate --base origin/main --plan
+npm run agent:check -- --tier pr --base origin/main --plan
+
 # Formatting & Linting
 npm run agent:preflight:fix                            # Fast changed-file preflight with safe auto-fixes
 npm run lint:repo                                       # Every check the Repo Lint workflow runs
@@ -53,7 +57,7 @@ For a fixture edit, add `--files Tests/Runtime/path/Fixture.cs` after `tests`, o
 `--files Tests/Editor/path/Fixture.cs` after `editor-tests`, and the optional variant. Include
 dependent fixture files when needed. This keeps production, shared test sources, test types and
 test doubles but omits the other fixtures. Runtime and Editor scopes cannot be mixed. Add `--server` to reuse a compiler server whose
-identity includes the project, variant, and all three shipped analyzer DLL hashes. A rebuilt
+identity includes the project, variant, and all shipped compiler-input DLL hashes. A rebuilt
 analyzer therefore selects a new server. The default still disables shared compilation. Iteration
 outputs and intermediate files are isolated from normal publication builds. Real
 scoped controls proved fresh `CS0246` and `WPROTO001` failures and a passing compile after an edit;

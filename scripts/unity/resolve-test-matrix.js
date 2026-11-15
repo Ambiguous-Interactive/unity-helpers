@@ -2,6 +2,7 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
+const { changedFiles, select } = require("../agent-check.js");
 
 const TEST_MODES = Object.freeze(["editmode", "playmode", "standalone"]);
 
@@ -50,7 +51,26 @@ function resolveTestMatrix(
   }
   return {
     "unity-versions": selectedVersions,
+    "unity-exclusions": versions
+      .filter((candidate) => !selectedVersions.includes(candidate))
+      .map((candidate) => ({ "unity-version": candidate })),
     "test-modes": selectedModes
+  };
+}
+
+function resolvePullRequestMatrix(versions, files) {
+  const full = resolveTestMatrix(versions);
+  const proposal = files.length ? select(files, "pr").unity : "full";
+  if (proposal === "full")
+    return { ...full, coverage: "full", reason: "compatibility-sensitive or unknown input" };
+  return {
+    ...resolveTestMatrix(versions, versions[versions.length - 1]),
+    "test-modes": ["editmode", "playmode"],
+    coverage: "latest-editors",
+    reason:
+      proposal === "none"
+        ? "documentation retains latest editor validation pending conditional enrollment"
+        : "ordinary C#; latest editors, full compatibility on main and default dispatch"
   };
 }
 
@@ -59,17 +79,35 @@ function main() {
   const versions = JSON.parse(
     fs.readFileSync(path.join(repoRoot, ".github", "unity-versions.json"), "utf8")
   ).all;
-  const matrix = resolveTestMatrix(
+  let matrix = resolveTestMatrix(
     versions,
     process.env.INPUT_UNITY_VERSION || "",
     process.env.INPUT_TEST_MODE || "all",
     process.env.INPUT_ACCEPTANCE || "none"
   );
+  if (process.env.GITHUB_EVENT_NAME === "pull_request") {
+    if (!/^[0-9a-f]{40}$/.test(process.env.AGENT_CHECK_BASE || ""))
+      throw new Error("PR matrix selection requires the immutable PR base SHA");
+    matrix = resolvePullRequestMatrix(
+      versions,
+      changedFiles(process.env.AGENT_CHECK_BASE, repoRoot)
+    );
+  }
   if (!process.env.GITHUB_OUTPUT) {
     throw new Error("GITHUB_OUTPUT is required to publish the Unity test matrix.");
   }
-  const outputs = Object.entries(matrix).map(([key, value]) => `${key}=${JSON.stringify(value)}`);
+  const outputs = Object.entries(matrix).map(
+    ([key, value]) => `${key}=${typeof value === "string" ? value : JSON.stringify(value)}`
+  );
   fs.appendFileSync(process.env.GITHUB_OUTPUT, `${outputs.join("\n")}\n`, "utf8");
+  if (process.env.GITHUB_STEP_SUMMARY)
+    fs.appendFileSync(
+      process.env.GITHUB_STEP_SUMMARY,
+      `### Selected Unity coverage\n\n${JSON.stringify(matrix)}\n\n` +
+        "SINGLE_THREADED follows the selected modes. Package export smoke also runs. " +
+        "Unselected versions and modes are not validated by this run. Main retains the full matrix.\n",
+      "utf8"
+    );
 }
 
 if (require.main === module) {
@@ -81,4 +119,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { TEST_MODES, resolveTestMatrix };
+module.exports = { TEST_MODES, resolveTestMatrix, resolvePullRequestMatrix };

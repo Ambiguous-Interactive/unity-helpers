@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -10,15 +11,19 @@ import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING, cast
 
+import yaml
 from cli_encoding import configure_output
+from yaml.nodes import MappingNode, Node, ScalarNode, SequenceNode
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 ROOT = Path(__file__).resolve().parents[1]
 ACTION_PREFIX = "Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/"
 MAX_ACTION_BYTES = 8 * 1024 * 1024
 KEY = re.compile(r"^([A-Za-z0-9_][A-Za-z0-9_-]*):(?:\s|$)")
-USES = re.compile(r"^[ \t]*(?:-[ \t]*)?uses:")
-REFERENCE = re.compile(r"^[ \t]*(?:-[ \t]*)?uses:[ \t]*(\S+)[ \t]*(?:#.*)?$")
 
 
 @dataclass(frozen=True)
@@ -94,31 +99,63 @@ def split_lines(content: str) -> list[str]:
     return re.split(r"\r?\n", content)
 
 
-def collect_calls(file: Path, relative: str) -> list[Call]:
-    with file.open(encoding="utf-8", newline="") as stream:
-        lines = split_lines(stream.read())
-    calls: list[Call] = []
-    for index, line in enumerate(lines):
-        if is_blank_or_comment(line) or not USES.match(line) or ACTION_PREFIX not in line:
+def yaml_mappings(content: str, label: str) -> Iterator[dict[str, Node]]:
+    try:
+        document = yaml.compose(content, Loader=yaml.SafeLoader)
+    except (yaml.YAMLError, RecursionError) as error:
+        raise ValueError(f"{label}: YAML could not be parsed: {error}") from error
+    pending = [document] if document is not None else []
+    visited: set[int] = set()
+    while pending:
+        node = pending.pop()
+        if id(node) in visited:
             continue
-        match = REFERENCE.fullmatch(line)
-        if not match or not match[1].startswith(ACTION_PREFIX):
+        visited.add(id(node))
+        if isinstance(node, MappingNode):
+            fields: dict[str, Node] = {}
+            for key, value in node.value:
+                if not isinstance(key, ScalarNode) or key.value in fields or key.value == "<<":
+                    raise ValueError(f"{label}: YAML requires unique scalar keys without merges")
+                fields[key.value] = value
+                pending.append(value)
+            yield fields
+        elif isinstance(node, SequenceNode):
+            pending.extend(reversed(node.value))
+
+
+def collect_calls(file: Path, relative: str) -> list[Call]:
+    calls: list[Call] = []
+    for fields in yaml_mappings(file.read_text(encoding="utf-8"), relative):
+        uses = fields.get("uses")
+        if uses is None:
+            continue
+        if not isinstance(uses, ScalarNode):
+            raise ValueError(f"{relative}: action reference could not be parsed")
+        reference = uses.value
+        if ACTION_PREFIX.lower() not in reference.lower():
+            continue
+        line = uses.start_mark.line + 1
+        if not reference.startswith(ACTION_PREFIX):
             raise ValueError(
-                f"{relative}:{index + 1}: build-lock action reference could not be parsed: {line.strip()}"
+                f"{relative}:{line}: build-lock action reference could not be parsed: {reference}"
             )
-        reference = match[1]
         parts = reference[len(ACTION_PREFIX) :].split("@")
-        if len(parts) < 2 or not parts[0] or not parts[1]:
+        if len(parts) != 2 or not parts[0] or not parts[1]:
             raise ValueError(
-                f"{relative}:{index + 1}: build-lock action reference is not pinned to a commit: {reference}"
+                f"{relative}:{line}: build-lock action reference is not pinned to a commit: {reference}"
             )
+        supplied = fields.get("with")
+        if supplied is not None and not isinstance(supplied, MappingNode):
+            raise ValueError(f"{relative}:{line}: action inputs must be a mapping")
         calls.append(
             Call(
                 parts[0],
                 parts[1],
                 relative,
-                index + 1,
-                collect_with_keys(lines, index, key_column(line)),
+                line,
+                [key.value for key, _ in supplied.value if isinstance(key, ScalarNode)]
+                if isinstance(supplied, MappingNode)
+                else [],
             )
         )
     return calls
@@ -181,10 +218,13 @@ def git_environment() -> dict[str, str]:
 
 
 def read_action_at_ref(policy_root: Path, action: str, ref: str) -> str:
+    return read_policy_object(policy_root, f"{ref}:.github/actions/{action}/action.yml")
+
+
+def read_policy_object(policy_root: Path, target: str) -> str:
     git = shutil.which("git")
     if git is None:
         raise ValueError("Git is required to read the central policy checkout.")
-    target = f"{ref}:.github/actions/{action}/action.yml"
     with tempfile.TemporaryFile() as output:
         try:
             result = subprocess.run(  # noqa: S603 - read-only Git object lookup, without a shell.
@@ -224,7 +264,32 @@ def collect_yaml_files(directory: Path) -> list[Path]:
     return sorted(found)
 
 
-def validate_build_lock_action_inputs(root: Path, policy_root: Path) -> Result:
+def approved_pins(policy_root: Path, ref: str) -> dict[str, set[str]]:
+    document: object = json.loads(
+        read_policy_object(policy_root, f"{ref}:unity-enrollment-policy.json")
+    )
+    if not isinstance(document, dict):
+        raise ValueError("Central approval policy must be an object.")
+    policy = cast("dict[str, object]", document)
+    approved: dict[str, set[str]] = {}
+    for name in ("approvedLockShas", "approvedReturnShas"):
+        values = policy.get(name)
+        if (
+            not isinstance(values, list)
+            or not values
+            or any(
+                not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{40}", value) is None
+                for value in cast("list[object]", values)
+            )
+        ):
+            raise ValueError(f"Central approval policy {name} must contain full commit SHAs.")
+        approved[name] = set(cast("list[str]", values))
+    return approved
+
+
+def validate_build_lock_action_inputs(
+    root: Path, policy_root: Path, approval_ref: str | None = None
+) -> Result:
     calls: list[Call] = []
     files: set[str] = set()
     for file in collect_yaml_files(root / ".github"):
@@ -235,7 +300,19 @@ def validate_build_lock_action_inputs(root: Path, policy_root: Path) -> Result:
             calls.extend(found)
     declarations: dict[str, dict[str, bool]] = {}
     failures: list[str] = []
+    approvals = approved_pins(policy_root, approval_ref) if approval_ref else None
     for call in calls:
+        if approvals is not None:
+            approval = (
+                "approvedReturnShas"
+                if call.action == "return-unity-license"
+                else "approvedLockShas"
+            )
+            if call.ref not in approvals[approval]:
+                failures.append(
+                    f"{call.file}:{call.line}: {call.action}@{call.ref} is not approved by {approval_ref}:{approval}."
+                )
+                continue
         key = f"{call.action}@{call.ref}"
         if key not in declarations:
             declarations[key] = parse_action_inputs(
@@ -260,16 +337,12 @@ def resolve_build_lock_pin(action_name: str, root: Path = ROOT) -> str:
     github = root / ".github"
     if not github.exists():
         raise ValueError(f"No .github directory under {root}")
-    pattern = re.compile(
-        r"^[ \t]*(?:-[ \t]*)?uses:[ \t]*" + re.escape(ACTION_PREFIX + action_name) + r"@(\S+)",
-        re.MULTILINE,
-    )
     usages: list[tuple[str, str]] = []
     for file in collect_yaml_files(github):
-        with file.open(encoding="utf-8", newline="") as stream:
-            content = stream.read()
         usages.extend(
-            (match[1], file.relative_to(root).as_posix()) for match in pattern.finditer(content)
+            (call.ref, call.file)
+            for call in collect_calls(file, file.relative_to(root).as_posix())
+            if call.action == action_name
         )
     if not usages:
         raise ValueError(
@@ -310,9 +383,12 @@ def main(argv: list[str] | None = None) -> int:
         except (OSError, ValueError) as error:
             print(str(error), file=sys.stderr)
             return 1
+    if arguments and arguments != ["--approved"]:
+        print("usage: python scripts/build_lock_inputs.py [--approved]", file=sys.stderr)
+        return 2
     configured = os.environ.get("BUILD_LOCK_POLICY_ROOT", "")
     if not configured:
-        if os.environ.get("GITHUB_ACTIONS") == "true":
+        if os.environ.get("GITHUB_ACTIONS") == "true" or arguments == ["--approved"]:
             print(
                 "BUILD_LOCK_POLICY_ROOT is unset under GitHub Actions. The central policy checkout step must run before this gate; skipping here would drop the input contract silently.",
                 file=sys.stderr,
@@ -323,7 +399,11 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 0
     try:
-        result = validate_build_lock_action_inputs(ROOT, Path(configured).resolve())
+        result = validate_build_lock_action_inputs(
+            ROOT,
+            Path(configured).resolve(),
+            "refs/remotes/origin/main" if arguments == ["--approved"] else None,
+        )
     except (OSError, ValueError) as error:
         print(f"[validate-build-lock-action-inputs] {error}", file=sys.stderr)
         return 1

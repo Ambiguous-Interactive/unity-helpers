@@ -1475,3 +1475,72 @@ for (const [startup, shutdown, expected] of [
 console.log(
   `${shutdownSelections.length} final telemetry attachment admissions and four removed guards passed.`
 );
+
+let historicalAggregateControls = 0;
+for (const name of [
+  "unity-tests-aggregate",
+  "unity-tests-single-threaded-aggregate",
+  "unitypackage-smoke-aggregate"
+]) {
+  const block = workflow.match(
+    new RegExp("^  " + name + ":\n([\\s\\S]*?)(?=^  [\\w-]+:\n)", "m")
+  )?.[1];
+  assert.ok(block, `${name} must exist`);
+  assert.ok(!block.includes("HISTORICAL_READBACK"));
+  const condition = expression(block.match(/^    if: (.+)$/m)?.[1]);
+  for (const event of ["push", "pull_request", "workflow_dispatch"]) {
+    for (const request of ["", "123"]) {
+      for (const outcome of ["success", "failure", "cancelled", "skipped"]) {
+        assert.equal(
+          Boolean(
+            condition({
+              always: () => true,
+              github: { event_name: event },
+              inputs: { "native-readback-run-id": request },
+              needs: { "unity-tests": { result: outcome } }
+            })
+          ),
+          event !== "workflow_dispatch" || request === ""
+        );
+        historicalAggregateControls++;
+      }
+    }
+  }
+  const program = block.match(/^        run: \|\n([\s\S]+)$/m)?.[1]?.replace(/^ {10}/gm, "");
+  assert.ok(program, `${name} needs an executable result gate`);
+  const outcomes = ["success", "failure", "cancelled", "skipped"];
+  for (const [fork, dependabot] of [
+    [false, false],
+    [true, false],
+    [false, true]
+  ]) {
+    for (const preflight of outcomes) {
+      for (const licensed of outcomes) {
+        const accepted =
+          fork || dependabot
+            ? preflight === "skipped" && licensed === "skipped"
+            : preflight === "success" && licensed === "success";
+        const result = spawnSync("bash", ["-c", program], {
+          encoding: "utf8",
+          env: {
+            ...process.env,
+            FORK_PR: String(fork),
+            DEPENDABOT_PR: String(dependabot),
+            RUNNER_PREFLIGHT_RESULT: preflight,
+            UNITY_TESTS_RESULT: licensed
+          }
+        });
+        assert.ifError(result.error);
+        assert.equal(
+          result.status === 0,
+          accepted,
+          `${name}: ${JSON.stringify({ fork, dependabot, preflight, licensed })}: ${result.stderr}`
+        );
+        historicalAggregateControls++;
+      }
+    }
+  }
+}
+console.log(
+  `${historicalAggregateControls} diagnostic exclusion and executed qualification result controls passed.`
+);

@@ -2191,6 +2191,8 @@ $defaultMatrixIsVersionGrouped = (
     [regex]::Matches($unityTestsMatrixJob, '(?m)^      matrix:\s*$').Count -eq 1 -and
     $matrixVersionsAreStaticText -and
     $matrixVersionsMatchCanonicalSource -and
+    $unityTestsMatrixJob.Contains('exclude: ${{ fromJSON(needs.matrix-config.outputs.unity-exclusions) }}') -and
+    $workflowContent.Contains('unity-exclusions: ${{ steps.resolve.outputs.unity-exclusions }}') -and
     [regex]::Matches($unityTestsMatrixJob, '(?m)^        test-mode:\s*$').Count -eq 0 -and
     -not $unityTestsMatrixJob.Contains('matrix.test-mode') -and
     $unityTestsMatrixJob.Contains('needs.matrix-config.outputs.test-modes') -and
@@ -2202,7 +2204,7 @@ if (-not $defaultMatrixIsVersionGrouped) {
     Write-Host '::error file=.github/workflows/unity-tests.yml::The default Unity matrix must list the versions from .github/unity-versions.json as static text (the enrollment audit can only prove per-leg gate and return pins on a static axis). Modes must be sequential steps within each version job, never a second matrix axis that multiplies the licensed runner queue.'
     $failed = $true
 } elseif ($VerboseOutput) {
-    Write-Info 'Checked the default Unity matrix creates exactly one job per supported version from the canonical source.'
+    Write-Info 'Checked the Unity matrix keeps a canonical static universe and excludes only unselected versions.'
 }
 
 function Test-ShardFailureEvidence {
@@ -2436,7 +2438,7 @@ foreach ($mode in @(
 $singleThreadedOutcomeGate = Get-UnityWorkflowStepText -JobText $unityTestsSingleThreadedJob -StepName 'Require every SINGLE_THREADED Unity mode'
 $singleThreadedModesAreComplete = (
     $singleThreadedModesAreComplete -and
-    $singleThreadedOutcomeGate.Contains('SELECTED_MODES: ''["editmode","playmode","standalone"]''') -and
+    $singleThreadedOutcomeGate.Contains('SELECTED_MODES: ${{ github.event_name == ''pull_request'' && needs.matrix-config.outputs.test-modes || ''["editmode","playmode","standalone"]'' }}') -and
     $singleThreadedOutcomeGate.Contains('./scripts/unity/assert-test-mode-outcomes.ps1') -and
     -not $singleThreadedOutcomeGate.Contains('.conclusion')
 )
