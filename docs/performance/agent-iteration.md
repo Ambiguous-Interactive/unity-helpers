@@ -121,6 +121,10 @@ evidence does not qualify new source.
 The unsafe-code registry scan also creates its SARIF report; report upload checks that output
 instead of executing the scanner a second time.
 
+Central action discovery and pin resolution share a YAML node reader. Quoted, folded, flow, and
+aliased references cannot bypass approval checks. The reader rejects duplicate keys and merges.
+Its launchers select the existing locked Python metadata dependency group.
+
 ## Task and agent operation
 
 Start with one bounded task: objective, acceptance criteria, affected systems, failing witness,

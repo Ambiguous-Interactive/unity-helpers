@@ -208,7 +208,6 @@ def test_invalid_approval_policy_fails_closed(
 @pytest.mark.parametrize(
     "line",
     [
-        "uses: 'PREFIXexample@pin'",
         "uses: PREFIXexample",
         "uses: PREFIX@example",
         "uses: PREFIXexample@",
@@ -223,6 +222,77 @@ def test_malformed_action_calls_are_refused(tmp_path: Path, line: str) -> None:
     path.write_text(line.replace("PREFIX", inputs.ACTION_PREFIX), encoding="utf-8")
     with pytest.raises(ValueError, match=r"reference (?:could not be parsed|is not pinned)"):
         inputs.collect_calls(path, "workflow.yml")
+
+
+@pytest.mark.parametrize(
+    "step",
+    [
+        "- uses : PREFIXexample@REF",
+        "- 'uses': 'PREFIXexample@REF'",
+        '- "uses": "PREFIXexample@REF"',
+        "- {uses: PREFIXexample@REF}",
+        "- uses: >-\n          PREFIXexample@REF",
+        '- uses: "Ambiguous-\\u0049nteractive/ambiguous-organization-build-lock/.github/actions/example@REF"',
+        "- uses: &pin PREFIXexample@REF\n      - uses: *pin",
+    ],
+)
+def test_yaml_forms_cannot_hide_unapproved_calls(
+    tmp_path: Path, policy: tuple[Path, str, str], step: str
+) -> None:
+    policy_root, first, second = policy
+    root = tmp_path / "consumer"
+    write_workflow(root, first)
+    path = root / ".github/workflows/noncanonical.yml"
+    path.write_text(
+        "jobs:\n  job:\n    steps:\n      "
+        + step.replace("PREFIX", inputs.ACTION_PREFIX).replace("REF", second)
+        + "\n",
+        encoding="utf-8",
+    )
+    approved = policy_root / "unity-enrollment-policy.json"
+    approved.write_text(
+        json.dumps({"approvedLockShas": [first], "approvedReturnShas": [first]}),
+        encoding="utf-8",
+    )
+    git(policy_root, "add", "--", approved.name)
+    git(policy_root, "commit", "-m", "Approve only first action")
+    result = inputs.validate_build_lock_action_inputs(root, policy_root, "HEAD")
+    assert any("not approved" in failure and second in failure for failure in result.failures)
+    with pytest.raises(ValueError, match="different commits"):
+        inputs.resolve_build_lock_pin("example", root)
+
+
+@pytest.mark.parametrize(
+    "document",
+    [
+        "uses: [broken",
+        "uses: actions/checkout@v1\nuses: PREFIXexample@pin\n",
+        "uses: {hidden: PREFIXexample@pin}\n",
+        "step: {uses: PREFIXexample@pin, with: {alpha: one, alpha: two}}\n",
+        "base: &base {uses: PREFIXexample@pin}\nstep: {<<: *base}\n",
+    ],
+)
+def test_ambiguous_yaml_is_refused(tmp_path: Path, document: str) -> None:
+    file = tmp_path / "workflow.yml"
+    file.write_text(document.replace("PREFIX", inputs.ACTION_PREFIX), encoding="utf-8")
+    with pytest.raises(ValueError, match=r"workflow\.yml: (?:YAML|action reference)"):
+        inputs.collect_calls(file, "workflow.yml")
+
+
+def test_flow_inputs_keep_required_and_unknown_input_checks(
+    tmp_path: Path, policy: tuple[Path, str, str]
+) -> None:
+    policy_root, first, _ = policy
+    root = tmp_path / "consumer"
+    file = write_workflow(root, first)
+    file.write_text(
+        f"steps: [{{uses: '{inputs.ACTION_PREFIX}example@{first}', with: {{alpha: value, wrong: value}}}}]\n",
+        encoding="utf-8",
+    )
+    result = inputs.validate_build_lock_action_inputs(root, policy_root)
+    assert result.call_count == 1
+    assert len(result.failures) == 1
+    assert "declares no input 'wrong'" in result.failures[0]
 
 
 def test_comments_and_unrelated_uses_are_ignored(tmp_path: Path) -> None:
@@ -439,7 +509,7 @@ def original_pins() -> list[FrozenPin]:
 
 
 @pytest.mark.parametrize("case", original_pins(), ids=lambda case: case["name"])
-def test_original_pin_observations(case: FrozenPin, tmp_path: Path) -> None:
+def test_pin_observations_with_yaml_quote_detection(case: FrozenPin, tmp_path: Path) -> None:
     files = case["files"]
     if files is not None:
         (tmp_path / ".github").mkdir()
@@ -447,6 +517,12 @@ def test_original_pin_observations(case: FrozenPin, tmp_path: Path) -> None:
             file = tmp_path / ".github" / relative
             file.parent.mkdir(parents=True, exist_ok=True)
             file.write_bytes(content.encode("utf-8"))
+    if case["name"] == "quoted":
+        assert (
+            inputs.resolve_build_lock_pin(case["action"], tmp_path)
+            == "0123456789abcdef0123456789abcdef01234567"
+        )
+        return
     expected = case["error"]
     if expected is not None:
         with pytest.raises(

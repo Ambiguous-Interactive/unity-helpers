@@ -12,6 +12,8 @@ function resolveBuildLockPin(actionName, root = repoRoot) {
       path.join(repoRoot, "scripts/python~"),
       "--locked",
       "--no-dev",
+      "--group",
+      "metadata",
       "python",
       path.join(repoRoot, "scripts/build_lock_inputs.py"),
       "--resolve",

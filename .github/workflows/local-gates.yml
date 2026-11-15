@@ -87,7 +87,7 @@ jobs:
         working-directory: unity-helpers
         env:
           BUILD_LOCK_POLICY_ROOT: ${{ github.workspace }}/build-lock-policy
-        run: uv run --project scripts/python~ --locked --no-dev python scripts/build_lock_inputs.py --approved
+        run: uv run --project scripts/python~ --locked --no-dev --group metadata python scripts/build_lock_inputs.py --approved
 
       # package-lock.json is GITIGNORED here, so the cached path is the exception rather than the
       # rule and `cache: npm` on its own fails the job outright with "Dependencies lock file is not

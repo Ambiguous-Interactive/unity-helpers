@@ -259,7 +259,7 @@
     "test:postinstall-hooks": "node scripts/tests/test-postinstall-hooks.js",
     "test:github-pages-sortable": "node scripts/tests/test-github-pages-sortable.js",
     "test:portable-cleanup-classifier": "node scripts/tests/test-portable-cleanup-classifier.js",
-    "test:build-lock-action-inputs": "uv run --project scripts/python~ --locked --no-dev python scripts/build_lock_inputs.py",
+    "test:build-lock-action-inputs": "uv run --project scripts/python~ --locked --no-dev --group metadata python scripts/build_lock_inputs.py",
     "test:node-bin": "uv run --quiet --project scripts/python~ --locked pytest scripts/tests/test_node_bin.py -q",
     "test:build-lock-action-input-parser": "uv run --project scripts/python~ --locked pytest scripts/tests/test_build_lock_inputs.py -q",
     "test:read-stdin-sync": "node scripts/tests/test-read-stdin-sync.js",
