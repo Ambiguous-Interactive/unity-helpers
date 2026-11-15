@@ -384,6 +384,22 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
             "a rethrow caught before normal continuation",
             "protected override void OnDestroy() { try { try { throw new Exception(); } catch { base.OnDestroy(); throw; } } catch { } Release(); }"
         )]
+        [TestCase(
+            "an exceptional finally before outer catch cleanup",
+            "protected override void OnDestroy() { try { try { throw new Exception(); } finally { base.OnDestroy(); } } catch { Release(); } }"
+        )]
+        [TestCase(
+            "an exceptional finally before a compatible typed catch",
+            "protected override void OnDestroy() { try { try { throw new InvalidOperationException(); } finally { base.OnDestroy(); } } catch (Exception) { Release(); } }"
+        )]
+        [TestCase(
+            "a nested catch rethrow still crosses the finally",
+            "protected override void OnDestroy() { try { try { try { throw new Exception(); } catch { throw; } } finally { base.OnDestroy(); } } catch { Release(); } }"
+        )]
+        [TestCase(
+            "a user conversion determines the exception dispatched after finally",
+            "protected override void OnDestroy() { try { try { throw (ArgumentException)new OtherException(); } finally { base.OnDestroy(); } } catch (ArgumentException) { Release(); } } private sealed class OtherException : Exception { public static implicit operator ArgumentException(OtherException value) { return new ArgumentException(); } }"
+        )]
         public void NestedTeardownWithReachableFollowingWorkIsReported(string shape, string body)
         {
             Diagnostic reported = Single(body);
@@ -438,6 +454,26 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
         [TestCase(
             "an empty catch with an exception binding",
             "protected override void OnDestroy() { try { try { throw new Exception(); } catch { base.OnDestroy(); throw; } } catch (Exception exception) { } }"
+        )]
+        [TestCase(
+            "a rethrow cannot enter an unrelated typed catch",
+            "protected override void OnDestroy() { try { try { throw new InvalidOperationException(); } catch (InvalidOperationException) { base.OnDestroy(); throw; } } catch (ArgumentException) { Release(); } }"
+        )]
+        [TestCase(
+            "an exceptional finally cannot enter an unrelated catch",
+            "protected override void OnDestroy() { try { try { throw new InvalidOperationException(); } finally { base.OnDestroy(); } } catch (ArgumentException) { Release(); } }"
+        )]
+        [TestCase(
+            "a compatible empty catch consumes the known rethrow",
+            "protected override void OnDestroy() { try { try { try { throw new InvalidOperationException(); } catch (InvalidOperationException) { base.OnDestroy(); throw; } } catch (InvalidOperationException) { } } catch { Release(); } }"
+        )]
+        [TestCase(
+            "a rethrow cannot enter an unrelated filtered catch",
+            "protected override void OnDestroy() { try { try { throw new InvalidOperationException(); } catch (InvalidOperationException) { base.OnDestroy(); throw; } } catch (ArgumentException) when (0 < handles) { Release(); } }"
+        )]
+        [TestCase(
+            "a nested throw consumed before the finally cannot dispatch outside it",
+            "protected override void OnDestroy() { try { try { try { throw new Exception(); } catch { } } finally { base.OnDestroy(); } } catch { Release(); } }"
         )]
         public void NestedTeardownWithoutFollowingWorkIsNotReported(string shape, string body)
         {

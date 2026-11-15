@@ -240,7 +240,8 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                         graph,
                         branch.Source,
                         branch.Semantics == ControlFlowBranchSemantics.Rethrow,
-                        pending
+                        pending,
+                        exceptionType: RethrownExceptionType(branch.Source)
                     )
                 )
                 {
@@ -281,11 +282,14 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             ControlFlowGraph graph,
             BasicBlock source,
             bool includeHandlers,
-            Queue<BasicBlock> pending
+            Queue<BasicBlock> pending,
+            ControlFlowRegion completedFinally = null,
+            ITypeSymbol exceptionType = null
         )
         {
             for (
-                ControlFlowRegion region = source.EnclosingRegion;
+                ControlFlowRegion region =
+                    completedFinally?.EnclosingRegion ?? source.EnclosingRegion;
                 region != null;
                 region = region.EnclosingRegion
             )
@@ -301,24 +305,29 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                         for (int index = 1; index < region.NestedRegions.Length; ++index)
                         {
                             ControlFlowRegion handler = region.NestedRegions[index];
+                            ITypeSymbol handlerType = handler.ExceptionType;
+                            if (AreProvablyUnrelated(exceptionType, handlerType))
+                            {
+                                continue;
+                            }
                             if (QueueDestination(graph.Blocks[handler.FirstBlockOrdinal], pending))
                             {
                                 return true;
                             }
-                            ITypeSymbol exceptionType = handler.ExceptionType;
                             if (
                                 handler.Kind == ControlFlowRegionKind.Catch
                                 && (
-                                    exceptionType == null
-                                    || exceptionType.SpecialType == SpecialType.System_Object
+                                    IsSameOrDerived(exceptionType, handlerType)
+                                    || handlerType == null
+                                    || handlerType.SpecialType == SpecialType.System_Object
                                     || (
                                         string.Equals(
-                                            exceptionType.Name,
+                                            handlerType.Name,
                                             nameof(Exception),
                                             StringComparison.Ordinal
                                         )
                                         && string.Equals(
-                                            exceptionType.ContainingNamespace.ToDisplayString(),
+                                            handlerType.ContainingNamespace.ToDisplayString(),
                                             "System",
                                             StringComparison.Ordinal
                                         )
@@ -339,6 +348,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 {
                     if (
                         nested.Kind == ControlFlowRegionKind.Finally
+                        && nested != completedFinally
                         && (
                             source.Ordinal < nested.FirstBlockOrdinal
                             || nested.LastBlockOrdinal < source.Ordinal
@@ -386,6 +396,42 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             {
                 return false;
             }
+            ControlFlowRegion body = region.EnclosingRegion?.NestedRegions[0];
+            if (
+                body != null
+                && body.FirstBlockOrdinal <= branch.Source.Ordinal
+                && branch.Source.Ordinal <= body.LastBlockOrdinal
+                && (
+                    branch.Semantics == ControlFlowBranchSemantics.Throw
+                    || branch.Semantics == ControlFlowBranchSemantics.Rethrow
+                )
+            )
+            {
+                IOperation thrown = branch.Source.BranchValue;
+                while (
+                    thrown is IConversionOperation conversion
+                    && conversion.IsImplicit
+                    && conversion.OperatorMethod == null
+                )
+                {
+                    thrown = conversion.Operand;
+                }
+                ITypeSymbol exceptionType = thrown?.Type ?? RethrownExceptionType(branch.Source);
+                if (
+                    !IsCaughtBeforeFinally(branch.Source, region, exceptionType)
+                    && HasUnwindingCleanup(
+                        graph,
+                        branch.Source,
+                        true,
+                        pending,
+                        region,
+                        exceptionType
+                    )
+                )
+                {
+                    return true;
+                }
+            }
             for (int index = 0; index < branch.FinallyRegions.Length; ++index)
             {
                 if (branch.FinallyRegions[index] != region)
@@ -406,6 +452,108 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 return QueueDestination(branch.Destination, pending);
             }
             return false;
+        }
+
+        private static bool IsCaughtBeforeFinally(
+            BasicBlock source,
+            ControlFlowRegion completedFinally,
+            ITypeSymbol exceptionType
+        )
+        {
+            for (
+                ControlFlowRegion region = source.EnclosingRegion;
+                region != null && region != completedFinally.EnclosingRegion;
+                region = region.EnclosingRegion
+            )
+            {
+                if (region.Kind != ControlFlowRegionKind.TryAndCatch)
+                {
+                    continue;
+                }
+                ControlFlowRegion body = region.NestedRegions[0];
+                if (
+                    source.Ordinal < body.FirstBlockOrdinal
+                    || body.LastBlockOrdinal < source.Ordinal
+                )
+                {
+                    continue;
+                }
+                for (int index = 1; index < region.NestedRegions.Length; ++index)
+                {
+                    ControlFlowRegion handler = region.NestedRegions[index];
+                    ITypeSymbol handlerType = handler.ExceptionType;
+                    if (
+                        handler.Kind == ControlFlowRegionKind.Catch
+                        && (
+                            handlerType == null
+                            || handlerType.SpecialType == SpecialType.System_Object
+                            || IsSameOrDerived(exceptionType, handlerType)
+                            || (
+                                string.Equals(
+                                    handlerType.Name,
+                                    nameof(Exception),
+                                    StringComparison.Ordinal
+                                )
+                                && string.Equals(
+                                    handlerType.ContainingNamespace.ToDisplayString(),
+                                    "System",
+                                    StringComparison.Ordinal
+                                )
+                            )
+                        )
+                    )
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        private static ITypeSymbol RethrownExceptionType(BasicBlock source)
+        {
+            for (
+                ControlFlowRegion region = source.EnclosingRegion;
+                region != null;
+                region = region.EnclosingRegion
+            )
+            {
+                if (region.Kind == ControlFlowRegionKind.Catch)
+                {
+                    return region.ExceptionType;
+                }
+            }
+            return null;
+        }
+
+        private static bool IsSameOrDerived(ITypeSymbol type, ITypeSymbol ancestor)
+        {
+            if (ancestor == null)
+            {
+                return false;
+            }
+            for (
+                ITypeSymbol current = type;
+                current != null;
+                current = (current as INamedTypeSymbol)?.BaseType
+            )
+            {
+                if (SymbolEqualityComparer.Default.Equals(current, ancestor))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static bool AreProvablyUnrelated(ITypeSymbol thrown, ITypeSymbol caught)
+        {
+            return thrown != null
+                && caught != null
+                && thrown.TypeKind == TypeKind.Class
+                && caught.TypeKind == TypeKind.Class
+                && !IsSameOrDerived(thrown, caught)
+                && !IsSameOrDerived(caught, thrown);
         }
 
         private static bool QueueDestination(BasicBlock destination, Queue<BasicBlock> pending)

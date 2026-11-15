@@ -61,7 +61,7 @@ path uses a bounded scan for at most 16 subjects and hash membership above that 
 required suffix anchors remain fixed. Large-set temporary storage scales with subjects, not sources.
 
 The [qualification record](./compiler-analysis-20261114.json) and
-[2,274 raw observations](./compiler-analysis-20261114.csv) include accepted and rejected variants,
+[3,714 raw observations](./compiler-analysis-20261114.csv) include accepted and rejected variants,
 payload hashes, source hashes, exact generated-source digests and reproducible probe sources.
 Measurements use .NET 9 / Roslyn 5.9 on the host; they are not Unity editor or player build-time claims.
 The analysis capture has known host API gaps, so its unchanged diagnostic set is a parity control,
@@ -69,12 +69,12 @@ not proof that those sources compile against every Unity API.
 
 | Workload                                              | Observed result                                                                                                                                                                                                 |
 | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| All 28 analyzers, 865-source census                   | Median analysis 12.543 → 11.906 seconds; all 250 diagnostics retain the same digest. Three fresh processes per variant in ABBAAB order.                                                                         |
+| All 28 analyzers, 865-source census                   | Final rerun median analysis 12.599 → 10.327 seconds; all 250 diagnostics retain the same digest. Three fresh processes per variant in ABBAAB order.                                                             |
 | 100,000 diagnostic-catalog reads per analyzer         | Exactly 91,200,000 fewer allocated bytes per complete sweep; both variants retain the same 176-byte probe residual. Separate positive-control-backed policy tests measure zero getter allocations after warmup. |
 | Audit membership, up to 16,384 sources / 512 subjects | Largest controls take about 1–3% of the former time. All measured cells stay within a 1.05 ratio. The hash path uses more temporary bytes for large slash-only subject sets; see the raw data.                  |
 | WProto ordering, 512-contract chain                   | About 0.009 of the prior expression's time, with stable ordering. Shallow ordering stays close to the original path.                                                                                            |
-| Odin generation, 16 / 64 / 256 types                  | Warm ratios 0.542 / 0.570 / 0.526, with identical emitted text.                                                                                                                                                 |
-| WProto generation, 16 / 64 / 256 contracts            | Warm ratios 1.055 / 0.979 / 0.935. The small control regresses about 0.37 ms warm and 9.7% on first execution; this tradeoff remains explicit.                                                                  |
+| Odin generation, 16 / 64 / 256 types                  | Supported enum-key dictionaries: warm ratios 0.565 / 0.527 / 0.725, with identical fields, edits and accessors.                                                                                                 |
+| WProto generation, 16 / 64 / 256 contracts            | Rerun warm ratios 0.978 / 0.944 / 0.969; first-execution ratios 1.081 / 1.130 / 0.885. Earlier small-control regressions remain in the data.                                                                    |
 | Rejected enum name checks, 256 enums                  | About 5.5% slower warm and 31.8% slower on first execution. The original implementation and DLL are retained.                                                                                                   |
 
 Generation captures warm each corpus for at least 1.5 seconds before seven observations in each of
@@ -83,7 +83,21 @@ measure an entire build. Shared semantic binding can move between analyzer telem
 per-rule timing reductions must not be read as whole-compiler savings. Earlier analysis traces that
 overlap owned builds are retained locally and excluded from these results.
 
-Correctness qualification passes 1,357 analyzer and 2,258 WProto/Odin cases, plus 70 enum cases with
+The rerun checks every measured result's diagnostics, tree count and sorted source digest after
+stopping the timer and allocation counter. Odin additionally requires each owner, its supported
+enum-key dictionary field, rewrite edits, and capture/restore accessors. The earlier int-key Odin
+corpus did not exercise that path; its observations remain explicitly labeled as under-covered.
+Earlier generation rounds checked counts alone and remain labeled as historical observations.
+
+The earlier analyzer median ratio was 0.949; the first review rerun observed 0.749 and the final conversion-guard rerun observes 0.820. All three
+captures remain in the data. The unchanged enum implementation also varies up to 9.8% warm and
+21.3% on first execution in the rerun. These controls expose host variation; small ratios are not
+proof of a causal improvement. Earlier WProto small-control regressions of 0.37 ms warm and 9.7%
+on first execution remain disclosed alongside the rerun's first-execution regressions. One SDK
+generated assembly-info revision changed before the rerun; its old and current hashes are recorded,
+and both payloads used the same newly frozen 865-source census.
+
+Correctness qualification passes 1,366 analyzer and 2,258 WProto/Odin cases, plus 70 enum cases with
 one existing unsupported-boolean skip. Eight ordering controls cover both path boundaries, deep
 chains, branching, reversed discovery order and preservation of the input list. Native Unity
 qualification passes 25 profile and 57 analyzer-policy cases with clean raw exits and stable input
@@ -502,7 +516,7 @@ branch, or after an early return that bypasses it, does not make a nested call r
 bodies, empty statements and a bare `return;` do not count. There is deliberately **no** allow-list for a body that "only logs afterwards":
 moving one line is cheaper than a suppression, and an exception list reads as permission.
 
-WUH009 also follows a bare rethrow into an enclosing catch and its normal continuation. A sibling catch cannot handle a rethrow from another handler in the same try statement.
+WUH009 also follows a bare rethrow into an enclosing catch and its normal continuation, including exceptional dispatch after a base call inside `finally`. Provably unrelated catch types are excluded; unknown compatibility remains conservative. A catch that consumes the exception before the `finally` does not dispatch it outside that statement. A sibling catch cannot handle a rethrow from another handler in the same try statement.
 
 The message quotes the `base` call exactly as it was written, arguments included, rather than
 reconstructing a parameterless one.

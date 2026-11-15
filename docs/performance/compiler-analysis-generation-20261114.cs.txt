@@ -136,14 +136,14 @@ internal static class Program
                 )
                     Add("Runtime/Core/Serialization/OdinMigration/" + name + ".cs");
                 Add("Runtime/Core/Helper/ReferenceIdentityComparer.cs");
-                source.Append("namespace Cases {");
+                source.Append("namespace Cases { public enum Key : int { First, Second }");
                 for (int i = 0; i < count; i++)
                 {
                     source
                         .Append("public partial class O")
                         .Append(i)
                         .Append(
-                            " : UnityEngine.ScriptableObject {[Sirenix.Serialization.OdinSerialize] private System.Collections.Generic.Dictionary<int,System.Collections.Generic.List<UnityEngine.Texture>> Values = new();"
+                            " : UnityEngine.ScriptableObject {[Sirenix.Serialization.OdinSerialize] private System.Collections.Generic.Dictionary<Key,System.Collections.Generic.List<UnityEngine.Texture>> Values = new();"
                         );
                     for (int j = 0; j < 10; j++)
                     {
@@ -181,14 +181,54 @@ internal static class Program
             foreach (var d in expected.Diagnostics)
                 if (d.Severity == DiagnosticSeverity.Error)
                     throw new InvalidOperationException(d.ToString());
-            var output = new List<string>();
-            foreach (var result in expected.Results)
-            foreach (var item in result.GeneratedSources)
-                output.Add(item.HintName + "\n" + item.SourceText.ToString());
-            output.Sort(StringComparer.Ordinal);
-            string digest = Convert.ToHexString(
-                SHA256.HashData(Encoding.UTF8.GetBytes(string.Join("\n", output)))
-            );
+            string ValidateOutput(GeneratorDriverRunResult result)
+            {
+                foreach (var diagnostic in result.Diagnostics)
+                    if (diagnostic.Severity == DiagnosticSeverity.Error)
+                        throw new InvalidOperationException(diagnostic.ToString());
+                var output = new List<string>();
+                foreach (var generated in result.Results)
+                foreach (var item in generated.GeneratedSources)
+                    output.Add(item.HintName + "\n" + item.SourceText.ToString());
+                output.Sort(StringComparer.Ordinal);
+                string combined = string.Join("\n", output);
+                if (family == "odin")
+                {
+                    for (int index = 0; index < count; index++)
+                    {
+                        string owner = "global::Cases.O" + index;
+                        if (
+                            !combined.Contains("typeof(" + owner + ")", StringComparison.Ordinal)
+                            || !combined.Contains(
+                                owner + ".CreateOdinMigrationCaptureValues",
+                                StringComparison.Ordinal
+                            )
+                            || !combined.Contains(
+                                owner + ".CreateOdinMigrationRestoreValues",
+                                StringComparison.Ordinal
+                            )
+                        )
+                            throw new InvalidOperationException("Missing Odin owner " + owner);
+                    }
+                    if (
+                        combined
+                            .Split("OdinMigrationCompiledField(\"Values\"", StringSplitOptions.None)
+                            .Length - 1
+                            != count
+                        || combined.Split(".@Values", StringSplitOptions.None).Length - 1
+                            != count * 2
+                        || combined
+                            .Split("OdinMigrationCompiledSourceEdit(", StringSplitOptions.None)
+                            .Length - 1
+                            < count
+                    )
+                        throw new InvalidOperationException(
+                            "Odin dictionary edits/accessors were not exercised"
+                        );
+                }
+                return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(combined)));
+            }
+            string digest = ValidateOutput(expected);
             var warmTimer = Stopwatch.StartNew();
             int warmIterations = 0;
             do
@@ -205,6 +245,10 @@ internal static class Program
                 long bytes = GC.GetTotalAllocatedBytes(true) - begin;
                 if (result.GeneratedTrees.Length != expected.GeneratedTrees.Length)
                     throw new InvalidOperationException("Lost outputs");
+                if (!string.Equals(ValidateOutput(result), digest, StringComparison.Ordinal))
+                    throw new InvalidOperationException(
+                        "Generated content changed between measured runs"
+                    );
                 Console.WriteLine(
                     JsonSerializer.Serialize(
                         new
