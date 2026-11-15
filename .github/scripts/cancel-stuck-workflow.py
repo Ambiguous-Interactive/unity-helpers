@@ -9,7 +9,9 @@ import subprocess
 from pathlib import Path
 from typing import cast
 
-OPERATOR_WORKFLOWS = frozenset({"release.yml", "unity-tests.yml", "unity-benchmarks.yml"})
+OPERATOR_WORKFLOWS = frozenset(
+    {"release.yml", "unity-tests.yml", "unity-benchmarks.yml", "unity-compatibility.yml"}
+)
 IDENTITY_FIELDS = ("id", "run_attempt", "head_sha", "path", "event", "workflow_id")
 
 

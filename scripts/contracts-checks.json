@@ -75,7 +75,13 @@
     "id": "watchdog-cancellation",
     "name": "Watchdog cancellation and scheduling controls",
     "run": "npm run test:watchdog-cancellation",
-    "inputs": ["@tooling"]
+    "inputs": [
+      "@tooling",
+      ".github/workflows/*.yml",
+      ".github/workflows/*.yaml",
+      ".github/scripts/cancel-stuck-workflow.py",
+      "scripts/tests/test-watchdog-cancellation.py"
+    ]
   },
   {
     "id": "native-build-readback",
@@ -616,7 +622,11 @@
       "@tooling",
       "scripts/unity/resolve-test-matrix.js",
       ".github/workflows/unity-tests.yml",
-      "scripts/tests/test-unity-grouped-modes.js"
+      "scripts/tests/test-unity-grouped-modes.js",
+      "scripts/tests/test-unity-compatibility.js",
+      "scripts/unity/generate-compatibility-workflow.js",
+      ".github/workflows/unity-compatibility.yml",
+      "scripts/release-tools/require-native-unity-export.js"
     ]
   },
   {

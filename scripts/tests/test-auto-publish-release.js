@@ -39,7 +39,7 @@ const pull = {
 const runs = requiredWorkflows.map((file, index) => ({
   id: index + 1,
   path: `.github/workflows/${file}`,
-  event: "push",
+  event: file === "unity-compatibility.yml" ? "workflow_dispatch" : "push",
   head_sha: sha,
   head_branch: "main",
   repository: { full_name: repository },
@@ -380,14 +380,24 @@ async function main() {
       fs.readFileSync(path.join(root, ".github/workflows", file), "utf8")
     );
     if (!validation.on?.push) continue;
-    assert.ok(validation.concurrency.group.includes("github.event_name == 'push' && github.sha"));
+    assert.ok(
+      validation.concurrency.group.includes(
+        file === "unity-compatibility.yml"
+          ? "github.sha"
+          : "github.event_name == 'push' && github.sha"
+      )
+    );
     assert.equal(
       validation.concurrency["cancel-in-progress"],
-      file === "unity-tests.yml" ? true : "${{ github.event_name == 'pull_request' }}"
+      ["unity-tests.yml", "unity-compatibility.yml"].includes(file)
+        ? true
+        : "${{ github.event_name == 'pull_request' }}"
     );
-    if (file === "unity-tests.yml") {
+    if (["unity-tests.yml", "unity-compatibility.yml"].includes(file)) {
       const access = validation.jobs["runner-preflight"].concurrency;
-      assert.ok(access.group.includes("github.event_name == 'push' && github.sha"));
+      if (file === "unity-compatibility.yml")
+        assert.equal(access.group, "${{ github.workflow }}-runner-preflight-${{ github.sha }}");
+      else assert.ok(access.group.includes("github.event_name == 'push' && github.sha"));
       assert.equal(access["cancel-in-progress"], true);
     }
   }

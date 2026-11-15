@@ -6,7 +6,7 @@ const { execFileSync } = require("node:child_process");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-test("PR native tiers preserve full compatibility for risky or unknown changes", () => {
+test("PR native tiers keep all changes on the latest supported 6.x editor", () => {
   const { resolvePullRequestMatrix } = require("../unity/resolve-test-matrix");
   const versions = ["2021.3.45f1", "6000.6.0f1"];
   const latest = resolvePullRequestMatrix(versions, ["Runtime/Utils/WallMath.cs"]);
@@ -16,10 +16,10 @@ test("PR native tiers preserve full compatibility for risky or unknown changes",
   assert.equal(latest.coverage, "latest-editors");
   for (const files of [["new.config"], ["Runtime/Core/Serialization/Serializer.cs"], []]) {
     const full = resolvePullRequestMatrix(versions, files);
-    assert.deepEqual(full["unity-versions"], versions);
-    assert.deepEqual(full["unity-exclusions"], []);
+    assert.deepEqual(full["unity-versions"], [versions.at(-1)]);
+    assert.deepEqual(full["unity-exclusions"], [{ "unity-version": versions[0] }]);
     assert.ok(full["test-modes"].includes("standalone"));
-    assert.equal(full.coverage, "full");
+    assert.equal(full.coverage, "latest-full-modes");
   }
   const documentation = resolvePullRequestMatrix(versions, ["docs/guide.md"]);
   assert.deepEqual(documentation["unity-versions"], [versions.at(-1)]);
@@ -153,9 +153,9 @@ test("native compatibility risk does not force every compiler profile during sou
 });
 test("tooling iteration does not repeat PR aggregates", () => {
   const plan = select(["scripts/agent-check.js"], "iterate");
-  assert.equal(plan.commands.length, 2);
-  assert.ok(plan.commands[0].includes("scripts/agent-preflight.ps1"));
-  assert.deepEqual(plan.commands[1], [
+  assert.equal(plan.commands.length, 1);
+  assert.ok(!plan.commands.some((command) => command.includes("scripts/agent-preflight.ps1")));
+  assert.deepEqual(plan.commands[0], [
     "node",
     "scripts/run-contract-tests.js",
     "--only",
@@ -257,6 +257,70 @@ test("workflow edits include both resolver consumers and matrix wiring", () => {
   const controls = plan.commands.find((command) => command[1] === "scripts/run-contract-tests.js");
   assert.deepEqual(controls.slice(2), [
     "--only",
-    "unity-workflow-matrix-contract,unity-acceptance-workflow,unity-grouped-modes"
+    "watchdog-cancellation,unity-workflow-matrix-contract,unity-acceptance-workflow,unity-grouped-modes"
   ]);
+});
+
+test("fixture edits scope compilation while shared, production and deleted inputs retain broad checks", () => {
+  const runtime = "Tests/Runtime/Helper/WallMathDistributionTests.cs";
+  const editor = "Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs";
+  for (const file of [runtime, editor]) {
+    const plan = select([file], "iterate");
+    const compile = plan.commands.find((command) => command.includes("typecheck:iterate"));
+    assert.deepEqual(compile.slice(-2), ["--files", file]);
+    assert.ok(!plan.commands.some((command) => command.includes("scripts/agent-preflight.ps1")));
+    assert.ok(
+      select([file], "pr").commands.some((command) =>
+        command.includes("scripts/agent-preflight.ps1")
+      )
+    );
+  }
+  for (const files of [
+    [runtime, "Runtime/Core/Helper/WallMath.cs"],
+    [runtime, "Tests/Core/Shared.cs"],
+    ["Tests/Runtime/DeletedFixture.cs"]
+  ]) {
+    const compiles = select(files, "iterate").commands.filter((command) =>
+      command.includes("typecheck:iterate")
+    );
+    assert.ok(compiles.length > 0);
+    assert.ok(compiles.every((command) => !command.includes("--files")));
+  }
+  const shared = select(["Tests/Core/Shared.cs"], "iterate");
+  assert.ok(shared.commands.some((command) => command.includes("tests")));
+  assert.ok(shared.commands.some((command) => command.includes("editor-tests")));
+  assert.ok(
+    select(["scripts/unowned-new-tool.js"], "iterate").commands.some((command) =>
+      command.includes("scripts/agent-preflight.ps1")
+    )
+  );
+});
+
+test("new workflow definitions select operator protection controls before CI", () => {
+  for (const extension of ["yml", "yaml"]) {
+    const plan = select([`.github/workflows/new-licensed-workflow.${extension}`], "iterate");
+    assert.ok(
+      plan.commands.some(
+        (command) =>
+          command.includes("--only") && command.at(-1).split(",").includes("watchdog-cancellation")
+      )
+    );
+  }
+});
+
+test("opposite-scope metadata retains a broad compile without an empty fixture argument", () => {
+  const runtime = "Tests/Runtime/Helper/WallMathDistributionTests.cs";
+  const editor = "Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs";
+  for (const [source, metadata, narrow, broad] of [
+    [runtime, `${editor}.meta`, "tests", "editor-tests"],
+    [editor, `${runtime}.meta`, "editor-tests", "tests"]
+  ]) {
+    const commands = select([source, metadata], "iterate").commands;
+    assert.deepEqual(commands.find((command) => command.includes(narrow)).slice(-2), [
+      "--files",
+      source
+    ]);
+    assert.ok(!commands.find((command) => command.includes(broad)).includes("--files"));
+    assert.ok(commands.every((command) => command.at(-1) !== "--files"));
+  }
 });

@@ -1,5 +1,5 @@
 {
-  "_comment": "Canonical Unity version source of truth. `all` is the CI test matrix; its last entry is the benchmark latest. `release` pins release/publish flows. `maintenance` adds downstream project editors to default runner maintenance without expanding CI.",
+  "_comment": "Canonical Unity version source of truth. `all` lists supported editors; its last entry is the blocking latest 6.x editor and benchmark latest. Earlier entries run asynchronously in Unity Compatibility. `release` pins release/publish flows. `maintenance` adds downstream project editors to default runner maintenance without expanding CI.",
   "all": ["2021.3.45f1", "2022.3.45f1", "6000.5.2f1", "6000.6.0f1"],
   "maintenance": ["6000.6.7f1"],
   "release": "6000.6.0f1"

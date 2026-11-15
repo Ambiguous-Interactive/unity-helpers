@@ -58,19 +58,42 @@ function resolveTestMatrix(
   };
 }
 
+function latestVersion(versions) {
+  resolveTestMatrix(versions);
+  const latest = versions[versions.length - 1];
+  if (!/^6000\.\d+\.\d+f\d+$/.test(latest))
+    throw new Error("The blocking Unity version must be the final supported 6.x release.");
+  return latest;
+}
+
+function resolveCompatibilityMatrix(versions) {
+  const latest = latestVersion(versions);
+  const older = versions.filter((version) => version !== latest);
+  if (!older.length) throw new Error("Compatibility coverage requires at least one older editor.");
+  return {
+    ...resolveTestMatrix(older),
+    "unity-exclusions": [{ "unity-version": latest }]
+  };
+}
+
 function resolvePullRequestMatrix(versions, files) {
-  const full = resolveTestMatrix(versions);
+  const latest = latestVersion(versions);
+  const full = resolveTestMatrix(versions, latest);
   const proposal = files.length ? select(files, "pr").unity : "full";
   if (proposal === "full")
-    return { ...full, coverage: "full", reason: "compatibility-sensitive or unknown input" };
+    return {
+      ...full,
+      coverage: "latest-full-modes",
+      reason: "compatibility-sensitive or unknown input; older editors run asynchronously"
+    };
   return {
-    ...resolveTestMatrix(versions, versions[versions.length - 1]),
+    ...resolveTestMatrix(versions, latest),
     "test-modes": ["editmode", "playmode"],
     coverage: "latest-editors",
     reason:
       proposal === "none"
         ? "documentation retains latest editor validation pending conditional enrollment"
-        : "ordinary C#; latest editors, full compatibility on main and default dispatch"
+        : "ordinary C#; latest editors, older editors run asynchronously"
   };
 }
 
@@ -85,7 +108,11 @@ function main() {
     process.env.INPUT_TEST_MODE || "all",
     process.env.INPUT_ACCEPTANCE || "none"
   );
-  if (process.env.GITHUB_EVENT_NAME === "pull_request") {
+  if (process.env.INPUT_UNITY_COVERAGE === "compatibility") {
+    matrix = resolveCompatibilityMatrix(versions);
+  } else if (process.env.GITHUB_EVENT_NAME === "push") {
+    matrix = resolveTestMatrix(versions, latestVersion(versions));
+  } else if (process.env.GITHUB_EVENT_NAME === "pull_request") {
     if (!/^[0-9a-f]{40}$/.test(process.env.AGENT_CHECK_BASE || ""))
       throw new Error("PR matrix selection requires the immutable PR base SHA");
     matrix = resolvePullRequestMatrix(
@@ -105,7 +132,7 @@ function main() {
       process.env.GITHUB_STEP_SUMMARY,
       `### Selected Unity coverage\n\n${JSON.stringify(matrix)}\n\n` +
         "SINGLE_THREADED follows the selected modes. Package export smoke also runs. " +
-        "Unselected versions and modes are not validated by this run. Main retains the full matrix.\n",
+        "Unselected versions and modes are not validated by this run. Older editors run in Unity Compatibility; default manual dispatch retains full qualification.\n",
       "utf8"
     );
 }
@@ -119,4 +146,10 @@ if (require.main === module) {
   }
 }
 
-module.exports = { TEST_MODES, resolveTestMatrix, resolvePullRequestMatrix };
+module.exports = {
+  TEST_MODES,
+  resolveTestMatrix,
+  resolvePullRequestMatrix,
+  latestVersion,
+  resolveCompatibilityMatrix
+};

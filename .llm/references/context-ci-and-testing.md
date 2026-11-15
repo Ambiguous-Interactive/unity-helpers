@@ -2,9 +2,12 @@
 
 ## Batch changes before you push
 
-Every push starts CI. Ordinary PRs select the latest editor in EditMode and PlayMode;
-compatibility-sensitive or unknown inputs select the full supported matrix, including IL2CPP.
-Main, releases, and default manual runs retain full qualification. Local iteration checks do not
+Every push starts CI. All PRs and main pushes block only on the configured latest 6.x editor.
+Ordinary PRs select EditMode and PlayMode; compatibility-sensitive or unknown inputs add IL2CPP.
+Main runs all modes on that latest editor. A separate workflow runs older supported editors asynchronously on each main commit,
+one version at a time on the background runner, under
+`Unity Compatibility Success`. Release publication waits for both exact-source results. Default
+manual Unity Tests dispatch retains full qualification. Local iteration checks do not
 run native tests. See [task validation](../../docs/performance/agent-iteration.md) for coverage rules.
 Batch verified changes before pushing: a new push supersedes the prior native run and spends
 runner and review capacity.

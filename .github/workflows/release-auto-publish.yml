@@ -4,6 +4,7 @@ on:
   workflow_run:
     workflows:
       - Unity Tests
+      - Unity Compatibility
       - Local Gates
       - Repo Lint
       - WallstopProto Generator
@@ -27,7 +28,10 @@ concurrency:
 
 jobs:
   publish:
-    if: github.event.repository.fork == false && github.event.workflow_run.event == 'push' && contains(fromJSON('["success", "skipped"]'), github.event.workflow_run.conclusion)
+    if: >-
+      github.event.repository.fork == false && (github.event.workflow_run.event == 'push' || (github.event.workflow_run.event == 'workflow_dispatch' &&
+      github.event.workflow_run.path == '.github/workflows/unity-compatibility.yml')) && contains(fromJSON('["success", "skipped"]'),
+      github.event.workflow_run.conclusion)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
