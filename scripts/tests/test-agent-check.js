@@ -99,6 +99,31 @@ test("full tier always includes compatibility", () =>
   assert.equal(select([], "full").unity, "full"));
 test("iteration selects compiler scope", () =>
   assert.ok(select(["Editor/Thing.cs"], "iterate").commands.some((c) => c.includes("editor"))));
+test("native compatibility risk does not force every compiler profile during source iteration", () => {
+  for (const file of [
+    "Runtime/Core/Serialization/Serializer.cs",
+    "Runtime/Core/Threading/Worker.cs"
+  ]) {
+    const plan = select([file], "iterate");
+    assert.equal(plan.unity, "full");
+    assert.ok(
+      plan.commands.some(
+        (command) => command.includes("typecheck:iterate") && command.includes("runtime")
+      )
+    );
+    assert.ok(!plan.commands.some((command) => command.includes("typecheck:unity")));
+    assert.ok(select([file], "pr").commands.some((command) => command.includes("typecheck:unity")));
+  }
+  for (const files of [
+    ["Generator~/Generator.cs"],
+    ["Runtime/Core/Thing.cs", "Runtime/Assembly.asmdef"],
+    ["Runtime/Analyzers/Analyzer.dll"]
+  ]) {
+    assert.ok(
+      select(files, "iterate").commands.some((command) => command.includes("typecheck:unity"))
+    );
+  }
+});
 test("tooling iteration does not repeat PR aggregates", () => {
   const plan = select(["scripts/agent-check.js"], "iterate");
   assert.equal(plan.commands.length, 1);

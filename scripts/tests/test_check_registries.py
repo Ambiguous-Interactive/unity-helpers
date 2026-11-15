@@ -187,6 +187,17 @@ def test_expensive_tooling_controls_follow_their_implementation_inputs(
         assert identifier in {check.id for check in affected_checks(checks, [file])}
 
 
+@pytest.mark.parametrize(
+    "file", [".github/workflows/build-publish-devcontainer.yml", ".devcontainer/devcontainer.json"]
+)
+def test_developer_configuration_inputs_keep_their_ci_gate(file: str) -> None:
+    from check_registries import affected_checks
+
+    assert "devcontainer-config" in {
+        check.id for check in affected_checks(load_checks("lint"), [file])
+    }
+
+
 def test_affected_selection_rejects_missing_dependencies_and_cycles(
     tmp_path: Path,
 ) -> None:

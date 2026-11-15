@@ -227,6 +227,10 @@ try {
   Write-TestResult -TestName 'this repository passes through pwsh -File' `
     -Passed ($realResult.ExitCode -eq 0) -Message "exit $($realResult.ExitCode): $($realResult.Output)"
   Test-Accepts -TestName 'a verbatim copy passes' -Root (New-ConfigFixture -Name 'baseline')
+  $legacyRegistry = New-ConfigFixture -Name 'legacy-lint-registry'
+  Edit-FixtureFile -Root $legacyRegistry -RelativePath '.github/workflows/repo-lint.yml' `
+    -From 'python scripts/check_registries.py lint --direct --ci' -To 'python scripts/check_registries.py lint --direct'
+  Test-Accepts -TestName 'the legacy lint registry entry point also passes' -Root $legacyRegistry
 
   foreach ($invalidInvocation in @(
     @{ Name = 'contracts-registry'; Replacement = 'python scripts/check_registries.py contracts --direct' },

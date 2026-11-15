@@ -177,7 +177,11 @@ function select(files, tier) {
           else if (file.startsWith("Editor/")) scopes.add("editor");
           else if (file.startsWith("Runtime/")) scopes.add("runtime");
         }
-        if (!scopes.size || unity === "full") commands.push(npm("typecheck:unity"));
+        const sourceOnly = files.every((file) =>
+          /^(Runtime|Editor|Tests)\/.*\.cs(?:\.meta)?$/.test(file)
+        );
+        if (!scopes.size || (unity === "full" && !sourceOnly))
+          commands.push(npm("typecheck:unity"));
         else
           for (const scope of scopes)
             commands.push(["npm", "run", "typecheck:iterate", "--", scope]);

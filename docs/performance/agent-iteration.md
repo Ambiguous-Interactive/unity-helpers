@@ -55,6 +55,9 @@ Explicit files replace discovery. Missing revisions fail rather than silently na
 
 Iteration runs changed-file preflight and the existing compiler iteration scopes. Run the task's
 focused failing/passing witness separately; iteration does not repeat the PR contract aggregates.
+Serialization and threading source edits also use focused compiler iteration; their PR still
+requires full compiler and native compatibility checks. Generator, assembly, and analyzer inputs
+retain compiler escalation.
 PR checks enable normal compiler analysis. Compatibility-sensitive and unknown inputs propose full native coverage.
 Full means all configured local lint, contract, source compiler, and compiler-control commands.
 It does not mean Unity ran: native fixture validation and the hosted Unity matrix remain required.
