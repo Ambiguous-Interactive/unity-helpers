@@ -1039,7 +1039,7 @@
     "generation": "Three fresh baseline and exact accepted payload processes in ABBAAB order; 16/64/256-type corpora warm at least 1.5 seconds before seven timed runs. Every measured result checks diagnostics, count and complete sorted source digest outside the timed/allocation interval. Odin uses Int32-backed enum keys and independently requires every owner, dictionary field, rewrite edit and capture/restore accessor. Historical count-only and unsupported-key observations remain labeled in the CSV and legacy summaries. First-execution observations are not whole-build timings.",
     "ordering": "Three fresh processes; seven calibrated alternating before/after rounds, each batch at least 20ms. Baseline is the prior stable LINQ expression, compiled in the probe against the same symbol APIs. Deep chains use cached buckets; shallow hierarchies retain the stable sort after the unconditional-bucket caller regression.",
     "admission": "Three fresh processes; seven calibrated alternating rounds at four source sizes and two subject sizes, with slash/backslash forms. Baseline is the former nested LINQ predicate; candidate links the actual audit implementation. Required suffix anchors are fixed at nine. Large-set membership is linear in sources plus subjects, while small sets have a bounded linear scan.",
-    "scope": "Timings are host observations, not Unity editor/player build-time guarantees. Shared semantic binding can move between analyzer telemetry callbacks. Warm and first-execution results differ; small accepted WProto controls regress and are disclosed. Broad issue #1200 remains open. The unchanged enum control varies up to 9.8% warm and 21.3% on first execution in this rerun, so small ratios should not be interpreted as causal improvements. The earlier analysis ratio 0.949 is preserved alongside the first review rerun ratio 0.749; the final conversion-guard ratio is 0.820.",
+    "scope": "Timings are host observations, not Unity editor/player build-time guarantees. Shared semantic binding can move between analyzer telemetry callbacks. Warm and first-execution results differ; small accepted WProto controls regress and are disclosed. Broad issue #1200 remains open. The unchanged enum control varies up to 9.8% warm and 21.3% on first execution in this rerun, so small ratios should not be interpreted as causal improvements. The earlier analysis ratio 0.949 is preserved alongside the first review rerun ratio 0.749; the final conversion-guard ratio is 0.820. Timings describe timedPayloadCommit; later exceptional-dispatch fixes have separate postMeasurementQualification output/allocation-counter parity, not new timing measurements.",
     "sources": "Probe sources are formatted standalone reproductions; project XML preserves the captured configuration. The controls probe separately exercises foreign subjects while retaining every required anchor, small/large branches, case sensitivity, duplicate inputs and separator forms."
   },
   "rejected": {
@@ -1048,7 +1048,7 @@
     "unconditionalAuditHashing": "Earlier nine-subject/512-source control regressed 27.7%; the accepted implementation uses a bounded small-set path."
   },
   "functional": {
-    "analyzersPassed": 1366,
+    "analyzersPassed": 1377,
     "protoOdinPassed": 2258,
     "enumPassed": 70,
     "enumExistingSkip": 1,
@@ -1094,7 +1094,8 @@
     "Generate SDK audit source/reference/symbol manifests with the editor source check; compare all recorded source hashes before reusing the analysis census.",
     "For the generation probe, write the captured Odin stub content to its recorded path. Runtime attribute and migration sources are read from the repository.",
     "Use separate output directories and fresh processes for each payload variant. No owned build or native test may overlap a timing capture.",
-    "The controls probe invokes the real audit phase and its original expression over deliberately valid and invalid small/large corpora."
+    "The controls probe invokes the real audit phase and its original expression over deliberately valid and invalid small/large corpora.",
+    "Restore generatedSourceSnapshots content as exact UTF-8 bytes before checking the full source census; these SDK-generated metadata inputs otherwise change with the checkout build revision."
   ],
   "legacySourceCensusOverrides": {
     "Generator~/WallstopStudios.UnityHelpers.EditorCheck/obj/Debug/netstandard2.1/WallstopStudios.UnityHelpers.EditorCheck.AssemblyInfo.cs": "685ccebb3aa715f0d06c775d9bb763bc2965398a80b8f49e4b304a39fa6a192a"
@@ -1269,5 +1270,36 @@
     "WallstopStudios.UnityHelpers.OdinMigration.Generator.dll": "88783410229556ae7e26679a8b78524f1c38b21c424b71e660944a573da56d9f",
     "WallstopStudios.UnityHelpers.Proto.Generator.dll": "ec54efa13a0105ad041509b182003ee7054fadf5fcec9cf148fc1fc14bec8c86"
   },
-  "reviewRerunDate": "2026-11-15"
+  "reviewRerunDate": "2026-11-15",
+  "timedPayloadCommit": "3b733e5de8ee316cbf4f00f30bd1c8736550589d",
+  "postMeasurementQualification": {
+    "date": "2026-11-15",
+    "scope": "Subsequent exceptional-dispatch correctness fixes; no timing claim for this later payload. Timings above remain observations of timedPayloadCommit.",
+    "payloadSha256": {
+      "WallstopStudios.UnityHelpers.Analyzers.dll": "124b9a88383a86a9e1f071f126852298247835f8fdebdccbb5ed3fa424857357",
+      "WallstopStudios.UnityHelpers.Enum.Generator.dll": "1ea0a74724edb4e5c05864224b392b74f837c342af5a24d38e275cc01642ffd0",
+      "WallstopStudios.UnityHelpers.OdinMigration.Generator.dll": "88783410229556ae7e26679a8b78524f1c38b21c424b71e660944a573da56d9f",
+      "WallstopStudios.UnityHelpers.Proto.Generator.dll": "ec54efa13a0105ad041509b182003ee7054fadf5fcec9cf148fc1fc14bec8c86"
+    },
+    "analyzersPassed": 1377,
+    "teardownCasesPassed": 68,
+    "sourceCensusUnchanged": true,
+    "diagnostics": 250,
+    "diagnosticDigest": "BC09FA51172F0C4D2808B48C5349DB1E434BEF03CA28FD1A1B5A14EFC5F2BC51",
+    "descriptorProbeResidualBytes": 176,
+    "positiveControlBytes": 1048,
+    "floorRoslynAssemblyVersion": "3.8.0.0",
+    "floorTeardownCasesPassed": 68,
+    "floorCompilerIdentityCasesPassed": 1
+  },
+  "generatedSourceSnapshots": {
+    "Generator~/WallstopStudios.UnityHelpers.EditorCheck/obj/Debug/netstandard2.1/.NETStandard,Version=v2.1.AssemblyAttributes.cs": {
+      "contentUtf8": "// <autogenerated />\r\nusing System;\r\nusing System.Reflection;\r\n[assembly: global::System.Runtime.Versioning.TargetFrameworkAttribute(\".NETStandard,Version=v2.1\", FrameworkDisplayName = \".NET Standard 2.1\")]\n",
+      "sha256": "2709798141b676ec191594806a723869b9925fbe61ab5ec7feaf6285028ba812"
+    },
+    "Generator~/WallstopStudios.UnityHelpers.EditorCheck/obj/Debug/netstandard2.1/WallstopStudios.UnityHelpers.EditorCheck.AssemblyInfo.cs": {
+      "contentUtf8": "//------------------------------------------------------------------------------\n// <auto-generated>\n//     This code was generated by a tool.\n//\n//     Changes to this file may cause incorrect behavior and will be lost if\n//     the code is regenerated.\n// </auto-generated>\n//------------------------------------------------------------------------------\n\nusing System;\nusing System.Reflection;\n\n[assembly: System.Reflection.AssemblyCompanyAttribute(\"WallstopStudios.UnityHelpers.EditorCheck\")]\n[assembly: System.Reflection.AssemblyConfigurationAttribute(\"Debug\")]\n[assembly: System.Reflection.AssemblyFileVersionAttribute(\"1.0.0.0\")]\n[assembly: System.Reflection.AssemblyInformationalVersionAttribute(\"1.0.0+dd0893b9a35eb15e37f33a7500c8a867882b5e11\")]\n[assembly: System.Reflection.AssemblyProductAttribute(\"WallstopStudios.UnityHelpers.EditorCheck\")]\n[assembly: System.Reflection.AssemblyTitleAttribute(\"WallstopStudios.UnityHelpers.EditorCheck\")]\n[assembly: System.Reflection.AssemblyVersionAttribute(\"1.0.0.0\")]\n\n// Generated by the MSBuild WriteCodeFragment class.\n\n",
+      "sha256": "457b38e19bcb121fa16c330053b12dabe88112a0789c8ecc705236fcc6c96e1b"
+    }
+  }
 }

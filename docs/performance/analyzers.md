@@ -97,7 +97,13 @@ on first execution remain disclosed alongside the rerun's first-execution regres
 generated assembly-info revision changed before the rerun; its old and current hashes are recorded,
 and both payloads used the same newly frozen 865-source census.
 
-Correctness qualification passes 1,366 analyzer and 2,258 WProto/Odin cases, plus 70 enum cases with
+The timed payload snapshot is commit `3b733e5d`. Subsequent exceptional-dispatch corrections
+retain all 250 diagnostic identities on the same frozen corpus and the positive-backed diagnostic
+array allocation result; the timing comparison applies to the earlier snapshot. The JSON records their exact
+payload hashes and the generated SDK source snapshots needed to restore the census. All 68 teardown
+controls also pass on Roslyn 3.8.0.0, with a separate loaded-compiler identity control.
+
+Correctness qualification passes 1,377 analyzer and 2,258 WProto/Odin cases, plus 70 enum cases with
 one existing unsupported-boolean skip. Eight ordering controls cover both path boundaries, deep
 chains, branching, reversed discovery order and preservation of the input list. Native Unity
 qualification passes 25 profile and 57 analyzer-policy cases with clean raw exits and stable input
@@ -516,7 +522,7 @@ branch, or after an early return that bypasses it, does not make a nested call r
 bodies, empty statements and a bare `return;` do not count. There is deliberately **no** allow-list for a body that "only logs afterwards":
 moving one line is cheaper than a suppression, and an exception list reads as permission.
 
-WUH009 also follows a bare rethrow into an enclosing catch and its normal continuation, including exceptional dispatch after a base call inside `finally`. Provably unrelated catch types are excluded; unknown compatibility remains conservative. A catch that consumes the exception before the `finally` does not dispatch it outside that statement. A sibling catch cannot handle a rethrow from another handler in the same try statement.
+WUH009 also follows a bare rethrow into an enclosing catch and its normal continuation, including exceptional dispatch after a base call inside `finally`. Provably unrelated catch types are excluded; unknown compatibility remains conservative. A catch that consumes the exception before the `finally` does not dispatch it outside that statement. An intervening `finally` without a normal exit replaces the original exception; its replacement is analyzed separately. Outer filters are evaluated before the completed `finally`, so only the selected handler and its continuation count as following work. Null constants dispatch `NullReferenceException`, while nullable or user-code expressions remain conservative. A sibling catch cannot handle a rethrow from another handler in the same try statement.
 
 The message quotes the `base` call exactly as it was written, arguments included, rather than
 reconstructing a parameterless one.

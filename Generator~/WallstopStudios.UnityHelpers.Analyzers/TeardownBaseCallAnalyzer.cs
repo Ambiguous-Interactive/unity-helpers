@@ -310,7 +310,27 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                             {
                                 continue;
                             }
-                            if (QueueDestination(graph.Blocks[handler.FirstBlockOrdinal], pending))
+                            ControlFlowRegion destination = handler;
+                            if (
+                                completedFinally != null
+                                && handler.Kind == ControlFlowRegionKind.FilterAndHandler
+                            )
+                            {
+                                foreach (ControlFlowRegion nested in handler.NestedRegions)
+                                {
+                                    if (nested.Kind == ControlFlowRegionKind.Catch)
+                                    {
+                                        destination = nested;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (
+                                QueueDestination(
+                                    graph.Blocks[destination.FirstBlockOrdinal],
+                                    pending
+                                )
+                            )
                             {
                                 return true;
                             }
@@ -407,18 +427,9 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 )
             )
             {
-                IOperation thrown = branch.Source.BranchValue;
-                while (
-                    thrown is IConversionOperation conversion
-                    && conversion.IsImplicit
-                    && conversion.OperatorMethod == null
-                )
-                {
-                    thrown = conversion.Operand;
-                }
-                ITypeSymbol exceptionType = thrown?.Type ?? RethrownExceptionType(branch.Source);
+                ITypeSymbol exceptionType = ThrownExceptionType(graph, branch);
                 if (
-                    !IsCaughtBeforeFinally(branch.Source, region, exceptionType)
+                    !IsInterceptedBeforeFinally(graph, branch.Source, region, exceptionType)
                     && HasUnwindingCleanup(
                         graph,
                         branch.Source,
@@ -454,7 +465,8 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             return false;
         }
 
-        private static bool IsCaughtBeforeFinally(
+        private static bool IsInterceptedBeforeFinally(
+            ControlFlowGraph graph,
             BasicBlock source,
             ControlFlowRegion completedFinally,
             ITypeSymbol exceptionType
@@ -466,6 +478,31 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 region = region.EnclosingRegion
             )
             {
+                if (region.Kind == ControlFlowRegionKind.Filter)
+                {
+                    return true;
+                }
+                if (region.Kind == ControlFlowRegionKind.TryAndFinally)
+                {
+                    ControlFlowRegion finallyBody = region.NestedRegions[0];
+                    if (
+                        finallyBody.FirstBlockOrdinal <= source.Ordinal
+                        && source.Ordinal <= finallyBody.LastBlockOrdinal
+                    )
+                    {
+                        foreach (ControlFlowRegion nested in region.NestedRegions)
+                        {
+                            if (
+                                nested.Kind == ControlFlowRegionKind.Finally
+                                && !HasNormalFinallyExit(graph, nested)
+                            )
+                            {
+                                return true;
+                            }
+                        }
+                    }
+                    continue;
+                }
                 if (region.Kind != ControlFlowRegionKind.TryAndCatch)
                 {
                     continue;
@@ -508,6 +545,84 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 }
             }
             return false;
+        }
+
+        private static bool HasNormalFinallyExit(ControlFlowGraph graph, ControlFlowRegion region)
+        {
+            for (int index = region.FirstBlockOrdinal; index <= region.LastBlockOrdinal; ++index)
+            {
+                BasicBlock block = graph.Blocks[index];
+                if (
+                    block.IsReachable
+                    && (
+                        IsFinallyExit(block.FallThroughSuccessor, region)
+                        || IsFinallyExit(block.ConditionalSuccessor, region)
+                    )
+                )
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static bool IsFinallyExit(ControlFlowBranch branch, ControlFlowRegion target)
+        {
+            if (
+                branch == null
+                || branch.Semantics != ControlFlowBranchSemantics.StructuredExceptionHandling
+            )
+            {
+                return false;
+            }
+            for (
+                ControlFlowRegion region = branch.Source.EnclosingRegion;
+                region != null;
+                region = region.EnclosingRegion
+            )
+            {
+                if (region.Kind == ControlFlowRegionKind.Filter)
+                {
+                    return false;
+                }
+                if (region.Kind == ControlFlowRegionKind.Finally)
+                {
+                    return region == target;
+                }
+            }
+            return false;
+        }
+
+        private static ITypeSymbol ThrownExceptionType(
+            ControlFlowGraph graph,
+            ControlFlowBranch branch
+        )
+        {
+            if (branch.Semantics == ControlFlowBranchSemantics.Rethrow)
+            {
+                return RethrownExceptionType(branch.Source);
+            }
+            IOperation thrown = branch.Source.BranchValue;
+            while (
+                thrown is IConversionOperation conversion
+                && conversion.IsImplicit
+                && conversion.OperatorMethod == null
+            )
+            {
+                thrown = conversion.Operand;
+            }
+            if (
+                thrown != null
+                && thrown.ConstantValue.HasValue
+                && thrown.ConstantValue.Value == null
+            )
+            {
+                return graph.OriginalOperation.SemanticModel?.Compilation.GetTypeByMetadataName(
+                    "System.NullReferenceException"
+                );
+            }
+            // Other expressions may be null or run user code before yielding the exception.
+            return thrown is IObjectCreationOperation ? thrown.Type : null;
         }
 
         private static ITypeSymbol RethrownExceptionType(BasicBlock source)

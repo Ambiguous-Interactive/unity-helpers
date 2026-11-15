@@ -400,6 +400,34 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
             "a user conversion determines the exception dispatched after finally",
             "protected override void OnDestroy() { try { try { throw (ArgumentException)new OtherException(); } finally { base.OnDestroy(); } } catch (ArgumentException) { Release(); } } private sealed class OtherException : Exception { public static implicit operator ArgumentException(OtherException value) { return new ArgumentException(); } }"
         )]
+        [TestCase(
+            "a replacement exception reaches its own handler",
+            "protected override void OnDestroy() { try { try { try { throw new ArgumentException(); } finally { throw new InvalidOperationException(); } } finally { base.OnDestroy(); } } catch (InvalidOperationException) { Release(); } }"
+        )]
+        [TestCase(
+            "an original exception survives a conditionally throwing finally",
+            "protected override void OnDestroy() { try { try { try { throw new ArgumentException(); } finally { if (0 < handles) { throw new InvalidOperationException(); } } } finally { base.OnDestroy(); } } catch (ArgumentException) { Release(); } }"
+        )]
+        [TestCase(
+            "a filtered handler body runs after the finally",
+            "protected override void OnDestroy() { try { try { throw new Exception(); } finally { base.OnDestroy(); } } catch (Exception) when (0 < handles) { Release(); } }"
+        )]
+        [TestCase(
+            "a filtered handler continuation runs after the finally",
+            "protected override void OnDestroy() { try { try { throw new Exception(); } finally { base.OnDestroy(); } } catch (Exception) when (0 < handles) { } Release(); }"
+        )]
+        [TestCase(
+            "a null throw in a typed catch dispatches a new null reference exception",
+            "protected override void OnDestroy() { try { try { try { throw new InvalidOperationException(); } catch (InvalidOperationException) { throw null; } } finally { base.OnDestroy(); } } catch (NullReferenceException) { Release(); } }"
+        )]
+        [TestCase(
+            "a nullable exception expression can dispatch a null reference exception",
+            "protected override void OnDestroy() { try { try { ArgumentException exception = null; throw exception; } finally { base.OnDestroy(); } } catch (NullReferenceException) { Release(); } }"
+        )]
+        [TestCase(
+            "an empty intervening finally preserves the original exception",
+            "protected override void OnDestroy() { try { try { try { throw new ArgumentException(); } finally { } } finally { base.OnDestroy(); } } catch (ArgumentException) { Release(); } }"
+        )]
         public void NestedTeardownWithReachableFollowingWorkIsReported(string shape, string body)
         {
             Diagnostic reported = Single(body);
@@ -474,6 +502,22 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
         [TestCase(
             "a nested throw consumed before the finally cannot dispatch outside it",
             "protected override void OnDestroy() { try { try { try { throw new Exception(); } catch { } } finally { base.OnDestroy(); } } catch { Release(); } }"
+        )]
+        [TestCase(
+            "an intervening finally replaces the original exception",
+            "protected override void OnDestroy() { try { try { try { throw new ArgumentException(); } finally { throw new InvalidOperationException(); } } finally { base.OnDestroy(); } } catch (ArgumentException) { Release(); } }"
+        )]
+        [TestCase(
+            "an outer exception filter runs before the finally",
+            "protected override void OnDestroy() { try { try { throw new Exception(); } finally { base.OnDestroy(); } } catch (Exception) when (0 < handles) { } }"
+        )]
+        [TestCase(
+            "a typed null constant cannot dispatch its written exception type",
+            "protected override void OnDestroy() { try { try { throw (ArgumentException)null; } finally { base.OnDestroy(); } } catch (ArgumentException) { Release(); } }"
+        )]
+        [TestCase(
+            "an exception thrown by a filter is swallowed before the finally",
+            "protected override void OnDestroy() { try { try { try { throw new ArgumentException(); } catch (ArgumentException) when (0 < handles ? throw new InvalidOperationException() : false) { } } finally { base.OnDestroy(); } } catch (InvalidOperationException) { Release(); } }"
         )]
         public void NestedTeardownWithoutFollowingWorkIsNotReported(string shape, string body)
         {
