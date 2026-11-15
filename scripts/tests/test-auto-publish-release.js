@@ -395,7 +395,9 @@ async function main() {
     );
     if (["unity-tests.yml", "unity-compatibility.yml"].includes(file)) {
       const access = validation.jobs["runner-preflight"].concurrency;
-      assert.ok(access.group.includes("github.event_name == 'push' && github.sha"));
+      if (file === "unity-compatibility.yml")
+        assert.equal(access.group, "${{ github.workflow }}-runner-preflight-${{ github.sha }}");
+      else assert.ok(access.group.includes("github.event_name == 'push' && github.sha"));
       assert.equal(access["cancel-in-progress"], true);
     }
   }

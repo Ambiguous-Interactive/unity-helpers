@@ -67,6 +67,10 @@ function renderCompatibilityWorkflow(source) {
     }
     if (id === "runner-preflight") {
       block = block.replace(
+        /      group: >-\n(?:        .*\n)+/,
+        "      group: ${{ github.workflow }}-runner-preflight-${{ github.sha }}\n"
+      );
+      block = block.replace(
         /          required-label-sets: >-\n(?:            .*\n?)+/,
         `          required-label-sets: '[["self-hosted","Windows","RAM-64GB","DAD-MACHINE"]]'\n`
       );

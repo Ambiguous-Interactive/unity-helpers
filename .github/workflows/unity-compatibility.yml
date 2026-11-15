@@ -283,10 +283,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     concurrency:
-      group: >-
-        ${{ github.workflow }}-runner-preflight-${{ github.event_name == 'push' && github.sha ||
-        github.ref }}${{ github.event_name == 'workflow_dispatch' && '' != '' &&
-        format('-native-readback-{0}', github.run_id) || '' }}
+      group: ${{ github.workflow }}-runner-preflight-${{ github.sha }}
       cancel-in-progress: true
     steps:
       # Verifies only that every required label set has a registered runner

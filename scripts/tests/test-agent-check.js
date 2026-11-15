@@ -257,7 +257,7 @@ test("workflow edits include both resolver consumers and matrix wiring", () => {
   const controls = plan.commands.find((command) => command[1] === "scripts/run-contract-tests.js");
   assert.deepEqual(controls.slice(2), [
     "--only",
-    "unity-workflow-matrix-contract,unity-acceptance-workflow,unity-grouped-modes"
+    "watchdog-cancellation,unity-workflow-matrix-contract,unity-acceptance-workflow,unity-grouped-modes"
   ]);
 });
 
@@ -294,4 +294,33 @@ test("fixture edits scope compilation while shared, production and deleted input
       command.includes("scripts/agent-preflight.ps1")
     )
   );
+});
+
+test("new workflow definitions select operator protection controls before CI", () => {
+  for (const extension of ["yml", "yaml"]) {
+    const plan = select([`.github/workflows/new-licensed-workflow.${extension}`], "iterate");
+    assert.ok(
+      plan.commands.some(
+        (command) =>
+          command.includes("--only") && command.at(-1).split(",").includes("watchdog-cancellation")
+      )
+    );
+  }
+});
+
+test("opposite-scope metadata retains a broad compile without an empty fixture argument", () => {
+  const runtime = "Tests/Runtime/Helper/WallMathDistributionTests.cs";
+  const editor = "Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs";
+  for (const [source, metadata, narrow, broad] of [
+    [runtime, `${editor}.meta`, "tests", "editor-tests"],
+    [editor, `${runtime}.meta`, "editor-tests", "tests"]
+  ]) {
+    const commands = select([source, metadata], "iterate").commands;
+    assert.deepEqual(commands.find((command) => command.includes(narrow)).slice(-2), [
+      "--files",
+      source
+    ]);
+    assert.ok(!commands.find((command) => command.includes(broad)).includes("--files"));
+    assert.ok(commands.every((command) => command.at(-1) !== "--files"));
+  }
 });

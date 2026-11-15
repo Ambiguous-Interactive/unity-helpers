@@ -145,13 +145,12 @@ function select(files, tier) {
             fixtures.every((file) => fs.existsSync(path.join(root, file)));
           for (const scope of scopes) {
             const command = ["npm", "run", "typecheck:iterate", "--", scope];
-            if (fixtureOnly)
-              command.push(
-                "--files",
-                ...fixtures.filter((file) =>
+            const scopeFixtures = fixtureOnly
+              ? fixtures.filter((file) =>
                   file.startsWith(scope === "tests" ? "Tests/Runtime/" : "Tests/Editor/")
                 )
-              );
+              : [];
+            if (scopeFixtures.length) command.push("--files", ...scopeFixtures);
             commands.push(command);
           }
         }

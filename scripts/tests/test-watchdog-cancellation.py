@@ -447,8 +447,9 @@ class WorkflowSchedulingTests(unittest.TestCase):
     def test_all_license_lock_workflows_have_operator_protection(self) -> None:
         licensed = {
             path.name
-            for path in (ROOT / ".github/workflows").glob("*.yml")
-            if "ambiguous-organization-build-lock/.github/actions/acquire-build-lock@"
+            for path in (ROOT / ".github/workflows").iterdir()
+            if path.suffix in {".yml", ".yaml"}
+            and "ambiguous-organization-build-lock/.github/actions/acquire-build-lock@"
             in path.read_text()
         }
         assert {"unity-tests.yml", "unity-benchmarks.yml"}.issubset(licensed)

@@ -33,6 +33,10 @@ test("compatibility is generated from the canonical licensed jobs and has separa
     "unity-tests"
   ]);
   assert.equal(compatibility.jobs["runner-preflight"].if, canonical.jobs["runner-preflight"].if);
+  assert.equal(
+    compatibility.jobs["runner-preflight"].concurrency.group,
+    "${{ github.workflow }}-runner-preflight-${{ github.sha }}"
+  );
   assert.deepEqual(compatibility.jobs["unity-tests"]["runs-on"], [
     "self-hosted",
     "Windows",

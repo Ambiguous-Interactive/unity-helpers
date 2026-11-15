@@ -58,7 +58,7 @@ changed file immediately; run changed-file preflight before publication, once th
 The `pr` tier includes that preflight. An edit-loop task without a compiler, documentation or owned
 contract check falls back to preflight, so an unowned input cannot silently pass with no checks.
 Fixture-only edits compile the named existing fixtures plus production and shared test sources.
-Mixed production/shared changes and deleted fixtures retain whole-scope compilation; shared test
+Mixed production/shared changes, deleted fixtures and metadata-only scopes retain whole-scope compilation; shared test
 changes check both runtime and editor fixtures. If a fixture needs another fixture's declarations,
 use `npm run typecheck:iterate -- tests` or `editor-tests` for the complete tree.
 Iteration also runs contract controls whose non-group input paths or patterns match a changed file,
@@ -172,7 +172,7 @@ This approach follows [OpenAI harness guidance](https://openai.com/index/harness
 [bounded delegation guidance](https://learn.chatgpt.com/docs/agent-configuration/subagents), and
 [long-running agent handoff guidance](https://www.anthropic.com/research/effective-harnesses-for-long-running-agents).
 
-## Qualification still required
+## Qualification and measurement
 
 Three compiler-command pairs completed with compiler inputs unchanged and verified by a content
 hash before and after. Normal multi-configuration checks took 551.7, 808.1, and 749.0 seconds;
@@ -183,10 +183,36 @@ tests, native execution, and review are excluded. The [retained measurements](./
 include the input hash, commands, samples, and descriptive nearest-rank p95; three samples do not
 establish tail latency. This is a component probe, not qualification of three complete task pilots.
 
+The local task pilots exposed missing end-to-end savings in the first implementation: runtime
+warm feedback improved by 48.8%, editor feedback grew by 2.3%, and tooling improved by 63.4%.
+Those observations remain in [the pilot record](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1206).
+A second experiment at `9a380729` measured the revised edit loop in three pairs with changed source per task:
+
+| Task            | Normal median | Iteration median | Reduction | Descriptive p95, normal → edit |
+| --------------- | ------------- | ---------------- | --------- | ------------------------------ |
+| Runtime fixture | 84.1 s        | 9.4 s            | 88.8%     | 106.8 s → 10.6 s               |
+| Editor fixture  | 32.7 s        | 18.3 s           | 44.1%     | 50.2 s → 18.9 s                |
+| PR template     | 39.6 s        | 1.0 s            | 97.4%     | 50.9 s → 1.0 s                 |
+
+Each path includes the same task-specific behavior witness. The normal path includes preflight
+and the applicable normal compiler or documentation checks. The edit path defers publication
+preflight and full analyzer/variant coverage, using scoped compilation or owned controls.
+Publication and native checks remain
+separate. The editor pilot misses the individual 50% target. With three samples, descriptive p95
+is the largest observation and does not establish population tail latency. No cold-machine claim
+is made for the second experiment.
+
+Workflow inventory controls own both YAML suffixes. Adding a workflow therefore checks operator
+registration locally, including protection of licensed work from generic watchdog cancellation.
+The full source-free organization audit remains necessary; source review alone missed an exact
+aggregate-condition contract during this rollout.
+
 Measure cold and warm feedback separately with at least three paired local runs. Compare CI
 queue, setup, execution, and cleanup on comparable runners. Report median, p95, runner time,
 and seat occupancy. The target is a 50% reduction in warm local feedback and ordinary PR elapsed
 time; no such improvement is established by the selector tests.
 
-Remaining rollout work includes three task pilots, current-head CI qualification, and conditional
-native enrollment. Preserve supported public APIs and editor versions.
+Head-specific pilot acceptance, raw samples and CI qualification are tracked in
+[the task record](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1206).
+Conditional native enrollment remains tracked separately in the organization policy work.
+Preserve supported public APIs and editor versions.
