@@ -1,10 +1,13 @@
 # Context CI and Testing
 
-## Pushing costs a full CI matrix -- batch before you push
+## Batch changes before you push
 
-**Every push to the remote triggers the whole CI matrix**, including four Unity editor versions in
-editmode, playmode and gated IL2CPP standalone. That is expensive and slow. Treat a push as a
-deliberate act, not the tail of every commit.
+Every push starts CI. Ordinary PRs select the latest editor in EditMode and PlayMode;
+compatibility-sensitive or unknown inputs select the full supported matrix, including IL2CPP.
+Main, releases, and default manual runs retain full qualification. Local iteration checks do not
+run native tests. See [task validation](../../docs/performance/agent-iteration.md) for coverage rules.
+Batch verified changes before pushing: a new push supersedes the prior native run and spends
+runner and review capacity.
 
 The separate 6000.6 `SINGLE_THREADED` job runs core EditMode, PlayMode, and IL2CPP Standalone
 assemblies with the define in every assembly. Its Standalone result is independently verified,

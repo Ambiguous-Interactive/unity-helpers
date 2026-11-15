@@ -7,7 +7,7 @@
 npm run hooks:install                                   # Install git hooks
 dotnet tool restore                                     # Restore .NET tools (CSharpier, etc.)
 
-# Task selection (CI records decisions in shadow mode; native validation stays separate)
+# Task selection (local feedback tiers; CI selects affected checks and native coverage)
 npm run agent:check -- --tier iterate --base origin/main --plan
 npm run agent:check -- --tier pr --base origin/main --plan
 
