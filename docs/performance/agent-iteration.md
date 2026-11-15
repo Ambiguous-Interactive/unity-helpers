@@ -119,10 +119,11 @@ rejects the three diagnostic aggregate branches; the
 must land before this consumer can pass enrollment. This is not a clean whole-repository audit. The external exceptions remain
 unresolved.
 
-Historical capture dispatch now requires successful runner preflight and artifact readback plus
-skipped licensed jobs in each aggregate. Ordinary and untrusted PR branches retain their existing
-requirements. The final qualification gate stays skipped for capture-only dispatch; reading old
-evidence does not qualify new source.
+Historical capture dispatch retains its original skipped qualification gates. The capture job
+reports its own diagnostic result; it does not certify new native work. Ordinary PRs, pushes, and
+default manual qualification keep their always-reporting native result requirements. The central
+policy update admits only that exact diagnostic exclusion and preserves the original result script;
+it does not attempt to sandbox arbitrary capture scripts.
 
 The unsafe-code registry scan also creates its SARIF report; report upload checks that output
 instead of executing the scanner a second time.

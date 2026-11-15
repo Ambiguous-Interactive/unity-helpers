@@ -2280,15 +2280,13 @@ jobs:
           reservation-id: ${{ steps.release_unity_lock.outputs.reservation-id }}
           incident-id: ${{ steps.release_unity_lock.outputs.incident-id }}
 
-  # Each licensed job needs its own always-reporting aggregate.
-  # The diagnostic branch verifies readback and records skipped qualification.
-  # Capture-only dispatch leaves the final qualification job skipped.
+  # Each licensed job reports qualification separately.
+  # Historical readback reports diagnostics and skips these qualification gates.
   unity-tests-aggregate:
     name: Unity CI aggregate gate (tests)
-    if: ${{ always() }}
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.native-readback-run-id != '') && (always()) }}
     needs:
       - runner-preflight
-      - native-historical-readback
       - unity-tests
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -2300,15 +2298,9 @@ jobs:
           UNITY_TESTS_RESULT: ${{ needs.unity-tests.result }}
           FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
           DEPENDABOT_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]' }}
-          HISTORICAL_READBACK: ${{ github.event_name == 'workflow_dispatch' && inputs.native-readback-run-id != '' }}
-          HISTORICAL_READBACK_RESULT: ${{ needs.native-historical-readback.result }}
         run: |
           set -euo pipefail
-          if [ "${HISTORICAL_READBACK}" = "true" ]; then
-            test "${RUNNER_PREFLIGHT_RESULT}" = success
-            test "${HISTORICAL_READBACK_RESULT}" = success
-            test "${UNITY_TESTS_RESULT}" = skipped
-          elif [ "${FORK_PR}" = "true" ] || [ "${DEPENDABOT_PR}" = "true" ]; then
+          if [ "${FORK_PR}" = "true" ] || [ "${DEPENDABOT_PR}" = "true" ]; then
             test "${RUNNER_PREFLIGHT_RESULT}" = skipped
             test "${UNITY_TESTS_RESULT}" = skipped
           else
@@ -2318,10 +2310,9 @@ jobs:
 
   unity-tests-single-threaded-aggregate:
     name: Unity CI aggregate gate (single-threaded)
-    if: ${{ always() }}
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.native-readback-run-id != '') && (always()) }}
     needs:
       - runner-preflight
-      - native-historical-readback
       - unity-tests-single-threaded
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -2333,15 +2324,9 @@ jobs:
           UNITY_TESTS_RESULT: ${{ needs.unity-tests-single-threaded.result }}
           FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
           DEPENDABOT_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]' }}
-          HISTORICAL_READBACK: ${{ github.event_name == 'workflow_dispatch' && inputs.native-readback-run-id != '' }}
-          HISTORICAL_READBACK_RESULT: ${{ needs.native-historical-readback.result }}
         run: |
           set -euo pipefail
-          if [ "${HISTORICAL_READBACK}" = "true" ]; then
-            test "${RUNNER_PREFLIGHT_RESULT}" = success
-            test "${HISTORICAL_READBACK_RESULT}" = success
-            test "${UNITY_TESTS_RESULT}" = skipped
-          elif [ "${FORK_PR}" = "true" ] || [ "${DEPENDABOT_PR}" = "true" ]; then
+          if [ "${FORK_PR}" = "true" ] || [ "${DEPENDABOT_PR}" = "true" ]; then
             test "${RUNNER_PREFLIGHT_RESULT}" = skipped
             test "${UNITY_TESTS_RESULT}" = skipped
           else
@@ -2351,10 +2336,9 @@ jobs:
 
   unitypackage-smoke-aggregate:
     name: Unity CI aggregate gate (package smoke)
-    if: ${{ always() }}
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.native-readback-run-id != '') && (always()) }}
     needs:
       - runner-preflight
-      - native-historical-readback
       - unitypackage-smoke
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -2366,15 +2350,9 @@ jobs:
           UNITY_TESTS_RESULT: ${{ needs.unitypackage-smoke.result }}
           FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
           DEPENDABOT_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]' }}
-          HISTORICAL_READBACK: ${{ github.event_name == 'workflow_dispatch' && inputs.native-readback-run-id != '' }}
-          HISTORICAL_READBACK_RESULT: ${{ needs.native-historical-readback.result }}
         run: |
           set -euo pipefail
-          if [ "${HISTORICAL_READBACK}" = "true" ]; then
-            test "${RUNNER_PREFLIGHT_RESULT}" = success
-            test "${HISTORICAL_READBACK_RESULT}" = success
-            test "${UNITY_TESTS_RESULT}" = skipped
-          elif [ "${FORK_PR}" = "true" ] || [ "${DEPENDABOT_PR}" = "true" ]; then
+          if [ "${FORK_PR}" = "true" ] || [ "${DEPENDABOT_PR}" = "true" ]; then
             test "${RUNNER_PREFLIGHT_RESULT}" = skipped
             test "${UNITY_TESTS_RESULT}" = skipped
           else
