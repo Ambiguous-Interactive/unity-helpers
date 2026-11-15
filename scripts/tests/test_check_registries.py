@@ -71,7 +71,14 @@ def test_hooks_precede_shared_checks_and_retain_exclusion_policy() -> None:
 
 @pytest.mark.parametrize(
     "contents",
-    [[], [entry(), entry()], [entry("")], [entry(command=" ")], [entry() | {"name": ""}], {}],
+    [
+        [],
+        [entry(), entry()],
+        [entry("")],
+        [entry(command=" ")],
+        [entry() | {"name": ""}],
+        {},
+    ],
 )
 def test_rejects_empty_duplicate_or_invalid_registry(contents: object, tmp_path: Path) -> None:
     write_registry(tmp_path, "lint", contents)
@@ -79,7 +86,9 @@ def test_rejects_empty_duplicate_or_invalid_registry(contents: object, tmp_path:
         load_checks("lint", tmp_path)
 
 
-def test_duplicate_ids_across_hook_and_contract_registries_are_rejected(tmp_path: Path) -> None:
+def test_duplicate_ids_across_hook_and_contract_registries_are_rejected(
+    tmp_path: Path,
+) -> None:
     write_registry(tmp_path, "hooks", [entry()])
     write_registry(tmp_path, "contracts", [entry()])
     with pytest.raises(ValueError, match="duplicate"):
@@ -110,7 +119,9 @@ def test_invalid_cli_fails_closed(arguments: list[str], monkeypatch: pytest.Monk
 
 @pytest.mark.parametrize("arguments", [["--only", "absent"], ["--jobs", "0"], ["--jobs", "nan"]])
 def test_selection_errors_return_failure_without_running_checks(
-    arguments: list[str], monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    arguments: list[str],
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     monkeypatch.setattr(check_runner, "OUTPUT_FORMAT", "json")
     assert main(["contracts", *arguments]) == 1
@@ -124,3 +135,112 @@ def test_misspelled_or_mistyped_safety_policy_fails_closed(
     write_registry(tmp_path, "contracts", [entry() | field])
     with pytest.raises(ValueError, match=r"(configuration field|boolean)"):
         checks_for("contracts", root=tmp_path)
+
+
+def test_affected_selection_keeps_dependencies_and_unclassified_checks(
+    tmp_path: Path,
+) -> None:
+    from check_registries import affected_checks
+
+    write_registry(
+        tmp_path,
+        "lint",
+        [
+            entry("docs") | {"inputs": ["docs/**"], "dependencies": ["control"]},
+            entry("control") | {"inputs": ["scripts/**"]},
+            entry("code") | {"inputs": ["Runtime/**"]},
+            entry("unclassified"),
+        ],
+    )
+    checks = load_checks("lint", tmp_path)
+    assert [check.id for check in affected_checks(checks, ["docs/guide.md"])] == [
+        "docs",
+        "control",
+        "unclassified",
+    ]
+    assert [check.id for check in affected_checks(checks, ["Runtime/Thing.cs"])] == [
+        "code",
+        "unclassified",
+    ]
+    assert affected_checks(checks, []) == []
+
+
+def test_affected_selection_rejects_missing_dependencies_and_cycles(
+    tmp_path: Path,
+) -> None:
+    from check_registries import affected_checks
+
+    for checks in [
+        [entry("a") | {"dependencies": ["absent"]}],
+        [entry("a") | {"dependencies": ["b"]}, entry("b") | {"dependencies": ["a"]}],
+    ]:
+        write_registry(tmp_path, "lint", checks)
+        with pytest.raises(ValueError, match="dependency"):
+            affected_checks(load_checks("lint", tmp_path), ["docs/guide.md"])
+
+
+@pytest.mark.parametrize("ci", [False, True])
+def test_affected_cli_delegates_base_inventory_to_shared_planner(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], ci: bool
+) -> None:
+    def inventory(command: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        assert command[-3:] == ["origin/main", "--plan", "--json"]
+        return subprocess.CompletedProcess(
+            command, 0, stdout=json.dumps({"files": ["docs/guide.md"]}), stderr=""
+        )
+
+    monkeypatch.setattr(check_runner, "OUTPUT_FORMAT", "json")
+    monkeypatch.setattr(subprocess, "run", inventory)
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "pull_request")
+    monkeypatch.setenv("AGENT_CHECK_BASE", "origin/main")
+    assert main(["lint", "--list", *(["--ci"] if ci else ["--base", "origin/main"])]) == 0
+    output = capsys.readouterr().out.splitlines()
+    assert "doc-links" in output
+    assert "doc-links-test" in output
+    assert "csharp-naming" not in output
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [["lint", "--base"], ["lint", "--files"], ["lint", "--base", "main", "--files", "docs/a.md"]],
+)
+def test_affected_cli_refuses_ambiguous_or_empty_inventory(
+    arguments: list[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(check_runner, "OUTPUT_FORMAT", "json")
+    assert main(arguments) == 1
+
+
+def test_known_documentation_without_relevant_suites_is_inapplicable(tmp_path: Path) -> None:
+    from check_registries import affected_checks
+
+    write_registry(tmp_path, "contracts", [entry("tool") | {"inputs": ["scripts/**"]}])
+    checks = load_checks("contracts", tmp_path)
+    assert affected_checks(checks, ["docs/guide.md"]) == []
+    assert affected_checks(checks, ["unknown.config"]) == checks
+    assert affected_checks(checks, ["docs/program.sh"]) == checks
+
+
+def test_empty_affected_scope_cannot_hide_invalid_check_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(check_runner, "OUTPUT_FORMAT", "json")
+    assert main(["contracts", "--only", "absent", "--files", "docs/guide.md"]) == 1
+
+
+def test_ci_main_keeps_full_registry_even_with_stale_pr_base(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(check_runner, "OUTPUT_FORMAT", "json")
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "push")
+    monkeypatch.setenv("AGENT_CHECK_BASE", "not-a-real-revision")
+    assert main(["lint", "--ci", "--list"]) == 0
+    assert capsys.readouterr().out.splitlines() == [check.id for check in checks_for("lint")]
+
+
+def test_ci_pr_requires_its_base(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(check_runner, "OUTPUT_FORMAT", "json")
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "pull_request")
+    monkeypatch.delenv("AGENT_CHECK_BASE", raising=False)
+    assert main(["lint", "--ci", "--list"]) == 1
+    assert main(["lint", "--ci", "--base", "HEAD"]) == 1

@@ -642,7 +642,7 @@ for (const event of ["push", "pull_request", "workflow_dispatch"]) {
               assert.ok(block, name);
               const expected =
                 Boolean(expression(previous)(context)) &&
-                (name === "runner-preflight" || !requested);
+                (name === "runner-preflight" || name.endsWith("-aggregate") || !requested);
               assert.equal(
                 Boolean(jobGate(block)(context)),
                 expected,

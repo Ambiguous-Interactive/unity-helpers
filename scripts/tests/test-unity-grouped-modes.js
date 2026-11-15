@@ -73,6 +73,7 @@ try {
       encoding: "utf8",
       env: {
         ...process.env,
+        GITHUB_EVENT_NAME: "workflow_dispatch",
         INPUT_UNITY_VERSION: versions[0],
         INPUT_TEST_MODE: "standalone",
         GITHUB_OUTPUT: output
@@ -102,6 +103,7 @@ try {
       encoding: "utf8",
       env: {
         ...process.env,
+        GITHUB_EVENT_NAME: "workflow_dispatch",
         INPUT_UNITY_VERSION: versions[0],
         INPUT_TEST_MODE: "editmode",
         INPUT_ACCEPTANCE: "serialization",

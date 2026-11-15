@@ -1,0 +1,20 @@
+{
+  "csharp": ["Runtime/**", "Editor/**", "Tests/**", "Generator~/**", "Samples~/**", "Styles/**"],
+  "tooling": [
+    "scripts/**",
+    ".github/**",
+    ".githooks/**",
+    ".devcontainer/**",
+    ".llm/**",
+    ".agents/**",
+    "AGENTS.md",
+    "package.json",
+    "cspell.json",
+    ".editorconfig",
+    ".gitattributes",
+    ".gitignore",
+    "requirements*.lock",
+    "requirements*.txt"
+  ],
+  "documentation": ["docs/**", "*.md", "mkdocs.yml"]
+}

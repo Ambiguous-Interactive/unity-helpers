@@ -2,659 +2,796 @@
   {
     "id": "yaml-controls",
     "name": "YAML source and command boundary controls",
-    "run": "npm run test:lint-yaml"
+    "run": "npm run test:lint-yaml",
+    "inputs": ["@tooling"]
   },
   {
     "id": "check-registries",
     "name": "Typed check registry contracts",
-    "run": "npm run test:check-registries"
+    "run": "npm run test:check-registries",
+    "inputs": ["@tooling"]
   },
   {
     "id": "bounded-sampling-parser",
     "name": "Typed production arithmetic parser",
-    "run": "npm run test:bounded-sampling"
+    "run": "npm run test:bounded-sampling",
+    "inputs": ["@csharp", "@tooling"]
   },
   {
     "id": "fixture-assets",
     "name": "Image fixture pixels and Unity identities",
-    "run": "npm run test:fixture-assets"
+    "run": "npm run test:fixture-assets",
+    "inputs": ["@tooling"]
   },
   {
     "id": "meta-generation",
     "name": "Unity metadata historical importer contracts",
-    "run": "npm run test:meta-generation"
+    "run": "npm run test:meta-generation",
+    "inputs": ["@tooling"]
   },
   {
     "id": "assembly-launchers",
     "name": "Assembly Python compatibility launchers",
-    "run": "npm run test:assembly-launchers"
+    "run": "npm run test:assembly-launchers",
+    "inputs": ["@tooling"]
   },
   {
     "id": "compiler-tooling",
     "name": "Compiler cleanup and formatter compatibility",
-    "run": "npm run test:compiler-tooling"
+    "run": "npm run test:compiler-tooling",
+    "inputs": ["@tooling"]
   },
   {
     "id": "asmdef",
     "name": "Assembly definition contracts",
-    "run": "npm run test:asmdef"
+    "run": "npm run test:asmdef",
+    "inputs": ["@tooling"]
   },
   {
     "id": "protobuf-candidate",
     "name": "Protobuf binary identity controls",
-    "run": "npm run test:protobuf-candidate"
+    "run": "npm run test:protobuf-candidate",
+    "inputs": ["@tooling"]
   },
   {
     "id": "python-policy",
     "name": "Strict migrated Python policies",
-    "run": "npm run lint:python"
+    "run": "npm run lint:python",
+    "inputs": ["@tooling"]
   },
   {
     "id": "unity-framework",
     "name": "Unity Test Framework policy and loaded-source evidence",
-    "run": "npm run test:unity-framework"
+    "run": "npm run test:unity-framework",
+    "inputs": ["@tooling"]
   },
   {
     "id": "watchdog-cancellation",
     "name": "Watchdog cancellation and scheduling controls",
-    "run": "npm run test:watchdog-cancellation"
+    "run": "npm run test:watchdog-cancellation",
+    "inputs": ["@tooling"]
   },
   {
     "id": "native-build-readback",
     "name": "Historical native Build receipt readback",
-    "run": "npm run validate:tests:native-build-readback"
+    "run": "npm run validate:tests:native-build-readback",
+    "inputs": ["@tooling"]
   },
   {
     "id": "native-fault-capture",
     "name": "Native capture and loader-flag transaction controls",
-    "run": "npm run test:native-fault-capture"
+    "run": "npm run test:native-fault-capture",
+    "inputs": ["@tooling"]
   },
   {
     "id": "auto-publish-release",
     "name": "Automatic release publication",
-    "run": "npm run test:auto-publish-release"
+    "run": "npm run test:auto-publish-release",
+    "inputs": ["@tooling"]
   },
   {
     "id": "browser-storage",
     "name": "Browser storage bridge and platform metadata",
-    "run": "npm run test:browser-storage"
+    "run": "npm run test:browser-storage",
+    "inputs": ["@tooling"]
   },
   {
     "id": "browser-consumer",
     "name": "WebGL consumer identity and failure controls",
-    "run": "npm run test:browser-consumer"
+    "run": "npm run test:browser-consumer",
+    "inputs": ["@tooling"]
   },
   {
     "id": "durable-file",
     "name": "Durable file unsupported-replacement preservation",
-    "run": "npm run test:durable-file"
+    "run": "npm run test:durable-file",
+    "inputs": ["@csharp", "@tooling"]
   },
   {
     "id": "csharp-syntax",
     "name": "C# syntax policies and migration controls",
-    "run": "npm run lint:csharp-syntax"
+    "run": "npm run lint:csharp-syntax",
+    "inputs": ["@csharp", "@tooling"]
   },
   {
     "id": "lint-tests",
     "name": "Test lifecycle linter",
-    "run": "npm run lint:tests"
+    "run": "npm run lint:tests",
+    "inputs": ["@tooling"]
   },
   {
     "id": "check-eol",
     "name": "Line-ending checker",
-    "run": "npm run test:check-eol"
+    "run": "npm run test:check-eol",
+    "inputs": ["@tooling"]
   },
   {
     "id": "out-parameters",
     "name": "Out-parameter discipline",
-    "run": "npm run test:out-parameters"
+    "run": "npm run test:out-parameters",
+    "inputs": ["@csharp", "@tooling"]
   },
   {
     "id": "analyzer-placement",
     "name": "Shipped analyzer placement",
-    "run": "npm run test:analyzer-placement"
+    "run": "npm run test:analyzer-placement",
+    "inputs": ["@csharp", "@tooling"]
   },
   {
     "id": "random-periods",
     "name": "Generator period declarations and docs",
-    "run": "npm run test:random-periods"
+    "run": "npm run test:random-periods",
+    "inputs": ["@csharp", "@tooling"]
   },
   {
     "id": "reference-upstream-drift",
     "name": "Reference upstream drift check",
-    "run": "npm run test:reference-upstream-drift"
+    "run": "npm run test:reference-upstream-drift",
+    "inputs": ["@tooling"]
   },
   {
     "id": "verify-shipped-analyzers",
     "name": "Shipped analyzer freshness gate self-test",
-    "run": "npm run test:verify-shipped-analyzers"
+    "run": "npm run test:verify-shipped-analyzers",
+    "inputs": ["@tooling"]
   },
   {
     "id": "asset-postprocessor-reachability",
     "name": "AssetPostprocessor reachability",
-    "run": "npm run test:asset-postprocessor-reachability"
+    "run": "npm run test:asset-postprocessor-reachability",
+    "inputs": ["@csharp", "@tooling"]
   },
   {
     "id": "wproto-annotations",
     "name": "WallstopProto annotations",
-    "run": "npm run test:wproto-annotations"
+    "run": "npm run test:wproto-annotations",
+    "inputs": ["@csharp", "@tooling", "docs/features/serialization/**", "docs/performance/**"]
   },
   {
     "id": "test-result-evidence",
     "name": "Strict NUnit and TRX evidence controls",
-    "run": "npm run test:test-result-evidence"
+    "run": "npm run test:test-result-evidence",
+    "inputs": ["@tooling"]
   },
   {
     "id": "wproto-evidence",
     "name": "WProto catalog and provenance controls",
-    "run": "npm run test:wproto-evidence"
+    "run": "npm run test:wproto-evidence",
+    "inputs": ["@tooling", "docs/features/serialization/**", "docs/performance/**"]
   },
   {
     "id": "run-wproto-evidence",
     "name": "WProto evidence process collector controls",
-    "run": "npm run test:run-wproto-evidence"
+    "run": "npm run test:run-wproto-evidence",
+    "inputs": ["@tooling", "docs/features/serialization/**", "docs/performance/**"]
   },
   {
     "id": "wproto-corpus",
     "name": "WProto frozen corpus measurement controls",
-    "run": "npm run test:wproto-corpus"
+    "run": "npm run test:wproto-corpus",
+    "inputs": ["@tooling", "docs/features/serialization/**", "docs/performance/**"]
   },
   {
     "id": "lint-markdown",
     "name": "Markdown inventory and lint failure controls",
-    "run": "npm run test:lint-markdown"
+    "run": "npm run test:lint-markdown",
+    "inputs": ["@tooling"]
   },
   {
     "id": "agent-skill-migration",
     "name": "Agent skill migration and discovery",
-    "run": "npm run test:agent-skill-migration"
+    "run": "npm run test:agent-skill-migration",
+    "inputs": ["@tooling"]
   },
   {
     "id": "skill-stubs",
     "name": "Typed discovery stubs and ownership controls",
-    "run": "npm run test:skill-stubs"
+    "run": "npm run test:skill-stubs",
+    "inputs": ["@tooling"]
   },
   {
     "id": "lint-changelog",
     "name": "Changelog linter self-test",
-    "run": "npm run test:lint-changelog"
+    "run": "npm run test:lint-changelog",
+    "inputs": ["@tooling"]
   },
   {
     "id": "lint-unity-test-modules",
     "name": "Unity test-project module manifest linter self-test",
-    "run": "npm run test:lint-unity-test-modules"
+    "run": "npm run test:lint-unity-test-modules",
+    "inputs": ["@tooling"]
   },
   {
     "id": "lint-bundled-assemblies",
     "name": "Bundled assembly constraint linter self-test",
-    "run": "npm run test:lint-bundled-assemblies"
+    "run": "npm run test:lint-bundled-assemblies",
+    "inputs": ["@tooling"]
   },
   {
     "id": "sync-readme-mirror",
     "name": "README mirror generator self-test",
-    "run": "npm run test:sync-readme-mirror"
+    "run": "npm run test:sync-readme-mirror",
+    "inputs": ["@tooling"]
   },
   {
     "id": "lint-doc-counts",
     "name": "Documentation count linter self-test",
-    "run": "npm run test:lint-doc-counts"
+    "run": "npm run test:lint-doc-counts",
+    "inputs": ["@tooling"]
   },
   {
     "id": "validate-devcontainer-config",
     "name": "Devcontainer configuration validator self-test",
-    "run": "npm run test:validate-devcontainer-config"
+    "run": "npm run test:validate-devcontainer-config",
+    "inputs": ["@tooling"]
   },
   {
     "id": "devcontainer-persistence",
     "name": "Persistent agent state and container recovery",
-    "run": "npm run test:devcontainer-persistence"
+    "run": "npm run test:devcontainer-persistence",
+    "inputs": ["@tooling"]
   },
   {
     "id": "validate-hook-permissions",
     "name": "Git hook permission validator self-test",
-    "run": "npm run test:validate-hook-permissions"
+    "run": "npm run test:validate-hook-permissions",
+    "inputs": ["@tooling"]
   },
   {
     "id": "validate-hook-sync-calls",
     "name": "Git hook sync-call validator self-test",
-    "run": "npm run test:validate-hook-sync-calls"
+    "run": "npm run test:validate-hook-sync-calls",
+    "inputs": ["@tooling"]
   },
   {
     "id": "validate-github-pages-css",
     "name": "GitHub Pages CSS validator self-test",
-    "run": "npm run test:validate-github-pages-css"
+    "run": "npm run test:validate-github-pages-css",
+    "inputs": ["@tooling"]
   },
   {
     "id": "check-code-fence-syntax",
     "name": "Code fence syntax gate self-test",
-    "run": "npm run test:check-code-fence-syntax"
+    "run": "npm run test:check-code-fence-syntax",
+    "inputs": ["@tooling"]
   },
   {
     "id": "markdown-fence-repair",
     "name": "Markdown fence inference and compatibility",
-    "run": "npm run test:markdown-fence-repair"
+    "run": "npm run test:markdown-fence-repair",
+    "inputs": ["@tooling"]
   },
   {
     "id": "lint-doc-identifiers",
     "name": "Documentation identifier linter self-test",
-    "run": "npm run test:lint-doc-identifiers"
+    "run": "npm run test:lint-doc-identifiers",
+    "inputs": ["@tooling"]
   },
   {
     "id": "lint-dependabot",
     "name": "Dependabot linter self-test",
-    "run": "npm run test:lint-dependabot"
+    "run": "npm run test:lint-dependabot",
+    "inputs": ["@tooling"]
   },
   {
     "id": "lint-duplicate-usings",
     "name": "Duplicate-usings linter self-test",
-    "run": "npm run test:lint-duplicate-usings"
+    "run": "npm run test:lint-duplicate-usings",
+    "inputs": ["@tooling"]
   },
   {
     "id": "lint-preserve-attributes",
     "name": "Preserve-attributes linter self-test",
-    "run": "npm run test:lint-preserve-attributes"
+    "run": "npm run test:lint-preserve-attributes",
+    "inputs": ["@tooling"]
   },
   {
     "id": "extract-code-samples",
     "name": "Documentation code-sample extractor self-test",
-    "run": "npm run test:extract-code-samples"
+    "run": "npm run test:extract-code-samples",
+    "inputs": ["@tooling"]
   },
   {
     "id": "extract-doc-samples",
     "name": "Documentation sample compile-gate self-test",
-    "run": "npm run test:extract-doc-samples"
+    "run": "npm run test:extract-doc-samples",
+    "inputs": ["@tooling"]
   },
   {
     "id": "empty-corpus-gates",
     "name": "Empty-corpus gate self-test",
-    "run": "npm run test:empty-corpus-gates"
+    "run": "npm run test:empty-corpus-gates",
+    "inputs": ["@csharp", "@tooling"]
   },
   {
     "id": "lint-comparison-direction",
     "name": "Comparison-direction linter self-test",
-    "run": "npm run test:lint-comparison-direction"
+    "run": "npm run test:lint-comparison-direction",
+    "inputs": ["@tooling"]
   },
   {
     "id": "evaluate-testu01",
     "name": "TestU01 verdict evaluator self-test",
-    "run": "npm run test:evaluate-testu01"
+    "run": "npm run test:evaluate-testu01",
+    "inputs": ["@tooling"]
   },
   {
     "id": "lint-nested-type-placement",
     "name": "Nested-type placement linter self-test",
-    "run": "npm run test:lint-nested-type-placement"
+    "run": "npm run test:lint-nested-type-placement",
+    "inputs": ["@tooling"]
   },
   {
     "id": "typecheck-controls",
     "name": "Type-check gate control self-test",
-    "run": "npm run test:typecheck-controls"
+    "run": "npm run test:typecheck-controls",
+    "inputs": ["@tooling"]
   },
   {
     "id": "typecheck-iterate",
     "name": "Fast compiler iteration contract",
-    "run": "npm run test:typecheck-iterate"
+    "run": "npm run test:typecheck-iterate",
+    "inputs": ["@tooling"]
   },
   {
     "id": "lint-comment-block-form",
     "name": "Comment block-form linter self-test",
-    "run": "npm run test:lint-comment-block-form"
+    "run": "npm run test:lint-comment-block-form",
+    "inputs": ["@tooling"]
   },
   {
     "id": "lint-typecheck-asmdef-references",
     "name": "Typecheck asmdef-reference linter self-test",
-    "run": "npm run test:lint-typecheck-asmdef-references"
+    "run": "npm run test:lint-typecheck-asmdef-references",
+    "inputs": ["@tooling"]
   },
   {
     "id": "lint-production-test-hooks",
     "name": "Production test-hook policy controls",
-    "run": "npm run test:lint-production-test-hooks"
+    "run": "npm run test:lint-production-test-hooks",
+    "inputs": ["@tooling"]
   },
   {
     "id": "lint-xml-doc-summaries",
     "name": "XML doc summary linter self-test",
-    "run": "npm run test:lint-xml-doc-summaries"
+    "run": "npm run test:lint-xml-doc-summaries",
+    "inputs": ["@tooling"]
   },
   {
     "id": "lint-concurrent-cache-fill",
     "name": "Concurrent cache fill linter self-test",
-    "run": "npm run test:lint-concurrent-cache-fill"
+    "run": "npm run test:lint-concurrent-cache-fill",
+    "inputs": ["@tooling"]
   },
   {
     "id": "lint-pwsh-invocations",
     "name": "PowerShell invocation linter self-test",
-    "run": "npm run test:lint-pwsh-invocations"
+    "run": "npm run test:lint-pwsh-invocations",
+    "inputs": ["@tooling"]
   },
   {
     "id": "lint-workflow-run-expression-length",
     "name": "Workflow run-expression linter self-test",
-    "run": "npm run test:lint-workflow-run-expression-length"
+    "run": "npm run test:lint-workflow-run-expression-length",
+    "inputs": ["@tooling"]
   },
   {
     "id": "validate-lint-error-codes",
     "name": "Lint-error-code validator self-test",
-    "run": "npm run test:validate-lint-error-codes"
+    "run": "npm run test:validate-lint-error-codes",
+    "inputs": ["@tooling"]
   },
   {
     "id": "gitignore-docs",
     "name": "Gitignore-docs linter self-test",
-    "run": "npm run test:gitignore-docs"
+    "run": "npm run test:gitignore-docs",
+    "inputs": ["@tooling"]
   },
   {
     "id": "runner-maintenance",
     "name": "Runner maintenance selection and CLI",
-    "run": "npm run test:runner-maintenance"
+    "run": "npm run test:runner-maintenance",
+    "inputs": ["@tooling"]
   },
   {
     "id": "python-compatibility",
     "name": "Python migration compatibility entry points",
-    "run": "npm run test:python-compatibility"
+    "run": "npm run test:python-compatibility",
+    "inputs": ["@tooling"]
   },
   {
     "id": "check-runner",
     "name": "Python check execution and completion",
-    "run": "npm run test:check-runner"
+    "run": "npm run test:check-runner",
+    "inputs": ["@tooling"]
   },
   {
     "id": "run-repo-lint",
     "name": "Repo Lint runner contracts",
-    "run": "npm run test:run-repo-lint"
+    "run": "npm run test:run-repo-lint",
+    "inputs": ["@tooling"]
   },
   {
     "id": "run-contract-tests",
     "name": "Contract runner contracts",
-    "run": "npm run test:run-contract-tests"
+    "run": "npm run test:run-contract-tests",
+    "inputs": ["@tooling"]
   },
   {
     "id": "git-path-helpers",
     "name": "Git path helpers",
-    "run": "npm run test:git-path-helpers"
+    "run": "npm run test:git-path-helpers",
+    "inputs": ["@tooling"]
   },
   {
     "id": "git-staging-helpers",
     "name": "Git staging helpers",
-    "run": "npm run test:git-staging-helpers"
+    "run": "npm run test:git-staging-helpers",
+    "inputs": ["@tooling"]
   },
   {
     "id": "configure-git-defaults",
     "name": "Git default configuration",
-    "run": "npm run test:configure-git-defaults"
+    "run": "npm run test:configure-git-defaults",
+    "inputs": ["@tooling"]
   },
   {
     "id": "normalize-container-git-config",
     "name": "Container git config normalization",
-    "run": "npm run test:normalize-container-git-config"
+    "run": "npm run test:normalize-container-git-config",
+    "inputs": ["@tooling"]
   },
   {
     "id": "validate-git-push-config",
     "name": "Git push configuration validator",
-    "run": "npm run test:validate-git-push-config"
+    "run": "npm run test:validate-git-push-config",
+    "inputs": ["@tooling"]
   },
   {
     "id": "github-token",
     "name": "GitHub token helper",
-    "run": "npm run test:github-token"
+    "run": "npm run test:github-token",
+    "inputs": ["@tooling"]
   },
   {
     "id": "format-on-demand-workflow",
     "name": "Opt-in formatting command and PR-state guards",
-    "run": "npm run test:format-on-demand-workflow"
+    "run": "npm run test:format-on-demand-workflow",
+    "inputs": ["@tooling"]
   },
   {
     "id": "sync-script-contracts",
     "name": "Script and workflow sync contracts",
-    "run": "npm run test:sync-script-contracts"
+    "run": "npm run test:sync-script-contracts",
+    "inputs": ["@tooling"]
   },
   {
     "id": "pr-workflow-concurrency",
     "name": "Pull-request workflow concurrency",
-    "run": "npm run test:pr-workflow-concurrency"
+    "run": "npm run test:pr-workflow-concurrency",
+    "inputs": ["@tooling"]
   },
   {
     "id": "workflow-repository-guard",
     "name": "Workflow repository guard",
-    "run": "npm run test:workflow-repository-guard"
+    "run": "npm run test:workflow-repository-guard",
+    "inputs": ["@tooling"]
   },
   {
     "id": "workflow-license-secret-scope",
     "name": "Workflow licensing-credential scope",
-    "run": "npm run test:workflow-license-secret-scope"
+    "run": "npm run test:workflow-license-secret-scope",
+    "inputs": ["@tooling"]
   },
   {
     "id": "asmdef-discovery",
     "name": "Asmdef discovery classification",
-    "run": "npm run test:asmdef-discovery"
+    "run": "npm run test:asmdef-discovery",
+    "inputs": ["@tooling"]
   },
   {
     "id": "unity-workflow-matrix-contract",
     "name": "Unity workflow matrix contract",
-    "run": "npm run test:unity-workflow-matrix-contract"
+    "run": "npm run test:unity-workflow-matrix-contract",
+    "inputs": ["@tooling"]
   },
   {
     "id": "release-export-only",
     "name": "Release export without publication",
-    "run": "npm run test:release-export-only"
+    "run": "npm run test:release-export-only",
+    "inputs": ["@tooling"]
   },
   {
     "id": "unity-package-export",
     "name": "Unity native package export",
-    "run": "npm run test:unity-package-export"
+    "run": "npm run test:unity-package-export",
+    "inputs": ["@tooling"]
   },
   {
     "id": "create-unitypackage",
     "name": "Portable Unity package archive",
-    "run": "npm run test:create-unitypackage"
+    "run": "npm run test:create-unitypackage",
+    "inputs": ["@tooling"]
   },
   {
     "id": "unity-test-filter",
     "name": "Unity test filter arguments and results",
-    "run": "npm run test:unity-test-filter"
+    "run": "npm run test:unity-test-filter",
+    "inputs": ["@tooling"]
   },
   {
     "id": "unity-frozen-player-provenance",
     "name": "Unity frozen player provenance",
-    "run": "npm run test:unity-frozen-player-provenance"
+    "run": "npm run test:unity-frozen-player-provenance",
+    "inputs": ["@tooling"]
   },
   {
     "id": "unity-acceptance-runner",
     "name": "Unity native acceptance orchestration",
     "run": "npm run test:unity-acceptance-runner",
-    "completionPattern": "^[1-9][0-9]* orchestration, exact XML and raw evidence integration controls passed\\.\\r?$"
+    "completionPattern": "^[1-9][0-9]* orchestration, exact XML and raw evidence integration controls passed\\.\\r?$",
+    "inputs": ["@tooling"]
   },
   {
     "id": "unity-acceptance-evidence",
     "name": "Unity raw acceptance evidence",
-    "run": "npm run test:unity-acceptance-evidence"
+    "run": "npm run test:unity-acceptance-evidence",
+    "inputs": ["@tooling"]
   },
   {
     "id": "unity-acceptance-workflow",
     "name": "Unity optional acceptance workflow",
-    "run": "npm run test:unity-acceptance-workflow"
+    "run": "npm run test:unity-acceptance-workflow",
+    "inputs": ["@tooling"]
   },
   {
     "id": "unity-grouped-modes",
     "name": "Grouped Unity mode dispatch and outcome controls",
-    "run": "npm run test:unity-grouped-modes"
+    "run": "npm run test:unity-grouped-modes",
+    "inputs": ["@tooling"]
   },
   {
     "id": "standalone-scene-provision",
     "name": "Standalone packed-scene build provision controls",
-    "run": "npm run test:standalone-scene-provision"
+    "run": "npm run test:standalone-scene-provision",
+    "inputs": ["@tooling"]
   },
   {
     "id": "build-lock-action-inputs",
     "name": "Build-lock action inputs",
-    "run": "npm run test:build-lock-action-inputs"
+    "run": "npm run test:build-lock-action-inputs",
+    "inputs": ["@tooling"]
   },
   {
     "id": "build-lock-action-input-parser",
     "name": "Build-lock action input parser",
-    "run": "npm run test:build-lock-action-input-parser"
+    "run": "npm run test:build-lock-action-input-parser",
+    "inputs": ["@tooling"]
   },
   {
     "id": "portable-cleanup-classifier",
     "name": "Portable cleanup classifier",
-    "run": "npm run test:portable-cleanup-classifier"
+    "run": "npm run test:portable-cleanup-classifier",
+    "inputs": ["@tooling"]
   },
   {
     "id": "license-cache",
     "name": "Unity license cache",
-    "run": "npm run test:license-cache"
+    "run": "npm run test:license-cache",
+    "inputs": ["@tooling"]
   },
   {
     "id": "license-year-rename",
     "name": "License year resolution across a rename",
-    "run": "npm run test:license-year-rename"
+    "run": "npm run test:license-year-rename",
+    "inputs": ["@tooling"]
   },
   {
     "id": "license-year-copy-detection",
     "name": "License year copy detection",
-    "run": "npm run test:license-year-copy-detection"
+    "run": "npm run test:license-year-copy-detection",
+    "inputs": ["@tooling"]
   },
   {
     "id": "unity-nunit-results",
     "name": "Unity NUnit results gate",
-    "run": "npm run test:unity-nunit-results"
+    "run": "npm run test:unity-nunit-results",
+    "inputs": ["@tooling"]
   },
   {
     "id": "redact-unity-artifacts",
     "name": "Unity artifact credential redactor",
-    "run": "npm run test:redact-unity-artifacts"
+    "run": "npm run test:redact-unity-artifacts",
+    "inputs": ["@tooling"]
   },
   {
     "id": "unity-artifact-redaction",
     "name": "Unity artifact redaction coverage",
-    "run": "npm run test:unity-artifact-redaction"
+    "run": "npm run test:unity-artifact-redaction",
+    "inputs": ["@tooling"]
   },
   {
     "id": "unity-license-cache-location",
     "name": "Unity license cache location",
-    "run": "npm run test:unity-license-cache-location"
+    "run": "npm run test:unity-license-cache-location",
+    "inputs": ["@tooling"]
   },
   {
     "id": "shell-portability",
     "name": "Shell portability",
-    "run": "npm run test:shell-portability"
+    "run": "npm run test:shell-portability",
+    "inputs": ["@tooling"]
   },
   {
     "id": "read-stdin-sync",
     "name": "Synchronous stdin reader",
-    "run": "npm run test:read-stdin-sync"
+    "run": "npm run test:read-stdin-sync",
+    "inputs": ["@tooling"]
   },
   {
     "id": "validate-mcp-config",
     "name": "MCP configuration validator",
-    "run": "npm run test:validate-mcp-config"
+    "run": "npm run test:validate-mcp-config",
+    "inputs": ["@tooling"]
   },
   {
     "id": "github-mcp",
     "name": "GitHub MCP launcher",
-    "run": "npm run test:github-mcp"
+    "run": "npm run test:github-mcp",
+    "inputs": ["@tooling"]
   },
   {
     "id": "unity-mcp",
     "name": "Unity MCP helpers",
-    "run": "npm run test:unity-mcp"
+    "run": "npm run test:unity-mcp",
+    "inputs": ["@tooling"]
   },
   {
     "id": "zai-mcp",
     "name": "Z.AI MCP launcher",
-    "run": "npm run test:zai-mcp"
+    "run": "npm run test:zai-mcp",
+    "inputs": ["@tooling"]
   },
   {
     "id": "sync-mcp",
     "name": "MCP worktree and global config sync",
-    "run": "npm run test:sync-mcp"
+    "run": "npm run test:sync-mcp",
+    "inputs": ["@tooling"]
   },
   {
     "id": "accelerator",
     "name": "Unity Accelerator configuration",
-    "run": "npm run test:accelerator"
+    "run": "npm run test:accelerator",
+    "inputs": ["@tooling"]
   },
   {
     "id": "project-workspace",
     "name": "Project workspace resolution",
-    "run": "npm run test:project-workspace"
+    "run": "npm run test:project-workspace",
+    "inputs": ["@tooling"]
   },
   {
     "id": "postinstall-hooks",
     "name": "Postinstall hook wiring",
-    "run": "npm run test:postinstall-hooks"
+    "run": "npm run test:postinstall-hooks",
+    "inputs": ["@tooling"]
   },
   {
     "id": "add-cspell-word",
     "name": "cspell word insertion",
-    "run": "npm run test:add-cspell-word"
+    "run": "npm run test:add-cspell-word",
+    "inputs": ["@tooling"]
   },
   {
     "id": "github-pages-sortable",
     "name": "GitHub Pages sortable tables",
-    "run": "npm run test:github-pages-sortable"
+    "run": "npm run test:github-pages-sortable",
+    "inputs": ["@tooling"]
   },
   {
     "id": "wiki-generation",
     "name": "Wiki generation",
-    "run": "npm run test:wiki-generation"
+    "run": "npm run test:wiki-generation",
+    "inputs": ["@tooling"]
   },
   {
     "id": "npm-package-signature",
     "name": "npm package signature",
-    "run": "npm run test:npm-package-signature"
+    "run": "npm run test:npm-package-signature",
+    "inputs": ["@tooling"]
   },
   {
     "id": "npm-package-changelog",
     "name": "npm package changelog",
     "run": "npm run test:npm-package-changelog",
-    "exclusive": true
+    "exclusive": true,
+    "inputs": ["@tooling"]
   },
   {
     "id": "release-tools",
     "name": "Release tooling",
-    "run": "npm run test:release-tools"
+    "run": "npm run test:release-tools",
+    "inputs": ["@tooling"]
   },
   {
     "id": "verify-release-tag",
     "name": "Release tag contract",
-    "run": "npm run test:verify-release-tag"
+    "run": "npm run test:verify-release-tag",
+    "inputs": ["@tooling"]
   },
   {
     "id": "perf-tools",
     "name": "Performance report tooling",
-    "run": "npm run test:perf-tools"
+    "run": "npm run test:perf-tools",
+    "inputs": ["@tooling"]
   },
   {
     "id": "random-quality-stream",
     "name": "Random-quality stream",
-    "run": "npm run test:random-quality-stream"
+    "run": "npm run test:random-quality-stream",
+    "inputs": ["@tooling"]
   },
   {
     "id": "random-quality-outcomes",
     "name": "Random-quality outcomes",
-    "run": "npm run test:random-quality-outcomes"
+    "run": "npm run test:random-quality-outcomes",
+    "inputs": ["@tooling"]
   },
   {
     "id": "frozen-files",
     "name": "Frozen file Python inventory controls",
-    "run": "npm run test:frozen-files"
+    "run": "npm run test:frozen-files",
+    "inputs": ["@tooling", "docs/features/serialization/**", "docs/performance/**"]
   },
   {
     "id": "csharp-lints",
     "name": "Typed C# license and Conditional checks",
-    "run": "npm run test:csharp-lints"
+    "run": "npm run test:csharp-lints",
+    "inputs": ["@csharp", "@tooling"]
   },
   {
     "id": "unity-timeout",
     "name": "GNU timeout selection and early refusal",
-    "run": "npm run test:unity-timeout"
+    "run": "npm run test:unity-timeout",
+    "inputs": ["@tooling"]
   },
   {
     "id": "doc-link-test-launcher",
     "name": "Documentation link test compatibility launcher",
     "run": "npm run test:doc-links-launcher",
-    "completionPattern": "^1 passed(?:, [0-9]+ deselected)? in "
+    "completionPattern": "^1 passed(?:, [0-9]+ deselected)? in ",
+    "inputs": ["@tooling"]
   },
   {
     "id": "node-bin",
     "name": "Node tool launcher controls",
-    "run": "npm run test:node-bin"
+    "run": "npm run test:node-bin",
+    "inputs": ["@tooling"]
+  },
+  {
+    "id": "agent-check",
+    "name": "Task validation selection",
+    "run": "npm run test:agent-check",
+    "inputs": ["@tooling"]
   }
 ]

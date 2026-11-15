@@ -2436,7 +2436,7 @@ foreach ($mode in @(
 $singleThreadedOutcomeGate = Get-UnityWorkflowStepText -JobText $unityTestsSingleThreadedJob -StepName 'Require every SINGLE_THREADED Unity mode'
 $singleThreadedModesAreComplete = (
     $singleThreadedModesAreComplete -and
-    $singleThreadedOutcomeGate.Contains('SELECTED_MODES: ''["editmode","playmode","standalone"]''') -and
+    $singleThreadedOutcomeGate.Contains('SELECTED_MODES: ${{ github.event_name == ''pull_request'' && needs.matrix-config.outputs.test-modes || ''["editmode","playmode","standalone"]'' }}') -and
     $singleThreadedOutcomeGate.Contains('./scripts/unity/assert-test-mode-outcomes.ps1') -and
     -not $singleThreadedOutcomeGate.Contains('.conclusion')
 )

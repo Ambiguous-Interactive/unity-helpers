@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -10,6 +11,7 @@ import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 from cli_encoding import configure_output
 
@@ -181,10 +183,13 @@ def git_environment() -> dict[str, str]:
 
 
 def read_action_at_ref(policy_root: Path, action: str, ref: str) -> str:
+    return read_policy_object(policy_root, f"{ref}:.github/actions/{action}/action.yml")
+
+
+def read_policy_object(policy_root: Path, target: str) -> str:
     git = shutil.which("git")
     if git is None:
         raise ValueError("Git is required to read the central policy checkout.")
-    target = f"{ref}:.github/actions/{action}/action.yml"
     with tempfile.TemporaryFile() as output:
         try:
             result = subprocess.run(  # noqa: S603 - read-only Git object lookup, without a shell.
@@ -224,7 +229,32 @@ def collect_yaml_files(directory: Path) -> list[Path]:
     return sorted(found)
 
 
-def validate_build_lock_action_inputs(root: Path, policy_root: Path) -> Result:
+def approved_pins(policy_root: Path, ref: str) -> dict[str, set[str]]:
+    document: object = json.loads(
+        read_policy_object(policy_root, f"{ref}:unity-enrollment-policy.json")
+    )
+    if not isinstance(document, dict):
+        raise ValueError("Central approval policy must be an object.")
+    policy = cast("dict[str, object]", document)
+    approved: dict[str, set[str]] = {}
+    for name in ("approvedLockShas", "approvedReturnShas"):
+        values = policy.get(name)
+        if (
+            not isinstance(values, list)
+            or not values
+            or any(
+                not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{40}", value) is None
+                for value in cast("list[object]", values)
+            )
+        ):
+            raise ValueError(f"Central approval policy {name} must contain full commit SHAs.")
+        approved[name] = set(cast("list[str]", values))
+    return approved
+
+
+def validate_build_lock_action_inputs(
+    root: Path, policy_root: Path, approval_ref: str | None = None
+) -> Result:
     calls: list[Call] = []
     files: set[str] = set()
     for file in collect_yaml_files(root / ".github"):
@@ -235,7 +265,19 @@ def validate_build_lock_action_inputs(root: Path, policy_root: Path) -> Result:
             calls.extend(found)
     declarations: dict[str, dict[str, bool]] = {}
     failures: list[str] = []
+    approvals = approved_pins(policy_root, approval_ref) if approval_ref else None
     for call in calls:
+        if approvals is not None:
+            approval = (
+                "approvedReturnShas"
+                if call.action == "return-unity-license"
+                else "approvedLockShas"
+            )
+            if call.ref not in approvals[approval]:
+                failures.append(
+                    f"{call.file}:{call.line}: {call.action}@{call.ref} is not approved by {approval_ref}:{approval}."
+                )
+                continue
         key = f"{call.action}@{call.ref}"
         if key not in declarations:
             declarations[key] = parse_action_inputs(
@@ -310,9 +352,12 @@ def main(argv: list[str] | None = None) -> int:
         except (OSError, ValueError) as error:
             print(str(error), file=sys.stderr)
             return 1
+    if arguments and arguments != ["--approved"]:
+        print("usage: python scripts/build_lock_inputs.py [--approved]", file=sys.stderr)
+        return 2
     configured = os.environ.get("BUILD_LOCK_POLICY_ROOT", "")
     if not configured:
-        if os.environ.get("GITHUB_ACTIONS") == "true":
+        if os.environ.get("GITHUB_ACTIONS") == "true" or arguments == ["--approved"]:
             print(
                 "BUILD_LOCK_POLICY_ROOT is unset under GitHub Actions. The central policy checkout step must run before this gate; skipping here would drop the input contract silently.",
                 file=sys.stderr,
@@ -323,7 +368,11 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 0
     try:
-        result = validate_build_lock_action_inputs(ROOT, Path(configured).resolve())
+        result = validate_build_lock_action_inputs(
+            ROOT,
+            Path(configured).resolve(),
+            "refs/remotes/origin/main" if arguments == ["--approved"] else None,
+        )
     except (OSError, ValueError) as error:
         print(f"[validate-build-lock-action-inputs] {error}", file=sys.stderr)
         return 1

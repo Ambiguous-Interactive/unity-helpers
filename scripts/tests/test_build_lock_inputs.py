@@ -160,6 +160,51 @@ def test_shared_pin_is_read_once(
     assert seen == [("example", first)]
 
 
+def test_approval_uses_current_policy_not_the_action_release(
+    tmp_path: Path, policy: tuple[Path, str, str]
+) -> None:
+    policy_root, first, second = policy
+    root = tmp_path / "consumer"
+    write_workflow(root, first)
+    document = policy_root / "unity-enrollment-policy.json"
+    document.write_text(
+        json.dumps({"approvedLockShas": [first], "approvedReturnShas": [second]}),
+        encoding="utf-8",
+    )
+    git(policy_root, "add", "--", document.name)
+    git(policy_root, "commit", "-m", "Approve released action")
+    current = git(policy_root, "rev-parse", "HEAD")
+    assert inputs.validate_build_lock_action_inputs(root, policy_root, current).failures == []
+    write_workflow(root, second, "beta")
+    failures = inputs.validate_build_lock_action_inputs(root, policy_root, current).failures
+    assert len(failures) == 1
+    assert "not approved" in failures[0]
+    write_workflow(root, first)
+    workflow = root / ".github/workflows/workflow.yml"
+    workflow.write_text(
+        workflow.read_text(encoding="utf-8").replace("example@", "return-unity-license@"),
+        encoding="utf-8",
+    )
+    failures = inputs.validate_build_lock_action_inputs(root, policy_root, current).failures
+    assert len(failures) == 1
+    assert "approvedReturnShas" in failures[0]
+
+
+@pytest.mark.parametrize("document", [{}, {"approvedLockShas": [], "approvedReturnShas": []}])
+def test_invalid_approval_policy_fails_closed(
+    tmp_path: Path, policy: tuple[Path, str, str], document: dict[str, object]
+) -> None:
+    policy_root, first, _ = policy
+    root = tmp_path / "consumer"
+    write_workflow(root, first)
+    path = policy_root / "unity-enrollment-policy.json"
+    path.write_text(json.dumps(document), encoding="utf-8")
+    git(policy_root, "add", "--", path.name)
+    git(policy_root, "commit", "-m", "Invalid policy fixture")
+    with pytest.raises(ValueError, match="approvedLockShas"):
+        inputs.validate_build_lock_action_inputs(root, policy_root, "HEAD")
+
+
 @pytest.mark.parametrize(
     "line",
     [
@@ -235,10 +280,10 @@ def test_local_skip_is_distinct_from_actions_failure(
 ) -> None:
     monkeypatch.delenv("BUILD_LOCK_POLICY_ROOT", raising=False)
     monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
-    assert inputs.main() == 0
+    assert inputs.main([]) == 0
     assert "SKIPPED" in capsys.readouterr().out
     monkeypatch.setenv("GITHUB_ACTIONS", "true")
-    assert inputs.main() == 1
+    assert inputs.main([]) == 1
     assert "unset under GitHub Actions" in capsys.readouterr().err
 
 
@@ -251,7 +296,7 @@ def test_zero_calls_fail_main(
     (tmp_path / ".github").mkdir()
     monkeypatch.setattr(inputs, "ROOT", tmp_path)
     monkeypatch.setenv("BUILD_LOCK_POLICY_ROOT", str(policy[0]))
-    assert inputs.main() == 1
+    assert inputs.main([]) == 1
     assert "Found 0 pinned" in capsys.readouterr().err
 
 
@@ -265,10 +310,10 @@ def test_main_reports_success_and_failure_counts(
     write_workflow(tmp_path, first)
     monkeypatch.setattr(inputs, "ROOT", tmp_path)
     monkeypatch.setenv("BUILD_LOCK_POLICY_ROOT", str(root))
-    assert inputs.main() == 0
+    assert inputs.main([]) == 0
     assert "1 call(s) across 1 file(s) match 1 pinned" in capsys.readouterr().out
     write_workflow(tmp_path, first, "wrong")
-    assert inputs.main() == 1
+    assert inputs.main([]) == 1
     report = capsys.readouterr().err
     assert report.count("::error::") == 2
     assert "2 input contract violation(s)" in report

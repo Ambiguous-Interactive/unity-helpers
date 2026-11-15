@@ -5,7 +5,7 @@ name: Local Gates
 # `validate:tests` composes the fast contract suite with exhaustive synthetic hook regressions.
 # Developer `validate:prepush` is intentionally a fast last-resort safety check;
 # `validate:local` retains the old complete developer aggregate, and this job remains the
-# authoritative unconditional home for both test subsets. Before this job existed, `--no-verify`, a squash merge
+# authoritative entry point for both test subsets (affected PR checks; full main checks). Before this job existed, `--no-verify`, a squash merge
 # from the web UI, or a push from another environment could leave a pull request fully green with a
 # broken suite -- which happened in PR #334. `typecheck:unity` compiles the real Runtime sources with
 # the shipped analyzer loaded and likewise had no workflow coverage.
@@ -82,6 +82,12 @@ jobs:
           path: build-lock-policy
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Require centrally approved build-lock action pins
+        working-directory: unity-helpers
+        env:
+          BUILD_LOCK_POLICY_ROOT: ${{ github.workspace }}/build-lock-policy
+        run: uv run --project scripts/python~ --locked --no-dev python scripts/build_lock_inputs.py --approved
 
       # package-lock.json is GITIGNORED here, so the cached path is the exception rather than the
       # rule and `cache: npm` on its own fails the job outright with "Dependencies lock file is not
@@ -169,11 +175,18 @@ jobs:
       # rather than skipping, which is how this job discovered it needed one.
       # This suite also stages the release .unitypackage payload under Assets and verifies that its
       # runtime asmdef keeps the same default-on serialization path as a Package Manager install.
+      - name: Record task selection and native coverage proposal
+        working-directory: unity-helpers
+        env:
+          AGENT_CHECK_BASE: ${{ github.event.pull_request.base.sha || 'HEAD^' }}
+        run: node scripts/agent-check.js --tier pr --base "$AGENT_CHECK_BASE" --plan --json
+
       - name: Run contract suites
         working-directory: unity-helpers
         env:
           BUILD_LOCK_POLICY_ROOT: ${{ github.workspace }}/build-lock-policy
-        run: npm run validate:tests
+          AGENT_CHECK_BASE: ${{ github.event.pull_request.base.sha }}
+        run: npm run validate:tests -- --ci
 
   typecheck-phases:
     name: Type-check (${{ matrix.phase }})

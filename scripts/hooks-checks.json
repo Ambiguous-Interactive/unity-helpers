@@ -2,16 +2,19 @@
   {
     "id": "agent-preflight",
     "name": "Agent preflight regressions",
-    "run": "npm run test:agent-preflight"
+    "run": "npm run test:agent-preflight",
+    "inputs": ["@tooling"]
   },
   {
     "id": "precommit-integration",
     "name": "Pre-commit integration regressions",
-    "run": "npm run test:precommit-integration"
+    "run": "npm run test:precommit-integration",
+    "inputs": ["@tooling"]
   },
   {
     "id": "pre-push-changed-files",
     "name": "Pre-push changed-file regressions",
-    "run": "npm run test:pre-push-changed-files"
+    "run": "npm run test:pre-push-changed-files",
+    "inputs": ["@tooling"]
   }
 ]

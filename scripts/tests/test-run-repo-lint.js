@@ -510,6 +510,7 @@ runTest("no linter in scripts/ has been left unreachable", () => {
     ["scripts/lint-skill-sizes.ps1", "size-controls"],
     ["scripts/lint-unity-test-modules.ps1", "module-controls"],
     ["scripts/lint_unity_test_modules.py", "workflow"],
+    ["scripts/validate-formatting.sh", "formatting-controls"],
     ["scripts/lint-csharp-format.ps1", "preflight"],
     ["scripts/lint_csharp_format.py", "formatter-launcher"],
     ["scripts/lint_meta_files.py", "preflight"],
@@ -596,6 +597,10 @@ runTest("no linter in scripts/ has been left unreachable", () => {
     [
       "doc-count-controls",
       (file) => registeredControlsInvoke(file, "scripts/tests/test-lint-doc-counts.ps1")
+    ],
+    [
+      "formatting-controls",
+      (file) => registeredControlsInvoke(file, "scripts/tests/test-precommit-integration.sh")
     ],
     ["workflow", (file) => filesInvoking(".github/workflows", file).length > 0],
     ["preflight", (file) => fileInvokes("scripts/agent-preflight.ps1", file)],
