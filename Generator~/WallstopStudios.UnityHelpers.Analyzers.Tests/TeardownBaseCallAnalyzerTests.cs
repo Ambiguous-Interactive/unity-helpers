@@ -428,6 +428,18 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
             "an empty intervening finally preserves the original exception",
             "protected override void OnDestroy() { try { try { try { throw new ArgumentException(); } finally { } } finally { base.OnDestroy(); } } catch (ArgumentException) { Release(); } }"
         )]
+        [TestCase(
+            "a nullable local can dispatch its declared exception type",
+            "protected override void OnDestroy() { try { try { ArgumentException exception = 0 < handles ? new ArgumentException() : null; throw exception; } finally { base.OnDestroy(); } } catch (ArgumentException) { Release(); } }"
+        )]
+        [TestCase(
+            "a typed catch before the finally leaves the null alternative",
+            "protected override void OnDestroy() { try { try { try { ArgumentException exception = 0 < handles ? new ArgumentException() : null; throw exception; } catch (ArgumentException) { } } finally { base.OnDestroy(); } } catch (NullReferenceException) { Release(); } }"
+        )]
+        [TestCase(
+            "a typed catch after finally leaves the null alternative",
+            "protected override void OnDestroy() { try { try { try { ArgumentException exception = 0 < handles ? new ArgumentException() : null; throw exception; } finally { base.OnDestroy(); } } catch (ArgumentException) { } } catch (NullReferenceException) { Release(); } }"
+        )]
         public void NestedTeardownWithReachableFollowingWorkIsReported(string shape, string body)
         {
             Diagnostic reported = Single(body);
@@ -518,6 +530,18 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
         [TestCase(
             "an exception thrown by a filter is swallowed before the finally",
             "protected override void OnDestroy() { try { try { try { throw new ArgumentException(); } catch (ArgumentException) when (0 < handles ? throw new InvalidOperationException() : false) { } } finally { base.OnDestroy(); } } catch (InvalidOperationException) { Release(); } }"
+        )]
+        [TestCase(
+            "a nullable local cannot dispatch an unrelated exception",
+            "protected override void OnDestroy() { try { try { ArgumentException exception = null; throw exception; } finally { base.OnDestroy(); } } catch (InvalidOperationException) { Release(); } }"
+        )]
+        [TestCase(
+            "both alternatives consumed before finally cannot escape",
+            "protected override void OnDestroy() { try { try { try { ArgumentException exception = 0 < handles ? new ArgumentException() : null; throw exception; } catch (ArgumentException) { } catch (NullReferenceException) { } } finally { base.OnDestroy(); } } catch { Release(); } }"
+        )]
+        [TestCase(
+            "both alternatives consumed after finally cannot escape",
+            "protected override void OnDestroy() { try { try { try { ArgumentException exception = 0 < handles ? new ArgumentException() : null; throw exception; } finally { base.OnDestroy(); } } catch (ArgumentException) { } catch (NullReferenceException) { } } catch { Release(); } }"
         )]
         public void NestedTeardownWithoutFollowingWorkIsNotReported(string shape, string body)
         {

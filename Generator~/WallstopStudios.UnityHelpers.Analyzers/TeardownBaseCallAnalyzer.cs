@@ -284,7 +284,8 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             bool includeHandlers,
             Queue<BasicBlock> pending,
             ControlFlowRegion completedFinally = null,
-            ITypeSymbol exceptionType = null
+            ITypeSymbol exceptionType = null,
+            ITypeSymbol alternativeExceptionType = null
         )
         {
             for (
@@ -306,7 +307,13 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                         {
                             ControlFlowRegion handler = region.NestedRegions[index];
                             ITypeSymbol handlerType = handler.ExceptionType;
-                            if (AreProvablyUnrelated(exceptionType, handlerType))
+                            if (
+                                AreProvablyUnrelated(exceptionType, handlerType)
+                                && (
+                                    alternativeExceptionType == null
+                                    || AreProvablyUnrelated(alternativeExceptionType, handlerType)
+                                )
+                            )
                             {
                                 continue;
                             }
@@ -336,22 +343,10 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                             }
                             if (
                                 handler.Kind == ControlFlowRegionKind.Catch
-                                && (
-                                    IsSameOrDerived(exceptionType, handlerType)
-                                    || handlerType == null
-                                    || handlerType.SpecialType == SpecialType.System_Object
-                                    || (
-                                        string.Equals(
-                                            handlerType.Name,
-                                            nameof(Exception),
-                                            StringComparison.Ordinal
-                                        )
-                                        && string.Equals(
-                                            handlerType.ContainingNamespace.ToDisplayString(),
-                                            "System",
-                                            StringComparison.Ordinal
-                                        )
-                                    )
+                                && ConsumeHandledExceptions(
+                                    ref exceptionType,
+                                    ref alternativeExceptionType,
+                                    handlerType
                                 )
                             )
                             {
@@ -427,16 +422,27 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 )
             )
             {
-                ITypeSymbol exceptionType = ThrownExceptionType(graph, branch);
+                ITypeSymbol exceptionType = ThrownExceptionType(
+                    graph,
+                    branch,
+                    out ITypeSymbol alternativeExceptionType
+                );
                 if (
-                    !IsInterceptedBeforeFinally(graph, branch.Source, region, exceptionType)
+                    !IsInterceptedBeforeFinally(
+                        graph,
+                        branch.Source,
+                        region,
+                        ref exceptionType,
+                        ref alternativeExceptionType
+                    )
                     && HasUnwindingCleanup(
                         graph,
                         branch.Source,
                         true,
                         pending,
                         region,
-                        exceptionType
+                        exceptionType,
+                        alternativeExceptionType
                     )
                 )
                 {
@@ -469,7 +475,8 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             ControlFlowGraph graph,
             BasicBlock source,
             ControlFlowRegion completedFinally,
-            ITypeSymbol exceptionType
+            ref ITypeSymbol exceptionType,
+            ref ITypeSymbol alternativeExceptionType
         )
         {
             for (
@@ -521,22 +528,10 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                     ITypeSymbol handlerType = handler.ExceptionType;
                     if (
                         handler.Kind == ControlFlowRegionKind.Catch
-                        && (
-                            handlerType == null
-                            || handlerType.SpecialType == SpecialType.System_Object
-                            || IsSameOrDerived(exceptionType, handlerType)
-                            || (
-                                string.Equals(
-                                    handlerType.Name,
-                                    nameof(Exception),
-                                    StringComparison.Ordinal
-                                )
-                                && string.Equals(
-                                    handlerType.ContainingNamespace.ToDisplayString(),
-                                    "System",
-                                    StringComparison.Ordinal
-                                )
-                            )
+                        && ConsumeHandledExceptions(
+                            ref exceptionType,
+                            ref alternativeExceptionType,
+                            handlerType
                         )
                     )
                     {
@@ -595,9 +590,11 @@ namespace WallstopStudios.UnityHelpers.Analyzers
 
         private static ITypeSymbol ThrownExceptionType(
             ControlFlowGraph graph,
-            ControlFlowBranch branch
+            ControlFlowBranch branch,
+            out ITypeSymbol alternativeExceptionType
         )
         {
+            alternativeExceptionType = null;
             if (branch.Semantics == ControlFlowBranchSemantics.Rethrow)
             {
                 return RethrownExceptionType(branch.Source);
@@ -621,8 +618,68 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                     "System.NullReferenceException"
                 );
             }
-            // Other expressions may be null or run user code before yielding the exception.
-            return thrown is IObjectCreationOperation ? thrown.Type : null;
+            ITypeSymbol type = thrown?.Type;
+            if (thrown is IObjectCreationOperation)
+            {
+                return type;
+            }
+            if (type == null || type.TypeKind != TypeKind.Class)
+            {
+                return null;
+            }
+            alternativeExceptionType =
+                graph.OriginalOperation.SemanticModel?.Compilation.GetTypeByMetadataName(
+                    "System.NullReferenceException"
+                );
+            if (alternativeExceptionType == null)
+            {
+                return null;
+            }
+            if (SymbolEqualityComparer.Default.Equals(type, alternativeExceptionType))
+            {
+                alternativeExceptionType = null;
+            }
+            return type;
+        }
+
+        private static bool ConsumeHandledExceptions(
+            ref ITypeSymbol exceptionType,
+            ref ITypeSymbol alternativeExceptionType,
+            ITypeSymbol handlerType
+        )
+        {
+            bool handlesAlternative =
+                alternativeExceptionType != null
+                && HandlerCatchesType(alternativeExceptionType, handlerType);
+            if (HandlerCatchesType(exceptionType, handlerType))
+            {
+                if (alternativeExceptionType == null || handlesAlternative)
+                {
+                    return true;
+                }
+                exceptionType = alternativeExceptionType;
+                alternativeExceptionType = null;
+            }
+            else if (handlesAlternative)
+            {
+                alternativeExceptionType = null;
+            }
+            return false;
+        }
+
+        private static bool HandlerCatchesType(ITypeSymbol type, ITypeSymbol handlerType)
+        {
+            return handlerType == null
+                || handlerType.SpecialType == SpecialType.System_Object
+                || IsSameOrDerived(type, handlerType)
+                || (
+                    string.Equals(handlerType.Name, nameof(Exception), StringComparison.Ordinal)
+                    && string.Equals(
+                        handlerType.ContainingNamespace.ToDisplayString(),
+                        "System",
+                        StringComparison.Ordinal
+                    )
+                );
         }
 
         private static ITypeSymbol RethrownExceptionType(BasicBlock source)
