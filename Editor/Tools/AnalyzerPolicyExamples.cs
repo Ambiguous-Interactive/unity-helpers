@@ -193,6 +193,21 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     selectedExplanation =
                         "Implement typed equality and matching object equality and hashing. Ref structs are excluded on Unity's C# version. Stored collection references keep reference equality unless the type documents content equality.";
                     break;
+                case "WUH029":
+                    selectedBadCode =
+                        "public class Item { private int value; public int Value => value; }";
+                    selectedGoodCode =
+                        "public class Item { public int Value => value; private int value; }";
+                    selectedExplanation =
+                        "Keep properties before fields and nested types last. Review static initializer dependencies before moving declarations. This rule reports order; it does not rewrite code.";
+                    break;
+                case "WUH030":
+                    selectedBadCode = "bool matches = \"text\".StartsWith(\"t\");";
+                    selectedGoodCode =
+                        "bool matches = \"text\".StartsWith(\"t\", StringComparison.Ordinal);";
+                    selectedExplanation =
+                        "Choose an explicit StringComparison or CultureInfo policy. Preserve culture-sensitive behavior when required; invariant casing is a separate deliberate choice. This rule is opt-in.";
+                    break;
                 case "WUH028":
                     selectedBadCode =
                         "using var lease = Buffers<int>.List.Get(out List<int> items);\nitems.Clear();";

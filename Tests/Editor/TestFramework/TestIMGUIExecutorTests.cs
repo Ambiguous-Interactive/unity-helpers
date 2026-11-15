@@ -18,6 +18,153 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
             while (enumerator.MoveNext()) { }
         }
 
+        [TestCase(false, false, false)]
+        [TestCase(false, false, true)]
+        [TestCase(false, true, false)]
+        [TestCase(false, true, true)]
+        [TestCase(true, false, false)]
+        [TestCase(true, false, true)]
+        [TestCase(true, true, false)]
+        [TestCase(true, true, true)]
+        public void DefaultRunsRestoreIncomingPolicy(
+            bool incoming,
+            bool mouseDown,
+            bool budgetFailure
+        )
+        {
+            bool previous = LogAssert.ignoreFailingMessages;
+            LogAssert.ignoreFailingMessages = incoming;
+            try
+            {
+                TestIMGUIExecutorBudget budget = budgetFailure
+                    ? TestIMGUIExecutorBudget.WithFrames(0)
+                    : TestIMGUIExecutorBudget.Default;
+                IEnumerator runner = mouseDown
+                    ? TestIMGUIExecutor.RunMouseDown(() => { }, Vector2.zero, budget)
+                    : TestIMGUIExecutor.Run(() => { }, budget);
+                if (budgetFailure)
+                {
+                    Assert.Throws<TestIMGUIExecutorTimeoutException>(() => DrainEnumerator(runner));
+                }
+                else
+                {
+                    DrainEnumerator(runner);
+                }
+                Assert.That(LogAssert.ignoreFailingMessages, Is.EqualTo(incoming));
+            }
+            finally
+            {
+                LogAssert.ignoreFailingMessages = previous;
+            }
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void InitializeEditorStylesPreservesIncomingLogPolicy(bool incoming)
+        {
+            bool previous = LogAssert.ignoreFailingMessages;
+            LogAssert.ignoreFailingMessages = incoming;
+            try
+            {
+                TestIMGUIExecutor.InitializeEditorStyles();
+                Assert.That(LogAssert.ignoreFailingMessages, Is.EqualTo(incoming));
+            }
+            finally
+            {
+                LogAssert.ignoreFailingMessages = previous;
+            }
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void StrictRunRestoresPolicyWhenTheBudgetFails(bool incoming)
+        {
+            bool previous = LogAssert.ignoreFailingMessages;
+            LogAssert.ignoreFailingMessages = incoming;
+            try
+            {
+                IEnumerator runner = TestIMGUIExecutor.Run(
+                    () => { },
+                    TestIMGUIExecutorBudget.WithFrames(0),
+                    strictLogs: true
+                );
+                Assert.Throws<TestIMGUIExecutorTimeoutException>(() => DrainEnumerator(runner));
+                Assert.That(LogAssert.ignoreFailingMessages, Is.EqualTo(incoming));
+            }
+            finally
+            {
+                LogAssert.ignoreFailingMessages = previous;
+            }
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void DefaultRunsExposeUnexpectedErrors(bool mouseDown)
+        {
+            const string probe = "default-log-policy-probe";
+            bool previous = LogAssert.ignoreFailingMessages;
+            LogAssert.ignoreFailingMessages = false;
+            bool emitted = false;
+            try
+            {
+                System.Action action = () =>
+                {
+                    if (!emitted)
+                    {
+                        emitted = true;
+                        Debug.LogError(probe);
+                    }
+                };
+                IEnumerator runner = mouseDown
+                    ? TestIMGUIExecutor.RunMouseDown(action, Vector2.zero)
+                    : TestIMGUIExecutor.Run(action);
+                DrainEnumerator(runner);
+                Assert.That(emitted, Is.True);
+                Assert.That(LogAssert.ignoreFailingMessages, Is.False);
+                Assert.Catch<System.Exception>(() => LogAssert.NoUnexpectedReceived());
+                LogAssert.Expect(LogType.Error, probe);
+                LogAssert.NoUnexpectedReceived();
+            }
+            finally
+            {
+                LogAssert.ignoreFailingMessages = previous;
+            }
+        }
+
+        [TestCase("strict-log-policy-probe")]
+        [TestCase(TestIMGUIExecutor.OffscreenCursorRectError)]
+        public void StrictRunExposesUnexpectedErrors(string probe)
+        {
+            bool previous = LogAssert.ignoreFailingMessages;
+            LogAssert.ignoreFailingMessages = false;
+            bool emitted = false;
+            try
+            {
+                IEnumerator runner = TestIMGUIExecutor.Run(
+                    () =>
+                    {
+                        if (!emitted)
+                        {
+                            emitted = true;
+                            Debug.LogError(probe);
+                        }
+                    },
+                    TestIMGUIExecutorBudget.Default,
+                    strictLogs: true
+                );
+                DrainEnumerator(runner);
+                Assert.That(emitted, Is.True);
+                Assert.That(LogAssert.ignoreFailingMessages, Is.False);
+                Assert.Catch<System.Exception>(() => LogAssert.NoUnexpectedReceived());
+                LogAssert.Expect(LogType.Error, probe);
+                LogAssert.NoUnexpectedReceived();
+            }
+            finally
+            {
+                LogAssert.ignoreFailingMessages = previous;
+            }
+        }
+
         [UnityTest]
         public IEnumerator RunInvokesActionAndCompletesWithinBudget()
         {

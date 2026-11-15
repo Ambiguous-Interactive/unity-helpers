@@ -102,3 +102,81 @@ from timing observations.
 
 The [additional replay archive](https://raw.githubusercontent.com/Ambiguous-Interactive/unity-helpers/587d3de6fde16c76a0ba256872cfe8c800bf1287/docs/performance/local-pool-runtime-qualification.zip) retains these attempts,
 exact instrumented inputs, final source snapshots, process receipts and complete NUnit trees.
+
+## Dropdown fixture comparison (withdrawn)
+
+`StringInListDrawerTests` and `WValueDropDownDrawerTests` were evaluated with synchronous object scopes.
+The migration was not retained after the strict requalification below; both keep `CommonTestBase`.
+All 120 case identities and assertions remain, alongside ten unchanged scope ownership controls.
+Both fixtures initialize real IMGUI styles before their style-dependent assertions, including in
+an isolated cold batch process. Production drawers are unchanged.
+
+Six serial fresh Windows x64 Unity 6000.6.7f1 Editor Mono processes use ABBAAB order.
+Each passes all 130 cases. Actual per-fixture scope reports match the captured assembly module
+identity; selected sources remain stable and all process receipts return raw zero, both stream
+ends and no drain stop. Temporary reporters are absent from the shipped fixtures.
+
+| Pair | String ratio | Dropdown ratio | Combined ratio | Unchanged control ratio |
+| ---- | -----------: | -------------: | -------------: | ----------------------: |
+| 1    |       0.9776 |         0.8273 |         0.9451 |                  1.0118 |
+| 2    |       0.9893 |         0.9722 |         0.9857 |                  1.7310 |
+| 3    |       0.9349 |         0.6919 |         0.8736 |                  0.6820 |
+
+Ratios are candidate/baseline fixture durations. The geometric mean of the six target ratios
+is 0.8919 and every combined pair improves, but these observations are withdrawn.
+Review found that the setup helper leaked `LogAssert.ignoreFailingMessages`: the common
+base reset it after cases while the synchronous base preserved it. The arms therefore
+used different logging policies. The numeric threshold alone does not qualify this change.
+The absolute savings are tens of milliseconds. The unchanged control varies substantially:
+these captures establish no whole-suite speedup or CI wall-clock target.
+
+The [complete durations](./dropdown-scopes-20261114.csv) and
+[qualification record](./dropdown-scopes-20261114.json) retain every process, case identity,
+source hash, assembly identity and process receipt. Two preparation attempts are excluded:
+one failed compilation because the extracted setup helper lacked its NUnit import; another
+passed 130 cases but omitted required identity reports from its output. Neither contributes
+timing observations.
+
+## Strict dropdown requalification (rejected)
+
+A new six-process ABBAAB campaign uses identical strict logging in both arms. Each fixture
+asserts that `LogAssert.ignoreFailingMessages` stays false, then restores its caller's policy.
+All 130 original timed identities pass in every process. The additional normal-inspector
+regression remains in final source and is excluded equally from the timed arms.
+Loaded scope, strict-policy and module witnesses match captured assemblies; selected sources
+remain stable and every process returns raw zero with both stream ends and no drain stop.
+
+| Pair | String ratio | Dropdown ratio | Combined ratio | Unchanged control ratio |
+| ---- | -----------: | -------------: | -------------: | ----------------------: |
+| 1    |       1.0215 |         1.0543 |         1.0287 |                  4.5328 |
+| 2    |       0.9714 |         0.8129 |         0.9369 |                  1.5419 |
+| 3    |       0.9591 |         0.8485 |         0.9331 |                  0.6821 |
+
+The geometric mean of the six target ratios is 0.9405, but the first combined pair regresses.
+The preregistered gate required every combined pair to improve, so the migration is rejected.
+The unchanged control also varies substantially. Neither this campaign nor the withdrawn one
+establishes a whole-suite speedup. The fixtures retain their original common base, all original
+assertions, real style initialization, strict logging and the normal-inspector regression.
+
+The [strict durations](./dropdown-scopes-strict-20261114.csv) and
+[qualification record](./dropdown-scopes-strict-20261114.json) retain every process,
+case identity, source and assembly identity, logging witness and receipt summary.
+
+The IMGUI executor restores its caller's log policy after every default and strict run, including mouse events and exhausted budgets. It does not enable broad log suppression while pumping events. Default offscreen passes tolerate only the exact native cursor-rectangle error from that pass; strict passes tolerate none. Native controls cover both incoming flag values and confirm unexpected errors remain visible on default and strict runs.
+
+### Native log-scope qualification
+
+The November 14 inspection used Unity **6000.6.7f1** with the actually loaded Test Framework **1.8.0**.
+Its schema-3 framework snapshot identifies `UnityEngine.TestRunner` by module ID
+`fca9cbc6-e5dc-46b6-8b76-59f7d0825373`. `LogScope.Current` and its private `m_Lock` are present;
+`AllLogs` and `FailingLogs` are lists implementing `IList`, and `LogEvent.IsHandled` is writable.
+The retained source digests are `a274f8220926da3f0165fa4848c3a851c43f945c8f0d0c9ec627198dd9d24a42`
+for `LogScope.cs` and `731b21dde017bc5acc2e69f040bc65580ee59f74dfb5646cf4d0528d757034a6`
+for `LogEvent.cs`.
+
+All 1,624 custom-drawer cases pass with the scoped cursor-error handling. The 21 executor controls
+cover both incoming policies, mouse events, exhausted budgets, unrelated unexpected errors, and
+strict rejection of the cursor message itself. The final 149-case asset/framework cohort also passes,
+including real blocked writes, persisted retries, and unrelated failures for similarly named assets.
+These observations qualify the loaded framework above; other supported editor/framework combinations
+remain checked by their own CI runs.

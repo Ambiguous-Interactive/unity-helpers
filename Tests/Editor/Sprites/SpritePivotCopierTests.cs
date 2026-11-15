@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
     using NUnit.Framework;
     using UnityEditor;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Sprites;
     using WallstopStudios.UnityHelpers.Editor.Utils;
     using WallstopStudios.UnityHelpers.Tests.Core;
@@ -676,7 +677,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         {
             string path = _folder + "/" + name + ".png";
             ExecuteWithImmediateImport(
-                () => EnsureFolder(Path.GetDirectoryName(path).Replace('\\', '/')),
+                () => EnsureFolder(Path.GetDirectoryName(path).SanitizePath()),
                 refreshBefore: false
             );
             Texture2D texture = Track(new Texture2D(width, height, TextureFormat.RGBA32, false));

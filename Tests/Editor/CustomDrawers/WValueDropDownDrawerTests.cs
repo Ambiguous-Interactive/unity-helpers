@@ -15,6 +15,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
     using WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils;
     using WallstopStudios.UnityHelpers.Tests.CustomDrawers.TestTypes;
     using WallstopStudios.UnityHelpers.Tests.Core;
+    using WallstopStudios.UnityHelpers.Tests.EditorFramework;
     using WallstopStudios.UnityHelpers.Tests.TestUtils;
     using PropertyAttribute = UnityEngine.PropertyAttribute;
 
@@ -23,6 +24,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
     [NUnit.Framework.Category("Integration")]
     public sealed class WValueDropDownDrawerTests : CommonTestBase
     {
+        private bool _initialLogPolicy;
+
         private static IEnumerable<TestCaseData> CustomOptionLabelData()
         {
             string[] labels = { null, "", " ", "\t\r\n", "\u2003\u00a0", "  Visible option  " };
@@ -68,6 +71,27 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 $"Expected selector to derive from WDropDownSelectorBase<string>, but was {selector?.GetType().FullName ?? "null"}."
             );
             dropDownSelector.ApplySelection(optionIndex);
+        }
+
+        [OneTimeSetUp]
+        public void InitializeEditorStylesInGuiContext()
+        {
+            _initialLogPolicy = UnityEngine.TestTools.LogAssert.ignoreFailingMessages;
+            TestIMGUIExecutor.InitializeEditorStyles();
+            UnityEngine.TestTools.LogAssert.ignoreFailingMessages = false;
+        }
+
+        [OneTimeTearDown]
+        public void RestoreLoggingPolicy()
+        {
+            try
+            {
+                Assert.That(UnityEngine.TestTools.LogAssert.ignoreFailingMessages, Is.False);
+            }
+            finally
+            {
+                UnityEngine.TestTools.LogAssert.ignoreFailingMessages = _initialLogPolicy;
+            }
         }
 
         [Test]

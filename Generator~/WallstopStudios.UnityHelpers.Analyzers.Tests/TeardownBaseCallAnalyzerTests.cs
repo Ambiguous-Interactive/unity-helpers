@@ -325,8 +325,13 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
                   return;
               }"
         )]
+        public void ATeardownThatIsAlreadyCorrectIsNotReported(string shape, string body)
+        {
+            AssertNothingReported(shape, body);
+        }
+
         [TestCase(
-            "a base call nested inside an if, which this rule declines to judge",
+            "a base call nested inside an if, with work after it",
             @"protected override void OnDestroy()
               {
                   if (0 < handles)
@@ -337,7 +342,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
               }"
         )]
         [TestCase(
-            "a base call nested inside a try, which this rule declines to judge",
+            "a base call nested inside a try, with work after it",
             @"protected override void OnDestroy()
               {
                   try
@@ -351,7 +356,214 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
                   }
               }"
         )]
-        public void ATeardownThatIsAlreadyCorrectIsNotReported(string shape, string body)
+        [TestCase(
+            "a nested call before outer cleanup",
+            "protected override void OnDestroy() { if (0 < handles) { base.OnDestroy(); } Release(); }"
+        )]
+        [TestCase(
+            "a nested call before finally cleanup",
+            "protected override void OnDestroy() { try { base.OnDestroy(); return; } finally { Release(); } }"
+        )]
+        [TestCase(
+            "a call in a catch before cleanup",
+            "protected override void OnDestroy() { try { Release(); } catch (Exception) { base.OnDestroy(); Release(); } }"
+        )]
+        [TestCase(
+            "a rethrow before enclosing cleanup",
+            "protected override void OnDestroy() { try { throw new Exception(); } catch { base.OnDestroy(); throw; } finally { Release(); } }"
+        )]
+        [TestCase(
+            "a finally call before its normal continuation",
+            "protected override void OnDestroy() { try { Release(); } finally { base.OnDestroy(); } Release(); }"
+        )]
+        [TestCase(
+            "a rethrow before outer catch cleanup",
+            "protected override void OnDestroy() { try { try { throw new Exception(); } catch { base.OnDestroy(); throw; } } catch { Release(); } }"
+        )]
+        [TestCase(
+            "a rethrow caught before normal continuation",
+            "protected override void OnDestroy() { try { try { throw new Exception(); } catch { base.OnDestroy(); throw; } } catch { } Release(); }"
+        )]
+        [TestCase(
+            "an exceptional finally before outer catch cleanup",
+            "protected override void OnDestroy() { try { try { throw new Exception(); } finally { base.OnDestroy(); } } catch { Release(); } }"
+        )]
+        [TestCase(
+            "an exceptional finally before a compatible typed catch",
+            "protected override void OnDestroy() { try { try { throw new InvalidOperationException(); } finally { base.OnDestroy(); } } catch (Exception) { Release(); } }"
+        )]
+        [TestCase(
+            "a nested catch rethrow still crosses the finally",
+            "protected override void OnDestroy() { try { try { try { throw new Exception(); } catch { throw; } } finally { base.OnDestroy(); } } catch { Release(); } }"
+        )]
+        [TestCase(
+            "a user conversion determines the exception dispatched after finally",
+            "protected override void OnDestroy() { try { try { throw (ArgumentException)new OtherException(); } finally { base.OnDestroy(); } } catch (ArgumentException) { Release(); } } private sealed class OtherException : Exception { public static implicit operator ArgumentException(OtherException value) { return new ArgumentException(); } }"
+        )]
+        [TestCase(
+            "a replacement exception reaches its own handler",
+            "protected override void OnDestroy() { try { try { try { throw new ArgumentException(); } finally { throw new InvalidOperationException(); } } finally { base.OnDestroy(); } } catch (InvalidOperationException) { Release(); } }"
+        )]
+        [TestCase(
+            "an original exception survives a conditionally throwing finally",
+            "protected override void OnDestroy() { try { try { try { throw new ArgumentException(); } finally { if (0 < handles) { throw new InvalidOperationException(); } } } finally { base.OnDestroy(); } } catch (ArgumentException) { Release(); } }"
+        )]
+        [TestCase(
+            "a filtered handler body runs after the finally",
+            "protected override void OnDestroy() { try { try { throw new Exception(); } finally { base.OnDestroy(); } } catch (Exception) when (0 < handles) { Release(); } }"
+        )]
+        [TestCase(
+            "a filtered handler continuation runs after the finally",
+            "protected override void OnDestroy() { try { try { throw new Exception(); } finally { base.OnDestroy(); } } catch (Exception) when (0 < handles) { } Release(); }"
+        )]
+        [TestCase(
+            "a null throw in a typed catch dispatches a new null reference exception",
+            "protected override void OnDestroy() { try { try { try { throw new InvalidOperationException(); } catch (InvalidOperationException) { throw null; } } finally { base.OnDestroy(); } } catch (NullReferenceException) { Release(); } }"
+        )]
+        [TestCase(
+            "a nullable exception expression can dispatch a null reference exception",
+            "protected override void OnDestroy() { try { try { ArgumentException exception = null; throw exception; } finally { base.OnDestroy(); } } catch (NullReferenceException) { Release(); } }"
+        )]
+        [TestCase(
+            "an empty intervening finally preserves the original exception",
+            "protected override void OnDestroy() { try { try { try { throw new ArgumentException(); } finally { } } finally { base.OnDestroy(); } } catch (ArgumentException) { Release(); } }"
+        )]
+        [TestCase(
+            "a nullable local can dispatch its declared exception type",
+            "protected override void OnDestroy() { try { try { ArgumentException exception = 0 < handles ? new ArgumentException() : null; throw exception; } finally { base.OnDestroy(); } } catch (ArgumentException) { Release(); } }"
+        )]
+        [TestCase(
+            "a typed catch before the finally leaves the null alternative",
+            "protected override void OnDestroy() { try { try { try { ArgumentException exception = 0 < handles ? new ArgumentException() : null; throw exception; } catch (ArgumentException) { } } finally { base.OnDestroy(); } } catch (NullReferenceException) { Release(); } }"
+        )]
+        [TestCase(
+            "a typed catch after finally leaves the null alternative",
+            "protected override void OnDestroy() { try { try { try { ArgumentException exception = 0 < handles ? new ArgumentException() : null; throw exception; } finally { base.OnDestroy(); } } catch (ArgumentException) { } } catch (NullReferenceException) { Release(); } }"
+        )]
+        [TestCase(
+            "an exception factory can throw while evaluating a throw operand",
+            "protected override void OnDestroy() { try { try { throw MakeException(); } finally { base.OnDestroy(); } } catch (InvalidOperationException) { Release(); } } private ArgumentException MakeException() { throw new InvalidOperationException(); }"
+        )]
+        [TestCase(
+            "a getter can throw while evaluating a throw operand",
+            "protected override void OnDestroy() { try { try { throw Error; } finally { base.OnDestroy(); } } catch (InvalidOperationException) { Release(); } } private ArgumentException Error { get { throw new InvalidOperationException(); } }"
+        )]
+        [TestCase(
+            "a user constructor can throw while evaluating a throw operand",
+            "protected override void OnDestroy() { try { try { throw new OtherException(); } finally { base.OnDestroy(); } } catch (InvalidOperationException) { Release(); } } private sealed class OtherException : Exception { public OtherException() { throw new InvalidOperationException(); } }"
+        )]
+        [TestCase(
+            "a constructor argument can throw while evaluating a throw operand",
+            "protected override void OnDestroy() { try { try { throw new ArgumentException(FailMessage()); } finally { base.OnDestroy(); } } catch (InvalidOperationException) { Release(); } } private string FailMessage() { throw new InvalidOperationException(); }"
+        )]
+        [TestCase(
+            "a conversion can throw while evaluating a throw operand",
+            "protected override void OnDestroy() { try { try { throw (ArgumentException)new OtherException(); } finally { base.OnDestroy(); } } catch (InvalidOperationException) { Release(); } } private sealed class OtherException : Exception { public static implicit operator ArgumentException(OtherException value) { throw new InvalidOperationException(); } }"
+        )]
+        public void NestedTeardownWithReachableFollowingWorkIsReported(string shape, string body)
+        {
+            Diagnostic reported = Single(body);
+            Assert.That(reported.Id, Is.EqualTo(DiagnosticId), shape);
+            Assert.That(reported.Severity, Is.EqualTo(DiagnosticSeverity.Warning));
+        }
+
+        [TestCase(
+            "a nested final call",
+            "protected override void OnDestroy() { if (0 < handles) { Release(); base.OnDestroy(); } }"
+        )]
+        [TestCase(
+            "cleanup on another branch",
+            "protected override void OnDestroy() { if (0 < handles) { base.OnDestroy(); } else { Release(); } }"
+        )]
+        [TestCase(
+            "an early return before outer cleanup",
+            "protected override void OnDestroy() { if (0 < handles) { base.OnDestroy(); return; } Release(); }"
+        )]
+        [TestCase(
+            "a local function body",
+            "protected override void OnDestroy() { void Later() { base.OnDestroy(); Release(); } }"
+        )]
+        [TestCase(
+            "an empty finally",
+            "protected override void OnDestroy() { try { Release(); base.OnDestroy(); } finally { } }"
+        )]
+        [TestCase(
+            "a final call inside finally",
+            "protected override void OnDestroy() { try { Release(); } finally { base.OnDestroy(); } }"
+        )]
+        [TestCase(
+            "a rethrow without enclosing cleanup",
+            "protected override void OnDestroy() { try { throw new Exception(); } catch { base.OnDestroy(); throw; } }"
+        )]
+        [TestCase(
+            "an exceptional finally cannot reach outer work",
+            "protected override void OnDestroy() { try { throw new Exception(); } finally { base.OnDestroy(); } Release(); }"
+        )]
+        [TestCase(
+            "a rethrow with empty terminal outer catch",
+            "protected override void OnDestroy() { try { try { throw new Exception(); } catch { base.OnDestroy(); throw; } } catch { } }"
+        )]
+        [TestCase(
+            "a sibling catch cannot handle its own rethrow",
+            "protected override void OnDestroy() { try { throw new Exception(); } catch (InvalidOperationException) { base.OnDestroy(); throw; } catch { Release(); } }"
+        )]
+        [TestCase(
+            "a consuming catch blocks outer cleanup",
+            "protected override void OnDestroy() { try { try { try { throw new Exception(); } catch { base.OnDestroy(); throw; } } catch { } } catch { Release(); } }"
+        )]
+        [TestCase(
+            "an empty catch with an exception binding",
+            "protected override void OnDestroy() { try { try { throw new Exception(); } catch { base.OnDestroy(); throw; } } catch (Exception exception) { } }"
+        )]
+        [TestCase(
+            "a rethrow cannot enter an unrelated typed catch",
+            "protected override void OnDestroy() { try { try { throw new InvalidOperationException(); } catch (InvalidOperationException) { base.OnDestroy(); throw; } } catch (ArgumentException) { Release(); } }"
+        )]
+        [TestCase(
+            "an exceptional finally cannot enter an unrelated catch",
+            "protected override void OnDestroy() { try { try { throw new InvalidOperationException(); } finally { base.OnDestroy(); } } catch (ArgumentException) { Release(); } }"
+        )]
+        [TestCase(
+            "a compatible empty catch consumes the known rethrow",
+            "protected override void OnDestroy() { try { try { try { throw new InvalidOperationException(); } catch (InvalidOperationException) { base.OnDestroy(); throw; } } catch (InvalidOperationException) { } } catch { Release(); } }"
+        )]
+        [TestCase(
+            "a rethrow cannot enter an unrelated filtered catch",
+            "protected override void OnDestroy() { try { try { throw new InvalidOperationException(); } catch (InvalidOperationException) { base.OnDestroy(); throw; } } catch (ArgumentException) when (0 < handles) { Release(); } }"
+        )]
+        [TestCase(
+            "a nested throw consumed before the finally cannot dispatch outside it",
+            "protected override void OnDestroy() { try { try { try { throw new Exception(); } catch { } } finally { base.OnDestroy(); } } catch { Release(); } }"
+        )]
+        [TestCase(
+            "an intervening finally replaces the original exception",
+            "protected override void OnDestroy() { try { try { try { throw new ArgumentException(); } finally { throw new InvalidOperationException(); } } finally { base.OnDestroy(); } } catch (ArgumentException) { Release(); } }"
+        )]
+        [TestCase(
+            "an outer exception filter runs before the finally",
+            "protected override void OnDestroy() { try { try { throw new Exception(); } finally { base.OnDestroy(); } } catch (Exception) when (0 < handles) { } }"
+        )]
+        [TestCase(
+            "a typed null constant cannot dispatch its written exception type",
+            "protected override void OnDestroy() { try { try { throw (ArgumentException)null; } finally { base.OnDestroy(); } } catch (ArgumentException) { Release(); } }"
+        )]
+        [TestCase(
+            "an exception thrown by a filter is swallowed before the finally",
+            "protected override void OnDestroy() { try { try { try { throw new ArgumentException(); } catch (ArgumentException) when (0 < handles ? throw new InvalidOperationException() : false) { } } finally { base.OnDestroy(); } } catch (InvalidOperationException) { Release(); } }"
+        )]
+        [TestCase(
+            "a nullable local cannot dispatch an unrelated exception",
+            "protected override void OnDestroy() { try { try { ArgumentException exception = null; throw exception; } finally { base.OnDestroy(); } } catch (InvalidOperationException) { Release(); } }"
+        )]
+        [TestCase(
+            "both alternatives consumed before finally cannot escape",
+            "protected override void OnDestroy() { try { try { try { ArgumentException exception = 0 < handles ? new ArgumentException() : null; throw exception; } catch (ArgumentException) { } catch (NullReferenceException) { } } finally { base.OnDestroy(); } } catch { Release(); } }"
+        )]
+        [TestCase(
+            "both alternatives consumed after finally cannot escape",
+            "protected override void OnDestroy() { try { try { try { ArgumentException exception = 0 < handles ? new ArgumentException() : null; throw exception; } finally { base.OnDestroy(); } } catch (ArgumentException) { } catch (NullReferenceException) { } } catch { Release(); } }"
+        )]
+        public void NestedTeardownWithoutFollowingWorkIsNotReported(string shape, string body)
         {
             AssertNothingReported(shape, body);
         }

@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     using System.Runtime.CompilerServices;
     using System.Text.Json;
     using UnityEditor.PackageManager;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     internal static class TestPackageRoot
     {
@@ -48,7 +49,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 return false;
             }
 
-            string normalized = path.Replace('\\', '/');
+            string normalized = path.SanitizePath();
             string[] segments = normalized.Split('/');
             foreach (string segment in segments)
             {

@@ -13,9 +13,11 @@ namespace WallstopStudios.UnityHelpers.Analyzers
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
     public sealed class RepeatedCollectionCountAnalyzer : DiagnosticAnalyzer
     {
-        /// <inheritdoc />
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
+        private static readonly ImmutableArray<DiagnosticDescriptor> SupportedRules =
             ImmutableArray.Create(UnityHelpersDiagnostics.RepeatedCollectionCount);
+
+        /// <inheritdoc />
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => SupportedRules;
 
         private static Dictionary<ISymbol, ISymbol> NewState()
         {

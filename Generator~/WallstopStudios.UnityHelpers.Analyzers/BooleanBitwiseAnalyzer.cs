@@ -12,9 +12,11 @@ namespace WallstopStudios.UnityHelpers.Analyzers
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
     public sealed class BooleanBitwiseAnalyzer : DiagnosticAnalyzer
     {
-        /// <inheritdoc />
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
+        private static readonly ImmutableArray<DiagnosticDescriptor> SupportedRules =
             ImmutableArray.Create(UnityHelpersDiagnostics.BooleanBitwiseOperation);
+
+        /// <inheritdoc />
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => SupportedRules;
 
         private static void Analyze(OperationAnalysisContext context)
         {

@@ -187,7 +187,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                     || path[0] == '\\'
                     || 0 <= path.IndexOf(':')
                     || 0 <= path.IndexOf('\0')
-                    || 0 <= Array.IndexOf(path.Replace('\\', '/').Split('/'), "..")
+                    || 0 <= Array.IndexOf(path.SanitizePath().Split('/'), "..")
                 )
             )
             {

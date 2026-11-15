@@ -119,7 +119,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             {
                 relativePath = fullPath.Substring(projectRoot.Length);
             }
-            return relativePath.Replace('\\', '/');
+            return relativePath.SanitizePath();
         }
 
         private static bool AssetPathExistsInDatabase(string assetPath)

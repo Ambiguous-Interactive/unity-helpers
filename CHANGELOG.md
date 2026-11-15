@@ -11,13 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add configurable Unity 6 build-profile scene synchronization, preserving custom lists and supporting automatic updates after scene-list events ([#1185](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1185)).
+- Add editor asset enumeration, including subassets, and native asset replacement that keeps existing references intact ([#1182](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1182)).
+- Add opt-in member-order (`WUH029`) and string-policy (`WUH030`) warnings, asynchronous cleanup checks in `WUH014`, and nested teardown checks in `WUH009` ([#1200](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1200)).
 - Add `[WEnumHelpers]` and the enum source generator, which emits concrete overloads for flag checks, numeric conversion, cached names, display names, and span formatting while leaving generic and runtime-generated enums on the generalized path. See [Enum Helpers](./docs/features/utilities/math-and-extensions.md#enum-helpers) and [Enum Helper Performance](./docs/performance/enum-helpers-performance.md).
 - Add `TryFormatCachedName` for writing an enum's cached name into a caller-owned `Span<char>`.
 - Add allocation-free counting medians for unsorted byte channels, slug identifier validation, and optional cleanup failure reporting for `DisposableScope`. [#1200](https://github.com/wallstop/unity-helpers/issues/1200)
 - Add `LatestWriteFile` for coalesced saves and synchronous final flushes, plus optional thread-pool failure callbacks ([#1181](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1181)).
 - Add single-owner managed pools with explicit returns and fixed-length per-thread array pools with clearing on return ([#1173](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1173)).
 - Add a test-only support assembly with allocation controls, synchronous Unity object tracking and managed resource cleanup for consumer test fixtures ([#1180](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1180)).
-- Add region-only reads for readable RGB24, ARGB32, BGRA32 and Alpha8 sprites to reduce temporary pixel storage ([#1113](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1113)).
+- Add direct texture reads for readable RGBA32, RGB24, ARGB32, BGRA32, Alpha8, RGB565 and RGBA4444 sprite masks and bounds, avoiding intermediate color arrays ([#1113](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1113)).
 - Add reusable weighted index tables, draw-sparing probability checks, and exponential and Gumbel samples ([#1176](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1176)).
 - Add stable score distributions, sorted-span percentiles, tie-averaged ranks and rank correlations ([#1177](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1177)).
 - Add CSS cubic Bézier evaluation and weighted animation-curve conversion ([#1186](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1186)).
@@ -25,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `ThreadAmbient<T>` for per-thread context with nested scopes and safe repeated disposal ([#1175](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1175)).
 - Add stable little-endian integer hash steps, raw UTF-16 text hashing, and explicitly weak whole-word FNV folding ([#1174](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1174)).
 - Add `HoldSet` for independent input or pause holds, disposable handles, occupancy callbacks, and destroyed-owner cleanup ([#1183](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1183)).
-- Add `StopwatchTimestamp` for elapsed time and counter-tick conversions without a timer allocation ([#1179](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1179)).
+- Add `StopwatchTimestamp` for elapsed time, direct elapsed seconds and counter-tick conversions without a timer allocation ([#1179](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1179)).
 - Add stable in-place insertion sort for spans without renting a buffer ([#1157](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1157)).
 - Add optional struct discovery to `GetTypesDerivedFrom` while retaining the default class-only filter ([#1169](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1169)).
 - Add `LongMap<T>` and `LongSet` for unsigned 64-bit keys, packed iteration, reusable storage and key-only set storage ([#1162](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1162)).
@@ -47,6 +50,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Reduce analyzer allocations and repeated compiler work while preserving diagnostics and generated output ([qualification](./docs/performance/analyzers.md#compiler-work-and-measurements)).
+- Reduce shared buffer clock-conversion overhead while preserving custom time providers ([#1173](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1173)).
 - Reduce enum helper startup allocations and keep membership checks correct for enums with unsupported underlying types.
 - Reduce shared buffer rental and return synchronization while retaining usage tracking, purge policies and callback behavior ([#1173](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1173)).
 - Read only the selected rectangle when querying readable RGBA32 sprite masks, art bounds and ink regions ([#1113](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1113)).

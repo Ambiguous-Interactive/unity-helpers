@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
     using NUnit.Framework;
     using UnityEditor;
     using WallstopStudios.UnityHelpers.Editor.Utils;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     internal sealed class EditorAssetFileScope : IDisposable
     {
@@ -30,7 +31,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 Assert.That(path.Split('/'), Does.Not.Contain(".."));
                 CaptureFile(path);
                 CaptureFile(path + ".meta");
-                string folder = Path.GetDirectoryName(path)?.Replace('\\', '/');
+                string folder = Path.GetDirectoryName(path)?.SanitizePath();
                 while (
                     !string.IsNullOrEmpty(folder)
                     && !string.Equals(folder, "Assets", StringComparison.Ordinal)
@@ -51,7 +52,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     {
                         _createdFolders.Add(folder);
                     }
-                    folder = Path.GetDirectoryName(folder)?.Replace('\\', '/');
+                    folder = Path.GetDirectoryName(folder)?.SanitizePath();
                 }
             }
             _createdFolders.Sort((left, right) => right.Length.CompareTo(left.Length));

@@ -170,6 +170,11 @@
     "run": "npm run test:agent-skill-migration"
   },
   {
+    "id": "skill-stubs",
+    "name": "Typed discovery stubs and ownership controls",
+    "run": "npm run test:skill-stubs"
+  },
+  {
     "id": "lint-changelog",
     "name": "Changelog linter self-test",
     "run": "npm run test:lint-changelog"
@@ -223,6 +228,11 @@
     "id": "check-code-fence-syntax",
     "name": "Code fence syntax gate self-test",
     "run": "npm run test:check-code-fence-syntax"
+  },
+  {
+    "id": "markdown-fence-repair",
+    "name": "Markdown fence inference and compatibility",
+    "run": "npm run test:markdown-fence-repair"
   },
   {
     "id": "lint-doc-identifiers",

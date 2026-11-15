@@ -32,9 +32,11 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         private const string CompareModeFieldName = "compareMode";
         private const string FreezeMethodName = "Freeze";
 
-        /// <inheritdoc />
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
+        private static readonly ImmutableArray<DiagnosticDescriptor> SupportedRules =
             ImmutableArray.Create(UnityHelpersDiagnostics.ComparerModeChangesAfterCollectionUse);
+
+        /// <inheritdoc />
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => SupportedRules;
 
         private static void OnOperationBlockStart(OperationBlockStartAnalysisContext context)
         {

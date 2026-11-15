@@ -16,8 +16,10 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         /// <summary>
         /// Gets the callback inheritance diagnostic.
         /// </summary>
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
+        private static readonly ImmutableArray<DiagnosticDescriptor> SupportedRules =
             ImmutableArray.Create(UnityHelpersDiagnostics.HiddenUnityCallback);
+
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => SupportedRules;
 
         private static bool SameParameters(IMethodSymbol first, IMethodSymbol second)
         {

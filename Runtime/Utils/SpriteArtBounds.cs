@@ -25,7 +25,14 @@ namespace WallstopStudios.UnityHelpers.Utils
             byte alphaThreshold = 1
         )
         {
-            if (!SpriteMaskReader.TryReadPixels(sprite, out SpritePixelRegion region, out error))
+            if (
+                !SpriteMaskReader.TryReadPixels(
+                    sprite,
+                    out SpritePixelRegion region,
+                    out error,
+                    borrowReadableTexture: true
+                )
+            )
             {
                 if (sprite != null && sprite.packed && sprite.associatedAlphaSplitTexture == null)
                 {
@@ -46,7 +53,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 int first = 0;
                 for (; first < width; ++first)
                 {
-                    byte alpha = region.GetPixel(first, row).a;
+                    byte alpha = region.GetAlpha(first, row);
                     if (alpha != 0 && alphaThreshold <= alpha)
                     {
                         break;
@@ -60,7 +67,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 int last = width - 1;
                 for (; first < last; --last)
                 {
-                    byte alpha = region.GetPixel(last, row).a;
+                    byte alpha = region.GetAlpha(last, row);
                     if (alpha != 0 && alphaThreshold <= alpha)
                     {
                         break;

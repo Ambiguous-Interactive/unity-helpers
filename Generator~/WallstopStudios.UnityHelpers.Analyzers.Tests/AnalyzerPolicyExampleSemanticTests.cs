@@ -87,7 +87,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random {
 
         private static IEnumerable<TestCaseData> Cases()
         {
-            for (int number = 1; number <= 28; ++number)
+            for (int number = 1; number <= 30; ++number)
             {
                 string id = $"WUH{number:000}";
                 yield return new TestCaseData(id).SetName(id + "ExamplesMatchTheActualDiagnostic");
@@ -146,6 +146,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random {
                     return new BooleanBitwiseAnalyzer();
                 case "WUH028":
                     return new RedundantPooledClearAnalyzer();
+                case "WUH029":
+                    return new MemberOrderAnalyzer();
+                case "WUH030":
+                    return new StringComparisonPolicyAnalyzer();
                 case "WUH027":
                     return new RedundantCallerNameAnalyzer();
                 case "WUH025":
@@ -160,6 +164,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random {
 
         private static string SourceFor(string id, string code)
         {
+            if (string.Equals(id, "WUH029", StringComparison.Ordinal))
+            {
+                return code;
+            }
             if (string.Equals(id, "WUH028", StringComparison.Ordinal))
             {
                 return "using System.Collections.Generic; using WallstopStudios.UnityHelpers.Utils; public class Subject { public void Run() { "
@@ -339,6 +347,30 @@ namespace WallstopStudios.UnityHelpers.Core.Random {
                 .GetAnalyzerDiagnosticsAsync()
                 .GetAwaiter()
                 .GetResult();
+        }
+
+        [TestCaseSource(nameof(Cases))]
+        public void SupportedDiagnosticReadsAllocateNothingAfterWarmup(string id)
+        {
+            DiagnosticAnalyzer analyzer = AnalyzerFor(id);
+            int observed = 0;
+            for (int index = 0; index < 32; ++index)
+            {
+                observed += analyzer.SupportedDiagnostics.Length;
+            }
+            long controlStart = GC.GetAllocatedBytesForCurrentThread();
+            byte[] control = new byte[1024];
+            long controlBytes = GC.GetAllocatedBytesForCurrentThread() - controlStart;
+            GC.KeepAlive(control);
+            Assert.LessOrEqual(1024, controlBytes);
+            long start = GC.GetAllocatedBytesForCurrentThread();
+            for (int index = 0; index < 1000; ++index)
+            {
+                observed += analyzer.SupportedDiagnostics.Length;
+            }
+            long allocated = GC.GetAllocatedBytesForCurrentThread() - start;
+            Assert.AreEqual(0, allocated, id);
+            Assert.Less(0, observed);
         }
 
         [TestCaseSource(nameof(Cases))]

@@ -223,7 +223,9 @@ def test_selection_limits_and_order() -> None:
             read_selection(raw, profiles)
 
 
-def make_control(tmp_path: Path) -> tuple[list[Mode], Mode, dict[str, str], str]:
+def make_control(
+    tmp_path: Path, unity_version: str = "6000.6.0f1"
+) -> tuple[list[Mode], Mode, dict[str, str], str]:
     shell = shutil.which("pwsh")
     assert shell is not None
     runner = tmp_path / "worker with spaces.ps1"
@@ -276,7 +278,9 @@ def make_control(tmp_path: Path) -> tuple[list[Mode], Mode, dict[str, str], str]
         if ($env:CONTROL_FAIL -eq $TestMode) { throw 'Controlled mode failure.' }
         if ($env:CONTROL_FAIL_PHASE -eq $EditorPhaseGroup) { throw 'Controlled editor phase failure.' }
         if ($EditorPhaseGroup -eq 'Isolated') {
-            foreach ($part in @('compilation', 'migration')) {
+            $parts = @('compilation', 'migration')
+            if ([int]$UnityVersion.Split('.')[0] -ge 6000) { $parts += 'idle-editor' }
+            foreach ($part in $parts) {
                 if ($env:CONTROL_MISSING_EVIDENCE -eq $part) { continue }
                 $folder = Join-Path $ArtifactsPath $part
                 $null = New-Item -ItemType Directory -Path $folder -Force
@@ -298,7 +302,7 @@ def make_control(tmp_path: Path) -> tuple[list[Mode], Mode, dict[str, str], str]
                 "SchemaVersion": 1,
                 "State": "requested",
                 "OwnerProcessId": os.getpid(),
-                "UnityVersion": "6000.6.0f1",
+                "UnityVersion": unity_version,
                 "EditorPath": str(tmp_path / "editor with spaces.exe"),
                 "Identity": identity,
             }
@@ -326,7 +330,7 @@ def make_control(tmp_path: Path) -> tuple[list[Mode], Mode, dict[str, str], str]
             {
                 "LicenseSessionPath": str(session_path),
                 "ArtifactsPath": str(tmp_path / name),
-                "UnityVersion": "6000.6.0f1",
+                "UnityVersion": unity_version,
                 "TestMode": name,
                 "ProjectRootMinimumFreeGb": "0",
             },
@@ -392,12 +396,13 @@ def test_real_workers_overlap_and_keep_every_outcome(tmp_path: Path, failed: str
     )
 
 
+@pytest.mark.parametrize("unity_version", ["2022.3.45f1", "6000.6.0f1"])
 @pytest.mark.parametrize("failed", ["", "Main", "Isolated"])
 @pytest.mark.parametrize("include_proto", [False, True])
 def test_editor_halves_require_both_and_publish_fixture_evidence(
-    tmp_path: Path, failed: str, include_proto: bool
+    tmp_path: Path, failed: str, include_proto: bool, unity_version: str
 ) -> None:
-    modes, preparation, environment, shell = make_control(tmp_path)
+    modes, preparation, environment, shell = make_control(tmp_path, unity_version)
     modes[0] = Mode("editmode", {**modes[0].parameters, "EditorPhaseGroup": "Main"})
     isolated = Mode(
         "editmode_isolated",
@@ -463,16 +468,21 @@ def test_editor_halves_require_both_and_publish_fixture_evidence(
         mode.name for mode in selected
     }
     if failed != "Isolated":
-        for name in ("compilation", "migration"):
+        for name in (
+            "compilation",
+            "migration",
+            *(["idle-editor"] if unity_version.startswith("6000") else []),
+        ):
             assert (tmp_path / "editmode" / name / "control.txt").read_text(
                 encoding="utf-8"
             ) == name
             assert not (tmp_path / "editmode/isolated" / name).exists()
 
 
+@pytest.mark.parametrize("part", ["compilation", "migration", "idle-editor"])
 @pytest.mark.parametrize("damage", ["missing", "conflict"])
 def test_isolated_evidence_cannot_be_missing_or_replace_existing_results(
-    tmp_path: Path, damage: str
+    tmp_path: Path, damage: str, part: str
 ) -> None:
     modes, preparation, environment, shell = make_control(tmp_path)
     isolated = Mode(
@@ -485,9 +495,9 @@ def test_isolated_evidence_cannot_be_missing_or_replace_existing_results(
     )
     environment["CONTROL_MODE_COUNT"] = "4"
     if damage == "missing":
-        environment["CONTROL_MISSING_EVIDENCE"] = "compilation"
+        environment["CONTROL_MISSING_EVIDENCE"] = part
     else:
-        destination = tmp_path / "editmode/compilation"
+        destination = tmp_path / "editmode" / part
         destination.mkdir(parents=True)
         (destination / "canary.txt").write_text("preserve", encoding="utf-8")
     with pytest.raises(RuntimeError, match="evidence is missing or conflicts"):
@@ -504,7 +514,7 @@ def test_isolated_evidence_cannot_be_missing_or_replace_existing_results(
     receipt = json.loads((tmp_path / "receipt.json").read_text(encoding="utf-8"))
     assert set(receipt["Outcomes"].values()) == {"failure"}
     if damage == "conflict":
-        assert (tmp_path / "editmode/compilation/canary.txt").read_text(
+        assert (tmp_path / "editmode" / part / "canary.txt").read_text(
             encoding="utf-8"
         ) == "preserve"
 

@@ -223,12 +223,29 @@ New-Item -ItemType Directory -Path $temporary | Out-Null
 $checks = 0
 try {
     $isolationChecks = 0
+    foreach ($version in @('2021.3.45f1', '2022.3.45f1', '6000.0.1f1', '6000.6.7f1', '6001.1.0f1')) {
+        $idleExpected = $version.StartsWith('600')
+        $versionPhases = @(New-UnityEditorTestPhases -ArtifactsPath $temporary -IsolateCompilationFixtures -UnityVersion $version)
+        $idlePhases = @($versionPhases | Where-Object TestCategory -CEQ 'IdleEditorIsolation')
+        if ($idlePhases.Count -ne [int]$idleExpected) { throw "Wrong idle-editor coverage for $version." }
+        if ($idleExpected -and ($versionPhases.Count -ne 5 -or
+                $versionPhases[0].TestCategory -cne 'IdleEditorIsolation' -or
+                $idlePhases[0].RequiredFixture.Count -ne 1 -or -not $idlePhases[0].RequirePassedTests -or
+                $idlePhases[0].TestFilter -cne 'WallstopStudios.UnityHelpers.Tests.Editor.Tools.BuildProfileSceneSyncTests')) {
+            throw 'Idle-only API fixtures must run first in an independent required process.'
+        }
+        $versionMain = @(New-UnityEditorTestPhases -ArtifactsPath $temporary -IsolateCompilationFixtures -UnityVersion $version -EditorPhaseGroup Main)
+        $versionIsolated = @(New-UnityEditorTestPhases -ArtifactsPath $temporary -IsolateCompilationFixtures -UnityVersion $version -EditorPhaseGroup Isolated)
+        if ($versionMain.Count -ne 1 -or $versionMain[0].TestCategory -notlike '*!IdleEditorIsolation*' -or
+            $versionIsolated.Count -ne (3 + [int]$idleExpected)) { throw 'Phase splitting lost idle-editor isolation.' }
+        $isolationChecks++
+    }
     $phases = @(New-UnityEditorTestPhases -ArtifactsPath $temporary `
         -TestCategory '!Performance;!Stress' -IsolateCompilationFixtures)
     if ($phases.Count -ne 4 -or $phases[0].TestCategory -cne 'CompilationIsolation' -or
         $phases[0].ArtifactsPath -ceq $phases[1].ArtifactsPath -or
         -not $phases[0].RequirePassedTests -or
-        $phases[-1].TestCategory -cne '!Performance;!Stress;!CompilationIsolation;!MigrationIsolation') {
+        $phases[-1].TestCategory -cne '!Performance;!Stress;!CompilationIsolation;!MigrationIsolation;!IdleEditorIsolation') {
         throw 'Compiler and normal tests must have separate complete selections and artifacts.'
     }
     $selectedMigrationFixtures = @($phases[1..2] | ForEach-Object { $_.RequiredFixture })
@@ -342,7 +359,7 @@ try {
     $verifierScript = Join-Path $temporary 'verify-action.ps1'
     Set-Content -LiteralPath $verifierScript -Value $verifierProgram
     $oldEnvironment = @{}
-    foreach ($key in @('GITHUB_WORKSPACE', 'UH_RESULTS_DIR', 'UH_LABEL', 'UH_EXPECTED_EMPTY', 'UH_REQUIRED_TEST_NAME', 'UH_REQUIRED_COMPILATION_FIXTURE')) {
+    foreach ($key in @('GITHUB_WORKSPACE', 'UH_RESULTS_DIR', 'UH_LABEL', 'UH_EXPECTED_EMPTY', 'UH_REQUIRED_TEST_NAME', 'UH_REQUIRED_COMPILATION_FIXTURE', 'UH_UNITY_VERSION')) {
         $oldEnvironment[$key] = [Environment]::GetEnvironmentVariable($key)
     }
     try {
@@ -351,6 +368,7 @@ try {
         $env:UH_EXPECTED_EMPTY = 'false'
         $env:UH_REQUIRED_TEST_NAME = ''
         $env:UH_REQUIRED_COMPILATION_FIXTURE = 'Subject'
+        $env:UH_UNITY_VERSION = ''
         foreach ($fixture in @(
                 @{ Root = $null; Child = 'Passed'; Exit = 1 },
                 @{ Root = 'Passed'; Child = $null; Exit = 1 },
@@ -425,6 +443,30 @@ try {
                 $isolationChecks++
             }
         }
+        $env:UH_UNITY_VERSION = '6000.6.7f1'
+        $idleFixture = @(Get-UnityIdleEditorIsolationFixtures -UnityVersion $env:UH_UNITY_VERSION)[0]
+        $idleResult = Join-Path $env:UH_RESULTS_DIR ('idle-editor/' + $idleFixture + '/results.xml')
+        New-Item -ItemType Directory -Force -Path (Split-Path $idleResult -Parent) | Out-Null
+        $idleXml = "<test-run total='1' passed='1' failed='0'><test-case classname='$idleFixture' result='Passed'/></test-run>"
+        foreach ($damage in @('missing', 'omitted fixture', 'wrong subject', 'Skipped', 'Inconclusive', 'Failed', 'failed suite', 'failed root', 'healthy')) {
+            [xml]$idleDocument = $idleXml
+            $subject = $idleDocument.SelectSingleNode('//test-case')
+            if ($damage -eq 'omitted fixture') { [void]$subject.ParentNode.RemoveChild($subject) }
+            elseif ($damage -eq 'wrong subject') { $subject.SetAttribute('classname', 'Wrong.Subject') }
+            elseif ($damage -eq 'failed root') { $idleDocument.DocumentElement.SetAttribute('result', 'Failed') }
+            elseif ($damage -eq 'failed suite') {
+                $suite = $idleDocument.CreateElement('test-suite')
+                $suite.SetAttribute('result', 'Failed')
+                [void]$idleDocument.DocumentElement.AppendChild($suite)
+            }
+            elseif ($damage -ne 'missing' -and $damage -ne 'healthy') { $subject.SetAttribute('result', $damage) }
+            $idleDocument.Save($idleResult)
+            if ($damage -eq 'missing') { Remove-Item -LiteralPath $idleResult }
+            $output = & (Get-Process -Id $PID).Path -NoProfile -File $verifierScript 2>&1 | Out-String
+            if (($LASTEXITCODE -eq 0) -ne ($damage -eq 'healthy')) { throw "Idle-editor verifier accepted $damage or rejected healthy results: $output" }
+            $isolationChecks++
+        }
+        $env:UH_UNITY_VERSION = ''
         $dumpAction = Get-Content -LiteralPath (Join-Path $PSScriptRoot '../../.github/actions/dump-unity-log-tail/action.yml') -Raw
         $dumpStart = $dumpAction.IndexOf($runMarker)
         if ($dumpStart -lt 0) { throw 'The shipping dump action must have a run block.' }

@@ -35,9 +35,11 @@ namespace WallstopStudios.UnityHelpers.Analyzers
     {
         private const string ListMetadataName = "System.Collections.Generic.List`1";
 
-        /// <inheritdoc />
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
+        private static readonly ImmutableArray<DiagnosticDescriptor> SupportedRules =
             ImmutableArray.Create(UnityHelpersDiagnostics.CountingLoopOverAllocationFreeSequence);
+
+        /// <inheritdoc />
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => SupportedRules;
 
         private static void OnCompilationStart(CompilationStartAnalysisContext context)
         {

@@ -44,9 +44,11 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         private const string UnityObjectMetadataName = "UnityEngine.Object";
         private const string TypeMetadataName = "System.Type";
 
-        /// <inheritdoc />
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
+        private static readonly ImmutableArray<DiagnosticDescriptor> SupportedRules =
             ImmutableArray.Create(UnityHelpersDiagnostics.GetComponentComparedAgainstNull);
+
+        /// <inheritdoc />
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => SupportedRules;
 
         private static void OnCompilationStart(CompilationStartAnalysisContext context)
         {

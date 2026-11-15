@@ -82,6 +82,38 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             }
         }
 
+        private static void AssertSecondsSinceWithinCounterReadings(long start)
+        {
+            long before = Stopwatch.GetTimestamp();
+            double actual = StopwatchTimestamp.SecondsSince(start);
+            long after = Stopwatch.GetTimestamp();
+            double lower = (double)((decimal)unchecked(before - start) / Stopwatch.Frequency);
+            double upper = (double)((decimal)unchecked(after - start) / Stopwatch.Frequency);
+            double tolerance = Math.Max(1, Math.Max(Math.Abs(lower), Math.Abs(upper))) * 1e-14;
+            Assert.That(
+                actual,
+                Is.InRange(Math.Min(lower, upper) - tolerance, Math.Max(lower, upper) + tolerance)
+            );
+        }
+
+        [TestCase(long.MinValue)]
+        [TestCase(long.MaxValue)]
+        [TestCase(0L)]
+        [TestCase(-1L)]
+        public void SecondsSinceUsesWrappingSignedCounterSubtraction(long start)
+        {
+            AssertSecondsSinceWithinCounterReadings(start);
+        }
+
+        [TestCase(-1)]
+        [TestCase(0)]
+        [TestCase(1)]
+        public void SecondsSinceHandlesPastCurrentAndFutureStarts(int offset)
+        {
+            long start = unchecked(Stopwatch.GetTimestamp() + offset * Stopwatch.Frequency);
+            AssertSecondsSinceWithinCounterReadings(start);
+        }
+
         [TestCaseSource(nameof(CounterScaleCases))]
         public void CounterScalingMatchesExactArithmeticAtFrequencyAndDurationLimits(
             long value,
@@ -116,6 +148,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [TestCase(long.MaxValue)]
         public void FloatingPointConversionsKeepSignAndMagnitude(long ticks)
         {
+            double seconds = (double)ticks / Stopwatch.Frequency;
+            Assert.That(
+                StopwatchTimestamp.ToSeconds(ticks),
+                Is.EqualTo(seconds).Within(Math.Abs(seconds) * 0.000000000001 + double.Epsilon)
+            );
             double milliseconds = (double)ticks / Stopwatch.Frequency * 1000.0;
             double nanoseconds = (double)ticks / Stopwatch.Frequency * 1000000000.0;
             Assert.That(

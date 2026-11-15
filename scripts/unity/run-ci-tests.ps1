@@ -1216,6 +1216,7 @@ function New-UnityEditorTestPhases {
         [string]$TestFilter,
         [string]$TestCategory,
         [switch]$IsolateCompilationFixtures,
+        [string]$UnityVersion,
         [ValidateSet('All', 'Main', 'Isolated')][string]$EditorPhaseGroup = 'All'
     )
 
@@ -1228,6 +1229,15 @@ function New-UnityEditorTestPhases {
             throw 'Compilation isolation cannot be combined with a caller test filter.'
         }
         if ($EditorPhaseGroup -ne 'Main') {
+            foreach ($idleFixture in @(Get-UnityIdleEditorIsolationFixtures -UnityVersion $UnityVersion)) {
+                [pscustomobject]@{
+                    ArtifactsPath = Join-Path $ArtifactsPath ('idle-editor/' + $idleFixture)
+                    TestFilter = $idleFixture
+                    TestCategory = 'IdleEditorIsolation'
+                    RequiredFixture = @($idleFixture)
+                    RequirePassedTests = $true
+                }
+            }
             [pscustomobject]@{
                 ArtifactsPath = Join-Path $ArtifactsPath 'compilation'
                 TestFilter = $fixture
@@ -1245,7 +1255,7 @@ function New-UnityEditorTestPhases {
                 }
             }
         }
-        $TestCategory = (@($TestCategory, '!CompilationIsolation', '!MigrationIsolation') |
+        $TestCategory = (@($TestCategory, '!CompilationIsolation', '!MigrationIsolation', '!IdleEditorIsolation') |
             Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join ';'
     }
     if ($EditorPhaseGroup -eq 'Isolated') { return }
@@ -5800,7 +5810,7 @@ try {
         # background thread during shutdown AFTER RunFinished wrote the file.
         $phases = @(New-UnityEditorTestPhases -ArtifactsPath $ArtifactsPath `
             -TestFilter $TestFilter -TestCategory $TestCategory `
-            -IsolateCompilationFixtures:$IsolateCompilationFixtures -EditorPhaseGroup $EditorPhaseGroup)
+            -IsolateCompilationFixtures:$IsolateCompilationFixtures -EditorPhaseGroup $EditorPhaseGroup -UnityVersion $UnityVersion)
         foreach ($phase in $phases) {
             $phaseArguments = @(New-UnityEditorPhaseArguments -Arguments $testArgs `
                 -TestCategory $phase.TestCategory -TestFilter $phase.TestFilter -UnityVersion $UnityVersion)

@@ -38,6 +38,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
     [Generator]
     public sealed partial class WProtoGenerator : ISourceGenerator
     {
+        private const int MaximumShallowHierarchyDepth = 16;
         private const string AttributeNamespace =
             "WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto";
         private const string ContractAttribute = AttributeNamespace + ".WProtoContractAttribute";
@@ -73,6 +74,58 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             typeof(DataMemberAttribute).FullName;
 
         /// <summary>
+        /// Orders contracts so that every subtype precedes the base it derives from.
+        /// </summary>
+        /// <param name="contracts">The compilation's contracts, in discovery order.</param>
+        /// <returns>The same contracts, deepest inheritance level first.</returns>
+        /// <remarks>
+        /// What lets a base's include set be filtered as its source is written: an include names a
+        /// DIRECT subtype, so once every deeper contract has been attempted, the outcome of each of
+        /// a base's subtypes is already known. Ordering by depth is enough -- a subtype is strictly
+        /// deeper than its base. The shallow path retains the qualified stable sort; deep chains use
+        /// stable buckets and cache shared base depths.
+        /// </remarks>
+        internal static List<INamedTypeSymbol> DeepestFirst(List<INamedTypeSymbol> contracts)
+        {
+            if (contracts.Count < 2)
+            {
+                return new List<INamedTypeSymbol>(contracts);
+            }
+            if (!RequiresDepthCache(contracts))
+            {
+                return contracts.OrderByDescending(ContractDepth).ToList();
+            }
+            List<INamedTypeSymbol> ordered = new List<INamedTypeSymbol>(contracts);
+            int[] depths = new int[contracts.Count];
+            Dictionary<INamedTypeSymbol, int> baseDepths = null;
+            List<INamedTypeSymbol> pending = null;
+            int maximumDepth = 0;
+            for (int index = 0; index < contracts.Count; ++index)
+            {
+                int depth = ContractDepth(contracts[index], ref baseDepths, ref pending);
+                depths[index] = depth;
+                maximumDepth = Math.Max(maximumDepth, depth);
+            }
+            int[] positions = new int[maximumDepth + 1];
+            foreach (int depth in depths)
+            {
+                ++positions[depth];
+            }
+            int next = 0;
+            for (int depth = maximumDepth; 0 <= depth; --depth)
+            {
+                int count = positions[depth];
+                positions[depth] = next;
+                next += count;
+            }
+            for (int index = 0; index < contracts.Count; ++index)
+            {
+                ordered[positions[depths[index]]++] = contracts[index];
+            }
+            return ordered;
+        }
+
+        /// <summary>
         /// Whether this compilation is one the editor performs, rather than one a player ships.
         /// </summary>
         /// <param name="context">The generator's execution context.</param>
@@ -93,7 +146,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </remarks>
         private static bool IsEditorCompilation(GeneratorExecutionContext context)
         {
-            ParseOptions options = context.ParseOptions;
+            return HasPreprocessorSymbol(context.ParseOptions, "UNITY_EDITOR");
+        }
+
+        private static bool HasPreprocessorSymbol(ParseOptions options, string required)
+        {
             if (options == null)
             {
                 // Without editor symbols, missing tags must use the player-safe refusal.
@@ -102,7 +159,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             foreach (string symbol in options.PreprocessorSymbolNames)
             {
-                if (string.Equals(symbol, "UNITY_EDITOR", StringComparison.Ordinal))
+                if (string.Equals(symbol, required, StringComparison.Ordinal))
                 {
                     return true;
                 }
@@ -1895,29 +1952,27 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             return false;
         }
 
-        /// <summary>
-        /// Orders contracts so that every subtype precedes the base it derives from.
-        /// </summary>
-        /// <param name="contracts">The compilation's contracts, in discovery order.</param>
-        /// <returns>The same contracts, deepest inheritance level first.</returns>
-        /// <remarks>
-        /// What lets a base's include set be filtered as its source is written: an include names a
-        /// DIRECT subtype, so once every deeper contract has been attempted, the outcome of each of
-        /// a base's subtypes is already known. Ordering by depth is enough -- a subtype is strictly
-        /// deeper than its base -- and <see cref="Enumerable.OrderByDescending{T, TKey}"/> is
-        /// stable, so contracts at one depth keep discovery order and the output stays
-        /// deterministic.
-        /// </remarks>
-        private static List<INamedTypeSymbol> DeepestFirst(List<INamedTypeSymbol> contracts)
+        private static bool RequiresDepthCache(List<INamedTypeSymbol> contracts)
         {
-            return contracts.OrderByDescending(ContractDepth).ToList();
+            foreach (INamedTypeSymbol contract in contracts)
+            {
+                int depth = 0;
+                for (
+                    INamedTypeSymbol current = contract.BaseType;
+                    current != null;
+                    current = current.BaseType
+                )
+                {
+                    ++depth;
+                    if (MaximumShallowHierarchyDepth <= depth)
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
         }
 
-        /// <summary>
-        /// How many contracts sit above <paramref name="contract"/> in its base chain.
-        /// </summary>
-        /// <param name="contract">The contract to measure.</param>
-        /// <returns>Zero when nothing above it is a contract.</returns>
         private static int ContractDepth(INamedTypeSymbol contract)
         {
             int depth = 0;
@@ -1929,7 +1984,47 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             {
                 ++depth;
             }
+            return depth;
+        }
 
+        private static int ContractDepth(
+            INamedTypeSymbol contract,
+            ref Dictionary<INamedTypeSymbol, int> baseDepths,
+            ref List<INamedTypeSymbol> pending
+        )
+        {
+            INamedTypeSymbol current = contract.BaseType;
+            if (current == null || !Shape.IsContract(current))
+            {
+                return 0;
+            }
+            if (baseDepths == null)
+            {
+                baseDepths = new Dictionary<INamedTypeSymbol, int>(SymbolEqualityComparer.Default);
+                pending = new List<INamedTypeSymbol>();
+            }
+            pending.Clear();
+            int depth;
+            while (true)
+            {
+                if (baseDepths.TryGetValue(current, out depth))
+                {
+                    ++depth;
+                    break;
+                }
+                pending.Add(current);
+                current = current.BaseType;
+                if (current == null || !Shape.IsContract(current))
+                {
+                    depth = 0;
+                    break;
+                }
+            }
+            for (int index = pending.Count - 1; 0 <= index; --index)
+            {
+                baseDepths[pending[index]] = depth;
+                ++depth;
+            }
             return depth;
         }
 
@@ -4676,10 +4771,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             if (
                 (hasRegistrar || externalProviderRegistrar)
                 && !disableModuleInitializer
-                && (
-                    context.ParseOptions == null
-                    || !context.ParseOptions.PreprocessorSymbolNames.Contains("UNITY_5_3_OR_NEWER")
-                )
+                && !HasPreprocessorSymbol(context.ParseOptions, "UNITY_5_3_OR_NEWER")
                 && !(
                     context.Compilation.GetTypeByMetadataName(
                         "System.Runtime.CompilerServices.ModuleInitializerAttribute"

@@ -93,3 +93,5 @@
   [validate-before-commit](../skills/validate-before-commit.md) already prescribes
 
 ---
+
+- **Normalize path separators once with the shared helper.** Use `SanitizePath()` (or public `PathHelper.Sanitize`) instead of manual `Replace` calls in Runtime, Editor, Tests and Generator~. Cache the normalized value when checking multiple candidates. `npm run lint:path-normalization` bans character and string overload spellings, with the sole implementation exception in `PathHelper`; standalone Generator tools link the same Unity-free helper source.

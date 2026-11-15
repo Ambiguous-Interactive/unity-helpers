@@ -652,6 +652,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 if (
                     attribute.AttributeClass != null
                     && string.Equals(
+                        attribute.AttributeClass.Name,
+                        "WProtoContractAttribute",
+                        System.StringComparison.Ordinal
+                    )
+                    && string.Equals(
                         attribute.AttributeClass.ToDisplayString(),
                         "WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoContractAttribute",
                         System.StringComparison.Ordinal

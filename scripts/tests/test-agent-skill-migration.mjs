@@ -22,8 +22,20 @@ try {
   }
   fs.symlinkSync(path.join(repo, "node_modules"), path.join(root, "node_modules"), "dir");
   fs.copyFileSync(path.join(repo, ".prettierrc.json"), path.join(root, ".prettierrc.json"));
-  for (const script of ["migrate-agent-skills.mjs", "generate-agent-skill-stubs.mjs"]) {
+  for (const script of [
+    "migrate-agent-skills.mjs",
+    "generate-agent-skill-stubs.mjs",
+    "generate_agent_skill_stubs.py",
+    "cli_encoding.py"
+  ]) {
     fs.copyFileSync(path.join(repo, "scripts", script), path.join(root, "scripts", script));
+  }
+  fs.mkdirSync(path.join(root, "scripts/python~"));
+  for (const filename of ["pyproject.toml", "uv.lock"]) {
+    fs.copyFileSync(
+      path.join(repo, "scripts/python~", filename),
+      path.join(root, "scripts/python~", filename)
+    );
   }
 
   const source = [
@@ -54,7 +66,10 @@ try {
   assert.match(router, /\[Read section\]\(\.\.\/references\/demo-part-2\.md#second-section\)/);
   assert.match(router, /### \[Follow-up\]\(\.\.\/references\/demo-part-2\.md#follow-up\)/);
   const partTwo = path.join(root, ".llm/references/demo-part-2.md");
-  assert.match(fs.readFileSync(partTwo, "utf8"), /^# demo - Part 2\n\n## Split Content\n\n### Follow-up/m);
+  assert.match(
+    fs.readFileSync(partTwo, "utf8"),
+    /^# demo - Part 2\n\n## Split Content\n\n### Follow-up/m
+  );
 
   const partOne = path.join(root, ".llm/references/demo-part-1.md");
   fs.appendFileSync(partOne, "\nAdditional instruction.\n");

@@ -320,6 +320,59 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
             );
         }
 
+        [TestCase(false, false)]
+        [TestCase(false, true)]
+        [TestCase(true, false)]
+        [TestCase(true, true)]
+        public void ModernNamespaceAndGlobalAliasesRemainCovered(bool globalAlias, bool fileScoped)
+        {
+            const string alias = "using SnapshotAlias = UnityEngine.Random.State;";
+            string consumer =
+                (fileScoped ? "namespace Consumer;" : "namespace Consumer {")
+                + (globalAlias ? string.Empty : alias)
+                + "public class Subject { public SnapshotAlias Snapshot; }"
+                + (fileScoped ? string.Empty : "}");
+            CSharpParseOptions parsing = new CSharpParseOptions(LanguageVersion.Latest);
+            CSharpCompilation compilation = Compile(string.Empty, ReportDiagnostic.Default)
+                .RemoveAllSyntaxTrees()
+                .AddSyntaxTrees(
+                    CSharpSyntaxTree.ParseText(
+                        globalAlias ? "global " + alias : string.Empty,
+                        parsing
+                    ),
+                    CSharpSyntaxTree.ParseText(consumer, parsing),
+                    CSharpSyntaxTree.ParseText(UnityRandomStub, parsing)
+                );
+            ImmutableArray<Diagnostic> reported = Run(compilation, "modern alias scope");
+            Assert.AreEqual(2, reported.Length);
+            foreach (Diagnostic diagnostic in reported)
+            {
+                Assert.AreEqual(DiagnosticId, diagnostic.Id);
+            }
+        }
+
+        [TestCase("using SnapshotAlias = UnityEngine.Random.State;", "SnapshotAlias", 2)]
+        [TestCase("using @SnapshotAlias = UnityEngine.Random.State;", "@SnapshotAlias", 2)]
+        [TestCase("using RandomAlias = UnityEngine.Random;", "RandomAlias.State", 1)]
+        public void NestedStateAliasesRemainCoveredByNameFiltering(
+            string directives,
+            string type,
+            int expected
+        )
+        {
+            ImmutableArray<Diagnostic> reported = Analyze(
+                directives,
+                "public static " + type + " Snapshot;",
+                ReportDiagnostic.Default
+            );
+            Assert.AreEqual(expected, reported.Length);
+            foreach (Diagnostic diagnostic in reported)
+            {
+                Assert.AreEqual(DiagnosticId, diagnostic.Id);
+                StringAssert.Contains("UnityEngine.Random.State", diagnostic.GetMessage());
+            }
+        }
+
         /// <summary>
         /// The three claims the message makes about the API, each of which was false before.
         /// </summary>

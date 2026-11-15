@@ -565,6 +565,44 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
         /// is not there, and this analyzer's whole value is that it has an answer to point at.
         /// </remarks>
         [Test]
+        [TestCase(
+            "public System.Threading.Tasks.ValueTask DisposeAsync() { Global.Active = 0; return default; }"
+        )]
+        [TestCase(
+            "System.Threading.Tasks.ValueTask IAsyncDisposable.DisposeAsync() { Global.Depth++; return default; }"
+        )]
+        [TestCase(
+            "public async System.Threading.Tasks.ValueTask DisposeAsync() { await default(System.Threading.Tasks.ValueTask); Global.Active = 0; }"
+        )]
+        [TestCase(
+            "private bool _disposed; public System.Threading.Tasks.ValueTask DisposeAsync() { _disposed = true; return default; }"
+        )]
+        public void AsyncDisposalAssignmentsAreReported(string members)
+        {
+            string subject = "public struct AsyncScope : IAsyncDisposable { " + members + " }";
+            Diagnostic reported = Single(subject);
+            Assert.That(reported.Id, Is.EqualTo(DiagnosticId));
+            Assert.That(reported.Severity, Is.EqualTo(DiagnosticSeverity.Warning));
+        }
+
+        [TestCase(
+            "public class AsyncScope : IAsyncDisposable { public System.Threading.Tasks.ValueTask DisposeAsync() { Global.Active = 0; return default; } }"
+        )]
+        [TestCase(
+            "public struct AsyncScope : IAsyncDisposable { public System.Threading.Tasks.ValueTask DisposeAsync() { return default; } public void DisposeAsync(int value) { Global.Active = value; } }"
+        )]
+        [TestCase(
+            "public struct AsyncScope : IAsyncDisposable { public System.Threading.Tasks.ValueTask DisposeAsync() { void Later() { Global.Active = 0; } return default; } }"
+        )]
+        [TestCase(
+            "public struct AsyncScope : IAsyncDisposable { System.Threading.Tasks.ValueTask IAsyncDisposable.DisposeAsync() { return default; } public void DisposeAsync() { Global.Active = 0; } }"
+        )]
+        public void NonDisposalAsyncAssignmentsAreNotReported(string subject)
+        {
+            Assert.That(Analyze(subject), Is.Empty);
+        }
+
+        [Test]
         public void TheApiTheMessageRecommendsIsShippedAndDoesNotItselfAssign()
         {
             string repositoryRoot = FindRepositoryRoot();

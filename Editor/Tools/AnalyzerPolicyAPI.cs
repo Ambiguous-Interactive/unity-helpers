@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
     using System.IO;
     using UnityEditor;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     /// <summary>Writes compiler-readable Unity Helpers analyzer policies without opening a window.</summary>
     /// <remarks>Writes repair legacy XML namespaces while preserving other rules and includes.</remarks>
@@ -157,6 +158,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 "Fresh pooled collection clears",
                 "Reports an immediate Clear after a known Buffers rental. Collections are already empty; retain clears after use and custom-pool cleanup."
             ),
+            new(
+                "WUH029",
+                "Member declaration order",
+                "Reports member order and nested types before ordinary members. This policy is opt-in; review initializer and conditional-compilation dependencies before moving code."
+            ),
+            new(
+                "WUH030",
+                "Explicit string comparison and culture",
+                "Reports string comparisons, searches and casing without an explicit comparison or culture policy. This policy is opt-in; preserve required culture-sensitive behavior."
+            ),
         };
 
         /// <summary>Enables or disables every Unity Helpers analyzer in the default ruleset.</summary>
@@ -201,7 +212,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             out string message
         )
         {
-            string normalizedPath = rulesetAssetPath?.Replace('\\', '/');
+            string normalizedPath = rulesetAssetPath?.SanitizePath();
             if (
                 string.IsNullOrWhiteSpace(normalizedPath)
                 || !normalizedPath.StartsWith("Assets/", StringComparison.Ordinal)
@@ -233,7 +244,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             string folder;
             try
             {
-                folder = Path.GetDirectoryName(normalizedPath)?.Replace('\\', '/');
+                folder = Path.GetDirectoryName(normalizedPath)?.SanitizePath();
                 if (string.IsNullOrWhiteSpace(folder) || !AssetDatabase.IsValidFolder(folder))
                 {
                     message = "The ruleset asset folder does not exist.";

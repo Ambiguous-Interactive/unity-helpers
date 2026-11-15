@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
     using System.Collections;
     using System.Reflection;
     using System.Runtime.ExceptionServices;
+    using NUnit.Framework;
     using UnityEditor;
     using UnityEngine;
     using UnityEngine.TestTools;
@@ -44,6 +45,28 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
     // fixtures' OnGUI), not a test fixture, so it does not inherit CommonTestBase.
     internal static class TestIMGUIExecutor
     {
+        internal const string OffscreenCursorRectError =
+            "EditorGUIUtility.AddCursorRect called outside an editor OnGUI";
+
+        private static readonly Type LogScopeType = typeof(LogAssert).Assembly.GetType(
+            "UnityEngine.TestTools.Logging.LogScope"
+        );
+        private static readonly Type LogEventType = typeof(LogAssert).Assembly.GetType(
+            "UnityEngine.TestTools.Logging.LogEvent"
+        );
+        private static readonly PropertyInfo CurrentLogScope = LogScopeType?.GetProperty("Current");
+        private static readonly PropertyInfo AllLogs = LogScopeType?.GetProperty("AllLogs");
+        private static readonly PropertyInfo FailingLogs = LogScopeType?.GetProperty("FailingLogs");
+        private static readonly FieldInfo LogScopeLock = LogScopeType?.GetField(
+            "m_Lock",
+            BindingFlags.Instance | BindingFlags.NonPublic
+        );
+        private static readonly PropertyInfo LogEventKind = LogEventType?.GetProperty("LogType");
+        private static readonly PropertyInfo LogEventMessage = LogEventType?.GetProperty("Message");
+        private static readonly PropertyInfo LogEventHandled = LogEventType?.GetProperty(
+            "IsHandled"
+        );
+
         // Unity’s internal panel members require reflection; public IMGUIContainer operations bind normally.
         private static bool _resolved;
         private static bool _available;
@@ -52,6 +75,20 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
         private static PropertyInfo _visualTreeProperty;
         private static MethodInfo _validateLayout;
         private static MethodInfo _handleIMGUIEvent;
+
+        internal static void InitializeEditorStyles()
+        {
+            IEnumerator initialization = Run(
+                () =>
+                {
+                    Assert.That(EditorStyles.helpBox, Is.Not.Null);
+                    Assert.That(EditorStyles.miniButtonLeft, Is.Not.Null);
+                },
+                TestIMGUIExecutorBudget.Default,
+                strictLogs: true
+            );
+            Assert.That(initialization.MoveNext(), Is.False);
+        }
 
         internal static IEnumerator Run(Action action)
         {
@@ -62,7 +99,11 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
             Keep the iterator contract while executing the pass on its first MoveNext so caller assertions
             observe failures synchronously.
         */
-        internal static IEnumerator Run(Action action, TestIMGUIExecutorBudget budget)
+        internal static IEnumerator Run(
+            Action action,
+            TestIMGUIExecutorBudget budget,
+            bool strictLogs = false
+        )
         {
             if (action != null)
             {
@@ -71,7 +112,8 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
                     budget,
                     CreateLayoutRepaintEvents(),
                     overrideMouseDownPosition: false,
-                    mouseDownPosition: default
+                    mouseDownPosition: default,
+                    strictLogs: strictLogs
                 );
             }
 
@@ -96,7 +138,8 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
                     budget,
                     CreateLayoutMouseDownRepaintEvents(mousePosition),
                     overrideMouseDownPosition: true,
-                    mouseDownPosition: mousePosition
+                    mouseDownPosition: mousePosition,
+                    strictLogs: false
                 );
             }
 
@@ -104,6 +147,91 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
         }
 
         private static void Execute(
+            Action action,
+            TestIMGUIExecutorBudget budget,
+            Event[] events,
+            bool overrideMouseDownPosition,
+            Vector2 mouseDownPosition,
+            bool strictLogs
+        )
+        {
+            bool previous = LogAssert.ignoreFailingMessages;
+            (object Sync, IList Logs, IList Failing) logState = strictLogs
+                ? default
+                : GetLogRecords();
+            int firstLog = 0;
+            if (logState.Logs != null)
+            {
+                lock (logState.Sync)
+                {
+                    firstLog = logState.Logs.Count;
+                }
+            }
+            try
+            {
+                if (strictLogs)
+                {
+                    LogAssert.ignoreFailingMessages = false;
+                }
+                ExecuteCore(action, budget, events, overrideMouseDownPosition, mouseDownPosition);
+            }
+            finally
+            {
+                try
+                {
+                    if (logState.Logs != null)
+                    {
+                        lock (logState.Sync)
+                        {
+                            for (int index = firstLog; index < logState.Logs.Count; ++index)
+                            {
+                                object log = logState.Logs[index];
+                                if (
+                                    (LogType)LogEventKind.GetValue(log) == LogType.Error
+                                    && string.Equals(
+                                        LogEventMessage.GetValue(log) as string,
+                                        OffscreenCursorRectError,
+                                        StringComparison.Ordinal
+                                    )
+                                )
+                                {
+                                    LogEventHandled.SetValue(log, true);
+                                    logState.Failing.Remove(log);
+                                }
+                            }
+                        }
+                    }
+                }
+                finally
+                {
+                    LogAssert.ignoreFailingMessages = previous;
+                }
+            }
+        }
+
+        private static (object Sync, IList Logs, IList Failing) GetLogRecords()
+        {
+            object scope = CurrentLogScope?.GetValue(null);
+            object sync = scope == null ? null : LogScopeLock?.GetValue(scope);
+            IList logs = scope == null ? null : AllLogs?.GetValue(scope) as IList;
+            IList failing = scope == null ? null : FailingLogs?.GetValue(scope) as IList;
+            if (
+                sync == null
+                || logs == null
+                || failing == null
+                || LogEventKind == null
+                || LogEventMessage == null
+                || LogEventHandled == null
+            )
+            {
+                throw new InvalidOperationException(
+                    "The loaded Unity Test Framework must expose its strict log scope for offscreen cursor-error handling."
+                );
+            }
+            return (sync, logs, failing);
+        }
+
+        private static void ExecuteCore(
             Action action,
             TestIMGUIExecutorBudget budget,
             Event[] events,
@@ -197,13 +325,6 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
                 VisualElement visualTree = (VisualElement)_visualTreeProperty.GetValue(panel);
                 visualTree.Add(container);
                 _validateLayout.Invoke(panel, null);
-
-                /*
-                    Offscreen panels lack a GUIView, so numeric fields emit native cursor-rect errors that
-                    bypass managed log handlers. Keep suppression active through framework log evaluation;
-                    action and assertion exceptions still propagate.
-                */
-                LogAssert.ignoreFailingMessages = true;
 
                 // The pass budget turns a pathological IMGUI pump into a bounded test failure.
                 int passes = 0;

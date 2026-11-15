@@ -7,10 +7,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     using System.Collections.Generic;
     using System.IO;
     using System.Linq;
+    using System.Text.RegularExpressions;
     using NUnit.Framework;
     using UnityEditor;
+    using UnityEditor.SceneManagement;
     using UnityEditorInternal;
     using UnityEngine;
+    using UnityEngine.SceneManagement;
+    using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Utils;
@@ -121,6 +125,542 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 .Select(so => AssetDatabase.GetAssetPath(so))
                 .ToHashSet(StringComparer.Ordinal);
             Assert.Contains(assetPath, guids.ToList());
+        }
+
+        [Test]
+        public void EnumerateAssetsIncludesEveryMatchingSubassetOnce()
+        {
+            string path = _scriptableFolder + "/Clips.asset";
+            TrackAssetPath(path);
+            DummyScriptableObject container = Track(
+                ScriptableObject.CreateInstance<DummyScriptableObject>()
+            );
+            AnimationClip first = Track(new AnimationClip { name = "First" });
+            AnimationClip second = Track(new AnimationClip { name = "Second" });
+            ExecuteWithImmediateImport(() =>
+            {
+                AssetDatabase.CreateAsset(container, path);
+                AssetDatabase.AddObjectToAsset(first, container);
+                AssetDatabase.AddObjectToAsset(second, container);
+                AssetDatabase.SaveAssets();
+                AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
+            });
+
+            AnimationClip[] clips = Helpers
+                .EnumerateAssets<AnimationClip>(new[] { _scriptableFolder })
+                .ToArray();
+            Assert.That(clips, Is.EquivalentTo(new[] { first, second }));
+            Assert.That(
+                Helpers.EnumerateAssets<AnimationClip>().Any(clip => clip == first),
+                Is.True
+            );
+            Assert.That(
+                Helpers.EnumerateAssets<AnimationClip>(
+                    new[] { " ", null, _scriptableFolder + "/Missing" }
+                ),
+                Is.Empty
+            );
+            Assert.That(Helpers.EnumerateAssets<AnimationClip>(Array.Empty<string>()), Is.Empty);
+            Assert.That(Helpers.EnumerateAssets<AnimationClip>(new[] { _prefabFolder }), Is.Empty);
+        }
+
+        [Test]
+        public void EnumerateAssetsFindsSceneMainAssets()
+        {
+            string path = _scriptableFolder + "/Scene.unity";
+            TrackAssetPath(path);
+            Scene scene = CreateTempScene(nameof(EnumerateAssetsFindsSceneMainAssets));
+            ExecuteWithImmediateImport(() =>
+            {
+                Assert.That(EditorSceneManager.SaveScene(scene, path), Is.True);
+                AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
+            });
+            SceneAsset[] scenes = Helpers
+                .EnumerateAssets<SceneAsset>(new[] { _scriptableFolder })
+                .ToArray();
+            Assert.That(scenes.Length, Is.EqualTo(1));
+            Assert.That(AssetDatabase.GetAssetPath(scenes[0]), Is.EqualTo(path));
+        }
+
+        [Test]
+        public void CreateOrReplaceAssetRefusesSubassetSources()
+        {
+            string path = _scriptableFolder + "/Subasset.asset";
+            TrackAssetPath(path);
+            DummyScriptableObject original = Track(
+                ScriptableObject.CreateInstance<DummyScriptableObject>()
+            );
+            DummyScriptableObject child = Track(
+                ScriptableObject.CreateInstance<DummyScriptableObject>()
+            );
+            original.value = 7;
+            child.value = 42;
+            ExecuteWithImmediateImport(() =>
+            {
+                AssetDatabase.CreateAsset(original, path);
+                AssetDatabase.AddObjectToAsset(child, original);
+                AssetDatabase.SaveAssets();
+                Assert.That(Helpers.CreateOrReplaceAsset(child, path), Is.Null);
+                Assert.That(original.value, Is.EqualTo(7));
+            });
+        }
+
+        [Test]
+        public void CreateOrReplaceAssetPreservesIdentityAndReferences()
+        {
+            string path = _scriptableFolder + "/Replace.asset";
+            string holderPath = _scriptableFolder + "/Reference.asset";
+            TrackAssetPath(path);
+            TrackAssetPath(holderPath);
+            DummyScriptableObject original = Track(
+                ScriptableObject.CreateInstance<DummyScriptableObject>()
+            );
+            DummyScriptableObject replacement = Track(
+                ScriptableObject.CreateInstance<DummyScriptableObject>()
+            );
+            DummyScriptableObject holder = Track(
+                ScriptableObject.CreateInstance<DummyScriptableObject>()
+            );
+            original.value = 7;
+            replacement.value = 42;
+            ExecuteWithImmediateImport(() =>
+            {
+                Assert.That(Helpers.CreateOrReplaceAsset(original, path), Is.SameAs(original));
+                holder.reference = original;
+                AssetDatabase.CreateAsset(holder, holderPath);
+                AssetDatabase.SaveAssets();
+                Assert.That(
+                    AssetDatabase.TryGetGUIDAndLocalFileIdentifier(
+                        original,
+                        out string guidBefore,
+                        out long idBefore
+                    ),
+                    Is.True
+                );
+                Assert.That(
+                    Helpers.TryCreateOrReplaceAsset(
+                        replacement,
+                        path,
+                        out UnityEngine.Object saved,
+                        out string error
+                    ),
+                    Is.True,
+                    error
+                );
+                Assert.That(saved, Is.SameAs(original));
+                Assert.That(original.value, Is.EqualTo(42));
+                Assert.That(holder.reference, Is.SameAs(original));
+                Assert.That(
+                    AssetDatabase.TryGetGUIDAndLocalFileIdentifier(
+                        saved,
+                        out string guidAfter,
+                        out long idAfter
+                    ),
+                    Is.True
+                );
+                Assert.That(guidAfter, Is.EqualTo(guidBefore));
+                Assert.That(idAfter, Is.EqualTo(idBefore));
+                Assert.That(AssetDatabase.Contains(replacement), Is.False);
+                Assert.That(Helpers.CreateOrReplaceAsset(original, path), Is.SameAs(original));
+            });
+        }
+
+        [Test]
+        public void ReplaceAssetSupportsInMemoryUndoAndRedo()
+        {
+            string path = _scriptableFolder + "/Undo.asset";
+            TrackAssetPath(path);
+            DummyScriptableObject original = Track(
+                ScriptableObject.CreateInstance<DummyScriptableObject>()
+            );
+            DummyScriptableObject replacement = Track(
+                ScriptableObject.CreateInstance<DummyScriptableObject>()
+            );
+            original.value = 3;
+            replacement.value = 9;
+            ExecuteWithImmediateImport(() =>
+            {
+                AssetDatabase.CreateAsset(original, path);
+                AssetDatabase.SaveAssets();
+                Undo.IncrementCurrentGroup();
+                Assert.That(Helpers.CreateOrReplaceAsset(replacement, path), Is.SameAs(original));
+                Undo.PerformUndo();
+                Assert.That(original.value, Is.EqualTo(3));
+                Undo.PerformRedo();
+                Assert.That(original.value, Is.EqualTo(9));
+            });
+        }
+
+        [TestCase(null)]
+        [TestCase("")]
+        [TestCase(" ")]
+        [TestCase("Packages/value.asset")]
+        [TestCase("Assets/../value.asset")]
+        [TestCase("Assets/./value.asset")]
+        [TestCase("Assets//value.asset")]
+        [TestCase("Assets/value.png")]
+        [TestCase("Assets/value.prefab")]
+        [TestCase("Assets/value.unity")]
+        [TestCase("Assets/value")]
+        [TestCase("Assets/bad?.asset")]
+        [TestCase("Assets/bad*.asset")]
+        [TestCase("Assets/bad\n.asset")]
+        [TestCase("Assets/bad\0.asset")]
+        public void CreateOrReplaceAssetRefusesInvalidDestinations(string path)
+        {
+            DummyScriptableObject source = Track(
+                ScriptableObject.CreateInstance<DummyScriptableObject>()
+            );
+            Assert.That(
+                Helpers.TryCreateOrReplaceAsset(
+                    source,
+                    path,
+                    out UnityEngine.Object saved,
+                    out string error
+                ),
+                Is.False
+            );
+            Assert.That(saved, Is.Null);
+            Assert.That(error, Is.Not.Null.And.Not.Empty);
+            Assert.That(AssetDatabase.Contains(source), Is.False);
+        }
+
+        [Test]
+        public void CreateOrReplaceAssetRequiresAnExistingParentFolder()
+        {
+            DummyScriptableObject source = Track(
+                ScriptableObject.CreateInstance<DummyScriptableObject>()
+            );
+            string path = _scriptableFolder + "/Missing/Value.asset";
+            Assert.That(Helpers.CreateOrReplaceAsset(source, path), Is.Null);
+            Assert.That(AssetDatabase.Contains(source), Is.False);
+        }
+
+        [Test]
+        public void CreateOrReplaceAssetReportsLockedFileWrites()
+        {
+            if (SystemInfo.operatingSystemFamily != OperatingSystemFamily.Windows)
+            {
+                Assert.Ignore("The native Windows file-sharing failure control requires Windows.");
+            }
+            string path = _scriptableFolder + "/Locked.asset";
+            TrackAssetPath(path);
+            DummyScriptableObject original = CreateScriptableObject<DummyScriptableObject>();
+            DummyScriptableObject replacement = CreateScriptableObject<DummyScriptableObject>();
+            original.value = 7;
+            replacement.value = 42;
+            ExecuteWithImmediateImport(() =>
+            {
+                AssetDatabase.CreateAsset(original, path);
+                AssetDatabase.SaveAssets();
+                byte[] before = File.ReadAllBytes(path);
+                Regex saveError = new(
+                    "^File " + Regex.Escape(path) + " couldn't be written\\..*failed\\.$"
+                );
+                LogAssert.Expect(LogType.Error, saveError);
+                LogAssert.Expect(LogType.Error, saveError);
+                using (
+                    FileStream locked = new(path, FileMode.Open, FileAccess.Read, FileShare.Read)
+                )
+                {
+                    Assert.IsFalse(
+                        Helpers.TryCreateOrReplaceAsset(
+                            replacement,
+                            path,
+                            out UnityEngine.Object saved,
+                            out string error
+                        )
+                    );
+                    Assert.IsTrue(saved == null);
+                    Assert.IsNotEmpty(error);
+                }
+                CollectionAssert.AreEqual(before, File.ReadAllBytes(path));
+                Assert.IsTrue(
+                    Helpers.TryCreateOrReplaceAsset(
+                        replacement,
+                        path,
+                        out UnityEngine.Object persisted,
+                        out string retryError
+                    ),
+                    retryError
+                );
+                Assert.AreSame(original, persisted);
+                Assert.AreEqual(42, original.value);
+                Resources.UnloadAsset(original);
+                DummyScriptableObject reloaded = Track(
+                    AssetDatabase.LoadAssetAtPath<DummyScriptableObject>(path)
+                );
+                Assert.AreEqual(42, reloaded.value);
+            });
+        }
+
+        [TestCase("File Assets/Data.asset couldn't be written.", true)]
+        [TestCase("File ASSETS/DATA.ASSET couldn't be written.", true)]
+        [TestCase("File C:/Project/Assets/Data.asset couldn't be written.", false)]
+        [TestCase("File Assets/Backup/Assets/Data.asset couldn't be written.", false)]
+        [TestCase("File Assets/Backup Assets/Data.asset couldn't be written.", false)]
+        [TestCase("Could not save 'Assets/Data.asset'.", true)]
+        [TestCase("File Assets/Data.asset.backup.asset couldn't be written.", false)]
+        [TestCase("File Assets/Data.asset backup.asset couldn't be written.", false)]
+        [TestCase("File Assets/Data.asset).asset couldn't be written.", false)]
+        [TestCase("Could not save 'Assets/Data.asset.backup.asset'.", false)]
+        public void AssetSaveErrorsMatchCompletePaths(string message, bool expected)
+        {
+            Assert.AreEqual(expected, Helpers.HasAssetPathToken(message, "Assets/Data.asset"));
+        }
+
+        [Test]
+        public void AbsoluteAssetSaveErrorMatchesOnlyTheCompleteAbsolutePath()
+        {
+            const string path = "C:/Project/Assets/Data.asset";
+            Assert.IsTrue(
+                Helpers.HasAssetPathToken("File " + path + " couldn't be written.", path)
+            );
+            Assert.IsTrue(Helpers.HasAssetPathToken("Could not save '" + path + "'.", path));
+            Assert.IsFalse(
+                Helpers.HasAssetPathToken(
+                    "File C:/OtherProject/Assets/Data.asset couldn't be written.",
+                    path
+                )
+            );
+        }
+
+        [Test]
+        public void UnrelatedPrefixWriteFailureDoesNotAbortSuccessfulReplacement()
+        {
+            if (SystemInfo.operatingSystemFamily != OperatingSystemFamily.Windows)
+            {
+                Assert.Ignore("The native Windows file-sharing failure control requires Windows.");
+            }
+            string path = _scriptableFolder + "/Data.asset";
+            string otherPath = path + ".backup.asset";
+            TrackAssetPath(path);
+            TrackAssetPath(otherPath);
+            DummyScriptableObject original = CreateScriptableObject<DummyScriptableObject>();
+            DummyScriptableObject other = CreateScriptableObject<DummyScriptableObject>();
+            DummyScriptableObject replacement = CreateScriptableObject<DummyScriptableObject>();
+            replacement.value = 42;
+            ExecuteWithImmediateImport(() =>
+            {
+                AssetDatabase.CreateAsset(original, path);
+                AssetDatabase.CreateAsset(other, otherPath);
+                AssetDatabase.SaveAssets();
+                byte[] before = File.ReadAllBytes(otherPath);
+                other.value = 99;
+                EditorUtility.SetDirty(other);
+                Regex saveError = new(
+                    "^File " + Regex.Escape(otherPath) + " couldn't be written\\..*failed\\.$"
+                );
+                LogAssert.Expect(LogType.Error, saveError);
+                LogAssert.Expect(LogType.Error, saveError);
+                using (
+                    FileStream locked = new(
+                        otherPath,
+                        FileMode.Open,
+                        FileAccess.Read,
+                        FileShare.Read
+                    )
+                )
+                {
+                    Assert.IsTrue(
+                        Helpers.TryCreateOrReplaceAsset(
+                            replacement,
+                            path,
+                            out UnityEngine.Object saved,
+                            out string error
+                        ),
+                        error
+                    );
+                    Assert.AreSame(original, saved);
+                }
+                CollectionAssert.AreEqual(before, File.ReadAllBytes(otherPath));
+                Assert.IsFalse(EditorUtility.IsDirty(original));
+                Resources.UnloadAsset(original);
+                DummyScriptableObject reloaded = Track(
+                    AssetDatabase.LoadAssetAtPath<DummyScriptableObject>(path)
+                );
+                Assert.AreEqual(42, reloaded.value);
+            });
+        }
+
+        [Test]
+        public void CreateOrReplaceAssetReportsBlockedWrites()
+        {
+            string path = _scriptableFolder + "/Blocked.asset";
+            TrackAssetPath(path);
+            DummyScriptableObject original = Track(
+                ScriptableObject.CreateInstance<DummyScriptableObject>()
+            );
+            DummyScriptableObject replacement = Track(
+                ScriptableObject.CreateInstance<DummyScriptableObject>()
+            );
+            original.value = 7;
+            replacement.value = 42;
+            ExecuteWithImmediateImport(() =>
+            {
+                AssetDatabase.CreateAsset(original, path);
+                AssetDatabase.SaveAssets();
+                byte[] before = File.ReadAllBytes(path);
+                int filteredBefore = HelpersAssetSaveFilter.FilteredSaves;
+                HelpersAssetSaveFilter.BlockedPath = path;
+                try
+                {
+                    Assert.That(
+                        Helpers.TryCreateOrReplaceAsset(
+                            replacement,
+                            path,
+                            out UnityEngine.Object saved,
+                            out string error
+                        ),
+                        Is.False
+                    );
+                    Assert.That(saved, Is.Null);
+                    Assert.That(error, Is.Not.Empty);
+                    Assert.That(
+                        HelpersAssetSaveFilter.FilteredSaves,
+                        Is.GreaterThan(filteredBefore)
+                    );
+                    Assert.That(EditorUtility.IsDirty(original), Is.True);
+                    Assert.That(original.value, Is.EqualTo(42));
+                    CollectionAssert.AreEqual(before, File.ReadAllBytes(path));
+                }
+                finally
+                {
+                    HelpersAssetSaveFilter.BlockedPath = null;
+                }
+                Assert.That(Helpers.CreateOrReplaceAsset(replacement, path), Is.SameAs(original));
+                Resources.UnloadAsset(original);
+                DummyScriptableObject reloaded = Track(
+                    AssetDatabase.LoadAssetAtPath<DummyScriptableObject>(path)
+                );
+                Assert.That(reloaded.value, Is.EqualTo(42));
+            });
+        }
+
+        [Test]
+        public void CreateOrReplaceAssetRefusesImportedSources()
+        {
+            string importedPath = _scriptableFolder + "/Imported.png";
+            string destination = _scriptableFolder + "/ImportedCopy.asset";
+            TrackAssetPath(importedPath);
+            TrackAssetPath(destination);
+            Texture2D texture = Track(new Texture2D(1, 1));
+            ExecuteWithImmediateImport(() =>
+            {
+                File.WriteAllBytes(importedPath, texture.EncodeToPNG());
+                AssetDatabase.ImportAsset(importedPath, ImportAssetOptions.ForceSynchronousImport);
+                Texture2D imported = AssetDatabase.LoadAssetAtPath<Texture2D>(importedPath);
+                Assert.That(imported, Is.Not.Null);
+                Assert.That(Helpers.CreateOrReplaceAsset(imported, destination), Is.Null);
+                Assert.That(AssetDatabase.LoadMainAssetAtPath(destination), Is.Null);
+                Assert.That(
+                    AssetDatabase.LoadAssetAtPath<Texture2D>(importedPath),
+                    Is.SameAs(imported)
+                );
+            });
+        }
+
+        [Test]
+        public void CreateOrReplaceAssetPreservesUnrecognizedFiles()
+        {
+            string path = _scriptableFolder + "/Occupied.asset";
+            TrackAssetPath(path);
+            byte[] bytes = { 23, 42, 17 };
+            DummyScriptableObject source = Track(
+                ScriptableObject.CreateInstance<DummyScriptableObject>()
+            );
+            File.WriteAllBytes(path, bytes);
+            try
+            {
+                Assert.That(Helpers.CreateOrReplaceAsset(source, path), Is.Null);
+                CollectionAssert.AreEqual(bytes, File.ReadAllBytes(path));
+                Assert.That(AssetDatabase.Contains(source), Is.False);
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
+
+        [Test]
+        public void CreateOrReplaceAssetRefusesUnsavableSources()
+        {
+            DummyScriptableObject source = Track(
+                ScriptableObject.CreateInstance<DummyScriptableObject>()
+            );
+            source.hideFlags = HideFlags.DontSaveInEditor;
+            string path = _scriptableFolder + "/Unsavable.asset";
+            Assert.That(
+                Helpers.TryCreateOrReplaceAsset(
+                    source,
+                    path,
+                    out UnityEngine.Object saved,
+                    out string error
+                ),
+                Is.False
+            );
+            Assert.That(saved, Is.Null);
+            Assert.That(error, Is.Not.Empty);
+            Assert.That(AssetDatabase.LoadMainAssetAtPath(path), Is.Null);
+        }
+
+        [Test]
+        public void CreateOrReplaceAssetSavesEditsToItsExistingSource()
+        {
+            string path = _scriptableFolder + "/Same.asset";
+            TrackAssetPath(path);
+            DummyScriptableObject source = Track(
+                ScriptableObject.CreateInstance<DummyScriptableObject>()
+            );
+            ExecuteWithImmediateImport(() =>
+            {
+                AssetDatabase.CreateAsset(source, path);
+                AssetDatabase.SaveAssets();
+                source.value = 42;
+                Assert.That(Helpers.CreateOrReplaceAsset(source, path), Is.SameAs(source));
+                Resources.UnloadAsset(source);
+                DummyScriptableObject reloaded = Track(
+                    AssetDatabase.LoadAssetAtPath<DummyScriptableObject>(path)
+                );
+                Assert.That(reloaded.value, Is.EqualTo(42));
+            });
+        }
+
+        [Test]
+        public void CreateOrReplaceAssetRefusesTypeChangesAndPersistentMoves()
+        {
+            string path = _scriptableFolder + "/Retained.asset";
+            string other = _scriptableFolder + "/Other.asset";
+            TrackAssetPath(path);
+            TrackAssetPath(other);
+            DummyScriptableObject original = Track(
+                ScriptableObject.CreateInstance<DummyScriptableObject>()
+            );
+            AnimationClip differentType = Track(new AnimationClip());
+            ExecuteWithImmediateImport(() =>
+            {
+                AssetDatabase.CreateAsset(original, path);
+                AssetDatabase.SaveAssets();
+                string guid = AssetDatabase.AssetPathToGUID(path);
+                Assert.That(
+                    Helpers.TryCreateOrReplaceAsset(
+                        differentType,
+                        path,
+                        out UnityEngine.Object saved,
+                        out string error
+                    ),
+                    Is.False
+                );
+                Assert.That(saved, Is.Null);
+                Assert.That(error, Is.Not.Empty);
+                Assert.That(AssetDatabase.AssetPathToGUID(path), Is.EqualTo(guid));
+                Assert.That(AssetDatabase.LoadMainAssetAtPath(path), Is.SameAs(original));
+                Assert.That(Helpers.CreateOrReplaceAsset(original, other), Is.Null);
+                Assert.That(AssetDatabase.LoadMainAssetAtPath(other), Is.Null);
+                Assert.That(Helpers.CreateOrReplaceAsset(null, path), Is.Null);
+                UnityEngine.Object.DestroyImmediate(differentType);
+                Assert.That(Helpers.CreateOrReplaceAsset(differentType, path), Is.Null);
+            });
         }
 
         [Test]

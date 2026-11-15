@@ -436,7 +436,10 @@ def run(
             for worker in workers:
                 if worker.mode.name == "editmode_isolated" and worker.process.returncode == 0:
                     folder = Path(str(worker.mode.parameters["ArtifactsPath"]))
-                    for name in ("compilation", "migration"):
+                    names = ["compilation", "migration"]
+                    if int(str(worker.mode.parameters["UnityVersion"]).split(".")[0]) >= 6000:
+                        names.append("idle-editor")
+                    for name in names:
                         destination = folder.parent / name
                         if destination.exists() or not (folder / name).is_dir():
                             raise RuntimeError("Isolated EditMode evidence is missing or conflicts")

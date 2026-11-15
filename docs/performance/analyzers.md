@@ -33,11 +33,81 @@ compilation. The window reports these files as needing repair; choose **Enable A
 All** to repair the namespace while keeping other rules and includes. API writes also repair the
 namespace. Reading or refreshing a file does not change it.
 
-For package development, `npm run verify:shipped-analyzers` compares all three shipped compiler-input DLLs with fresh
+For package development, `npm run verify:shipped-analyzers` compares all four shipped compiler-input DLLs with fresh
 Release builds. `npm run verify:shipped-analyzers:fix` stages each replacement in a hidden directory
 before publishing it. A failed copy or replacement leaves that DLL and its importer metadata intact
 and returns failure. Earlier successful replacements in the same run remain published; retry the
 command after resolving the failure. Temporary directories are excluded from Unity imports.
+
+## Compiler work and measurements
+
+Compiler analysis now reuses each analyzer's immutable diagnostic catalog instead of allocating an
+array on every read. Unity random-state analysis checks candidate nested-type and alias names before
+semantic binding; ordinary identifiers no longer need a symbol lookup for that rule. Global aliases,
+file-scoped namespaces and nested-state aliases retain semantic coverage. Member-order analysis skips
+trivia traversal when a type contains no directives.
+
+WProto retains its stable sort for shallow hierarchies. Deep hierarchies use stable depth buckets and
+cache shared base depths, preserving discovery order within a level. A bounded hierarchy probe picks
+the path. Unconditional buckets were rejected: a 256-contract caller regressed even though isolated
+ordering was faster. Odin migration scans declarations without descending through method expressions,
+and avoids formatting names for unrelated attributes. The enum generator remains byte-identical to
+the baseline after its name-check candidate failed qualification.
+
+The excluded-source audit removes its LINQ queries, normalizes each subject once and streams manifest
+paths while preserving first occurrence. The former membership term was `sources × subjects`; the
+current nine subjects bound that factor, while larger sets expose the scaling problem. The accepted
+path uses a bounded scan for at most 16 subjects and hash membership above that threshold. Its nine
+required suffix anchors remain fixed. Large-set temporary storage scales with subjects, not sources.
+
+The [qualification record](./compiler-analysis-20261114.json) and
+[3,714 raw observations](./compiler-analysis-20261114.csv) include accepted and rejected variants,
+payload hashes, source hashes, exact generated-source digests and reproducible probe sources.
+Measurements use .NET 9 / Roslyn 5.9 on the host; they are not Unity editor or player build-time claims.
+The analysis capture has known host API gaps, so its unchanged diagnostic set is a parity control,
+not proof that those sources compile against every Unity API.
+
+| Workload                                              | Observed result                                                                                                                                                                                                 |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| All 28 analyzers, 865-source census                   | Final rerun median analysis 12.599 → 10.327 seconds; all 250 diagnostics retain the same digest. Three fresh processes per variant in ABBAAB order.                                                             |
+| 100,000 diagnostic-catalog reads per analyzer         | Exactly 91,200,000 fewer allocated bytes per complete sweep; both variants retain the same 176-byte probe residual. Separate positive-control-backed policy tests measure zero getter allocations after warmup. |
+| Audit membership, up to 16,384 sources / 512 subjects | Largest controls take about 1–3% of the former time. All measured cells stay within a 1.05 ratio. The hash path uses more temporary bytes for large slash-only subject sets; see the raw data.                  |
+| WProto ordering, 512-contract chain                   | About 0.009 of the prior expression's time, with stable ordering. Shallow ordering stays close to the original path.                                                                                            |
+| Odin generation, 16 / 64 / 256 types                  | Supported enum-key dictionaries: warm ratios 0.565 / 0.527 / 0.725, with identical fields, edits and accessors.                                                                                                 |
+| WProto generation, 16 / 64 / 256 contracts            | Rerun warm ratios 0.978 / 0.944 / 0.969; first-execution ratios 1.081 / 1.130 / 0.885. Earlier small-control regressions remain in the data.                                                                    |
+| Rejected enum name checks, 256 enums                  | About 5.5% slower warm and 31.8% slower on first execution. The original implementation and DLL are retained.                                                                                                   |
+
+Generation captures warm each corpus for at least 1.5 seconds before seven observations in each of
+three fresh processes. First-execution records follow validation of the input compilation and do not
+measure an entire build. Shared semantic binding can move between analyzer telemetry callbacks;
+per-rule timing reductions must not be read as whole-compiler savings. Earlier analysis traces that
+overlap owned builds are retained locally and excluded from these results.
+
+The rerun checks every measured result's diagnostics, tree count and sorted source digest after
+stopping the timer and allocation counter. Odin additionally requires each owner, its supported
+enum-key dictionary field, rewrite edits, and capture/restore accessors. The earlier int-key Odin
+corpus did not exercise that path; its observations remain explicitly labeled as under-covered.
+Earlier generation rounds checked counts alone and remain labeled as historical observations.
+
+The earlier analyzer median ratio was 0.949; the first review rerun observed 0.749 and the final conversion-guard rerun observes 0.820. All three
+captures remain in the data. The unchanged enum implementation also varies up to 9.8% warm and
+21.3% on first execution in the rerun. These controls expose host variation; small ratios are not
+proof of a causal improvement. Earlier WProto small-control regressions of 0.37 ms warm and 9.7%
+on first execution remain disclosed alongside the rerun's first-execution regressions. One SDK
+generated assembly-info revision changed before the rerun; its old and current hashes are recorded,
+and both payloads used the same newly frozen 865-source census.
+
+The timed payload snapshot is commit `3b733e5d`. Subsequent exceptional-dispatch corrections
+retain all 250 diagnostic identities on the same frozen corpus and the positive-backed diagnostic
+array allocation result; the timing comparison applies to the earlier snapshot. The JSON records their exact
+payload hashes and the generated SDK source snapshots needed to restore the census. All 79 teardown
+controls also pass on Roslyn 3.8.0.0, with a separate loaded-compiler identity control.
+
+Correctness qualification passes 1,388 analyzer and 2,258 WProto/Odin cases, plus 70 enum cases with
+one existing unsupported-boolean skip. Eight ordering controls cover both path boundaries, deep
+chains, branching, reversed discovery order and preservation of the input list. Native Unity
+qualification passes 25 profile and 57 analyzer-policy cases with clean raw exits and stable input
+hashes. The broader compiler/tooling work in issue #1200 remains open.
 
 | Id                                                                       | Reports                                                               |
 | ------------------------------------------------------------------------ | --------------------------------------------------------------------- |
@@ -69,20 +139,22 @@ command after resolving the failure. Temporary directories are excluded from Uni
 | [`WUH026`](#wuh026-boolean-bitwise-operators)                            | Bitwise operators on boolean operands                                 |
 | [`WUH027`](#wuh027-implicit-caller-names)                                | Explicit caller names the compiler can provide                        |
 | [`WUH028`](#wuh028-fresh-pooled-collection-clears)                       | Redundant clears immediately after known Buffers rentals              |
+| [`WUH029`](#wuh029-member-declaration-order-opt-in)                      | Member order and nested-type placement (**off by default**)           |
+| [`WUH030`](#wuh030-explicit-string-comparison-and-culture-opt-in)        | Explicit string comparison and culture (**off by default**)           |
 
 These are a different family from the `WPROTO###` serialization diagnostics, and they follow a
 different policy on purpose:
 
-|                     | `WPROTO###`                                                  | `WUH###`                                                                            |
-| ------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
-| Reports             | A serialization contract that cannot be honoured             | An allocation or footgun in correct code                                            |
-| Severity            | Error: the alternative is an exception from a shipped player | Warning by default; project overrides supported                                     |
-| Can fail your build | Yes, and it should                                           | Only when explicitly promoted to Error                                              |
-| Default             | On                                                           | On, except `WUH010`, `WUH013`, `WUH018`, `WUH019`, `WUH021`, `WUH023`, and `WUH024` |
+|                     | `WPROTO###`                                                  | `WUH###`                                                                                                |
+| ------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| Reports             | A serialization contract that cannot be honoured             | An allocation or footgun in correct code                                                                |
+| Severity            | Error: the alternative is an exception from a shipped player | Warning by default; project overrides supported                                                         |
+| Can fail your build | Yes, and it should                                           | Only when explicitly promoted to Error                                                                  |
+| Default             | On                                                           | On, except `WUH010`, `WUH013`, `WUH018`, `WUH019`, `WUH021`, `WUH023`, `WUH024`, `WUH029`, and `WUH030` |
 
 **A `WUH###` diagnostic defaults to a warning.** Taking a package upgrade does not promote it to
 a build error; an explicit Error override does. If your project treats warnings as errors, see
-[Turning one off](#turning-one-off). `WUH010`, `WUH013`, `WUH018`, `WUH019`, `WUH021`, `WUH023`, and `WUH024` go further and are off until you ask for them, because
+[Turning one off](#turning-one-off). `WUH010`, `WUH013`, `WUH018`, `WUH019`, `WUH021`, `WUH023`, `WUH024`, `WUH029`, and `WUH030` go further and are off until you ask for them, because
 their shapes are correct code far more often than they are defects.
 
 The compact policy list offers a severity selector beside each diagnostic:
@@ -444,11 +516,28 @@ There is a real asymmetry here, and it is why "always call base first" is wrong 
 - **Teardown chains base-last.** The body has to finish using it before the base takes it away.
 
 Reported in an `override` of `OnDestroy`, `OnDisable`, `OnApplicationQuit` or `Dispose()` when the
-`base` call is a top-level statement with executed statements after it. Local function declarations,
-empty statements and a bare `return;` do not count, because none of them runs anything the base call
-could have been moved ahead of; a `base` call nested inside an `if` or a `try` is left alone rather
-than guessed at. There is deliberately **no** allow-list for a body that "only logs afterwards":
+`base` call has executed statements after it. Top-level checks retain their statement ordering;
+nested calls use control flow to follow reachable successors and `finally` cleanup. Work on another
+branch, or after an early return that bypasses it, does not make a nested call report. Local function
+bodies, empty statements and a bare `return;` do not count. There is deliberately **no** allow-list for a body that "only logs afterwards":
 moving one line is cheaper than a suppression, and an exception list reads as permission.
+
+WUH009 also follows a bare rethrow into an enclosing catch and its normal continuation, including
+exceptional dispatch after a base call inside `finally`. Provably unrelated catch types are excluded;
+unknown compatibility remains conservative. A catch that consumes the exception before the `finally`
+does not dispatch it outside that statement. An intervening `finally` without a normal exit replaces
+the original exception; its replacement is analyzed separately. Outer filters are evaluated before
+the completed `finally`, so only the selected handler and its continuation count as following work.
+A sibling catch cannot handle a rethrow from another handler in the same try statement.
+
+Null constants dispatch `NullReferenceException`. Local and parameter references retain their
+declared subtype plus the null alternative; catches consume the alternatives separately. Effectful throw operands stay conservative, including calls,
+getters, user conversions, user constructors and constructor-argument evaluation. Direct parameterless
+core exception constructions retain their known exception type.
+
+This CFG policy follows explicit throw/rethrow edges and normal continuations. A call without an
+explicit throw edge does not gain an inferred exception edge; analysis of exceptions raised inside
+called methods or getters remains outside this qualification under issue #1200.
 
 The message quotes the `base` call exactly as it was written, arguments included, rather than
 reconstructing a parameterless one.
@@ -673,6 +762,10 @@ that explains the callback path. Negative controls require `WUH013` to fail ever
 
 ## `WUH014`: a disposable `struct`'s `Dispose` that assigns
 
+The same rule covers the actual `IAsyncDisposable.DisposeAsync` implementation, including explicit
+implementations and assignments after an `await`. Classes, unrelated overloads, and deferred local
+functions keep their existing behavior. The warning remains enabled by default and suppressible.
+
 `readonly` on a disposable `struct` settles one half of copy safety and not the other. It stops a
 struct tracking "have I been disposed?" in one of its own fields, where the flag is per **copy** and
 a copy handed to a method cannot see that the original finished. It says nothing about a scope that
@@ -711,8 +804,8 @@ exactly this, at any nesting depth and in any disposal order.
 
 ### Where the line is drawn
 
-The signal is an assignment inside the parameterless `Dispose` of a `struct` that implements
-`IDisposable`, and what decides it is the assignment's **target**:
+The signal is an assignment inside a struct's actual `IDisposable.Dispose` or
+`IAsyncDisposable.DisposeAsync` implementation. What decides it is the assignment's **target**:
 
 | Target                                      | Reported | Why                                                     |
 | ------------------------------------------- | -------- | ------------------------------------------------------- |
@@ -1249,6 +1342,38 @@ the excluded-editor-source audit includes a reporting control. The Analyzer Poli
 provides compiled examples and the usual severity controls. The warning makes no claim about
 performance margins for a caller's workload.
 
+## `WUH029`: member declaration order (opt-in)
+
+Enable this consumer rule through the Analyzer Policies window or a ruleset entry:
+
+```xml
+<Rule Id="WUH029" Action="Warning" />
+```
+
+It reports the package's member ordering in each class, struct, interface or record declaration:
+constants, events, delegates, static properties, static fields, properties, fields, constructors,
+static methods and methods. Within a tier, order public, protected, internal and private declarations;
+declarations with no explicit access modifier follow them. Nested classes, structs, interfaces,
+records and enums belong after ordinary members. Nested delegates retain their delegate tier.
+Partial declarations are checked independently.
+
+The analyzer checks the active compilation. Separate conditional branches retain separate member
+ordering; directives wholly inside a method do not reset the surrounding order. Repository CI also
+retains its source gate, which checks inactive conditional branches.
+
+This is a suppressible warning and is off by default. It reports order without rewriting source.
+Review static initializer dependencies and conditional compilation before moving any declaration;
+changing textual initialization order can change program behavior.
+
+The Analyzer Policy search exposes the new opt-in rule. These real offscreen Unity
+6000.6.7f1 Editor captures use the same light skin and query before and after adding
+the catalog entry; neither capture writes a project ruleset. Both native capture
+cases pass without render errors.
+
+| Before                                                                                | After                                                                                |
+| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| ![No matching member-order policy](../images/analyzer-policy-member-order-before.png) | ![Member declaration order policy](../images/analyzer-policy-member-order-after.png) |
+
 ## `WUH027`: implicit caller names
 
 A helper can capture its caller with an optional `[CallerMemberName] string caller = null`
@@ -1308,3 +1433,40 @@ null handling: `false & null` is `false`, `true | null` is `true`, and `null ^ f
 is `null`. `left != right` does not preserve nullable exclusive-or semantics.
 There is no automatic fix because the analyzer cannot choose which evaluations
 and null states the application needs.
+
+## `WUH030`: explicit string comparison and culture (opt-in)
+
+Enable this suppressible warning through Analyzer Policies or a ruleset:
+
+```xml
+<Rule Id="WUH030" Action="Warning" />
+```
+
+The rule reports `string.Equals`, `Compare`, `StartsWith`, `EndsWith`, string-based
+`IndexOf` and `LastIndexOf`, and parameterless `ToLower` and `ToUpper` when the
+selected overload has no `StringComparison` or `CultureInfo` parameter. A Boolean
+ignore-case argument alone does not specify culture. Character-only searches,
+`Equals(object)`, `CompareOrdinal`, and invariant casing are unchanged. Calls on
+other types are excluded.
+
+Choose a policy for the data. For identifiers, an ordinal comparison is often
+appropriate; user-facing text may require the current culture. The analyzer
+provides no automatic rewrite because changing culture can change behavior.
+
+```csharp
+bool startsWithPrefix = "prefix-value".StartsWith("prefix", System.StringComparison.Ordinal);
+string lower = "TEXT".ToLower(System.Globalization.CultureInfo.CurrentCulture);
+```
+
+This is separate from `WUH018`, which covers string equality operators. Both are
+off by default for consumers. Explicit arguments are accepted as the caller's
+policy, including values selected at runtime.
+
+The real Analyzer Policy UI exposes the opt-in string rule. Both native Unity
+6000.6.7 light-skin captures pass without render errors or ruleset writes; the
+[qualification record](./analyzer-policy-string-policy-20261114.json) retains the
+fixture, controller, image/source hashes and process receipts.
+
+| Before                                                                           | After                                                                        |
+| -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| ![No matching string policy](../images/analyzer-policy-string-policy-before.png) | ![Explicit string policy](../images/analyzer-policy-string-policy-after.png) |

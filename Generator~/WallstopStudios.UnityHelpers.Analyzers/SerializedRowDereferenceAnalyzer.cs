@@ -46,9 +46,11 @@ namespace WallstopStudios.UnityHelpers.Analyzers
 
         private const string CompactionMethodName = "RemoveAll";
 
-        /// <inheritdoc />
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
+        private static readonly ImmutableArray<DiagnosticDescriptor> SupportedRules =
             ImmutableArray.Create(UnityHelpersDiagnostics.SerializedRowDereferencedWithoutTest);
+
+        /// <inheritdoc />
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => SupportedRules;
 
         private static void OnCompilationStart(CompilationStartAnalysisContext context)
         {

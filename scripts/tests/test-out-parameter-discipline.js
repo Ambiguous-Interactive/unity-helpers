@@ -95,6 +95,206 @@ function isTerminalExit(statement) {
   return /^(?:return\b|throw\b)/.test(statement);
 }
 
+function maskNonCode(text) {
+  const masked = text.split("");
+  const frames = [];
+  let comment = null;
+  const hide = (index) => {
+    if (text[index] !== "\n" && text[index] !== "\r") masked[index] = " ";
+  };
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    const next = text[index + 1];
+    const frame = frames[frames.length - 1];
+    if (comment !== null) {
+      if (comment === "line" && (char === "\n" || char === "\r")) {
+        comment = null;
+      } else {
+        hide(index);
+        if (comment === "block" && char === "*" && next === "/") {
+          hide(index + 1);
+          index += 1;
+          comment = null;
+        }
+      }
+    } else if (frame?.kind === "format") {
+      hide(index);
+      if (!frame.verbatim && char === "\\") {
+        hide(index + 1);
+        index += 1;
+      } else if (char === "}") {
+        frames.pop();
+      }
+    } else if (frame?.kind === "string") {
+      hide(index);
+      if (!frame.verbatim && char === "\\") {
+        hide(index + 1);
+        index += 1;
+      } else if (char === frame.quote) {
+        if (frame.verbatim && next === frame.quote) {
+          hide(index + 1);
+          index += 1;
+        } else {
+          frames.pop();
+        }
+      } else if (frame.interpolated && char === "{") {
+        if (next === "{") {
+          hide(index + 1);
+          index += 1;
+        } else {
+          frames.push({ kind: "expression", depth: 1, groupDepth: 0, verbatim: frame.verbatim });
+        }
+      }
+    } else {
+      if (frame?.kind === "expression") hide(index);
+      if (char === "/" && (next === "/" || next === "*")) {
+        comment = next === "/" ? "line" : "block";
+        hide(index);
+        hide(index + 1);
+        index += 1;
+      } else if (char === '"' || char === "'") {
+        const prefix = text.slice(Math.max(0, index - 2), index);
+        frames.push({
+          kind: "string",
+          quote: char,
+          verbatim: char === '"' && (prefix.endsWith("@") || prefix === "@$"),
+          interpolated: char === '"' && (prefix.endsWith("$") || prefix === "$@")
+        });
+        hide(index);
+      } else if (frame?.kind === "expression") {
+        if (char === "(" || char === "[") frame.groupDepth += 1;
+        else if (char === ")" || char === "]") frame.groupDepth -= 1;
+        else if (char === "{") frame.depth += 1;
+        else if (char === "}" && --frame.depth === 0) frames.pop();
+        else if (
+          char === ":" &&
+          frame.depth === 1 &&
+          frame.groupDepth === 0 &&
+          next !== ":" &&
+          text[index - 1] !== ":"
+        )
+          frame.kind = "format";
+      }
+    }
+  }
+  return masked.join("");
+}
+
+function lineAfterStatement(lines, start) {
+  let nesting = 0;
+  for (let end = start; end < lines.length; end += 1) {
+    for (const char of lines[end]) {
+      if ("([{".includes(char)) {
+        nesting += 1;
+      } else if (")]}".includes(char)) {
+        nesting -= 1;
+      } else if (char === ";" && nesting === 0) {
+        return end + 1;
+      }
+    }
+  }
+  return lines.length;
+}
+
+function nextStatementAfterOutAssignment(lines, start, siblingAssignment) {
+  let next = lineAfterStatement(lines, start);
+  while (next < lines.length) {
+    const line = lines[next].trim();
+    if (line === "" || line.startsWith("//") || line.startsWith("/*") || line.startsWith("*")) {
+      next += 1;
+    } else if (siblingAssignment.test(lines[next])) {
+      next = lineAfterStatement(lines, next);
+    } else {
+      break;
+    }
+  }
+  return next;
+}
+
+for (const [body, expected] of [
+  ['value = null;\nerror =\n    "failure";\nreturn false;', true],
+  ["value = Compute(\n    first,\n    second);\nerror = null;\nreturn true;", true],
+  ['value = null;\n// explanation\nerror =\n    "failure";\nreturn false;', true],
+  ['value = null;\nerror =\n    "failure";\nDoWork();\nreturn false;', false],
+  ['value = null;\nerror =\n    "failure";\nreturnValue = 1;\nreturn false;', false],
+  ['value = null;\nerror =\n    "failure";\nif (condition) return false;', false],
+  ["value = null; // unavailable\nDoWork();\nreturn false;", false],
+  ['value = "//;"; /* unavailable */\nDoWork();\nreturn false;', false],
+  ['value = "/*;*/";\nreturn false;', true],
+  ['value = @"first;\n// second";\nDoWork();\nreturn false;', false],
+  ["value = () => {\nDoWork();\n}; // assigned\nreturn false;", true],
+  ["value = ';'; // assigned\nDoWork();\nreturn false;", false],
+  [
+    String.raw`value = @$"C:\temp\";
+DoWork();
+return false;`,
+    false
+  ],
+  [
+    String.raw`value = $@"C:\temp\";
+DoWork();
+return false;`,
+    false
+  ],
+  ["value = null; /* reason\ncontinued */\nreturn false;", true],
+  ["value = null; /* reason\ncontinued */\nDoWork();\nreturn false;", false],
+  ["value = null; /* reason\ncontinued */ error = null;\nreturn false;", true]
+]) {
+  const lines = maskNonCode(body).split("\n");
+  const next = nextStatementAfterOutAssignment(lines, 0, /^\s*(?:value|error)\s*=(?!=)/);
+  const terminal = next >= lines.length || isTerminalExit(lines[next].trim());
+  if (terminal !== expected) {
+    throw new Error(`Out-parameter assignment-group control failed: ${body}`);
+  }
+}
+
+for (const [body, expected] of [
+  [`value = $"{Get("can't")}";\nDoWork();\nreturn false;`, false],
+  [`value = $"{Get("can't")}";\nreturn false;`, true],
+  [`value = $@"{Get("can't")}";\nDoWork();\nreturn false;`, false],
+  [`value = @$"{Get("can't")}";\nDoWork();\nreturn false;`, false],
+  ['value = $"{Get($"{1}")}";\nDoWork();\nreturn false;', false],
+  ["value = $\"{{literal}} {Get('}')}\";\nDoWork();\nreturn false;", false]
+]) {
+  const lines = maskNonCode(body.replaceAll("\\n", "\n")).split("\n");
+  const next = nextStatementAfterOutAssignment(lines, 0, /^\s*(?:value|error)\s*=(?!=)/);
+  const terminal = next >= lines.length || isTerminalExit(lines[next].trim());
+  if (terminal !== expected) throw new Error(`Interpolated out-parameter control failed: ${body}`);
+}
+
+for (const body of [
+  'value = "}";\nDoWork();\nreturn false;',
+  "value = $\"{Get('}')}\";\nDoWork();\nreturn false;",
+  "value = null; /* } */\nDoWork();\nreturn false;"
+]) {
+  const code = maskNonCode(`{${body.replaceAll("\\n", "\n")}}`);
+  const extracted = bodyOf(code, 0);
+  if (extracted === null || !extracted.includes("DoWork")) {
+    throw new Error(`Literal/comment braces changed the method boundary: ${body}`);
+  }
+  const lines = extracted.split("\n");
+  const next = nextStatementAfterOutAssignment(lines, 0, /^\s*value\s*=(?!=)/);
+  if (next >= lines.length || isTerminalExit(lines[next].trim())) {
+    throw new Error(`Extracted out-parameter body lost intervening work: ${body}`);
+  }
+}
+
+for (const [body, expected] of [
+  ['value = $"{42:0//}";\nDoWork();\nreturn false;', false],
+  ['value = $"{42:0/*}";\nDoWork();\nreturn false;', false],
+  ['value = $"{Get(value: 42):0//}";\nDoWork();\nreturn false;', false],
+  ['value = $"{(flag ? 1 : 2):0//}";\nDoWork();\nreturn false;', false],
+  ['value = $@"{42:0//}";\nreturn false;', true]
+]) {
+  const code = maskNonCode(`{${body.replaceAll("\\n", "\n")}}`);
+  const extracted = bodyOf(code, 0);
+  if (extracted === null) throw new Error(`Format text changed the method boundary: ${body}`);
+  const lines = extracted.split("\n");
+  const next = nextStatementAfterOutAssignment(lines, 0, /^\s*value\s*=(?!=)/);
+  const terminal = next >= lines.length || isTerminalExit(lines[next].trim());
+  if (terminal !== expected) throw new Error(`Formatted interpolation control failed: ${body}`);
+}
+
 for (const [statement, expected] of [
   ["return false;", true],
   ["return;", true],
@@ -135,12 +335,13 @@ function scanRoot(rootName) {
       continue;
     }
     result.files += 1;
+    const code = maskNonCode(text);
 
     const signature =
       /\b(?:public|private|internal|protected)[^\n;(]*\(([^)]*)\)\s*(?:where[^\n{]*)?\s*\{/g;
 
     let match;
-    while ((match = signature.exec(text)) !== null) {
+    while ((match = signature.exec(code)) !== null) {
       const outNames = [...match[1].matchAll(/\bout\s+[\w<>[\],.?\s]*?(\w+)\s*(?:,|$)/g)].map(
         (m) => m[1]
       );
@@ -148,8 +349,8 @@ function scanRoot(rootName) {
         continue;
       }
 
-      const openBrace = text.lastIndexOf("{", signature.lastIndex);
-      const body = bodyOf(text, openBrace);
+      const openBrace = code.lastIndexOf("{", signature.lastIndex);
+      const body = bodyOf(code, openBrace);
       if (body === null) {
         continue;
       }
@@ -163,9 +364,9 @@ function scanRoot(rootName) {
         result.anchorHits += 1;
       }
 
-      const lines = body.split("\n");
+      const lines = maskNonCode(body).split("\n");
       for (const name of outNames) {
-        const assignment = new RegExp(`^\\s*${name}\\s*=[^=]`);
+        const assignment = new RegExp(`^\\s*${name}\\s*=(?!=)`);
         for (let index = 0; index < lines.length; index += 1) {
           if (!assignment.test(lines[index])) {
             continue;
@@ -175,26 +376,9 @@ function scanRoot(rootName) {
           // assignments to the method's OTHER out parameters: a method with two of them writes both
           // and then returns, which satisfies the rule jointly even though only the last assignment
           // literally touches the return.
-          const siblingAssignment = new RegExp(`^\\s*(?:${outNames.join("|")})\\s*=[^=]`);
+          const siblingAssignment = new RegExp(`^\\s*(?:${outNames.join("|")})\\s*=(?!=)`);
 
-          // An assignment may span lines. Walk to the one that actually ends the statement before
-          // asking what follows it, or a wrapped expression reads as "followed by its own second
-          // line" and is reported forever.
-          let index2 = index;
-          while (index2 < lines.length && !lines[index2].trimEnd().endsWith(";")) {
-            index2 += 1;
-          }
-          let next = index2 + 1;
-          while (
-            next < lines.length &&
-            (lines[next].trim() === "" ||
-              lines[next].trim().startsWith("//") ||
-              lines[next].trim().startsWith("/*") ||
-              lines[next].trim().startsWith("*") ||
-              siblingAssignment.test(lines[next]))
-          ) {
-            next += 1;
-          }
+          const next = nextStatementAfterOutAssignment(lines, index, siblingAssignment);
 
           // Falling off the end of the body IS the exit, and for a `void` method carrying an `out`
           // it is the only one there is. Requiring a literal `return;` there would be code shaped

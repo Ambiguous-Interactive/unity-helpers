@@ -81,12 +81,14 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         private static readonly ImmutableHashSet<string> EqualityAssertions =
             ImmutableHashSet.Create(System.StringComparer.Ordinal, "AreEqual", "AreNotEqual");
 
-        /// <inheritdoc />
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
+        private static readonly ImmutableArray<DiagnosticDescriptor> SupportedRules =
             ImmutableArray.Create(
                 UnityHelpersDiagnostics.NullPropagationOnUnityObject,
                 UnityHelpersDiagnostics.NullAssertionOnUnityObject
             );
+
+        /// <inheritdoc />
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => SupportedRules;
 
         private static void OnCompilationStart(CompilationStartAnalysisContext context)
         {

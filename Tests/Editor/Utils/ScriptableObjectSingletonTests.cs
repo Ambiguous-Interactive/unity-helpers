@@ -128,7 +128,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 throw new ArgumentException("relativePath cannot be empty", nameof(relativePath));
             }
 
-            string sanitized = relativePath.Replace("\\", "/").TrimStart('/');
+            string sanitized = relativePath.SanitizePath().TrimStart('/');
             if (string.IsNullOrEmpty(sanitized))
             {
                 throw new ArgumentException("relativePath cannot be empty", nameof(relativePath));
@@ -147,7 +147,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             string directory = Path.GetDirectoryName(fullPath);
             if (!string.IsNullOrWhiteSpace(directory))
             {
-                directory = directory.Replace("\\", "/");
+                directory = directory.SanitizePath();
                 EnsureFolderStatic(directory);
             }
 
@@ -178,7 +178,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             string directory = Path.GetDirectoryName(assetPath);
             while (!string.IsNullOrWhiteSpace(directory))
             {
-                directory = directory.Replace("\\", "/");
+                directory = directory.SanitizePath();
                 if (!directory.StartsWith(ResourcesRoot, StringComparison.Ordinal))
                 {
                     break;
@@ -1029,8 +1029,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                     + $"Actual resourcesPath: '{entry.resourcesPath}'"
             );
 
-            string expectedFolder = scenario.ExpectedFolder?.Replace("\\", "/") ?? string.Empty;
-            string actualFolder = (entry.resourcesPath ?? string.Empty).Replace("\\", "/");
+            string expectedFolder = scenario.ExpectedFolder?.SanitizePath() ?? string.Empty;
+            string actualFolder = (entry.resourcesPath ?? string.Empty).SanitizePath();
             if (string.IsNullOrEmpty(expectedFolder))
             {
                 Assert.IsTrue(

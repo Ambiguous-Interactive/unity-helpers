@@ -1,0 +1,195 @@
+using System;
+using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Diagnostics;
+using System.IO;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Diagnostics;
+using WallstopStudios.UnityHelpers.Analyzers;
+
+internal static class Program
+{
+    static int Main(string[] args)
+    {
+        DiagnosticAnalyzer[] analyzers =
+        {
+            new BooleanBitwiseAnalyzer(),
+            new CacheFactoryAnalyzer(),
+            new CountingLoopAnalyzer(),
+            new DictionaryIndexerAnalyzer(),
+            new DiscardedHandleAnalyzer(),
+            new DisposableStructAssignmentAnalyzer(),
+            new DisposableStructBoxingAnalyzer(),
+            new EnumHelperAnalyzer(),
+            new GetComponentNullComparisonAnalyzer(),
+            new HardCollectionReadAnalyzer(),
+            new LoopBoundAnalyzer(),
+            new MemberOrderAnalyzer(),
+            new NestedCollectionAnalyzer(),
+            new PublicStructEqualityAnalyzer(),
+            new RedundantCallerNameAnalyzer(),
+            new RedundantPooledClearAnalyzer(),
+            new RelationalFieldAnalyzer(),
+            new RepeatedCollectionCountAnalyzer(),
+            new SerializedRowDereferenceAnalyzer(),
+            new SerializedStringComparerMutationAnalyzer(),
+            new StringComparisonPolicyAnalyzer(),
+            new StringEqualityAnalyzer(),
+            new TeardownBaseCallAnalyzer(),
+            new UnityLifecycleAnalyzer(),
+            new UnityMessageInheritanceAnalyzer(),
+            new UnityObjectNullAnalyzer(),
+            new UnityRandomAnalyzer(),
+            new UntestedTryOutAnalyzer(),
+        };
+        byte[] control = new byte[1024];
+        long controlStart = GC.GetAllocatedBytesForCurrentThread();
+        GC.KeepAlive(new byte[1024]);
+        long controlBytes = GC.GetAllocatedBytesForCurrentThread() - controlStart;
+        if (controlBytes < 1024)
+            throw new Exception("Broken allocation control");
+        int analyzerIndex = 0;
+        string[] names =
+        {
+            "BooleanBitwiseAnalyzer",
+            "CacheFactoryAnalyzer",
+            "CountingLoopAnalyzer",
+            "DictionaryIndexerAnalyzer",
+            "DiscardedHandleAnalyzer",
+            "DisposableStructAssignmentAnalyzer",
+            "DisposableStructBoxingAnalyzer",
+            "EnumHelperAnalyzer",
+            "GetComponentNullComparisonAnalyzer",
+            "HardCollectionReadAnalyzer",
+            "LoopBoundAnalyzer",
+            "MemberOrderAnalyzer",
+            "NestedCollectionAnalyzer",
+            "PublicStructEqualityAnalyzer",
+            "RedundantCallerNameAnalyzer",
+            "RedundantPooledClearAnalyzer",
+            "RelationalFieldAnalyzer",
+            "RepeatedCollectionCountAnalyzer",
+            "SerializedRowDereferenceAnalyzer",
+            "SerializedStringComparerMutationAnalyzer",
+            "StringComparisonPolicyAnalyzer",
+            "StringEqualityAnalyzer",
+            "TeardownBaseCallAnalyzer",
+            "UnityLifecycleAnalyzer",
+            "UnityMessageInheritanceAnalyzer",
+            "UnityObjectNullAnalyzer",
+            "UnityRandomAnalyzer",
+            "UntestedTryOutAnalyzer",
+        };
+        foreach (var analyzer in analyzers)
+        {
+            GC.KeepAlive(analyzer.SupportedDiagnostics);
+            var watch = new Stopwatch();
+            long start = GC.GetAllocatedBytesForCurrentThread();
+            watch.Start();
+            int count = 0;
+            for (int i = 0; i < 100000; i++)
+            {
+                count += analyzer.SupportedDiagnostics.Length;
+            }
+            watch.Stop();
+            long bytes = GC.GetAllocatedBytesForCurrentThread() - start;
+            Console.WriteLine(
+                JsonSerializer.Serialize(
+                    new
+                    {
+                        kind = "descriptors",
+                        analyzer = names[analyzerIndex++],
+                        count,
+                        bytes,
+                        milliseconds = watch.Elapsed.TotalMilliseconds,
+                        controlBytes,
+                    }
+                )
+            );
+        }
+        if (args.Length == 0)
+            return 0;
+        var symbols = File.ReadAllText(args[2])
+            .Split(new[] { ';', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+        var options = new CSharpParseOptions(LanguageVersion.CSharp9, preprocessorSymbols: symbols);
+        var trees = new List<SyntaxTree>();
+        foreach (string path in File.ReadAllLines(args[0]))
+            if (!string.IsNullOrWhiteSpace(path))
+                trees.Add(CSharpSyntaxTree.ParseText(File.ReadAllText(path), options, path));
+        var references = new List<MetadataReference>();
+        foreach (string path in File.ReadAllLines(args[1]))
+            if (!string.IsNullOrWhiteSpace(path))
+                references.Add(MetadataReference.CreateFromFile(path));
+        var policies = ImmutableDictionary<string, ReportDiagnostic>.Empty;
+        foreach (var analyzer in analyzers)
+        foreach (var rule in analyzer.SupportedDiagnostics)
+            policies = policies.SetItem(rule.Id, ReportDiagnostic.Warn);
+        var compilation = CSharpCompilation.Create(
+            "GeneratorPerformance",
+            trees,
+            references,
+            new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary,
+                allowUnsafe: true,
+                specificDiagnosticOptions: policies
+            )
+        );
+        var analyzerOptions = new CompilationWithAnalyzersOptions(
+            new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty),
+            null,
+            false,
+            true,
+            false
+        );
+        var driver = compilation.WithAnalyzers(ImmutableArray.Create(analyzers), analyzerOptions);
+        var timer = Stopwatch.StartNew();
+        var diagnostics = driver.GetAnalyzerDiagnosticsAsync().GetAwaiter().GetResult();
+        timer.Stop();
+        var records = new List<string>();
+        foreach (var diagnostic in diagnostics)
+        {
+            if (diagnostic.Id == "AD0001")
+                throw new Exception(diagnostic.ToString());
+            records.Add(diagnostic.ToString());
+        }
+        records.Sort(StringComparer.Ordinal);
+        var digest = Convert.ToHexString(
+            SHA256.HashData(Encoding.UTF8.GetBytes(string.Join("\n", records)))
+        );
+        Console.WriteLine(
+            JsonSerializer.Serialize(
+                new
+                {
+                    kind = "compilation",
+                    files = trees.Count,
+                    diagnostics = diagnostics.Length,
+                    digest,
+                    milliseconds = timer.Elapsed.TotalMilliseconds,
+                }
+            )
+        );
+        analyzerIndex = 0;
+        foreach (var analyzer in analyzers)
+        {
+            var telemetry = driver
+                .GetAnalyzerTelemetryInfoAsync(analyzer, default)
+                .GetAwaiter()
+                .GetResult();
+            Console.WriteLine(
+                JsonSerializer.Serialize(
+                    new
+                    {
+                        kind = "telemetry",
+                        analyzer = names[analyzerIndex++],
+                        milliseconds = telemetry.ExecutionTime.TotalMilliseconds,
+                    }
+                )
+            );
+        }
+        return 0;
+    }
+}

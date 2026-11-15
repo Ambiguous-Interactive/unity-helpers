@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     using System.IO;
     using NUnit.Framework;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Validation;
     using WallstopStudios.UnityHelpers.Tests.Editor.Validation.TestTypes;
 
@@ -143,7 +144,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         [Test]
         public void APathOutsideTheProjectIsLeftAlone()
         {
-            string outside = Path.Combine(Path.GetTempPath(), "Elsewhere.asset").Replace('\\', '/');
+            string outside = Path.Combine(Path.GetTempPath(), "Elsewhere.asset").SanitizePath();
 
             Assert.AreEqual(outside, AuthoredAssetPaths.ToAssetPath(outside));
         }
