@@ -61,23 +61,20 @@ retain compiler escalation.
 PR checks enable normal compiler analysis. Compatibility-sensitive and unknown inputs propose full native coverage.
 Full means all configured local lint, contract, source compiler, and compiler-control commands.
 It does not mean Unity ran: native fixture validation and the hosted Unity matrix remain required.
-Local `--reuse` is opt-in. It binds successful command receipts to the Git tree, complete tracked
-diff, raw tracked and untracked source bytes, command arguments, tool versions, platform, and hashed environment.
-Inputs are checked again after execution; changed inputs invalidate the result. Failed commands
-cannot be reused. Receipts remain ignored under `progress/.artifacts/agent-check/`. CI refuses reuse
-and executes its selected commands independently. Normal execution avoids fingerprint overhead.
+Every selected command executes and reports its status and elapsed time. Generic result reuse is
+not enabled. The existing compiler iteration command manages its own incremental build state;
+the task runner does not add another cache over arbitrary validators.
 
-The first receipt prototype read every tracked file and took 82.5 seconds on this workspace. Using
-only the immutable Git tree plus dirty/untracked content took 4.13 seconds, but that faster design
-was also rejected: Git normalizes line endings, so a raw source change can leave its diff empty.
-A regression demonstrates the missed invalidation. Reuse now also hashes raw tracked bytes with
-Git's filter-free object reader and refuses tracked symlinks and submodules. This makes opt-in
-receipt lookup more expensive. These observations describe instrument cost, not accepted task
-speedups. Prefer normal execution for short checks; use reuse only when its complete lookup saves
-time compared with the command. Normal execution performs no receipt fingerprinting.
+The generic reuse experiment failed both cost and correctness checks. Its first source reader
+took 82.5 seconds. A Git tree/diff variant took 4.13 seconds but missed raw line-ending changes
+hidden by Git normalization. Adding raw-byte hashing took another 48.0 seconds for 9,053 files in
+one observation, exceeding the measured runtime iteration cost.
 
-Raw-byte hashing alone took 48.0 seconds for 9,053 tracked files in one local observation. It is
-unsuitable as a default cost for short edit loops.
+Even raw source hashes did not capture ignored local settings. A real command first returned zero,
+then should have returned seven after an ignored setting changed; the unchanged Git snapshot
+reused the earlier success instead. The regression now requires actual execution and observes the
+failure. This rejects generic caching rather than treating source equality as proof of every
+validator's inputs. A future cache needs a complete input contract for each eligible check.
 
 PR lint and contract jobs now use the shared planner's merge-base inventory. Registry entries
 name input groups and required companion checks. Missing metadata runs unconditionally; unknown
@@ -109,9 +106,17 @@ modes; a reduced run does not qualify omitted players.
 The action pins now use the approved v1.17.1 release rather than the unapproved commit previously
 labelled v1.17.1. Local Gates checks every action against the central approval registry at its
 fetched main revision, separately from validating each pinned action's input declarations. A
-targeted official enrollment audit of the two license-acquiring workflows reports only two expired
-central exceptions (October 31); this is not a clean whole-repository enrollment audit. Those
-external exceptions remain unresolved.
+targeted enrollment audit of the two license-acquiring workflows with the proposed readback
+policy reports only two expired central exceptions (October 31). The current central analyzer also
+rejects the three diagnostic aggregate branches; the
+[policy update](https://github.com/Ambiguous-Interactive/ambiguous-organization-build-lock/pull/381)
+must land before this consumer can pass enrollment. This is not a clean whole-repository audit. The external exceptions remain
+unresolved.
+
+Historical capture dispatch now requires successful runner preflight and artifact readback plus
+skipped licensed jobs in each aggregate. Ordinary and untrusted PR branches retain their existing
+requirements. The final qualification gate stays skipped for capture-only dispatch; reading old
+evidence does not qualify new source.
 
 The unsafe-code registry scan also creates its SARIF report; report upload checks that output
 instead of executing the scanner a second time.

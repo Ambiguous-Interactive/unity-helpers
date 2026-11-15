@@ -213,6 +213,9 @@ def test_invalid_approval_policy_fails_closed(
         "uses: PREFIX@example",
         "uses: PREFIXexample@",
         "uses: other/PREFIXexample@pin",
+        "uses: ambiguous-interactive/ambiguous-organization-build-lock/.github/actions/example@pin",
+        "uses: Ambiguous-Interactive/Ambiguous-Organization-Build-Lock/.github/actions/example@pin",
+        "uses: PREFIXexample@" + "a" * 40 + "@other",
     ],
 )
 def test_malformed_action_calls_are_refused(tmp_path: Path, line: str) -> None:

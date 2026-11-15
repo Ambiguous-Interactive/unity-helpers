@@ -99,6 +99,12 @@ test("full tier always includes compatibility", () =>
   assert.equal(select([], "full").unity, "full"));
 test("iteration selects compiler scope", () =>
   assert.ok(select(["Editor/Thing.cs"], "iterate").commands.some((c) => c.includes("editor"))));
+test("integration sources select the compiler project that includes them", () => {
+  const plan = select(["Runtime/Integrations/Zenject/RelationalSceneLoadListener.cs"], "iterate");
+  assert.ok(plan.commands.some((command) => command.includes("integrations")));
+  assert.ok(!plan.commands.some((command) => command.includes("runtime")));
+  assert.equal(plan.unity, "full");
+});
 test("native compatibility risk does not force every compiler profile during source iteration", () => {
   for (const file of [
     "Runtime/Core/Serialization/Serializer.cs",
@@ -159,106 +165,38 @@ test("committed, deleted, renamed and untracked files remain selected", () => {
   }
 });
 
-test("receipts invalidate on source, configuration, command, and tool changes", () => {
-  const { fingerprint, reusable } = require("../agent-check");
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "agent-receipt-"));
-  try {
-    execFileSync("git", ["init", "-q"], { cwd: root });
-    fs.writeFileSync(path.join(root, "source.cs"), "before");
-    execFileSync("git", ["add", "."], { cwd: root });
-    execFileSync(
-      "git",
-      ["-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-qm", "base"],
-      { cwd: root }
-    );
-    const first = fingerprint(root, ["node", "check"], "tool-v1");
-    assert.ok(reusable({ fingerprint: first, status: 0, stable: true }, first));
-    assert.ok(!reusable({ fingerprint: first, status: 1, stable: true }, first));
-    assert.ok(!reusable({ fingerprint: first, status: 0, stable: false }, first));
-    fs.writeFileSync(path.join(root, "source.cs"), "after");
-    assert.notEqual(fingerprint(root, ["node", "check"], "tool-v1"), first);
-    fs.writeFileSync(path.join(root, "source.cs"), "before");
-    fs.writeFileSync(path.join(root, "config.json"), "{}");
-    assert.notEqual(fingerprint(root, ["node", "check"], "tool-v1"), first);
-    fs.unlinkSync(path.join(root, "config.json"));
-    assert.notEqual(fingerprint(root, ["node", "other"], "tool-v1"), first);
-    assert.notEqual(fingerprint(root, ["node", "check"], "tool-v2"), first);
-    execFileSync("git", ["update-index", "--assume-unchanged", "source.cs"], { cwd: root });
-    assert.throws(() => fingerprint(root, ["node", "check"], "tool-v1"), /assume-unchanged/);
-    execFileSync("git", ["update-index", "--no-assume-unchanged", "source.cs"], { cwd: root });
-    fs.writeFileSync(path.join(root, "link"), "source.cs");
-    const linkBlob = execFileSync("git", ["hash-object", "-w", "link"], {
-      cwd: root,
-      encoding: "utf8"
-    }).trim();
-    execFileSync("git", ["update-index", "--add", "--cacheinfo", `120000,${linkBlob},link`], {
-      cwd: root
-    });
-    assert.throws(() => fingerprint(root, ["node", "check"], "tool-v1"), /tracked symlinks/);
-  } finally {
-    fs.rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test("real command receipts reuse success and reject input mutation", () => {
+test("selected commands observe ignored live settings and preserve failures", () => {
   const { executeChecks } = require("../agent-check");
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "agent-execution-"));
-  const previousActions = process.env.GITHUB_ACTIONS;
-  try {
-    process.env.GITHUB_ACTIONS = "true";
-    assert.throws(() => executeChecks({ commands: [] }, root, true), /CI must independently/);
-    process.env.GITHUB_ACTIONS = "false";
-    execFileSync("git", ["init", "-q"], { cwd: root });
-    fs.writeFileSync(path.join(root, ".gitignore"), "progress/\n");
-    const command = [process.execPath, "-e", "require('fs').appendFileSync('progress/count', 'x')"];
-    const selection = { commands: [command] };
-    assert.equal(executeChecks(selection, root, true), 0);
-    assert.equal(executeChecks(selection, root, true), 0);
-    assert.equal(fs.readFileSync(path.join(root, "progress/count"), "utf8"), "x");
-    fs.writeFileSync(path.join(root, "source.cs"), "changed");
-    assert.equal(executeChecks(selection, root, true), 0);
-    assert.equal(fs.readFileSync(path.join(root, "progress/count"), "utf8"), "xx");
-    assert.equal(
-      executeChecks({ commands: [[process.execPath, "-e", "process.exit(7)"]] }, root, true),
-      7
-    );
-    assert.throws(
-      () =>
-        executeChecks(
-          {
-            commands: [
-              [process.execPath, "-e", "require('fs').writeFileSync('source.cs', 'mutated')"]
-            ]
-          },
-          root,
-          true
-        ),
-      /inputs changed/
-    );
-  } finally {
-    if (previousActions === undefined) delete process.env.GITHUB_ACTIONS;
-    else process.env.GITHUB_ACTIONS = previousActions;
-    fs.rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test("receipt identity includes raw bytes hidden by Git line-ending normalization", () => {
-  const { fingerprint } = require("../agent-check");
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "agent-raw-input-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "agent-live-input-"));
   const git = (...args) => execFileSync("git", args, { cwd: root, encoding: "utf8" });
   try {
     git("init", "-q");
-    fs.writeFileSync(path.join(root, ".gitattributes"), "*.cs text eol=crlf\n");
-    fs.writeFileSync(path.join(root, "source.cs"), "before\r\n");
+    fs.writeFileSync(path.join(root, ".gitignore"), "settings.txt\n");
     git("add", ".");
     git("-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-qm", "base");
-    const before = fingerprint(root, ["check"], "tool");
-    fs.writeFileSync(path.join(root, "source.cs"), "before\n");
+    const settings = path.join(root, "settings.txt");
+    const selection = {
+      commands: [
+        [
+          process.execPath,
+          "-e",
+          "process.exit(require('node:fs').readFileSync('settings.txt','utf8')==='bad'?7:0)"
+        ]
+      ]
+    };
+    fs.writeFileSync(settings, "good");
+    assert.equal(executeChecks(selection, root), 0);
+    fs.writeFileSync(settings, "bad");
     assert.equal(git("diff", "HEAD", "--"), "");
-    assert.notEqual(fingerprint(root, ["check"], "tool"), before);
+    assert.equal(executeChecks(selection, root), 7);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("generic result reuse remains disabled", () => {
+  const { main } = require("../agent-check");
+  assert.throws(() => main(["--reuse", "--plan", "--files", "docs/guide.md"]), /Unknown argument/);
 });
 
 test("missing CLI values fail before repository discovery", () => {

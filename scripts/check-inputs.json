@@ -14,7 +14,10 @@
     ".gitattributes",
     ".gitignore",
     "requirements*.lock",
-    "requirements*.txt"
+    "requirements*.txt",
+    ".prettierrc*",
+    "prettier.config.*",
+    ".prettierignore"
   ],
   "documentation": ["docs/**", "*.md", "mkdocs.yml"]
 }

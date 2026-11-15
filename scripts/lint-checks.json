@@ -333,19 +333,19 @@
     "id": "format-md",
     "name": "Prettier (Markdown)",
     "run": "npm run format:md:check",
-    "inputs": ["@tooling", "*.md"]
+    "inputs": ["@tooling", "*.md", "*.markdown"]
   },
   {
     "id": "format-json",
     "name": "Prettier (JSON / asmdef)",
     "run": "npm run format:json:check",
-    "inputs": ["@tooling", "*.json"]
+    "inputs": ["@tooling", "*.json", "*.jsonc", "*.asmdef", "*.asmref"]
   },
   {
     "id": "format-js",
     "name": "Prettier (JS)",
     "run": "npm run format:js:check",
-    "inputs": ["@tooling", "*.js", "*.mjs"]
+    "inputs": ["@tooling", "*.js", "*.mjs", "*.jslib"]
   },
   {
     "id": "format-yaml",

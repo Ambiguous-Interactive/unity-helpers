@@ -117,7 +117,7 @@
     "id": "lint-tests",
     "name": "Test lifecycle linter",
     "run": "npm run lint:tests",
-    "inputs": ["@tooling"]
+    "inputs": ["@tooling", "@csharp"]
   },
   {
     "id": "check-eol",
@@ -189,7 +189,12 @@
     "id": "wproto-corpus",
     "name": "WProto frozen corpus measurement controls",
     "run": "npm run test:wproto-corpus",
-    "inputs": ["@tooling", "docs/features/serialization/**", "docs/performance/**"]
+    "inputs": [
+      "@tooling",
+      "docs/features/serialization/**",
+      "docs/performance/**",
+      "Tests/Runtime/Serialization/ProtoBenchmarkCorpusIdentity.cs"
+    ]
   },
   {
     "id": "lint-markdown",
@@ -363,7 +368,7 @@
     "id": "lint-typecheck-asmdef-references",
     "name": "Typecheck asmdef-reference linter self-test",
     "run": "npm run test:lint-typecheck-asmdef-references",
-    "inputs": ["@tooling"]
+    "inputs": ["@tooling", "@csharp"]
   },
   {
     "id": "lint-production-test-hooks",
@@ -483,7 +488,7 @@
     "id": "sync-script-contracts",
     "name": "Script and workflow sync contracts",
     "run": "npm run test:sync-script-contracts",
-    "inputs": ["@tooling"]
+    "inputs": ["@tooling", "@csharp"]
   },
   {
     "id": "pr-workflow-concurrency",
@@ -507,7 +512,7 @@
     "id": "asmdef-discovery",
     "name": "Asmdef discovery classification",
     "run": "npm run test:asmdef-discovery",
-    "inputs": ["@tooling"]
+    "inputs": ["@tooling", "@csharp"]
   },
   {
     "id": "unity-workflow-matrix-contract",

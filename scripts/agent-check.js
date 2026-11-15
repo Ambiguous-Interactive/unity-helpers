@@ -1,79 +1,7 @@
 "use strict";
 const { execFileSync, spawnSync } = require("node:child_process");
-const fs = require("node:fs");
 const path = require("node:path");
-const crypto = require("node:crypto");
 const root = path.resolve(__dirname, "..");
-function fingerprint(cwd, command, tools) {
-  const hash = crypto.createHash("sha256");
-  hash.update(JSON.stringify({ command, tools }));
-  const git = (...args) => execFileSync("git", args, { cwd, maxBuffer: 67108864 });
-  const flags = git("ls-files", "-v", "-z").toString("utf8").split("\0");
-  if (flags.some((entry) => /^[a-zS]/.test(entry)))
-    throw new Error("Reuse refuses assume-unchanged or sparse inputs");
-  if (
-    git("ls-files", "--stage", "-z")
-      .toString("utf8")
-      .split("\0")
-      .some((entry) => /^(120000|160000) /.test(entry))
-  )
-    throw new Error("Reuse requires a repository without tracked symlinks or submodules");
-  const head = spawnSync("git", ["rev-parse", "--verify", "HEAD^{tree}"], {
-    cwd,
-    encoding: "utf8"
-  });
-  hash.update(head.status === 0 ? head.stdout : "unborn");
-  hash.update(
-    git(
-      "diff",
-      "--binary",
-      "--no-ext-diff",
-      "--no-textconv",
-      ...(head.status === 0 ? ["HEAD"] : []),
-      "--"
-    )
-  );
-  if (head.status !== 0)
-    hash.update(git("diff", "--cached", "--binary", "--no-ext-diff", "--no-textconv", "--"));
-  const deleted = new Set(git("ls-files", "--deleted", "-z").toString("utf8").split("\0"));
-  const tracked = git("ls-files", "-z")
-    .toString("utf8")
-    .split("\0")
-    .filter((file) => file && !deleted.has(file));
-  if (tracked.length)
-    hash.update(
-      execFileSync("git", ["hash-object", "--no-filters", "--stdin-paths"], {
-        cwd,
-        input: `${tracked.map((file) => JSON.stringify(file)).join("\n")}\n`,
-        maxBuffer: 67108864
-      })
-    );
-  const files = git("ls-files", "--others", "--exclude-standard", "-z").toString("utf8");
-  for (const file of [...new Set(files.split("\0").filter(Boolean))].sort()) {
-    hash.update(JSON.stringify(file));
-    const full = path.join(cwd, file);
-    if (!fs.lstatSync(full).isFile()) throw new Error(`Cannot fingerprint non-file input: ${file}`);
-    hash.update(crypto.createHash("sha256").update(fs.readFileSync(full)).digest());
-  }
-  return hash.digest("hex");
-}
-function reusable(receipt, identity) {
-  return receipt?.fingerprint === identity && receipt.status === 0 && receipt.stable === true;
-}
-function toolIdentity() {
-  const versions = {};
-  for (const tool of ["dotnet", "uv", "pwsh", "git"]) {
-    const result = spawnSync(tool, ["--version"], { encoding: "utf8" });
-    versions[tool] = { status: result.status, output: result.stdout, error: result.error?.code };
-  }
-  return JSON.stringify({
-    versions,
-    node: process.versions,
-    environment: process.env,
-    platform: process.platform,
-    architecture: process.arch
-  });
-}
 function changedFiles(base, cwd = root) {
   if (!base || base.startsWith("-")) throw new Error("An explicit base revision is required");
   const git = (...args) =>
@@ -175,6 +103,7 @@ function select(files, tier) {
           else if (file.startsWith("Tests/Runtime/") || file.startsWith("Tests/Core/"))
             scopes.add("tests");
           else if (file.startsWith("Editor/")) scopes.add("editor");
+          else if (file.startsWith("Runtime/Integrations/")) scopes.add("integrations");
           else if (file.startsWith("Runtime/")) scopes.add("runtime");
         }
         const sourceOnly = files.every((file) =>
@@ -216,7 +145,6 @@ function main(args) {
   let tier = "iterate",
     base,
     plan = false,
-    reuse = false,
     json = false,
     files = [];
   while (args.length) {
@@ -226,7 +154,6 @@ function main(args) {
       if (arg === "--tier") tier = args.shift();
       else base = args.shift();
     } else if (arg === "--plan") plan = true;
-    else if (arg === "--reuse") reuse = true;
     else if (arg === "--json") json = true;
     else if (arg === "--files") {
       if (!args.length || args[0].startsWith("--")) throw new Error("Missing paths for --files");
@@ -237,29 +164,10 @@ function main(args) {
   const selection = select(files, tier);
   console.log(json ? JSON.stringify(selection) : JSON.stringify(selection, null, 2));
   if (plan || selection.status === "not-applicable") return 0;
-  return executeChecks(selection, root, reuse);
+  return executeChecks(selection, root);
 }
-function executeChecks(selection, cwd = root, reuse = false) {
-  if (reuse && process.env.GITHUB_ACTIONS === "true")
-    throw new Error("CI must independently execute validation; --reuse is local only");
-  const tools = reuse ? toolIdentity() : null;
-  const receiptRoot = path.join(cwd, "progress", ".artifacts", "agent-check");
-  fs.mkdirSync(receiptRoot, { recursive: true });
+function executeChecks(selection, cwd = root) {
   for (const command of selection.commands) {
-    const identity = reuse ? fingerprint(cwd, command, tools) : null;
-    const receiptPath = path.join(receiptRoot, `${identity}.json`);
-    if (reuse && fs.existsSync(receiptPath)) {
-      let receipt;
-      try {
-        receipt = JSON.parse(fs.readFileSync(receiptPath, "utf8"));
-      } catch {
-        receipt = null;
-      }
-      if (reusable(receipt, identity)) {
-        console.log(`Reused local completion: ${JSON.stringify(command)}`);
-        continue;
-      }
-    }
     const started = performance.now();
     let [executable, ...argv] = command;
     if (executable === "npm" && process.env.npm_execpath) {
@@ -268,30 +176,19 @@ function executeChecks(selection, cwd = root, reuse = false) {
     }
     const result = spawnSync(executable, argv, { cwd, stdio: "inherit" });
     if (result.error) throw result.error;
-    const stable = reuse && fingerprint(cwd, command, tools) === identity;
-    const receipt = {
-      command,
-      fingerprint: identity,
-      status: result.status,
-      signal: result.signal,
-      stable,
-      seconds: (performance.now() - started) / 1000,
-      completed: new Date().toISOString()
-    };
-    const temporary = `${receiptPath}.${process.pid}.tmp`;
-    if (reuse) {
-      fs.writeFileSync(temporary, JSON.stringify(receipt, null, 2));
-      fs.renameSync(temporary, receiptPath);
-    }
+    console.log(
+      JSON.stringify({
+        command,
+        status: result.status,
+        signal: result.signal,
+        seconds: (performance.now() - started) / 1000
+      })
+    );
     if (result.status !== 0) return result.status || 1;
-    if (reuse && !stable)
-      throw new Error(
-        "Validation inputs changed during execution; result cannot qualify this tree"
-      );
   }
   return 0;
 }
-module.exports = { select, changedFiles, fingerprint, reusable, executeChecks, main };
+module.exports = { select, changedFiles, executeChecks, main };
 if (require.main === module) {
   try {
     process.exitCode = main(process.argv.slice(2));

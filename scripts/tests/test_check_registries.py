@@ -198,6 +198,42 @@ def test_developer_configuration_inputs_keep_their_ci_gate(file: str) -> None:
     }
 
 
+@pytest.mark.parametrize(
+    ("registry", "file", "expected"),
+    [
+        ("contracts", "Runtime/Utils/RuntimeSingleton.cs", ("sync-script-contracts",)),
+        ("contracts", "Tests/Runtime/Fixture.cs", ("lint-tests",)),
+        (
+            "contracts",
+            "Tests/Runtime/Fixtures.asmdef",
+            ("asmdef-discovery", "lint-typecheck-asmdef-references"),
+        ),
+        (
+            "contracts",
+            "Tests/Runtime/Serialization/ProtoBenchmarkCorpusIdentity.cs",
+            ("wproto-corpus",),
+        ),
+        ("contracts", "Tests/Runtime/SingletonTests.cs", ("sync-script-contracts",)),
+        ("contracts", "Runtime/WallstopStudios.UnityHelpers.asmdef", ("sync-script-contracts",)),
+        ("lint", ".prettierrc.json", ("format-md", "format-json", "format-js", "format-yaml")),
+        ("lint", ".prettierrc.yaml", ("format-md", "format-json", "format-js", "format-yaml")),
+        ("lint", "prettier.config.js", ("format-md", "format-json", "format-js", "format-yaml")),
+        ("lint", "Runtime/Assembly.asmdef", ("format-json",)),
+        ("lint", "Runtime/Assembly.asmref", ("format-json",)),
+        ("lint", "Runtime/settings.jsonc", ("format-json",)),
+        ("lint", "Runtime/plugin.jslib", ("format-js",)),
+        ("lint", "docs/guide.markdown", ("format-md",)),
+    ],
+)
+def test_shared_source_and_formatter_inputs_keep_their_controls(
+    registry: str, file: str, expected: tuple[str, ...]
+) -> None:
+    from check_registries import affected_checks
+
+    selected = {check.id for check in affected_checks(load_checks(registry), [file])}
+    assert set(expected).issubset(selected)
+
+
 def test_affected_selection_rejects_missing_dependencies_and_cycles(
     tmp_path: Path,
 ) -> None:

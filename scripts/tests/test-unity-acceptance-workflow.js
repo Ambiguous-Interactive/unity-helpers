@@ -1475,3 +1475,75 @@ for (const [startup, shutdown, expected] of [
 console.log(
   `${shutdownSelections.length} final telemetry attachment admissions and four removed guards passed.`
 );
+
+let historicalAggregateControls = 0;
+for (const name of [
+  "unity-tests-aggregate",
+  "unity-tests-single-threaded-aggregate",
+  "unitypackage-smoke-aggregate"
+]) {
+  const block = workflow.match(
+    new RegExp("^  " + name + ":\n([\\s\\S]*?)(?=^  [\\w-]+:\n)", "m")
+  )?.[1];
+  assert.ok(block, `${name} must exist`);
+  assert.match(block, /^    if: \$\{\{ always\(\) \}\}$/m);
+  assert.match(block, /^      - native-historical-readback$/m);
+  assert.match(
+    block,
+    /^          HISTORICAL_READBACK_RESULT: \$\{\{ needs.native-historical-readback.result \}\}$/m
+  );
+  const selector = expression(block.match(/^          HISTORICAL_READBACK: (.+)$/m)?.[1]);
+  for (const event of ["push", "pull_request", "workflow_dispatch"]) {
+    for (const request of ["", "123"]) {
+      assert.equal(
+        Boolean(
+          selector({ github: { event_name: event }, inputs: { "native-readback-run-id": request } })
+        ),
+        event === "workflow_dispatch" && request !== ""
+      );
+    }
+  }
+  const program = block.match(/^        run: \|\n([\s\S]+)$/m)?.[1]?.replace(/^ {10}/gm, "");
+  assert.ok(program, `${name} needs an executable result gate`);
+  const outcomes = ["success", "failure", "cancelled", "skipped"];
+  for (const [historical, fork, dependabot] of [
+    [false, false, false],
+    [false, true, false],
+    [false, false, true],
+    [true, false, false]
+  ]) {
+    for (const preflight of outcomes) {
+      for (const licensed of outcomes) {
+        for (const capture of historical ? outcomes : ["skipped"]) {
+          const accepted = historical
+            ? preflight === "success" && licensed === "skipped" && capture === "success"
+            : fork || dependabot
+              ? preflight === "skipped" && licensed === "skipped"
+              : preflight === "success" && licensed === "success";
+          const result = spawnSync("bash", ["-c", program], {
+            encoding: "utf8",
+            env: {
+              ...process.env,
+              HISTORICAL_READBACK: String(historical),
+              HISTORICAL_READBACK_RESULT: capture,
+              FORK_PR: String(fork),
+              DEPENDABOT_PR: String(dependabot),
+              RUNNER_PREFLIGHT_RESULT: preflight,
+              UNITY_TESTS_RESULT: licensed
+            }
+          });
+          assert.ifError(result.error);
+          assert.equal(
+            result.status === 0,
+            accepted,
+            `${name}: ${JSON.stringify({ historical, fork, dependabot, preflight, licensed, capture })}: ${result.stderr}`
+          );
+          historicalAggregateControls++;
+        }
+      }
+    }
+  }
+}
+console.log(
+  `${historicalAggregateControls} executed historical and licensed aggregate result controls passed.`
+);

@@ -325,5 +325,16 @@
       "These figures compare feedback scopes, not equivalent compiler work or algorithm speed.",
       "Preflight, focused tests, native Unity and review are outside these component timings."
     ]
+  },
+  "rejectedResultReuse": {
+    "prototypeSourceCommit": "d3d9b3956dcdfb88fd7d7b21986c2d90d462eebc",
+    "rawHashSeconds": 47.97295420100272,
+    "trackedFilesHashed": 9053,
+    "firstCommandStatus": 0,
+    "changedIgnoredSettingExpectedStatus": 7,
+    "changedIgnoredSettingReusedStatus": 0,
+    "gitDiffEmpty": true,
+    "decision": "Reject generic result reuse; execute selected commands and keep existing incremental compiler builds.",
+    "reason": "A Git source snapshot is not a complete input contract for arbitrary validators."
   }
 }

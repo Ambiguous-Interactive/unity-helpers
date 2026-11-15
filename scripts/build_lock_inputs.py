@@ -101,7 +101,11 @@ def collect_calls(file: Path, relative: str) -> list[Call]:
         lines = split_lines(stream.read())
     calls: list[Call] = []
     for index, line in enumerate(lines):
-        if is_blank_or_comment(line) or not USES.match(line) or ACTION_PREFIX not in line:
+        if (
+            is_blank_or_comment(line)
+            or not USES.match(line)
+            or ACTION_PREFIX.lower() not in line.lower()
+        ):
             continue
         match = REFERENCE.fullmatch(line)
         if not match or not match[1].startswith(ACTION_PREFIX):
@@ -110,7 +114,7 @@ def collect_calls(file: Path, relative: str) -> list[Call]:
             )
         reference = match[1]
         parts = reference[len(ACTION_PREFIX) :].split("@")
-        if len(parts) < 2 or not parts[0] or not parts[1]:
+        if len(parts) != 2 or not parts[0] or not parts[1]:
             raise ValueError(
                 f"{relative}:{index + 1}: build-lock action reference is not pinned to a commit: {reference}"
             )
