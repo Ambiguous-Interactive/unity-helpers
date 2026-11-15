@@ -262,6 +262,7 @@ jobs:
     timeout-minutes: 2
     outputs:
       unity-versions: ${{ steps.resolve.outputs.unity-versions }}
+      unity-exclusions: ${{ steps.resolve.outputs.unity-exclusions }}
       release-unity-version: ${{ steps.release_version.outputs.version }}
       test-modes: ${{ steps.resolve.outputs.test-modes }}
       editmode-integration-assemblies: ${{ steps.assemblies.outputs.editmode_integrations }}
@@ -577,17 +578,16 @@ jobs:
       # trade-off accepted here is politeness -- a sibling repo's Unity job can now
       # queue behind more of ours at once.
       # The enrollment audit proves the editor gate and central return pin the
-      # same version per leg only when every matrix axis is static text, so
-      # the axis restates .github/unity-versions.json. A dynamic dispatch
-      # selector axis would defeat that per-leg proof, so dispatches run the
-      # full matrix. The matrix contract below fails when this list drifts
-      # from the canonical file.
+      # same version per leg when each axis is static text. Exclusions only
+      # remove complete legs; they preserve that proof for every selected leg.
+      # Keep the declared universe aligned with .github/unity-versions.json.
       matrix:
         unity-version:
           - 2021.3.45f1
           - 2022.3.45f1
           - 6000.5.2f1
           - 6000.6.0f1
+        exclude: ${{ fromJSON(needs.matrix-config.outputs.unity-exclusions) }}
     steps:
       - name: Require current PR head before setup
         timeout-minutes: 2

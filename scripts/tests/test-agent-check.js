@@ -10,17 +10,20 @@ test("PR native tiers preserve full compatibility for risky or unknown changes",
   const { resolvePullRequestMatrix } = require("../unity/resolve-test-matrix");
   const versions = ["2021.3.45f1", "6000.6.0f1"];
   const latest = resolvePullRequestMatrix(versions, ["Runtime/Utils/WallMath.cs"]);
-  assert.deepEqual(latest["unity-versions"], versions);
+  assert.deepEqual(latest["unity-versions"], [versions.at(-1)]);
+  assert.deepEqual(latest["unity-exclusions"], [{ "unity-version": versions[0] }]);
   assert.deepEqual(latest["test-modes"], ["editmode", "playmode"]);
-  assert.equal(latest.coverage, "editors");
+  assert.equal(latest.coverage, "latest-editors");
   for (const files of [["new.config"], ["Runtime/Core/Serialization/Serializer.cs"], []]) {
     const full = resolvePullRequestMatrix(versions, files);
     assert.deepEqual(full["unity-versions"], versions);
+    assert.deepEqual(full["unity-exclusions"], []);
     assert.ok(full["test-modes"].includes("standalone"));
     assert.equal(full.coverage, "full");
   }
   const documentation = resolvePullRequestMatrix(versions, ["docs/guide.md"]);
-  assert.equal(documentation.coverage, "editors");
+  assert.deepEqual(documentation["unity-versions"], [versions.at(-1)]);
+  assert.equal(documentation.coverage, "latest-editors");
   assert.match(documentation.reason, /enrollment/);
 });
 test("native CLI requires a PR base and shares the committed change inventory", () => {
@@ -63,6 +66,24 @@ test("native CLI requires a PR base and shares the committed change inventory", 
     );
     assert.equal(result.status, 0, result.stderr);
     assert.match(fs.readFileSync(output, "utf8"), /test-modes=\["editmode","playmode"\]/);
+    const published = Object.fromEntries(
+      fs
+        .readFileSync(output, "utf8")
+        .trim()
+        .split("\n")
+        .map((line) => {
+          const separator = line.indexOf("=");
+          return [line.slice(0, separator), line.slice(separator + 1)];
+        })
+    );
+    const canonical = JSON.parse(
+      fs.readFileSync(path.join(checkout, ".github/unity-versions.json"), "utf8")
+    ).all;
+    assert.deepEqual(JSON.parse(published["unity-versions"]), [canonical.at(-1)]);
+    assert.deepEqual(
+      JSON.parse(published["unity-exclusions"]),
+      canonical.slice(0, -1).map((version) => ({ "unity-version": version }))
+    );
     const missing = spawnSync(
       process.execPath,
       [path.join(checkout, "scripts/unity/resolve-test-matrix.js")],

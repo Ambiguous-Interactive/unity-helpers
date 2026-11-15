@@ -51,6 +51,9 @@ function resolveTestMatrix(
   }
   return {
     "unity-versions": selectedVersions,
+    "unity-exclusions": versions
+      .filter((candidate) => !selectedVersions.includes(candidate))
+      .map((candidate) => ({ "unity-version": candidate })),
     "test-modes": selectedModes
   };
 }
@@ -61,13 +64,13 @@ function resolvePullRequestMatrix(versions, files) {
   if (proposal === "full")
     return { ...full, coverage: "full", reason: "compatibility-sensitive or unknown input" };
   return {
-    "unity-versions": [...versions],
+    ...resolveTestMatrix(versions, versions[versions.length - 1]),
     "test-modes": ["editmode", "playmode"],
-    coverage: "editors",
+    coverage: "latest-editors",
     reason:
       proposal === "none"
-        ? "documentation retains editor validation pending conditional enrollment"
-        : "ordinary C#; static enrolled editor matrix, full players on main and dispatch"
+        ? "documentation retains latest editor validation pending conditional enrollment"
+        : "ordinary C#; latest editors, full compatibility on main and default dispatch"
   };
 }
 

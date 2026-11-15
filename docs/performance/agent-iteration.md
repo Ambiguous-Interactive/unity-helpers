@@ -94,14 +94,17 @@ by the existing hook regressions.
 Native PR mode selection uses the same merge-base inventory and risk selector. Ordinary C# and
 documentation changes run EditMode and PlayMode; compatibility-sensitive and unknown changes
 retain Standalone and protobuf-only players. SINGLE_THREADED follows PR mode selection. Main and
-manual qualification retain full coverage. Every selected mode still requires passing native XML,
+default manual qualification retain full coverage. Every selected mode still requires passing native XML,
 redaction, artifact upload, and confirmed cleanup.
 
 The approved organization policy requires a static version axis to prove matching editor setup
-and license return. All four editor versions therefore remain enrolled, even for ordinary PRs.
-The planner's latest-only proposal is not an executed version reduction. Documentation still runs
-editor validation pending a qualified conditional gate. Job summaries report the actual selected
-modes; a reduced run does not qualify omitted players.
+and license return. The workflow retains that literal universe and uses
+[matrix exclusions](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idstrategymatrixexclude)
+to remove complete unselected legs. Ordinary C# PRs run latest stable EditMode and PlayMode;
+compatibility-sensitive and unknown changes retain all versions and players. Main and default
+manual qualification retain the full matrix. An explicit manual version selects that named editor.
+Documentation retains latest editor validation pending a qualified conditional gate. Job summaries
+report selected versions and modes; a reduced run does not qualify omitted coverage.
 
 The action pins now use the approved v1.17.1 release rather than the unapproved commit previously
 labelled v1.17.1. Local Gates checks every action against the central approval registry at its
