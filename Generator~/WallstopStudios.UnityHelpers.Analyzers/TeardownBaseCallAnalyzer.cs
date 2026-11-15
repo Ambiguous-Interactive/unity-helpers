@@ -619,9 +619,28 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 );
             }
             ITypeSymbol type = thrown?.Type;
-            if (thrown is IObjectCreationOperation)
+            if (thrown is IObjectCreationOperation creation)
+            {
+                IAssemblySymbol coreAssembly = graph
+                    .OriginalOperation.SemanticModel?.Compilation.GetTypeByMetadataName(
+                        "System.Exception"
+                    )
+                    ?.ContainingAssembly;
+                return
+                    creation.Arguments.IsDefaultOrEmpty
+                    && creation.Initializer == null
+                    && coreAssembly != null
+                    && SymbolEqualityComparer.Default.Equals(type?.ContainingAssembly, coreAssembly)
+                    ? type
+                    : null;
+            }
+            if (thrown is IInstanceReferenceOperation)
             {
                 return type;
+            }
+            if (!(thrown is ILocalReferenceOperation) && !(thrown is IParameterReferenceOperation))
+            {
+                return null;
             }
             if (type == null || type.TypeKind != TypeKind.Class)
             {

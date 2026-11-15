@@ -1048,7 +1048,7 @@
     "unconditionalAuditHashing": "Earlier nine-subject/512-source control regressed 27.7%; the accepted implementation uses a bounded small-set path."
   },
   "functional": {
-    "analyzersPassed": 1383,
+    "analyzersPassed": 1388,
     "protoOdinPassed": 2258,
     "enumPassed": 70,
     "enumExistingSkip": 1,
@@ -1274,22 +1274,22 @@
   "timedPayloadCommit": "3b733e5de8ee316cbf4f00f30bd1c8736550589d",
   "postMeasurementQualification": {
     "date": "2026-11-15",
-    "scope": "Subsequent exceptional-dispatch correctness fixes, including declared-type/null alternatives; timings remain observations of timedPayloadCommit. Implicit exceptions raised inside called methods or properties are outside this explicit CFG policy.",
+    "scope": "Subsequent exceptional-dispatch correctness fixes, including declared-type/null alternatives; timings remain observations of timedPayloadCommit. Effectful operands of explicit throws remain unknown; calls without an explicit throw edge are not expanded into exception edges.",
     "payloadSha256": {
-      "WallstopStudios.UnityHelpers.Analyzers.dll": "6b462575cccbf5b163c5a849c425c402fcefea5f509ab27ae3bb819899628c96",
+      "WallstopStudios.UnityHelpers.Analyzers.dll": "c18903d4f0d327a9702d6bfe692d01ec24e89428c4d265788b7054c9dea5b6fb",
       "WallstopStudios.UnityHelpers.Enum.Generator.dll": "1ea0a74724edb4e5c05864224b392b74f837c342af5a24d38e275cc01642ffd0",
       "WallstopStudios.UnityHelpers.OdinMigration.Generator.dll": "88783410229556ae7e26679a8b78524f1c38b21c424b71e660944a573da56d9f",
       "WallstopStudios.UnityHelpers.Proto.Generator.dll": "ec54efa13a0105ad041509b182003ee7054fadf5fcec9cf148fc1fc14bec8c86"
     },
-    "analyzersPassed": 1383,
-    "teardownCasesPassed": 74,
+    "analyzersPassed": 1388,
+    "teardownCasesPassed": 79,
     "sourceCensusUnchanged": true,
     "diagnostics": 250,
     "diagnosticDigest": "BC09FA51172F0C4D2808B48C5349DB1E434BEF03CA28FD1A1B5A14EFC5F2BC51",
     "descriptorProbeResidualBytes": 176,
     "positiveControlBytes": 1048,
     "floorRoslynAssemblyVersion": "3.8.0.0",
-    "floorTeardownCasesPassed": 74,
+    "floorTeardownCasesPassed": 79,
     "floorCompilerIdentityCasesPassed": 1
   },
   "generatedSourceSnapshots": {
@@ -1321,5 +1321,27 @@
     "floorRoslynAssemblyVersion": "3.8.0.0",
     "floorTeardownCasesPassed": 68,
     "floorCompilerIdentityCasesPassed": 1
-  }
+  },
+  "postMeasurementQualificationHistory": [
+    {
+      "date": "2026-11-15",
+      "scope": "Subsequent exceptional-dispatch correctness fixes, including declared-type/null alternatives; timings remain observations of timedPayloadCommit. Implicit exceptions raised inside called methods or properties are outside this explicit CFG policy.",
+      "payloadSha256": {
+        "WallstopStudios.UnityHelpers.Analyzers.dll": "6b462575cccbf5b163c5a849c425c402fcefea5f509ab27ae3bb819899628c96",
+        "WallstopStudios.UnityHelpers.Enum.Generator.dll": "1ea0a74724edb4e5c05864224b392b74f837c342af5a24d38e275cc01642ffd0",
+        "WallstopStudios.UnityHelpers.OdinMigration.Generator.dll": "88783410229556ae7e26679a8b78524f1c38b21c424b71e660944a573da56d9f",
+        "WallstopStudios.UnityHelpers.Proto.Generator.dll": "ec54efa13a0105ad041509b182003ee7054fadf5fcec9cf148fc1fc14bec8c86"
+      },
+      "analyzersPassed": 1383,
+      "teardownCasesPassed": 74,
+      "sourceCensusUnchanged": true,
+      "diagnostics": 250,
+      "diagnosticDigest": "BC09FA51172F0C4D2808B48C5349DB1E434BEF03CA28FD1A1B5A14EFC5F2BC51",
+      "descriptorProbeResidualBytes": 176,
+      "positiveControlBytes": 1048,
+      "floorRoslynAssemblyVersion": "3.8.0.0",
+      "floorTeardownCasesPassed": 74,
+      "floorCompilerIdentityCasesPassed": 1
+    }
+  ]
 }

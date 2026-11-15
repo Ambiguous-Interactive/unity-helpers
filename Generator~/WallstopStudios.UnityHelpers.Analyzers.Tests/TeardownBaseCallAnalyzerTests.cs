@@ -440,6 +440,26 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
             "a typed catch after finally leaves the null alternative",
             "protected override void OnDestroy() { try { try { try { ArgumentException exception = 0 < handles ? new ArgumentException() : null; throw exception; } finally { base.OnDestroy(); } } catch (ArgumentException) { } } catch (NullReferenceException) { Release(); } }"
         )]
+        [TestCase(
+            "an exception factory can throw while evaluating a throw operand",
+            "protected override void OnDestroy() { try { try { throw MakeException(); } finally { base.OnDestroy(); } } catch (InvalidOperationException) { Release(); } } private ArgumentException MakeException() { throw new InvalidOperationException(); }"
+        )]
+        [TestCase(
+            "a getter can throw while evaluating a throw operand",
+            "protected override void OnDestroy() { try { try { throw Error; } finally { base.OnDestroy(); } } catch (InvalidOperationException) { Release(); } } private ArgumentException Error { get { throw new InvalidOperationException(); } }"
+        )]
+        [TestCase(
+            "a user constructor can throw while evaluating a throw operand",
+            "protected override void OnDestroy() { try { try { throw new OtherException(); } finally { base.OnDestroy(); } } catch (InvalidOperationException) { Release(); } } private sealed class OtherException : Exception { public OtherException() { throw new InvalidOperationException(); } }"
+        )]
+        [TestCase(
+            "a constructor argument can throw while evaluating a throw operand",
+            "protected override void OnDestroy() { try { try { throw new ArgumentException(FailMessage()); } finally { base.OnDestroy(); } } catch (InvalidOperationException) { Release(); } } private string FailMessage() { throw new InvalidOperationException(); }"
+        )]
+        [TestCase(
+            "a conversion can throw while evaluating a throw operand",
+            "protected override void OnDestroy() { try { try { throw (ArgumentException)new OtherException(); } finally { base.OnDestroy(); } } catch (InvalidOperationException) { Release(); } } private sealed class OtherException : Exception { public static implicit operator ArgumentException(OtherException value) { throw new InvalidOperationException(); } }"
+        )]
         public void NestedTeardownWithReachableFollowingWorkIsReported(string shape, string body)
         {
             Diagnostic reported = Single(body);

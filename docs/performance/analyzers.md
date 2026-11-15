@@ -100,10 +100,10 @@ and both payloads used the same newly frozen 865-source census.
 The timed payload snapshot is commit `3b733e5d`. Subsequent exceptional-dispatch corrections
 retain all 250 diagnostic identities on the same frozen corpus and the positive-backed diagnostic
 array allocation result; the timing comparison applies to the earlier snapshot. The JSON records their exact
-payload hashes and the generated SDK source snapshots needed to restore the census. All 74 teardown
+payload hashes and the generated SDK source snapshots needed to restore the census. All 79 teardown
 controls also pass on Roslyn 3.8.0.0, with a separate loaded-compiler identity control.
 
-Correctness qualification passes 1,383 analyzer and 2,258 WProto/Odin cases, plus 70 enum cases with
+Correctness qualification passes 1,388 analyzer and 2,258 WProto/Odin cases, plus 70 enum cases with
 one existing unsupported-boolean skip. Eight ordering controls cover both path boundaries, deep
 chains, branching, reversed discovery order and preservation of the input list. Native Unity
 qualification passes 25 profile and 57 analyzer-policy cases with clean raw exits and stable input
@@ -530,12 +530,14 @@ the original exception; its replacement is analyzed separately. Outer filters ar
 the completed `finally`, so only the selected handler and its continuation count as following work.
 A sibling catch cannot handle a rethrow from another handler in the same try statement.
 
-Null constants dispatch `NullReferenceException`. Other typed exception values retain their declared
-subtype plus the null alternative; catches consume the alternatives separately.
+Null constants dispatch `NullReferenceException`. Local and parameter references retain their
+declared subtype plus the null alternative; catches consume the alternatives separately. Effectful throw operands stay conservative, including calls,
+getters, user conversions, user constructors and constructor-argument evaluation. Direct parameterless
+core exception constructions retain their known exception type.
 
-This CFG policy follows explicit throw/rethrow edges and normal continuations. It does not infer
-exceptions raised inside invoked methods or getters; that broader analysis of called methods remains
-outside this qualification under issue #1200.
+This CFG policy follows explicit throw/rethrow edges and normal continuations. A call without an
+explicit throw edge does not gain an inferred exception edge; analysis of exceptions raised inside
+called methods or getters remains outside this qualification under issue #1200.
 
 The message quotes the `base` call exactly as it was written, arguments included, rather than
 reconstructing a parameterless one.
