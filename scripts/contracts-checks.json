@@ -532,6 +532,7 @@
     "run": "npm run test:unity-workflow-matrix-contract",
     "inputs": [
       "@tooling",
+      "Tests/Runtime/Performance/*.cs",
       ".github/workflows/unity-tests.yml",
       ".github/unity-versions.json",
       "scripts/tests/test-unity-workflow-matrix-contract.ps1"
@@ -844,6 +845,12 @@
     "id": "agent-check",
     "name": "Task validation selection",
     "run": "npm run test:agent-check",
-    "inputs": ["@tooling", "scripts/agent-check.js", "scripts/tests/test-agent-check.js"]
+    "inputs": [
+      "@tooling",
+      "scripts/agent-check.js",
+      "scripts/tests/test-agent-check.js",
+      "scripts/check_registries.py",
+      "scripts/contracts-checks.json"
+    ]
   }
 ]

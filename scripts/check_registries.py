@@ -74,8 +74,10 @@ def checks_for(
     return resolved
 
 
-def affected_checks(checks: list[Check], files: list[str]) -> list[Check]:
-    """Keep every affected check and its controls; unknown inputs select the full registry."""
+def affected_checks(
+    checks: list[Check], files: list[str], *, direct_inputs_only: bool = False
+) -> list[Check]:
+    """Share pattern and dependency rules; focused iteration omits groups and fallback."""
     known = {check.id: check for check in checks}
     visited: set[str] = set()
     active: set[str] = set()
@@ -114,12 +116,15 @@ def affected_checks(checks: list[Check], files: list[str]) -> list[Check]:
             raise ValueError("Input groups require nonempty literal patterns")
 
     def expanded(check: Check) -> tuple[str, ...]:
+        if direct_inputs_only and check.inputs == ("*",):
+            return ()
         result: list[str] = []
         for pattern in check.inputs:
             if pattern.startswith("@"):
                 if pattern[1:] not in groups:
                     raise ValueError(f"Unknown check input group: {pattern}")
-                result.extend(groups[pattern[1:]])
+                if not direct_inputs_only:
+                    result.extend(groups[pattern[1:]])
             else:
                 result.append(pattern)
         return tuple(result)
@@ -130,7 +135,7 @@ def affected_checks(checks: list[Check], files: list[str]) -> list[Check]:
     patterns = [
         pattern for check in checks if check.inputs != ("*",) for pattern in inputs[check.id]
     ]
-    if any(
+    if not direct_inputs_only and any(
         not any(fnmatch.fnmatchcase(file, pattern) for pattern in patterns)
         and not (
             re.search(r"\.(?:md|png|jpe?g|svg)(?:\.meta)?$", file)
@@ -165,6 +170,12 @@ def main(argv: list[str] | None = None) -> int:
         if not arguments or arguments[0] not in {"lint", "contracts"}:
             raise ValueError("Expected lint or contracts registry")
         registry = cast("Registry", arguments.pop(0))
+        if "--focused-ids" in arguments:
+            if arguments[:2] != ["--focused-ids", "--files"] or len(arguments) < 3:
+                raise ValueError("--focused-ids requires --files and affected paths")
+            checks = affected_checks(checks_for(registry), arguments[2:], direct_inputs_only=True)
+            print(json.dumps([check.id for check in checks]))
+            return 0
         if "--ci" in arguments:
             arguments.remove("--ci")
             if "--base" in arguments or "--files" in arguments:

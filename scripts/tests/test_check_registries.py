@@ -202,6 +202,11 @@ def test_developer_configuration_inputs_keep_their_ci_gate(file: str) -> None:
     ("registry", "file", "expected"),
     [
         ("contracts", "Runtime/Utils/RuntimeSingleton.cs", ("sync-script-contracts",)),
+        (
+            "contracts",
+            "Tests/Runtime/Performance/CachePerformanceTests.cs",
+            ("unity-workflow-matrix-contract",),
+        ),
         ("contracts", "Tests/Runtime/Fixture.cs", ("lint-tests",)),
         (
             "contracts",
@@ -246,6 +251,45 @@ def test_affected_selection_rejects_missing_dependencies_and_cycles(
         write_registry(tmp_path, "lint", checks)
         with pytest.raises(ValueError, match="dependency"):
             affected_checks(load_checks("lint", tmp_path), ["docs/guide.md"])
+
+
+@pytest.mark.parametrize(
+    "pattern",
+    [
+        "docs/features/**",
+        "docs/*/serialization/*.md",
+        "docs/features/serialization/guide.?d",
+        "docs/features/serialization/[g]uide.md",
+    ],
+)
+def test_focused_selection_shares_patterns_and_dependencies(pattern: str) -> None:
+    from check_registries import affected_checks
+
+    checks = check_runner.read_checks(
+        [
+            entry("owner") | {"inputs": [pattern, "@tooling"], "dependencies": ["control"]},
+            entry("control") | {"inputs": ["@tooling"]},
+            entry("broad") | {"inputs": ["@tooling"]},
+            entry("unscoped"),
+        ]
+    )
+    assert [
+        check.id
+        for check in affected_checks(
+            checks, ["docs/features/serialization/guide.md"], direct_inputs_only=True
+        )
+    ] == ["owner", "control"]
+    assert affected_checks(checks, ["scripts/unowned.js"], direct_inputs_only=True) == []
+    assert affected_checks(checks, ["unknown.config"], direct_inputs_only=True) == []
+
+
+def test_focused_ids_cli_returns_owned_controls(capsys: pytest.CaptureFixture[str]) -> None:
+    assert (
+        main(["contracts", "--focused-ids", "--files", "docs/features/serialization/guide.md"]) == 0
+    )
+    assert "wproto-annotations" in json.loads(capsys.readouterr().out)
+    assert main(["contracts", "--focused-ids"]) == 1
+    assert "requires --files" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize("ci", [False, True])

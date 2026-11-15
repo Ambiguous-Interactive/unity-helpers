@@ -167,6 +167,13 @@ test("tooling iteration does not repeat PR aggregates", () => {
     select(["scripts/agent-check.js"], "pr").commands.some((c) => c.includes("validate:tests"))
   );
 });
+
+test("iteration matches nested paths owned by registry patterns", () => {
+  const plan = select(["docs/features/serialization/guide.md"], "iterate");
+  const controls = plan.commands.find((command) => command.includes("--only"));
+  assert.ok(controls, "Expected owned serialization controls");
+  assert.ok(controls.at(-1).split(",").includes("wproto-annotations"));
+});
 test("invalid tiers and escaping paths fail", () => {
   assert.throws(() => select([], "bad"));
   assert.throws(() => select(["../outside"], "pr"));

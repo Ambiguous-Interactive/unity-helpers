@@ -1,33 +1,28 @@
 "use strict";
 const { execFileSync, spawnSync } = require("node:child_process");
-const fs = require("node:fs");
 const path = require("node:path");
 const root = path.resolve(__dirname, "..");
 function focusedControlIds(files) {
-  const checks = JSON.parse(
-    fs.readFileSync(path.join(root, "scripts/contracts-checks.json"), "utf8")
-  );
-  if (!Array.isArray(checks)) throw new Error("Contract registry must be a list");
-  const byId = new Map();
-  const selected = new Set();
-  for (const check of checks) {
-    if (
-      typeof check.id !== "string" ||
-      !Array.isArray(check.inputs) ||
-      check.inputs.some((input) => typeof input !== "string")
+  return JSON.parse(
+    execFileSync(
+      "uv",
+      [
+        "run",
+        "--quiet",
+        "--project",
+        "scripts/python~",
+        "--locked",
+        "--no-dev",
+        "python",
+        "scripts/check_registries.py",
+        "contracts",
+        "--focused-ids",
+        "--files",
+        ...files
+      ],
+      { cwd: root, encoding: "utf8" }
     )
-      throw new Error("Invalid contract ownership metadata");
-    byId.set(check.id, check);
-    if (check.inputs.some((input) => !input.startsWith("@") && files.includes(input)))
-      selected.add(check.id);
-  }
-  for (const id of selected) {
-    const check = byId.get(id);
-    if (!check || !Array.isArray(check.dependencies || []))
-      throw new Error(`Invalid focused control dependency: ${id}`);
-    for (const dependency of check.dependencies || []) selected.add(dependency);
-  }
-  return [...selected];
+  );
 }
 function changedFiles(base, cwd = root) {
   if (!base || base.startsWith("-")) throw new Error("An explicit base revision is required");
