@@ -330,17 +330,13 @@ def alias_dataset() -> dict[str, object]:
 def test_inline_alias_uses_its_associated_trusted_review_identity(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    import copy
-
     data = alias_dataset()
-    before = copy.deepcopy(data)
     result, output, _ = render(monkeypatch, capsys, data=data)
     assert result == 0
     assert "outside/unknown human inputs: none" in output
     assert "1 comment(s): 0 outside/self/unknown" in output
     assert "copilot-pull-request-reviewer[bot] [trusted deterministic automation" in output
     assert "ALIAS INLINE" in output
-    assert data == before
 
 
 @pytest.mark.parametrize(
@@ -419,3 +415,16 @@ def test_unknown_alias_stays_outside_without_review(
     result, output, _ = render(monkeypatch, capsys, data=data)
     assert result == 0
     assert "inline review comment: Copilot" in output
+
+
+def test_correlation_preserves_the_actual_input_records() -> None:
+    import copy
+
+    data = alias_dataset()
+    inline = cast("list[feedback.Record]", data["/pulls/42/comments?per_page=100"])
+    reviews = cast("list[feedback.Record]", data["/pulls/42/reviews?per_page=100"])
+    before = copy.deepcopy((inline, reviews))
+    correlated = feedback.correlate_inline_identities(inline, reviews, feedback.API + "/pulls/42")
+    assert (inline, reviews) == before
+    assert feedback.actor(inline[0])["login"] == "Copilot"
+    assert feedback.actor(correlated[0])["login"] == "copilot-pull-request-reviewer[bot]"
