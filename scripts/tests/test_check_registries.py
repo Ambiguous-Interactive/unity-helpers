@@ -296,14 +296,14 @@ def test_focused_ids_cli_returns_owned_controls(capsys: pytest.CaptureFixture[st
 def test_affected_cli_delegates_base_inventory_to_shared_planner(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], ci: bool
 ) -> None:
-    def inventory(command: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
-        assert command[-3:] == ["origin/main", "--plan", "--json"]
-        return subprocess.CompletedProcess(
-            command, 0, stdout=json.dumps({"files": ["docs/guide.md"]}), stderr=""
-        )
+    import agent_check
+
+    def inventory(base: str) -> list[str]:
+        assert base == "origin/main"
+        return ["docs/guide.md"]
 
     monkeypatch.setattr(check_runner, "OUTPUT_FORMAT", "json")
-    monkeypatch.setattr(subprocess, "run", inventory)
+    monkeypatch.setattr(agent_check, "changed_files", inventory)
     monkeypatch.setenv("GITHUB_EVENT_NAME", "pull_request")
     monkeypatch.setenv("AGENT_CHECK_BASE", "origin/main")
     assert main(["lint", "--list", *(["--ci"] if ci else ["--base", "origin/main"])]) == 0

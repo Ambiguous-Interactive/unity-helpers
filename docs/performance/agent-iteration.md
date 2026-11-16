@@ -44,6 +44,11 @@ and healthy cleanup. Retain native worker phase evidence when investigating the 
 
 Use the shared selector to inspect the work before launching checks:
 
+The selector and its regression suite run in typed Python through locked uv.
+The Node entry point retains its CLI and imported functions for existing consumers.
+Registry base selection calls the Python inventory directly; focused iteration reads the
+same registry in process. Neither path starts native Unity work.
+
 ```bash
 npm run agent:check -- --tier iterate --base origin/main --plan --json
 npm run agent:check -- --tier iterate --files Runtime/Core/Helper/WallMath.cs
@@ -54,6 +59,15 @@ npm run agent:check -- --tier full --base origin/main
 The base uses a merge-base diff, then includes staged, unstaged, and untracked changes.
 Both sides of renames and deleted paths remain visible. A commit does not erase task scope.
 Explicit files replace discovery. Missing revisions fail rather than silently narrowing coverage.
+
+A November 16 Linux ext4 comparison used seven alternating fresh-process pairs after two
+warmups per arm and cell. One-source iteration medians were 82.14 ms for the original Node
+selector and 58.74 ms through uv; 100-source iteration was 72.06 ms and 52.31 ms.
+One-source PR planning regressed from 18.18 ms to 49.57 ms because its original path needed
+no Python worker. These include startup and compare identical parsed plans. They do not
+establish whole-check, Windows or CI gains. The frozen original-plan corpus preserves 69
+plans across all three tiers; executable controls cover Git changes, shallow clones,
+Unicode paths, live ignored settings and failure propagation.
 
 Iteration runs the compiler scope and contract controls needed for the changed task. Format each
 changed file immediately; run changed-file preflight before publication, once the task is ready.

@@ -858,6 +858,9 @@
     "inputs": [
       "@tooling",
       "scripts/agent-check.js",
+      "scripts/agent_check.py",
+      "scripts/tests/test_agent_check.py",
+      "scripts/tests/fixtures/agent-check-v1.json",
       "scripts/tests/test-agent-check.js",
       "scripts/check_registries.py",
       "scripts/contracts-checks.json"
