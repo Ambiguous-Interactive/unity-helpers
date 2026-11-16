@@ -281,8 +281,14 @@ function Invoke-GitAddWithRetry {
         [int]$InitialDelayMilliseconds = $script:GitLockInitialDelayMs,
         [int]$MaxDelayMilliseconds = $script:GitLockMaxDelayMs,
         [switch]$UpdateOnly,
-        [switch]$Quiet
+        [switch]$Quiet,
+        [switch]$ExecutableOnly
     )
+
+    if ($ExecutableOnly -and $UpdateOnly) {
+        Write-GitStagingError 'ExecutableOnly cannot be combined with UpdateOnly.'
+        return 64
+    }
 
     if (-not $Items -or $Items.Count -eq 0) {
         Write-GitStagingVerbose "git_add_with_retry: no files to add, returning success"
@@ -291,6 +297,7 @@ function Invoke-GitAddWithRetry {
 
     Write-GitStagingVerbose "git_add_with_retry: staging $($Items.Count) file(s)"
 
+    $operationName = if ($ExecutableOnly) { 'git update-index --chmod=+x' } else { 'git add' }
     $gitArgs = @('add')
     if ($UpdateOnly) {
         $gitArgs += '--update'
@@ -338,16 +345,44 @@ function Invoke-GitAddWithRetry {
             # Capture stderr for better error messages
             $stderrFile = [System.IO.Path]::GetTempFileName()
             try {
+                if ($ExecutableOnly) {
+                    # Preserve the flag so chmod skips working-file content without changing index flags.
+                    $gitArgs = @('update-index', '--chmod=+x')
+                    foreach ($item in $Items) {
+                        $tagOutput = & git ls-files -v -z -- (":(literal)" + $item) 2>$stderrFile
+                        $tagExitCode = $LASTEXITCODE
+                        if ($tagExitCode -ne 0) {
+                            Write-GitStagingError "Cannot read index flags for literal path: $item"
+                            return $tagExitCode
+                        }
+                        $tagText = $tagOutput -join "`n"
+                        if ([string]::IsNullOrEmpty($tagText)) {
+                            Write-GitStagingError "No index entry for literal path: $item"
+                            return 1
+                        }
+                        $tag = $tagText.Substring(0, 1)
+                        if ($tag -cne $tag.ToUpperInvariant()) {
+                            $gitArgs += '--assume-unchanged'
+                        } else {
+                            $gitArgs += '--no-assume-unchanged'
+                        }
+                        $literalItem = $item
+                        if ($literalItem.StartsWith('-')) {
+                            $literalItem = './' + $literalItem
+                        }
+                        $gitArgs += $literalItem
+                    }
+                }
                 & git @gitArgs 2>$stderrFile
                 $exitCode = $LASTEXITCODE
 
                 if ($exitCode -eq 0) {
-                    Write-GitStagingVerbose "git add succeeded on attempt $attempt"
+                    Write-GitStagingVerbose "$operationName succeeded on attempt $attempt"
                     return 0
                 }
 
                 $gitStderr = Get-Content -Path $stderrFile -Raw -ErrorAction SilentlyContinue
-                Write-GitStagingVerbose "git add failed with exit code $exitCode on attempt $attempt"
+                Write-GitStagingVerbose "$operationName failed with exit code $exitCode on attempt $attempt"
                 if ($gitStderr) {
                     Write-GitStagingVerbose "git stderr: $gitStderr"
                 }
@@ -372,7 +407,7 @@ function Invoke-GitAddWithRetry {
                     }
                     $delay = [int]$baseDelay + $jitter
                     if (-not $Quiet) {
-                        Write-GitStagingWarning "git add failed (exit code $exitCode), retrying in ${delay}ms (attempt $attempt/$MaxAttempts)..."
+                        Write-GitStagingWarning "$operationName failed (exit code $exitCode), retrying in ${delay}ms (attempt $attempt/$MaxAttempts)..."
                     }
                     Start-Sleep -Milliseconds $delay
                     continue
@@ -380,7 +415,7 @@ function Invoke-GitAddWithRetry {
 
                 # Non-retryable failure - show the actual error
                 if ($gitStderr -and -not $Quiet) {
-                    Write-GitStagingError "git add failed with non-retryable error: $gitStderr"
+                    Write-GitStagingError "$operationName failed with non-retryable error: $gitStderr"
                 }
 
                 return $exitCode
@@ -389,7 +424,7 @@ function Invoke-GitAddWithRetry {
             }
         }
 
-        Write-GitStagingError "git add failed after $MaxAttempts attempts"
+        Write-GitStagingError "$operationName failed after $MaxAttempts attempts"
         return 128
     } finally {
         if ($mutexAcquired -and $null -ne $mutex) {
