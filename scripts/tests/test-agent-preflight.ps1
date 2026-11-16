@@ -74,7 +74,7 @@ function New-TestRepo {
     $repoRoot = Split-Path -Parent $PSScriptRoot | Split-Path -Parent
     Copy-Item (Join-Path $repoRoot 'scripts/agent-preflight.ps1') (Join-Path $scriptsDir 'agent-preflight.ps1') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/lint_meta_files.py') (Join-Path $scriptsDir 'lint_meta_files.py') -Force
-    foreach ($module in @('lint_skill_sizes.py', 'cli_encoding.py', 'csharp_sources.py', 'check_eol.py', 'normalize_eol.py', 'validate_lint_error_codes.py', 'doc_counts.py', 'lint_tests.py', 'lint_comment_block_form.py', 'run_node_bin.py', 'fix_markdown_fence_languages.py', 'generate_agent_skill_stubs.py')) {
+    foreach ($module in @('configure_git_defaults.py', 'lint_skill_sizes.py', 'cli_encoding.py', 'csharp_sources.py', 'check_eol.py', 'normalize_eol.py', 'validate_lint_error_codes.py', 'doc_counts.py', 'lint_tests.py', 'lint_comment_block_form.py', 'run_node_bin.py', 'fix_markdown_fence_languages.py', 'generate_agent_skill_stubs.py')) {
         Copy-Item (Join-Path $repoRoot "scripts/$module") (Join-Path $scriptsDir $module) -Force
     }
     $pythonProject = Join-Path $scriptsDir 'python~'
@@ -570,7 +570,7 @@ function Get-AdmissionSnapshot {
 function New-AdmissionRepo {
     param([switch]$UnsafeConfig)
     $repo = New-TestRepo -ConfigurePushDefaults:(!$UnsafeConfig) -GitIgnorePatterns @('node_modules/', 'pre-commit.log')
-    & uv run --quiet --project (Join-Path $repo 'scripts/python~') --locked --no-dev python -c 'import sys; sys.path.insert(0, sys.argv[1]); import check_eol, validate_lint_error_codes' (Join-Path $repo 'scripts')
+    & uv run --quiet --project (Join-Path $repo 'scripts/python~') --locked --no-dev python -c 'import sys; sys.path.insert(0, sys.argv[1]); import check_eol, validate_lint_error_codes, configure_git_defaults' (Join-Path $repo 'scripts')
     if ($LASTEXITCODE -ne 0) { throw 'The admission fixture requires its Python tools to be installed before taking byte snapshots.' }
     [void][IO.Directory]::CreateDirectory((Join-Path $repo 'Runtime'))
     foreach ($name in @('Selected', 'Additional', 'User')) {
