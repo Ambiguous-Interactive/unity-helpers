@@ -117,6 +117,11 @@ def validate(root: Path) -> tuple[int, list[str]]:
         checker = root / "scripts/check-container-git-credentials.sh"
         if checker.is_file():
             result = run_git(executable, root, "config", "--get-all", "credential.helper")
+            if result.returncode not in (0, 1):
+                lines.append(
+                    f"{PREFIX} ERROR: git config credential.helper failed with exit {result.returncode}."
+                )
+                failures += 1
             helpers = result.stdout.splitlines() if result.returncode == 0 else []
             if any(
                 "vscode-remote-containers" in helper.lower()

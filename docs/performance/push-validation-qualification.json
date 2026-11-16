@@ -6,8 +6,8 @@
     "git-path-helpers.ps1": "fd4ac97ea238bc1b874db567cfcd5375be6f77bf3e7245caaa0f21c91d1d160d"
   },
   "source_sha256": {
-    "scripts/push_validation.py": "dd39b782eb983aa1283c5d5f604d9606e5b4d516b2ae3eb8afaca03348d7cd8e",
-    "scripts/tests/test_push_validation.py": "441037527ec7b4f5ec204c621c120139c0c840c9bdde0fb3ee9b6c2c1193b775",
+    "scripts/push_validation.py": "121170f18c6e7dceebcaf7c84588fecc818e4d1e117e57ee650cc13327d73ff7",
+    "scripts/tests/test_push_validation.py": "8c797688eb54ac8a89b5fc745ec64a0eec3da3465eadb51ef722ee6790b209b8",
     "scripts/tests/fixtures/push-validation-v1.json": "8c5253505db054c9b2a2085e50f61d8c03409c786707a6450c116dbc729ef81e"
   },
   "original_controls": 38,
@@ -325,6 +325,20 @@
       "Apply and verify fixture executable mode through its actual Bash host, as the original fixture did; include validator diagnostics in a failed recheck."
     ],
     "linux_evidence": "52 typed controls, 13 Repo Lint runner contracts and 33 normalization controls pass. The two obsolete contract failures reproduced locally before correction.",
-    "windows_limit": "Head a54ac94b still fails the native Windows healthy recheck although its Bash executable probes pass. The assertion now prints every diagnostic without pytest representation truncation. Root cause and native Windows qualification remain pending; no platform skip or production checker change."
+    "windows_limit": "Linux controls and strict gates pass; native Windows confirmation remains pending CI. Retain the failed mode hypothesis and full diagnostic job rather than claim executable chmod fixed this mismatch.",
+    "windows_root_cause": "Job133361036214 on96ba97bd proves executable mode is healthy. MSYS rewrites the normalizer helper argument from !/c/... to !C:/... while the unchanged container checker expects the POSIX spelling. This is a native-Windows fixture boundary, not a production checker permission defect.",
+    "windows_correction": "Only the disposable fixture normalizer subprocess excludes !/ argument prefixes via the MSYS argument-conversion exclusion setting. Assert exact helper readback against the actual Bash pwd before the healthy postcondition. Other path conversion remains active.",
+    "windows_source": "https://www.msys2.org/docs/filesystem-paths/"
+  },
+  "before_review_source_sha256": {
+    "scripts/push_validation.py": "dd39b782eb983aa1283c5d5f604d9606e5b4d516b2ae3eb8afaca03348d7cd8e",
+    "scripts/tests/test_push_validation.py": "519e73b74929b8413bd96c7b9f950130d6eb8849fb58ae7a99381a3c6fafc07d",
+    "scripts/tests/fixtures/push-validation-v1.json": "8c5253505db054c9b2a2085e50f61d8c03409c786707a6450c116dbc729ef81e"
+  },
+  "review_correction": {
+    "review": 5921784192,
+    "controls": "Three red helper-read controls for Git exits 2, 3 and 128 now fail visibly; the absent-key exit 1 remains green. All 56 typed controls pass. Generated broken and healthy Bash checker bytes are asserted as LF on every host.",
+    "changes": "Report credential.helper lookup statuses other than 0 or 1 as errors. Use explicit LF fixture writes on Windows.",
+    "timing_limit": "Raw pairs above describe the pre-review implementation, retained with their timing seals; no current corrected-source timing or Windows speed claim."
   }
 }
