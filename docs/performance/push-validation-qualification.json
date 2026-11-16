@@ -7,12 +7,12 @@
   },
   "source_sha256": {
     "scripts/push_validation.py": "dd39b782eb983aa1283c5d5f604d9606e5b4d516b2ae3eb8afaca03348d7cd8e",
-    "scripts/tests/test_push_validation.py": "54b60908b0ec26c027b8eba1bb00416151b24ec20a31350fc96cc331bfde28e9",
+    "scripts/tests/test_push_validation.py": "a81a4ffcdd8c2997607aea43dd953836e836e31d33af4f93b155fae579019bdf",
     "scripts/tests/fixtures/push-validation-v1.json": "8c5253505db054c9b2a2085e50f61d8c03409c786707a6450c116dbc729ef81e"
   },
   "original_controls": 38,
   "frozen_cli_observations": 39,
-  "typed_controls": 51,
+  "typed_controls": 52,
   "preserved_contract": [
     "Read local push defaults, compare trimmed values without case sensitivity, and fail on missing or incorrect values.",
     "Recognize hook artifact stems and five extensions in the repository root and .githooks. Preserve ignored, unignored and check-ignore-error classifications. Never delete an artifact.",
@@ -311,5 +311,20 @@
     "scripts/push_validation.py": "dd39b782eb983aa1283c5d5f604d9606e5b4d516b2ae3eb8afaca03348d7cd8e",
     "scripts/tests/test_push_validation.py": "4dbf85881cee9d7e61d34ec62c47110ad4f73a81e716f55cfd774da391db36d9",
     "scripts/tests/fixtures/push-validation-v1.json": "8c5253505db054c9b2a2085e50f61d8c03409c786707a6450c116dbc729ef81e"
+  },
+  "ci_corrections": {
+    "source_head": "c3680417b4b20bcde973479d986686aa2210b003",
+    "observed_failures": [
+      "The Repo Lint ownership contract still claimed the retired PowerShell entry point was called by pre-push.",
+      "The normalization suite grepped the retired implementation instead of executing the npm route.",
+      "The Windows fixture failed its healthy postcondition recheck without diagnostic output."
+    ],
+    "corrections": [
+      "Use the registered executable compatibility controls as the launcher owner.",
+      "Execute the real npm pre-push route against broken and healthy owned checkers.",
+      "Apply and verify fixture executable mode through its actual Bash host, as the original fixture did; include validator diagnostics in a failed recheck."
+    ],
+    "linux_evidence": "52 typed controls, 13 Repo Lint runner contracts and 33 normalization controls pass. The two obsolete contract failures reproduced locally before correction.",
+    "windows_limit": "Corrected native Windows execution remains pending CI. Do not replace the integration with a platform skip or claim an unmeasured Windows fix."
   }
 }

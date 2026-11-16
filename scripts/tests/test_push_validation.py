@@ -14,6 +14,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import push_validation as push
+from typecheck_clean import npm_command
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = cast(
@@ -164,6 +165,30 @@ def test_real_container_credential_postcondition(
         target = scripts / name
         shutil.copyfile(ROOT / "scripts" / name, target)
         target.chmod(0o755)
+    helper = scripts / "github-token.sh"
+    mode_before = subprocess.run(
+        [bash, "-c", 'test -x "$1"', "fixture", helper.as_posix()],
+        check=False,
+        capture_output=True,
+    ).returncode
+    permissions = subprocess.run(
+        [
+            bash,
+            "-c",
+            'chmod +x -- "$@"',
+            "fixture",
+            *(path.as_posix() for path in scripts.iterdir()),
+        ],
+        check=False,
+        capture_output=True,
+    )
+    assert permissions.returncode == 0, permissions.stdout + permissions.stderr
+    executable = subprocess.run(
+        [bash, "-c", 'test -x "$1"', "fixture", helper.as_posix()],
+        check=False,
+        capture_output=True,
+    )
+    assert executable.returncode == 0, executable.stdout + executable.stderr
     git(
         root,
         "config",
@@ -185,7 +210,8 @@ def test_real_container_credential_postcondition(
     )
     assert result.returncode == 0, result.stdout + result.stderr
     before = {p.relative_to(root): p.read_bytes() for p in root.rglob("*") if p.is_file()}
-    assert push.validate(root)[0] == 0
+    status, diagnostics = push.validate(root)
+    assert status == 0, {"diagnostics": diagnostics, "executable_before_native_chmod": mode_before}
     assert {p.relative_to(root): p.read_bytes() for p in root.rglob("*") if p.is_file()} == before
     Path(os.environ["GIT_CONFIG_GLOBAL"]).write_text("", encoding="utf-8")
     Path(os.environ["GIT_CONFIG_SYSTEM"]).write_text("", encoding="utf-8")
@@ -314,3 +340,28 @@ def test_cli_artifact_diagnostics_are_deterministic(tmp_path: Path) -> None:
     ]
     assert all(result.returncode == 1 for result in results)
     assert len({result.stdout for result in results}) == 1
+
+
+def test_npm_pre_push_route_reaches_postcondition(tmp_path: Path) -> None:
+    usable_bash()
+    root = tmp_path / "repo"
+    checker_name = "scripts/check-container-git-credentials.sh"
+    prepare(
+        root,
+        {
+            "config": dict(push.EXPECTED),
+            "files": {
+                checker_name: '#!/usr/bin/env bash\nprintf "owned-postcondition-%s\\n" "$1"\nexit 7\n'
+            },
+        },
+    )
+    git(root, "config", "--local", "credential.helper", "vscode-remote-containers-fixture")
+    command = [*npm_command(), "run", "validate:prepush", "--", "--", f"--repo-root={root}"]
+    broken = subprocess.run(command, cwd=ROOT, check=False, capture_output=True, timeout=60)
+    assert broken.returncode == 1, broken.stdout + broken.stderr
+    assert b"cached-token credential helper" in broken.stdout
+    assert b"owned-postcondition---quiet" in broken.stdout
+    (root / checker_name).write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+    healthy = subprocess.run(command, cwd=ROOT, check=False, capture_output=True, timeout=60)
+    assert healthy.returncode == 0, healthy.stdout + healthy.stderr
+    assert b"Git push config and hook artifact checks passed" in healthy.stdout

@@ -192,7 +192,7 @@ Dev Containers helper is registered; it reads configuration and declared host na
 and does not request a token. Git reads and the checker have 30-second process deadlines.
 
 The [qualification record](../performance/push-validation-qualification.json)
-retains 39 original CLI observations and 51 typed controls. The real container
+retains 39 original CLI observations and 52 typed controls. The real container
 integration uses disposable Git configuration. A PowerShell probe verifies the
 case-sensitive versus case-insensitive filename boundary. Seven alternating Linux
 pairs after two warmup pairs measured 298.45 → 41.40 ms for a clean fixture and
