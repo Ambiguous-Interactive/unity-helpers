@@ -935,3 +935,26 @@ leave compilation pending until the current Test Runner invocation completes,
 so waiting inside a later test cannot make that process idle.
 
 Use `SanitizePath()` or `PathHelper.Sanitize` for separator normalization in Runtime, Editor, Tests and Generator~, and reuse the result when checking multiple paths. `npm run lint:path-normalization` enforces the rule and `npm run test:lint-path-normalization` checks reporting and empty-scope rejection. The shared helper implementation is the only exception within those trees; standalone Generator tools link the same Unity-free helper source.
+
+### Wiki publication
+
+The wiki deployment uses the existing auto-commit GitHub App through
+`AUTO_COMMIT_APP_ID` and `AUTO_COMMIT_APP_PRIVATE_KEY`, requesting only its existing
+repository contents write capability. The workflow token reads source; it does
+not authenticate wiki writes. Checkout does not persist credentials, and wiki
+Git authentication is supplied through process environment configuration rather
+than a credential-bearing remote URL.
+
+A missing credential fails before cloning. A receive-access dry run precedes
+content generation; public clone success alone does not prove write access.
+Generation and content validation remain mandatory. Publication pushes only the
+detected branch once and verifies its remote revision against the generated
+commit. The summary reports failures before considering dry-run or no-change
+states. Run the publication controls with
+`uv run --project scripts/python~ --locked pytest scripts/wiki/test_wiki_scripts.py -q`.
+
+If the App is denied wiki access, inspect its existing installation and this
+repository's access to the two secrets. Do not retry alternate branches or widen
+permissions. Record the denied run and the exact owner action required before
+attempting publication again. A workflow dry run checks receive access and
+validates generated content without publishing it.
