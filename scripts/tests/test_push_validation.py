@@ -204,11 +204,27 @@ def test_real_container_credential_postcondition(
     result = subprocess.run(
         [bash, str(scripts / "normalize-container-git-config.sh")],
         cwd=root,
+        env={**os.environ, "MSYS2_ARG_CONV_EXCL": "!/"},
         check=False,
         capture_output=True,
         timeout=30,
     )
     assert result.returncode == 0, result.stdout + result.stderr
+    expected_helper = subprocess.run(
+        [
+            bash,
+            "-c",
+            'printf "!%s/github-token.sh" "$(cd "$1" && pwd)"',
+            "fixture",
+            scripts.as_posix(),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    ).stdout
+    installed = git(root, "config", "--global", "--get-all", "credential.https://github.com.helper")
+    assert installed.stdout.strip() == expected_helper
     before = {p.relative_to(root): p.read_bytes() for p in root.rglob("*") if p.is_file()}
     status, diagnostics = push.validate(root)
     if status:
