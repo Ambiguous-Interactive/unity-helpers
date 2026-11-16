@@ -2020,9 +2020,11 @@
     "trigger": "PR #1216 inline comment 4585786849 and associated review 5920058641 expose different Copilot logins for the same Bot user ID 175728472; #859 comment 6917340859 tracks the correction.",
     "source_sha256": {
       "scripts/pr_feedback.py": "adf49ffec7d1e0ba0359ef29396a167cda4dd367d020fb48d9644f561492ef59",
-      "scripts/tests/test_pr_feedback.py": "a620463216f57c1cfcc9f7b3d9221549f19e910d0e48a045baa9db7b80cf3718"
+      "scripts/tests/test_pr_feedback.py": "a620463216f57c1cfcc9f7b3d9221549f19e910d0e48a045baa9db7b80cf3718",
+      "scripts/tests/test_skills_tooling.py": "68d217595b5dc81e50829eea69a14d8696c3b541936d260beb56463c39173b1f"
     },
     "evidence": "The report-level alias control failed before correction. All 90 offline controls now pass, including 28 unproven-identity cases, duplicate review IDs and absent review. Fetched records remain unchanged. Strict Ruff, mypy and Pyright pass.",
-    "limits": "Only inline identities from the current PR are correlated with their associated, already trusted Bot review by matching positive integer user IDs and unique review ID. Display names and repository association do not confer trust. Existing timing/source captures above remain historical; no performance claim is made for this correction."
+    "limits": "Only inline identities from the current PR are correlated with their associated, already trusted Bot review by matching positive integer user IDs and unique review ID. Display names and repository association do not confer trust. Existing timing/source captures above remain historical; no performance claim is made for this correction.",
+    "policy_mutation_correction": "Three frozen byte-fragment controls failed before exercising the linter after source insertion. Retain exact frozen fragments when present; otherwise mutate the current span matched by the unchanged frozen policy regex. The captured fragment must still satisfy that same regex. All 123 skill-tooling controls pass, including every policy rejection. An initial first-match-only mutation attempt missed three repeated requirements; retain global exact-fragment replacement."
   }
 }

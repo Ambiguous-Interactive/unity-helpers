@@ -882,9 +882,20 @@ def test_each_frozen_policy_requirement_remains_enforced(
             content.replace("raise FeedbackError", "raise RemovedFeedbackError"), encoding="utf-8"
         )
     else:
+        import re
+
+        assert re.search(pattern, fragment), label
         owners = [path for path in files if fragment in path.read_text(encoding="utf-8")]
-        assert owners, label
-        path = owners[0]
+        if not owners:
+            matches = [
+                (path, match.group())
+                for path in files
+                if (match := re.search(pattern, path.read_text(encoding="utf-8"))) is not None
+            ]
+            assert matches, label
+            path, fragment = matches[0]
+        else:
+            path = owners[0]
         content = path.read_text(encoding="utf-8")
         path.write_text(content.replace(fragment, "REMOVED POLICY REQUIREMENT"), encoding="utf-8")
     errors = lint.policy_errors(guidance)
