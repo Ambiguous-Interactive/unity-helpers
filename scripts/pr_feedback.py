@@ -209,6 +209,46 @@ def is_trusted_automation(item: Record) -> bool:
     return account.get("type") == "Bot" and login in TRUSTED_AUTOMATION
 
 
+def correlate_inline_identities(
+    inline: list[Record], reviews: list[Record], pull_url: str
+) -> list[Record]:
+    """Copy aliases only when their associated review proves the same trusted Bot ID."""
+    indexed: dict[int, Record] = {}
+    duplicate: set[int] = set()
+    for review in reviews:
+        review_id = review.get("id")
+        if type(review_id) is not int or review_id <= 0:
+            continue
+        if review_id in indexed:
+            duplicate.add(review_id)
+        indexed[review_id] = review
+
+    correlated: list[Record] = []
+    for comment in inline:
+        review_id = comment.get("pull_request_review_id")
+        account = actor(comment)
+        account_id = account.get("id")
+        if (
+            account.get("type") == "Bot"
+            and type(account_id) is int
+            and account_id > 0
+            and type(review_id) is int
+            and review_id > 0
+            and review_id not in duplicate
+            and comment.get("pull_request_url") == pull_url
+            and (associated := indexed.get(review_id)) is not None
+            and is_trusted_automation(associated)
+            and type(actor(associated).get("id")) is int
+            and actor(associated).get("id") == account_id
+        ):
+            correlated.append(
+                {**comment, "user": {**account, "login": text(actor(associated), "login")}}
+            )
+        else:
+            correlated.append(comment)
+    return correlated
+
+
 def classify(item: Record, viewer_login: str) -> str:
     login = text(actor(item), "login")
     if viewer_login and login.casefold() == viewer_login.casefold():
@@ -442,6 +482,7 @@ def report() -> int:
         commits = get_all(f"/pulls/{number}/commits?per_page=100")
         inline = get_all(f"/pulls/{number}/comments?per_page=100")
         reviews = get_all(f"/pulls/{number}/reviews?per_page=100")
+        inline = correlate_inline_identities(inline, reviews, API + f"/pulls/{number}")
         conversation = get_all(f"/issues/{number}/comments?per_page=100")
         check_runs = get_all(f"/commits/{head_sha}/check-runs?per_page=100", "check_runs")
     except FeedbackError as error:

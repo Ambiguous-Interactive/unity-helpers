@@ -8,7 +8,7 @@ import shutil
 import subprocess
 import sys
 import threading
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, ClassVar, cast
 
 if TYPE_CHECKING:
     import urllib.request
@@ -304,3 +304,118 @@ def test_real_redirect_never_receives_authorization(
         server.server_close()
         thread.join(timeout=5)
     assert not thread.is_alive()
+
+
+def alias_dataset() -> dict[str, object]:
+    data = dataset()
+    data["/pulls/42/comments?per_page=100"] = [
+        {
+            "id": 4585786849,
+            "pull_request_review_id": 5920058641,
+            "pull_request_url": feedback.API + "/pulls/42",
+            "user": {"login": "Copilot", "type": "Bot", "id": 175728472},
+            "body": "ALIAS INLINE",
+        }
+    ]
+    data["/pulls/42/reviews?per_page=100"] = [
+        {
+            "id": 5920058641,
+            "user": {"login": "copilot-pull-request-reviewer[bot]", "type": "Bot", "id": 175728472},
+            "body": "CANONICAL REVIEW",
+        }
+    ]
+    return data
+
+
+def test_inline_alias_uses_its_associated_trusted_review_identity(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    import copy
+
+    data = alias_dataset()
+    before = copy.deepcopy(data)
+    result, output, _ = render(monkeypatch, capsys, data=data)
+    assert result == 0
+    assert "outside/unknown human inputs: none" in output
+    assert "1 comment(s): 0 outside/self/unknown" in output
+    assert "copilot-pull-request-reviewer[bot] [trusted deterministic automation" in output
+    assert "ALIAS INLINE" in output
+    assert data == before
+
+
+@pytest.mark.parametrize(
+    ("target", "key", "value"),
+    [
+        ("comment", "pull_request_review_id", None),
+        ("comment", "pull_request_review_id", True),
+        ("comment", "pull_request_review_id", "5920058641"),
+        ("comment", "pull_request_review_id", 123),
+        ("comment", "pull_request_url", None),
+        ("comment", "pull_request_url", feedback.API + "/pulls/43"),
+        ("comment", "pull_request_url", "https://example.test/pulls/42"),
+        ("comment_user", "type", "User"),
+        ("comment_user", "id", None),
+        ("comment_user", "id", True),
+        ("comment_user", "id", "175728472"),
+        ("comment_user", "id", 0),
+        ("comment_user", "id", -1),
+        ("comment_user", "id", 123),
+        ("review", "id", None),
+        ("review", "id", True),
+        ("review", "id", 0),
+        ("review", "id", -1),
+        ("review", "id", "5920058641"),
+        ("review", "id", 123),
+        ("review_user", "type", "User"),
+        ("review_user", "id", None),
+        ("review_user", "id", True),
+        ("review_user", "id", "175728472"),
+        ("review_user", "id", 123),
+        ("review_user", "login", "third-party[bot]"),
+        ("review_user", "login", "Copilot"),
+        ("review_user", "login", ""),
+    ],
+)
+def test_alias_without_associated_bot_identity_stays_outside(
+    target: str,
+    key: str,
+    value: object,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    data = alias_dataset()
+    comment = cast("list[dict[str, object]]", data["/pulls/42/comments?per_page=100"])[0]
+    review = cast("list[dict[str, object]]", data["/pulls/42/reviews?per_page=100"])[0]
+    records = {
+        "comment": comment,
+        "review": review,
+        "comment_user": cast("dict[str, object]", comment["user"]),
+        "review_user": cast("dict[str, object]", review["user"]),
+    }
+    records[target][key] = value
+    result, output, _ = render(monkeypatch, capsys, data=data)
+    assert result == 0
+    assert "inline review comment: Copilot" in output
+    assert "Copilot [OUTSIDE OR UNKNOWN" in output
+    assert "1 outside/self/unknown (Copilot), 0 from trusted automation" in output
+
+
+def test_duplicate_review_ids_cannot_prove_an_alias(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    data = alias_dataset()
+    reviews = cast("list[dict[str, object]]", data["/pulls/42/reviews?per_page=100"])
+    reviews.append(dict(reviews[0]))
+    result, output, _ = render(monkeypatch, capsys, data=data)
+    assert result == 0
+    assert "inline review comment: Copilot" in output
+
+
+def test_unknown_alias_stays_outside_without_review(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    data = alias_dataset()
+    data["/pulls/42/reviews?per_page=100"] = []
+    result, output, _ = render(monkeypatch, capsys, data=data)
+    assert result == 0
+    assert "inline review comment: Copilot" in output
