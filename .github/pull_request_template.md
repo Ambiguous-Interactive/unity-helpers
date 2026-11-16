@@ -10,6 +10,6 @@
 
 -
 
-<!-- Use Refs instead of Fixes while work remains in the linked issue. -->
+<!-- Use Fixes only when all work in the linked issue is complete. -->
 
-Fixes #
+Refs #

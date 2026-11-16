@@ -436,7 +436,7 @@ def test_failed_metadata_io_leaves_no_destination_or_temporary_file(
 
         def fail_close() -> None:
             monkeypatch.setattr(stream.file, "close", original_close)
-            original_close()
+            stream.close()
             raise OSError("synthetic metadata close failure")
 
         monkeypatch.setattr(
