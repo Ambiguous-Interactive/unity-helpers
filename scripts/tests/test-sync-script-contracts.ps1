@@ -74,25 +74,6 @@ function Test-AppearsBefore {
 function Get-RepoRoot {  return (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
 }
 
-function Get-PowerShellSingleQuotedArrayEntries {
-  param(
-    [string]$Content,
-    [string]$VariableName
-  )
-
-  $escapedName = [regex]::Escape($VariableName)
-  $arrayPattern = '(?ms)\${0}\s*=\s*@\((?<body>.*?)\)' -f $escapedName
-  $match = [regex]::Match($Content, $arrayPattern)
-  if (-not $match.Success) {
-    return @()
-  }
-
-  return @(
-    [regex]::Matches($match.Groups['body'].Value, "'(?<entry>[^']+)'") |
-      ForEach-Object { $_.Groups['entry'].Value }
-  )
-}
-
 function Assert-NoNewlineWriteHasFinalLfNormalization {
   param(
     [string]$ScriptPath,
@@ -2766,105 +2747,16 @@ function Run-ReleasePackageContentContractTests {
     -Passed ($missingPackageFiles.Count -eq 0) `
     -Message "Missing package.json files entries: $($missingPackageFiles -join ', ')"
 
-  $validatorPath = Join-Path $repoRoot 'scripts/validate-npm-package.ps1'
-  $validatorContent = Get-Content -Path $validatorPath -Raw
-  $validatorRequiredEntries = Get-PowerShellSingleQuotedArrayEntries `
-    -Content $validatorContent `
-    -VariableName 'requiredPackageEntries'
-  $validatorAllowedTopLevelEntries = Get-PowerShellSingleQuotedArrayEntries `
-    -Content $validatorContent `
-    -VariableName 'allowedTopLevelEntries'
-  $validatorUnityFolders = Get-PowerShellSingleQuotedArrayEntries `
-    -Content $validatorContent `
-    -VariableName 'unityFolders'
-  $validatorPackageContentRoots = Get-PowerShellSingleQuotedArrayEntries `
-    -Content $validatorContent `
-    -VariableName 'packageContentRoots'
-  $validatorKeepsPackOutputConcise = (
-    $validatorContent.Contains('npm pack --json --pack-destination $tempDir') -and
-    $validatorContent.Contains('1> $packStdoutPath 2> $packStderrPath') -and
-    $validatorContent.Contains('npm pack produced $($packSummary.filename)') -and
-    -not $validatorContent.Contains('2>&1 | Out-String') -and
-    -not $validatorContent.Contains('npm pack output: $packOutput')
+  $packageControlOutput = @(
+    uv run --quiet --project (Join-Path $repoRoot 'scripts/python~') --locked pytest (Join-Path $repoRoot 'scripts/tests/test_npm_package.py') -k 'package_contract or legacy_package_validator' -q 2>&1
   )
-  $missingValidatorRequiredEntries = @($requiredPackageFilesEntries | Where-Object { $_ -notin $validatorRequiredEntries })
-  $requiredValidatorAllowedTopLevelEntries = @('scripts', 'scripts.meta')
-  $missingValidatorAllowedTopLevelEntries = @($requiredValidatorAllowedTopLevelEntries | Where-Object { $_ -notin $validatorAllowedTopLevelEntries })
-  $nestedValidatorAllowedTopLevelEntries = @($validatorAllowedTopLevelEntries | Where-Object { $_.Contains('/') -or $_.Contains('\') })
-  $missingValidatorUnityFolders = @($requiredUnityPackageFolders | Where-Object { $_ -notin $validatorUnityFolders })
-  $missingValidatorPackageContentRoots = @($requiredPackageFilesEntries | Where-Object { $_ -notin $validatorPackageContentRoots })
-  $validatorUsesCaseSensitiveMembership = (
-    $validatorContent.Contains('$entry -cnotin $allowedTopLevelEntries') -and
-    $validatorContent.Contains('$entry -cnotin $allowedScriptsEntries') -and
-    $validatorContent.Contains('$gitFile -cnotin $npmPackageFiles') -and
-    $validatorContent.Contains('$npmFile -cnotin $gitPackageFiles')
-  )
-  $validatorPreservesCaseOnlyPathVariants = -not $validatorContent.Contains('Sort-Object -Unique')
-  $validatorComparesWholePackagePayload = (
-    $validatorContent.Contains('Get-TrackedPackageFiles -RepoRoot $repoRoot -PackageRoots $packageContentRoots') -and
-    $validatorContent.Contains('Get-PackedPackageFiles -PackageDir $packageDir') -and
-    $validatorContent.Contains('Get-ChildItem -LiteralPath $PackageDir -Recurse -File -Force') -and
-    $validatorContent.Contains('git -C $RepoRoot ls-files -z -- @trackedRoots') -and
-    -not $validatorContent.Contains('Test-Path -LiteralPath (Join-Path $RepoRoot $_)') -and
-    $missingValidatorPackageContentRoots.Count -eq 0
-  )
-  $validatorChecksHiddenScriptEntries = $validatorContent.Contains('Get-ChildItem -LiteralPath $scriptsDir -Recurse -File -Force')
-  $validatorChecksHiddenPackedCsFiles = $validatorContent.Contains("Get-ChildItem -LiteralPath `$packageDir -Recurse -File -Filter '*.cs' -Force")
-  $validatorChecksHiddenUnityFolderEntries = $validatorContent.Contains('Get-ChildItem -LiteralPath $folderPath -Recurse -Force')
-  $validatorUsesStructuredRelativePaths = (
-    $validatorContent.Contains('function ConvertTo-PackageRelativePath') -and
-    $validatorContent.Contains('[System.IO.Path]::GetRelativePath($rootPath, $childPath)') -and
-    -not $validatorContent.Contains('.FullName.Replace(')
-  )
-  # package.json's files array and the validator's lists are two hand-maintained descriptions of the
-  # same payload, and until now nothing compared them in this direction: the checks above only assert
-  # that each list CONTAINS what a release needs. An entry that package.json ships and the validator
-  # forbids fails the release, and it fails it at the one moment nobody wants a surprise. An entry the
-  # validator allows and package.json omits is worse -- npm simply does not ship it, and no check
-  # anywhere says so.
-  $validatorForbiddenEntries = Get-PowerShellSingleQuotedArrayEntries `
-    -Content $validatorContent `
-    -VariableName 'forbiddenPackageEntries'
-  $validatorForbiddenRootMarkdownPrefixes = Get-PowerShellSingleQuotedArrayEntries `
-    -Content $validatorContent `
-    -VariableName 'forbiddenRootMarkdownArtifactPrefixes'
-  $packageFilesTopLevelEntries = @(
-    $packageFiles |
-      ForEach-Object { ($_ -split '[\\/]')[0] } |
-      Where-Object { $_ } |
-      Select-Object -Unique
-  )
-  $shippedButForbiddenEntries = @(
-    $packageFiles |
-      Where-Object {
-        $entry = $_
-        ($entry -in $validatorForbiddenEntries) -or
-        (
-          @($validatorForbiddenRootMarkdownPrefixes | Where-Object {
-              $entry.StartsWith($_, [System.StringComparison]::OrdinalIgnoreCase)
-            }).Count -gt 0
-        )
-      }
-  )
-  # package.json is never listed in files -- npm always includes it -- so the validator allowing it is
-  # not drift. Nothing else may appear in one list and not the other.
-  $shippedButNotAllowedEntries = @(
-    $packageFilesTopLevelEntries | Where-Object { $_ -cnotin $validatorAllowedTopLevelEntries }
-  )
-  $allowedButNotShippedEntries = @(
-    $validatorAllowedTopLevelEntries |
-      Where-Object { $_ -ne 'package.json' } |
-      Where-Object { $_ -cnotin $packageFilesTopLevelEntries }
-  )
+  $packageControlExit = $LASTEXITCODE
+  $packageControlText = $packageControlOutput | Out-String
+  Write-TestResult `
+    -TestName 'npm package policy, hidden paths, case and CLI controls execute successfully' `
+    -Passed ($packageControlExit -eq 0 -and $packageControlText -match '\b[1-9][0-9]* passed\b') `
+    -Message $packageControlText
 
-  $validatorRejectsPrDescriptionArtifacts = (
-    $validatorContent.Contains('$forbiddenRootMarkdownArtifactPrefixes') -and
-    $validatorContent.Contains("'pr-description.md'") -and
-    $validatorContent.Contains('function Test-ForbiddenRootMarkdownArtifact') -and
-    $validatorContent.Contains('.StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase)') -and
-    $validatorContent.Contains('[System.StringComparison]::OrdinalIgnoreCase') -and
-    $validatorContent.Contains('Forbidden release artifact included in npm package')
-  )
   $productionPowerShellScriptsWithStringPathExtraction = @(
     Get-ChildItem -LiteralPath (Join-Path $repoRoot 'scripts') -Recurse -File -Filter '*.ps1' |
       Where-Object { $_.FullName -notmatch '[\\/](scripts[\\/])?tests[\\/]' } |
@@ -2873,89 +2765,9 @@ function Run-ReleasePackageContentContractTests {
   )
 
   Write-TestResult `
-    -TestName 'npm package validator requires all release package entries' `
-    -Passed ($missingValidatorRequiredEntries.Count -eq 0) `
-    -Message "Missing validator required entries: $($missingValidatorRequiredEntries -join ', ')"
-
-  Write-TestResult `
-    -TestName 'npm package validator keeps npm pack diagnostics concise' `
-    -Passed $validatorKeepsPackOutputConcise `
-    -Message 'Expected validate-npm-package.ps1 to avoid dumping the full npm pack file list during normal verbose validation.'
-
-  Write-TestResult `
-    -TestName 'npm package validator allows shipped scripts folder metadata' `
-    -Passed ($missingValidatorAllowedTopLevelEntries.Count -eq 0) `
-    -Message "Missing validator allowed top-level entries: $($missingValidatorAllowedTopLevelEntries -join ', ')"
-
-  Write-TestResult `
-    -TestName 'npm package validator top-level allowlist contains only top-level entries' `
-    -Passed ($nestedValidatorAllowedTopLevelEntries.Count -eq 0) `
-    -Message "Nested entries in top-level allowlist: $($nestedValidatorAllowedTopLevelEntries -join ', ')"
-
-  Write-TestResult `
-    -TestName 'npm package validator compares all shipped Unity roots against git' `
-    -Passed ($missingValidatorUnityFolders.Count -eq 0) `
-    -Message "Missing validator Unity folders: $($missingValidatorUnityFolders -join ', ')"
-
-  Write-TestResult `
-    -TestName 'npm package validator compares whole release payload against git' `
-    -Passed $validatorComparesWholePackagePayload `
-    -Message "Missing validator package content roots: $($missingValidatorPackageContentRoots -join ', ')"
-
-  Write-TestResult `
-    -TestName 'npm package validator checks hidden Unity folder entries for metadata' `
-    -Passed $validatorChecksHiddenUnityFolderEntries `
-    -Message 'Expected Unity folder metadata validation to enumerate with -LiteralPath and -Force, matching packed payload parity.'
-
-  Write-TestResult `
-    -TestName 'npm package validator checks hidden scripts entries against allowlist' `
-    -Passed $validatorChecksHiddenScriptEntries `
-    -Message 'Expected scripts folder allowlist validation to enumerate with -LiteralPath and -Force.'
-
-  Write-TestResult `
-    -TestName 'npm package validator checks hidden C# files for root restrictions' `
-    -Passed $validatorChecksHiddenPackedCsFiles `
-    -Message 'Expected packed C# root validation to enumerate with -LiteralPath and -Force.'
-
-  Write-TestResult `
-    -TestName 'npm package validator uses structured relative path extraction' `
-    -Passed $validatorUsesStructuredRelativePaths `
-    -Message 'Expected validate-npm-package.ps1 to use GetRelativePath instead of string replacement on FullName.'
-
-  Write-TestResult `
     -TestName 'production PowerShell scripts avoid string-based FullName relative paths' `
     -Passed ($productionPowerShellScriptsWithStringPathExtraction.Count -eq 0) `
     -Message "Scripts still using string-based FullName relative path extraction: $($productionPowerShellScriptsWithStringPathExtraction -join ', ')"
-
-  Write-TestResult `
-    -TestName 'npm package validator rejects PR description artifacts explicitly' `
-    -Passed $validatorRejectsPrDescriptionArtifacts `
-    -Message 'Expected validate-npm-package.ps1 to reject pr-description.md case variants before package publication.'
-
-  Write-TestResult `
-    -TestName 'package.json ships nothing the npm package validator forbids' `
-    -Passed ($shippedButForbiddenEntries.Count -eq 0) `
-    -Message "package.json files entries the validator forbids: $($shippedButForbiddenEntries -join ', ')"
-
-  Write-TestResult `
-    -TestName 'package.json ships nothing outside the validator top-level allowlist' `
-    -Passed ($shippedButNotAllowedEntries.Count -eq 0) `
-    -Message "package.json files entries missing from allowedTopLevelEntries: $($shippedButNotAllowedEntries -join ', ')"
-
-  Write-TestResult `
-    -TestName 'npm package validator allows nothing package.json forgets to ship' `
-    -Passed ($allowedButNotShippedEntries.Count -eq 0) `
-    -Message "allowedTopLevelEntries absent from package.json files: $($allowedButNotShippedEntries -join ', ')"
-
-  Write-TestResult `
-    -TestName 'npm package validator uses case-sensitive package membership checks' `
-    -Passed $validatorUsesCaseSensitiveMembership `
-    -Message 'Expected validate-npm-package.ps1 to reject differently-cased package paths with -cnotin.'
-
-  Write-TestResult `
-    -TestName 'npm package validator preserves case-only path variants before membership checks' `
-    -Passed $validatorPreservesCaseOnlyPathVariants `
-    -Message 'Expected validate-npm-package.ps1 not to collapse case-only path variants with Sort-Object -Unique.'
 
   $exporterPath = Join-Path $repoRoot 'scripts/unity/stage_unitypackage.py'
   $requiredExportEntries = @(

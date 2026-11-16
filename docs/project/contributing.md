@@ -123,6 +123,26 @@ manifest, 243.13→39.66 ms with 1,000 extra fields, and 238.56→38.83 ms for a
 Exit status, standard output and step-output bytes match in every pair. Source and lock
 hashes stayed fixed. These local command observations do not measure release-job or Windows speed.
 
+Npm package validation uses `scripts/validate_npm_package.py` through locked uv.
+It checks archive entries directly, without extraction. The six original policy lists and
+12 original executable decisions remain frozen in regression fixtures. Checks retain exact
+path case, hidden entries, required metadata, permitted exclusions, and one diagnostic for
+forbidden PR artifacts. Links, special entries, duplicate paths and path conflicts are refused.
+The comparison with Git verifies the file inventory; it does not compare file bytes.
+
+`npm run test:npm-package-changelog` checks the package surface and validator;
+`npm run test:npm-package-signature` checks signature metadata. Compatibility PowerShell
+commands remain tested. Child failures preserve their status and both output streams.
+Owned temporary directories are cleaned after success and failure. Synchronization contracts
+execute semantic policy and path controls in place of checks for PowerShell source text.
+
+Seven alternating fresh-process pairs with pinned uv 0.13.8 and Node 22.23.4 on Linux tmpfs
+measured small-package validation at 539.82 → 225.71 ms and validation with 250 extra
+source/meta pairs at 811.76 → 348.76 ms. Every pair matched normal output bytes and kept
+inputs unchanged. The [qualification record](../performance/npm-package-qualification.json)
+retains both captures, all timed rows, input manifest hashes and source identities. These are local
+warm observations; native Windows, cold-machine and whole-CI performance remain unverified.
+
 Release preparation, notes and UPM changelog synchronization use `scripts/release_tools.py`
 through locked uv. The PowerShell commands remain compatibility launchers. The release workflows
 call Python directly. Preparation retains named version/bump arguments, dry runs, fenced
