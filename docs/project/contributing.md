@@ -237,8 +237,8 @@ the floor without interpreting unused candidate sizes.
 The [workspace qualification record](../performance/project-workspace-qualification.json)
 retains original implementations, host comparisons and paired Linux measurements.
 Seven alternating pairs after two warmup pairs measured workspace resolution at
-0.67 → 34.06 ms and prune planning at 0.83 → 35.40 ms. Empty-project retention checks
-on the measured deep artifact path improved from 346.15 → 39.31 ms. These results
+0.77 → 33.30 ms and prune planning at 0.95 → 34.41 ms. Empty-project retention checks
+on the measured deep artifact path improved from 339.55 → 39.06 ms. These results
 include Python startup, retain both regressions and do not measure Windows, shallow
 paths, complete Unity jobs or statistical significance. No runner file lock is
 resolved by this migration.

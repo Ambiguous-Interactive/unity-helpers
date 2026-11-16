@@ -31,9 +31,11 @@ def leaf_name(version: str, mode: str, scope: str = "", *, share_editor: bool = 
 
 
 def join_path(root: str, *children: str) -> str:
-    result = root.replace("\\", os.sep)
+    result = root.replace("\\", os.sep).replace("/", os.sep)
     for child in children:
-        result = os.path.join(result, child.replace("\\", os.sep).lstrip(os.sep))  # noqa: PTH118 - retain native lexical dot components.
+        result = os.path.join(  # noqa: PTH118 - retain native lexical dot components.
+            result, child.replace("\\", os.sep).replace("/", os.sep).lstrip(os.sep)
+        )
     return result
 
 
