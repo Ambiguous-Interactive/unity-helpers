@@ -259,13 +259,30 @@ jobs:
 
       - name: Commit and push to wiki
         id: publish
-        if: steps.changes.outputs.has_changes == 'true' || github.event.inputs.force_sync == 'true'
         env:
           WIKI_TOKEN: ${{ steps.app-token.outputs.token }}
           WIKI_BRANCH: ${{ steps.clone-wiki.outputs.wiki_branch }}
         run: |
           set -euo pipefail
           cd wiki
+
+          export GIT_TERMINAL_PROMPT=0
+          export GIT_CONFIG_COUNT=2
+          export GIT_CONFIG_KEY_0=http.https://github.com/.extraheader
+          GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$WIKI_TOKEN" | base64 -w0)"
+          export GIT_CONFIG_VALUE_0
+          export GIT_CONFIG_KEY_1=credential.helper
+          export GIT_CONFIG_VALUE_1=""
+          verify_wiki_revision() {
+            local expected actual
+            expected=$(git rev-parse HEAD)
+            actual=$(git ls-remote origin "refs/heads/$WIKI_BRANCH" | cut -f1)
+            if [ "$actual" != "$expected" ]; then
+              echo "::error::Published wiki revision does not match the generated commit."
+              return 1
+            fi
+            echo "wiki_revision=$actual" >> "$GITHUB_OUTPUT"
+          }
 
           # Configure git
           git config user.name "github-actions[bot]"
@@ -284,7 +301,7 @@ jobs:
           # Check for changes again (in case force_sync but no actual changes)
           if git diff --staged --quiet; then
             echo "::notice::No changes to commit (force_sync enabled but content identical)"
-            echo "wiki_revision=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+            verify_wiki_revision
             exit 0
           fi
 
@@ -301,24 +318,11 @@ jobs:
           # Commit changes
           git commit -m "$COMMIT_MSG"
 
-          export GIT_TERMINAL_PROMPT=0
-          export GIT_CONFIG_COUNT=2
-          export GIT_CONFIG_KEY_0=http.https://github.com/.extraheader
-          GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$WIKI_TOKEN" | base64 -w0)"
-          export GIT_CONFIG_VALUE_0
-          export GIT_CONFIG_KEY_1=credential.helper
-          export GIT_CONFIG_VALUE_1=""
           if ! git push origin "HEAD:refs/heads/$WIKI_BRANCH"; then
             echo "::error::Wiki push failed. Check publisher authorization or branch concurrency; no alternate branch was attempted."
             exit 1
           fi
-          expected=$(git rev-parse HEAD)
-          actual=$(git ls-remote origin "refs/heads/$WIKI_BRANCH" | cut -f1)
-          if [ "$actual" != "$expected" ]; then
-            echo "::error::Published wiki revision does not match the generated commit."
-            exit 1
-          fi
-          echo "wiki_revision=$actual" >> "$GITHUB_OUTPUT"
+          verify_wiki_revision
 
           echo ""
           echo "✅ Successfully synced documentation to wiki"

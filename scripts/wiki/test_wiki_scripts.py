@@ -918,6 +918,36 @@ class TestWikiPublication:
         assert result.returncode == 0
         assert "wiki_revision=expected-sha" in (tmp_path / "output").read_text()
 
+    @pytest.mark.parametrize("force", ["true", "false"])
+    @pytest.mark.parametrize("remote", ["expected-sha", "advanced-sha"])
+    def test_no_change_rechecks_remote(self, tmp_path: Path, force: str, remote: str) -> None:
+        result = self.run_step(
+            "Commit and push to wiki",
+            tmp_path,
+            DIFF_EXIT="0",
+            REMOTE_SHA=remote,
+            **{"github.event.inputs.force_sync": force},
+        )
+        calls = (tmp_path / "calls").read_text()
+        assert "ls-remote origin refs/heads/master" in calls
+        assert "push " not in calls
+        if remote == "expected-sha":
+            assert result.returncode == 0
+            assert "wiki_revision=expected-sha" in (tmp_path / "output").read_text()
+        else:
+            assert result.returncode != 0
+            assert not (tmp_path / "output").exists()
+
+    def test_dry_run_does_not_publish(self, tmp_path: Path) -> None:
+        result = self.run_step(
+            "Commit and push to wiki", tmp_path, **{"github.event.inputs.dry_run": "true"}
+        )
+        assert result.returncode == 0
+        calls = (tmp_path / "calls").read_text()
+        assert "push " not in calls
+        assert "commit " not in calls
+        assert not (tmp_path / "output").exists()
+
     @pytest.mark.parametrize("dry_run", ["true", "false"])
     def test_failure_summary_never_claims_success(self, tmp_path: Path, dry_run: str) -> None:
         result = self.run_step(
