@@ -1,0 +1,1059 @@
+{
+  "scope": "Unity workspace policy and retention planning; issue #859 remains unfinished.",
+  "captured_utc": "2026-11-16T16:38:21.129743+00:00",
+  "original_source_sha256": "a6569064eb144db5bd696cd8a9c818fdb890d891d0f91c66438bc9414ca40511",
+  "original_driver_sha256": "43debb36d5116cb435a57d66df7476d4a084fb0d34288efe2c07e207873f8bac",
+  "original_controls": 63,
+  "frozen_decisions": 61,
+  "additional_native_boundary_cases": 3,
+  "registered_controls": 95,
+  "framework_controls": 48,
+  "evidence": [
+    "Original 63-control native driver passes before migration and from its byte-verified frozen source against the migrated adapter.",
+    "Each host executes both the original frozen implementation and current adapter for 61 captured cases and three additional boundary cases; Windows results remain pending at capture.",
+    "The 48 existing framework workspace controls pass without native Unity, MCP calls or runner filesystem changes.",
+    "A regression reproduced eager conversion of an unused malformed size; the typed planner now converts only consumed sizes.",
+    "Three red native boundary cases prove ignored Unicode mode comparison, leading child separators and lexical dot preservation before their fixes.",
+    "The first frozen-driver seal check rejected normalized line endings; restoring original CRLF bytes matches the recorded original hash.",
+    "Protocol errors, BOM provenance encodings, linked ancestors, bounded provenance reads and nonfinite prune observations are covered.",
+    "Three review controls reproduced an unreadable-pointer false absence and two nonfinite native early-return bypasses. Explicit stat errors and native finite checks correct these failures."
+  ],
+  "native_exceptions": [
+    "PowerShell host comparison, DateTime conversion and Sort-Object ordering marshal ordered candidates without replacing culture or unstable equal-key behavior.",
+    "Native Directory.Move owns the retention mutation and preserves its no-replacement failure behavior. It adds path diagnostics without retrying failures.",
+    "The existing Invoke-PersistentProjectPrune retains DriveInfo space measurement, native directory metadata and Remove-Item deletion semantics; its budget plan delegates to typed Python."
+  ],
+  "retained_limits": [
+    "This family does not prove the complete #859 scripting inventory migrated.",
+    "Planning and directory movement are separate phases; no atomic check-and-move guarantee or rollback is introduced.",
+    "The known self-hosted Windows runner lock remains external; diagnostics improve the next failure but do not identify or release its holder.",
+    "Owned symlink tests skip only when Windows denies fixture creation; existing junction controls remain in the frozen native driver.",
+    "An independent native writer must remain idle during retention; no deletion, handle killing or fresh-project fallback is introduced."
+  ],
+  "measurement": {
+    "host": "Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.36",
+    "filesystem": "Owned worktree: tmpfs; measured deep shared artifact fixture: Windows-backed 9p mount. No native Unity execution.",
+    "method": "One existing PowerShell parent, two warmup pairs then seven alternating original/typed pairs. Dot-source outside each timed operation; actual decisions and no-retention result checked.",
+    "medians_ms": {
+      "workspace": {
+        "original": 0.6735,
+        "typed": 34.059
+      },
+      "prune": {
+        "original": 0.8346,
+        "typed": 35.3957
+      },
+      "retention-empty": {
+        "original": 346.1465,
+        "typed": 39.3076
+      }
+    },
+    "pairs": [
+      {
+        "variant": "original",
+        "scenario": "workspace",
+        "milliseconds": 19.6842,
+        "pair": -2
+      },
+      {
+        "variant": "original",
+        "scenario": "prune",
+        "milliseconds": 33.0533,
+        "pair": -2
+      },
+      {
+        "variant": "original",
+        "scenario": "retention-empty",
+        "milliseconds": 379.3457,
+        "pair": -2
+      },
+      {
+        "variant": "typed",
+        "scenario": "workspace",
+        "milliseconds": 60.7335,
+        "pair": -2
+      },
+      {
+        "variant": "typed",
+        "scenario": "prune",
+        "milliseconds": 58.853,
+        "pair": -2
+      },
+      {
+        "variant": "typed",
+        "scenario": "retention-empty",
+        "milliseconds": 44.8813,
+        "pair": -2
+      },
+      {
+        "variant": "typed",
+        "scenario": "workspace",
+        "milliseconds": 33.0552,
+        "pair": -1
+      },
+      {
+        "variant": "typed",
+        "scenario": "prune",
+        "milliseconds": 33.5645,
+        "pair": -1
+      },
+      {
+        "variant": "typed",
+        "scenario": "retention-empty",
+        "milliseconds": 38.8581,
+        "pair": -1
+      },
+      {
+        "variant": "original",
+        "scenario": "workspace",
+        "milliseconds": 1.138,
+        "pair": -1
+      },
+      {
+        "variant": "original",
+        "scenario": "prune",
+        "milliseconds": 0.8002,
+        "pair": -1
+      },
+      {
+        "variant": "original",
+        "scenario": "retention-empty",
+        "milliseconds": 357.3881,
+        "pair": -1
+      },
+      {
+        "variant": "original",
+        "scenario": "workspace",
+        "milliseconds": 0.8248,
+        "pair": 0
+      },
+      {
+        "variant": "original",
+        "scenario": "prune",
+        "milliseconds": 0.9383,
+        "pair": 0
+      },
+      {
+        "variant": "original",
+        "scenario": "retention-empty",
+        "milliseconds": 341.211,
+        "pair": 0
+      },
+      {
+        "variant": "typed",
+        "scenario": "workspace",
+        "milliseconds": 34.059,
+        "pair": 0
+      },
+      {
+        "variant": "typed",
+        "scenario": "prune",
+        "milliseconds": 36.3913,
+        "pair": 0
+      },
+      {
+        "variant": "typed",
+        "scenario": "retention-empty",
+        "milliseconds": 39.1021,
+        "pair": 0
+      },
+      {
+        "variant": "typed",
+        "scenario": "workspace",
+        "milliseconds": 32.7889,
+        "pair": 1
+      },
+      {
+        "variant": "typed",
+        "scenario": "prune",
+        "milliseconds": 35.7367,
+        "pair": 1
+      },
+      {
+        "variant": "typed",
+        "scenario": "retention-empty",
+        "milliseconds": 39.3076,
+        "pair": 1
+      },
+      {
+        "variant": "original",
+        "scenario": "workspace",
+        "milliseconds": 9.7942,
+        "pair": 1
+      },
+      {
+        "variant": "original",
+        "scenario": "prune",
+        "milliseconds": 1.0403,
+        "pair": 1
+      },
+      {
+        "variant": "original",
+        "scenario": "retention-empty",
+        "milliseconds": 386.4752,
+        "pair": 1
+      },
+      {
+        "variant": "original",
+        "scenario": "workspace",
+        "milliseconds": 0.6153,
+        "pair": 2
+      },
+      {
+        "variant": "original",
+        "scenario": "prune",
+        "milliseconds": 0.7795,
+        "pair": 2
+      },
+      {
+        "variant": "original",
+        "scenario": "retention-empty",
+        "milliseconds": 389.4824,
+        "pair": 2
+      },
+      {
+        "variant": "typed",
+        "scenario": "workspace",
+        "milliseconds": 33.8882,
+        "pair": 2
+      },
+      {
+        "variant": "typed",
+        "scenario": "prune",
+        "milliseconds": 34.5791,
+        "pair": 2
+      },
+      {
+        "variant": "typed",
+        "scenario": "retention-empty",
+        "milliseconds": 39.3128,
+        "pair": 2
+      },
+      {
+        "variant": "typed",
+        "scenario": "workspace",
+        "milliseconds": 34.0979,
+        "pair": 3
+      },
+      {
+        "variant": "typed",
+        "scenario": "prune",
+        "milliseconds": 37.2785,
+        "pair": 3
+      },
+      {
+        "variant": "typed",
+        "scenario": "retention-empty",
+        "milliseconds": 40.3586,
+        "pair": 3
+      },
+      {
+        "variant": "original",
+        "scenario": "workspace",
+        "milliseconds": 0.6735,
+        "pair": 3
+      },
+      {
+        "variant": "original",
+        "scenario": "prune",
+        "milliseconds": 0.8325,
+        "pair": 3
+      },
+      {
+        "variant": "original",
+        "scenario": "retention-empty",
+        "milliseconds": 356.1111,
+        "pair": 3
+      },
+      {
+        "variant": "original",
+        "scenario": "workspace",
+        "milliseconds": 0.7893,
+        "pair": 4
+      },
+      {
+        "variant": "original",
+        "scenario": "prune",
+        "milliseconds": 1.1018,
+        "pair": 4
+      },
+      {
+        "variant": "original",
+        "scenario": "retention-empty",
+        "milliseconds": 346.1465,
+        "pair": 4
+      },
+      {
+        "variant": "typed",
+        "scenario": "workspace",
+        "milliseconds": 34.8773,
+        "pair": 4
+      },
+      {
+        "variant": "typed",
+        "scenario": "prune",
+        "milliseconds": 34.4845,
+        "pair": 4
+      },
+      {
+        "variant": "typed",
+        "scenario": "retention-empty",
+        "milliseconds": 38.7528,
+        "pair": 4
+      },
+      {
+        "variant": "typed",
+        "scenario": "workspace",
+        "milliseconds": 33.4859,
+        "pair": 5
+      },
+      {
+        "variant": "typed",
+        "scenario": "prune",
+        "milliseconds": 35.3957,
+        "pair": 5
+      },
+      {
+        "variant": "typed",
+        "scenario": "retention-empty",
+        "milliseconds": 41.6804,
+        "pair": 5
+      },
+      {
+        "variant": "original",
+        "scenario": "workspace",
+        "milliseconds": 0.5477,
+        "pair": 5
+      },
+      {
+        "variant": "original",
+        "scenario": "prune",
+        "milliseconds": 0.8346,
+        "pair": 5
+      },
+      {
+        "variant": "original",
+        "scenario": "retention-empty",
+        "milliseconds": 342.0366,
+        "pair": 5
+      },
+      {
+        "variant": "original",
+        "scenario": "workspace",
+        "milliseconds": 0.4234,
+        "pair": 6
+      },
+      {
+        "variant": "original",
+        "scenario": "prune",
+        "milliseconds": 0.6582,
+        "pair": 6
+      },
+      {
+        "variant": "original",
+        "scenario": "retention-empty",
+        "milliseconds": 333.1886,
+        "pair": 6
+      },
+      {
+        "variant": "typed",
+        "scenario": "workspace",
+        "milliseconds": 35.108,
+        "pair": 6
+      },
+      {
+        "variant": "typed",
+        "scenario": "prune",
+        "milliseconds": 34.7701,
+        "pair": 6
+      },
+      {
+        "variant": "typed",
+        "scenario": "retention-empty",
+        "milliseconds": 38.3748,
+        "pair": 6
+      }
+    ],
+    "script": "param([string]$Original, [string]$Current, [string]$Root)\n$ErrorActionPreference = 'Stop'\n$records = [Collections.Generic.List[object]]::new()\n$sampleRoot = Join-Path $Root 'workspace-measure-fixture'\n[void][IO.Directory]::CreateDirectory($sampleRoot)\n$candidates = @(0..9 | ForEach-Object { @{Name=\"entry-$_\"; LastUsed=([datetime]'2020-01-01').AddDays($_); SizeBytes=1} })\nforeach ($pair in -2..6) {\n    $variants = @('original', 'typed')\n    if ($pair % 2 -ne 0) { [array]::Reverse($variants) }\n    foreach ($variant in $variants) {\n        if ($variant -eq 'original') { . $Original } else { . $Current }\n        foreach ($scenario in @('workspace', 'prune', 'retention-empty')) {\n            $clock = [Diagnostics.Stopwatch]::StartNew()\n            switch ($scenario) {\n                workspace { $value = Resolve-UnityProjectWorkspace -RepoRoot $sampleRoot -Version '6000.6.0f1' -Mode playmode -ShareEditorProject -Scope ' single-threaded ' -GenerationFingerprint '0123456789abcdef' }\n                prune { $value = @(Get-PersistentProjectPruneOrder -Candidates $candidates -FreeBytes 0 -MinimumFreeBytes 5) }\n                retention-empty { $value = Move-UnityProjectWithMigrationResidue -Project $sampleRoot }\n            }\n            $clock.Stop()\n            if ($scenario -eq 'workspace' -and $value.LeafName -ne 'f-09d2bebc44c97016') { throw 'Workspace result mismatch.' }\n            if ($scenario -eq 'prune' -and ($value -join ',') -ne 'entry-0,entry-1,entry-2,entry-3,entry-4') { throw 'Prune result mismatch.' }\n            if ($scenario -eq 'retention-empty' -and $null -ne $value) { throw 'Unexpected retention mutation.' }\n            $records.Add(@{pair=$pair; variant=$variant; scenario=$scenario; milliseconds=$clock.Elapsed.TotalMilliseconds})\n        }\n    }\n}\nConvertTo-Json -InputObject $records.ToArray() -Depth 10 -Compress\n",
+    "stderr_sha256": "faa78e375e9b072b2a46a31f1a1674ffd186e03c76e5c9a141a5b72720d91a15",
+    "notes": [
+      "All startup regressions retained. The deep shared artifact path is the measured retention fixture; no shallow-path or Windows extrapolation.",
+      "Inherited VIRTUAL_ENV mismatch diagnostic is included in the timed uv calls; uv selects the explicit owned project environment.",
+      "Earlier paired captures are retained with their original rows; current capture follows the review failure-path corrections.",
+      "No statistical significance, full-job improvement or runner-lock recovery is claimed."
+    ],
+    "earlier_captures": [
+      {
+        "file": "workspace-pairs.json",
+        "sha256": "9c38c07ec00e00f8f8af2e676dc784a0d58188f8cb50c94bc60dc28b58d4026c",
+        "pairs": [
+          {
+            "variant": "original",
+            "scenario": "workspace",
+            "milliseconds": 21.4161,
+            "pair": -2
+          },
+          {
+            "variant": "original",
+            "scenario": "prune",
+            "milliseconds": 33.7232,
+            "pair": -2
+          },
+          {
+            "variant": "original",
+            "scenario": "retention-empty",
+            "milliseconds": 361.5664,
+            "pair": -2
+          },
+          {
+            "variant": "typed",
+            "scenario": "workspace",
+            "milliseconds": 59.0502,
+            "pair": -2
+          },
+          {
+            "variant": "typed",
+            "scenario": "prune",
+            "milliseconds": 58.3934,
+            "pair": -2
+          },
+          {
+            "variant": "typed",
+            "scenario": "retention-empty",
+            "milliseconds": 42.8747,
+            "pair": -2
+          },
+          {
+            "variant": "typed",
+            "scenario": "workspace",
+            "milliseconds": 32.7873,
+            "pair": -1
+          },
+          {
+            "variant": "typed",
+            "scenario": "prune",
+            "milliseconds": 35.7127,
+            "pair": -1
+          },
+          {
+            "variant": "typed",
+            "scenario": "retention-empty",
+            "milliseconds": 40.9439,
+            "pair": -1
+          },
+          {
+            "variant": "original",
+            "scenario": "workspace",
+            "milliseconds": 1.1342,
+            "pair": -1
+          },
+          {
+            "variant": "original",
+            "scenario": "prune",
+            "milliseconds": 0.7637,
+            "pair": -1
+          },
+          {
+            "variant": "original",
+            "scenario": "retention-empty",
+            "milliseconds": 362.5006,
+            "pair": -1
+          },
+          {
+            "variant": "original",
+            "scenario": "workspace",
+            "milliseconds": 0.7937,
+            "pair": 0
+          },
+          {
+            "variant": "original",
+            "scenario": "prune",
+            "milliseconds": 1.0061,
+            "pair": 0
+          },
+          {
+            "variant": "original",
+            "scenario": "retention-empty",
+            "milliseconds": 357.4536,
+            "pair": 0
+          },
+          {
+            "variant": "typed",
+            "scenario": "workspace",
+            "milliseconds": 32.7909,
+            "pair": 0
+          },
+          {
+            "variant": "typed",
+            "scenario": "prune",
+            "milliseconds": 34.4597,
+            "pair": 0
+          },
+          {
+            "variant": "typed",
+            "scenario": "retention-empty",
+            "milliseconds": 39.7466,
+            "pair": 0
+          },
+          {
+            "variant": "typed",
+            "scenario": "workspace",
+            "milliseconds": 32.859,
+            "pair": 1
+          },
+          {
+            "variant": "typed",
+            "scenario": "prune",
+            "milliseconds": 34.1598,
+            "pair": 1
+          },
+          {
+            "variant": "typed",
+            "scenario": "retention-empty",
+            "milliseconds": 40.1399,
+            "pair": 1
+          },
+          {
+            "variant": "original",
+            "scenario": "workspace",
+            "milliseconds": 9.6647,
+            "pair": 1
+          },
+          {
+            "variant": "original",
+            "scenario": "prune",
+            "milliseconds": 1.0945,
+            "pair": 1
+          },
+          {
+            "variant": "original",
+            "scenario": "retention-empty",
+            "milliseconds": 343.3264,
+            "pair": 1
+          },
+          {
+            "variant": "original",
+            "scenario": "workspace",
+            "milliseconds": 0.8557,
+            "pair": 2
+          },
+          {
+            "variant": "original",
+            "scenario": "prune",
+            "milliseconds": 0.9075,
+            "pair": 2
+          },
+          {
+            "variant": "original",
+            "scenario": "retention-empty",
+            "milliseconds": 343.0204,
+            "pair": 2
+          },
+          {
+            "variant": "typed",
+            "scenario": "workspace",
+            "milliseconds": 34.2317,
+            "pair": 2
+          },
+          {
+            "variant": "typed",
+            "scenario": "prune",
+            "milliseconds": 34.6111,
+            "pair": 2
+          },
+          {
+            "variant": "typed",
+            "scenario": "retention-empty",
+            "milliseconds": 37.9687,
+            "pair": 2
+          },
+          {
+            "variant": "typed",
+            "scenario": "workspace",
+            "milliseconds": 33.1002,
+            "pair": 3
+          },
+          {
+            "variant": "typed",
+            "scenario": "prune",
+            "milliseconds": 34.7761,
+            "pair": 3
+          },
+          {
+            "variant": "typed",
+            "scenario": "retention-empty",
+            "milliseconds": 38.2895,
+            "pair": 3
+          },
+          {
+            "variant": "original",
+            "scenario": "workspace",
+            "milliseconds": 0.7497,
+            "pair": 3
+          },
+          {
+            "variant": "original",
+            "scenario": "prune",
+            "milliseconds": 1.0942,
+            "pair": 3
+          },
+          {
+            "variant": "original",
+            "scenario": "retention-empty",
+            "milliseconds": 335.4368,
+            "pair": 3
+          },
+          {
+            "variant": "original",
+            "scenario": "workspace",
+            "milliseconds": 0.6947,
+            "pair": 4
+          },
+          {
+            "variant": "original",
+            "scenario": "prune",
+            "milliseconds": 0.7759,
+            "pair": 4
+          },
+          {
+            "variant": "original",
+            "scenario": "retention-empty",
+            "milliseconds": 329.2881,
+            "pair": 4
+          },
+          {
+            "variant": "typed",
+            "scenario": "workspace",
+            "milliseconds": 34.0009,
+            "pair": 4
+          },
+          {
+            "variant": "typed",
+            "scenario": "prune",
+            "milliseconds": 34.2136,
+            "pair": 4
+          },
+          {
+            "variant": "typed",
+            "scenario": "retention-empty",
+            "milliseconds": 40.9952,
+            "pair": 4
+          },
+          {
+            "variant": "typed",
+            "scenario": "workspace",
+            "milliseconds": 32.8528,
+            "pair": 5
+          },
+          {
+            "variant": "typed",
+            "scenario": "prune",
+            "milliseconds": 35.5166,
+            "pair": 5
+          },
+          {
+            "variant": "typed",
+            "scenario": "retention-empty",
+            "milliseconds": 45.5188,
+            "pair": 5
+          },
+          {
+            "variant": "original",
+            "scenario": "workspace",
+            "milliseconds": 0.622,
+            "pair": 5
+          },
+          {
+            "variant": "original",
+            "scenario": "prune",
+            "milliseconds": 0.8773,
+            "pair": 5
+          },
+          {
+            "variant": "original",
+            "scenario": "retention-empty",
+            "milliseconds": 360.6322,
+            "pair": 5
+          },
+          {
+            "variant": "original",
+            "scenario": "workspace",
+            "milliseconds": 0.3573,
+            "pair": 6
+          },
+          {
+            "variant": "original",
+            "scenario": "prune",
+            "milliseconds": 0.4615,
+            "pair": 6
+          },
+          {
+            "variant": "original",
+            "scenario": "retention-empty",
+            "milliseconds": 327.8853,
+            "pair": 6
+          },
+          {
+            "variant": "typed",
+            "scenario": "workspace",
+            "milliseconds": 33.9787,
+            "pair": 6
+          },
+          {
+            "variant": "typed",
+            "scenario": "prune",
+            "milliseconds": 33.9904,
+            "pair": 6
+          },
+          {
+            "variant": "typed",
+            "scenario": "retention-empty",
+            "milliseconds": 41.349,
+            "pair": 6
+          }
+        ]
+      },
+      {
+        "file": "workspace-pairs-final.json",
+        "sha256": "f9a35706c6fea663a5fd1c9585f4ede9351b2c7351ad36a9f84608b31924f68c",
+        "pairs": [
+          {
+            "variant": "original",
+            "pair": -2,
+            "milliseconds": 21.9936,
+            "scenario": "workspace"
+          },
+          {
+            "variant": "original",
+            "pair": -2,
+            "milliseconds": 35.6269,
+            "scenario": "prune"
+          },
+          {
+            "variant": "original",
+            "pair": -2,
+            "milliseconds": 359.5922,
+            "scenario": "retention-empty"
+          },
+          {
+            "variant": "typed",
+            "pair": -2,
+            "milliseconds": 60.6233,
+            "scenario": "workspace"
+          },
+          {
+            "variant": "typed",
+            "pair": -2,
+            "milliseconds": 59.2116,
+            "scenario": "prune"
+          },
+          {
+            "variant": "typed",
+            "pair": -2,
+            "milliseconds": 45.5482,
+            "scenario": "retention-empty"
+          },
+          {
+            "variant": "typed",
+            "pair": -1,
+            "milliseconds": 33.6878,
+            "scenario": "workspace"
+          },
+          {
+            "variant": "typed",
+            "pair": -1,
+            "milliseconds": 34.3369,
+            "scenario": "prune"
+          },
+          {
+            "variant": "typed",
+            "pair": -1,
+            "milliseconds": 40.661,
+            "scenario": "retention-empty"
+          },
+          {
+            "variant": "original",
+            "pair": -1,
+            "milliseconds": 1.1866,
+            "scenario": "workspace"
+          },
+          {
+            "variant": "original",
+            "pair": -1,
+            "milliseconds": 0.7691,
+            "scenario": "prune"
+          },
+          {
+            "variant": "original",
+            "pair": -1,
+            "milliseconds": 410.7599,
+            "scenario": "retention-empty"
+          },
+          {
+            "variant": "original",
+            "pair": 0,
+            "milliseconds": 0.739,
+            "scenario": "workspace"
+          },
+          {
+            "variant": "original",
+            "pair": 0,
+            "milliseconds": 0.9719,
+            "scenario": "prune"
+          },
+          {
+            "variant": "original",
+            "pair": 0,
+            "milliseconds": 369.7186,
+            "scenario": "retention-empty"
+          },
+          {
+            "variant": "typed",
+            "pair": 0,
+            "milliseconds": 37.1056,
+            "scenario": "workspace"
+          },
+          {
+            "variant": "typed",
+            "pair": 0,
+            "milliseconds": 35.4476,
+            "scenario": "prune"
+          },
+          {
+            "variant": "typed",
+            "pair": 0,
+            "milliseconds": 41.9066,
+            "scenario": "retention-empty"
+          },
+          {
+            "variant": "typed",
+            "pair": 1,
+            "milliseconds": 35.1627,
+            "scenario": "workspace"
+          },
+          {
+            "variant": "typed",
+            "pair": 1,
+            "milliseconds": 34.9681,
+            "scenario": "prune"
+          },
+          {
+            "variant": "typed",
+            "pair": 1,
+            "milliseconds": 42.9963,
+            "scenario": "retention-empty"
+          },
+          {
+            "variant": "original",
+            "pair": 1,
+            "milliseconds": 9.6232,
+            "scenario": "workspace"
+          },
+          {
+            "variant": "original",
+            "pair": 1,
+            "milliseconds": 1.1906,
+            "scenario": "prune"
+          },
+          {
+            "variant": "original",
+            "pair": 1,
+            "milliseconds": 344.4335,
+            "scenario": "retention-empty"
+          },
+          {
+            "variant": "original",
+            "pair": 2,
+            "milliseconds": 0.6937,
+            "scenario": "workspace"
+          },
+          {
+            "variant": "original",
+            "pair": 2,
+            "milliseconds": 1.0077,
+            "scenario": "prune"
+          },
+          {
+            "variant": "original",
+            "pair": 2,
+            "milliseconds": 339.6241,
+            "scenario": "retention-empty"
+          },
+          {
+            "variant": "typed",
+            "pair": 2,
+            "milliseconds": 34.1628,
+            "scenario": "workspace"
+          },
+          {
+            "variant": "typed",
+            "pair": 2,
+            "milliseconds": 34.1547,
+            "scenario": "prune"
+          },
+          {
+            "variant": "typed",
+            "pair": 2,
+            "milliseconds": 40.1371,
+            "scenario": "retention-empty"
+          },
+          {
+            "variant": "typed",
+            "pair": 3,
+            "milliseconds": 33.0058,
+            "scenario": "workspace"
+          },
+          {
+            "variant": "typed",
+            "pair": 3,
+            "milliseconds": 34.0798,
+            "scenario": "prune"
+          },
+          {
+            "variant": "typed",
+            "pair": 3,
+            "milliseconds": 39.3724,
+            "scenario": "retention-empty"
+          },
+          {
+            "variant": "original",
+            "pair": 3,
+            "milliseconds": 0.7133,
+            "scenario": "workspace"
+          },
+          {
+            "variant": "original",
+            "pair": 3,
+            "milliseconds": 0.8266,
+            "scenario": "prune"
+          },
+          {
+            "variant": "original",
+            "pair": 3,
+            "milliseconds": 346.2841,
+            "scenario": "retention-empty"
+          },
+          {
+            "variant": "original",
+            "pair": 4,
+            "milliseconds": 0.6523,
+            "scenario": "workspace"
+          },
+          {
+            "variant": "original",
+            "pair": 4,
+            "milliseconds": 0.8364,
+            "scenario": "prune"
+          },
+          {
+            "variant": "original",
+            "pair": 4,
+            "milliseconds": 327.8572,
+            "scenario": "retention-empty"
+          },
+          {
+            "variant": "typed",
+            "pair": 4,
+            "milliseconds": 34.346,
+            "scenario": "workspace"
+          },
+          {
+            "variant": "typed",
+            "pair": 4,
+            "milliseconds": 38.7904,
+            "scenario": "prune"
+          },
+          {
+            "variant": "typed",
+            "pair": 4,
+            "milliseconds": 40.4015,
+            "scenario": "retention-empty"
+          },
+          {
+            "variant": "typed",
+            "pair": 5,
+            "milliseconds": 36.1194,
+            "scenario": "workspace"
+          },
+          {
+            "variant": "typed",
+            "pair": 5,
+            "milliseconds": 34.0836,
+            "scenario": "prune"
+          },
+          {
+            "variant": "typed",
+            "pair": 5,
+            "milliseconds": 42.0193,
+            "scenario": "retention-empty"
+          },
+          {
+            "variant": "original",
+            "pair": 5,
+            "milliseconds": 0.5342,
+            "scenario": "workspace"
+          },
+          {
+            "variant": "original",
+            "pair": 5,
+            "milliseconds": 0.8954,
+            "scenario": "prune"
+          },
+          {
+            "variant": "original",
+            "pair": 5,
+            "milliseconds": 333.3605,
+            "scenario": "retention-empty"
+          },
+          {
+            "variant": "original",
+            "pair": 6,
+            "milliseconds": 0.4944,
+            "scenario": "workspace"
+          },
+          {
+            "variant": "original",
+            "pair": 6,
+            "milliseconds": 0.5857,
+            "scenario": "prune"
+          },
+          {
+            "variant": "original",
+            "pair": 6,
+            "milliseconds": 335.0078,
+            "scenario": "retention-empty"
+          },
+          {
+            "variant": "typed",
+            "pair": 6,
+            "milliseconds": 33.0067,
+            "scenario": "workspace"
+          },
+          {
+            "variant": "typed",
+            "pair": 6,
+            "milliseconds": 35.5562,
+            "scenario": "prune"
+          },
+          {
+            "variant": "typed",
+            "pair": 6,
+            "milliseconds": 37.7344,
+            "scenario": "retention-empty"
+          }
+        ]
+      }
+    ]
+  },
+  "source_sha256": {
+    "scripts/unity/project_workspace.py": "0f5720b81c413d79cc30a06f6415a1cce0e13718fab4b757a7a48fa7c553d8c3",
+    "scripts/unity/lib/project-workspace.ps1": "af193d9d26f0b6a678f3cbf6b00f94015a186e9ecad4a72b1e40b2980cab0358",
+    "scripts/tests/test_project_workspace.py": "7843de17d8f9ac014009376aa33a5d104c3fe4e38b5623d122de97d6708e1f94",
+    "scripts/tests/test-project-workspace.ps1": "55c5300ff280015e726b1e2264b06d90380119c44f68e908bf0b5501cfa9e904",
+    "scripts/tests/fixtures/project-workspace-v1.json": "30058f8a29b69a61e505c2bbaae12aa36e45287b15911c102764292132264682",
+    "scripts/python~/pyproject.toml": "e1da5d3265ced631e5ab8cf4e6d4b5104297363a32eae38005d94eea3cc74c12",
+    "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d",
+    "package.json": "232876fb844e6f83caa8ad7dabafa316b4f28e8c4bd647c0cec4471016ad97a6",
+    "scripts/tests/test-run-contract-tests.js": "fa1229cfdd7f7a7ceaa64bd6cac6d950aa94e1d5c5adfca8ae41f3efd88c5156"
+  }
+}

@@ -218,6 +218,31 @@ pairs after two warmup pairs measured 298.45 → 41.40 ms for a clean fixture an
 checker and do not measure Windows, complete pushes or CI. Host configuration helpers
 remain separate migration scope.
 
+Unity project workspace selection and retention planning use locked typed Python behind
+`scripts/unity/lib/project-workspace.ps1`. Run `npm run test:project-workspace` for
+original-host comparisons, filesystem controls and compatibility launchers.
+Explicit paths retain precedence; generated fingerprints continue to isolate variant
+projects while sharing download caches. Native PowerShell comparison and timestamp
+ordering remain at the adapter boundary, including equal-time ordering. Native
+`Directory.Move` retains project directories without replacement; existing native
+volume measurement and deletion preserve host filesystem behavior.
+
+Retention refuses linked ancestors, explicit projects with migration residue and
+unproven generated projects. A failed move reports source and destination without
+retrying, deleting residue or falling back to a fresh project. Release blocking
+handles after licensed work and cleanup are idle before retrying. Prune plans reject
+nonfinite space observations and consumed negative or nonfinite sizes. They stop at
+the floor without interpreting unused candidate sizes.
+
+The [workspace qualification record](../performance/project-workspace-qualification.json)
+retains original implementations, host comparisons and paired Linux measurements.
+Seven alternating pairs after two warmup pairs measured workspace resolution at
+0.67 → 34.06 ms and prune planning at 0.83 → 35.40 ms. Empty-project retention checks
+on the measured deep artifact path improved from 346.15 → 39.31 ms. These results
+include Python startup, retain both regressions and do not measure Windows, shallow
+paths, complete Unity jobs or statistical significance. No runner file lock is
+resolved by this migration.
+
 Hook executable-mode validation runs through locked Python with
 `npm run validate:hook-perms`; the shell validation and test commands remain launchers.
 Only tracked, extensionless hook basenames are checked, including nested paths.

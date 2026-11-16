@@ -1351,6 +1351,10 @@
     {
       "filename": ["scripts/tests/fixtures/hook-validation-v1.json", "cspell.json"],
       "words": ["readtoend"]
+    },
+    {
+      "filename": ["scripts/tests/fixtures/project-workspace-v1.json", "cspell.json"],
+      "words": ["lfs", "cnotmatch", "ceq", "stra", "dfe", "STRASSE"]
     }
   ]
 }
