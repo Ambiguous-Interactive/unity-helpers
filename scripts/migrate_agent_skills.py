@@ -32,6 +32,7 @@ class Split(TypedDict):
 
 
 Update = tuple[Path, Split, str, list[str], str]
+Snapshots = dict[Path, bytes | None]
 
 
 def digest(text: str) -> str:
@@ -42,11 +43,24 @@ def line_count(text: str) -> int:
     return len(text.rstrip().split("\n"))
 
 
-def read(path: Path) -> str:
+def read(path: Path, snapshots: Snapshots | None = None) -> str:
     require_owned_path(path)
     if path.is_symlink() or not path.is_file():
         raise ValueError(f"Expected a physical regular file: {path}")
-    return path.read_bytes().decode("utf-8")
+    content = path.read_bytes()
+    if snapshots is not None:
+        if path in snapshots and snapshots[path] != content:
+            raise ValueError(f"Skill input changed during migration: {path}")
+        snapshots[path] = content
+    return content.decode("utf-8")
+
+
+def verify_snapshots(snapshots: Snapshots) -> None:
+    for path, expected in snapshots.items():
+        require_owned_path(path)
+        current = path.read_bytes() if path.exists() else None
+        if current != expected:
+            raise ValueError(f"Skill input changed during migration: {path}")
 
 
 def child(directory: Path, name: str) -> Path:
@@ -213,8 +227,10 @@ def router_text(prefix: str, name: str, chunks: list[str]) -> str:
     return f"{prefix}## Reference Parts\n\n{navigation}\n\n" + "\n\n".join(headings) + "\n"
 
 
-def load_manifest(path: Path) -> tuple[dict[str, object], list[Split]]:
-    manifest = mapping(cast("object", json.loads(read(path))))
+def load_manifest(
+    path: Path, snapshots: Snapshots | None = None
+) -> tuple[dict[str, object], list[Split]]:
+    manifest = mapping(cast("object", json.loads(read(path, snapshots))))
     raw = manifest.get("skills")
     if not isinstance(raw, list):
         raise ValueError("Skill manifest requires a skills array")
@@ -266,15 +282,17 @@ def format_manifest(manifest: dict[str, object], root: Path) -> str:
     return result.stdout.decode("utf-8")
 
 
-def chunks_for(entry: Split, root: Path) -> tuple[Path, str, list[str]]:
+def chunks_for(
+    entry: Split, root: Path, snapshots: Snapshots | None = None
+) -> tuple[Path, str, list[str]]:
     source = child(root / ".llm/skills", entry["name"] + ".md")
-    canonical = read(source)
+    canonical = read(source, snapshots)
     router_sha256 = entry.get("routerSha256")
     if router_sha256 and router_digest(canonical) != router_sha256:
         raise ValueError(f"Router changed outside refresh: {entry['name']}")
     chunks = [
         rewrite_links(
-            reference_body(read(child(root / ".llm/references", part)), part),
+            reference_body(read(child(root / ".llm/references", part), snapshots), part),
             entry["name"],
             root,
             reverse=True,
@@ -304,14 +322,25 @@ def check_entry(entry: Split, root: Path) -> None:
 
 
 def commit_updates(
-    updates: list[Update], manifest: dict[str, object], root: Path, expected_manifest: bytes | None
+    updates: list[Update],
+    manifest: dict[str, object],
+    root: Path,
+    expected_manifest: bytes | None,
+    snapshots: Snapshots,
 ) -> None:
+    for _, entry, _, _, _ in updates:
+        for part in entry["parts"]:
+            destination = child(root / ".llm/references", part)
+            if destination not in snapshots:
+                snapshots[destination] = destination.read_bytes() if destination.exists() else None
+    verify_snapshots(snapshots)
     formatted = format_manifest(manifest, root)
     manifest_path = root / ".llm/skill-splits.json"
     recovery = root / ".llm/.skill-migration-recovery"
     recovery.mkdir(mode=0o700)
     retain = False
     try:
+        verify_snapshots(snapshots)
         current_manifest = manifest_path.read_bytes() if manifest_path.exists() else None
         if current_manifest != expected_manifest:
             raise ValueError(
@@ -365,16 +394,31 @@ def commit_updates(
         (recovery / "recovery.json").write_text(
             json.dumps({"files": journal}, indent=2) + "\n", encoding="utf-8"
         )
-        attempted: list[tuple[Path, Path | None]] = []
+        verify_snapshots(snapshots)
+        attempted: list[tuple[Path, Path | None, bytes]] = []
         retain = True
         try:
             for path, after, backup in staged:
-                attempted.append((path, backup))
+                verify_snapshots({path: snapshots[path]})
+                published = after.read_bytes()
+                attempted.append((path, backup, published))
                 after.replace(path)
+                snapshots[path] = published
+            verify_snapshots(snapshots)
         except BaseException as error:
             failures: list[str] = []
-            for path, backup in reversed(attempted):
+            for path, backup, published in reversed(attempted):
                 try:
+                    require_owned_path(path)
+                    current = path.read_bytes() if path.exists() else None
+                    original = backup.read_bytes() if backup is not None else None
+                    if current == original:
+                        continue
+                    if current != published:
+                        failures.append(
+                            f"{path}: changed during migration; preserving authored edit"
+                        )
+                        continue
                     if backup is None:
                         path.unlink(missing_ok=True)
                     else:
@@ -418,20 +462,22 @@ def run(mode: str, root: Path = ROOT) -> int:
     if not sources:
         raise ValueError("Skill split scan found no authored .md files")
     manifest_path = root / ".llm/skill-splits.json"
+    snapshots: Snapshots = {}
     manifest: dict[str, object]
     entries: list[Split]
     if manifest_path.exists():
-        manifest, entries = load_manifest(manifest_path)
+        manifest, entries = load_manifest(manifest_path, snapshots)
     elif mode in {"--write", "--plan"}:
         entries = []
         manifest = {"version": 1, "skills": entries}
+        snapshots[manifest_path] = None
     else:
         raise ValueError("Skill split manifest is missing")
-    expected_manifest = manifest_path.read_bytes() if manifest_path.exists() else None
+    expected_manifest = snapshots[manifest_path]
     updates: list[Update] = []
     if mode == "--refresh":
         for entry in entries:
-            source, canonical, chunks = chunks_for(entry, root)
+            source, canonical, chunks = chunks_for(entry, root, snapshots)
             prefix = prefix_of(canonical)
             router = router_text(prefix, entry["name"], chunks)
             references = [
@@ -447,11 +493,11 @@ def run(mode: str, root: Path = ROOT) -> int:
                 digest(prefix + "".join(chunks)),
                 router_digest(router),
             )
-        commit_updates(updates, manifest, root, expected_manifest)
+        commit_updates(updates, manifest, root, expected_manifest, snapshots)
     elif mode in {"--write", "--plan"}:
         known = {entry["name"] for entry in entries}
         for source in sources:
-            original = read(source)
+            original = read(source, snapshots)
             name = source.name[:-3]
             if line_count(original) <= MAX_LINES or name in known:
                 continue
@@ -491,7 +537,9 @@ def run(mode: str, root: Path = ROOT) -> int:
                 )
             return 0
         entries.sort(key=lambda entry: entry["name"].encode("utf-16-be", errors="surrogatepass"))
-        commit_updates(updates, {"version": 1, "skills": entries}, root, expected_manifest)
+        commit_updates(
+            updates, {"version": 1, "skills": entries}, root, expected_manifest, snapshots
+        )
     for entry in entries:
         check_entry(entry, root)
     for source in sources:

@@ -417,6 +417,101 @@ def test_publication_refuses_inputs_changed_during_preparation(
     assert not (tmp_path / ".llm/.skill-migration-recovery").exists()
 
 
+@pytest.mark.parametrize("phase", ["format", "stage"])
+@pytest.mark.parametrize("changed", ["reference", "source", "manifest"])
+def test_refresh_preserves_inputs_edited_after_capture(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, phase: str, changed: str
+) -> None:
+    source = split_fixture(tmp_path, SPLIT_CASES[0])
+    assert migration.run("--write", tmp_path) == 0
+    path = {
+        "reference": tmp_path / ".llm/references/demo-part-1.md",
+        "source": source,
+        "manifest": tmp_path / ".llm/skill-splits.json",
+    }[changed]
+    before = instruction_files(tmp_path)
+    authored = path.read_bytes() + b"\nAuthored while migration was preparing.\n"
+    original_format = migration.format_manifest
+    original_publish = index.publish
+    edited = False
+
+    def edit() -> None:
+        nonlocal edited
+        if not edited:
+            path.write_bytes(authored)
+            edited = True
+
+    def format_manifest(manifest: dict[str, object], root: Path) -> str:
+        result = original_format(manifest, root)
+        if phase == "format":
+            edit()
+        return result
+
+    def publish(destination: Path, content: str) -> None:
+        original_publish(destination, content)
+        if phase == "stage" and destination.name == "after-0":
+            edit()
+
+    monkeypatch.setattr(migration, "format_manifest", format_manifest)
+    monkeypatch.setattr(migration, "publish", publish)
+    with pytest.raises(ValueError, match="changed during migration"):
+        migration.run("--refresh", tmp_path)
+    before[path.relative_to(tmp_path).as_posix()] = authored
+    assert instruction_files(tmp_path) == before
+    assert not (tmp_path / ".llm/.skill-migration-recovery").exists()
+
+
+@pytest.mark.parametrize("changed", ["source", "manifest"])
+def test_refresh_checks_remaining_inputs_before_each_replacement(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, changed: str
+) -> None:
+    source = split_fixture(tmp_path, SPLIT_CASES[0])
+    assert migration.run("--write", tmp_path) == 0
+    path = source if changed == "source" else tmp_path / ".llm/skill-splits.json"
+    before = instruction_files(tmp_path)
+    authored = path.read_bytes() + b"\nAuthored between replacements.\n"
+    original_replace = Path.replace
+    edited = False
+
+    def replace(staged: Path, target: str | Path) -> Path:
+        nonlocal edited
+        result = original_replace(staged, target)
+        if staged.name == "after-0" and not edited:
+            path.write_bytes(authored)
+            edited = True
+        return result
+
+    monkeypatch.setattr(Path, "replace", replace)
+    with pytest.raises(ValueError, match="changed during migration"):
+        migration.run("--refresh", tmp_path)
+    before[path.relative_to(tmp_path).as_posix()] = authored
+    assert instruction_files(tmp_path) == before
+    assert not (tmp_path / ".llm/.skill-migration-recovery").exists()
+
+
+def test_rollback_preserves_edit_to_already_published_destination(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    first, second = two_skills(tmp_path)
+    original_replace = Path.replace
+    authored = b"# Authored after migration published the router\n"
+
+    def replace(path: Path, target: str | Path) -> Path:
+        if Path(target) == second:
+            first.write_bytes(authored)
+            raise OSError("publication fault")
+        return original_replace(path, target)
+
+    monkeypatch.setattr(Path, "replace", replace)
+    with pytest.raises(ValueError, match="recovery files retained"):
+        migration.run("--write", tmp_path)
+    assert first.read_bytes() == authored
+    recovery = tmp_path / ".llm/.skill-migration-recovery"
+    assert (recovery / "recovery.json").is_file()
+    with pytest.raises(ValueError, match="Pending skill migration recovery"):
+        migration.run("--write", tmp_path)
+
+
 @pytest.mark.parametrize(
     "part", ["../../../outside.md", "../outside.md", "C:/outside.md", "other\\outside.md", ""]
 )

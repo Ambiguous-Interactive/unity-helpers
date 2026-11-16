@@ -9,7 +9,7 @@
     "scripts/check_registries.py": "688185e971a52e3dc7bc449be0861eec633d624d6d705ab2b5c41c315342b726",
     "scripts/generate_skills_index.py": "f83e9909615d4fb2244eb1dcbcb7a256f7fe213dfb6f40e6f71f82fd9b8c1842",
     "scripts/lint_llm_instructions.py": "eda487ecf8db7c95fd3aae8d9e06507eedb00e9efaba74eede25dbc6d76cf106",
-    "scripts/migrate_agent_skills.py": "3764b6ca420882ef3b47cdd9c80ace18f04cf4e987c03987d0cf8341622add12",
+    "scripts/migrate_agent_skills.py": "17f215f28ee8e0be9f2f6f330c164ecc99387b197d43171686d7722f47bb8a5f",
     "scripts/release_tools.py": "ef04087ec4a6fe972346f4ce4d37285575501e62290140903e318e4f412e49ba",
     "scripts/validate_npm_package.py": "e83c52442bc3b9d896b74dd289b5d87450de27a7b3b0ea074ff1f25e8aa5508d",
     "scripts/python~/pyproject.toml": "df739d2193f6b3756ac65b7d52dfb415e2b39f1eab0fe1aa1c85bd4008f24aee",
@@ -24,7 +24,8 @@
   "regressions": {
     "combined_cases_passed": 521,
     "strict_sources": 164,
-    "strict_tools": ["Ruff", "mypy", "Pyright"]
+    "strict_tools": ["Ruff", "mypy", "Pyright"],
+    "round_two_skill_cases_passed": 122
   },
   "initial_windows_failures": [
     {
@@ -129,10 +130,22 @@
     "directory": ".llm/.skill-migration-recovery",
     "normal_failure": "Roll back attempted replacements and retain original file modes.",
     "rollback_failure_or_interruption": "Retain before/after files and recovery.json. Later migration and check commands refuse pending recovery.",
-    "unblock": "Inspect recovery.json and its recorded owned paths and hashes. Restore each remaining backup by replacement. Verify a missing backup against before_sha256; remove a published path only when the journal says no original file existed. Remove the recovery directory only after the original batch has been restored, then retry the whole migration.",
+    "unblock": "Inspect recovery.json and its recorded owned paths and hashes. First save later authored edits separately. Restore each remaining backup by replacement. Verify a missing backup against before_sha256; remove a published path only when the journal says no original file existed. Remove the recovery directory only after the original batch has been restored, then reapply authored edits and retry the whole migration.",
     "limits": "Filesystem operations cannot guarantee rollback when the operating system refuses restoration. A hard process termination can leave recovery work. No automatic deletion of pending recovery state is permitted."
   },
   "performance_scope": "Existing paired timing records describe their captured source hashes before these correctness and portability fixes. No new timing or native Windows performance claim is made for the corrected implementation.",
-  "native_windows_verification": "Pending the next CI run for the submitted revision; local reproductions do not substitute for it.",
-  "raw_evidence": "Original and corrected captures, failing/passing logs and full masked CI job logs remain in ignored session evidence."
+  "native_windows_verification": {
+    "revision": "f85fb5ff6fd58e4fe9c6ae40ec4f97897c6fea11",
+    "instructions": "https://github.com/Ambiguous-Interactive/unity-helpers/actions/runs/43838987839/job/133202629058",
+    "assembly_tools": "https://github.com/Ambiguous-Interactive/unity-helpers/actions/runs/43838987901/job/133202629616",
+    "result": "Both Windows jobs passed on the corrected revision. This establishes the retained Windows controls, not Windows performance."
+  },
+  "raw_evidence": "Original and corrected captures, failing/passing logs and full masked CI job logs remain in ignored session evidence.",
+  "round_two_review": {
+    "comment": "https://github.com/Ambiguous-Interactive/unity-helpers/pull/1214#discussion_r4583996838",
+    "red": "Five failures and two already-passing controls reproduced reference edits during formatting, reference/source/manifest edits during staging, and rollback overwriting a later edit.",
+    "change": "Capture raw bytes when reading every manifest, source and reference. Compare all inputs after formatting and staging, each destination before its replacement, and the resulting batch before successful cleanup. Rollback restores only unchanged published bytes; preserve other edits and retain recovery evidence.",
+    "controls": "Nine focused controls cover formatting, staging, between-replacement edits, and an edit to an already published router.",
+    "limits": "Comparisons are immediately before replacement, not filesystem compare-and-swap. Keep noncooperating editors and writers idle during migration. Manual recovery must save later edits before restoring backups."
+  }
 }

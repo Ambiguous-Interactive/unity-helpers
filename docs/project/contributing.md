@@ -173,7 +173,10 @@ Publication replaces each selected file atomically and preserves existing file m
 A hard-linked authored file stays unchanged. Invalid reference filenames fail before writes;
 the original refresh could change an authored file outside the instruction roots and then fail.
 Skill publication validates and stages all selected files before replacement. It rolls back
-handled publication failures. If rollback fails, `.llm/.skill-migration-recovery` retains
+handled publication failures. It compares every source, reference and manifest with its captured
+bytes after formatting and staging, checks each destination immediately before its replacement,
+and checks the resulting batch before cleanup. Rollback preserves
+an observed later edit instead of restoring a backup over it. If rollback fails, `.llm/.skill-migration-recovery` retains
 backups and hashes; later migration and check commands refuse to skip that recovery state.
 
 Seven fresh-process pairs on Linux x86_64 with tmpfs, uv 0.13.8, Node 22.23.4,
@@ -200,8 +203,11 @@ ASCII versions, rejects dangling lockfile links, and preserves fenced example he
 
 The timing tables describe the captured implementations before these later corrections.
 They do not measure the corrected source. Pending recovery must be inspected before retrying:
-restore the owned paths from the recorded backups and verify their hashes, then remove the
-recovery directory and retry the whole migration. Remove a published path only when the
+first save any later authored edits separately. Restore the owned paths from the recorded backups
+and verify their hashes, then remove the recovery directory and retry the whole migration.
+Reapply saved edits and refresh again. Keep editors and other writers idle during migration;
+byte comparisons detect observed changes but do not provide an operating-system compare-and-swap
+against a noncooperating writer between the final check and replacement. Remove a published path only when the
 journal records that no original file existed. A hard process termination or an operating
 system refusal can require this manual recovery.
 
