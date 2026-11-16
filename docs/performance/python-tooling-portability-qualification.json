@@ -9,7 +9,7 @@
     "scripts/check_registries.py": "688185e971a52e3dc7bc449be0861eec633d624d6d705ab2b5c41c315342b726",
     "scripts/generate_skills_index.py": "f83e9909615d4fb2244eb1dcbcb7a256f7fe213dfb6f40e6f71f82fd9b8c1842",
     "scripts/lint_llm_instructions.py": "eda487ecf8db7c95fd3aae8d9e06507eedb00e9efaba74eede25dbc6d76cf106",
-    "scripts/migrate_agent_skills.py": "17f215f28ee8e0be9f2f6f330c164ecc99387b197d43171686d7722f47bb8a5f",
+    "scripts/migrate_agent_skills.py": "e831aba3556f6a82678c347ee3aec95a4c43f89697bb86347029c51be3ecb868",
     "scripts/release_tools.py": "ef04087ec4a6fe972346f4ce4d37285575501e62290140903e318e4f412e49ba",
     "scripts/validate_npm_package.py": "e83c52442bc3b9d896b74dd289b5d87450de27a7b3b0ea074ff1f25e8aa5508d",
     "scripts/python~/pyproject.toml": "df739d2193f6b3756ac65b7d52dfb415e2b39f1eab0fe1aa1c85bd4008f24aee",
@@ -25,7 +25,8 @@
     "combined_cases_passed": 521,
     "strict_sources": 164,
     "strict_tools": ["Ruff", "mypy", "Pyright"],
-    "round_two_skill_cases_passed": 122
+    "round_two_skill_cases_passed": 122,
+    "round_three_skill_cases_passed": 123
   },
   "initial_windows_failures": [
     {
@@ -147,5 +148,11 @@
     "change": "Capture raw bytes when reading every manifest, source and reference. Compare all inputs after formatting and staging, each destination before its replacement, and the resulting batch before successful cleanup. Rollback restores only unchanged published bytes; preserve other edits and retain recovery evidence.",
     "controls": "Nine focused controls cover formatting, staging, between-replacement edits, and an edit to an already published router.",
     "limits": "Comparisons are immediately before replacement, not filesystem compare-and-swap. Keep noncooperating editors and writers idle during migration. Manual recovery must save later edits before restoring backups."
+  },
+  "round_three_review": {
+    "comment": "https://github.com/Ambiguous-Interactive/unity-helpers/pull/1214#discussion_r4584165569",
+    "red": "Ownership validation raised ValueError during rollback and stopped restoration of earlier destinations. The control failed before the fix.",
+    "change": "Record ownership refusal alongside filesystem rollback failures and continue restoring other destinations. Preserve recovery evidence and report original publication error, recovery location and instructions.",
+    "controls": "The focused fault-injection test verifies independent destinations restore, unsafe ownership remains untouched, backups persist and the diagnostic includes the original failure and recovery instructions."
   }
 }

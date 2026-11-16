@@ -423,11 +423,12 @@ def commit_updates(
                         path.unlink(missing_ok=True)
                     else:
                         backup.replace(path)
-                except OSError as rollback_error:
+                except (OSError, ValueError) as rollback_error:
                     failures.append(f"{path}: {rollback_error}")
             if failures:
                 raise ValueError(
-                    f"Skill publication rollback failed; recovery files retained at {recovery}: {'; '.join(failures)}"
+                    f"Skill publication rollback failed; recovery files retained at {recovery}: {'; '.join(failures)}. "
+                    f"Original publication error: {error}. Inspect recovery.json and save later edits before restoring recorded backups."
                 ) from error
             retain = False
             raise

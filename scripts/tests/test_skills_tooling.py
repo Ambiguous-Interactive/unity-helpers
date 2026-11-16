@@ -395,6 +395,42 @@ def test_failed_rollback_retains_recovery_and_refuses_silent_retry(
     assert migration.run("--check", tmp_path) == 0
 
 
+def test_ownership_refusal_during_rollback_restores_other_destinations(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    first, second = two_skills(tmp_path)
+    original_replace = Path.replace
+    from generate_agent_skill_stubs import require_owned_path
+
+    original_require_owned = require_owned_path
+    failed = False
+    before = instruction_files(tmp_path)
+
+    def replace(staged: Path, target: str | Path) -> Path:
+        nonlocal failed
+        if Path(target) == second:
+            failed = True
+            raise OSError("original publication fault")
+        return original_replace(staged, target)
+
+    def require_owned(path: Path) -> None:
+        if failed and path == first:
+            raise ValueError("ownership changed during rollback")
+        original_require_owned(path)
+
+    monkeypatch.setattr(Path, "replace", replace)
+    monkeypatch.setattr(migration, "require_owned_path", require_owned)
+    with pytest.raises(ValueError, match="recovery files retained") as caught:
+        migration.run("--write", tmp_path)
+    assert "original publication fault" in str(caught.value)
+    assert "ownership changed during rollback" in str(caught.value)
+    assert "recovery.json" in str(caught.value)
+    assert first.read_bytes() != before[first.relative_to(tmp_path).as_posix()]
+    assert second.read_bytes() == before[second.relative_to(tmp_path).as_posix()]
+    assert not list((tmp_path / ".llm/references").iterdir())
+    assert (tmp_path / ".llm/.skill-migration-recovery/recovery.json").is_file()
+
+
 @pytest.mark.parametrize("changed", ["source", "manifest"])
 def test_publication_refuses_inputs_changed_during_preparation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, changed: str
