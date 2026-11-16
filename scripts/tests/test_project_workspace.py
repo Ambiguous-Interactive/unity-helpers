@@ -297,3 +297,76 @@ def test_native_space_guard_precedes_early_return(
     )
     assert result.returncode != 0
     assert "space values must be finite" in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("present", "failure"), [(False, False), (True, False), (False, True), (True, True)]
+)
+def test_native_adapter_preserves_caller_exit_status(
+    tmp_path: Path, present: bool, failure: bool
+) -> None:
+    executable = shutil.which("pwsh")
+    assert executable is not None
+    script = tmp_path / "exit-status.ps1"
+    setup = (
+        "$global:LASTEXITCODE=41"
+        if present
+        else "Remove-Variable LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue"
+    )
+    call = (
+        "Resolve-UnityProjectWorkspace -RepoRoot . -Version 6000 -Mode editmode -GenerationFingerprint invalid"
+        if failure
+        else "Get-UnityProjectLeafName -Version 6000 -Mode editmode"
+    )
+    script.write_text(
+        "param([string]$Helper)\n$ErrorActionPreference='Stop'\n. $Helper\n"
+        + setup
+        + "\n$failed=$false\ntry { $null="
+        + call
+        + " } catch { $failed=$true }\n$exitVariable=Get-Variable LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue\n@{ present=($null -ne $exitVariable); value=$(if ($null -ne $exitVariable) {$exitVariable.Value}); failed=$failed } | ConvertTo-Json -Compress\n",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [
+            executable,
+            "-NoProfile",
+            "-File",
+            str(script),
+            "-Helper",
+            str(REPOSITORY / "scripts/unity/lib/project-workspace.ps1"),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {
+        "present": present,
+        "value": 41 if present else None,
+        "failed": failure,
+    }
+
+
+def test_native_adapter_reads_actual_child_status_with_local_shadow(tmp_path: Path) -> None:
+    executable = shutil.which("pwsh")
+    assert executable is not None
+    script = tmp_path / "shadow.ps1"
+    script.write_text(
+        "param([string]$Helper)\n$ErrorActionPreference='Stop'\n. $Helper\nfunction Invoke-Fixture { $local:LASTEXITCODE=73; Get-UnityProjectLeafName -Version 6000 -Mode editmode }\nInvoke-Fixture\n",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [
+            executable,
+            "-NoProfile",
+            "-File",
+            str(script),
+            "-Helper",
+            str(REPOSITORY / "scripts/unity/lib/project-workspace.ps1"),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "6000-editmode"

@@ -1,22 +1,31 @@
 # Native filesystem and PowerShell comparison boundary for typed workspace policy.
 function Invoke-UnityWorkspacePolicy {
     param([Parameter(Mandatory = $true)][hashtable]$Request)
-    $scriptsRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-    $project = Join-Path $scriptsRoot 'python~'
-    $module = Join-Path $scriptsRoot 'unity/project_workspace.py'
-    $payload = ConvertTo-Json -InputObject $Request -Depth 10 -Compress -EscapeHandling EscapeNonAscii
-    $output = @($payload | & uv run --project $project --locked python $module)
-    $status = $LASTEXITCODE
-    $document = [System.Text.Json.JsonDocument]::Parse(($output -join "`n"))
+    $priorExitVariable = Get-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue
+    $hadExitVariable = $null -ne $priorExitVariable
+    $priorExitCode = if ($hadExitVariable) { $priorExitVariable.Value } else { $null }
     try {
-        $root = $document.RootElement
-        $errorText = $root.GetProperty('error').GetString()
-        if ($status -ne 0 -or -not [string]::IsNullOrEmpty($errorText)) {
-            throw "Workspace policy failed: $errorText"
+        $scriptsRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+        $project = Join-Path $scriptsRoot 'python~'
+        $module = Join-Path $scriptsRoot 'unity/project_workspace.py'
+        $payload = ConvertTo-Json -InputObject $Request -Depth 10 -Compress -EscapeHandling EscapeNonAscii
+        $output = @($payload | & uv run --project $project --locked python $module)
+        $status = $global:LASTEXITCODE
+        $document = [System.Text.Json.JsonDocument]::Parse(($output -join "`n"))
+        try {
+            $root = $document.RootElement
+            $errorText = $root.GetProperty('error').GetString()
+            if ($status -ne 0 -or -not [string]::IsNullOrEmpty($errorText)) {
+                throw "Workspace policy failed: $errorText"
+            }
+            return $root.GetProperty('value').Clone()
         }
-        return $root.GetProperty('value').Clone()
+        finally { $document.Dispose() }
     }
-    finally { $document.Dispose() }
+    finally {
+        if ($hadExitVariable) { $global:LASTEXITCODE = $priorExitCode }
+        else { Remove-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue }
+    }
 }
 
 function Get-UnityProjectLeafName {
