@@ -28,7 +28,7 @@
   ],
   "primary_sdk_reference": "https://learn.microsoft.com/en-us/dotnet/api/system.io.file.openread?view=net-10.0",
   "retained_limits": [
-    "Windows active-writer qualification is not inferred from Linux. The POSIX permission fixture skips on Windows.",
+    "Windows active-writer qualification is recorded separately below; the POSIX permission fixture skips on Windows.",
     "Diagnostic observations do not establish test success, a native exit fix, license return or final cleanup.",
     "The existing Windows runner lock and parent PR cancellation remain separate blockers. No handle killing, private activation-log access, native Unity execution or Unity MCP call occurred.",
     "This family does not complete the remaining #859 scripting scope."
@@ -1622,5 +1622,18 @@
     "scripts/lint-checks.json": "96d0226865d7e906a66c2d85169c3df1ebd23ad91149a67d633637108dbac1d8",
     "scripts/tests/test-run-contract-tests.js": "6505e5bbcb285d539d9a2226d89ae594fdbc271193b14814e6123dff556e0cec",
     ".github/workflows/local-gates.yml": "f95b4749203ac8ee1054cfcf5474084fbfb54e7f3d6cbbffd740e8e9e883903d"
+  },
+  "windows_qualification": {
+    "head": "8609dd853522b78d9bd1c3da344a15f4c3df5a25",
+    "job": 133480135740,
+    "workspace_and_log_adapter_step": {
+      "passed": 135,
+      "skipped": 2,
+      "seconds": 18.91
+    },
+    "owned_active_writer_control": "Passed on Windows; recorded in the duration output at 0.32 seconds.",
+    "scanner_source_sha256": "112be1cc9dbe15065b6319baa5f832100e3462cf6f5dbf6b96b845daee14e367",
+    "native_adapter_sha256": "6ad47013623de5e773f79c98ec24b85af72160bbb1d413be3b84b4b4dd09cbca",
+    "scope": "This proves the unchanged scanner implementation and its Windows sharing boundary at the recorded head, not all later review corrections or a Windows performance improvement."
   }
 }
