@@ -1,0 +1,387 @@
+{
+  "scope": "Apply local Git push defaults through one locked typed implementation while retaining native PowerShell result and host formatting contracts. Issue #859 remains open.",
+  "original_commit": "c3680417b4b20bcde973479d986686aa2210b003",
+  "original_source_sha256": {
+    "scripts/configure-git-defaults.sh": "111ee0b46067ea7147906345c99af9f6233b4d47debb495ea5d661157247ffd6",
+    "scripts/configure-git-defaults.ps1": "baaec0cff0871ad8c4f8f6ecf64974ce93ef51d124c5c5bdeaad007b04d1a205",
+    "scripts/git-push-defaults-helpers.ps1": "76250286cafa4f9a436b53b5c43b4b24b66a0db2f9194c076b0e85f6e4684dd2",
+    "scripts/tests/test-configure-git-defaults.sh": "043a11aba40573baaa4198fcd0a5bbee92d344abbd15c24a2ed4fe7272806356"
+  },
+  "timing_capture_sha256": {
+    "scripts/configure_git_defaults.py": "bcff2b6bb1aeaa2c2efbfca5103b8bf8d564ba31ca4b8684497eed495ba8e842",
+    "scripts/git-push-defaults-helpers.ps1": "3a4f57941de508e54db9af84aacca6a79b321bcd5305d696ba23e0fdbb20e95f",
+    "scripts/configure-git-defaults.sh": "a114d4b66814daba27dd220eb1ad498ee49d4184ad5d31c1735badb41dc144d5",
+    "scripts/configure-git-defaults.ps1": "baaec0cff0871ad8c4f8f6ecf64974ce93ef51d124c5c5bdeaad007b04d1a205",
+    "scripts/tests/test_push_defaults.py": "7781c0924fdcf3bf57efd02bdcddef11250ff0a4bff835ba24398ba39c3e74f3",
+    "scripts/tests/fixtures/push-defaults-v1.json": "29e152d69631690567e308c4272152042b6d74a1953f0e0e377077c9a71e52e7",
+    "scripts/python~/pyproject.toml": "785165834cdd0f419085847b5beaeb2b008e1127e94e4863430f08e57492a979",
+    "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d"
+  },
+  "source_sha256": {
+    "scripts/configure_git_defaults.py": "bcff2b6bb1aeaa2c2efbfca5103b8bf8d564ba31ca4b8684497eed495ba8e842",
+    "scripts/git-push-defaults-helpers.ps1": "3a4f57941de508e54db9af84aacca6a79b321bcd5305d696ba23e0fdbb20e95f",
+    "scripts/configure-git-defaults.sh": "a114d4b66814daba27dd220eb1ad498ee49d4184ad5d31c1735badb41dc144d5",
+    "scripts/configure-git-defaults.ps1": "baaec0cff0871ad8c4f8f6ecf64974ce93ef51d124c5c5bdeaad007b04d1a205",
+    "scripts/tests/test_push_defaults.py": "0e31e99f8c7c4ce051d1ecba65022f42e673a0cae4b2cd1da1a348d88a203ae7",
+    "scripts/tests/fixtures/push-defaults-v1.json": "29e152d69631690567e308c4272152042b6d74a1953f0e0e377077c9a71e52e7",
+    "scripts/python~/pyproject.toml": "785165834cdd0f419085847b5beaeb2b008e1127e94e4863430f08e57492a979",
+    "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d",
+    "scripts/tests/test-agent-preflight.ps1": "e49f63dddbadad076b3b4bedbcc6feb23d28e64eb20b02c501d94c3083a9e1c2"
+  },
+  "unchanged_dependency_sha256": {
+    "scripts/cli_encoding.py": "d946dc4bb98fc3eb66ffb1b4394625281421b346fbac364e7d9a50c99d90a9f9"
+  },
+  "original_controls": 13,
+  "frozen_profile_observations": 34,
+  "registered_controls": 67,
+  "contract": [
+    "Write only push.autoSetupRemote=true and push.default=simple to the selected local repository configuration. Preserve other local values and global/system configuration.",
+    "Verify readback and preserve original caller-specific validation, warning and failure-code behavior.",
+    "Return a native PowerShell Hashtable with Success, Errors and Values without exiting or throwing from configuration failures. Preserve LASTEXITCODE, including a prior or undefined value when no Git process ran.",
+    "Retain missing-tool and malformed-child-response failure tables; a bad protocol cannot become success.",
+    "Git configuration uses its native lock. Never delete another writer config.lock. A second-write failure can leave the first key updated; this is not a transaction across keys.",
+    "Git subprocesses have 30-second deadlines and report failure visibly."
+  ],
+  "profile_boundaries": {
+    "bash": "Git itself checks the root; readback comparison is case sensitive; Git-version failure and write failures preserve their native exit codes.",
+    "powershell": "Require an existing directory; readback comparison is case insensitive; malformed or failed Git-version probes remain best effort. Native formatting, Hashtable and LASTEXITCODE adaptation remain PowerShell."
+  },
+  "red_green": {
+    "native_prior_exit_state": "Two native missing-directory/file cases failed before preserving the scalar prior value, because a saved PSVariable object changed with LASTEXITCODE. All 17 native profile controls then passed."
+  },
+  "host_limits": [
+    "Local evidence is Linux, PowerShell 7.5.3 and CPython 3.14.10. A separate Windows PowerShell 5.1 control is registered for Windows CI and cannot execute on Linux.",
+    "POSIX executable Git shims and Bash compatibility controls are explicitly host limited; the portable policy corpus and real native PowerShell profiles run separately.",
+    "uv is a prerequisite. Missing uv produces a native failure table without exiting the caller.",
+    "The read-only healthy push gate does not call this repair/configuration path. Bootstrap and explicit repair callers are affected by retained CLI startup regressions."
+  ],
+  "measurement": {
+    "host": "Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.36",
+    "filesystem": "tmpfs",
+    "toolchain": {
+      "uv": "0.13.8",
+      "python": "3.14.10",
+      "powershell": "7.5.3",
+      "git": "2.51.1"
+    },
+    "method": "Two warmup pairs then seven alternating-order pairs per caller. Restore identical local input values before every arm. CLI output after removing legacy ANSI color and exit codes agree, and both local values are verified after every CLI observation. The inner-parent measurements exclude parent startup and dot-sourcing.",
+    "cli_samples": [
+      {
+        "profile": "bash",
+        "pair": 0,
+        "kind": "original",
+        "ms": 10.401455,
+        "stdout_sha256": "42354002a9a21acf60dbb6384755ad981bf7b1cc64b2b185a5c9849dd056f61d",
+        "stderr_hex": ""
+      },
+      {
+        "profile": "bash",
+        "pair": 0,
+        "kind": "python",
+        "ms": 48.135618,
+        "stdout_sha256": "69073376805eeb2d25b016295c78d926f530d1db8f65f123b16776b90dca2ea4",
+        "stderr_hex": ""
+      },
+      {
+        "profile": "bash",
+        "pair": 1,
+        "kind": "python",
+        "ms": 47.376546,
+        "stdout_sha256": "69073376805eeb2d25b016295c78d926f530d1db8f65f123b16776b90dca2ea4",
+        "stderr_hex": ""
+      },
+      {
+        "profile": "bash",
+        "pair": 1,
+        "kind": "original",
+        "ms": 10.10498,
+        "stdout_sha256": "42354002a9a21acf60dbb6384755ad981bf7b1cc64b2b185a5c9849dd056f61d",
+        "stderr_hex": ""
+      },
+      {
+        "profile": "bash",
+        "pair": 2,
+        "kind": "original",
+        "ms": 10.34005,
+        "stdout_sha256": "42354002a9a21acf60dbb6384755ad981bf7b1cc64b2b185a5c9849dd056f61d",
+        "stderr_hex": ""
+      },
+      {
+        "profile": "bash",
+        "pair": 2,
+        "kind": "python",
+        "ms": 46.962568,
+        "stdout_sha256": "69073376805eeb2d25b016295c78d926f530d1db8f65f123b16776b90dca2ea4",
+        "stderr_hex": ""
+      },
+      {
+        "profile": "bash",
+        "pair": 3,
+        "kind": "python",
+        "ms": 49.062502,
+        "stdout_sha256": "69073376805eeb2d25b016295c78d926f530d1db8f65f123b16776b90dca2ea4",
+        "stderr_hex": ""
+      },
+      {
+        "profile": "bash",
+        "pair": 3,
+        "kind": "original",
+        "ms": 10.497709,
+        "stdout_sha256": "42354002a9a21acf60dbb6384755ad981bf7b1cc64b2b185a5c9849dd056f61d",
+        "stderr_hex": ""
+      },
+      {
+        "profile": "bash",
+        "pair": 4,
+        "kind": "original",
+        "ms": 9.731622,
+        "stdout_sha256": "42354002a9a21acf60dbb6384755ad981bf7b1cc64b2b185a5c9849dd056f61d",
+        "stderr_hex": ""
+      },
+      {
+        "profile": "bash",
+        "pair": 4,
+        "kind": "python",
+        "ms": 49.012461,
+        "stdout_sha256": "69073376805eeb2d25b016295c78d926f530d1db8f65f123b16776b90dca2ea4",
+        "stderr_hex": ""
+      },
+      {
+        "profile": "bash",
+        "pair": 5,
+        "kind": "python",
+        "ms": 48.754026,
+        "stdout_sha256": "69073376805eeb2d25b016295c78d926f530d1db8f65f123b16776b90dca2ea4",
+        "stderr_hex": ""
+      },
+      {
+        "profile": "bash",
+        "pair": 5,
+        "kind": "original",
+        "ms": 10.593011,
+        "stdout_sha256": "42354002a9a21acf60dbb6384755ad981bf7b1cc64b2b185a5c9849dd056f61d",
+        "stderr_hex": ""
+      },
+      {
+        "profile": "bash",
+        "pair": 6,
+        "kind": "original",
+        "ms": 9.850711,
+        "stdout_sha256": "42354002a9a21acf60dbb6384755ad981bf7b1cc64b2b185a5c9849dd056f61d",
+        "stderr_hex": ""
+      },
+      {
+        "profile": "bash",
+        "pair": 6,
+        "kind": "python",
+        "ms": 48.457839,
+        "stdout_sha256": "69073376805eeb2d25b016295c78d926f530d1db8f65f123b16776b90dca2ea4",
+        "stderr_hex": ""
+      },
+      {
+        "profile": "powershell",
+        "pair": 0,
+        "kind": "original",
+        "ms": 267.288213,
+        "stdout_sha256": "4eba8dc256542f37adabbf8a029ab0017eb8efe4cb210bda1f418fa400619f57",
+        "stderr_hex": ""
+      },
+      {
+        "profile": "powershell",
+        "pair": 0,
+        "kind": "python",
+        "ms": 305.76986,
+        "stdout_sha256": "4eba8dc256542f37adabbf8a029ab0017eb8efe4cb210bda1f418fa400619f57",
+        "stderr_hex": ""
+      },
+      {
+        "profile": "powershell",
+        "pair": 1,
+        "kind": "python",
+        "ms": 296.753446,
+        "stdout_sha256": "4eba8dc256542f37adabbf8a029ab0017eb8efe4cb210bda1f418fa400619f57",
+        "stderr_hex": ""
+      },
+      {
+        "profile": "powershell",
+        "pair": 1,
+        "kind": "original",
+        "ms": 294.730894,
+        "stdout_sha256": "4eba8dc256542f37adabbf8a029ab0017eb8efe4cb210bda1f418fa400619f57",
+        "stderr_hex": ""
+      },
+      {
+        "profile": "powershell",
+        "pair": 2,
+        "kind": "original",
+        "ms": 318.083074,
+        "stdout_sha256": "4eba8dc256542f37adabbf8a029ab0017eb8efe4cb210bda1f418fa400619f57",
+        "stderr_hex": ""
+      },
+      {
+        "profile": "powershell",
+        "pair": 2,
+        "kind": "python",
+        "ms": 297.372367,
+        "stdout_sha256": "4eba8dc256542f37adabbf8a029ab0017eb8efe4cb210bda1f418fa400619f57",
+        "stderr_hex": ""
+      },
+      {
+        "profile": "powershell",
+        "pair": 3,
+        "kind": "python",
+        "ms": 307.077771,
+        "stdout_sha256": "4eba8dc256542f37adabbf8a029ab0017eb8efe4cb210bda1f418fa400619f57",
+        "stderr_hex": ""
+      },
+      {
+        "profile": "powershell",
+        "pair": 3,
+        "kind": "original",
+        "ms": 296.345623,
+        "stdout_sha256": "4eba8dc256542f37adabbf8a029ab0017eb8efe4cb210bda1f418fa400619f57",
+        "stderr_hex": ""
+      },
+      {
+        "profile": "powershell",
+        "pair": 4,
+        "kind": "original",
+        "ms": 283.185924,
+        "stdout_sha256": "4eba8dc256542f37adabbf8a029ab0017eb8efe4cb210bda1f418fa400619f57",
+        "stderr_hex": ""
+      },
+      {
+        "profile": "powershell",
+        "pair": 4,
+        "kind": "python",
+        "ms": 304.650709,
+        "stdout_sha256": "4eba8dc256542f37adabbf8a029ab0017eb8efe4cb210bda1f418fa400619f57",
+        "stderr_hex": ""
+      },
+      {
+        "profile": "powershell",
+        "pair": 5,
+        "kind": "python",
+        "ms": 304.735276,
+        "stdout_sha256": "4eba8dc256542f37adabbf8a029ab0017eb8efe4cb210bda1f418fa400619f57",
+        "stderr_hex": ""
+      },
+      {
+        "profile": "powershell",
+        "pair": 5,
+        "kind": "original",
+        "ms": 299.520804,
+        "stdout_sha256": "4eba8dc256542f37adabbf8a029ab0017eb8efe4cb210bda1f418fa400619f57",
+        "stderr_hex": ""
+      },
+      {
+        "profile": "powershell",
+        "pair": 6,
+        "kind": "original",
+        "ms": 273.493913,
+        "stdout_sha256": "4eba8dc256542f37adabbf8a029ab0017eb8efe4cb210bda1f418fa400619f57",
+        "stderr_hex": ""
+      },
+      {
+        "profile": "powershell",
+        "pair": 6,
+        "kind": "python",
+        "ms": 303.099235,
+        "stdout_sha256": "4eba8dc256542f37adabbf8a029ab0017eb8efe4cb210bda1f418fa400619f57",
+        "stderr_hex": ""
+      }
+    ],
+    "inner_samples": [
+      {
+        "kind": "original",
+        "pair": 0,
+        "ms": 52.7193
+      },
+      {
+        "kind": "python",
+        "pair": 0,
+        "ms": 50.7864
+      },
+      {
+        "kind": "python",
+        "pair": 1,
+        "ms": 49.9471
+      },
+      {
+        "kind": "original",
+        "pair": 1,
+        "ms": 52.3679
+      },
+      {
+        "kind": "original",
+        "pair": 2,
+        "ms": 58.9284
+      },
+      {
+        "kind": "python",
+        "pair": 2,
+        "ms": 59.2371
+      },
+      {
+        "kind": "python",
+        "pair": 3,
+        "ms": 49.2521
+      },
+      {
+        "kind": "original",
+        "pair": 3,
+        "ms": 55.7031
+      },
+      {
+        "kind": "original",
+        "pair": 4,
+        "ms": 54.48
+      },
+      {
+        "kind": "python",
+        "pair": 4,
+        "ms": 49.4328
+      },
+      {
+        "kind": "python",
+        "pair": 5,
+        "ms": 48.0604
+      },
+      {
+        "kind": "original",
+        "pair": 5,
+        "ms": 53.4251
+      },
+      {
+        "kind": "original",
+        "pair": 6,
+        "ms": 49.387
+      },
+      {
+        "kind": "python",
+        "pair": 6,
+        "ms": 48.357
+      }
+    ],
+    "median_ms": {
+      "bash": {
+        "original": 10.34005,
+        "python": 48.457839
+      },
+      "powershell": {
+        "original": 294.730894,
+        "python": 304.650709
+      },
+      "inner_powershell": {
+        "original": 53.4251,
+        "python": 49.4328
+      }
+    },
+    "retained_misses": "The Bash CLI regresses from 10.34 to 48.46 ms; the PowerShell CLI regresses from 294.73 to 304.65 ms. The inner-parent median is 53.43 to 49.43 ms. Do not generalize that small observation into a speed claim.",
+    "limits": [
+      "One warm Linux host with disposable Git configuration; no Windows, cold provisioning, whole-hook or CI performance claim.",
+      "Seven pairs do not establish statistical significance. Current runtime inputs match the timing capture; later test-only controls have separately recorded current seals."
+    ]
+  },
+  "consumer_fixture_correction": "The first hook aggregate failed because the admission fixture omitted the migrated configuration module. Copy and preload configure_git_defaults.py before taking fixture byte snapshots. The full preflight, pre-commit and pre-push regression aggregate then passed."
+}
