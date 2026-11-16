@@ -210,13 +210,14 @@ Dev Containers helper is registered; it reads configuration and declared host na
 and does not request a token. Git reads and the checker have 30-second process deadlines.
 
 The [qualification record](../performance/push-validation-qualification.json)
-retains 39 original CLI observations and 52 typed controls. The real container
+retains 39 original CLI observations and 56 typed controls. The real container
 integration uses disposable Git configuration. A PowerShell probe verifies the
-case-sensitive versus case-insensitive filename boundary. Seven alternating Linux
-pairs after two warmup pairs measured 298.45 → 41.40 ms for a clean fixture and
-575.73 → 66.68 ms with 30 hook artifacts. Those fixture timings exclude the container
-checker and do not measure Windows, complete pushes or CI. Host configuration helpers
-remain separate migration scope.
+case-sensitive versus case-insensitive filename boundary. Historical measurements from
+seven alternating Linux pairs after two warmup pairs were 298.45 → 41.40 ms for a clean
+fixture and 575.73 → 66.68 ms with 30 hook artifacts. The receipt seals that pre-review
+implementation; the corrected credential-read error handling has no new timing claim.
+These fixture timings exclude the container checker and do not measure Windows,
+complete pushes or CI. Host configuration helpers remain separate migration scope.
 
 Unity failure patterns and environment warnings share the declarative catalogue in
 `scripts/unity/log-patterns.json`. Native consumers retain their existing regex engine
