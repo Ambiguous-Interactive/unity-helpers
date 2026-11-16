@@ -119,13 +119,7 @@ jobs:
           source_sha="$(git rev-parse HEAD)"
           package_name="$(jq -r '.name // empty' package.json)"
           package_version="$(jq -r '.version // empty' package.json)"
-          # shellcheck disable=SC2016 # PowerShell $env:CHANGELOG_VERSION is expanded by pwsh, not bash.
-          if ! CHANGELOG_VERSION="${package_version}" pwsh -NoProfile -Command '
-            $ErrorActionPreference = "Stop"
-            . ./scripts/release-tools/release-helpers.ps1
-            $content = [System.IO.File]::ReadAllText("CHANGELOG.md")
-            [void](Get-ChangelogSection -Content $content -Version $env:CHANGELOG_VERSION)
-          '; then
+          if ! uv run --quiet --project scripts/python~ --locked --no-dev python scripts/release_tools.py section --version="${package_version}"; then
             echo "::error::CHANGELOG.md has no exact section with release-note content for ${package_version}."
             exit 1
           fi
@@ -284,10 +278,10 @@ jobs:
           mkdir -p .artifacts/release
           mv "${pack_dir}/${package_file}" ".artifacts/release/${package_file}"
           (cd .artifacts/release && sha256sum "${package_file}" > "${package_file}.sha256")
-          pwsh -NoProfile -File scripts/release-tools/write-release-notes.ps1 \
-            -Version "${{ needs.verify-tag.outputs.package-version }}" \
-            -Footer \
-            -OutputPath .artifacts/release/release-notes.md
+          uv run --quiet --project scripts/python~ --locked --no-dev python scripts/release_tools.py notes \
+            --version "${{ needs.verify-tag.outputs.package-version }}" \
+            --footer \
+            --output-path .artifacts/release/release-notes.md
           echo "package-file=${package_file}" >> "${GITHUB_OUTPUT}"
 
       - name: Upload release package artifact

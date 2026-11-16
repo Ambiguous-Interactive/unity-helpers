@@ -1,0 +1,434 @@
+[
+  {
+    "operation": "next",
+    "arguments": {
+      "CurrentVersion": "1.2.3",
+      "Bump": "major",
+      "Version": ""
+    },
+    "result": "2.0.0",
+    "error": null
+  },
+  {
+    "operation": "next",
+    "arguments": {
+      "CurrentVersion": "1.2.3",
+      "Bump": "minor",
+      "Version": ""
+    },
+    "result": "1.3.0",
+    "error": null
+  },
+  {
+    "operation": "next",
+    "arguments": {
+      "CurrentVersion": "1.2.3",
+      "Bump": "patch",
+      "Version": ""
+    },
+    "result": "1.2.4",
+    "error": null
+  },
+  {
+    "operation": "next",
+    "arguments": {
+      "CurrentVersion": "0.0.0",
+      "Bump": "patch",
+      "Version": ""
+    },
+    "result": "0.0.1",
+    "error": null
+  },
+  {
+    "operation": "next",
+    "arguments": {
+      "CurrentVersion": "01.2.3",
+      "Bump": "patch",
+      "Version": ""
+    },
+    "result": null,
+    "error": "Invalid semver '01.2.3'. Expected X.Y.Z with numeric components and no leading zeroes."
+  },
+  {
+    "operation": "next",
+    "arguments": {
+      "CurrentVersion": "1.2",
+      "Bump": "patch",
+      "Version": ""
+    },
+    "result": null,
+    "error": "Invalid semver '1.2'. Expected X.Y.Z with numeric components and no leading zeroes."
+  },
+  {
+    "operation": "next",
+    "arguments": {
+      "CurrentVersion": "1.2.3-alpha",
+      "Bump": "patch",
+      "Version": ""
+    },
+    "result": null,
+    "error": "Invalid semver '1.2.3-alpha'. Expected X.Y.Z with numeric components and no leading zeroes."
+  },
+  {
+    "operation": "next",
+    "arguments": {
+      "CurrentVersion": "1.2.3\n",
+      "Bump": "patch",
+      "Version": ""
+    },
+    "result": "1.2.4",
+    "error": null
+  },
+  {
+    "operation": "next",
+    "arguments": {
+      "CurrentVersion": "2147483648.0.0",
+      "Bump": "patch",
+      "Version": ""
+    },
+    "result": null,
+    "error": "Cannot convert value \"2147483648\" to type \"System.Int32\". Error: \"Value was either too large or too small for an Int32.\""
+  },
+  {
+    "operation": "next",
+    "arguments": {
+      "CurrentVersion": "1.2.2147483647",
+      "Bump": "patch",
+      "Version": ""
+    },
+    "result": "1.2.2147483648",
+    "error": null
+  },
+  {
+    "operation": "next",
+    "arguments": {
+      "CurrentVersion": "1.2.3",
+      "Bump": "patch",
+      "Version": "1.2.3"
+    },
+    "result": null,
+    "error": "Explicit version 1.2.3 must be strictly greater than the current version 1.2.3."
+  },
+  {
+    "operation": "next",
+    "arguments": {
+      "CurrentVersion": "1.2.3",
+      "Bump": "patch",
+      "Version": "1.2.2"
+    },
+    "result": null,
+    "error": "Explicit version 1.2.2 must be strictly greater than the current version 1.2.3."
+  },
+  {
+    "operation": "next",
+    "arguments": {
+      "CurrentVersion": "1.2.3",
+      "Bump": "patch",
+      "Version": "2.0.0"
+    },
+    "result": "2.0.0",
+    "error": null
+  },
+  {
+    "operation": "next",
+    "arguments": {
+      "CurrentVersion": "1.2.3",
+      "Bump": "patch",
+      "Version": "1.02.4"
+    },
+    "result": null,
+    "error": "Invalid semver '1.02.4'. Expected X.Y.Z with numeric components and no leading zeroes."
+  },
+  {
+    "operation": "next",
+    "arguments": {
+      "CurrentVersion": "1.2.3",
+      "Bump": "patch",
+      "Version": " "
+    },
+    "result": "1.2.4",
+    "error": null
+  },
+  {
+    "operation": "next",
+    "arguments": {
+      "CurrentVersion": "1.2.3",
+      "Bump": "patch",
+      "Version": "1.2.4"
+    },
+    "result": "1.2.4",
+    "error": null
+  },
+  {
+    "operation": "rotate",
+    "arguments": {
+      "Content": "# Changelog\n\n## [Unreleased]\n\n### Added\n\n- New.\n\n## [1.2.3]\n\n- Old.\n",
+      "Version": "1.2.4",
+      "Date": "2026-06-30"
+    },
+    "result": {
+      "Content": "# Changelog\n\n## [Unreleased]\n\n## [1.2.4] - 2026-06-30\n\n### Added\n\n- New.\n\n## [1.2.3]\n\n- Old.\n",
+      "Rotated": true
+    },
+    "error": null
+  },
+  {
+    "operation": "rotate",
+    "arguments": {
+      "Content": "# Changelog\r\n\r\n## [Unreleased]\r\n\r\n### Added\r\n\r\n- New.\r\n\r\n## [1.2.3]\r\n\r\n- Old.\r\n",
+      "Version": "1.2.4",
+      "Date": "2026-06-30"
+    },
+    "result": {
+      "Content": "# Changelog\n\n## [Unreleased]\n\n## [1.2.4] - 2026-06-30\n\n### Added\n\n- New.\n\n## [1.2.3]\n\n- Old.\n",
+      "Rotated": true
+    },
+    "error": null
+  },
+  {
+    "operation": "rotate",
+    "arguments": {
+      "Content": "# Changelog\r\r## [Unreleased]\r\r### Added\r\r- New.\r\r## [1.2.3]\r\r- Old.\r",
+      "Version": "1.2.4",
+      "Date": "2026-06-30"
+    },
+    "result": {
+      "Content": "# Changelog\n\n## [Unreleased]\n\n## [1.2.4] - 2026-06-30\n\n### Added\n\n- New.\n\n## [1.2.3]\n\n- Old.\n",
+      "Rotated": true
+    },
+    "error": null
+  },
+  {
+    "operation": "rotate",
+    "arguments": {
+      "Content": "# Changelog\n\n## [Unreleased]\n\n### Added\n\n\n\n## [1.2.3]\n\n- Old.\n",
+      "Version": "1.2.4",
+      "Date": "2026-06-30"
+    },
+    "result": null,
+    "error": "The '## [Unreleased]' section has no release-note content."
+  },
+  {
+    "operation": "rotate",
+    "arguments": {
+      "Content": "# Changelog\n\n## [unreleased]\n\n### Added\n\n- New.\n\n## [1.2.3]\n\n- Old.\n",
+      "Version": "1.2.4",
+      "Date": "2026-06-30"
+    },
+    "result": {
+      "Content": "# Changelog\n\n## [unreleased]\n\n## [1.2.4] - 2026-06-30\n\n### Added\n\n- New.\n\n## [1.2.3]\n\n- Old.\n",
+      "Rotated": true
+    },
+    "error": null
+  },
+  {
+    "operation": "rotate",
+    "arguments": {
+      "Content": "# Changelog\n\n## [Unreleased]\n\n## [Unreleased]\n\n### Added\n\n- New.\n\n## [1.2.3]\n\n- Old.\n",
+      "Version": "1.2.4",
+      "Date": "2026-06-30"
+    },
+    "result": null,
+    "error": "CHANGELOG.md must contain exactly one '## [Unreleased]' heading; found 2."
+  },
+  {
+    "operation": "rotate",
+    "arguments": {
+      "Content": "# Changelog\n\n## [Unreleased]\n\n### Added\n\n````markdown\n```\n## [1.2.4]\n````\n\n- New.\n\n## [1.2.3]\n\n- Old.\n",
+      "Version": "1.2.4",
+      "Date": "2026-06-30"
+    },
+    "result": {
+      "Content": "# Changelog\n\n## [Unreleased]\n\n## [1.2.4] - 2026-06-30\n\n### Added\n\n````markdown\n```\n## [1.2.4]\n````\n\n- New.\n\n## [1.2.3]\n\n- Old.\n",
+      "Rotated": true
+    },
+    "error": null
+  },
+  {
+    "operation": "rotate",
+    "arguments": {
+      "Content": "# Changelog\n\n## [Unreleased]\n\n### Added\n\n~~~markdown\n## [1.2.4]\n~~~\n\n- New.\n\n## [1.2.3]\n\n- Old.\n",
+      "Version": "1.2.4",
+      "Date": "2026-06-30"
+    },
+    "result": {
+      "Content": "# Changelog\n\n## [Unreleased]\n\n## [1.2.4] - 2026-06-30\n\n### Added\n\n~~~markdown\n## [1.2.4]\n~~~\n\n- New.\n\n## [1.2.3]\n\n- Old.\n",
+      "Rotated": true
+    },
+    "error": null
+  },
+  {
+    "operation": "rotate",
+    "arguments": {
+      "Content": "# Changelog\n\n## [Unreleased]\n\n### Added\n\n- New.\n\n## [1.2.4]\n\n- Already.\n\n## [1.2.3]\n\n- Old.\n",
+      "Version": "1.2.4",
+      "Date": "2026-06-30"
+    },
+    "result": null,
+    "error": "CHANGELOG.md already contains '## [1.2.4]' but '## [Unreleased]' still has release-note content."
+  },
+  {
+    "operation": "rotate",
+    "arguments": {
+      "Content": "# Changelog\n\n## [Unreleased]\n\n### Added\n\n\n## [1.2.4]\n\n- Already.\n\n## [1.2.3]\n\n- Old.\n",
+      "Version": "1.2.4",
+      "Date": "2026-06-30"
+    },
+    "result": {
+      "Content": "# Changelog\n\n## [Unreleased]\n\n### Added\n\n\n## [1.2.4]\n\n- Already.\n\n## [1.2.3]\n\n- Old.\n",
+      "Rotated": false
+    },
+    "error": null
+  },
+  {
+    "operation": "rotate",
+    "arguments": {
+      "Content": "# Changelog\n\n## [Unreleased]\n\n### Added\n\n\n## [1.2.4]\n\n### Added\n\n## [1.2.3]\n\n- Old.\n",
+      "Version": "1.2.4",
+      "Date": "2026-06-30"
+    },
+    "result": null,
+    "error": "CHANGELOG.md section '## [1.2.4]' has no release-note content."
+  },
+  {
+    "operation": "rotate",
+    "arguments": {
+      "Content": "# Changelog\n\n## [Else]\n\n### Added\n\n- New.\n\n## [1.2.3]\n\n- Old.\n",
+      "Version": "1.2.4",
+      "Date": "2026-06-30"
+    },
+    "result": null,
+    "error": "CHANGELOG.md must contain exactly one '## [Unreleased]' heading; found 0."
+  },
+  {
+    "operation": "section",
+    "arguments": {
+      "Content": "# Changelog\n\n## [Unreleased]\n\n### Added\n\n- New.\n\n## [1.2.3]\n\n- Old.\n",
+      "Version": "1.2.3"
+    },
+    "result": "- Old.",
+    "error": null
+  },
+  {
+    "operation": "section",
+    "arguments": {
+      "Content": "# Changelog\n\n## [Unreleased]\n\n### Added\n\n- New.\n\n## [1.2.3]\n\n\n",
+      "Version": "1.2.3"
+    },
+    "result": null,
+    "error": "CHANGELOG.md section '## [1.2.3]' has no release-note content."
+  },
+  {
+    "operation": "section",
+    "arguments": {
+      "Content": "# Changelog\n\n## [Unreleased]\n\n### Added\n\n- New.\n\n## [1.2.3] - 2026-01-01\n\n- Old.\n",
+      "Version": "1.2.3"
+    },
+    "result": "- Old.",
+    "error": null
+  },
+  {
+    "operation": "section",
+    "arguments": {
+      "Content": "# Changelog\n\n## [Unreleased]\n\n### Added\n\n- New.\n\n## [1.2.3]\n\n```md\n## [fake]\n```\n",
+      "Version": "1.2.3"
+    },
+    "result": "```md\n## [fake]\n```",
+    "error": null
+  },
+  {
+    "operation": "section",
+    "arguments": {
+      "Content": "# Changelog\n\n## [Unreleased]\n\n### Added\n\n- New.\n\n## [1.2.3] trailing\n\n- Old.\n",
+      "Version": "1.2.3"
+    },
+    "result": null,
+    "error": "CHANGELOG.md has no '## [1.2.3]' section."
+  },
+  {
+    "operation": "section",
+    "arguments": {
+      "Content": "# Changelog\n\n## [Unreleased]\n\n### Added\n\n- New.\n\n## [1.2.3]\n\n  \n### Fixed\n\t\n",
+      "Version": "1.2.3"
+    },
+    "result": null,
+    "error": "CHANGELOG.md section '## [1.2.3]' has no release-note content."
+  },
+  {
+    "operation": "package",
+    "arguments": {
+      "Content": "{\"version\":\"1.2.3\",\"nested\":{\"version\":\"9.0.0\"}}",
+      "CurrentVersion": "1.2.3",
+      "NextVersion": "1.3.0"
+    },
+    "result": "{\"version\":\"1.3.0\",\"nested\":{\"version\":\"9.0.0\"}}\n",
+    "error": null
+  },
+  {
+    "operation": "package",
+    "arguments": {
+      "Content": "{\r\n  \"version\": \"1.2.3\"\r\n}\r\n",
+      "CurrentVersion": "1.2.3",
+      "NextVersion": "1.3.0"
+    },
+    "result": "{\n  \"version\": \"1.3.0\"\n}\n",
+    "error": null
+  },
+  {
+    "operation": "package",
+    "arguments": {
+      "Content": "{\"version\":\"1.2.3\",\"nested\":{\"version\":\"1.2.3\"}}",
+      "CurrentVersion": "1.2.3",
+      "NextVersion": "1.3.0"
+    },
+    "result": null,
+    "error": "Expected exactly one package.json version property for '1.2.3'; found 2."
+  },
+  {
+    "operation": "package",
+    "arguments": {
+      "Content": "{\"version\":\"9.0.0\"}",
+      "CurrentVersion": "1.2.3",
+      "NextVersion": "1.3.0"
+    },
+    "result": null,
+    "error": "package.json parsed version '9.0.0' did not match expected current version '1.2.3'."
+  },
+  {
+    "operation": "package",
+    "arguments": {
+      "Content": "{\"Version\":\"1.2.3\"}",
+      "CurrentVersion": "1.2.3",
+      "NextVersion": "1.3.0"
+    },
+    "result": null,
+    "error": "Expected exactly one package.json version property for '1.2.3'; found 0."
+  },
+  {
+    "operation": "lock",
+    "arguments": {
+      "Content": "{\"version\":\"1.2.3\",\"lockfileVersion\":3,\"packages\":{\"\":{\"version\":\"1.2.3\"},\"node_modules/x\":{\"version\":\"1.2.3\"}}}",
+      "NextVersion": "1.3.0"
+    },
+    "result": "{\n  \"version\": \"1.3.0\",\n  \"lockfileVersion\": 3,\n  \"packages\": {\n    \"\": {\n      \"version\": \"1.3.0\"\n    },\n    \"node_modules/x\": {\n      \"version\": \"1.2.3\"\n    }\n  }\n}\n",
+    "error": null
+  },
+  {
+    "operation": "lock",
+    "arguments": {
+      "Content": "{\"packages\":{\"\":{}}}",
+      "NextVersion": "1.3.0"
+    },
+    "result": "{\n  \"packages\": {\n    \"\": {}\n  }\n}\n",
+    "error": null
+  },
+  {
+    "operation": "lock",
+    "arguments": {
+      "Content": "{}",
+      "NextVersion": "1.3.0"
+    },
+    "result": "{}\n",
+    "error": null
+  }
+]

@@ -1899,7 +1899,7 @@ function Run-ReleaseWorkflowChangelogContractTests {
 
     $content = Get-Content -Path $workflowPath -Raw
     $relativePath = [System.IO.Path]::GetRelativePath($repoRoot, $workflowPath).Replace('\', '/')
-    if ($content -notmatch 'Get-ChangelogSection') {
+    if ($content -notmatch 'scripts/release_tools\.py section --version=') {
       $missingSectionHelper += $relativePath
     }
     if ($content -match 'grep\s+-Eq\s+"\^##\s+\\\[') {
@@ -1910,7 +1910,7 @@ function Run-ReleaseWorkflowChangelogContractTests {
   Write-TestResult `
     -TestName 'release publish workflow validates changelog release-note content' `
     -Passed ($missingSectionHelper.Count -eq 0) `
-    -Message "Missing Get-ChangelogSection usage: $($missingSectionHelper -join '; ')"
+    -Message "Missing typed changelog section gate: $($missingSectionHelper -join '; ')"
 
   Write-TestResult `
     -TestName 'release publish workflow avoids raw changelog heading grep' `
@@ -2538,7 +2538,7 @@ function Run-ReleasePrepareWorkflowContractTests {
     -not ($workflowContent -match 'gh api[^\r\n]+\|\|\s*true') -and
     -not ($workflowContent -match 'grep -Eq .*\bstatus')
   )
-  $notesIndex = $workflowContent.IndexOf('scripts/release-tools/write-release-notes.ps1')
+  $notesIndex = $workflowContent.IndexOf('scripts/release_tools.py notes')
   $prBodyIndex = $workflowContent.IndexOf('pr_body_file="${RUNNER_TEMP}/release-pr-body.md"')
   $prBodyLimitIndex = $workflowContent.IndexOf('pr_body_length="$(wc -m < "${pr_body_file}")"')
   $branchPushIndex = $workflowContent.IndexOf('push origin "HEAD:refs/heads/${BRANCH}"')
@@ -2548,7 +2548,7 @@ function Run-ReleasePrepareWorkflowContractTests {
     $notesIndex -lt $branchPushIndex
   )
   $usesExplicitPrepareReleaseInvocation = (
-    $workflowContent.Contains('./scripts/release-tools/prepare-release.ps1 -Bump $env:BUMP -Version $env:EXPLICIT_VERSION') -and
+    $workflowContent.Contains('scripts/release_tools.py prepare --bump="${BUMP}" --version="${EXPLICIT_VERSION}"') -and
     -not $workflowContent.Contains('$arguments = @(') -and
     -not $workflowContent.Contains('@arguments')
   )
@@ -2584,10 +2584,10 @@ function Run-ReleasePrepareWorkflowContractTests {
   Write-TestResult `
     -TestName 'release prepare validates release notes before pushing branch' `
     -Passed $generatesNotesBeforePushingBranch `
-    -Message 'Expected write-release-notes.ps1 to run before pushing release/X.Y.Z so failed note generation leaves no remote branch.'
+    -Message 'Expected typed release notes to run before pushing release/X.Y.Z so failed note generation leaves no remote branch.'
 
   Write-TestResult `
-    -TestName 'release prepare invokes prepare-release with explicit PowerShell parameters' `
+    -TestName 'release prepare invokes typed preparation with quoted named arguments' `
     -Passed $usesExplicitPrepareReleaseInvocation `
     -Message 'Expected release-prepare.yml to avoid positional array splatting that can bind "-Bump" as the Bump value.'
 

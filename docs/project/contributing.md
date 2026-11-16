@@ -123,6 +123,25 @@ manifest, 243.13→39.66 ms with 1,000 extra fields, and 238.56→38.83 ms for a
 Exit status, standard output and step-output bytes match in every pair. Source and lock
 hashes stayed fixed. These local command observations do not measure release-job or Windows speed.
 
+Release preparation, notes and UPM changelog synchronization use `scripts/release_tools.py`
+through locked uv. The PowerShell commands remain compatibility launchers. The release workflows
+call Python directly. Preparation retains named version/bump arguments, dry runs, fenced
+changelog examples and lockfile root versions. UPM notes retain the 8,000 UTF-16 code-unit
+budget and whole-line truncation. `npm run test:release-tools` replays 42 original helper
+observations and eight original UPM file outputs, then checks publication and CLI failures.
+
+Selected release files publish atomically and preserve hard-linked authored aliases.
+Invalid input and redirected source paths fail before preparation writes. A later filesystem
+failure can still leave a partially published batch. Diagnostic wording for malformed types
+and integer overflow can differ from PowerShell. Native Windows verification remains pending CI.
+
+Seven alternating fresh-process pairs on Linux tmpfs with pinned uv 0.13.8 measured median
+small preparation dry runs at 283.27 → 53.34 ms, 1,000-line dry runs at 288.11 → 51.31 ms,
+and 1,000-line note extraction at 246.25 → 51.13 ms. Every pair matched stdout bytes and
+left its input files unchanged. The [qualification record](../performance/release-tooling-qualification.json)
+retains the raw rows and source identities. These are local warm observations; release-job,
+cold-machine and Windows performance remain unverified.
+
 Skill indexing, instruction validation and skill-split migration also use typed Python.
 The PowerShell and Node entry points remain tested compatibility launchers. The generator
 preserves the original index bytes and ordinal basename order. Its `--check` mode reads the

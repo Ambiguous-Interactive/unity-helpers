@@ -102,19 +102,19 @@ jobs:
           fi
 
       - name: Prepare release files
-        shell: pwsh
+        shell: bash
         env:
           BUMP: ${{ inputs.bump }}
           EXPLICIT_VERSION: ${{ inputs.version }}
         run: |
-          ./scripts/release-tools/prepare-release.ps1 -Bump $env:BUMP -Version $env:EXPLICIT_VERSION
+          uv run --quiet --project scripts/python~ --locked --no-dev python scripts/release_tools.py prepare --bump="${BUMP}" --version="${EXPLICIT_VERSION}"
 
       - name: Sync generated version references
         shell: pwsh
         run: |
           ./scripts/sync-banner-version.ps1
           ./scripts/sync-issue-template-versions.ps1 -AddPackageVersion
-          ./scripts/release-tools/sync-upm-changelog.ps1
+          uv run --quiet --project scripts/python~ --locked --no-dev python scripts/release_tools.py sync-upm
 
       - name: Validate prepared release tree
         run: |
@@ -214,9 +214,9 @@ jobs:
           git show --stat --oneline --decorate --no-renames HEAD > "artifacts/release-prepare/release-${VERSION}.stat.txt"
 
           notes_file="${RUNNER_TEMP}/release-notes.md"
-          pwsh -NoProfile -File scripts/release-tools/write-release-notes.ps1 \
-            -Version "${VERSION}" \
-            -OutputPath "${notes_file}"
+          uv run --quiet --project scripts/python~ --locked --no-dev python scripts/release_tools.py notes \
+            --version "${VERSION}" \
+            --output-path "${notes_file}"
 
           pr_body_file="${RUNNER_TEMP}/release-pr-body.md"
           {
