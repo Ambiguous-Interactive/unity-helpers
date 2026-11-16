@@ -153,7 +153,7 @@ observations and eight original UPM file outputs, then checks publication and CL
 Selected release files publish atomically and preserve hard-linked authored aliases.
 Invalid input and redirected source paths fail before preparation writes. A later filesystem
 failure can still leave a partially published batch. Diagnostic wording for malformed types
-and integer overflow can differ from PowerShell. Native Windows verification remains pending CI.
+and integer overflow can differ from PowerShell. These local captures do not establish native Windows behavior.
 
 Seven alternating fresh-process pairs on Linux tmpfs with pinned uv 0.13.8 measured median
 small preparation dry runs at 283.27 → 53.34 ms, 1,000-line dry runs at 288.11 → 51.31 ms,
@@ -164,7 +164,7 @@ cold-machine and Windows performance remain unverified.
 
 Skill indexing, instruction validation and skill-split migration also use typed Python.
 The PowerShell and Node entry points remain tested compatibility launchers. The generator
-preserves the original index bytes and ordinal basename order. Its `--check` mode reads the
+preserves the canonical index bytes and ordinal basename order. Links retain the actual source filename. Its `--check` mode reads the
 index and requires matching bytes, a tracked file and clean Git status for that path.
 Instruction checks retain all 35 original policy requirements and two independent generator
 processes. The regression suite mutates temporary copies of tracked guidance.
@@ -172,7 +172,9 @@ processes. The regression suite mutates temporary copies of tracked guidance.
 Publication replaces each selected file atomically and preserves existing file modes.
 A hard-linked authored file stays unchanged. Invalid reference filenames fail before writes;
 the original refresh could change an authored file outside the instruction roots and then fail.
-This does not provide whole-batch rollback after a later filesystem failure.
+Skill publication validates and stages all selected files before replacement. It rolls back
+handled publication failures. If rollback fails, `.llm/.skill-migration-recovery` retains
+backups and hashes; later migration and check commands refuse to skip that recovery state.
 
 Seven fresh-process pairs on Linux x86_64 with tmpfs, uv 0.13.8, Node 22.23.4,
 PowerShell 7.5.3 and Python 3.14.10 measured these median command times:
@@ -189,6 +191,19 @@ The [qualification record](../performance/skill-tooling-qualification.json) reta
 paired observation, source and runtime identities, the earlier bootstrap-tool regression,
 and the filesystem-label correction. Guidance and discovery inputs are identical across the two
 worktrees. Each implementation’s source seals remain unchanged during its capture. These observations do not establish Windows, cold-machine or whole-CI performance.
+
+The [portability qualification](../performance/python-tooling-portability-qualification.json)
+records the Windows failures and their local regression controls. Explicit generated manifests
+bypass formatter ignore rules, matching the former Prettier API. Index stdout stays LF across
+platforms. The registry CLI restores its caller's output mode. Release preparation requires
+ASCII versions, rejects dangling lockfile links, and preserves fenced example headings.
+
+The timing tables describe the captured implementations before these later corrections.
+They do not measure the corrected source. Pending recovery must be inspected before retrying:
+restore the owned paths from the recorded backups and verify their hashes, then remove the
+recovery directory and retry the whole migration. Remove a published path only when the
+journal records that no original file existed. A hard process termination or an operating
+system refusal can require this manual recovery.
 
 Repository-local Prettier, cspell and markdownlint launch through
 `scripts/run_node_bin.py` in locked uv. The existing Node launchers remain compatible.

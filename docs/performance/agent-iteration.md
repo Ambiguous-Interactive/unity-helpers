@@ -311,3 +311,7 @@ Head-specific pilot acceptance, raw samples and CI qualification are tracked in
 [the task record](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1206).
 Conditional native enrollment remains tracked separately in the organization policy work.
 Preserve supported public APIs and editor versions.
+
+The selector timings above predate the later bridge-framing and caller-output restoration fixes.
+The [portability qualification](./python-tooling-portability-qualification.json) records those
+corrections; the corrected source was not timed again.

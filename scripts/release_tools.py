@@ -24,7 +24,7 @@ def normalize(content: str) -> str:
 
 
 def semver(version: str) -> tuple[int, int, int]:
-    match = re.match(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$", version)
+    match = re.fullmatch(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)", version)
     if match is None:
         raise ValueError(
             f"Invalid semver '{version}'. Expected X.Y.Z with numeric components and no leading zeroes."
@@ -58,11 +58,15 @@ def fence_mask(lines: list[str]) -> list[bool]:
     mask: list[bool] = []
     for line in lines:
         inside = bool(character)
-        marker = re.match(r"^(`{3,}|~{3,})", line.lstrip())
+        marker = re.match(r"^ {0,3}(`{3,}|~{3,})", line)
         if marker:
             if not character:
                 character, width = marker[1][0], len(marker[1])
-            elif marker[1][0] == character and len(marker[1]) >= width:
+            elif (
+                marker[1][0] == character
+                and len(marker[1]) >= width
+                and re.fullmatch(r" {0,3}(?:`{3,}|~{3,})[ \t]*", line)
+            ):
                 character, width = "", 0
         mask.append(inside or bool(character))
     return mask
@@ -195,7 +199,7 @@ def prepare(root: Path, bump: str, version: str, date: str, *, dry_run: bool = F
     version = next_version(current, bump, version)
     updated_package = package_version(content, current, version)
     updated_changelog, rotated = rotate_changelog(read(changelog), version, date)
-    updated_lock = lock_version(read(lock), version) if lock.exists() else None
+    updated_lock = lock_version(read(lock), version) if lock.exists() or lock.is_symlink() else None
     if not dry_run:
         if rotated:
             publish(changelog, updated_changelog)

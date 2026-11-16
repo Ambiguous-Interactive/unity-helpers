@@ -162,6 +162,7 @@ def affected_checks(
 
 def main(argv: list[str] | None = None) -> int:
     configure_output()
+    previous_output = check_runner.OUTPUT_FORMAT
     check_runner.OUTPUT_FORMAT = "text"
     arguments = list(sys.argv[1:] if argv is None else argv)
     try:
@@ -241,6 +242,8 @@ def main(argv: list[str] | None = None) -> int:
     except (OSError, ValueError, KeyError, re.error) as error:
         print(f"Check registry failed: {error}", file=sys.stderr)
         return 1
+    finally:
+        check_runner.OUTPUT_FORMAT = previous_output
 
 
 if __name__ == "__main__":

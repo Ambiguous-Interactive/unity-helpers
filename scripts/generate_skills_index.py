@@ -53,7 +53,7 @@ def skill_sources(directory: Path) -> list[Path]:
 
 
 def render(directory: Path, *, verbose: bool = False) -> str:
-    entries: list[tuple[str, str, str]] = []
+    entries: list[tuple[str, str, str, str]] = []
     for source in skill_sources(directory):
         content = source.read_text(encoding="utf-8-sig")
         category = "Feature"
@@ -67,7 +67,7 @@ def render(directory: Path, *, verbose: bool = False) -> str:
             if verbose:
                 print(f"[skills-index] No trigger comment in {source.name} - skipping")
             continue
-        entries.append((source.stem, description, category))
+        entries.append((source.stem, description, category, source.name))
     entries.sort(key=lambda entry: entry[0].encode("utf-16-be", errors="surrogatepass"))
     result = HEADER
     for title, category in SECTIONS:
@@ -75,8 +75,8 @@ def render(directory: Path, *, verbose: bool = False) -> str:
         if not items:
             continue
         result += f"\n## {title}\n\n| Skill | When to Use |\n| --- | --- |\n"
-        for name, description, _ in items:
-            result += f"| [{name}](./{name}.md) | {description} |\n"
+        for name, description, _, filename in items:
+            result += f"| [{name}](./{filename}) | {description} |\n"
     return result
 
 
@@ -155,7 +155,8 @@ def main(arguments: list[str] | None = None) -> int:
             check_index(args.repo_root, content.encode("utf-8"))
             print("Skills index is up-to-date.")
         elif args.stdout:
-            sys.stdout.write(content)
+            sys.stdout.flush()
+            sys.stdout.buffer.write(content.encode("utf-8"))
         else:
             output = args.output_path or args.repo_root / ".llm/skills/index.md"
             publish(output, content)

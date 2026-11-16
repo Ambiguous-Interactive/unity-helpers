@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import io
 import json
 import secrets
 import shutil
@@ -50,7 +52,11 @@ def test_original_index_bytes(case: dict[str, object], tmp_path: Path) -> None:
         with pytest.raises(ValueError, match="no authored"):
             index.render(directory)
     else:
-        assert index.render(directory) == case["stdout"]
+        expected = str(case["stdout"])
+        if "UPPER.MD" in mapping(case["files"]):
+            assert "./UPPER.md" in expected
+            expected = expected.replace("./UPPER.md", "./UPPER.MD")
+        assert index.render(directory) == expected
 
 
 def split_fixture(root: Path, case: dict[str, object]) -> Path:
@@ -197,6 +203,218 @@ def test_formatter_failure_preserves_unsplit_inputs(tmp_path: Path) -> None:
     assert source.read_bytes() == before
     assert not (tmp_path / ".llm/skill-splits.json").exists()
     assert not list((tmp_path / ".llm/references").iterdir())
+
+
+@pytest.mark.parametrize("directory", ["Temp", "node_modules"])
+def test_owned_manifest_formatting_ignores_repository_exclusions(
+    tmp_path: Path, directory: str
+) -> None:
+    root = tmp_path / directory / "fixture"
+    split_fixture(root, SPLIT_CASES[0])
+    assert migration.run("--write", root) == 0
+    expected = mapping(SPLIT_CASES[0]["files"])[".llm/skill-splits.json"]
+    assert (root / ".llm/skill-splits.json").read_bytes().decode("utf-8") == expected
+    (root / ".prettierrc.json").write_text("{", encoding="utf-8")
+    before = (root / ".llm/skill-splits.json").read_bytes()
+    with pytest.raises(ValueError, match="formatting failed"):
+        migration.run("--refresh", root)
+    assert (root / ".llm/skill-splits.json").read_bytes() == before
+
+
+def test_index_stdout_bytes_bypass_platform_newline_translation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    directory = tmp_path / ".llm/skills"
+    directory.mkdir(parents=True)
+    (directory / "a.md").write_bytes(b"# A\n\n<!-- trigger: a | Alpha | Core -->\n")
+    expected = index.render(directory).encode("utf-8")
+    raw = io.BytesIO()
+    stream = io.TextIOWrapper(raw, encoding="utf-8", newline="\r\n")
+    with monkeypatch.context() as patch:
+        patch.setattr(sys, "stdout", stream)
+        assert index.main(["--repo-root", str(tmp_path), "--stdout"]) == 0
+        stream.flush()
+        actual = raw.getvalue()
+    stream.close()
+    assert actual == expected
+
+
+def test_index_link_uses_actual_source_filename(tmp_path: Path) -> None:
+    directory = tmp_path / "skills"
+    directory.mkdir()
+    source = directory / "UPPER.MD"
+    source.write_bytes(b"<!-- trigger: upper | Upper | Core -->\n")
+    rendered = index.render(directory)
+    assert "[UPPER](./UPPER.MD)" in rendered
+    assert (directory / "UPPER.MD").is_file()
+
+
+@pytest.mark.parametrize("marker", ["```", "~~~"])
+def test_literal_closing_markers_preserve_fence_and_links(marker: str) -> None:
+    lines = [marker + "text", marker + "literal", "## Example", "[Local](./local.md)", marker]
+    assert migration.fenced_lines(lines) == [True] * len(lines)
+    content = "\n".join(lines) + "\n"
+    assert migration.rewrite_links(content, "demo", ROOT) == content
+
+
+def test_split_does_not_choose_boundary_inside_literal_marker_fence() -> None:
+    body = "~~~text\n" + "code\n" * 121 + "~~~literal\n\n## Example\n\n" + "code\n" * 100 + "~~~\n"
+    with pytest.raises(ValueError, match="No safe split boundary"):
+        migration.chunks_of(body)
+
+
+def test_h1_scan_respects_fence_indentation() -> None:
+    assert len(lint.h1_lines("# Real\n~~~text\n    ~~~\n# Inside\n~~~")) == 1
+    assert len(lint.h1_lines("# First\n    ~~~\n# Second\n    ~~~")) == 2
+
+
+def test_unowned_reference_collision_preserves_all_files(tmp_path: Path) -> None:
+    source = split_fixture(tmp_path, SPLIT_CASES[0])
+    reference = tmp_path / ".llm/references/demo-part-1.md"
+    reference.write_bytes(b"# Authored reference\n")
+    before = source.read_bytes()
+    with pytest.raises(ValueError, match="reference destination"):
+        migration.run("--write", tmp_path)
+    assert source.read_bytes() == before
+    assert reference.read_bytes() == b"# Authored reference\n"
+    assert not (tmp_path / ".llm/skill-splits.json").exists()
+
+
+def two_skills(root: Path) -> tuple[Path, Path]:
+    first = split_fixture(root, SPLIT_CASES[0])
+    first = first.rename(first.with_name("a.md"))
+    second = first.with_name("b.md")
+    second.write_bytes(first.read_bytes())
+    return first, second
+
+
+def instruction_files(root: Path) -> dict[str, bytes]:
+    return {
+        path.relative_to(root).as_posix(): path.read_bytes()
+        for path in (root / ".llm").rglob("*")
+        if path.is_file()
+    }
+
+
+def test_all_destinations_checked_before_any_split_publishes(tmp_path: Path) -> None:
+    _, second = two_skills(tmp_path)
+    mode = second.stat().st_mode
+    second.chmod(0o444)
+    before = instruction_files(tmp_path)
+    try:
+        with pytest.raises((ValueError, OSError), match="non-writable"):
+            migration.run("--write", tmp_path)
+        assert instruction_files(tmp_path) == before
+    finally:
+        second.chmod(mode)
+    assert migration.run("--write", tmp_path) == 0
+    entries = cast(
+        "list[dict[str, object]]",
+        mapping(cast("object", json.loads((tmp_path / ".llm/skill-splits.json").read_bytes())))[
+            "skills"
+        ],
+    )
+    assert {entry["name"] for entry in entries} == {"a", "b"}
+
+
+@pytest.mark.parametrize("destination", ["second-source", "manifest"])
+def test_late_publication_failure_rolls_back_and_retry_tracks_every_split(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, destination: str
+) -> None:
+    _, second = two_skills(tmp_path)
+    failed_destination = (
+        second if destination == "second-source" else tmp_path / ".llm/skill-splits.json"
+    )
+    before = instruction_files(tmp_path)
+    original_replace = Path.replace
+    failed = False
+
+    def replace(path: Path, target: str | Path) -> Path:
+        nonlocal failed
+        if Path(target) == failed_destination and not failed:
+            failed = True
+            raise OSError("publication fault")
+        return original_replace(path, target)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(Path, "replace", replace)
+        with pytest.raises(OSError, match="publication fault"):
+            migration.run("--write", tmp_path)
+    assert failed
+    assert instruction_files(tmp_path) == before
+    assert migration.run("--write", tmp_path) == 0
+    entries = cast(
+        "list[dict[str, object]]",
+        mapping(cast("object", json.loads((tmp_path / ".llm/skill-splits.json").read_bytes())))[
+            "skills"
+        ],
+    )
+    assert {entry["name"] for entry in entries} == {"a", "b"}
+    assert migration.run("--check", tmp_path) == 0
+
+
+def test_failed_rollback_retains_recovery_and_refuses_silent_retry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    first, second = two_skills(tmp_path)
+    before = instruction_files(tmp_path)
+    recovery = tmp_path / ".llm/.skill-migration-recovery"
+    original_replace = Path.replace
+    publication_failed = False
+
+    def replace(path: Path, target: str | Path) -> Path:
+        nonlocal publication_failed
+        if Path(target) == second and not publication_failed:
+            publication_failed = True
+            raise OSError("publication fault")
+        if Path(target) == first and publication_failed:
+            raise OSError("rollback fault")
+        return original_replace(path, target)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(Path, "replace", replace)
+        with pytest.raises(ValueError, match="recovery files retained"):
+            migration.run("--write", tmp_path)
+    journal = mapping(cast("object", json.loads((recovery / "recovery.json").read_bytes())))
+    for mode in ("--write", "--check"):
+        with pytest.raises(ValueError, match="Pending skill migration recovery"):
+            migration.run(mode, tmp_path)
+    for row in cast("list[object]", journal["files"]):
+        entry = mapping(row)
+        destination = tmp_path / str(entry["path"])
+        if entry["backup"] is None:
+            destination.unlink(missing_ok=True)
+        else:
+            backup = recovery / str(entry["backup"])
+            if backup.exists():
+                backup.replace(destination)
+            assert hashlib.sha256(destination.read_bytes()).hexdigest() == entry["before_sha256"]
+    shutil.rmtree(recovery)
+    assert instruction_files(tmp_path) == before
+    assert migration.run("--write", tmp_path) == 0
+    assert migration.run("--check", tmp_path) == 0
+
+
+@pytest.mark.parametrize("changed", ["source", "manifest"])
+def test_publication_refuses_inputs_changed_during_preparation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, changed: str
+) -> None:
+    source = split_fixture(tmp_path, SPLIT_CASES[0])
+    original_formatter = migration.format_manifest
+    path = source if changed == "source" else tmp_path / ".llm/skill-splits.json"
+    contents = b"# New authored content\n" if changed == "source" else b'{"version":1,"skills":[]}'
+
+    def format_manifest(manifest: dict[str, object], root: Path) -> str:
+        formatted = original_formatter(manifest, root)
+        path.write_bytes(contents)
+        return formatted
+
+    monkeypatch.setattr(migration, "format_manifest", format_manifest)
+    with pytest.raises(ValueError, match="changed during migration"):
+        migration.run("--write", tmp_path)
+    assert path.read_bytes() == contents
+    assert not list((tmp_path / ".llm/references").iterdir())
+    assert not (tmp_path / ".llm/.skill-migration-recovery").exists()
 
 
 @pytest.mark.parametrize(
@@ -570,6 +788,17 @@ def test_index_fix_restores_original_bytes(guidance: Path) -> None:
     path.write_bytes(data + b"drift\n")
     assert lint.main(["--repo-root", str(guidance), "--fix"]) == 0
     assert path.read_bytes() == data
+
+
+@pytest.mark.parametrize("encoding", ["bom", "crlf"])
+def test_index_fix_repairs_encoding_only_drift(encoding: str, guidance: Path) -> None:
+    path = guidance / ".llm/skills/index.md"
+    expected = path.read_bytes()
+    path.write_bytes(
+        b"\xef\xbb\xbf" + expected if encoding == "bom" else expected.replace(b"\n", b"\r\n")
+    )
+    assert lint.main(["--repo-root", str(guidance), "--fix"]) == 0
+    assert path.read_bytes() == expected
 
 
 @pytest.mark.parametrize(

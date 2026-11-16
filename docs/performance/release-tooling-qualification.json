@@ -538,5 +538,9 @@
     "strict_registered_sources": 162,
     "native_windows": "pending CI"
   },
-  "raw_evidence": "Full process streams, before/after seals and replay source remain in ignored session artifacts."
+  "raw_evidence": "Full process streams, before/after seals and replay source remain in ignored session artifacts.",
+  "post_capture_corrections": {
+    "record": "python-tooling-portability-qualification.json",
+    "scope": "Recorded timings remain bound to the original captured source. Later correctness and portability fixes were not remeasured."
+  }
 }

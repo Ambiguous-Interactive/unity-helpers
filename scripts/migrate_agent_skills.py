@@ -6,8 +6,10 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 import unicodedata
 from pathlib import Path
 from typing import NotRequired, TypedDict, cast
@@ -29,7 +31,7 @@ class Split(TypedDict):
     routerSha256: NotRequired[str]
 
 
-Update = tuple[Path, Split, str, list[str]]
+Update = tuple[Path, Split, str, list[str], str]
 
 
 def digest(text: str) -> str:
@@ -81,7 +83,9 @@ def fenced_lines(lines: list[str]) -> list[bool]:
         was_fenced = character is not None
         if match and character is None:
             character, width = match[1][0], len(match[1])
-        elif match and match[1][0] == character and len(match[1]) >= width:
+        elif character is not None and re.fullmatch(
+            rf" {{0,3}}{re.escape(character)}{{{width},}}[ \t]*", line.rstrip("\r\n")
+        ):
             character, width = None, 0
         result.append(was_fenced or character is not None or match is not None)
     return result
@@ -145,7 +149,11 @@ def rewrite_links(text: str, name: str, root: Path, *, reverse: bool = False) ->
         if marker:
             if not fenced:
                 fenced, character, width = True, marker[1][0], len(marker[1])
-            elif marker[1][0] == character and len(marker[1]) >= width:
+            elif (
+                marker[1][0] == character
+                and len(marker[1]) >= width
+                and re.fullmatch(r" {0,3}(?:`{3,}|~{3,})[ \t]*", line.rstrip("\r\n"))
+            ):
                 fenced = False
             result.append(line)
         else:
@@ -229,22 +237,28 @@ def load_manifest(path: Path) -> tuple[dict[str, object], list[Split]]:
 
 
 def format_manifest(manifest: dict[str, object], root: Path) -> str:
-    result = subprocess.run(  # noqa: S603 - fixed installed formatter with a literal stdin filepath.
-        [
-            sys.executable,
-            str(ROOT / "scripts/run_node_bin.py"),
-            "prettier",
-            "--parser",
-            "json",
-            "--stdin-filepath",
-            str(root / ".llm/skill-splits.json"),
-        ],
-        input=json.dumps(manifest, ensure_ascii=False).encode("utf-8"),
-        cwd=root,
-        capture_output=True,
-        check=False,
-        timeout=60,
-    )
+    with tempfile.TemporaryDirectory(prefix="skill-manifest-format-") as temporary:
+        ignore = Path(temporary) / "empty-ignore"
+        ignore.write_bytes(b"")
+        result = subprocess.run(  # noqa: S603 - fixed installed formatter, owned empty ignore file and literal stdin filepath.
+            [
+                sys.executable,
+                str(ROOT / "scripts/run_node_bin.py"),
+                "prettier",
+                "--parser",
+                "json",
+                "--ignore-path",
+                str(ignore),
+                "--with-node-modules",
+                "--stdin-filepath",
+                str(root / ".llm/skill-splits.json"),
+            ],
+            input=json.dumps(manifest, ensure_ascii=False).encode("utf-8"),
+            cwd=root,
+            capture_output=True,
+            check=False,
+            timeout=60,
+        )
     if result.returncode:
         raise ValueError(f"Manifest formatting failed: {result.stderr.decode('utf-8').strip()}")
     if not result.stdout.strip():
@@ -289,13 +303,95 @@ def check_entry(entry: Split, root: Path) -> None:
             raise ValueError(f"Missing anchored section link in {entry['name']}: {link}")
 
 
-def commit_updates(updates: list[Update], manifest: dict[str, object], root: Path) -> None:
+def commit_updates(
+    updates: list[Update], manifest: dict[str, object], root: Path, expected_manifest: bytes | None
+) -> None:
     formatted = format_manifest(manifest, root)
-    for source, entry, router, reference_texts in updates:
-        for part, content in zip(entry["parts"], reference_texts, strict=True):
-            publish(child(root / ".llm/references", part), content)
-        publish(source, router)
-    publish(root / ".llm/skill-splits.json", formatted)
+    manifest_path = root / ".llm/skill-splits.json"
+    recovery = root / ".llm/.skill-migration-recovery"
+    recovery.mkdir(mode=0o700)
+    retain = False
+    try:
+        current_manifest = manifest_path.read_bytes() if manifest_path.exists() else None
+        if current_manifest != expected_manifest:
+            raise ValueError(
+                "Skill manifest changed during migration; retry from the current source"
+            )
+        owned = (
+            {entry["name"]: set(entry["parts"]) for entry in load_manifest(manifest_path)[1]}
+            if current_manifest is not None
+            else {}
+        )
+        files: list[tuple[Path, str]] = []
+        for source, entry, router, reference_texts, original_source in updates:
+            if read(source) != original_source:
+                raise ValueError(f"Skill source changed during migration: {source}")
+            for part, content in zip(entry["parts"], reference_texts, strict=True):
+                destination = child(root / ".llm/references", part)
+                if destination.exists() and part not in owned.get(entry["name"], set()):
+                    raise ValueError(f"Refusing an existing unowned reference destination: {part}")
+                files.append((destination, content))
+            files.append((source, router))
+        files.append((manifest_path, formatted))
+        if len({path for path, _ in files}) != len(files):
+            raise ValueError("Skill migration contains duplicate publication destinations")
+        for path, _ in files:
+            require_owned_path(path)
+            if not path.parent.is_dir() or not path.parent.stat().st_mode & 0o222:
+                raise ValueError(f"Refusing a non-writable migration directory: {path.parent}")
+            if path.exists() and (not path.is_file() or not path.stat().st_mode & 0o222):
+                raise ValueError(f"Refusing a non-writable regular migration destination: {path}")
+        staged: list[tuple[Path, Path, Path | None]] = []
+        journal: list[dict[str, object]] = []
+        for index, (path, content) in enumerate(files):
+            backup = recovery / f"before-{index}" if path.exists() else None
+            if backup is not None:
+                shutil.copy2(path, backup)
+            after = recovery / f"after-{index}"
+            publish(after, content)
+            if backup is not None:
+                shutil.copymode(backup, after)
+            staged.append((path, after, backup))
+            journal.append(
+                {
+                    "path": path.relative_to(root).as_posix(),
+                    "backup": backup.name if backup is not None else None,
+                    "before_sha256": hashlib.sha256(backup.read_bytes()).hexdigest()
+                    if backup is not None
+                    else None,
+                    "after_sha256": digest(content),
+                }
+            )
+        (recovery / "recovery.json").write_text(
+            json.dumps({"files": journal}, indent=2) + "\n", encoding="utf-8"
+        )
+        attempted: list[tuple[Path, Path | None]] = []
+        retain = True
+        try:
+            for path, after, backup in staged:
+                attempted.append((path, backup))
+                after.replace(path)
+        except BaseException as error:
+            failures: list[str] = []
+            for path, backup in reversed(attempted):
+                try:
+                    if backup is None:
+                        path.unlink(missing_ok=True)
+                    else:
+                        backup.replace(path)
+                except OSError as rollback_error:
+                    failures.append(f"{path}: {rollback_error}")
+            if failures:
+                raise ValueError(
+                    f"Skill publication rollback failed; recovery files retained at {recovery}: {'; '.join(failures)}"
+                ) from error
+            retain = False
+            raise
+        else:
+            retain = False
+    finally:
+        if not retain:
+            shutil.rmtree(recovery)
 
 
 def run(mode: str, root: Path = ROOT) -> int:
@@ -304,6 +400,9 @@ def run(mode: str, root: Path = ROOT) -> int:
     root = root.resolve(strict=True)
     if (root / ".llm").is_symlink():
         raise ValueError("Refusing a redirected instruction directory")
+    pending = list((root / ".llm").glob(".skill-migration-*"))
+    if pending:
+        raise ValueError(f"Pending skill migration recovery; inspect {pending[0]} before retrying")
     skills = root / ".llm/skills"
     require_owned_path(skills)
     if not skills.is_dir():
@@ -328,6 +427,7 @@ def run(mode: str, root: Path = ROOT) -> int:
         manifest = {"version": 1, "skills": entries}
     else:
         raise ValueError("Skill split manifest is missing")
+    expected_manifest = manifest_path.read_bytes() if manifest_path.exists() else None
     updates: list[Update] = []
     if mode == "--refresh":
         for entry in entries:
@@ -342,12 +442,12 @@ def run(mode: str, root: Path = ROOT) -> int:
                 line_count(text) > MAX_LINES for text in references
             ):
                 raise ValueError(f"Split exceeds {MAX_LINES} lines after refresh: {entry['name']}")
-            updates.append((source, entry, router, references))
+            updates.append((source, entry, router, references, canonical))
             entry["sha256"], entry["routerSha256"] = (
                 digest(prefix + "".join(chunks)),
                 router_digest(router),
             )
-        commit_updates(updates, manifest, root)
+        commit_updates(updates, manifest, root, expected_manifest)
     elif mode in {"--write", "--plan"}:
         known = {entry["name"] for entry in entries}
         for source in sources:
@@ -358,6 +458,10 @@ def run(mode: str, root: Path = ROOT) -> int:
             prefix = prefix_of(original)
             chunks = chunks_of(original[len(prefix) :])
             parts = [f"{name}-part-{index + 1}.md" for index in range(len(chunks))]
+            for part in parts:
+                destination = child(root / ".llm/references", part)
+                if destination.exists():
+                    raise ValueError(f"Refusing an existing unowned reference destination: {part}")
             router = router_text(prefix, name, chunks)
             if line_count(router) > MAX_LINES:
                 raise ValueError(f"Router exceeds {MAX_LINES} lines: {name}")
@@ -375,7 +479,7 @@ def run(mode: str, root: Path = ROOT) -> int:
             entry = Split(
                 name=name, sha256=digest(original), parts=parts, routerSha256=router_digest(router)
             )
-            updates.append((source, entry, router, references))
+            updates.append((source, entry, router, references, original))
             entries.append(entry)
         if mode == "--plan":
             if not updates:
@@ -387,7 +491,7 @@ def run(mode: str, root: Path = ROOT) -> int:
                 )
             return 0
         entries.sort(key=lambda entry: entry["name"].encode("utf-16-be", errors="surrogatepass"))
-        commit_updates(updates, {"version": 1, "skills": entries}, root)
+        commit_updates(updates, {"version": 1, "skills": entries}, root, expected_manifest)
     for entry in entries:
         check_entry(entry, root)
     for source in sources:

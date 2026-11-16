@@ -142,11 +142,11 @@ def h1_lines(content: str) -> list[tuple[int, str]]:
     width = 0
     for index, line in enumerate(content.split("\n")):
         if character is None:
-            if match := re.match(r"^\s*(`{3,}|~{3,})", line):
+            if match := re.match(r"^ {0,3}(`{3,}|~{3,})", line):
                 character, width = match[1][0], len(match[1])
                 continue
         else:
-            if re.match(rf"^\s*({re.escape(character)}{{{width},}})\s*$", line):
+            if re.fullmatch(rf" {{0,3}}{re.escape(character)}{{{width},}}[ \t]*", line):
                 character = None
             continue
         if line.startswith("# "):
@@ -330,7 +330,9 @@ def validate(
                 )
         if index.exists():
             current = index.read_bytes()
-            if current.decode("utf-8-sig").replace("\r\n", "\n") != expected.decode("utf-8"):
+            if (fix and current != expected) or current.decode("utf-8-sig").replace(
+                "\r\n", "\n"
+            ) != expected.decode("utf-8"):
                 if fix:
                     publish(index, expected.decode("utf-8"))
                     current = index.read_bytes()

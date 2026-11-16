@@ -31,6 +31,11 @@ def corpus(name: str) -> list[dict[str, object]]:
 @pytest.mark.parametrize("case", corpus("release-helpers-v1.json"))
 def test_original_helper(case: dict[str, object]) -> None:
     args = {key: str(value) for key, value in mapping(case["arguments"]).items()}
+    if case["operation"] == "next" and "\n" in args["CurrentVersion"]:
+        assert case["result"] == "1.2.4"
+        with pytest.raises(ValueError, match="Invalid semver"):
+            release.next_version(args["CurrentVersion"], args["Bump"], args["Version"])
+        return
 
     def invoke() -> object:
         operation = case["operation"]
@@ -313,3 +318,46 @@ def test_legacy_test_launcher_selects_real_control(tmp_path: Path) -> None:
     )
     assert result.returncode == 0, result.stderr
     assert b"1 passed" in result.stdout
+
+
+@pytest.mark.parametrize("version", ["1.2.1٢", "1.2.3\n", "2.0.0\r", "1.٢.3"])
+def test_release_versions_require_complete_ascii_components(version: str) -> None:
+    with pytest.raises(ValueError, match="Invalid semver"):
+        release.semver(version)
+
+
+def test_unicode_explicit_version_leaves_release_inputs(tmp_path: Path) -> None:
+    fixture(tmp_path)
+    before = snapshot(tmp_path)
+    with pytest.raises(ValueError, match="Invalid semver"):
+        release.prepare(tmp_path, "patch", "1.2.1٢", "2026-06-30")
+    assert snapshot(tmp_path) == before
+
+
+def test_dangling_lockfile_refused_before_release_writes(tmp_path: Path) -> None:
+    fixture(tmp_path)
+    path = tmp_path / "package-lock.json"
+    path.unlink()
+    try:
+        path.symlink_to(tmp_path / "missing-lock.json")
+    except OSError:
+        pytest.skip("Creating symlinks requires host permission")
+    before = {name: (tmp_path / name).read_bytes() for name in ("package.json", "CHANGELOG.md")}
+    with pytest.raises(ValueError, match="linked skill path"):
+        release.prepare(tmp_path, "patch", "", "2026-06-30")
+    assert {name: (tmp_path / name).read_bytes() for name in before} == before
+    assert path.is_symlink()
+
+
+@pytest.mark.parametrize("marker", ["```", "~~~"])
+@pytest.mark.parametrize("suffix", ["literal", "indent"])
+def test_changelog_literal_markers_do_not_close_fences(marker: str, suffix: str) -> None:
+    false_close = marker + "literal" if suffix == "literal" else "    " + marker
+    content = f"# Changelog\n\n## [Unreleased]\n\n- Example:\n\n{marker}text\n{false_close}\n## [Unreleased]\n{marker}\n\n- Still new.\n\n## [1.2.3]\n\n- Old.\n"
+    rotated, changed = release.rotate_changelog(content, "1.2.4", "2026-06-30")
+    assert changed
+    assert false_close in rotated
+    notes = release.changelog_section(rotated, "1.2.4")
+    assert "## [Unreleased]" in notes
+    assert "- Still new." in notes
+    assert "- Old." not in notes

@@ -721,5 +721,9 @@
     "original_package_surface_suite": 42,
     "original_signature_suite": 5
   },
-  "raw_evidence": "Full process streams, source/controller and input manifests remain in ignored session evidence."
+  "raw_evidence": "Full process streams, source/controller and input manifests remain in ignored session evidence.",
+  "post_capture_corrections": {
+    "record": "python-tooling-portability-qualification.json",
+    "scope": "Recorded timings remain bound to the original captured source. Later correctness and portability fixes were not remeasured."
+  }
 }

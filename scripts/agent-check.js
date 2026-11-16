@@ -50,6 +50,7 @@ function main(args) {
   const lines = result.stdout.trimEnd().split("\n");
   const response = JSON.parse(lines.pop());
   if (lines.length) process.stdout.write(`${lines.join("\n")}\n`);
+  if (result.stderr) process.stderr.write(result.stderr);
   process.stdout.write(response.output);
   return response.value;
 }

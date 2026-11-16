@@ -190,6 +190,9 @@ def validation_errors(files: set[str], paths: set[str], tracked: set[str]) -> li
         if folder not in paths:
             errors.append(f"Missing required folder: {folder}")
             continue
+        if folder in files:
+            errors.append(f"Required Unity root is not a directory: {folder}")
+            continue
         if folder != "Samples~" and folder + ".meta" not in paths:
             errors.append(f"Missing .meta file for folder: {folder}")
         for name in sorted(path for path in paths if path.startswith(folder + "/")):
@@ -238,7 +241,7 @@ def validate(root: Path, *, verbose: bool = False) -> int:
     if not text_field(json_object(read(package)), "version").strip():
         raise ValueError("package.json must define a non-empty version.")
     with tempfile.TemporaryDirectory(prefix="npm-package-validation-") as directory:
-        temporary = Path(directory)
+        temporary = Path(directory).resolve(strict=True)
         stdout, stderr = temporary / "npm-pack.stdout.json", temporary / "npm-pack.stderr.log"
         if verbose:
             print("[validate-npm-package] Running npm pack...")

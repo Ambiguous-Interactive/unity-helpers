@@ -323,6 +323,17 @@ def test_package_contract_hidden_case_and_artifact_guards(name: str, fragment: s
         assert len([error for error in errors if name in error]) == 1
 
 
+@pytest.mark.parametrize("folder", validator.UNITY_FOLDERS)
+def test_package_contract_unity_roots_must_be_directories(folder: str) -> None:
+    files = {name for name in mapping(CASES[0]["files"]) if not name.startswith(folder + "/")}
+    files.add(folder)
+    paths = set(files)
+    for path in files:
+        paths.update(parent.as_posix() for parent in Path(path).parents if parent.parts)
+    errors = validator.validation_errors(files, paths, set(files))
+    assert f"Required Unity root is not a directory: {folder}" in errors
+
+
 @pytest.mark.parametrize(
     "launcher",
     [
@@ -434,3 +445,21 @@ def test_pack_failure_and_owned_cleanup(
         with pytest.raises(ValueError, match="Expected one npm tarball"):
             validator.validate(root)
     assert list(scratch.iterdir()) == []
+
+
+def test_owned_temporary_root_accepts_a_canonical_parent_alias(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "repository"
+    root.mkdir()
+    fixture(CASES[0], root)
+    physical = tmp_path / "physical-temp"
+    physical.mkdir()
+    alias = tmp_path / "temp-alias"
+    try:
+        alias.symlink_to(physical, target_is_directory=True)
+    except OSError:
+        pytest.skip("Creating a directory alias requires host permission")
+    monkeypatch.setattr(tempfile, "tempdir", str(alias))
+    assert validator.validate(root) == 0
+    assert list(physical.iterdir()) == []

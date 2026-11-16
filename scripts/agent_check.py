@@ -253,7 +253,9 @@ def select(files: list[str], tier: str, root: Path = ROOT) -> Selection:
     }
 
 
-def execute_checks(commands: list[list[str]], cwd: Path = ROOT) -> int:
+def execute_checks(
+    commands: list[list[str]], cwd: Path = ROOT, *, capture_output: bool = False
+) -> int:
     if any(not command or not command[0].strip() for command in commands):
         raise ValueError("Expected nonempty command argument vectors")
     for command in commands:
@@ -267,7 +269,15 @@ def execute_checks(commands: list[list[str]], cwd: Path = ROOT) -> int:
             argv = [node, npm_path, *command[1:]]
         elif executable := shutil.which(command[0]):
             argv = [executable, *command[1:]]
-        result = subprocess.run(argv, cwd=cwd, check=False)  # noqa: S603 - selected validation commands inherit live settings.
+        if capture_output:
+            result = subprocess.run(  # noqa: S603 - selected validation commands captured for the JSON bridge.
+                argv, cwd=cwd, check=False, capture_output=True
+            )
+            sys.stdout.write(result.stdout.decode("utf-8", errors="replace"))
+            sys.stderr.write(result.stderr.decode("utf-8", errors="replace"))
+            sys.stderr.flush()
+        else:
+            result = subprocess.run(argv, cwd=cwd, check=False)  # noqa: S603 - selected validation commands inherit live settings.
         print(
             json.dumps(
                 {
@@ -284,7 +294,7 @@ def execute_checks(commands: list[list[str]], cwd: Path = ROOT) -> int:
     return 0
 
 
-def main(arguments: list[str]) -> int:
+def main(arguments: list[str], *, capture_output: bool = False) -> int:
     tier = "iterate"
     base = "origin/main"
     plan = False
@@ -317,7 +327,7 @@ def main(arguments: list[str]) -> int:
     return (
         0
         if plan or selection["status"] == "not-applicable"
-        else execute_checks(selection["commands"])
+        else execute_checks(selection["commands"], capture_output=capture_output)
     )
 
 
@@ -347,7 +357,7 @@ def bridge() -> int:
     elif operation == "main":
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
-            value = main(strings(request.get("args")))
+            value = main(strings(request.get("args")), capture_output=True)
         print(json.dumps({"value": value, "output": output.getvalue()}))
         return 0
     else:

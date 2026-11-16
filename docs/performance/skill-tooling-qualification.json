@@ -2011,5 +2011,9 @@
       }
     ],
     "limitation": "Captured before restoring the original Node case-sensitive source census; retained as historical evidence."
+  },
+  "post_capture_corrections": {
+    "record": "python-tooling-portability-qualification.json",
+    "scope": "Recorded timings remain bound to the original captured source. Later correctness and portability fixes were not remeasured."
   }
 }

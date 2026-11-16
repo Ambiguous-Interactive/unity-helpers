@@ -153,6 +153,35 @@ def test_npm_uses_callers_entrypoint(tmp_path: Path, monkeypatch: pytest.MonkeyP
     assert agent_check.execute_checks([["npm", "literal argument"]], tmp_path) == 0
 
 
+@pytest.mark.parametrize("stdout", ["fragment", "line\n"])
+def test_exported_main_preserves_child_output_and_status(tmp_path: Path, stdout: str) -> None:
+    node = shutil.which("node")
+    assert node is not None
+    child = tmp_path / "npm-child.js"
+    child.write_text(
+        "process.stdout.write("
+        + json.dumps(stdout)
+        + ");process.stderr.write('child diagnostic');process.exit(7);",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [
+            node,
+            "-e",
+            "const {main}=require(process.argv[1]);process.exitCode=main(['--tier','iterate','--files','docs/guide.md']);",
+            str(ROOT / "scripts/agent-check.js"),
+        ],
+        cwd=tmp_path,
+        env={**os.environ, "npm_execpath": str(child)},
+        capture_output=True,
+        check=False,
+        timeout=30,
+    )
+    assert result.returncode == 7, result.stderr
+    assert stdout.encode() in result.stdout
+    assert b"child diagnostic" in result.stderr
+
+
 def test_legacy_test_launcher_reaches_selected_control() -> None:
     node = shutil.which("node")
     assert node is not None
