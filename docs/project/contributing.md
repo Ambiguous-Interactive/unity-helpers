@@ -190,13 +190,15 @@ This native coordinator preserves the active alternate index and existing conten
 Default template synchronization reads the tracked manifest; release preparation alone adds
 a package version. Local tags and remote releases cannot add dropdown entries.
 
-The read-only `check-banner` command checks the actual badge and version field. It rejects
+The read-only `check-banner` command checks every actual text badge and repeated version field.
+Commented and CDATA text cannot satisfy a badge check; repairs retain those bytes. It rejects
 five retained false positives from the old substring checks. The regression suite retains
 40 original synchronization observations and ten original validation observations, including
 malformed metadata that now fails before writes. Missing optional repair inputs still produce
 warnings. The validator and repository dropdown checks require their real input files.
 
-Seven alternating fresh-process pairs after two warmups per arm on Linux tmpfs measured:
+Before the later banner validation corrections, seven alternating fresh-process pairs after
+two warmups per arm on Linux tmpfs measured:
 
 | Command and input           | Original PowerShell | Python through uv |
 | --------------------------- | ------------------: | ----------------: |
@@ -212,8 +214,8 @@ Seven alternating fresh-process pairs after two warmups per arm on Linux tmpfs m
 Banner rewrites are slower at both sizes. Small template rewrite medians are effectively equal.
 A separate call inside an already running PowerShell parent measured 147.28 → 92.14 ms,
 excluding parent startup. The [qualification record](../performance/version-sync-qualification.json)
-retains every pair, source seals, fixtures and limits. These observations do not establish
-Windows, cold-machine, complete Git-commit or CI speed.
+retains every pair, source seals, fixtures and limits. These historical rows do not measure the
+corrected banner implementation, Windows, cold-machine, complete Git-commit or CI speed.
 
 Known non-writable destinations fail before any file is replaced. Hard-linked authored aliases
 stay unchanged. Each selected file publishes atomically; keep other writers idle. Publication

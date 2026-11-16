@@ -27,7 +27,11 @@ BANNER_VERSION = re.compile(
     r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"
     r"(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?"
 )
-BANNER_PATTERN = re.compile(r">v\d+\.\d+\.\d+[^<]*</text>", re.IGNORECASE)
+BANNER_PATTERN = re.compile(
+    r"""<text\b(?:[^<>"']|"[^"]*"|'[^']*')*(?P<badge>>v\d+\.\d+\.\d+[^<]*</text>)""",
+    re.IGNORECASE,
+)
+XML_NON_TEXT = re.compile(r"<!--.*?(?:-->|$)|<!\[CDATA\[.*?(?:\]\]>|$)", re.DOTALL)
 CONTEXT_PATTERN = re.compile(
     r"^\*\*Version\*\*:\s+\d+\.\d+\.\d+[^\r\n]*", re.MULTILINE | re.IGNORECASE
 )
@@ -88,6 +92,22 @@ def package_version(root: Path, inputs: dict[Path, bytes | None], *, banner: boo
     return value
 
 
+def banner_badges(content: str) -> list[re.Match[str]]:
+    masked = XML_NON_TEXT.sub(lambda match: " " * len(match[0]), content)
+    return list(BANNER_PATTERN.finditer(masked))
+
+
+def replace_badges(content: str, badges: list[re.Match[str]], replacement: str) -> str:
+    parts: list[str] = []
+    previous = 0
+    for badge in badges:
+        start, end = badge.span("badge")
+        parts.extend((content[previous:start], replacement))
+        previous = end
+    parts.append(content[previous:])
+    return "".join(parts).rstrip() + "\n"
+
+
 def banner_plan(root: Path) -> Plan:
     inputs: dict[Path, bytes | None] = {}
     version = package_version(root, inputs, banner=True)
@@ -99,15 +119,13 @@ def banner_plan(root: Path) -> Plan:
         messages.append(f"Banner SVG not found at: {banner}, skipping.")
     else:
         replacement = f">v{version}</text>"
-        match = BANNER_PATTERN.search(content)
-        if match is None:
+        badges = banner_badges(content)
+        if not badges:
             messages.append("No version pattern found in SVG, skipping.")
-        elif match[0].casefold() == replacement.casefold():
+        elif all(badge["badge"].casefold() == replacement.casefold() for badge in badges):
             messages.append(f"Banner already has correct version: v{version}")
         else:
-            changes.append(
-                Change(banner, BANNER_PATTERN.sub(lambda _: replacement, content).rstrip() + "\n")
-            )
+            changes.append(Change(banner, replace_badges(content, badges, replacement)))
             messages.extend((f"Updated banner version to: v{version}", f"Staged: {banner}"))
     context = root / ".llm/context.md"
     content = read(context, inputs, optional=True)
@@ -115,10 +133,10 @@ def banner_plan(root: Path) -> Plan:
         messages.append(".llm/context.md not found, skipping.")
     else:
         replacement = f"**Version**: {version}"
-        match = CONTEXT_PATTERN.search(content)
-        if match is None:
+        headings = list(CONTEXT_PATTERN.finditer(content))
+        if not headings:
             messages.append("No version pattern found in .llm/context.md, skipping.")
-        elif match[0].casefold() == replacement.casefold():
+        elif all(heading[0].casefold() == replacement.casefold() for heading in headings):
             messages.append(f".llm/context.md already has correct version: {version}")
         else:
             changes.append(
@@ -138,11 +156,15 @@ def check_banner(root: Path) -> int:
     context = read(root / ".llm/context.md", inputs)
     if banner is None or context is None:
         raise ValueError("Banner validation requires both version references.")
-    badge = BANNER_PATTERN.search(banner)
-    heading = CONTEXT_PATTERN.search(context)
-    if badge is None or badge[0].casefold() != f">v{version}</text>".casefold():
+    badges = banner_badges(banner)
+    headings = list(CONTEXT_PATTERN.finditer(context))
+    if not badges or any(
+        badge["badge"].casefold() != f">v{version}</text>".casefold() for badge in badges
+    ):
         raise ValueError(f"Banner SVG version badge does not match package version {version}.")
-    if heading is None or heading[0].casefold() != f"**Version**: {version}".casefold():
+    if not headings or any(
+        heading[0].casefold() != f"**Version**: {version}".casefold() for heading in headings
+    ):
         raise ValueError(f".llm/context.md version field does not match package version {version}.")
     print(f"Package version: {version}")
     print(f"Banner SVG contains version {version}")

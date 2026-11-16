@@ -434,3 +434,72 @@ def test_legacy_test_launcher_reaches_selected_control(tmp_path: Path) -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert b"8 passed" in result.stdout
+
+
+@pytest.mark.parametrize("target", ["badge", "context"])
+def test_every_repeated_version_is_validated_and_repaired(tmp_path: Path, target: str) -> None:
+    files: dict[str, str | None] = {
+        "package.json": '{"version":"1.2.3"}',
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.3</text></svg>",
+        ".llm/context.md": "**Version**: 1.2.3",
+    }
+    if target == "badge":
+        files["docs/images/unity-helpers-banner.svg"] = (
+            "<svg><text>v1.2.3</text><text>v1.2.2</text></svg>"
+        )
+    else:
+        files[".llm/context.md"] = "**Version**: 1.2.3\n**Version**: 1.2.2"
+    prepare(tmp_path, files, False)
+    with pytest.raises(ValueError, match="does not match"):
+        sync.check_banner(tmp_path)
+    plan = sync.banner_plan(tmp_path)
+    assert len(plan.changes) == 1
+    change = plan.changes[0]
+    assert "1.2.2" not in change.content
+    change.path.write_text(change.content, encoding="utf-8")
+    assert sync.check_banner(tmp_path) == 0
+    assert sync.banner_plan(tmp_path).changes == []
+
+
+@pytest.mark.parametrize(
+    ("svg", "valid", "repaired"),
+    [
+        (
+            "<svg><!--<text>v1.2.3</text>--><text>v1.2.2</text></svg>",
+            False,
+            "<svg><!--<text>v1.2.3</text>--><text>v1.2.3</text></svg>\n",
+        ),
+        ("<svg><!--<text>v1.2.2</text>--><text>v1.2.3</text></svg>", True, None),
+        ("<svg><!--<text>v1.2.3</text>--></svg>", False, None),
+        (
+            "<svg><![CDATA[<text>v1.2.3</text>]]><text>v1.2.2</text></svg>",
+            False,
+            "<svg><![CDATA[<text>v1.2.3</text>]]><text>v1.2.3</text></svg>\n",
+        ),
+        ("<svg><other>v1.2.3</text></svg>", False, None),
+        ('<svg><text title=">">v1.2.3</text></svg>', True, None),
+        ("<svg><text>v1.2.3</text><text>v1.2.3</text></svg>", True, None),
+    ],
+)
+def test_banner_uses_visible_text_elements(
+    tmp_path: Path, svg: str, valid: bool, repaired: str | None
+) -> None:
+    files: dict[str, str | None] = {
+        "package.json": '{"version":"1.2.3"}',
+        "docs/images/unity-helpers-banner.svg": svg,
+        ".llm/context.md": "**Version**: 1.2.3",
+    }
+    prepare(tmp_path, files, False)
+    if valid:
+        assert sync.check_banner(tmp_path) == 0
+    else:
+        with pytest.raises(ValueError, match="badge does not match"):
+            sync.check_banner(tmp_path)
+    plan = sync.banner_plan(tmp_path)
+    if repaired is None:
+        assert plan.changes == []
+    else:
+        assert len(plan.changes) == 1
+        assert plan.changes[0].content == repaired
+        plan.changes[0].path.write_text(repaired, encoding="utf-8")
+        assert sync.check_banner(tmp_path) == 0

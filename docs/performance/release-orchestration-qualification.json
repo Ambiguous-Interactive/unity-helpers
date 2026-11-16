@@ -6,13 +6,13 @@
   "source_sha256": {
     "scripts/release_automation.py": "e595e6547d9caba28cac10c0f23dd0069abffa2c140c6e4a202429176c12b695",
     "scripts/tests/test_release_automation.py": "c1179fa148a8d95c54746e49c8db22011e879963a9610237cec7dbb61afa7b42",
-    "scripts/python~/pyproject.toml": "2d388571310d88ad63d606cf76bb6361cac4107cdb1ac9ce01f705d26c31c9ed",
+    "scripts/python~/pyproject.toml": "d892b5634c1936a19f4ca97dad3fcdd5ad5c7e028e70c8da499f29ede7b844d7",
     "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d",
     "scripts/release-tools/auto-publish-release.js": "9ea5dd19f4c97ad5438bad4e53cd400b8b681b83e7220c1769644b8f11ea73b4",
     "scripts/release-tools/require-native-unity-export.js": "c0564d3e4252adb92f2f2ec3e4e5985d1d9f54b23cecbae8a6be35c648f8ad71",
     "scripts/tests/test-auto-publish-release.js": "a9a3f2d65d40e22caa7b7735e3d3a3b1382f16d45cddd29aca8937a342cb6836",
     "scripts/tests/test-require-native-unity-export.js": "a9a3f2d65d40e22caa7b7735e3d3a3b1382f16d45cddd29aca8937a342cb6836",
-    "scripts/tests/test-run-contract-tests.js": "7103a47c07e25b3ab501b13a2444a744d792f99f609e0f4b522f41c53ce52d2e",
+    "scripts/tests/test-run-contract-tests.js": "c72847e853a14a68c22935a2e484ce50deb82e7975adc340ed62c52ea09578bc",
     "scripts/tests/fixtures/release-orchestration-v1.json": "7e845c4a288cf6cf2f8b42000b16a9e03bbba72d9e203bf68b945bb82a5bc2d4"
   },
   "platform": "Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.36",
@@ -380,5 +380,18 @@
         }
       ]
     }
-  }
+  },
+  "previous_cohort_source_sha256": {
+    "scripts/release_automation.py": "e595e6547d9caba28cac10c0f23dd0069abffa2c140c6e4a202429176c12b695",
+    "scripts/tests/test_release_automation.py": "c1179fa148a8d95c54746e49c8db22011e879963a9610237cec7dbb61afa7b42",
+    "scripts/python~/pyproject.toml": "2d388571310d88ad63d606cf76bb6361cac4107cdb1ac9ce01f705d26c31c9ed",
+    "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d",
+    "scripts/release-tools/auto-publish-release.js": "9ea5dd19f4c97ad5438bad4e53cd400b8b681b83e7220c1769644b8f11ea73b4",
+    "scripts/release-tools/require-native-unity-export.js": "c0564d3e4252adb92f2f2ec3e4e5985d1d9f54b23cecbae8a6be35c648f8ad71",
+    "scripts/tests/test-auto-publish-release.js": "a9a3f2d65d40e22caa7b7735e3d3a3b1382f16d45cddd29aca8937a342cb6836",
+    "scripts/tests/test-require-native-unity-export.js": "a9a3f2d65d40e22caa7b7735e3d3a3b1382f16d45cddd29aca8937a342cb6836",
+    "scripts/tests/test-run-contract-tests.js": "7103a47c07e25b3ab501b13a2444a744d792f99f609e0f4b522f41c53ce52d2e",
+    "scripts/tests/fixtures/release-orchestration-v1.json": "7e845c4a288cf6cf2f8b42000b16a9e03bbba72d9e203bf68b945bb82a5bc2d4"
+  },
+  "source_snapshot_scope": "Version synchronization PR #1216 after banner review corrections; historical release-only seals remain in previous_cohort_source_sha256. This snapshot is not a moving-main invariant."
 }
