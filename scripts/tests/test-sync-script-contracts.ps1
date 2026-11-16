@@ -1929,10 +1929,10 @@ function Run-ReleaseWorkflowChangelogContractTests {
     '1.2.x',
     '1.2.3-alpha'
   )
-  $verifyTagScriptPath = Join-Path $repoRoot 'scripts/ci/verify-release-tag.ps1'
+  $verifyTagScriptPath = Join-Path $repoRoot 'scripts/ci/verify_release_tag.py'
   $verifyTagScriptContent = Get-Content -Path $verifyTagScriptPath -Raw
   $verifierHasStrictReleaseTagRegex = $verifyTagScriptContent.Contains(
-      "-notmatch '$strictReleaseTagRegex'"
+      $strictReleaseTagRegex
   )
   $strictRegexAcceptsExpectedTags = @(
     $acceptedReleaseTags | Where-Object { $_ -notmatch $strictReleaseTagRegex }
@@ -2047,7 +2047,7 @@ function Run-ReleaseWorkflowGitHubCliContractTests {
 
 function Run-ReleasePublishTagPreparationContractTests {
   $verifyTagScriptContent = Get-Content -Path (
-      Join-Path (Get-RepoRoot) 'scripts/ci/verify-release-tag.ps1'
+      Join-Path (Get-RepoRoot) 'scripts/ci/verify_release_tag.py'
   ) -Raw
   Write-Host ""
   Write-Host "Release publish tag-preparation contracts:" -ForegroundColor Magenta
@@ -2093,15 +2093,15 @@ function Run-ReleasePublishTagPreparationContractTests {
     $workflowContent.Contains('tag="${INPUT_VERSION}"') -and
     $workflowContent.Contains('Release version must be a single line.') -and
     $workflowContent.Contains('if [ -n "${tag}" ] && [[ "${tag}" == *$''\n''* || "${tag}" == *$''\r''* ]]; then') -and
-    $verifyTagScriptContent.Contains('"tag=$Tag"') -and
-    (Test-AppearsBefore -Haystack $verifyTagScriptContent -First 'Release version must be a single line.' -Second '"tag=$Tag"')
+    $verifyTagScriptContent.Contains('tag={args.tag}') -and
+    (Test-AppearsBefore -Haystack $verifyTagScriptContent -First 'Release version must be a single line.' -Second 'tag={args.tag}')
   )
 
   $emptyVersionUsesSelectedManifest = (
     $workflowContent.Contains('tag="$(jq -r ''.version // empty'' package.json)"') -and
     $workflowContent.Contains('Release version defaulted to package.json version ${tag}.') -and
-    (Test-AppearsBefore -Haystack $workflowContent -First 'tag="$(jq -r ''.version // empty'' package.json)"' -Second '-Tag "${tag}"') -and
-    (Test-AppearsBefore -Haystack $workflowContent -First '-Tag "${tag}"' -Second 'Release version defaulted to package.json version ${tag}.') -and
+    (Test-AppearsBefore -Haystack $workflowContent -First 'tag="$(jq -r ''.version // empty'' package.json)"' -Second '--tag="${tag}"') -and
+    (Test-AppearsBefore -Haystack $workflowContent -First '--tag="${tag}"' -Second 'Release version defaulted to package.json version ${tag}.') -and
     $workflowContent.Contains('group: release-publish') -and
     $workflowContent.Contains('cancel-in-progress: false')
   )

@@ -108,6 +108,20 @@ results, process receipts, source hashes and the complete case inventory.
 
 ### Typed Python scripts
 
+Release-tag validation uses `scripts/ci/verify_release_tag.py` through locked uv.
+The release workflow provisions the shared Python tools before validation. The PowerShell
+entry point remains compatible, including empty values and rejection of stray arguments.
+`npm run test:verify-release-tag` replays 24 frozen original CLI observations and checks
+metadata types, malformed input, output failures and both compatibility entry points.
+Package names and versions containing CR, LF or NUL fail before writing step outputs;
+the original verifier accepted a name containing LF and wrote an injected output.
+
+Seven alternating Linux ext4 process pairs after two warmups per arm measured original
+PowerShell versus Python through uv. Median times were 244.12→39.17 ms for a small valid
+manifest, 243.13→39.66 ms with 1,000 extra fields, and 238.56→38.83 ms for a version mismatch.
+Exit status, standard output and step-output bytes match in every pair. Source and lock
+hashes stayed fixed. These local command observations do not measure release-job or Windows speed.
+
 Repository-local Prettier, cspell and markdownlint launch through
 `scripts/run_node_bin.py` in locked uv. The existing Node launchers remain compatible.
 The launcher selects the installed package's declared binary, preserves argument boundaries

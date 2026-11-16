@@ -81,6 +81,9 @@ jobs:
         with:
           node-version: "22.23.4"
 
+      - name: Setup Python tools
+        uses: ./.github/actions/setup-python-tools
+
       - name: Verify tag matches package metadata
         id: verify
         env:
@@ -104,10 +107,10 @@ jobs:
           # Tag + package metadata contract, extracted for unit testing (#360). Writes the
           # package-name/package-version/tag step outputs and exits non-zero with a
           # ::error:: annotation on any violation.
-          pwsh -NoProfile -File scripts/ci/verify-release-tag.ps1 \
-            -Tag "${tag}" \
-            -SourceRef "${source_ref}" \
-            -PackageJsonPath package.json
+          uv run --quiet --project scripts/python~ --locked --no-dev python scripts/ci/verify_release_tag.py \
+            --tag="${tag}" \
+            --source-ref="${source_ref}" \
+            --package-json=package.json
 
           if [ "${version_defaulted}" = "true" ]; then
             echo "::notice::Release version defaulted to package.json version ${tag}."
@@ -225,7 +228,7 @@ jobs:
             echo "tag-action=${tag_action}"
           } >> "${GITHUB_OUTPUT}"
           # package-name, package-version, and tag step outputs are written by
-          # scripts/ci/verify-release-tag.ps1 after the tag contract passes.
+          # scripts/ci/verify_release_tag.py after the tag contract passes.
 
   validate-package:
     name: Validate and pack npm package

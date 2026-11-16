@@ -800,7 +800,15 @@
     "id": "verify-release-tag",
     "name": "Release tag contract",
     "run": "npm run test:verify-release-tag",
-    "inputs": ["@tooling"]
+    "inputs": [
+      "@tooling",
+      "scripts/ci/verify-release-tag.ps1",
+      "scripts/ci/verify_release_tag.py",
+      "scripts/tests/test-verify-release-tag.ps1",
+      "scripts/tests/test_release_tag.py",
+      "scripts/tests/fixtures/release-tag-v1.json",
+      ".github/workflows/release.yml"
+    ]
   },
   {
     "id": "perf-tools",

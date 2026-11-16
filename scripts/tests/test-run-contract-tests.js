@@ -367,6 +367,7 @@ runTest("no contract test in scripts/tests/ has been left unreachable", () => {
   // consolidation trades a loud failure (a chain that visibly lost an entry) for a quiet one (a
   // suite that still exists and no longer runs). The excuse is a PREDICATE, not prose.
   const runElsewhere = new Map([
+    ["scripts/tests/test-verify-release-tag.ps1", "release-tag-controls"],
     ["scripts/tests/test-agent-check.js", "agent-controls"],
     ["scripts/tests/test-lint-comparison-direction.js", "comparison-controls"],
     ["scripts/tests/test-typecheck-controls.js", "typecheck-controls"],
@@ -401,6 +402,10 @@ runTest("no contract test in scripts/tests/ has been left unreachable", () => {
     ["scripts/tests/test-sync-issue-template-versions.ps1", "workflow"]
   ]);
   const owners = new Map([
+    [
+      "release-tag-controls",
+      (file) => registeredControlsInvoke(file, "scripts/tests/test_release_tag.py")
+    ],
     [
       "agent-controls",
       (file) => registeredControlsInvoke(file, "scripts/tests/test_agent_check.py")

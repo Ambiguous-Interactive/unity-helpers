@@ -1,0 +1,290 @@
+{
+  "source": "ea385c59daeaa57522c13b52c1c7271643d02b7c",
+  "cases": [
+    {
+      "tag": "3.5.2",
+      "source_ref": "main",
+      "manifest": {
+        "name": "com.wallstop-studios.unity-helpers",
+        "version": "3.5.2"
+      },
+      "exit": 0,
+      "stdout": "Release tag 3.5.2 matches com.wallstop-studios.unity-helpers@3.5.2.\n",
+      "stderr": "",
+      "outputs": "existing=value\npackage-name=com.wallstop-studios.unity-helpers\npackage-version=3.5.2\ntag=3.5.2\n"
+    },
+    {
+      "tag": "3.5.2",
+      "source_ref": "\u00fc source",
+      "manifest": {
+        "name": "com.wallstop-studios.unity-helpers",
+        "version": "3.5.2"
+      },
+      "exit": 0,
+      "stdout": "Release tag 3.5.2 matches com.wallstop-studios.unity-helpers@3.5.2.\n",
+      "stderr": "",
+      "outputs": "existing=value\npackage-name=com.wallstop-studios.unity-helpers\npackage-version=3.5.2\ntag=3.5.2\n"
+    },
+    {
+      "tag": "v3.5.2",
+      "source_ref": "main",
+      "manifest": {
+        "name": "com.wallstop-studios.unity-helpers",
+        "version": "3.5.2"
+      },
+      "exit": 1,
+      "stdout": "::error::Release tags must use unprefixed X.Y.Z semver.\n",
+      "stderr": "",
+      "outputs": "existing=value\n"
+    },
+    {
+      "tag": "3.5",
+      "source_ref": "main",
+      "manifest": {
+        "name": "com.wallstop-studios.unity-helpers",
+        "version": "3.5.2"
+      },
+      "exit": 1,
+      "stdout": "::error::Release tags must use unprefixed X.Y.Z semver.\n",
+      "stderr": "",
+      "outputs": "existing=value\n"
+    },
+    {
+      "tag": "3.5.2.1",
+      "source_ref": "main",
+      "manifest": {
+        "name": "com.wallstop-studios.unity-helpers",
+        "version": "3.5.2"
+      },
+      "exit": 1,
+      "stdout": "::error::Release tags must use unprefixed X.Y.Z semver.\n",
+      "stderr": "",
+      "outputs": "existing=value\n"
+    },
+    {
+      "tag": "03.5.2",
+      "source_ref": "main",
+      "manifest": {
+        "name": "com.wallstop-studios.unity-helpers",
+        "version": "3.5.2"
+      },
+      "exit": 1,
+      "stdout": "::error::Release tags must use unprefixed X.Y.Z semver.\n",
+      "stderr": "",
+      "outputs": "existing=value\n"
+    },
+    {
+      "tag": "3.5.2-beta",
+      "source_ref": "main",
+      "manifest": {
+        "name": "com.wallstop-studios.unity-helpers",
+        "version": "3.5.2"
+      },
+      "exit": 1,
+      "stdout": "::error::Release tags must use unprefixed X.Y.Z semver.\n",
+      "stderr": "",
+      "outputs": "existing=value\n"
+    },
+    {
+      "tag": "release-3.5.2",
+      "source_ref": "main",
+      "manifest": {
+        "name": "com.wallstop-studios.unity-helpers",
+        "version": "3.5.2"
+      },
+      "exit": 1,
+      "stdout": "::error::Release tags must use unprefixed X.Y.Z semver.\n",
+      "stderr": "",
+      "outputs": "existing=value\n"
+    },
+    {
+      "tag": "",
+      "source_ref": "main",
+      "manifest": {
+        "name": "com.wallstop-studios.unity-helpers",
+        "version": "3.5.2"
+      },
+      "exit": 1,
+      "stdout": "::error::Release version is required.\n",
+      "stderr": "",
+      "outputs": "existing=value\n"
+    },
+    {
+      "tag": "3.5.2\nother",
+      "source_ref": "main",
+      "manifest": {
+        "name": "com.wallstop-studios.unity-helpers",
+        "version": "3.5.2"
+      },
+      "exit": 1,
+      "stdout": "::error::Release version must be a single line.\n",
+      "stderr": "",
+      "outputs": "existing=value\n"
+    },
+    {
+      "tag": "3.5.2\rother",
+      "source_ref": "main",
+      "manifest": {
+        "name": "com.wallstop-studios.unity-helpers",
+        "version": "3.5.2"
+      },
+      "exit": 1,
+      "stdout": "::error::Release version must be a single line.\n",
+      "stderr": "",
+      "outputs": "existing=value\n"
+    },
+    {
+      "tag": "3.5.2 ",
+      "source_ref": "main",
+      "manifest": {
+        "name": "com.wallstop-studios.unity-helpers",
+        "version": "3.5.2"
+      },
+      "exit": 1,
+      "stdout": "::error::Release tags must use unprefixed X.Y.Z semver.\n",
+      "stderr": "",
+      "outputs": "existing=value\n"
+    },
+    {
+      "tag": " 3.5.2",
+      "source_ref": "main",
+      "manifest": {
+        "name": "com.wallstop-studios.unity-helpers",
+        "version": "3.5.2"
+      },
+      "exit": 1,
+      "stdout": "::error::Release tags must use unprefixed X.Y.Z semver.\n",
+      "stderr": "",
+      "outputs": "existing=value\n"
+    },
+    {
+      "tag": "3.5.2",
+      "source_ref": "",
+      "manifest": {
+        "name": "com.wallstop-studios.unity-helpers",
+        "version": "3.5.2"
+      },
+      "exit": 1,
+      "stdout": "::error::Release source ref is required.\n",
+      "stderr": "",
+      "outputs": "existing=value\n"
+    },
+    {
+      "tag": "3.5.2",
+      "source_ref": "main\nsecond",
+      "manifest": {
+        "name": "com.wallstop-studios.unity-helpers",
+        "version": "3.5.2"
+      },
+      "exit": 1,
+      "stdout": "::error::Release source ref must be a single line.\n",
+      "stderr": "",
+      "outputs": "existing=value\n"
+    },
+    {
+      "tag": "3.5.2",
+      "source_ref": "main\rsecond",
+      "manifest": {
+        "name": "com.wallstop-studios.unity-helpers",
+        "version": "3.5.2"
+      },
+      "exit": 1,
+      "stdout": "::error::Release source ref must be a single line.\n",
+      "stderr": "",
+      "outputs": "existing=value\n"
+    },
+    {
+      "tag": "3.5.2",
+      "source_ref": "main",
+      "manifest": {
+        "name": "",
+        "version": "3.5.2"
+      },
+      "exit": 1,
+      "stdout": "::error::package.json name/version is missing.\n",
+      "stderr": "",
+      "outputs": "existing=value\n"
+    },
+    {
+      "tag": "3.5.2",
+      "source_ref": "main",
+      "manifest": {
+        "name": "pkg",
+        "version": ""
+      },
+      "exit": 1,
+      "stdout": "::error::package.json name/version is missing.\n",
+      "stderr": "",
+      "outputs": "existing=value\n"
+    },
+    {
+      "tag": "3.5.2",
+      "source_ref": "main",
+      "manifest": {
+        "name": "pkg",
+        "version": "3.5.1"
+      },
+      "exit": 1,
+      "stdout": "::error::Tag 3.5.2 does not match package.json version 3.5.1.\n",
+      "stderr": "",
+      "outputs": "existing=value\n"
+    },
+    {
+      "tag": "3.5.2",
+      "source_ref": "main",
+      "manifest": null,
+      "exit": 1,
+      "stdout": "::error::package.json name/version is missing.\n",
+      "stderr": "",
+      "outputs": "existing=value\n"
+    },
+    {
+      "tag": "0.0.0",
+      "source_ref": "main",
+      "manifest": {
+        "name": "pkg",
+        "version": "0.0.0"
+      },
+      "exit": 0,
+      "stdout": "Release tag 0.0.0 matches pkg@0.0.0.\n",
+      "stderr": "",
+      "outputs": "existing=value\npackage-name=pkg\npackage-version=0.0.0\ntag=0.0.0\n"
+    },
+    {
+      "tag": "1.2.3",
+      "source_ref": "main",
+      "manifest": {
+        "name": "pkg",
+        "version": "1.2.3"
+      },
+      "exit": 0,
+      "stdout": "Release tag 1.2.3 matches pkg@1.2.3.\n",
+      "stderr": "",
+      "outputs": "existing=value\npackage-name=pkg\npackage-version=1.2.3\ntag=1.2.3\n"
+    },
+    {
+      "tag": "10.20.30",
+      "source_ref": "main",
+      "manifest": {
+        "name": "pkg",
+        "version": "10.20.30"
+      },
+      "exit": 0,
+      "stdout": "Release tag 10.20.30 matches pkg@10.20.30.\n",
+      "stderr": "",
+      "outputs": "existing=value\npackage-name=pkg\npackage-version=10.20.30\ntag=10.20.30\n"
+    },
+    {
+      "tag": "999999999999999999999.1.2",
+      "source_ref": "main",
+      "manifest": {
+        "name": "pkg",
+        "version": "999999999999999999999.1.2"
+      },
+      "exit": 0,
+      "stdout": "Release tag 999999999999999999999.1.2 matches pkg@999999999999999999999.1.2.\n",
+      "stderr": "",
+      "outputs": "existing=value\npackage-name=pkg\npackage-version=999999999999999999999.1.2\ntag=999999999999999999999.1.2\n"
+    }
+  ]
+}

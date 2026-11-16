@@ -382,7 +382,7 @@
     "test:npm-package-signature": "pwsh -NoProfile -File scripts/tests/test-npm-package-signature.ps1 -VerboseOutput",
     "test:npm-package-changelog": "pwsh -NoProfile -File scripts/tests/test-npm-package-changelog.ps1 -VerboseOutput",
     "test:release-tools": "pwsh -NoProfile -File scripts/tests/test-release-tools.ps1 -VerboseOutput",
-    "test:verify-release-tag": "pwsh -NoProfile -File scripts/tests/test-verify-release-tag.ps1 -VerboseOutput",
+    "test:verify-release-tag": "uv run --quiet --project scripts/python~ --locked pytest scripts/tests/test_release_tag.py -q",
     "verify:tools": "bash scripts/verify-devcontainer-tools.sh",
     "test:devcontainer-persistence": "uv run --project scripts/python~ --locked pytest scripts/tests/test-devcontainer-persistence.py -q",
     "agents:update": "bash .devcontainer/install-agent-clis.sh --force-latest-check",
