@@ -311,6 +311,13 @@ jobs:
         shell: pwsh
         run: uv run --project scripts/python~ --locked pytest scripts/tests/test_asmdef.py -q
 
+      - name: Verify workspace and log adapters on Windows
+        shell: pwsh
+        run: >-
+          uv run --project scripts/python~ --locked pytest
+          scripts/tests/test_project_workspace.py scripts/tests/test_log_patterns.py
+          -q --durations=20
+
       - name: Verify metadata validation on Windows
         shell: pwsh
         run: >-
@@ -338,7 +345,7 @@ jobs:
           scripts/tests/test_skill_sizes.py scripts/tests/test_comment_block_form.py
           scripts/tests/test_doc_links.py
           scripts/tests/test_lifecycle_lint.py scripts/tests/test_yaml_lint.py scripts/tests/test_no_regions.py scripts/tests/test_dependabot.py scripts/tests/test_doc_samples.py
-          -q --durations=20
+          -vv --durations=20
 
       - name: Verify compiler payload publication on Windows
         shell: pwsh

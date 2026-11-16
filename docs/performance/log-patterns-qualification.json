@@ -19,7 +19,8 @@
     "Native caller exit status is preserved on success and failure. Catalogue data loads without Python and each returned catalogue remains independently mutable.",
     "The first relative-option fixture changed PowerShell location without changing process CWD. Its failure is retained; the corrected fixture launches with the same owned working directory.",
     "Native read handles are released after successful and failed child completion. The owned Windows active-writer comparison remains pending Windows CI.",
-    "The first ownership check found the new typed test unreachable. The lint registry now invokes its actual npm route, whose controls execute the retained native consumers."
+    "The first ownership check found the new typed test unreachable. The lint registry now invokes its actual npm route, whose controls execute the retained native consumers.",
+    "Combined-stack Windows qualification now explicitly runs the new workspace and log suites before the metadata suite. Verbose per-test progress preserves cancellation context without changing the existing ten-minute bound or metadata selection."
   ],
   "native_exceptions": [
     "Host catalogue loading remains native to support diagnostics when Python bootstrap is unavailable. Matching continues through each existing native regex consumer.",
@@ -1619,6 +1620,7 @@
     "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d",
     "package.json": "0a02a1488907f5b9cef22f6bac4574a2e594ecfc9b011621d877729ce5239f4c",
     "scripts/lint-checks.json": "96d0226865d7e906a66c2d85169c3df1ebd23ad91149a67d633637108dbac1d8",
-    "scripts/tests/test-run-contract-tests.js": "6505e5bbcb285d539d9a2226d89ae594fdbc271193b14814e6123dff556e0cec"
+    "scripts/tests/test-run-contract-tests.js": "6505e5bbcb285d539d9a2226d89ae594fdbc271193b14814e6123dff556e0cec",
+    ".github/workflows/local-gates.yml": "f95b4749203ac8ee1054cfcf5474084fbfb54e7f3d6cbbffd740e8e9e883903d"
   }
 }
