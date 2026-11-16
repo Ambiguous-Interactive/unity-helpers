@@ -1,0 +1,315 @@
+{
+  "scope": "Read-only Git push validation through locked typed Python; issue #859 remains unfinished.",
+  "original_commit": "da937cf9386f634cf46a4e8e311dae18146ba11b",
+  "original_source_sha256": {
+    "validate-git-push-config.ps1": "7681a440c7d0e621ca581f5c29747cb614a094204965fc13657b19a8f6cc3172",
+    "git-path-helpers.ps1": "fd4ac97ea238bc1b874db567cfcd5375be6f77bf3e7245caaa0f21c91d1d160d"
+  },
+  "source_sha256": {
+    "scripts/push_validation.py": "dd39b782eb983aa1283c5d5f604d9606e5b4d516b2ae3eb8afaca03348d7cd8e",
+    "scripts/tests/test_push_validation.py": "54b60908b0ec26c027b8eba1bb00416151b24ec20a31350fc96cc331bfde28e9",
+    "scripts/tests/fixtures/push-validation-v1.json": "8c5253505db054c9b2a2085e50f61d8c03409c786707a6450c116dbc729ef81e"
+  },
+  "original_controls": 38,
+  "frozen_cli_observations": 39,
+  "typed_controls": 51,
+  "preserved_contract": [
+    "Read local push defaults, compare trimmed values without case sensitivity, and fail on missing or incorrect values.",
+    "Recognize hook artifact stems and five extensions in the repository root and .githooks. Preserve ignored, unignored and check-ignore-error classifications. Never delete an artifact.",
+    "Inspect container helper configuration only when the existing host checker is present. Invoke the unchanged read-only Bash checker only when a Dev Containers helper is registered. Never invoke a credential helper to retrieve a token.",
+    "Anchor Git reads at the selected root even when invoked elsewhere. Keep token and credential permissions unchanged."
+  ],
+  "stability": [
+    "Git reads and the owned host checker have 30-second process deadlines and fail visibly.",
+    "Artifact diagnostic ordering is deterministic across Python hash seeds.",
+    "Unavailable roots, Git and applicable Bash failures cannot report success."
+  ],
+  "host_boundaries": [
+    "The frozen original host is case sensitive. The upper-extension alternative for a case-insensitive filesystem is labeled inferred in the fixture; an independent PowerShell literal-path probe verifies the host semantics.",
+    "The real container integration runs only when Bash can access repository files. A missing or incompatible host Bash is explicitly skipped for that integration; the applicable missing-Bash validator failure is still tested separately.",
+    "The unchanged Bash checker and push-default configuration helpers retain their host contracts; this cohort does not complete their remaining migration scope."
+  ],
+  "measurement": {
+    "host": "Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.36",
+    "filesystem": "tmpfs",
+    "toolchain": {
+      "uv": "0.13.8",
+      "python": "3.14.10",
+      "powershell": "7.5.3"
+    },
+    "method": "Two warmup pairs then seven alternating fresh-process pairs per fixture size, using isolated Git configuration and temporary repositories. Original and migrated exit statuses and sorted diagnostic lines agree in every observation.",
+    "samples": [
+      {
+        "size": 0,
+        "pair": 0,
+        "kind": "original",
+        "ms": 298.497948,
+        "status": 0,
+        "stdout_sha256": "120ac0f877ef73688a7ad21020a73db6c6d1ec54cec8b50642bf9485bc3e21df",
+        "stderr_hex": ""
+      },
+      {
+        "size": 0,
+        "pair": 0,
+        "kind": "python",
+        "ms": 41.362337,
+        "status": 0,
+        "stdout_sha256": "120ac0f877ef73688a7ad21020a73db6c6d1ec54cec8b50642bf9485bc3e21df",
+        "stderr_hex": ""
+      },
+      {
+        "size": 0,
+        "pair": 1,
+        "kind": "python",
+        "ms": 41.401075,
+        "status": 0,
+        "stdout_sha256": "120ac0f877ef73688a7ad21020a73db6c6d1ec54cec8b50642bf9485bc3e21df",
+        "stderr_hex": ""
+      },
+      {
+        "size": 0,
+        "pair": 1,
+        "kind": "original",
+        "ms": 298.445824,
+        "status": 0,
+        "stdout_sha256": "120ac0f877ef73688a7ad21020a73db6c6d1ec54cec8b50642bf9485bc3e21df",
+        "stderr_hex": ""
+      },
+      {
+        "size": 0,
+        "pair": 2,
+        "kind": "original",
+        "ms": 295.276917,
+        "status": 0,
+        "stdout_sha256": "120ac0f877ef73688a7ad21020a73db6c6d1ec54cec8b50642bf9485bc3e21df",
+        "stderr_hex": ""
+      },
+      {
+        "size": 0,
+        "pair": 2,
+        "kind": "python",
+        "ms": 41.409157,
+        "status": 0,
+        "stdout_sha256": "120ac0f877ef73688a7ad21020a73db6c6d1ec54cec8b50642bf9485bc3e21df",
+        "stderr_hex": ""
+      },
+      {
+        "size": 0,
+        "pair": 3,
+        "kind": "python",
+        "ms": 40.667644,
+        "status": 0,
+        "stdout_sha256": "120ac0f877ef73688a7ad21020a73db6c6d1ec54cec8b50642bf9485bc3e21df",
+        "stderr_hex": ""
+      },
+      {
+        "size": 0,
+        "pair": 3,
+        "kind": "original",
+        "ms": 279.860644,
+        "status": 0,
+        "stdout_sha256": "120ac0f877ef73688a7ad21020a73db6c6d1ec54cec8b50642bf9485bc3e21df",
+        "stderr_hex": ""
+      },
+      {
+        "size": 0,
+        "pair": 4,
+        "kind": "original",
+        "ms": 282.981234,
+        "status": 0,
+        "stdout_sha256": "120ac0f877ef73688a7ad21020a73db6c6d1ec54cec8b50642bf9485bc3e21df",
+        "stderr_hex": ""
+      },
+      {
+        "size": 0,
+        "pair": 4,
+        "kind": "python",
+        "ms": 43.543691,
+        "status": 0,
+        "stdout_sha256": "120ac0f877ef73688a7ad21020a73db6c6d1ec54cec8b50642bf9485bc3e21df",
+        "stderr_hex": ""
+      },
+      {
+        "size": 0,
+        "pair": 5,
+        "kind": "python",
+        "ms": 40.4088,
+        "status": 0,
+        "stdout_sha256": "120ac0f877ef73688a7ad21020a73db6c6d1ec54cec8b50642bf9485bc3e21df",
+        "stderr_hex": ""
+      },
+      {
+        "size": 0,
+        "pair": 5,
+        "kind": "original",
+        "ms": 321.159878,
+        "status": 0,
+        "stdout_sha256": "120ac0f877ef73688a7ad21020a73db6c6d1ec54cec8b50642bf9485bc3e21df",
+        "stderr_hex": ""
+      },
+      {
+        "size": 0,
+        "pair": 6,
+        "kind": "original",
+        "ms": 307.504629,
+        "status": 0,
+        "stdout_sha256": "120ac0f877ef73688a7ad21020a73db6c6d1ec54cec8b50642bf9485bc3e21df",
+        "stderr_hex": ""
+      },
+      {
+        "size": 0,
+        "pair": 6,
+        "kind": "python",
+        "ms": 41.939282,
+        "status": 0,
+        "stdout_sha256": "120ac0f877ef73688a7ad21020a73db6c6d1ec54cec8b50642bf9485bc3e21df",
+        "stderr_hex": ""
+      },
+      {
+        "size": 30,
+        "pair": 0,
+        "kind": "original",
+        "ms": 556.989767,
+        "status": 1,
+        "stdout_sha256": "3652a6487a424af87fea98c0c94114265da9e46f6a240922c66e483f45cc70da",
+        "stderr_hex": ""
+      },
+      {
+        "size": 30,
+        "pair": 0,
+        "kind": "python",
+        "ms": 65.389163,
+        "status": 1,
+        "stdout_sha256": "3652a6487a424af87fea98c0c94114265da9e46f6a240922c66e483f45cc70da",
+        "stderr_hex": ""
+      },
+      {
+        "size": 30,
+        "pair": 1,
+        "kind": "python",
+        "ms": 65.205609,
+        "status": 1,
+        "stdout_sha256": "3652a6487a424af87fea98c0c94114265da9e46f6a240922c66e483f45cc70da",
+        "stderr_hex": ""
+      },
+      {
+        "size": 30,
+        "pair": 1,
+        "kind": "original",
+        "ms": 595.138283,
+        "status": 1,
+        "stdout_sha256": "3652a6487a424af87fea98c0c94114265da9e46f6a240922c66e483f45cc70da",
+        "stderr_hex": ""
+      },
+      {
+        "size": 30,
+        "pair": 2,
+        "kind": "original",
+        "ms": 555.158049,
+        "status": 1,
+        "stdout_sha256": "3652a6487a424af87fea98c0c94114265da9e46f6a240922c66e483f45cc70da",
+        "stderr_hex": ""
+      },
+      {
+        "size": 30,
+        "pair": 2,
+        "kind": "python",
+        "ms": 63.444458,
+        "status": 1,
+        "stdout_sha256": "3652a6487a424af87fea98c0c94114265da9e46f6a240922c66e483f45cc70da",
+        "stderr_hex": ""
+      },
+      {
+        "size": 30,
+        "pair": 3,
+        "kind": "python",
+        "ms": 67.230147,
+        "status": 1,
+        "stdout_sha256": "3652a6487a424af87fea98c0c94114265da9e46f6a240922c66e483f45cc70da",
+        "stderr_hex": ""
+      },
+      {
+        "size": 30,
+        "pair": 3,
+        "kind": "original",
+        "ms": 563.0531,
+        "status": 1,
+        "stdout_sha256": "3652a6487a424af87fea98c0c94114265da9e46f6a240922c66e483f45cc70da",
+        "stderr_hex": ""
+      },
+      {
+        "size": 30,
+        "pair": 4,
+        "kind": "original",
+        "ms": 601.088282,
+        "status": 1,
+        "stdout_sha256": "3652a6487a424af87fea98c0c94114265da9e46f6a240922c66e483f45cc70da",
+        "stderr_hex": ""
+      },
+      {
+        "size": 30,
+        "pair": 4,
+        "kind": "python",
+        "ms": 67.422248,
+        "status": 1,
+        "stdout_sha256": "3652a6487a424af87fea98c0c94114265da9e46f6a240922c66e483f45cc70da",
+        "stderr_hex": ""
+      },
+      {
+        "size": 30,
+        "pair": 5,
+        "kind": "python",
+        "ms": 70.537318,
+        "status": 1,
+        "stdout_sha256": "3652a6487a424af87fea98c0c94114265da9e46f6a240922c66e483f45cc70da",
+        "stderr_hex": ""
+      },
+      {
+        "size": 30,
+        "pair": 5,
+        "kind": "original",
+        "ms": 575.728399,
+        "status": 1,
+        "stdout_sha256": "3652a6487a424af87fea98c0c94114265da9e46f6a240922c66e483f45cc70da",
+        "stderr_hex": ""
+      },
+      {
+        "size": 30,
+        "pair": 6,
+        "kind": "original",
+        "ms": 615.067257,
+        "status": 1,
+        "stdout_sha256": "3652a6487a424af87fea98c0c94114265da9e46f6a240922c66e483f45cc70da",
+        "stderr_hex": ""
+      },
+      {
+        "size": 30,
+        "pair": 6,
+        "kind": "python",
+        "ms": 66.675826,
+        "status": 1,
+        "stdout_sha256": "3652a6487a424af87fea98c0c94114265da9e46f6a240922c66e483f45cc70da",
+        "stderr_hex": ""
+      }
+    ],
+    "median_ms": {
+      "0": {
+        "original": 298.445824,
+        "python": 41.401075
+      },
+      "30": {
+        "original": 575.728399,
+        "python": 66.675826
+      }
+    },
+    "limits": [
+      "One Linux host with empty disposable system/global credential configuration. Real credential checker integration is correctness-tested separately, not timed here.",
+      "No Windows, cold provisioning, full Git push, whole hook or CI performance claim. Seven pairs do not establish statistical significance."
+    ]
+  },
+  "timing_capture_sha256": {
+    "scripts/push_validation.py": "dd39b782eb983aa1283c5d5f604d9606e5b4d516b2ae3eb8afaca03348d7cd8e",
+    "scripts/tests/test_push_validation.py": "4dbf85881cee9d7e61d34ec62c47110ad4f73a81e716f55cfd774da391db36d9",
+    "scripts/tests/fixtures/push-validation-v1.json": "8c5253505db054c9b2a2085e50f61d8c03409c786707a6450c116dbc729ef81e"
+  }
+}

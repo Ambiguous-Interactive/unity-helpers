@@ -183,6 +183,23 @@ Claims still prevent retries after uncertain mutations. CLI stdout and summaries
 Release admission retains the original handling of empty container fork flags, requires string
 branch names, and rejects non-JSON numbers and incompatible package encodings before publication.
 
+The read-only Git push gate runs through locked Python with
+`npm run validate:git-push-config`. Its retained PowerShell commands delegate to
+the same validator and controls. The gate checks local push defaults, classifies
+hook output artifacts, and preserves the existing container credential postcondition.
+It changes no configuration or files. The existing Bash checker runs only when a
+Dev Containers helper is registered; it reads configuration and declared host names,
+and does not request a token. Git reads and the checker have 30-second process deadlines.
+
+The [qualification record](../performance/push-validation-qualification.json)
+retains 39 original CLI observations and 51 typed controls. The real container
+integration uses disposable Git configuration. A PowerShell probe verifies the
+case-sensitive versus case-insensitive filename boundary. Seven alternating Linux
+pairs after two warmup pairs measured 298.45 → 41.40 ms for a clean fixture and
+575.73 → 66.68 ms with 30 hook artifacts. Those fixture timings exclude the container
+checker and do not measure Windows, complete pushes or CI. Host configuration helpers
+remain separate migration scope.
+
 Hook text validation runs through locked Python with
 `npm run validate:hook-sync`. The retained PowerShell validator and test commands
 delegate to that implementation. Required tokens and forbidden merge-hook startup

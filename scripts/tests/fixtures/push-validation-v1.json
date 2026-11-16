@@ -1,0 +1,744 @@
+{
+  "source_sha256": {
+    "validate-git-push-config.ps1": "7681a440c7d0e621ca581f5c29747cb614a094204965fc13657b19a8f6cc3172",
+    "git-path-helpers.ps1": "fd4ac97ea238bc1b874db567cfcd5375be6f77bf3e7245caaa0f21c91d1d160d"
+  },
+  "cases": [
+    {
+      "name": "push.autoSetupRemote-None",
+      "config": {
+        "push.default": "simple"
+      },
+      "files": {
+        ".githooks/pre-commit": "hook"
+      },
+      "status": 1,
+      "stdout_lines": [
+        "Run: npm run agent:preflight:fix",
+        "[validate-git-push-config] ERROR: Git push defaults are not configured for this repository:",
+        "[validate-git-push-config] Failed with 1 check(s) reporting issues.",
+        "push.autoSetupRemote is 'unset' (expected 'true')"
+      ],
+      "stderr_lines": []
+    },
+    {
+      "name": "push.autoSetupRemote-false",
+      "config": {
+        "push.autoSetupRemote": "false",
+        "push.default": "simple"
+      },
+      "files": {
+        ".githooks/pre-commit": "hook"
+      },
+      "status": 1,
+      "stdout_lines": [
+        "Run: npm run agent:preflight:fix",
+        "[validate-git-push-config] ERROR: Git push defaults are not configured for this repository:",
+        "[validate-git-push-config] Failed with 1 check(s) reporting issues.",
+        "push.autoSetupRemote is 'false' (expected 'true')"
+      ],
+      "stderr_lines": []
+    },
+    {
+      "name": "push.autoSetupRemote-TRUE",
+      "config": {
+        "push.autoSetupRemote": "TRUE",
+        "push.default": "simple"
+      },
+      "files": {
+        ".githooks/pre-commit": "hook"
+      },
+      "status": 0,
+      "stdout_lines": [
+        "[validate-git-push-config] Git push config and hook artifact checks passed."
+      ],
+      "stderr_lines": []
+    },
+    {
+      "name": "push.autoSetupRemote- true ",
+      "config": {
+        "push.autoSetupRemote": " true ",
+        "push.default": "simple"
+      },
+      "files": {
+        ".githooks/pre-commit": "hook"
+      },
+      "status": 0,
+      "stdout_lines": [
+        "[validate-git-push-config] Git push config and hook artifact checks passed."
+      ],
+      "stderr_lines": []
+    },
+    {
+      "name": "push.autoSetupRemote-yes",
+      "config": {
+        "push.autoSetupRemote": "yes",
+        "push.default": "simple"
+      },
+      "files": {
+        ".githooks/pre-commit": "hook"
+      },
+      "status": 1,
+      "stdout_lines": [
+        "Run: npm run agent:preflight:fix",
+        "[validate-git-push-config] ERROR: Git push defaults are not configured for this repository:",
+        "[validate-git-push-config] Failed with 1 check(s) reporting issues.",
+        "push.autoSetupRemote is 'yes' (expected 'true')"
+      ],
+      "stderr_lines": []
+    },
+    {
+      "name": "push.autoSetupRemote-1",
+      "config": {
+        "push.autoSetupRemote": "1",
+        "push.default": "simple"
+      },
+      "files": {
+        ".githooks/pre-commit": "hook"
+      },
+      "status": 1,
+      "stdout_lines": [
+        "Run: npm run agent:preflight:fix",
+        "[validate-git-push-config] ERROR: Git push defaults are not configured for this repository:",
+        "[validate-git-push-config] Failed with 1 check(s) reporting issues.",
+        "push.autoSetupRemote is '1' (expected 'true')"
+      ],
+      "stderr_lines": []
+    },
+    {
+      "name": "push.default-None",
+      "config": {
+        "push.autoSetupRemote": "true"
+      },
+      "files": {
+        ".githooks/pre-commit": "hook"
+      },
+      "status": 1,
+      "stdout_lines": [
+        "Run: npm run agent:preflight:fix",
+        "[validate-git-push-config] ERROR: Git push defaults are not configured for this repository:",
+        "[validate-git-push-config] Failed with 1 check(s) reporting issues.",
+        "push.default is 'unset' (expected 'simple')"
+      ],
+      "stderr_lines": []
+    },
+    {
+      "name": "push.default-matching",
+      "config": {
+        "push.autoSetupRemote": "true",
+        "push.default": "matching"
+      },
+      "files": {
+        ".githooks/pre-commit": "hook"
+      },
+      "status": 1,
+      "stdout_lines": [
+        "Run: npm run agent:preflight:fix",
+        "[validate-git-push-config] ERROR: Git push defaults are not configured for this repository:",
+        "[validate-git-push-config] Failed with 1 check(s) reporting issues.",
+        "push.default is 'matching' (expected 'simple')"
+      ],
+      "stderr_lines": []
+    },
+    {
+      "name": "push.default-SIMPLE",
+      "config": {
+        "push.autoSetupRemote": "true",
+        "push.default": "SIMPLE"
+      },
+      "files": {
+        ".githooks/pre-commit": "hook"
+      },
+      "status": 0,
+      "stdout_lines": [
+        "[validate-git-push-config] Git push config and hook artifact checks passed."
+      ],
+      "stderr_lines": []
+    },
+    {
+      "name": "push.default- simple ",
+      "config": {
+        "push.autoSetupRemote": "true",
+        "push.default": " simple "
+      },
+      "files": {
+        ".githooks/pre-commit": "hook"
+      },
+      "status": 0,
+      "stdout_lines": [
+        "[validate-git-push-config] Git push config and hook artifact checks passed."
+      ],
+      "stderr_lines": []
+    },
+    {
+      "name": "push.default-current",
+      "config": {
+        "push.autoSetupRemote": "true",
+        "push.default": "current"
+      },
+      "files": {
+        ".githooks/pre-commit": "hook"
+      },
+      "status": 1,
+      "stdout_lines": [
+        "Run: npm run agent:preflight:fix",
+        "[validate-git-push-config] ERROR: Git push defaults are not configured for this repository:",
+        "[validate-git-push-config] Failed with 1 check(s) reporting issues.",
+        "push.default is 'current' (expected 'simple')"
+      ],
+      "stderr_lines": []
+    },
+    {
+      "name": "push.default-nothing",
+      "config": {
+        "push.autoSetupRemote": "true",
+        "push.default": "nothing"
+      },
+      "files": {
+        ".githooks/pre-commit": "hook"
+      },
+      "status": 1,
+      "stdout_lines": [
+        "Run: npm run agent:preflight:fix",
+        "[validate-git-push-config] ERROR: Git push defaults are not configured for this repository:",
+        "[validate-git-push-config] Failed with 1 check(s) reporting issues.",
+        "push.default is 'nothing' (expected 'simple')"
+      ],
+      "stderr_lines": []
+    },
+    {
+      "name": "clean",
+      "config": {
+        "push.autoSetupRemote": "true",
+        "push.default": "simple"
+      },
+      "files": {
+        ".githooks/pre-commit": "hook"
+      },
+      "status": 0,
+      "stdout_lines": [
+        "[validate-git-push-config] Git push config and hook artifact checks passed."
+      ],
+      "stderr_lines": []
+    },
+    {
+      "name": "-txt-False",
+      "config": {
+        "push.autoSetupRemote": "true",
+        "push.default": "simple"
+      },
+      "files": {
+        ".githooks/pre-commit": "hook",
+        "pre-commit.txt": "redirected output"
+      },
+      "status": 1,
+      "stdout_lines": [
+        "<ROOT>/pre-commit.txt",
+        "For files not gitignored: delete manually if stale, or add a .gitignore entry and re-run (auto-delete is refused for safety).",
+        "NOT gitignored (manual review required):",
+        "[validate-git-push-config] ERROR: Stray git-hook artifact file(s) detected (likely redirected hook output):",
+        "[validate-git-push-config] Failed with 1 check(s) reporting issues."
+      ],
+      "stderr_lines": []
+    },
+    {
+      "name": "-txt-True",
+      "config": {
+        "push.autoSetupRemote": "true",
+        "push.default": "simple"
+      },
+      "files": {
+        ".githooks/pre-commit": "hook",
+        "pre-commit.txt": "redirected output",
+        ".gitignore": "*.txt\n"
+      },
+      "status": 1,
+      "stdout_lines": [
+        "<ROOT>/pre-commit.txt",
+        "For gitignored files: run npm run agent:preflight:fix.",
+        "[validate-git-push-config] ERROR: Stray git-hook artifact file(s) detected (likely redirected hook output):",
+        "[validate-git-push-config] Failed with 1 check(s) reporting issues.",
+        "gitignored (safe to auto-delete via agent:preflight:fix):"
+      ],
+      "stderr_lines": []
+    },
+    {
+      "name": "-log-False",
+      "config": {
+        "push.autoSetupRemote": "true",
+        "push.default": "simple"
+      },
+      "files": {
+        ".githooks/pre-commit": "hook",
+        "pre-commit.log": "redirected output"
+      },
+      "status": 1,
+      "stdout_lines": [
+        "<ROOT>/pre-commit.log",
+        "For files not gitignored: delete manually if stale, or add a .gitignore entry and re-run (auto-delete is refused for safety).",
+        "NOT gitignored (manual review required):",
+        "[validate-git-push-config] ERROR: Stray git-hook artifact file(s) detected (likely redirected hook output):",
+        "[validate-git-push-config] Failed with 1 check(s) reporting issues."
+      ],
+      "stderr_lines": []
+    },
+    {
+      "name": "-log-True",
+      "config": {
+        "push.autoSetupRemote": "true",
+        "push.default": "simple"
+      },
+      "files": {
+        ".githooks/pre-commit": "hook",
+        "pre-commit.log": "redirected output",
+        ".gitignore": "*.log\n"
+      },
+      "status": 1,
+      "stdout_lines": [
+        "<ROOT>/pre-commit.log",
+        "For gitignored files: run npm run agent:preflight:fix.",
+        "[validate-git-push-config] ERROR: Stray git-hook artifact file(s) detected (likely redirected hook output):",
+        "[validate-git-push-config] Failed with 1 check(s) reporting issues.",
+        "gitignored (safe to auto-delete via agent:preflight:fix):"
+      ],
+      "stderr_lines": []
+    },
+    {
+      "name": "-out-False",
+      "config": {
+        "push.autoSetupRemote": "true",
+        "push.default": "simple"
+      },
+      "files": {
+        ".githooks/pre-commit": "hook",
+        "pre-commit.out": "redirected output"
+      },
+      "status": 1,
+      "stdout_lines": [
+        "<ROOT>/pre-commit.out",
+        "For files not gitignored: delete manually if stale, or add a .gitignore entry and re-run (auto-delete is refused for safety).",
+        "NOT gitignored (manual review required):",
+        "[validate-git-push-config] ERROR: Stray git-hook artifact file(s) detected (likely redirected hook output):",
+        "[validate-git-push-config] Failed with 1 check(s) reporting issues."
+      ],
+      "stderr_lines": []
+    },
+    {
+      "name": "-out-True",
+      "config": {
+        "push.autoSetupRemote": "true",
+        "push.default": "simple"
+      },
+      "files": {
+        ".githooks/pre-commit": "hook",
+        "pre-commit.out": "redirected output",
+        ".gitignore": "*.out\n"
+      },
+      "status": 1,
+      "stdout_lines": [
+        "<ROOT>/pre-commit.out",
+        "For gitignored files: run npm run agent:preflight:fix.",
+        "[validate-git-push-config] ERROR: Stray git-hook artifact file(s) detected (likely redirected hook output):",
+        "[validate-git-push-config] Failed with 1 check(s) reporting issues.",
+        "gitignored (safe to auto-delete via agent:preflight:fix):"
+      ],
+      "stderr_lines": []
+    },
+    {
+      "name": "-err-False",
+      "config": {
+        "push.autoSetupRemote": "true",
+        "push.default": "simple"
+      },
+      "files": {
+        ".githooks/pre-commit": "hook",
+        "pre-commit.err": "redirected output"
+      },
+      "status": 1,
+      "stdout_lines": [
+        "<ROOT>/pre-commit.err",
+        "For files not gitignored: delete manually if stale, or add a .gitignore entry and re-run (auto-delete is refused for safety).",
+        "NOT gitignored (manual review required):",
+        "[validate-git-push-config] ERROR: Stray git-hook artifact file(s) detected (likely redirected hook output):",
+        "[validate-git-push-config] Failed with 1 check(s) reporting issues."
+      ],
+      "stderr_lines": []
+    },
+    {
+      "name": "-err-True",
+      "config": {
+        "push.autoSetupRemote": "true",
+        "push.default": "simple"
+      },
+      "files": {
+        ".githooks/pre-commit": "hook",
+        "pre-commit.err": "redirected output",
+        ".gitignore": "*.err\n"
+      },
+      "status": 1,
+      "stdout_lines": [
+        "<ROOT>/pre-commit.err",
+        "For gitignored files: run npm run agent:preflight:fix.",
+        "[validate-git-push-config] ERROR: Stray git-hook artifact file(s) detected (likely redirected hook output):",
+        "[validate-git-push-config] Failed with 1 check(s) reporting issues.",
+        "gitignored (safe to auto-delete via agent:preflight:fix):"
+      ],
+      "stderr_lines": []
+    },
+    {
+      "name": "-tmp-False",
+      "config": {
+        "push.autoSetupRemote": "true",
+        "push.default": "simple"
+      },
+      "files": {
+        ".githooks/pre-commit": "hook",
+        "pre-commit.tmp": "redirected output"
+      },
+      "status": 1,
+      "stdout_lines": [
+        "<ROOT>/pre-commit.tmp",
+        "For files not gitignored: delete manually if stale, or add a .gitignore entry and re-run (auto-delete is refused for safety).",
+        "NOT gitignored (manual review required):",
+        "[validate-git-push-config] ERROR: Stray git-hook artifact file(s) detected (likely redirected hook output):",
+        "[validate-git-push-config] Failed with 1 check(s) reporting issues."
+      ],
+      "stderr_lines": []
+    },
+    {
+      "name": "-tmp-True",
+      "config": {
+        "push.autoSetupRemote": "true",
+        "push.default": "simple"
+      },
+      "files": {
+        ".githooks/pre-commit": "hook",
+        "pre-commit.tmp": "redirected output",
+        ".gitignore": "*.tmp\n"
+      },
+      "status": 1,
+      "stdout_lines": [
+        "<ROOT>/pre-commit.tmp",
+        "For gitignored files: run npm run agent:preflight:fix.",
+        "[validate-git-push-config] ERROR: Stray git-hook artifact file(s) detected (likely redirected hook output):",
+        "[validate-git-push-config] Failed with 1 check(s) reporting issues.",
+        "gitignored (safe to auto-delete via agent:preflight:fix):"
+      ],
+      "stderr_lines": []
+    },
+    {
+      "name": ".githooks-txt-False",
+      "config": {
+        "push.autoSetupRemote": "true",
+        "push.default": "simple"
+      },
+      "files": {
+        ".githooks/pre-commit": "hook",
+        ".githooks/pre-commit.txt": "redirected output"
+      },
+      "status": 1,
+      "stdout_lines": [
+        "<ROOT>/.githooks/pre-commit.txt",
+        "For files not gitignored: delete manually if stale, or add a .gitignore entry and re-run (auto-delete is refused for safety).",
+        "NOT gitignored (manual review required):",
+        "[validate-git-push-config] ERROR: Stray git-hook artifact file(s) detected (likely redirected hook output):",
+        "[validate-git-push-config] Failed with 1 check(s) reporting issues."
+      ],
+      "stderr_lines": []
+    },
+    {
+      "name": ".githooks-txt-True",
+      "config": {
+        "push.autoSetupRemote": "true",
+        "push.default": "simple"
+      },
+      "files": {
+        ".githooks/pre-commit": "hook",
+        ".githooks/pre-commit.txt": "redirected output",
+        ".gitignore": "*.txt\n"
+      },
+      "status": 1,
+      "stdout_lines": [
+        "<ROOT>/.githooks/pre-commit.txt",
+        "For gitignored files: run npm run agent:preflight:fix.",
+        "[validate-git-push-config] ERROR: Stray git-hook artifact file(s) detected (likely redirected hook output):",
+        "[validate-git-push-config] Failed with 1 check(s) reporting issues.",
+        "gitignored (safe to auto-delete via agent:preflight:fix):"
+      ],
+      "stderr_lines": []
+    },
+    {
+      "name": ".githooks-log-False",
+      "config": {
+        "push.autoSetupRemote": "true",
+        "push.default": "simple"
+      },
+      "files": {
+        ".githooks/pre-commit": "hook",
+        ".githooks/pre-commit.log": "redirected output"
+      },
+      "status": 1,
+      "stdout_lines": [
+        "<ROOT>/.githooks/pre-commit.log",
+        "For files not gitignored: delete manually if stale, or add a .gitignore entry and re-run (auto-delete is refused for safety).",
+        "NOT gitignored (manual review required):",
+        "[validate-git-push-config] ERROR: Stray git-hook artifact file(s) detected (likely redirected hook output):",
+        "[validate-git-push-config] Failed with 1 check(s) reporting issues."
+      ],
+      "stderr_lines": []
+    },
+    {
+      "name": ".githooks-log-True",
+      "config": {
+        "push.autoSetupRemote": "true",
+        "push.default": "simple"
+      },
+      "files": {
+        ".githooks/pre-commit": "hook",
+        ".githooks/pre-commit.log": "redirected output",
+        ".gitignore": "*.log\n"
+      },
+      "status": 1,
+      "stdout_lines": [
+        "<ROOT>/.githooks/pre-commit.log",
+        "For gitignored files: run npm run agent:preflight:fix.",
+        "[validate-git-push-config] ERROR: Stray git-hook artifact file(s) detected (likely redirected hook output):",
+        "[validate-git-push-config] Failed with 1 check(s) reporting issues.",
+        "gitignored (safe to auto-delete via agent:preflight:fix):"
+      ],
+      "stderr_lines": []
+    },
+    {
+      "name": ".githooks-out-False",
+      "config": {
+        "push.autoSetupRemote": "true",
+        "push.default": "simple"
+      },
+      "files": {
+        ".githooks/pre-commit": "hook",
+        ".githooks/pre-commit.out": "redirected output"
+      },
+      "status": 1,
+      "stdout_lines": [
+        "<ROOT>/.githooks/pre-commit.out",
+        "For files not gitignored: delete manually if stale, or add a .gitignore entry and re-run (auto-delete is refused for safety).",
+        "NOT gitignored (manual review required):",
+        "[validate-git-push-config] ERROR: Stray git-hook artifact file(s) detected (likely redirected hook output):",
+        "[validate-git-push-config] Failed with 1 check(s) reporting issues."
+      ],
+      "stderr_lines": []
+    },
+    {
+      "name": ".githooks-out-True",
+      "config": {
+        "push.autoSetupRemote": "true",
+        "push.default": "simple"
+      },
+      "files": {
+        ".githooks/pre-commit": "hook",
+        ".githooks/pre-commit.out": "redirected output",
+        ".gitignore": "*.out\n"
+      },
+      "status": 1,
+      "stdout_lines": [
+        "<ROOT>/.githooks/pre-commit.out",
+        "For gitignored files: run npm run agent:preflight:fix.",
+        "[validate-git-push-config] ERROR: Stray git-hook artifact file(s) detected (likely redirected hook output):",
+        "[validate-git-push-config] Failed with 1 check(s) reporting issues.",
+        "gitignored (safe to auto-delete via agent:preflight:fix):"
+      ],
+      "stderr_lines": []
+    },
+    {
+      "name": ".githooks-err-False",
+      "config": {
+        "push.autoSetupRemote": "true",
+        "push.default": "simple"
+      },
+      "files": {
+        ".githooks/pre-commit": "hook",
+        ".githooks/pre-commit.err": "redirected output"
+      },
+      "status": 1,
+      "stdout_lines": [
+        "<ROOT>/.githooks/pre-commit.err",
+        "For files not gitignored: delete manually if stale, or add a .gitignore entry and re-run (auto-delete is refused for safety).",
+        "NOT gitignored (manual review required):",
+        "[validate-git-push-config] ERROR: Stray git-hook artifact file(s) detected (likely redirected hook output):",
+        "[validate-git-push-config] Failed with 1 check(s) reporting issues."
+      ],
+      "stderr_lines": []
+    },
+    {
+      "name": ".githooks-err-True",
+      "config": {
+        "push.autoSetupRemote": "true",
+        "push.default": "simple"
+      },
+      "files": {
+        ".githooks/pre-commit": "hook",
+        ".githooks/pre-commit.err": "redirected output",
+        ".gitignore": "*.err\n"
+      },
+      "status": 1,
+      "stdout_lines": [
+        "<ROOT>/.githooks/pre-commit.err",
+        "For gitignored files: run npm run agent:preflight:fix.",
+        "[validate-git-push-config] ERROR: Stray git-hook artifact file(s) detected (likely redirected hook output):",
+        "[validate-git-push-config] Failed with 1 check(s) reporting issues.",
+        "gitignored (safe to auto-delete via agent:preflight:fix):"
+      ],
+      "stderr_lines": []
+    },
+    {
+      "name": ".githooks-tmp-False",
+      "config": {
+        "push.autoSetupRemote": "true",
+        "push.default": "simple"
+      },
+      "files": {
+        ".githooks/pre-commit": "hook",
+        ".githooks/pre-commit.tmp": "redirected output"
+      },
+      "status": 1,
+      "stdout_lines": [
+        "<ROOT>/.githooks/pre-commit.tmp",
+        "For files not gitignored: delete manually if stale, or add a .gitignore entry and re-run (auto-delete is refused for safety).",
+        "NOT gitignored (manual review required):",
+        "[validate-git-push-config] ERROR: Stray git-hook artifact file(s) detected (likely redirected hook output):",
+        "[validate-git-push-config] Failed with 1 check(s) reporting issues."
+      ],
+      "stderr_lines": []
+    },
+    {
+      "name": ".githooks-tmp-True",
+      "config": {
+        "push.autoSetupRemote": "true",
+        "push.default": "simple"
+      },
+      "files": {
+        ".githooks/pre-commit": "hook",
+        ".githooks/pre-commit.tmp": "redirected output",
+        ".gitignore": "*.tmp\n"
+      },
+      "status": 1,
+      "stdout_lines": [
+        "<ROOT>/.githooks/pre-commit.tmp",
+        "For gitignored files: run npm run agent:preflight:fix.",
+        "[validate-git-push-config] ERROR: Stray git-hook artifact file(s) detected (likely redirected hook output):",
+        "[validate-git-push-config] Failed with 1 check(s) reporting issues.",
+        "gitignored (safe to auto-delete via agent:preflight:fix):"
+      ],
+      "stderr_lines": []
+    },
+    {
+      "name": "notes",
+      "config": {
+        "push.autoSetupRemote": "true",
+        "push.default": "simple"
+      },
+      "files": {
+        ".githooks/pre-commit": "hook",
+        ".githooks/notes.txt": "note"
+      },
+      "status": 0,
+      "stdout_lines": [
+        "[validate-git-push-config] Git push config and hook artifact checks passed."
+      ],
+      "stderr_lines": []
+    },
+    {
+      "name": "sample",
+      "config": {
+        "push.autoSetupRemote": "true",
+        "push.default": "simple"
+      },
+      "files": {
+        ".githooks/pre-commit.sample": "hook",
+        "pre-commit.txt": "note"
+      },
+      "status": 0,
+      "stdout_lines": [
+        "[validate-git-push-config] Git push config and hook artifact checks passed."
+      ],
+      "stderr_lines": []
+    },
+    {
+      "name": "extension-stem",
+      "config": {
+        "push.autoSetupRemote": "true",
+        "push.default": "simple"
+      },
+      "files": {
+        ".githooks/pre-commit.ps1": "hook",
+        "pre-commit.txt": "note"
+      },
+      "status": 1,
+      "stdout_lines": [
+        "<ROOT>/pre-commit.txt",
+        "For files not gitignored: delete manually if stale, or add a .gitignore entry and re-run (auto-delete is refused for safety).",
+        "NOT gitignored (manual review required):",
+        "[validate-git-push-config] ERROR: Stray git-hook artifact file(s) detected (likely redirected hook output):",
+        "[validate-git-push-config] Failed with 1 check(s) reporting issues."
+      ],
+      "stderr_lines": []
+    },
+    {
+      "name": "hidden-hook",
+      "config": {
+        "push.autoSetupRemote": "true",
+        "push.default": "simple"
+      },
+      "files": {
+        ".githooks/.secret": "hook",
+        ".secret.txt": "note"
+      },
+      "status": 0,
+      "stdout_lines": [
+        "[validate-git-push-config] Git push config and hook artifact checks passed."
+      ],
+      "stderr_lines": []
+    },
+    {
+      "name": "upper-extension",
+      "config": {
+        "push.autoSetupRemote": "true",
+        "push.default": "simple"
+      },
+      "files": {
+        ".githooks/pre-commit": "hook",
+        "pre-commit.TXT": "note"
+      },
+      "status": 0,
+      "stdout_lines": [
+        "[validate-git-push-config] Git push config and hook artifact checks passed."
+      ],
+      "stderr_lines": [],
+      "inferred_case_insensitive_filesystem": {
+        "status": 1,
+        "stdout_lines": [
+          "<ROOT>/pre-commit.txt",
+          "For files not gitignored: delete manually if stale, or add a .gitignore entry and re-run (auto-delete is refused for safety).",
+          "NOT gitignored (manual review required):",
+          "[validate-git-push-config] ERROR: Stray git-hook artifact file(s) detected (likely redirected hook output):",
+          "[validate-git-push-config] Failed with 1 check(s) reporting issues."
+        ],
+        "stderr_lines": []
+      }
+    },
+    {
+      "name": "no-hooks",
+      "config": {
+        "push.autoSetupRemote": "true",
+        "push.default": "simple"
+      },
+      "files": {},
+      "status": 0,
+      "stdout_lines": [
+        "[validate-git-push-config] Git push config and hook artifact checks passed."
+      ],
+      "stderr_lines": []
+    }
+  ],
+  "host_boundary": "The captured host is case sensitive. The upper-extension alternative follows the original literal Test-Path leaf semantics on a case-insensitive filesystem; an independent PowerShell filesystem control verifies host behavior."
+}
