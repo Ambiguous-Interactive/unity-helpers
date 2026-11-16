@@ -9,6 +9,11 @@ on:
       - ".github/issue-template-versions.json"
       - "scripts/tests/test-sync-issue-template-versions.ps1"
       - "scripts/sync-issue-template-versions.ps1"
+      - "scripts/version_sync.py"
+      - "scripts/stage-version-sync-files.ps1"
+      - "scripts/tests/test_version_sync.py"
+      - "scripts/python~/pyproject.toml"
+      - "scripts/python~/uv.lock"
       - ".github/workflows/sync-issue-template.yml"
   release:
     types:
@@ -38,13 +43,14 @@ jobs:
           ref: main
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Test sync-issue-template-versions script
-        shell: pwsh
-        run: ./scripts/tests/test-sync-issue-template-versions.ps1 -VerboseOutput
+      - name: Setup Python tooling
+        uses: ./.github/actions/setup-python-tools
+
+      - name: Test version synchronization
+        run: uv run --project scripts/python~ --locked pytest scripts/tests/test_version_sync.py -q
 
       - name: Run sync script
-        shell: pwsh
-        run: ./scripts/sync-issue-template-versions.ps1
+        run: uv run --project scripts/python~ --locked --no-dev python scripts/version_sync.py templates
 
       - name: Check for changes
         id: diff
@@ -65,7 +71,6 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .github/ISSUE_TEMPLATE/ .github/issue-template-versions.json
           git commit -m "chore: sync issue template package versions [skip ci]"
           git push origin main
 

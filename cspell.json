@@ -1343,6 +1343,10 @@
     {
       "filename": ["scripts/tests/fixtures/skill-splits-v1.json", "cspell.json"],
       "words": ["dcber", "fcber"]
+    },
+    {
+      "filename": ["scripts/tests/fixtures/version-sync-v1.json", "cspell.json"],
+      "words": ["manif", "misordered"]
     }
   ]
 }

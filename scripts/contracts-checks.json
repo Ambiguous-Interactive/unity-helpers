@@ -96,6 +96,17 @@
     "inputs": ["@tooling"]
   },
   {
+    "id": "version-sync",
+    "name": "Version reference synchronization",
+    "run": "npm run test:version-sync",
+    "inputs": [
+      "@tooling",
+      ".github/issue-template-versions.json",
+      ".github/ISSUE_TEMPLATE/*.yml",
+      "docs/images/unity-helpers-banner.svg"
+    ]
+  },
+  {
     "id": "auto-publish-release",
     "name": "Automatic release publication",
     "run": "npm run test:auto-publish-release",

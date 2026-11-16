@@ -9,6 +9,10 @@ on:
       - "docs/images/unity-helpers-banner.svg"
       - ".llm/context.md"
       - "scripts/sync-banner-version.ps1"
+      - "scripts/version_sync.py"
+      - "scripts/tests/test_version_sync.py"
+      - "scripts/python~/pyproject.toml"
+      - "scripts/python~/uv.lock"
       - ".github/workflows/sync-banner-version.yml"
   pull_request:
     paths:
@@ -16,6 +20,10 @@ on:
       - "docs/images/unity-helpers-banner.svg"
       - ".llm/context.md"
       - "scripts/sync-banner-version.ps1"
+      - "scripts/version_sync.py"
+      - "scripts/tests/test_version_sync.py"
+      - "scripts/python~/pyproject.toml"
+      - "scripts/python~/uv.lock"
       - ".github/workflows/sync-banner-version.yml"
 
 permissions:
@@ -32,37 +40,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
+      - name: Setup Python tooling
+        uses: ./.github/actions/setup-python-tools
+
       - name: Validate banner version matches package.json
-        shell: pwsh
-        run: |
-          $packageJson = Get-Content -Raw package.json | ConvertFrom-Json
-          $version = $packageJson.version
-          Write-Host "Package version: $version"
-
-          # Check SVG banner
-          $bannerPath = 'docs/images/unity-helpers-banner.svg'
-          if (-not (Test-Path $bannerPath)) {
-            Write-Host "::error::Banner SVG not found at $bannerPath"
-            exit 1
-          }
-          $bannerContent = Get-Content -Raw $bannerPath
-          if ($bannerContent -notmatch [regex]::Escape($version)) {
-            Write-Host "::error::Banner SVG does not contain version $version"
-            exit 1
-          }
-          Write-Host "Banner SVG contains version $version"
-
-          # Check .llm/context.md
-          $contextPath = '.llm/context.md'
-          if (-not (Test-Path $contextPath)) {
-            Write-Host "::error::.llm/context.md not found at $contextPath"
-            exit 1
-          }
-          $contextContent = Get-Content -Raw $contextPath
-          if ($contextContent -notmatch "Version.*$([regex]::Escape($version))") {
-            Write-Host "::error::.llm/context.md does not contain version $version"
-            exit 1
-          }
-          Write-Host ".llm/context.md contains version $version"
-
-          Write-Host "All version references are in sync."
+        run: uv run --project scripts/python~ --locked --no-dev python scripts/version_sync.py check-banner

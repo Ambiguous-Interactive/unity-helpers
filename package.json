@@ -407,6 +407,7 @@
     "test:enumeration": "dotnet test \"Generator~/WallstopStudios.UnityHelpers.Enumeration.Tests/WallstopStudios.UnityHelpers.Enumeration.Tests.csproj\" -c Release --nologo",
     "test:stable-assets": "dotnet test \"Generator~/WallstopStudios.UnityHelpers.StableAssets.Tests/WallstopStudios.UnityHelpers.StableAssets.Tests.csproj\" -c Release --nologo",
     "typecheck:unity:odin-bases-disabled": "dotnet build \"Generator~/WallstopStudios.UnityHelpers.TypeCheck/WallstopStudios.UnityHelpers.TypeCheck.csproj\" --nologo -v minimal -p:WallstopOdin=true -p:WallstopDisableOdinBases=true && dotnet build \"Generator~/WallstopStudios.UnityHelpers.TestCheck/WallstopStudios.UnityHelpers.TestCheck.csproj\" --nologo -v minimal -p:WallstopOdin=true -p:WallstopDisableOdinBases=true && dotnet build \"Generator~/WallstopStudios.UnityHelpers.EditorTestCheck/WallstopStudios.UnityHelpers.EditorTestCheck.csproj\" --nologo -v minimal -p:WallstopOdin=true -p:WallstopDisableOdinBases=true",
+    "test:version-sync": "uv run --project scripts/python~ --locked pytest scripts/tests/test_version_sync.py -q",
     "test:auto-publish-release": "uv run --project scripts/python~ --locked pytest scripts/tests/test_release_automation.py -q",
     "test:watchdog-cancellation": "uv run --project scripts/python~ --locked pytest scripts/tests/test-watchdog-cancellation.py -q",
     "test:unity-modes": "uv run --project scripts/python~ --locked pytest scripts/tests/test_ci_modes.py scripts/tests/test_editmode_shards.py -q",
