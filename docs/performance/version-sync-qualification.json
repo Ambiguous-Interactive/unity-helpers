@@ -6,14 +6,14 @@
     "scripts/git-staging-helpers.ps1": "6106ab0d95cf64cc30b0e6314d6a8cc5555ab56c7610e3fb3986f1153592f957"
   },
   "source_sha256": {
-    "scripts/version_sync.py": "827b3c546722a494d2a2896fae1e38fd22b221fadf1b445b4655e7dfb362b69a",
+    "scripts/version_sync.py": "92124656b2e2864bf55fcaf11e3745b045ee4cc3f8ed89b3142270a5ac1c65b7",
     "scripts/stage-version-sync-files.ps1": "dbb04a35a1edcae1f3cf88d54175c798fa33476b3db4b9931fd17fd3d4cbbeed",
     "scripts/sync-banner-version.ps1": "40a87a1c4ef824a69219eef2848d9ef1cf08af9b6d8cf3b04d4e34c39d9a806f",
     "scripts/sync-issue-template-versions.ps1": "5662dc9feba6a2172931cc9f156dc4a551a320f7f620108f3e46667cd1d76725",
     "scripts/git-staging-helpers.ps1": "6106ab0d95cf64cc30b0e6314d6a8cc5555ab56c7610e3fb3986f1153592f957",
     "scripts/python~/pyproject.toml": "d892b5634c1936a19f4ca97dad3fcdd5ad5c7e028e70c8da499f29ede7b844d7",
     "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d",
-    "scripts/tests/test_version_sync.py": "88902e2ebdd53db28aba25a4b3faf2ba944cda39db9db2875f46c956b26450f5"
+    "scripts/tests/test_version_sync.py": "139773aac78de51beb513fedff4638f36665ab241732a6a428c332109ec1fefb"
   },
   "platform": "Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.36",
   "filesystem": "tmpfs",
@@ -424,7 +424,7 @@
     "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d"
   },
   "review_corrections": {
-    "controls": 81,
+    "controls": 91,
     "new_red": 7,
     "new_already_green": 2,
     "changes": [
@@ -433,6 +433,10 @@
     ],
     "timing_limit": "All timing rows are historical before these banner corrections and do not measure corrected source. Prior source seals remain under timing_capture_sha256.",
     "retained_misses": "Banner rewrite regressions and effectively flat small-template rewrite medians remain historical evidence, not current-source performance claims.",
-    "linked_destination_control": "Renaming the test removed an accidental match against the temporary directory name and reproduced the claimed failure. The corrected anchored refusal diagnostic reaches link and file-preservation assertions."
+    "linked_destination_control": "Renaming the test removed an accidental match against the temporary directory name and reproduced the claimed failure. The corrected anchored refusal diagnostic reaches link and file-preservation assertions.",
+    "embedded_xml_red": 7,
+    "embedded_xml_already_green": 1,
+    "version_length_controls": 2,
+    "embedded_xml_repair": "Compare literal version characters independently from opaque XML source regions. Replace only version character spans, retaining comments and CDATA byte-for-byte, including when a region splits the version or the replacement changes its length."
   }
 }

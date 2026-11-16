@@ -479,6 +479,26 @@ def test_every_repeated_version_is_validated_and_repaired(tmp_path: Path, target
         ),
         ("<svg><other>v1.2.3</text></svg>", False, None),
         ('<svg><text title=">">v1.2.3</text></svg>', True, None),
+        ("<svg><text>v1.2.3<!--keep--></text></svg>", True, None),
+        ("<svg><text><!--keep-->v1.2.3</text></svg>", True, None),
+        (
+            "<svg><text>v1.2.2<!--keep--></text></svg>",
+            False,
+            "<svg><text>v1.2.3<!--keep--></text></svg>\n",
+        ),
+        (
+            "<svg><text>v1.<!--keep-->2.2</text></svg>",
+            False,
+            "<svg><text>v1.<!--keep-->2.3</text></svg>\n",
+        ),
+        (
+            "<svg><text>v0.1<![CDATA[preserved>data]]>.9</text></svg>",
+            False,
+            "<svg><text>v1.2<![CDATA[preserved>data]]>.3</text></svg>\n",
+        ),
+        ("<svg><text><![CDATA[v9.9.9]]>v1.2.3</text></svg>", True, None),
+        ("<svg><text><![CDATA[v1.2.3]]></text></svg>", False, None),
+        ("<svg><text/>v1.2.3</text></svg>", False, None),
         ("<svg><text>v1.2.3</text><text>v1.2.3</text></svg>", True, None),
     ],
 )
@@ -504,3 +524,27 @@ def test_banner_uses_visible_text_elements(
         assert plan.changes[0].content == repaired
         plan.changes[0].path.write_text(repaired, encoding="utf-8")
         assert sync.check_banner(tmp_path) == 0
+
+
+@pytest.mark.parametrize(
+    ("old", "version", "expected"),
+    [
+        ("v1.<!--keep-->2.3", "123.45.6789", "v12<!--keep-->3.45.6789"),
+        ("v100.<!--keep-->200.300", "1.2.3", "v1.2.<!--keep-->3"),
+    ],
+)
+def test_badge_repair_preserves_opaque_bytes_when_version_length_changes(
+    tmp_path: Path, old: str, version: str, expected: str
+) -> None:
+    files: dict[str, str | None] = {
+        "package.json": json.dumps({"version": version}),
+        "docs/images/unity-helpers-banner.svg": f"<svg><text>{old}</text></svg>",
+        ".llm/context.md": f"**Version**: {version}",
+    }
+    prepare(tmp_path, files, False)
+    plan = sync.banner_plan(tmp_path)
+    assert len(plan.changes) == 1
+    assert plan.changes[0].content == f"<svg><text>{expected}</text></svg>\n"
+    plan.changes[0].path.write_text(plan.changes[0].content, encoding="utf-8")
+    assert sync.check_banner(tmp_path) == 0
+    assert sync.banner_plan(tmp_path).changes == []
