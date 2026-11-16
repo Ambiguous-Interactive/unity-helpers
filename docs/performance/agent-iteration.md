@@ -24,7 +24,9 @@ p95 of 5,756 seconds (95m56s). The concurrent mode-controller step accounts for 
 seconds across successful runs, versus 294 seconds for license acquisition. These concurrent sums
 are not elapsed time or CPU time. Runner placement and changing source prevent causal speedup claims.
 
-Replaying the 30 task diffs against this selector proposes full native coverage for all 30.
+Replaying the 30 task diffs at the initial selector revision `cdf59dba` selects all native modes
+for all 30. This replay predates the latest-only required version policy; it does not mean older
+editors remain on the required path.
 For PRs, the replay uses each head's merge-base with retained main history; push runs use the first
 parent. This is a scope check, not a timing experiment or an assertion that historical trigger bases
 were identical. A last-commit-only replay incorrectly narrowed one multi-commit task and was rejected.
@@ -118,8 +120,8 @@ blocks only on that latest editor. Older versions run independently on each main
 `Unity Compatibility` workflow, one version at a time on the background runner. Its distinct `Unity Compatibility Success`
 check cannot replace the required `Unity CI Success` result. Each immutable main source retains
 its own run, so a later commit cannot cancel compatibility needed by a release. Re-run an existing
-source run to recover a transient failure. Background work uses the DAD-MACHINE runner; the other
-runner remains available for fast validation. Older-version failures remain visible and release
+source run to recover a transient failure. Background work uses DAD-MACHINE only. ELI-MACHINE
+is eligible for fast validation but is shared with other repositories. Older-version failures remain visible and release
 publication requires all older versions for the same source.
 Default manual Unity Tests qualification retains the full matrix. An explicit manual version selects
 that named editor. Regenerate the compatibility workflow with
@@ -131,13 +133,12 @@ report selected versions and modes; a reduced run does not qualify omitted cover
 
 The action pins now use the approved v1.17.1 release rather than the unapproved commit previously
 labelled v1.17.1. Local Gates checks every action against the central approval registry at its
-fetched main revision, separately from validating each pinned action's input declarations. A
-targeted enrollment audit of the two license-acquiring workflows with the proposed readback
-policy reports only two expired central exceptions (October 31). The current central analyzer also
-rejects the three diagnostic aggregate branches; the
-[policy update](https://github.com/Ambiguous-Interactive/ambiguous-organization-build-lock/pull/381)
-must land before this consumer can pass enrollment. This is not a clean whole-repository audit. The external exceptions remain
-unresolved.
+fetched main revision, separately from validating each pinned action's input declarations. The
+[central policy update](https://github.com/Ambiguous-Interactive/ambiguous-organization-build-lock/pull/381)
+is merged. The full source-free consumer audit at `fc5aa9a7` inventories 42 workflow entries and
+reports only the two pre-existing expired central exceptions (October 31). This is not a clean
+enrollment result. Those exceptions remain unresolved; no exception was renewed or removed to
+make this rollout pass.
 
 Historical capture dispatch retains its original skipped qualification gates. The capture job
 reports its own diagnostic result; it does not certify new native work. Ordinary PRs, pushes, and
@@ -162,6 +163,16 @@ Use one implementation owner by default. Delegate independent investigations or 
 when useful. Parallel writers need separate worktrees and explicit ownership. One owner validates
 each Unity project; never overlap aggregate builds against shared outputs. Wait for status changes
 and summarize deltas instead of repeatedly retrieving whole CI and review histories.
+
+Use a coordination session when several tasks share an editor or CI runner pool. It owns the
+frozen heads, live run IDs, validation order, and handoffs; implementation sessions own bounded
+tasks in separate worktrees. One validation owner per Unity project does not reserve organization
+runner capacity. Coordinate validation campaigns across shared-pool consumers when authorized;
+this repository's background-runner restriction alone cannot bound another repository's load.
+Keep queue delay in the measurement, and distinguish reduced runner use from reduced feedback time.
+The existing [organization admission issue](https://github.com/Ambiguous-Interactive/ambiguous-organization-build-lock/issues/53)
+tracks cross-repository runner starvation and bounded admission. This pilot does not implement
+that separate protocol or establish organization-wide queue fairness.
 
 For games, test pure calculations with fast host or EditMode tests, retain focused asset/lifecycle
 integration cases, and use real players for AOT, serialization, and platform claims. Keep seeded
@@ -206,6 +217,76 @@ Workflow inventory controls own both YAML suffixes. Adding a workflow therefore 
 registration locally, including protection of licensed work from generic watchdog cancellation.
 The full source-free organization audit remains necessary; source review alone missed an exact
 aggregate-condition contract during this rollout.
+
+### Native task pilots
+
+Primary CI pairs freeze each task's head and compare complete tracked trees with the PR's
+synthetic merge. The full control is the default manual all-version, all-mode qualification;
+the selected run is the normal PR workflow. Both use the concurrent mode controller. Experiments
+run serially, and main remains unchanged until all primary pairs finish. Subsequent integration
+and landing runs are excluded from these measurements.
+
+| Task            | Full elapsed                                                                               | Selected elapsed                                                                           | Occupied runners, full → selected | Lock reservations, full → selected |
+| --------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ | --------------------------------- | ---------------------------------- |
+| Runtime fixture | [1,754 s](https://github.com/Ambiguous-Interactive/unity-helpers/actions/runs/43759528452) | [2,117 s](https://github.com/Ambiguous-Interactive/unity-helpers/actions/runs/43762473530) | 2,932 s → 1,330 s                 | 2,464–2,510 s → 1,122–1,151 s      |
+| Editor fixture  | [4,699 s](https://github.com/Ambiguous-Interactive/unity-helpers/actions/runs/43769034819) | [1,732 s](https://github.com/Ambiguous-Interactive/unity-helpers/actions/runs/43765967541) | 2,397 s → 1,279 s                 | 1,917–1,962 s → 1,075–1,102 s      |
+| PR template     | [4,682 s](https://github.com/Ambiguous-Interactive/unity-helpers/actions/runs/43776490945) | [2,828 s](https://github.com/Ambiguous-Interactive/unity-helpers/actions/runs/43784347690) | 2,382 s → 995 s                   | 1,924–1,969 s → 782–808 s          |
+
+The runtime pair used head `727b05a0`. Occupied runner time fell 54.6%, but elapsed time rose
+20.7%; this observation missed the wall-time target. The latest normal job's created-to-start
+interval grew from 171 to 1,650 seconds. Host assignments also swapped: normal DAD to ELI and
+SINGLE_THREADED ELI to DAD. Events, generated stamps, caches, and observed sibling load differ,
+so the causal elapsed-time effect is inconclusive. Runner occupation and lock-reservation bounds
+are not CPU time or exact license-seat consumption. This small cohort does not establish
+population CI tail latency.
+
+The editor pair used head `39b7e149`. Observed elapsed fell 63.1% and occupied runner time fell
+46.6%; the full control's last 2021.3 job waited 4,004 seconds from creation to start. Both
+ordinary C# task pairs together have task medians of 3,226.5 s full and 1,924.5 s selected,
+an observed reduction of 40.4% that misses the 50% elapsed target. Their descriptive nearest-rank
+p95 values are 4,699 s and 2,117 s: maxima of only two heterogeneous task observations.
+The favorable editor pair does not replace the runtime miss or remove the shared-load confounders.
+The [editor evidence](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1206#issuecomment-6903383028)
+retains the complete paired values and source identities.
+
+All four new runtime cases pass in canonical PlayMode XML on every full-control version and
+selected latest. Each XML's start/end timestamps fall within its own run window; shard copies
+are not counted twice. The selected artifact inventory contains exactly normal and
+SINGLE_THREADED EditMode/PlayMode. Required result and cleanup gates pass; unselected Standalone
+acceptance is an expected skip. Both latest normal PlayMode captures retain the existing native
+post-test exit fault tracked in [#813](https://github.com/Ambiguous-Interactive/unity-helpers/issues/813).
+These case passes do not certify clean engine exits. The
+[paired evidence](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1206#issuecomment-6901962135)
+retains source identities, counts, timing limits, and the missed target.
+
+All four new editor culture cases also pass in canonical EditMode XML on all full-control
+versions and selected latest. Exact full and selected artifact inventories contain 19 and four
+artifacts. All nine native jobs have their required cleanup steps and applicable mode/export
+gates explicitly present and passing. XML timestamps fall inside each run's own window.
+
+The tooling pilot uses the PR template at head `cb3ef397`. This is an unknown-input control:
+it retains all native modes on latest 6.x rather than selecting no Unity work. Its full control
+produces 19 mode artifacts; all canonical XML files contain actual passing leaf cases, with
+matching passed headers and no failed cases, suites, or failure elements. Artifact digests,
+source identities, and run-window timestamps are verified independently. All six licensed jobs
+have positive result/export and cleanup gates. The
+[full-control evidence](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1206#issuecomment-6904609837)
+retains those checks. The selected run retains seven latest-only mode artifacts, including
+both Standalone variants and SINGLE_THREADED Standalone. The same independent XML checks pass
+for all seven, and all three jobs have their positive result/export and cleanup gates. This
+qualifies version reduction while preserving conservative mode selection. Observed elapsed fell
+39.6%, missing the individual 50% target; occupied runner time fell 58.2%. The normal latest job
+waited 2,372 seconds from creation to start. All 24 PR-event checks completed; PR creation to
+last check took 2,832 seconds. The
+[completed tooling evidence](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1206#issuecomment-6905199694)
+retains artifact counts, XML hashes, source identity and gate inventories.
+
+Across all three heterogeneous task pairs, elapsed medians are 4,682 s full and 2,117 s selected
+(54.8% lower); descriptive nearest-rank p95 values are 4,699 s and 2,828 s. Occupied runner
+medians are 2,397 s and 1,279 s (46.6% lower), with descriptive p95 values of 2,932 s and 1,330 s.
+These three-task statistics do not replace the ordinary C# cohort's 40.4% elapsed reduction and
+missed target. Each p95 is the largest of only three observations, not a population-tail estimate.
+Shared-pool load, host, cache, event and generated-stamp differences prevent causal speedup claims.
 
 Measure cold and warm feedback separately with at least three paired local runs. Compare CI
 queue, setup, execution, and cleanup on comparable runners. Report median, p95, runner time,
