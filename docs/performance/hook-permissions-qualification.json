@@ -13,7 +13,7 @@
     "scripts/python~/pyproject.toml": "93a93f1faf4243715a8e3c10022b76dd65d1422bb1255343448852bfbadb3a28",
     "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d",
     "package.json": "0a02a1488907f5b9cef22f6bac4574a2e594ecfc9b011621d877729ce5239f4c",
-    ".github/workflows/local-gates.yml": "f95b4749203ac8ee1054cfcf5474084fbfb54e7f3d6cbbffd740e8e9e883903d",
+    ".github/workflows/local-gates.yml": "1f8be32cb6eebc59894b755734ff1fa831f5b8bc18867fdb16d60a28cc9fc1df",
     "scripts/tests/test-run-contract-tests.js": "6505e5bbcb285d539d9a2226d89ae594fdbc271193b14814e6123dff556e0cec"
   },
   "original_controls": 11,
@@ -813,5 +813,6 @@
     "scripts/tests/test-run-contract-tests.js": "45869e1624e471f38bbde8c96abfeefc0b3ccefbefffe241b8781658a810e234"
   },
   "historical_validation_revision": "0d81424666c1f8206b3a2a31f15968f3dc8b3b09",
-  "source_scope": "Current integration-validation inputs only. Historical maps and timing captures remain immutable and do not attest current-head performance."
+  "source_scope": "Current integration-validation inputs only. Historical maps and timing captures remain immutable and do not attest current-head performance.",
+  "before_windows_phase_partition_workflow_sha256": "f95b4749203ac8ee1054cfcf5474084fbfb54e7f3d6cbbffd740e8e9e883903d"
 }
