@@ -990,7 +990,8 @@
         "requalification",
         "mklink",
         "ufeff",
-        "notin"
+        "notin",
+        "tmpfs"
       ]
     }
   ],
@@ -1290,7 +1291,8 @@
     "SIGXFSZ",
     "PTH",
     "axb",
-    "XCS"
+    "XCS",
+    "PRRT"
   ],
   "flagWords": [],
   "minWordLength": 3,
@@ -1333,6 +1335,14 @@
     {
       "filename": ["scripts/tests/fixtures/markdown-fence-original.json", "cspell.json"],
       "words": ["ceq"]
+    },
+    {
+      "filename": ["scripts/tests/fixtures/instruction-policy-v1.json", "cspell.json"],
+      "words": ["swe", "isinstance", "noqa", "repost", "shutil"]
+    },
+    {
+      "filename": ["scripts/tests/fixtures/skill-splits-v1.json", "cspell.json"],
+      "words": ["dcber", "fcber"]
     }
   ]
 }

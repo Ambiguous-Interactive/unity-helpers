@@ -116,11 +116,40 @@ metadata types, malformed input, output failures and both compatibility entry po
 Package names and versions containing CR, LF or NUL fail before writing step outputs;
 the original verifier accepted a name containing LF and wrote an injected output.
 
-Seven alternating Linux ext4 process pairs after two warmups per arm measured original
+Seven alternating Linux tmpfs process pairs after two warmups per arm used bootstrap uv 0.13.6
+and PowerShell 7.5.3 to measure original
 PowerShell versus Python through uv. Median times were 244.12→39.17 ms for a small valid
 manifest, 243.13→39.66 ms with 1,000 extra fields, and 238.56→38.83 ms for a version mismatch.
 Exit status, standard output and step-output bytes match in every pair. Source and lock
 hashes stayed fixed. These local command observations do not measure release-job or Windows speed.
+
+Skill indexing, instruction validation and skill-split migration also use typed Python.
+The PowerShell and Node entry points remain tested compatibility launchers. The generator
+preserves the original index bytes and ordinal basename order. Its `--check` mode reads the
+index and requires matching bytes, a tracked file and clean Git status for that path.
+Instruction checks retain all 35 original policy requirements and two independent generator
+processes. The regression suite mutates temporary copies of tracked guidance.
+
+Publication replaces each selected file atomically and preserves existing file modes.
+A hard-linked authored file stays unchanged. Invalid reference filenames fail before writes;
+the original refresh could change an authored file outside the instruction roots and then fail.
+This does not provide whole-batch rollback after a later filesystem failure.
+
+Seven fresh-process pairs on Linux x86_64 with tmpfs, uv 0.13.8, Node 22.23.4,
+PowerShell 7.5.3 and Python 3.14.10 measured these median command times:
+
+| Command                     |   Original | Python through uv |
+| --------------------------- | ---------: | ----------------: |
+| Index stdout                |  321.41 ms |          45.84 ms |
+| Split verification          |   81.90 ms |         111.27 ms |
+| Authorship policy           |  288.19 ms |          55.71 ms |
+| Full instruction validation | 1050.85 ms |         196.17 ms |
+
+Split verification is slower. Keep that cost beside the index and validation gains.
+The [qualification record](../performance/skill-tooling-qualification.json) retains every
+paired observation, source and runtime identities, the earlier bootstrap-tool regression,
+and the filesystem-label correction. Guidance and discovery inputs are identical across the two
+worktrees. Each implementation’s source seals remain unchanged during its capture. These observations do not establish Windows, cold-machine or whole-CI performance.
 
 Repository-local Prettier, cspell and markdownlint launch through
 `scripts/run_node_bin.py` in locked uv. The existing Node launchers remain compatible.

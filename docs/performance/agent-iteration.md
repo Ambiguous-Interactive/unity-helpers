@@ -60,8 +60,8 @@ The base uses a merge-base diff, then includes staged, unstaged, and untracked c
 Both sides of renames and deleted paths remain visible. A commit does not erase task scope.
 Explicit files replace discovery. Missing revisions fail rather than silently narrowing coverage.
 
-A November 16 Linux ext4 comparison used seven alternating fresh-process pairs after two
-warmups per arm and cell. One-source iteration medians were 82.14 ms for the original Node
+A November 16 Linux tmpfs comparison used seven alternating fresh-process pairs after two
+warmups per arm and cell, using bootstrap uv 0.13.6 and Node 22.23.3. One-source iteration medians were 82.14 ms for the original Node
 selector and 58.74 ms through uv; 100-source iteration was 72.06 ms and 52.31 ms.
 One-source PR planning regressed from 18.18 ms to 49.57 ms because its original path needed
 no Python worker. These include startup and compare identical parsed plans. They do not

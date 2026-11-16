@@ -218,7 +218,20 @@
     "id": "agent-skill-migration",
     "name": "Agent skill migration and discovery",
     "run": "npm run test:agent-skill-migration",
-    "inputs": ["@tooling"]
+    "inputs": [
+      "@tooling",
+      "scripts/generate_skills_index.py",
+      "scripts/migrate_agent_skills.py",
+      "scripts/lint_llm_instructions.py",
+      "scripts/generate-skills-index.ps1",
+      "scripts/migrate-agent-skills.mjs",
+      "scripts/lint-llm-instructions.ps1",
+      "scripts/tests/test_skills_tooling.py",
+      "scripts/tests/fixtures/skills-index-v1.json",
+      "scripts/tests/fixtures/skill-splits-v1.json",
+      "scripts/tests/fixtures/instruction-policy-v1.json",
+      ".github/workflows/llm-instructions-lint.yml"
+    ]
   },
   {
     "id": "skill-stubs",
