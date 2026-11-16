@@ -51,7 +51,7 @@ def prepare(root: Path, case: dict[str, object]) -> None:
     for name, content in cast("dict[str, str]", case["files"]).items():
         target = root / name
         target.parent.mkdir(exist_ok=True)
-        target.write_text(content, encoding="utf-8")
+        target.write_text(content, encoding="utf-8", newline="\n")
 
 
 def normalized(lines: list[str], root: Path) -> list[str]:
@@ -375,13 +375,48 @@ def test_npm_pre_push_route_reaches_postcondition(tmp_path: Path) -> None:
             },
         },
     )
+    assert (
+        root / checker_name
+    ).read_bytes() == b'#!/usr/bin/env bash\nprintf "owned-postcondition-%s\\n" "$1"\nexit 7\n'
     git(root, "config", "--local", "credential.helper", "vscode-remote-containers-fixture")
     command = [*npm_command(), "run", "validate:prepush", "--", "--", f"--repo-root={root}"]
     broken = subprocess.run(command, cwd=ROOT, check=False, capture_output=True, timeout=60)
     assert broken.returncode == 1, broken.stdout + broken.stderr
     assert b"cached-token credential helper" in broken.stdout
     assert b"owned-postcondition---quiet" in broken.stdout
-    (root / checker_name).write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+    (root / checker_name).write_text(
+        "#!/usr/bin/env bash\nexit 0\n", encoding="utf-8", newline="\n"
+    )
+    assert (root / checker_name).read_bytes() == b"#!/usr/bin/env bash\nexit 0\n"
     healthy = subprocess.run(command, cwd=ROOT, check=False, capture_output=True, timeout=60)
     assert healthy.returncode == 0, healthy.stdout + healthy.stderr
     assert b"Git push config and hook artifact checks passed" in healthy.stdout
+
+
+@pytest.mark.parametrize("exit_code", [1, 2, 3, 128])
+def test_helper_read_distinguishes_missing_key_from_git_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, exit_code: int
+) -> None:
+    root = tmp_path / "repo"
+    prepare(
+        root,
+        {
+            "config": dict(push.EXPECTED),
+            "files": {"scripts/check-container-git-credentials.sh": ""},
+        },
+    )
+    original = push.run_git
+
+    def command(
+        executable: str, directory: Path, *arguments: str
+    ) -> subprocess.CompletedProcess[str]:
+        if arguments == ("config", "--get-all", "credential.helper"):
+            return subprocess.CompletedProcess(arguments, exit_code, "", "fixture read failure")
+        return original(executable, directory, *arguments)
+
+    monkeypatch.setattr(push, "run_git", command)
+    status, lines = push.validate(root)
+    assert status == int(exit_code != 1)
+    if exit_code != 1:
+        assert any(f"credential.helper failed with exit {exit_code}" in line for line in lines)
+        assert not any("checks passed" in line for line in lines)
