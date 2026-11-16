@@ -406,9 +406,14 @@ runTest("no contract test in scripts/tests/ has been left unreachable", () => {
     ["scripts/tests/test_runner_maintenance_matrix.py", "workflow"],
     ["scripts/tests/test_verify_shipped_analyzers.py", "workflow"],
     ["scripts/tests/test-reference-upstream-drift.js", "reference-controls"],
-    ["scripts/tests/test-sync-issue-template-versions.ps1", "version-sync-controls"]
+    ["scripts/tests/test-sync-issue-template-versions.ps1", "version-sync-controls"],
+    ["scripts/tests/test-validate-hook-sync-calls.ps1", "hook-validation-controls"]
   ]);
   const owners = new Map([
+    [
+      "hook-validation-controls",
+      (file) => registeredControlsInvoke(file, "scripts/tests/test_hook_validation.py")
+    ],
     [
       "version-sync-controls",
       (file) => registeredControlsInvoke(file, "scripts/tests/test_version_sync.py")

@@ -1347,6 +1347,10 @@
     {
       "filename": ["scripts/tests/fixtures/version-sync-v1.json", "cspell.json"],
       "words": ["manif", "misordered"]
+    },
+    {
+      "filename": ["scripts/tests/fixtures/hook-validation-v1.json", "cspell.json"],
+      "words": ["readtoend"]
     }
   ]
 }

@@ -183,6 +183,21 @@ Claims still prevent retries after uncertain mutations. CLI stdout and summaries
 Release admission retains the original handling of empty container fork flags, requires string
 branch names, and rejects non-JSON numbers and incompatible package encodings before publication.
 
+Hook text validation runs through locked Python with
+`npm run validate:hook-sync`. The retained PowerShell validator and test commands
+delegate to that implementation. Required tokens and forbidden merge-hook startup
+tokens keep their case-insensitive presence rules. These rules also match comments;
+they do not parse or execute PowerShell. UTF-8, UTF-16 and UTF-32 BOM files retain their original behavior. Empty,
+unreadable, and malformed hook files fail. The previous validator incorrectly accepted empty hook files.
+
+The [qualification record](../performance/hook-validation-qualification.json)
+retains 24 original CLI observations and the three intentional empty-file corrections.
+The 50 controls cover each required and forbidden token, both retained launchers,
+and the current hooks. Seven alternating Linux pairs measured median CLI times of
+204.70 ms for PowerShell and 37.11 ms for locked uv/Python after two warmup pairs.
+These observations concern this no-op validator on one host; they do not measure
+whole hooks, Windows or CI.
+
 Version reference synchronization uses `scripts/version_sync.py` through locked uv.
 The PowerShell entry points remain launchers. Content rules, sorting and validation run in
 Python; batched staging delegates to the unchanged PowerShell mutex and retry helper.

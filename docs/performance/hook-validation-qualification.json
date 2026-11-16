@@ -1,0 +1,298 @@
+{
+  "scope": "Hook text validation migrated from PowerShell to locked typed Python; issue #859 remains open.",
+  "original_commit": "bd6218ab75728be9b2a3196beb588459d4b8d19b",
+  "original_source_sha256": "eef319ac42540f5d3db0c9ad8fa8a9fbd71dd34814095b9795a6a3dc733fa327",
+  "original_controls": 21,
+  "frozen_cli_observations": 24,
+  "current_controls": 50,
+  "intentional_corrections": [
+    "The original accepts each empty hook because PowerShell null regex results bypass missing-pattern checks. All three now fail.",
+    "A directory or unreadable or invalid UTF-8 hook fails visibly."
+  ],
+  "preserved_limits": [
+    "Rules check case-insensitive literal text presence, including comments. They do not prove PowerShell execution or syntax.",
+    "No hook content, Git index, credential configuration or shared Unity state is changed.",
+    "The seven runspace-harness controls were specific to the retired PowerShell implementation. Typed tests exercise the actual Python CLI and both retained PowerShell launchers.",
+    "UTF-8, UTF-16 and UTF-32 BOM detection preserves the original host encoding behavior. Malformed data fails visibly.",
+    "Full-hook uppercase/lowercase fixture copies produced spelling failures. The committed minimal original-CLI corpus covers the same rules without embedding unrelated hook sources; the original full-source corpus remains captured separately."
+  ],
+  "source_sha256": {
+    "scripts/hook_validation.py": "90601ee531ada366d8505c63c574afe9aad1ae2bc196e1e2dc81e7f5586cfe3b",
+    "scripts/tests/test_hook_validation.py": "c14dfdbaec605869c3250df3ea798f0f61179255902192d91ee05c7bc1dc514e",
+    "scripts/tests/fixtures/hook-validation-v1.json": "2776c1d642b3fea115b7e0340d0ed789d2dc5eb6ffb0c94ee8f2e390b012c059"
+  },
+  "measurement": {
+    "host": "Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.36",
+    "filesystem": "Local /tmp tmpfs worktree",
+    "toolchain": "CPython 3.14.10, uv 0.13.8, PowerShell 7.5.3",
+    "method": "Two warmup pairs, then seven alternating-order fresh-process pairs. Real current hook files, no-op validation. Both commands exit zero and emit zero stdout bytes.",
+    "samples": [
+      {
+        "pair": 0,
+        "kind": "original",
+        "ms": 211.344447,
+        "status": 0,
+        "stdout_hex": "",
+        "stderr_hex": ""
+      },
+      {
+        "pair": 0,
+        "kind": "python",
+        "ms": 37.451057,
+        "status": 0,
+        "stdout_hex": "",
+        "stderr_hex": ""
+      },
+      {
+        "pair": 1,
+        "kind": "python",
+        "ms": 36.625108,
+        "status": 0,
+        "stdout_hex": "",
+        "stderr_hex": ""
+      },
+      {
+        "pair": 1,
+        "kind": "original",
+        "ms": 204.704436,
+        "status": 0,
+        "stdout_hex": "",
+        "stderr_hex": ""
+      },
+      {
+        "pair": 2,
+        "kind": "original",
+        "ms": 194.942101,
+        "status": 0,
+        "stdout_hex": "",
+        "stderr_hex": ""
+      },
+      {
+        "pair": 2,
+        "kind": "python",
+        "ms": 37.069743,
+        "status": 0,
+        "stdout_hex": "",
+        "stderr_hex": ""
+      },
+      {
+        "pair": 3,
+        "kind": "python",
+        "ms": 37.105289,
+        "status": 0,
+        "stdout_hex": "",
+        "stderr_hex": ""
+      },
+      {
+        "pair": 3,
+        "kind": "original",
+        "ms": 214.505736,
+        "status": 0,
+        "stdout_hex": "",
+        "stderr_hex": ""
+      },
+      {
+        "pair": 4,
+        "kind": "original",
+        "ms": 200.991083,
+        "status": 0,
+        "stdout_hex": "",
+        "stderr_hex": ""
+      },
+      {
+        "pair": 4,
+        "kind": "python",
+        "ms": 37.10782,
+        "status": 0,
+        "stdout_hex": "",
+        "stderr_hex": ""
+      },
+      {
+        "pair": 5,
+        "kind": "python",
+        "ms": 36.813059,
+        "status": 0,
+        "stdout_hex": "",
+        "stderr_hex": ""
+      },
+      {
+        "pair": 5,
+        "kind": "original",
+        "ms": 195.862273,
+        "status": 0,
+        "stdout_hex": "",
+        "stderr_hex": ""
+      },
+      {
+        "pair": 6,
+        "kind": "original",
+        "ms": 207.610334,
+        "status": 0,
+        "stdout_hex": "",
+        "stderr_hex": ""
+      },
+      {
+        "pair": 6,
+        "kind": "python",
+        "ms": 38.104058,
+        "status": 0,
+        "stdout_hex": "",
+        "stderr_hex": ""
+      }
+    ],
+    "median_ms": {
+      "original": 204.704436,
+      "python_locked_uv": 37.105289
+    },
+    "limits": [
+      "One Linux host only; no Windows, cold provisioning, whole hook or CI speed claim.",
+      "Process startup dominates this small validator. Seven pairs do not establish statistical significance."
+    ]
+  },
+  "original_bom_observations": [
+    {
+      "encoding": "utf-8-sig",
+      "status": 0
+    },
+    {
+      "encoding": "utf-16",
+      "status": 0
+    },
+    {
+      "encoding": "utf-32",
+      "status": 0
+    }
+  ],
+  "historical_before_bom_correction": {
+    "source_sha256": {
+      "scripts/hook_validation.py": "c1b6f2930b32f7e6cca1e5a1193ffed150fe0a3aa4dd21a0d1ce266252ec887e",
+      "scripts/tests/test_hook_validation.py": "16bb5463073f267adba38dce1bddece947283c53ed3feef5978c357b0a9771c8",
+      "scripts/tests/fixtures/hook-validation-v1.json": "543ee31c13a97ec417a30666a2e20d4f1b834c0bb21e99cf464ab9fa4587f878"
+    },
+    "samples": [
+      {
+        "pair": 0,
+        "kind": "original",
+        "ms": 195.36262,
+        "status": 0,
+        "stdout_hex": "",
+        "stderr_hex": ""
+      },
+      {
+        "pair": 0,
+        "kind": "python",
+        "ms": 37.887655,
+        "status": 0,
+        "stdout_hex": "",
+        "stderr_hex": ""
+      },
+      {
+        "pair": 1,
+        "kind": "python",
+        "ms": 37.858878,
+        "status": 0,
+        "stdout_hex": "",
+        "stderr_hex": ""
+      },
+      {
+        "pair": 1,
+        "kind": "original",
+        "ms": 214.873708,
+        "status": 0,
+        "stdout_hex": "",
+        "stderr_hex": ""
+      },
+      {
+        "pair": 2,
+        "kind": "original",
+        "ms": 203.256259,
+        "status": 0,
+        "stdout_hex": "",
+        "stderr_hex": ""
+      },
+      {
+        "pair": 2,
+        "kind": "python",
+        "ms": 36.620401,
+        "status": 0,
+        "stdout_hex": "",
+        "stderr_hex": ""
+      },
+      {
+        "pair": 3,
+        "kind": "python",
+        "ms": 37.290948,
+        "status": 0,
+        "stdout_hex": "",
+        "stderr_hex": ""
+      },
+      {
+        "pair": 3,
+        "kind": "original",
+        "ms": 228.818393,
+        "status": 0,
+        "stdout_hex": "",
+        "stderr_hex": ""
+      },
+      {
+        "pair": 4,
+        "kind": "original",
+        "ms": 226.432622,
+        "status": 0,
+        "stdout_hex": "",
+        "stderr_hex": ""
+      },
+      {
+        "pair": 4,
+        "kind": "python",
+        "ms": 37.317361,
+        "status": 0,
+        "stdout_hex": "",
+        "stderr_hex": ""
+      },
+      {
+        "pair": 5,
+        "kind": "python",
+        "ms": 37.163683,
+        "status": 0,
+        "stdout_hex": "",
+        "stderr_hex": ""
+      },
+      {
+        "pair": 5,
+        "kind": "original",
+        "ms": 224.493617,
+        "status": 0,
+        "stdout_hex": "",
+        "stderr_hex": ""
+      },
+      {
+        "pair": 6,
+        "kind": "original",
+        "ms": 187.138905,
+        "status": 0,
+        "stdout_hex": "",
+        "stderr_hex": ""
+      },
+      {
+        "pair": 6,
+        "kind": "python",
+        "ms": 36.702512,
+        "status": 0,
+        "stdout_hex": "",
+        "stderr_hex": ""
+      }
+    ],
+    "median_ms": {
+      "original": 214.873708,
+      "python_locked_uv": 37.290948
+    },
+    "limit": "Historical inputs before BOM compatibility correction; superseded for current implementation performance."
+  },
+  "timing_capture_sha256": {
+    "scripts/hook_validation.py": "90601ee531ada366d8505c63c574afe9aad1ae2bc196e1e2dc81e7f5586cfe3b",
+    "scripts/tests/test_hook_validation.py": "bcc82c45fec052061faa75999b2113eb3e1bffa66becc8af85d92feab8994a45",
+    "scripts/tests/fixtures/hook-validation-v1.json": "543ee31c13a97ec417a30666a2e20d4f1b834c0bb21e99cf464ab9fa4587f878"
+  },
+  "frozen_fixture_scope": "24 minimal original-CLI observations. A separate 24-case original run against full real hooks reached the same statuses; retained raw source inputs and diagnostics use the recorded original commit and source hash."
+}
