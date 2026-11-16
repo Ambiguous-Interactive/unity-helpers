@@ -428,18 +428,19 @@ def test_failed_metadata_io_leaves_no_destination_or_temporary_file(
         stream = original_factory(
             mode="w", encoding="utf-8", newline="\r\n", dir=tmp_path, delete=False
         )
-        original_write, original_close = stream.write, stream.close
+        original_write, original_close = stream.write, stream.file.close
 
         def fail_write(content: str) -> int:
             original_write(content[:3])
             raise OSError("synthetic metadata write failure")
 
         def fail_close() -> None:
-            original_close()
+            monkeypatch.setattr(stream.file, "close", original_close)
+            stream.close()
             raise OSError("synthetic metadata close failure")
 
         monkeypatch.setattr(
-            stream,
+            stream if phase == "write" else stream.file,
             "write" if phase == "write" else "close",
             fail_write if phase == "write" else fail_close,
         )

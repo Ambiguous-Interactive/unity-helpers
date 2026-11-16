@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Tests.Sprites
 {
 #if UNITY_EDITOR
+    using System.Globalization;
     using NUnit.Framework;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Editor.Sprites;
@@ -75,6 +76,32 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 ),
                 Is.True
             );
+        }
+
+        [TestCase("tr-TR", "Assets/FILE.ICO", ".ico", true)]
+        [TestCase("tr-TR", "Assets/FILE.\u0130CO", ".ico", false)]
+        [TestCase("en-US", "Assets/FILE.ICO", ".ico", true)]
+        [TestCase("tr-TR", "Assets/FILE.ICO.meta", ".ico", false)]
+        public void ExtensionMatchingDoesNotDependOnCurrentCulture(
+            string cultureName,
+            string path,
+            string extension,
+            bool expected
+        )
+        {
+            CultureInfo previous = CultureInfo.CurrentCulture;
+            try
+            {
+                CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo(cultureName);
+                Assert.That(
+                    SpriteFileExtensions.HasAny(path, new[] { extension }),
+                    Is.EqualTo(expected)
+                );
+            }
+            finally
+            {
+                CultureInfo.CurrentCulture = previous;
+            }
         }
 
         [Test]
