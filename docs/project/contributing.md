@@ -244,6 +244,11 @@ measured catalogue loading at 0.11 → 0.59 ms, a tiny scan at 4.09 → 49.90 ms
 these observations do not establish Windows, full-job or statistically significant
 improvements. The owned Windows writer-sharing control requires Windows CI.
 
+Windows tool validation runs metadata and process-orchestration suites in two isolated
+phases, with at most two phases active. Each retains a ten-minute job limit. The
+`Assembly tools (Windows)` aggregate requires both phases to succeed; cancellation,
+skips and failures cannot pass it. All previously selected suites remain registered.
+
 Unity project workspace selection and retention planning use locked typed Python behind
 `scripts/unity/lib/project-workspace.ps1`. Run `npm run test:project-workspace` for
 original-host comparisons, filesystem controls and compatibility launchers.

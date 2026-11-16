@@ -370,20 +370,24 @@ def test_host_phases_preserve_full_commands_isolation_and_serial_ci_controls() -
 
 
 @pytest.mark.parametrize("state", ["success", "failure", "cancelled", "skipped", ""])
-def test_aggregate_gate_runs_and_rejects_every_non_success_state(state: str) -> None:
+@pytest.mark.parametrize("gate", ["typecheck", "assembly-tools-windows"])
+def test_aggregate_gate_runs_and_rejects_every_non_success_state(state: str, gate: str) -> None:
     import shutil
     import subprocess
 
     jobs = as_mapping(workflow("local-gates.yml")["jobs"])
-    job = as_mapping(jobs["typecheck"])
-    assert job["name"] == "Type-check Runtime and tests"
-    assert job["needs"] == "typecheck-phases"
+    job = as_mapping(jobs[gate])
+    expected_name, dependency, variable = (
+        ("Type-check Runtime and tests", "typecheck-phases", "TYPECHECK_PHASE_RESULT")
+        if gate == "typecheck"
+        else ("Assembly tools (Windows)", "windows-tool-phases", "WINDOWS_PHASE_RESULT")
+    )
+    assert job["name"] == expected_name
+    assert job["needs"] == dependency
     assert job["if"] == "always()"
     assert "continue-on-error" not in job
     step = next(step for step in steps(job) if isinstance(step.get("run"), str))
-    assert (
-        as_mapping(step["env"])["TYPECHECK_PHASE_RESULT"] == "${{ needs.typecheck-phases.result }}"
-    )
+    assert as_mapping(step["env"])[variable] == "${{ needs." + dependency + ".result }}"
     command = cast("str", step["run"])
     match = re.fullmatch(r"set -euo pipefail\nnode -e '([^'\n]+)'\n?", command)
     assert match is not None
@@ -391,7 +395,7 @@ def test_aggregate_gate_runs_and_rejects_every_non_success_state(state: str) -> 
     assert node is not None
     result = subprocess.run(
         [node, "-e", match.group(1)],
-        env={**os.environ, "TYPECHECK_PHASE_RESULT": state},
+        env={**os.environ, variable: state},
         capture_output=True,
         timeout=30,
         check=False,
@@ -605,3 +609,82 @@ def test_only_the_completed_excluded_audit_can_have_its_expected_exec_wrapper(de
         project, control, controls.Attempt(1, error_lines + "\n" + completion + "\n" + wrapper)
     )
     assert (result is None) is (defect == "none")
+
+
+def test_windows_phases_preserve_every_suite_and_bounded_concurrency() -> None:
+    jobs = as_mapping(workflow("local-gates.yml")["jobs"])
+    phase = as_mapping(jobs["windows-tool-phases"])
+    strategy = as_mapping(phase["strategy"])
+    assert strategy["fail-fast"] is False
+    assert strategy["max-parallel"] == 2
+    assert as_mapping(strategy["matrix"])["phase"] == ["metadata", "orchestration"]
+    assert phase["timeout-minutes"] == 10
+    assert phase["runs-on"] == "windows-latest"
+    assert "continue-on-error" not in phase
+    commands = [step for step in steps(phase) if "pytest" in str(step.get("run", ""))]
+    covered: list[str] = []
+    for step in commands:
+        command = str(step["run"])
+        covered.extend(re.findall(r"scripts/tests/[\w-]+\.py", command))
+        assert step.get("if") in ("matrix.phase == 'metadata'", "matrix.phase == 'orchestration'")
+        assert "continue-on-error" not in step
+        assert "--locked" in command
+    expected = {
+        "scripts/tests/test_agent_check.py",
+        "scripts/tests/test_asmdef.py",
+        "scripts/tests/test_browser_consumer.py",
+        "scripts/tests/test_changelog.py",
+        "scripts/tests/test_check_eol.py",
+        "scripts/tests/test_check_runner.py",
+        "scripts/tests/test_ci_modes.py",
+        "scripts/tests/test_code_samples.py",
+        "scripts/tests/test_comment_block_form.py",
+        "scripts/tests/test_concurrent_cache_fill.py",
+        "scripts/tests/test_cspell_tools.py",
+        "scripts/tests/test_dependabot.py",
+        "scripts/tests/test_doc_counts.py",
+        "scripts/tests/test_doc_identifiers.py",
+        "scripts/tests/test_doc_links.py",
+        "scripts/tests/test_doc_samples.py",
+        "scripts/tests/test_drawer_multiobject.py",
+        "scripts/tests/test_duplicate_usings.py",
+        "scripts/tests/test_editmode_shards.py",
+        "scripts/tests/test_fixture_assets.py",
+        "scripts/tests/test_frozen_files.py",
+        "scripts/tests/test_gitignore_docs.py",
+        "scripts/tests/test_hook_permissions.py",
+        "scripts/tests/test_hook_validation.py",
+        "scripts/tests/test_lifecycle_lint.py",
+        "scripts/tests/test_lint_error_codes.py",
+        "scripts/tests/test_log_patterns.py",
+        "scripts/tests/test_markdown_checks.py",
+        "scripts/tests/test_meta_lint.py",
+        "scripts/tests/test_no_regions.py",
+        "scripts/tests/test_normalize_eol.py",
+        "scripts/tests/test_npm_package.py",
+        "scripts/tests/test_preserve_attributes.py",
+        "scripts/tests/test_production_test_hooks.py",
+        "scripts/tests/test_project_workspace.py",
+        "scripts/tests/test_push_defaults.py",
+        "scripts/tests/test_push_validation.py",
+        "scripts/tests/test_release_automation.py",
+        "scripts/tests/test_release_tag.py",
+        "scripts/tests/test_release_tools.py",
+        "scripts/tests/test_runner_maintenance_matrix.py",
+        "scripts/tests/test_skill_sizes.py",
+        "scripts/tests/test_slow_tests.py",
+        "scripts/tests/test_unity_cli_maintenance.py",
+        "scripts/tests/test_unity_test_modules.py",
+        "scripts/tests/test_verify_shipped_analyzers.py",
+        "scripts/tests/test_version_sync.py",
+        "scripts/tests/test_workflow_expression_length.py",
+        "scripts/tests/test_xml_doc_summaries.py",
+        "scripts/tests/test_yaml_lint.py",
+    }
+    assert set(covered) == expected
+    assert len(covered) == len(expected)
+    orchestration = next(
+        step for step in commands if step["if"] == "matrix.phase == 'orchestration'"
+    )
+    assert "scripts/tests/test_ci_modes.py" in str(orchestration["run"])
+    assert "scripts/tests/test_browser_consumer.py" in str(orchestration["run"])

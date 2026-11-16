@@ -1621,7 +1621,8 @@
     "package.json": "0a02a1488907f5b9cef22f6bac4574a2e594ecfc9b011621d877729ce5239f4c",
     "scripts/lint-checks.json": "96d0226865d7e906a66c2d85169c3df1ebd23ad91149a67d633637108dbac1d8",
     "scripts/tests/test-run-contract-tests.js": "6505e5bbcb285d539d9a2226d89ae594fdbc271193b14814e6123dff556e0cec",
-    ".github/workflows/local-gates.yml": "f95b4749203ac8ee1054cfcf5474084fbfb54e7f3d6cbbffd740e8e9e883903d"
+    ".github/workflows/local-gates.yml": "1f8be32cb6eebc59894b755734ff1fa831f5b8bc18867fdb16d60a28cc9fc1df",
+    "scripts/tests/test_typecheck_controls.py": "be454a5826fbbf350084ad76764c46b184c862cab7ff1818d5859b526756d12e"
   },
   "windows_qualification": {
     "head": "8609dd853522b78d9bd1c3da344a15f4c3df5a25",
@@ -1635,5 +1636,13 @@
     "scanner_source_sha256": "112be1cc9dbe15065b6319baa5f832100e3462cf6f5dbf6b96b845daee14e367",
     "native_adapter_sha256": "6ad47013623de5e773f79c98ec24b85af72160bbb1d413be3b84b4b4dd09cbca",
     "scope": "This proves the unchanged scanner implementation and its Windows sharing boundary at the recorded head, not all later review corrections or a Windows performance improvement."
+  },
+  "windows_ci_partition": {
+    "reason": "Current-head Windows job 133507258107 reached its ten-minute limit after setup, strict checks, workspace/log controls and 2600 broad-suite passes. Its interruption does not establish executable lookup as the dominant cost.",
+    "previous_workflow_sha256": "f95b4749203ac8ee1054cfcf5474084fbfb54e7f3d6cbbffd740e8e9e883903d",
+    "selection": "All 50 existing test files remain selected exactly once across metadata and orchestration phases; original compiler exclusions remain unchanged.",
+    "bounds": "At most two isolated Windows phases run concurrently, each with the unchanged ten-minute job limit. The stable aggregate rejects every non-success phase result.",
+    "controls": "Missing phase red witness; full-selection, bounded-concurrency and actual aggregate commands tested, including failure, cancellation, skip and empty results.",
+    "qualification": "Pending actual current-source Windows execution; no speedup or completed gate claimed."
   }
 }
