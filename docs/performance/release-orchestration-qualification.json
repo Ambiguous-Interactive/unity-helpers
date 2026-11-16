@@ -1,0 +1,321 @@
+{
+  "issue": 859,
+  "source_parent": "c6d9131d205b3766a10088899ce17ef26eac06c7",
+  "original_source_commit": "f85fb5ff6fd58e4fe9c6ae40ec4f97897c6fea11",
+  "original_source_sha256": "67b9201b0f036921061342e3f2d3f2a0037e0728fb5cca9833c69cb57d841d83",
+  "source_sha256": {
+    "scripts/release_automation.py": "13d70773fcbd2f4003d06e35a6dd46e2b8a9d6facf55abeecc49d3443627cacd",
+    "scripts/tests/test_release_automation.py": "82c5a89fd9e2b842f78da5b47652c272a423de429037e2662d73bfdb173c17e9",
+    "scripts/python~/pyproject.toml": "2d388571310d88ad63d606cf76bb6361cac4107cdb1ac9ce01f705d26c31c9ed",
+    "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d",
+    "scripts/release-tools/auto-publish-release.js": "9ea5dd19f4c97ad5438bad4e53cd400b8b681b83e7220c1769644b8f11ea73b4",
+    "scripts/release-tools/require-native-unity-export.js": "c0564d3e4252adb92f2f2ec3e4e5985d1d9f54b23cecbae8a6be35c648f8ad71",
+    "scripts/tests/test-auto-publish-release.js": "a9a3f2d65d40e22caa7b7735e3d3a3b1382f16d45cddd29aca8937a342cb6836",
+    "scripts/tests/test-require-native-unity-export.js": "a9a3f2d65d40e22caa7b7735e3d3a3b1382f16d45cddd29aca8937a342cb6836",
+    "scripts/tests/test-run-contract-tests.js": "7103a47c07e25b3ab501b13a2444a744d792f99f609e0f4b522f41c53ce52d2e",
+    "scripts/tests/fixtures/release-orchestration-v1.json": "7e845c4a288cf6cf2f8b42000b16a9e03bbba72d9e203bf68b945bb82a5bc2d4"
+  },
+  "platform": "Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.36",
+  "filesystem": "tmpfs",
+  "toolchain": {
+    "uv": "uv 0.13.8 (x86_64-unknown-linux-gnu)",
+    "node": "v22.23.4",
+    "python": "Python 3.14.10"
+  },
+  "measurements": {
+    "small": {
+      "workflow_runs": 4,
+      "paired_ms": [
+        {
+          "original": 20.640004,
+          "python": 54.835624
+        },
+        {
+          "python": 49.52004,
+          "original": 23.045484
+        },
+        {
+          "original": 18.73544,
+          "python": 50.569902
+        },
+        {
+          "python": 50.632038,
+          "original": 19.405675
+        },
+        {
+          "original": 19.296294,
+          "python": 48.136653
+        },
+        {
+          "python": 49.866572,
+          "original": 18.667396
+        },
+        {
+          "original": 17.899886,
+          "python": 51.223368
+        }
+      ],
+      "median_ms": {
+        "original": 19.296294,
+        "python": 50.569902
+      }
+    },
+    "large": {
+      "workflow_runs": 1004,
+      "paired_ms": [
+        {
+          "original": 22.04062,
+          "python": 51.888449
+        },
+        {
+          "python": 51.98509,
+          "original": 21.654409
+        },
+        {
+          "original": 19.374998,
+          "python": 51.532189
+        },
+        {
+          "python": 51.513113,
+          "original": 20.819764
+        },
+        {
+          "original": 19.997735,
+          "python": 51.015408
+        },
+        {
+          "python": 51.125506,
+          "original": 19.903904
+        },
+        {
+          "original": 19.380638,
+          "python": 54.123565
+        }
+      ],
+      "median_ms": {
+        "original": 19.997735,
+        "python": 51.532189
+      }
+    }
+  },
+  "scope": "Seven alternating fresh-process pairs per input. The harness calls auto publication with deterministic fixture APIs, validates the same candidate and complete workflow run census, claims and dispatches only into memory. No network requests or real release mutations. This measures process startup plus fixture orchestration, not native Unity, network latency, Windows or complete CI performance.",
+  "harness_sha256": {
+    "uh-release-orchestration-perf.cjs": "77c82613ea0e3bfa192d73b18f5bae97605d5d1f5ae653b8bc92540bca54a270",
+    "uh-release-orchestration-perf.py": "cf168122106148f1c17e245352df3ec7614fbfe72b7af0fc5bdbd1453d012aef",
+    "uh-release-orchestration-small.json": "6b02f3153be2a12a8f474fbe2c7534fac438ed053935c41ebdbf9f49a6367198",
+    "uh-release-orchestration-large.json": "c12747a6037387c96ccd51a1559d731ce4542cbbee2ea759fb19ae033430d8cc"
+  },
+  "original_decisions": {
+    "fixture": "scripts/tests/fixtures/release-orchestration-v1.json",
+    "count": 565,
+    "original_suites": "Original Node auto-publication and native-export suites passed before capture; compatibility gate controls moved from the existing compatibility suite.",
+    "retained_changes": "Malformed matching validation rows with invalid IDs or non-string workflow paths now refuse evidence instead of potentially counting malformed API responses. Non-string pull bodies previously raised TypeError; they now refuse admission. These are fail-closed corrections, not relaxed release targets."
+  },
+  "validation": {
+    "typed_cases_passed": 644,
+    "strict_sources": 166,
+    "strict_tools": ["Ruff", "mypy", "Pyright"],
+    "original_workflow_controls": "All migrated permission, exact-source checkout, concurrency, all-push completion trigger, release opt-in and native dependency controls pass. The remaining compatibility workflow suite passes four tests.",
+    "integration_red": "Two workflow integration controls fail before replacing Node calls and pass after locked uv setup and invocation.",
+    "clis": "Direct Python and legacy Node CLIs tested from a foreign working directory, including ineligible admission without API reads, summary bytes, missing native token and test-launcher selection.",
+    "strict_identity_red": "Four controls fail when Python treats True as numeric run ID or attempt 1. Explicit positive integer identity restores the original Node strict comparison; all four pass after correction.",
+    "owner_red": "The contract ownership gate initially identified the two legacy Node test launchers as orphaned. They now have a reachable predicate owned by executable typed launcher controls; the ownership gate passes.",
+    "request_deadline": "A focused red control found no wall-clock process deadline; the corrected API bounds each owned HTTP child to 30 seconds using subprocess.run timeout, which kills/reaps a timed-out child. Worker controls verify HTTP statuses, safe error envelopes, token absence from process arguments/output, malformed input and a real worker process without network.",
+    "stdout_bytes": "A CRLF-translating stream control fails before the fix and passes after CLI stream configuration. Direct and Node CLI controls require exact LF JSON output and summary bytes.",
+    "relative_paths": "Original executable Node CLI accepts relative event/summary paths from a foreign directory. The new Node launcher initially failed that control by changing cwd. Inherit caller cwd instead; all four absolute/relative direct/Node combinations now pass with exact stdout and summary bytes.",
+    "documentation": "Markdown link lint and strict MkDocs build pass."
+  },
+  "publication_contract": {
+    "admission": "Trusted same repository/default branch, exact 40-character lowercase source SHA, exactly one merged same-repository release PR with exact version branch/title and standalone opt-in marker.",
+    "validation": "Latest workflow IDs per path; four required workflows must succeed. Every other triggered push validation gates publication except the four original independent workflows. Dispatch exception remains limited to compatibility.",
+    "bounds": "Forty polling attempts, 15-second pauses; automatic API pages capped at 100, native evidence pages at 20; 100 rows/page. An owned current-interpreter child handles each HTTP request, with a parent-enforced 30-second deadline and no retries after an uncertain mutation. Tokens are passed through stdin; redirects are refused.",
+    "claim": "Permanent atomic version claim precedes dispatch. Existing claims, including claims from another source, prevent dispatch. Ambiguous claim/dispatch responses are not retried.",
+    "native": "Newest trusted run and current attempt, exactly one successful export job, six successful ordered licensing/export/cleanup steps. Every supported older-editor job and its aggregate must independently succeed in the latest trusted compatibility run."
+  },
+  "retained_limitations": [
+    "Fixture orchestration is slower through Python and uv at both retained input sizes. No speedup is claimed.",
+    "No native Unity execution, production publication, real GitHub API timing or Windows performance measurement is represented by these fixture captures. Windows typed suite joins the existing CI cohort and awaits native CI.",
+    "Each actual HTTP request now pays for one Python child startup to retain the total request deadline across DNS, connection and response reads. Fixture timing rows use in-memory APIs and do not measure this additional network-path process cost."
+  ],
+  "earlier_captures": [
+    {
+      "source_parent": "e05c63858fba56778868f45fb8d2e0652f8e1625",
+      "source_sha256": {
+        "scripts/release_automation.py": "48d4aba9fbc743a019ac8e730738fb1f4c291fa7d0ce6d26aaa5cba1cafb5b30",
+        "scripts/tests/test_release_automation.py": "2a222c8ad05c8e17a4acd7669be22bc7af528499e18766c48e5846debb5d2c98",
+        "scripts/python~/pyproject.toml": "2d388571310d88ad63d606cf76bb6361cac4107cdb1ac9ce01f705d26c31c9ed",
+        "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d"
+      },
+      "measurements": {
+        "small": {
+          "workflow_runs": 4,
+          "paired_ms": [
+            {
+              "original": 19.073532,
+              "python": 46.316967
+            },
+            {
+              "python": 46.767187,
+              "original": 18.209658
+            },
+            {
+              "original": 19.506569,
+              "python": 49.550465
+            },
+            {
+              "python": 49.171627,
+              "original": 16.966237
+            },
+            {
+              "original": 18.692536,
+              "python": 48.005521
+            },
+            {
+              "python": 47.812486,
+              "original": 18.099675
+            },
+            {
+              "original": 17.741598,
+              "python": 46.671522
+            }
+          ],
+          "median_ms": {
+            "original": 18.209658,
+            "python": 47.812486
+          }
+        },
+        "large": {
+          "workflow_runs": 1004,
+          "paired_ms": [
+            {
+              "original": 21.235615,
+              "python": 49.922386
+            },
+            {
+              "python": 50.395828,
+              "original": 22.571344
+            },
+            {
+              "original": 20.591263,
+              "python": 50.88973
+            },
+            {
+              "python": 48.612464,
+              "original": 21.068493
+            },
+            {
+              "original": 20.201947,
+              "python": 48.812001
+            },
+            {
+              "python": 48.88516,
+              "original": 21.30441
+            },
+            {
+              "original": 19.054865,
+              "python": 49.526089
+            }
+          ],
+          "median_ms": {
+            "original": 21.068493,
+            "python": 49.526089
+          }
+        }
+      },
+      "scope": "Before restoring Node strict numeric identity semantics for boolean API fields. Retained historical regression; not measurements of the corrected implementation."
+    },
+    {
+      "source_parent": "c6d9131d205b3766a10088899ce17ef26eac06c7",
+      "source_sha256": {
+        "scripts/release_automation.py": "8b41437d61a4db9cdba0f9758d1b85a2d3582243773bec67e7c80be342737c03",
+        "scripts/tests/test_release_automation.py": "6362c330857bab872e765d698e29ef6b2b61c54df526b03a8fec6d53ac3e0e97",
+        "scripts/python~/pyproject.toml": "2d388571310d88ad63d606cf76bb6361cac4107cdb1ac9ce01f705d26c31c9ed",
+        "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d"
+      },
+      "measurements": {
+        "small": {
+          "workflow_runs": 4,
+          "paired_ms": [
+            {
+              "original": 18.970357,
+              "python": 47.904759
+            },
+            {
+              "python": 47.688203,
+              "original": 18.957227
+            },
+            {
+              "original": 17.610783,
+              "python": 50.466597
+            },
+            {
+              "python": 49.382518,
+              "original": 19.558647
+            },
+            {
+              "original": 19.900028,
+              "python": 51.127098
+            },
+            {
+              "python": 48.37902,
+              "original": 18.96909
+            },
+            {
+              "original": 18.568214,
+              "python": 47.110145
+            }
+          ],
+          "median_ms": {
+            "original": 18.96909,
+            "python": 48.37902
+          }
+        },
+        "large": {
+          "workflow_runs": 1004,
+          "paired_ms": [
+            {
+              "original": 20.565417,
+              "python": 52.726758
+            },
+            {
+              "python": 49.206473,
+              "original": 19.779421
+            },
+            {
+              "original": 20.408952,
+              "python": 49.260221
+            },
+            {
+              "python": 50.017653,
+              "original": 22.847743
+            },
+            {
+              "original": 20.053145,
+              "python": 49.614201
+            },
+            {
+              "python": 51.454022,
+              "original": 20.652098
+            },
+            {
+              "original": 19.557708,
+              "python": 53.062309
+            }
+          ],
+          "median_ms": {
+            "original": 20.408952,
+            "python": 50.017653
+          }
+        }
+      },
+      "scope": "Before the owned HTTP request deadline worker and LF-preserving CLI configuration. Historical source only; fixture APIs do not invoke real HTTP requests."
+    }
+  ],
+  "timing_capture_sha256": {
+    "scripts/release_automation.py": "13d70773fcbd2f4003d06e35a6dd46e2b8a9d6facf55abeecc49d3443627cacd",
+    "scripts/tests/test_release_automation.py": "4c86a006b21e12cb061bd62e6700fbabbaa443c4f921c72d2b188d853c000700",
+    "scripts/python~/pyproject.toml": "2d388571310d88ad63d606cf76bb6361cac4107cdb1ac9ce01f705d26c31c9ed",
+    "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d"
+  },
+  "post_timing_changes": "Only Node compatibility working-directory handling and its test cases changed after the final timing capture. The timed Python implementation, locked project and lockfile remain byte-identical. timing_capture_sha256 retains the actual captured input hashes; the captured test source is archived in ignored session evidence. source_sha256 identifies the final qualified files. No timing rerun or speed claim is substituted for the corrected CLI controls."
+}

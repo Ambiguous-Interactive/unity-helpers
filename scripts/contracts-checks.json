@@ -639,7 +639,9 @@
       "scripts/tests/test-unity-compatibility.js",
       "scripts/unity/generate-compatibility-workflow.js",
       ".github/workflows/unity-compatibility.yml",
-      "scripts/release-tools/require-native-unity-export.js"
+      "scripts/release-tools/require-native-unity-export.js",
+      "scripts/release_automation.py",
+      "scripts/tests/test_release_automation.py"
     ]
   },
   {
