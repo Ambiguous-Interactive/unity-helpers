@@ -179,7 +179,9 @@ pair and source hash. It does not measure production publication or Windows spee
 refuse redirects. Each request uses an owned Python child with a parent-enforced 30-second
 deadline. The token travels through stdin, and a timed-out child is killed and reaped.
 This adds process startup to actual HTTP calls; the fixture timings do not measure that cost.
-Claims still prevent retries after uncertain mutations. CLI stdout and summaries retain LF bytes.
+Claims still prevent retries after uncertain mutations. CLI stdout and summaries retain LF bytes. The timing rows predate later admission corrections and do not measure the corrected source.
+Release admission retains the original handling of empty container fork flags, requires string
+branch names, and rejects non-JSON numbers and incompatible package encodings before publication.
 
 Skill indexing, instruction validation and skill-split migration also use typed Python.
 The PowerShell and Node entry points remain tested compatibility launchers. The generator

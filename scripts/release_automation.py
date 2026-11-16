@@ -16,7 +16,7 @@ from collections.abc import Callable, Mapping
 from email.message import Message
 from io import TextIOWrapper
 from pathlib import Path
-from typing import IO, TYPE_CHECKING, Protocol, cast
+from typing import IO, TYPE_CHECKING, NoReturn, Protocol, cast
 
 if TYPE_CHECKING:
     from http.client import HTTPMessage
@@ -64,6 +64,10 @@ def matches(pattern: re.Pattern[str], value: object) -> bool:
     return isinstance(value, str) and pattern.fullmatch(value) is not None
 
 
+def reject_non_json_number(value: str) -> NoReturn:
+    raise ValueError(f"Non-JSON number is not permitted: {value}.")
+
+
 def safe_integer(value: object) -> bool:
     return type(value) is int and 0 < value <= 9007199254740991
 
@@ -79,13 +83,25 @@ def validation_event(run: object) -> bool:
     )
 
 
+def javascript_falsy(value: object) -> bool:
+    """Retain the original JSON flag semantics; empty containers are true in JavaScript."""
+    return (
+        value is None
+        or value is False
+        or (isinstance(value, (int, float)) and value == 0)
+        or (isinstance(value, str) and not value)
+    )
+
+
 def eligible(event: object, repository: str) -> bool:
     run = field(event, "workflow_run")
+    branch = field(event, "repository", "default_branch")
     return (
-        not field(event, "repository", "fork")
+        isinstance(branch, str)
+        and javascript_falsy(field(event, "repository", "fork"))
         and field(event, "repository", "full_name") == repository
         and validation_event(run)
-        and field(run, "head_branch") == field(event, "repository", "default_branch")
+        and field(run, "head_branch") == branch
         and field(run, "head_repository", "full_name") == repository
         and field(run, "conclusion") in ("success", "skipped")
         and matches(SHA, field(run, "head_sha"))
@@ -176,7 +192,10 @@ def auto_publish(
     content = record(api.get(f"contents/package.json?ref={sha}"))
     if content.get("encoding") != "base64" or not isinstance(content.get("content"), str):
         raise ValueError("Missing package metadata.")
-    package: object = json.loads(base64.b64decode(cast("str", content["content"])))
+    package: object = json.loads(
+        base64.b64decode(cast("str", content["content"])).decode("utf-8"),
+        parse_constant=reject_non_json_number,
+    )
     version = field(package, "version")
     candidate = release_candidate(event, pulls, version, repository)
     if candidate is None:
@@ -348,7 +367,8 @@ def require_compatibility(repository: str, source_sha: str, request: Request) ->
         request, f"/repos/{repository}/actions/runs/{run['id']}/jobs?filter=latest", "jobs"
     )
     versions: object = json.loads(
-        (ROOT / ".github/unity-versions.json").read_text(encoding="utf-8")
+        (ROOT / ".github/unity-versions.json").read_text(encoding="utf-8"),
+        parse_constant=reject_non_json_number,
     )
     all_versions = field(versions, "all")
     if not isinstance(all_versions, list) or len(cast("list[object]", all_versions)) < 2:
@@ -421,7 +441,9 @@ class GitHubApi:
             raise ValueError(
                 "GitHub API request worker failed; do not retry an uncertain mutation."
             )
-        response = record(cast("object", json.loads(result.stdout)))
+        response = record(
+            cast("object", json.loads(result.stdout, parse_constant=reject_non_json_number))
+        )
         status = response.get("http_status")
         if type(status) is int and 100 <= status <= 599:
             raise urllib.error.HTTPError(
@@ -453,7 +475,11 @@ class GitHubApi:
             },
         )
         with self.opener.open(request, timeout=30) as response:
-            return None if response.status == 204 else cast("object", json.load(response))
+            return (
+                None
+                if response.status == 204
+                else cast("object", json.load(response, parse_constant=reject_non_json_number))
+            )
 
     def get(self, endpoint: str) -> object:
         return self.request(endpoint)
@@ -478,7 +504,9 @@ class GitHubApi:
 
 def http_worker() -> int:
     try:
-        payload = record(cast("object", json.load(sys.stdin)))
+        payload = record(
+            cast("object", json.load(sys.stdin, parse_constant=reject_non_json_number))
+        )
         repository, token, endpoint, method = (
             payload.get(key) for key in ("repository", "token", "endpoint", "method")
         )
@@ -519,7 +547,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "auto-publish":
             event: object = json.loads(
-                Path(os.environ["GITHUB_EVENT_PATH"]).read_text(encoding="utf-8")
+                Path(os.environ["GITHUB_EVENT_PATH"]).read_text(encoding="utf-8"),
+                parse_constant=reject_non_json_number,
             )
             result = auto_publish(
                 event, repository, GitHubApi(repository, os.environ.get("GITHUB_TOKEN", ""))

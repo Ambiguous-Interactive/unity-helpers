@@ -4,8 +4,8 @@
   "original_source_commit": "f85fb5ff6fd58e4fe9c6ae40ec4f97897c6fea11",
   "original_source_sha256": "67b9201b0f036921061342e3f2d3f2a0037e0728fb5cca9833c69cb57d841d83",
   "source_sha256": {
-    "scripts/release_automation.py": "13d70773fcbd2f4003d06e35a6dd46e2b8a9d6facf55abeecc49d3443627cacd",
-    "scripts/tests/test_release_automation.py": "82c5a89fd9e2b842f78da5b47652c272a423de429037e2662d73bfdb173c17e9",
+    "scripts/release_automation.py": "e595e6547d9caba28cac10c0f23dd0069abffa2c140c6e4a202429176c12b695",
+    "scripts/tests/test_release_automation.py": "c1179fa148a8d95c54746e49c8db22011e879963a9610237cec7dbb61afa7b42",
     "scripts/python~/pyproject.toml": "2d388571310d88ad63d606cf76bb6361cac4107cdb1ac9ce01f705d26c31c9ed",
     "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d",
     "scripts/release-tools/auto-publish-release.js": "9ea5dd19f4c97ad5438bad4e53cd400b8b681b83e7220c1769644b8f11ea73b4",
@@ -112,7 +112,7 @@
     "retained_changes": "Malformed matching validation rows with invalid IDs or non-string workflow paths now refuse evidence instead of potentially counting malformed API responses. Non-string pull bodies previously raised TypeError; they now refuse admission. These are fail-closed corrections, not relaxed release targets."
   },
   "validation": {
-    "typed_cases_passed": 644,
+    "typed_cases_passed": 655,
     "strict_sources": 166,
     "strict_tools": ["Ruff", "mypy", "Pyright"],
     "original_workflow_controls": "All migrated permission, exact-source checkout, concurrency, all-push completion trigger, release opt-in and native dependency controls pass. The remaining compatibility workflow suite passes four tests.",
@@ -135,7 +135,8 @@
   "retained_limitations": [
     "Fixture orchestration is slower through Python and uv at both retained input sizes. No speedup is claimed.",
     "No native Unity execution, production publication, real GitHub API timing or Windows performance measurement is represented by these fixture captures. Windows typed suite joins the existing CI cohort and awaits native CI.",
-    "Each actual HTTP request now pays for one Python child startup to retain the total request deadline across DNS, connection and response reads. Fixture timing rows use in-memory APIs and do not measure this additional network-path process cost."
+    "Each actual HTTP request now pays for one Python child startup to retain the total request deadline across DNS, connection and response reads. Fixture timing rows use in-memory APIs and do not measure this additional network-path process cost.",
+    "Every timing row predates the later admission parity corrections. It remains historical evidence for its exact captured source, not a measurement of the corrected implementation."
   ],
   "earlier_captures": [
     {
@@ -317,5 +318,67 @@
     "scripts/python~/pyproject.toml": "2d388571310d88ad63d606cf76bb6361cac4107cdb1ac9ce01f705d26c31c9ed",
     "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d"
   },
-  "post_timing_changes": "Only Node compatibility working-directory handling and its test cases changed after the final timing capture. The timed Python implementation, locked project and lockfile remain byte-identical. timing_capture_sha256 retains the actual captured input hashes; the captured test source is archived in ignored session evidence. source_sha256 identifies the final qualified files. No timing rerun or speed claim is substituted for the corrected CLI controls."
+  "post_timing_changes": "First, only Node compatibility working-directory handling and its tests changed after the final timing capture. Later, fork flags, branch schema and JSON boundary corrections changed the Python implementation and tests. timing_capture_sha256 binds the actual earlier measured inputs; source_sha256 identifies the corrected qualified files. The project and lock are unchanged, but no quantitative timing claim is made for the corrected implementation.",
+  "admission_parity_corrections": {
+    "reviewed_parent": "b3da479be9b7b26057b2011bb1b0c89c0f519e5b",
+    "red_cases": 11,
+    "fork_flags": "Original Node rejects empty object/array fork flags before API reads; Python native Boolean conversion had admitted them. Retain the original false JSON values explicitly, including legacy null/zero/empty-string behavior.",
+    "branch_fields": "Original Node rejects separate object/array branch values and mismatched number/Boolean fields. Python structural/numeric equality had admitted them. Require the actual string branch schema before equality and API reads.",
+    "json_boundary": "Reject non-JSON NaN/Infinity constants in event, package, HTTP and worker JSON. Package metadata must decode as UTF-8 text before parsing, retaining original refusals of UTF-16 and a leading BOM. All malformed metadata controls leave publication posts empty.",
+    "original_witnesses": {
+      "fork": [
+        {
+          "fork": {},
+          "candidate": null,
+          "result": {
+            "status": "ineligible"
+          }
+        },
+        {
+          "fork": [],
+          "candidate": null,
+          "result": {
+            "status": "ineligible"
+          }
+        }
+      ],
+      "branch": [
+        {
+          "branch": {},
+          "head": {},
+          "base": {},
+          "candidate": null
+        },
+        {
+          "branch": [],
+          "head": [],
+          "base": [],
+          "candidate": null
+        },
+        {
+          "branch": 0,
+          "head": false,
+          "base": false,
+          "candidate": null
+        }
+      ],
+      "package_encodings": [
+        {
+          "rejected": true,
+          "posts": 0,
+          "payload_hex": "7b2276657273696f6e223a4e614e7d"
+        },
+        {
+          "rejected": true,
+          "posts": 0,
+          "payload_hex": "fffe7b002200760065007200730069006f006e0022003a00220031002e0032002e00330022007d00"
+        },
+        {
+          "rejected": true,
+          "posts": 0,
+          "payload_hex": "efbbbf7b2276657273696f6e223a22312e322e33227d"
+        }
+      ]
+    }
+  }
 }

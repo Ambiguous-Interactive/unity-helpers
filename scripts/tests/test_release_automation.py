@@ -267,6 +267,97 @@ def test_ineligible_event_does_not_read_api() -> None:
     assert release.auto_publish(event, REPOSITORY, RefuseApi()) == {"status": "ineligible"}
 
 
+@pytest.mark.parametrize("flag", [{}, []], ids=["object", "array"])
+def test_empty_container_fork_flag_is_ineligible_before_api_reads(flag: object) -> None:
+    class RefuseApi(FakeApi):
+        def pages(self, endpoint: str, key: str | None = None) -> list[object]:
+            raise AssertionError((endpoint, key))
+
+    event = {
+        **release.record(FIXTURE["event"]),
+        "repository": {
+            **release.record(release.field(FIXTURE["event"], "repository")),
+            "fork": flag,
+        },
+    }
+    assert release.release_candidate(event, [FIXTURE["pull"]], VERSION, REPOSITORY) is None
+    assert release.auto_publish(event, REPOSITORY, RefuseApi()) == {"status": "ineligible"}
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        b'{"version":NaN}',
+        '{"version":"1.2.3"}'.encode("utf-16"),
+        b'\xef\xbb\xbf{"version":"1.2.3"}',
+    ],
+    ids=["non-json-number", "utf16", "bom"],
+)
+def test_package_metadata_retains_original_utf8_json_boundary(data: bytes) -> None:
+    class PackageApi(FakeApi):
+        def get(self, endpoint: str) -> object:
+            assert endpoint.startswith("contents/package.json?")
+            return {"encoding": "base64", "content": base64.b64encode(data).decode()}
+
+    api = PackageApi()
+    with pytest.raises(ValueError, match=r"JSON|UTF|utf|codec"):
+        release.auto_publish(FIXTURE["event"], REPOSITORY, api)
+    assert api.posts == []
+
+
+@pytest.mark.parametrize("constant", ["NaN", "Infinity", "-Infinity"])
+def test_non_json_event_number_refused_before_api(
+    constant: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    event = tmp_path / "event.json"
+    data = {
+        **release.record(FIXTURE["event"]),
+        "repository": {
+            **release.record(release.field(FIXTURE["event"], "repository")),
+            "fork": "NUMBER",
+        },
+    }
+    event.write_text(json.dumps(data).replace('"NUMBER"', constant), encoding="utf-8")
+    monkeypatch.setenv("GITHUB_EVENT_PATH", str(event))
+    monkeypatch.setenv("GITHUB_REPOSITORY", REPOSITORY)
+    monkeypatch.setenv("GITHUB_TOKEN", "fixture-token")
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", "")
+    assert release.main(["auto-publish"]) == 1
+
+
+@pytest.mark.parametrize(
+    ("default_branch", "head_branch", "base_ref"),
+    [({}, {}, {}), ([], [], []), (0, False, False)],
+    ids=["objects", "arrays", "number-boolean"],
+)
+def test_malformed_matching_branch_fields_refused_before_api(
+    default_branch: object,
+    head_branch: object,
+    base_ref: object,
+) -> None:
+    class RefuseApi(FakeApi):
+        def pages(self, endpoint: str, key: str | None = None) -> list[object]:
+            raise AssertionError((endpoint, key))
+
+    event = {
+        **release.record(FIXTURE["event"]),
+        "repository": {
+            **release.record(release.field(FIXTURE["event"], "repository")),
+            "default_branch": default_branch,
+        },
+        "workflow_run": {
+            **release.record(release.field(FIXTURE["event"], "workflow_run")),
+            "head_branch": head_branch,
+        },
+    }
+    pull = {
+        **release.record(FIXTURE["pull"]),
+        "base": {**release.record(release.field(FIXTURE["pull"], "base")), "ref": base_ref},
+    }
+    assert release.release_candidate(event, [pull], VERSION, REPOSITORY) is None
+    assert release.auto_publish(event, REPOSITORY, RefuseApi()) == {"status": "ineligible"}
+
+
 def compatibility_fixture() -> tuple[dict[str, object], list[object]]:
     run = {
         **release.record(FIXTURE["nativeRun"]),
