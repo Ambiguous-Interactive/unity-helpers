@@ -18,7 +18,7 @@ name: Deploy Documentation to GitHub Wiki
         type: boolean
 
 permissions:
-  contents: write
+  contents: read
 
 # Prevent concurrent wiki pushes to avoid git conflicts
 concurrency:
@@ -68,21 +68,47 @@ jobs:
         with:
           path: main
           fetch-depth: 1
+          persist-credentials: false
 
       - name: Setup locked Python tooling
         uses: ./main/.github/actions/setup-python-tools
 
+      - name: Require wiki publisher credentials
+        env:
+          APP_ID: ${{ secrets.AUTO_COMMIT_APP_ID }}
+          APP_KEY: ${{ secrets.AUTO_COMMIT_APP_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${APP_ID:-}" ] || [ -z "${APP_KEY:-}" ]; then
+            echo "::error::Wiki publishing requires the existing AUTO_COMMIT_APP_ID and AUTO_COMMIT_APP_PRIVATE_KEY secrets. Restore access to those secrets; do not widen App permissions."
+            exit 1
+          fi
+
+      - name: Generate wiki publisher token
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
+        with:
+          client-id: ${{ secrets.AUTO_COMMIT_APP_ID }}
+          private-key: ${{ secrets.AUTO_COMMIT_APP_PRIVATE_KEY }}
+          permission-contents: write
+
       - name: Clone wiki repository
         id: clone-wiki
+        env:
+          WIKI_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           set -euo pipefail
           echo "Cloning wiki repository..."
 
-          WIKI_AUTH_URL="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.wiki.git"
-
-          if ! git clone "$WIKI_AUTH_URL" wiki 2>&1; then
-            echo "::error::Failed to clone wiki repository"
-            echo "::error::Ensure the wiki has been initialized with at least one page"
+          export GIT_TERMINAL_PROMPT=0
+          export GIT_CONFIG_COUNT=2
+          export GIT_CONFIG_KEY_0=http.https://github.com/.extraheader
+          GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$WIKI_TOKEN" | base64 -w0)"
+          export GIT_CONFIG_VALUE_0
+          export GIT_CONFIG_KEY_1=credential.helper
+          export GIT_CONFIG_VALUE_1=""
+          if ! git clone "$WIKI_URL" wiki; then
+            echo "::error::Cannot clone the initialized wiki with the configured publisher App. Check its existing repository installation access."
             exit 1
           fi
 
@@ -93,6 +119,10 @@ jobs:
           WIKI_BRANCH=$(git rev-parse --abbrev-ref HEAD)
           echo "wiki_branch=$WIKI_BRANCH" >> "$GITHUB_OUTPUT"
           echo "Wiki branch: $WIKI_BRANCH"
+          if ! git push --dry-run origin "HEAD:refs/heads/$WIKI_BRANCH"; then
+            echo "::error::Wiki publisher is denied receive access. Check the existing App installation's wiki access; do not retry other branches or widen permissions."
+            exit 1
+          fi
 
       - name: Prepare wiki content
         id: prepare
@@ -228,10 +258,31 @@ jobs:
           fi
 
       - name: Commit and push to wiki
-        if: steps.changes.outputs.has_changes == 'true' || github.event.inputs.force_sync == 'true'
+        id: publish
+        env:
+          WIKI_TOKEN: ${{ steps.app-token.outputs.token }}
+          WIKI_BRANCH: ${{ steps.clone-wiki.outputs.wiki_branch }}
         run: |
           set -euo pipefail
           cd wiki
+
+          export GIT_TERMINAL_PROMPT=0
+          export GIT_CONFIG_COUNT=2
+          export GIT_CONFIG_KEY_0=http.https://github.com/.extraheader
+          GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$WIKI_TOKEN" | base64 -w0)"
+          export GIT_CONFIG_VALUE_0
+          export GIT_CONFIG_KEY_1=credential.helper
+          export GIT_CONFIG_VALUE_1=""
+          verify_wiki_revision() {
+            local expected actual
+            expected=$(git rev-parse HEAD)
+            actual=$(git ls-remote origin "refs/heads/$WIKI_BRANCH" | cut -f1)
+            if [ "$actual" != "$expected" ]; then
+              echo "::error::Published wiki revision does not match the generated commit."
+              return 1
+            fi
+            echo "wiki_revision=$actual" >> "$GITHUB_OUTPUT"
+          }
 
           # Configure git
           git config user.name "github-actions[bot]"
@@ -247,12 +298,6 @@ jobs:
           # Stage all changes
           git add -A
 
-          # Check for changes again (in case force_sync but no actual changes)
-          if git diff --staged --quiet; then
-            echo "::notice::No changes to commit (force_sync enabled but content identical)"
-            exit 0
-          fi
-
           # Dry run mode
           if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
             echo "🔍 DRY RUN MODE - Changes that would be committed:"
@@ -263,22 +308,21 @@ jobs:
             exit 0
           fi
 
+          # Verify unchanged content against the current remote
+          if git diff --staged --quiet; then
+            echo "::notice::No content changes to commit; verifying current remote revision"
+            verify_wiki_revision
+            exit 0
+          fi
+
           # Commit changes
           git commit -m "$COMMIT_MSG"
 
-          # Push to wiki (try detected branch first, then common alternatives)
-          WIKI_BRANCH="${{ steps.clone-wiki.outputs.wiki_branch }}"
-          echo "Pushing to wiki branch: $WIKI_BRANCH"
-
-          if ! git push origin "$WIKI_BRANCH"; then
-            echo "::warning::Push to $WIKI_BRANCH failed, trying alternatives..."
-            if ! git push origin master 2>/dev/null; then
-              if ! git push origin main 2>/dev/null; then
-                echo "::error::Failed to push to wiki repository"
-                exit 1
-              fi
-            fi
+          if ! git push origin "HEAD:refs/heads/$WIKI_BRANCH"; then
+            echo "::error::Wiki push failed. Check publisher authorization or branch concurrency; no alternate branch was attempted."
+            exit 1
           fi
+          verify_wiki_revision
 
           echo ""
           echo "✅ Successfully synced documentation to wiki"
@@ -291,14 +335,19 @@ jobs:
             echo "## Wiki Sync Summary"
             echo ""
 
-            if [ "${{ needs.check-wiki.outputs.wiki_exists }}" = "false" ]; then
+            if [ "${{ job.status }}" != "success" ]; then
+              echo "❌ **Wiki sync failed** - Publication was not verified. Review the failed step."
+            elif [ "${{ needs.check-wiki.outputs.wiki_exists }}" = "false" ]; then
               echo "⚠️ **Wiki not available** - Please enable and initialize the wiki first."
-            elif [ "${{ steps.changes.outputs.has_changes }}" = "false" ] && [ "${{ github.event.inputs.force_sync }}" != "true" ]; then
-              echo "✅ **No changes detected** - Wiki is already up to date."
             elif [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
               echo "🔍 **Dry run completed** - No changes were pushed."
+            elif [ "${{ steps.changes.outputs.has_changes }}" = "false" ] && [ "${{ github.event.inputs.force_sync }}" != "true" ]; then
+              echo "✅ **No changes detected** - Wiki is already up to date."
+            elif [ "${{ steps.publish.outcome }}" = "success" ] && [ -n "${{ steps.publish.outputs.wiki_revision }}" ]; then
+              echo "✅ **Wiki synced successfully** - Verified revision: ${{ steps.publish.outputs.wiki_revision }}"
             else
-              echo "✅ **Wiki synced successfully**"
+              echo "::error::Publication was not verified."
+              exit 1
             fi
 
             echo ""
@@ -327,7 +376,7 @@ jobs:
             echo ""
             echo "1. **Check if wiki is enabled**: Go to Settings → Features → Wikis"
             echo "2. **Initialize wiki**: Create at least one page manually in the wiki"
-            echo "3. **Check permissions**: Ensure GITHUB_TOKEN has write access"
+            echo "3. **Check permissions**: Check the existing auto-commit App installation and AUTO_COMMIT_APP_* secrets"
             echo "4. **Review logs**: Check the workflow logs for specific errors"
             echo ""
             echo "[View Workflow Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"

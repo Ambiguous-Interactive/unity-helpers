@@ -5,12 +5,16 @@ Tests for the wiki generation scripts.
 Run with: uv run --project scripts/python~ --locked pytest scripts/wiki/test_wiki_scripts.py -v
 """
 
+import os
+import shutil
+import subprocess
 import sys
 import tempfile
 from collections.abc import Generator
 from pathlib import Path
 
 import pytest
+import yaml
 
 # Add scripts directory to path (test file is in scripts/wiki/)
 sys.path.insert(0, str(Path(__file__).parent))
@@ -683,6 +687,10 @@ End of document."""
         """Content containing only code blocks should be completely unchanged."""
         content = """```python
 import os
+import shutil
+import os
+import shutil
+import subprocess
 import sys
 
 def main():
@@ -798,6 +806,184 @@ class TestEmptyDirectories:
             # Should still generate valid sidebar structure
             assert "Home" in sidebar
             assert "## 📚 Documentation" in sidebar
+
+
+class TestWikiPublication:
+    """Execute the workflow's shell boundaries without network access."""
+
+    @staticmethod
+    def run_step(name: str, tmp_path: Path, **values: str) -> subprocess.CompletedProcess[str]:
+        workflow = Path(__file__).resolve().parents[2] / ".github/workflows/deploy-wiki.yml"
+        steps = yaml.safe_load(workflow.read_text())["jobs"]["sync-wiki"]["steps"]
+        step = next(step for step in steps if step["name"] == name)
+        script = step["run"]
+        substitutions = {
+            "github.sha": "source-sha",
+            "github.event_name": "push",
+            "github.server_url": "https://github.com",
+            "github.repository": "example/repository",
+            "github.run_id": "123",
+            "github.event.inputs.dry_run": "false",
+            "github.event.inputs.force_sync": "false",
+            "job.status": "success",
+            "needs.check-wiki.outputs.wiki_exists": "true",
+            "steps.changes.outputs.has_changes": "true",
+            "steps.publish.outcome": "success",
+            "steps.publish.outputs.wiki_revision": "expected-sha",
+        }
+        substitutions.update({key: value for key, value in values.items() if "." in key})
+        for key, value in substitutions.items():
+            script = script.replace("${{ " + key + " }}", value)
+        assert "${{" not in script
+        (tmp_path / "wiki").mkdir(exist_ok=True)
+        fake_git = """
+        git() {
+          printf '%s\\n' "$*" >> "$CALLS"
+          case "$*" in
+            "clone "*) return "${CLONE_EXIT:-0}" ;;
+            "rev-parse --abbrev-ref HEAD") echo master ;;
+            "rev-parse HEAD") echo expected-sha ;;
+            "diff --staged --quiet") return "${DIFF_EXIT:-1}" ;;
+            "push --dry-run "*) return "${RECEIVE_EXIT:-0}" ;;
+            "push "*) return "${PUSH_EXIT:-0}" ;;
+            "ls-remote origin "*) printf '%s\\trefs/heads/master\\n' "${REMOTE_SHA:-expected-sha}" ;;
+          esac
+        }
+        """
+        env = {
+            **os.environ,
+            "CALLS": str(tmp_path / "calls"),
+            "GITHUB_OUTPUT": str(tmp_path / "output"),
+            "GITHUB_STEP_SUMMARY": str(tmp_path / "summary"),
+            "WIKI_URL": "https://github.com/example/repository.wiki.git",
+            "WIKI_TOKEN": "synthetic-credential",
+            "WIKI_BRANCH": "master",
+            **{key: value for key, value in values.items() if "." not in key},
+        }
+        shell = shutil.which("bash")
+        assert shell is not None
+        return subprocess.run(
+            [shell, "-c", fake_git + script],
+            cwd=tmp_path,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+    @pytest.mark.parametrize(("app_id", "app_key"), [("", ""), ("id", ""), ("", "key")])
+    def test_missing_credentials_fail(self, tmp_path: Path, app_id: str, app_key: str) -> None:
+        result = self.run_step(
+            "Require wiki publisher credentials",
+            tmp_path,
+            APP_ID=app_id,
+            APP_KEY=app_key,
+        )
+        assert result.returncode != 0
+        assert "AUTO_COMMIT_APP" in result.stdout
+
+    def test_existing_credentials_pass(self, tmp_path: Path) -> None:
+        result = self.run_step(
+            "Require wiki publisher credentials",
+            tmp_path,
+            APP_ID="id",
+            APP_KEY="synthetic",
+        )
+        assert result.returncode == 0
+        assert "synthetic" not in result.stdout + result.stderr
+
+    @pytest.mark.parametrize("failure", ["CLONE_EXIT", "RECEIVE_EXIT"])
+    def test_denied_access_fails(self, tmp_path: Path, failure: str) -> None:
+        result = self.run_step("Clone wiki repository", tmp_path, **{failure: "1"})
+        assert result.returncode != 0
+        assert "::error::" in result.stdout
+        assert "synthetic-credential" not in (tmp_path / "calls").read_text()
+
+    def test_denied_push_does_not_retry(self, tmp_path: Path) -> None:
+        result = self.run_step("Commit and push to wiki", tmp_path, PUSH_EXIT="1")
+        assert result.returncode != 0
+        calls = (tmp_path / "calls").read_text().splitlines()
+        assert [call for call in calls if call.startswith("push ")] == [
+            "push origin HEAD:refs/heads/master"
+        ]
+        assert not (tmp_path / "output").exists()
+
+    def test_revision_mismatch_fails(self, tmp_path: Path) -> None:
+        result = self.run_step("Commit and push to wiki", tmp_path, REMOTE_SHA="wrong-sha")
+        assert result.returncode != 0
+        assert "does not match" in result.stdout
+
+    def test_verified_push_records_revision(self, tmp_path: Path) -> None:
+        result = self.run_step("Commit and push to wiki", tmp_path)
+        assert result.returncode == 0
+        assert "wiki_revision=expected-sha" in (tmp_path / "output").read_text()
+
+    @pytest.mark.parametrize("force", ["true", "false"])
+    @pytest.mark.parametrize("remote", ["expected-sha", "advanced-sha"])
+    def test_no_change_rechecks_remote(self, tmp_path: Path, force: str, remote: str) -> None:
+        result = self.run_step(
+            "Commit and push to wiki",
+            tmp_path,
+            DIFF_EXIT="0",
+            REMOTE_SHA=remote,
+            **{"github.event.inputs.force_sync": force},
+        )
+        calls = (tmp_path / "calls").read_text()
+        assert "ls-remote origin refs/heads/master" in calls
+        assert "push " not in calls
+        if remote == "expected-sha":
+            assert result.returncode == 0
+            assert "wiki_revision=expected-sha" in (tmp_path / "output").read_text()
+        else:
+            assert result.returncode != 0
+            assert not (tmp_path / "output").exists()
+
+    @pytest.mark.parametrize("diff_exit", ["0", "1"])
+    @pytest.mark.parametrize("remote", ["expected-sha", "advanced-sha"])
+    def test_dry_run_does_not_publish(self, tmp_path: Path, diff_exit: str, remote: str) -> None:
+        result = self.run_step(
+            "Commit and push to wiki",
+            tmp_path,
+            DIFF_EXIT=diff_exit,
+            REMOTE_SHA=remote,
+            **{"github.event.inputs.dry_run": "true"},
+        )
+        assert result.returncode == 0
+        calls = (tmp_path / "calls").read_text()
+        assert "push " not in calls
+        assert "commit " not in calls
+        assert "ls-remote " not in calls
+        assert not (tmp_path / "output").exists()
+
+    @pytest.mark.parametrize("changes", ["true", "false"])
+    def test_successful_dry_run_summary(self, tmp_path: Path, changes: str) -> None:
+        result = self.run_step(
+            "Summary",
+            tmp_path,
+            **{
+                "github.event.inputs.dry_run": "true",
+                "steps.changes.outputs.has_changes": changes,
+                "steps.publish.outputs.wiki_revision": "",
+            },
+        )
+        assert result.returncode == 0
+        summary = (tmp_path / "summary").read_text()
+        assert "Dry run completed" in summary
+        assert "synced successfully" not in summary
+        assert "already up to date" not in summary
+
+    @pytest.mark.parametrize("dry_run", ["true", "false"])
+    def test_failure_summary_never_claims_success(self, tmp_path: Path, dry_run: str) -> None:
+        result = self.run_step(
+            "Summary",
+            tmp_path,
+            **{"job.status": "failure", "github.event.inputs.dry_run": dry_run},
+        )
+        assert result.returncode == 0
+        summary = (tmp_path / "summary").read_text()
+        assert "Wiki sync failed" in summary
+        assert "synced successfully" not in summary
+        assert "Dry run completed" not in summary
 
 
 if __name__ == "__main__":

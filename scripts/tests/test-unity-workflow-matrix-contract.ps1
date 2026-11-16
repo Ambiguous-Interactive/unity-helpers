@@ -4452,6 +4452,9 @@ if (-not (Test-Path -LiteralPath $watchdogPath)) {
     $readerTokenStep = Get-UnityWorkflowStepText -JobText $watchdogContent -StepName 'Mint an org-scoped runner-inventory token'
     $releaseContent = Get-Content -LiteralPath (Join-Path $repoRoot '.github/workflows/release-prepare.yml') -Raw
     $releaseTokenStep = Get-UnityWorkflowStepText -JobText $releaseContent -StepName 'Generate auto-commit GitHub App token'
+    $wikiContent = Get-Content -LiteralPath (Join-Path $repoRoot '.github/workflows/deploy-wiki.yml') -Raw
+    $wikiTokenStep = Get-UnityWorkflowStepText -JobText $wikiContent -StepName 'Generate wiki publisher token'
+    $deprecatedWikiStep = $wikiTokenStep.Replace('client-id:', 'app-id:')
     $deprecatedReaderStep = $readerTokenStep.Replace('client-id:', 'app-id:')
     $deprecatedReleaseStep = $releaseTokenStep.Replace('client-id:', 'app-id:')
     $appTokenActionCount = 0
@@ -4473,13 +4476,17 @@ if (-not (Test-Path -LiteralPath $watchdogPath)) {
         @{
             Name = 'all pinned App token actions avoid the deprecated identity input'
             Ok = (
-                $appTokenActionCount -eq 2 -and
+                $appTokenActionCount -eq 3 -and
                 (Test-GitHubAppTokenIdentityStepText -StepText $readerTokenStep -IdentitySecret 'BUILD_LOCK_READER_APP_ID') -and
                 (Test-GitHubAppTokenIdentityStepText -StepText $releaseTokenStep -IdentitySecret 'AUTO_COMMIT_APP_ID') -and
+                (Test-GitHubAppTokenIdentityStepText -StepText $wikiTokenStep -IdentitySecret 'AUTO_COMMIT_APP_ID') -and
+                $wikiTokenStep -match '(?m)^\s+permission-contents: write\s*$' -and
+                [regex]::Matches($wikiTokenStep, '(?m)^\s+permission-').Count -eq 1 -and
+                -not (Test-GitHubAppTokenIdentityStepText -StepText $deprecatedWikiStep -IdentitySecret 'AUTO_COMMIT_APP_ID') -and
                 -not (Test-GitHubAppTokenIdentityStepText -StepText $deprecatedReaderStep -IdentitySecret 'BUILD_LOCK_READER_APP_ID') -and
                 -not (Test-GitHubAppTokenIdentityStepText -StepText $deprecatedReleaseStep -IdentitySecret 'AUTO_COMMIT_APP_ID')
             )
-            Message = 'Both pinned token actions must use client-id with the existing App ID and private-key secrets. The pinned implementation accepts the numeric App ID as a JWT issuer; prior app-id input shapes must fail this contract because they emit the deprecation warning.'
+            Message = 'All three pinned token actions must use client-id with the existing App ID and private-key secrets, and the wiki publisher must request only contents write. The pinned implementation accepts the numeric App ID as a JWT issuer; prior app-id input shapes must fail this contract because they emit the deprecation warning.'
             File = '.github/workflows/stuck-job-watchdog.yml'
         },
         @{
