@@ -1643,6 +1643,26 @@
     "selection": "All 50 existing test files remain selected exactly once across metadata and orchestration phases; original compiler exclusions remain unchanged.",
     "bounds": "At most two isolated Windows phases run concurrently, each with the unchanged ten-minute job limit. The stable aggregate rejects every non-success phase result.",
     "controls": "Missing phase red witness; full-selection, bounded-concurrency and actual aggregate commands tested, including failure, cancellation, skip and empty results.",
-    "qualification": "Pending actual current-source Windows execution; no speedup or completed gate claimed."
+    "qualification": {
+      "head": "26f0013dd06619ff2af7d87d9c74a241c6a2e8da",
+      "run_id": 43946365068,
+      "metadata_job_id": 133577047077,
+      "orchestration_job_id": 133577047341,
+      "aggregate_job_id": 133582072149,
+      "conclusion": "All three jobs succeeded.",
+      "metadata_job_seconds": 487,
+      "orchestration_job_seconds": 185,
+      "assembly_controls": "109 passed, two platform skips.",
+      "workspace_log_controls": "136 passed, two platform skips in 27.68 seconds.",
+      "metadata_controls": "3387 passed, 75 platform skips in 346.06 seconds.",
+      "orchestration_controls": "98 passed, 11 subtests passed in 128.49 seconds.",
+      "compiler_controls": "26 passed, two skips, 16 existing exclusions in 11.88 seconds.",
+      "limit": "Actual completion within each ten-minute phase bound; no paired Windows speedup or whole-Unity-job improvement claim."
+    }
+  },
+  "workspace_lock_followup": {
+    "issue": 1223,
+    "state_change": "Owner reported the DAD-MACHINE blocking directory was released after the failed 89ab8d70 native run. The holder and release mechanism were not captured.",
+    "scope": "Manual host recovery enables the next normal licensed qualification; it does not prove this migration fixed workspace cleanup. Original sharing failures remain retained."
   }
 }
