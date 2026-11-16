@@ -10,11 +10,11 @@
     "scripts/tests/fixtures/hook-permissions-v1.json": "e0632628efff18af59de80f0dd06699be04fc2d3b8bd1e8c4036bea393019a4a",
     "scripts/validate-hook-permissions.sh": "0da28ba2ef88e88f79b799c9d96bb55aeffe17250156f4ab5a32c032d4506541",
     "scripts/tests/test-validate-hook-permissions.sh": "86dbf34acb677981e3d273fe0b8d9d95bc03451a96b846dabaded7e647da5163",
-    "scripts/python~/pyproject.toml": "f1c03081409e9b6abaf03c5c87ef37f56c7ace60b36c672220d9b98307e03f0f",
+    "scripts/python~/pyproject.toml": "93a93f1faf4243715a8e3c10022b76dd65d1422bb1255343448852bfbadb3a28",
     "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d",
-    "package.json": "1ec1c3b87047bee95bb28ce3c8eda2be14ae0ec5e453a1d0d99526a5ed68260d",
-    ".github/workflows/local-gates.yml": "50eb09408704c8c8846dde714e45d187e7bc0a8397e6d803dce3f979c6c9d3b0",
-    "scripts/tests/test-run-contract-tests.js": "45869e1624e471f38bbde8c96abfeefc0b3ccefbefffe241b8781658a810e234"
+    "package.json": "0a02a1488907f5b9cef22f6bac4574a2e594ecfc9b011621d877729ce5239f4c",
+    ".github/workflows/local-gates.yml": "f95b4749203ac8ee1054cfcf5474084fbfb54e7f3d6cbbffd740e8e9e883903d",
+    "scripts/tests/test-run-contract-tests.js": "6505e5bbcb285d539d9a2226d89ae594fdbc271193b14814e6123dff556e0cec"
   },
   "original_controls": 11,
   "frozen_cli_decisions": 16,
@@ -761,7 +761,9 @@
       }
     ],
     "limits": "Retain all startup regressions, including native coordinator launch cost for repair. No Windows, cold provisioning, whole-hook or CI timing claim. Seven pairs do not establish statistical significance.",
-    "tooling_environment": "The parent VIRTUAL_ENV points at the shared root environment; uv selects the explicitly named project environment and emits a mismatch diagnostic. Captured stderr hashes retain this host-specific cost. No shared root environment is used by the measured child."
+    "tooling_environment": "The parent VIRTUAL_ENV points at the shared root environment; uv selects the explicitly named project environment and emits a mismatch diagnostic. Captured stderr hashes retain this host-specific cost. No shared root environment is used by the measured child.",
+    "captured_revision": "0d81424666c1f8206b3a2a31f15968f3dc8b3b09",
+    "source_scope": "Historical measured candidate at the recorded revision; verify the retained measurement.source_sha256 against that checkout."
   },
   "pre_directory_handling_measurement": {
     "source_sha256": {
@@ -795,5 +797,21 @@
   ],
   "captured_utc": "2026-11-16T15:42:46.012643+00:00",
   "required_checks": "Full hook regression aggregate, fast pre-push safety check, strict Ruff/mypy/Pyright and strict documentation build pass.",
-  "ownership_gate": "The contract-runner orphan gate reproduced red after the npm route moved. Register the retained shell test launcher through registeredControlsInvoke and the Python controls that actually execute it. All 15 contract-runner assertions pass; all 13 Repo Lint runner assertions also passed."
+  "ownership_gate": "The contract-runner orphan gate reproduced red after the npm route moved. Register the retained shell test launcher through registeredControlsInvoke and the Python controls that actually execute it. All 15 contract-runner assertions pass; all 13 Repo Lint runner assertions also passed.",
+  "historical_validation_source_sha256": {
+    "scripts/hook_permissions.py": "47d45f22950c9e31918544e401a36fc718fd9ea54b2d4076f1512d0bb8b6bc7f",
+    "scripts/tests/test_hook_permissions.py": "300f35a744bdef40a5934ea17fd7c8399f7f91728551d4ac77aa8511de02466e",
+    "scripts/set-hook-index-mode.ps1": "5d32fa396e1fdb4f49c9612712b3392e4d585dcd94afe0da99b4a0aea6828db3",
+    "scripts/git-staging-helpers.ps1": "fe0089a801c4b181db6878fc1c64e5824bfc8aee296cbaa4ac6af473b6c7b80f",
+    "scripts/tests/fixtures/hook-permissions-v1.json": "e0632628efff18af59de80f0dd06699be04fc2d3b8bd1e8c4036bea393019a4a",
+    "scripts/validate-hook-permissions.sh": "0da28ba2ef88e88f79b799c9d96bb55aeffe17250156f4ab5a32c032d4506541",
+    "scripts/tests/test-validate-hook-permissions.sh": "86dbf34acb677981e3d273fe0b8d9d95bc03451a96b846dabaded7e647da5163",
+    "scripts/python~/pyproject.toml": "f1c03081409e9b6abaf03c5c87ef37f56c7ace60b36c672220d9b98307e03f0f",
+    "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d",
+    "package.json": "1ec1c3b87047bee95bb28ce3c8eda2be14ae0ec5e453a1d0d99526a5ed68260d",
+    ".github/workflows/local-gates.yml": "50eb09408704c8c8846dde714e45d187e7bc0a8397e6d803dce3f979c6c9d3b0",
+    "scripts/tests/test-run-contract-tests.js": "45869e1624e471f38bbde8c96abfeefc0b3ccefbefffe241b8781658a810e234"
+  },
+  "historical_validation_revision": "0d81424666c1f8206b3a2a31f15968f3dc8b3b09",
+  "source_scope": "Current integration-validation inputs only. Historical maps and timing captures remain immutable and do not attest current-head performance."
 }

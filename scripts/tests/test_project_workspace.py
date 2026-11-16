@@ -370,3 +370,39 @@ def test_native_adapter_reads_actual_child_status_with_local_shadow(tmp_path: Pa
     )
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == "6000-editmode"
+
+
+def test_review_prune_planning_failure_is_best_effort_and_preserves_files(tmp_path: Path) -> None:
+    projects = tmp_path / "projects"
+    project = projects / "old"
+    project.mkdir(parents=True)
+    retained = project / "owned.txt"
+    retained.write_bytes(b"preserve")
+    script = tmp_path / "prune-failure.ps1"
+    script.write_text(
+        "param([string]$Helper,[string]$Projects)\n"
+        "$ErrorActionPreference='Stop'\n. $Helper\n"
+        "function Get-PersistentProjectPruneOrder { throw 'Owned planning failure.' }\n"
+        "$deleted=@(Invoke-PersistentProjectPrune -ProjectsRoot $Projects -KeepName current -MinimumFreeGb 1000000000000)\n"
+        "@{deleted=$deleted; continued=$true} | ConvertTo-Json -Compress\n",
+        encoding="utf-8",
+    )
+    executable = shutil.which("pwsh")
+    assert executable is not None
+    result = subprocess.run(
+        [
+            executable,
+            "-NoProfile",
+            "-File",
+            str(script),
+            str(REPOSITORY / "scripts/unity/lib/project-workspace.ps1"),
+            str(projects),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert json.loads(result.stdout.splitlines()[-1]) == {"deleted": [], "continued": True}
+    assert retained.read_bytes() == b"preserve"
+    assert "Owned planning failure" in result.stdout

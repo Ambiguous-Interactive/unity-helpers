@@ -10,8 +10,9 @@ if ($RemainingArguments -and $RemainingArguments.Count -gt 0) {
     [Console]::Error.WriteLine('Unexpected hook validation arguments.')
     exit 1
 }
+$resolvedRepoRoot = if ([string]::IsNullOrWhiteSpace($RepoRoot)) { Split-Path -Parent $PSScriptRoot } else { $RepoRoot }
 $arguments = @('run', '--quiet', '--project', (Join-Path $PSScriptRoot 'python~'), '--locked', '--no-dev',
-    'python', (Join-Path $PSScriptRoot 'hook_validation.py'), "--repo-root=$RepoRoot")
+    'python', (Join-Path $PSScriptRoot 'hook_validation.py'), "--repo-root=$resolvedRepoRoot")
 if ($VerboseOutput) { $arguments += '--verbose' }
 & uv @arguments
 exit $LASTEXITCODE

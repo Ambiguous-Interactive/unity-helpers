@@ -167,3 +167,34 @@ def test_bom_hook_encodings(tmp_path: Path, encoding: str) -> None:
         target.parent.mkdir(exist_ok=True)
         target.write_bytes("\n".join(patterns).encode(encoding))
     assert not hooks.validate(tmp_path).errors
+
+
+@pytest.mark.parametrize("kind", ["null", "empty", "whitespace", "explicit"])
+def test_review_native_empty_root_uses_wrapper_repository(tmp_path: Path, kind: str) -> None:
+    import shutil
+
+    executable = shutil.which("pwsh")
+    assert executable is not None
+    script = tmp_path / "root.ps1"
+    script.write_text(
+        "param([string]$Wrapper,[string]$Kind,[string]$Foreign)\n"
+        "Set-Location -LiteralPath $Foreign\n"
+        "$value=switch ($Kind) { null {$null}; empty {''}; whitespace {'   '}; explicit {$Foreign} }\n"
+        "& $Wrapper -RepoRoot $value\nexit $LASTEXITCODE\n",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [
+            executable,
+            "-NoProfile",
+            "-File",
+            str(script),
+            str(ROOT / "scripts/validate-hook-sync-calls.ps1"),
+            kind,
+            str(tmp_path),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == (1 if kind == "explicit" else 0), result.stdout + result.stderr

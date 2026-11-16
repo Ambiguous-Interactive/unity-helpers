@@ -6,8 +6,8 @@
     "git-path-helpers.ps1": "fd4ac97ea238bc1b874db567cfcd5375be6f77bf3e7245caaa0f21c91d1d160d"
   },
   "source_sha256": {
-    "scripts/push_validation.py": "121170f18c6e7dceebcaf7c84588fecc818e4d1e117e57ee650cc13327d73ff7",
-    "scripts/tests/test_push_validation.py": "8c797688eb54ac8a89b5fc745ec64a0eec3da3465eadb51ef722ee6790b209b8",
+    "scripts/push_validation.py": "ce9a413fe694e453d7bfa694895a6592e47a6cca94d68e373b209845df95ac45",
+    "scripts/tests/test_push_validation.py": "8eca5040cc9b1c9619c84709d5d18cfb8e6fcc09eb875f1cbe710b158234cc7b",
     "scripts/tests/fixtures/push-validation-v1.json": "8c5253505db054c9b2a2085e50f61d8c03409c786707a6450c116dbc729ef81e"
   },
   "original_controls": 38,
@@ -356,5 +356,13 @@
       "job_seconds": 383,
       "limit": "This later hosted run passes with the same test selection and ten-minute bound. Retain the earlier cancelled run. Different hosted observations do not establish that duration reporting accelerated execution."
     }
-  }
+  },
+  "historical_validation_source_sha256": {
+    "scripts/push_validation.py": "121170f18c6e7dceebcaf7c84588fecc818e4d1e117e57ee650cc13327d73ff7",
+    "scripts/tests/test_push_validation.py": "8c797688eb54ac8a89b5fc745ec64a0eec3da3465eadb51ef722ee6790b209b8",
+    "scripts/tests/fixtures/push-validation-v1.json": "8c5253505db054c9b2a2085e50f61d8c03409c786707a6450c116dbc729ef81e"
+  },
+  "source_scope": "Current integration-validation inputs only. Historical maps and timing captures remain immutable and do not attest current-head performance.",
+  "registered_controls": 60,
+  "review_environment_boundary": "Child Git reads and the Bash checker remove repository-location overrides while retaining configuration variables. API and both CLI wrappers cannot validate another GIT_DIR in place of the explicit repository."
 }

@@ -420,3 +420,70 @@ def test_helper_read_distinguishes_missing_key_from_git_failure(
     if exit_code != 1:
         assert any(f"credential.helper failed with exit {exit_code}" in line for line in lines)
         assert not any("checks passed" in line for line in lines)
+
+
+@pytest.mark.parametrize("entrypoint", ["api", "python", "powershell"])
+def test_review_explicit_root_ignores_other_repository_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, entrypoint: str
+) -> None:
+    first, second = tmp_path / "first", tmp_path / "second"
+    prepare(first, {"config": dict(push.EXPECTED), "files": {}})
+    prepare(second, {"config": {**dict(push.EXPECTED), "push.default": "matching"}, "files": {}})
+    before = [(root / ".git/config").read_bytes() for root in (first, second)]
+    monkeypatch.setenv("GIT_DIR", str(first / ".git"))
+    if entrypoint == "api":
+        status, lines = push.validate(second)
+        output = "\n".join(lines)
+    else:
+        if entrypoint == "python":
+            arguments = [
+                sys.executable,
+                str(ROOT / "scripts/push_validation.py"),
+                "--repo-root",
+                str(second),
+            ]
+        else:
+            executable = shutil.which("pwsh")
+            assert executable is not None
+            arguments = [
+                executable,
+                "-NoProfile",
+                "-File",
+                str(ROOT / "scripts/validate-git-push-config.ps1"),
+                "-RepoRoot",
+                str(second),
+            ]
+        result = subprocess.run(arguments, capture_output=True, text=True, timeout=30)
+        status, output = result.returncode, result.stdout
+    assert status == 1, output
+    assert "push.default is 'matching'" in output
+    assert [(root / ".git/config").read_bytes() for root in (first, second)] == before
+
+
+def test_review_checker_uses_sanitized_environment_and_retains_config(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    usable_bash()
+    first, second = tmp_path / "first", tmp_path / "second"
+    configuration = {**dict(push.EXPECTED), "credential.helper": "!git-credential-helper"}
+    for root in (first, second):
+        prepare(root, {"config": configuration, "files": {}})
+    scripts = second / "scripts"
+    scripts.mkdir()
+    (scripts / "check-container-git-credentials.sh").write_text(
+        "#!/usr/bin/env bash\n"
+        'test -z "$GIT_DIR" || exit 73\n'
+        'test "$GIT_CONFIG_COUNT" = 1 || exit 74\n'
+        'test "$GIT_CONFIG_KEY_0" = fixture.marker || exit 75\n'
+        'test "$GIT_CONFIG_VALUE_0" = retained || exit 76\n'
+        "printf checked > checker-ran\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    monkeypatch.setenv("GIT_DIR", str(first / ".git"))
+    monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
+    monkeypatch.setenv("GIT_CONFIG_KEY_0", "fixture.marker")
+    monkeypatch.setenv("GIT_CONFIG_VALUE_0", "retained")
+    status, lines = push.validate(second)
+    assert status == 0, lines
+    assert (second / "checker-ran").read_text() == "checked"

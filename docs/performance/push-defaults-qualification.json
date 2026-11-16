@@ -18,13 +18,13 @@
     "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d"
   },
   "source_sha256": {
-    "scripts/configure_git_defaults.py": "bcff2b6bb1aeaa2c2efbfca5103b8bf8d564ba31ca4b8684497eed495ba8e842",
-    "scripts/git-push-defaults-helpers.ps1": "3a4f57941de508e54db9af84aacca6a79b321bcd5305d696ba23e0fdbb20e95f",
+    "scripts/configure_git_defaults.py": "6475ef572bba192d25b47a06abf0bdb94b2eafab9d96f2af659f47861d22178b",
+    "scripts/git-push-defaults-helpers.ps1": "dfcc46c16764a9cad3294343d075a3cd310d1dd7736c5409b1adb14ebede5061",
     "scripts/configure-git-defaults.sh": "a114d4b66814daba27dd220eb1ad498ee49d4184ad5d31c1735badb41dc144d5",
     "scripts/configure-git-defaults.ps1": "baaec0cff0871ad8c4f8f6ecf64974ce93ef51d124c5c5bdeaad007b04d1a205",
-    "scripts/tests/test_push_defaults.py": "0e31e99f8c7c4ce051d1ecba65022f42e673a0cae4b2cd1da1a348d88a203ae7",
+    "scripts/tests/test_push_defaults.py": "97839ffb6211b755319902ecd4b2a159a962427437492c3cd6da962c99358185",
     "scripts/tests/fixtures/push-defaults-v1.json": "29e152d69631690567e308c4272152042b6d74a1953f0e0e377077c9a71e52e7",
-    "scripts/python~/pyproject.toml": "785165834cdd0f419085847b5beaeb2b008e1127e94e4863430f08e57492a979",
+    "scripts/python~/pyproject.toml": "93a93f1faf4243715a8e3c10022b76dd65d1422bb1255343448852bfbadb3a28",
     "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d",
     "scripts/tests/test-agent-preflight.ps1": "e49f63dddbadad076b3b4bedbcc6feb23d28e64eb20b02c501d94c3083a9e1c2"
   },
@@ -33,7 +33,7 @@
   },
   "original_controls": 13,
   "frozen_profile_observations": 34,
-  "registered_controls": 67,
+  "registered_controls": 70,
   "contract": [
     "Write only push.autoSetupRemote=true and push.default=simple to the selected local repository configuration. Preserve other local values and global/system configuration.",
     "Verify readback and preserve original caller-specific validation, warning and failure-code behavior.",
@@ -380,8 +380,32 @@
     "retained_misses": "The Bash CLI regresses from 10.34 to 48.46 ms; the PowerShell CLI regresses from 294.73 to 304.65 ms. The inner-parent median is 53.43 to 49.43 ms. Do not generalize that small observation into a speed claim.",
     "limits": [
       "One warm Linux host with disposable Git configuration; no Windows, cold provisioning, whole-hook or CI performance claim.",
-      "Seven pairs do not establish statistical significance. Current runtime inputs match the timing capture; later test-only controls have separately recorded current seals."
-    ]
+      "Seven pairs do not establish statistical significance. Historical runtime/configuration hashes are retained under timing_capture_sha256; current integration hashes do not rebind the captured timings or measure later error-path corrections."
+    ],
+    "configuration_revision": "0c5f854aab97ebb627460c4cc79414da6afd66bb",
+    "source_scope": "Historical pre-review runtime/configuration capture. The test-driver digest predates later committed controls; timing_capture_sha256 remains the exact immutable capture, not a claim that every captured test file belongs to the configuration commit."
   },
-  "consumer_fixture_correction": "The first hook aggregate failed because the admission fixture omitted the migrated configuration module. Copy and preload configure_git_defaults.py before taking fixture byte snapshots. The full preflight, pre-commit and pre-push regression aggregate then passed."
+  "consumer_fixture_correction": "The first hook aggregate failed because the admission fixture omitted the migrated configuration module. Copy and preload configure_git_defaults.py before taking fixture byte snapshots. The full preflight, pre-commit and pre-push regression aggregate then passed.",
+  "historical_validation_source_sha256": {
+    "scripts/configure_git_defaults.py": "bcff2b6bb1aeaa2c2efbfca5103b8bf8d564ba31ca4b8684497eed495ba8e842",
+    "scripts/git-push-defaults-helpers.ps1": "3a4f57941de508e54db9af84aacca6a79b321bcd5305d696ba23e0fdbb20e95f",
+    "scripts/configure-git-defaults.sh": "a114d4b66814daba27dd220eb1ad498ee49d4184ad5d31c1735badb41dc144d5",
+    "scripts/configure-git-defaults.ps1": "baaec0cff0871ad8c4f8f6ecf64974ce93ef51d124c5c5bdeaad007b04d1a205",
+    "scripts/tests/test_push_defaults.py": "0e31e99f8c7c4ce051d1ecba65022f42e673a0cae4b2cd1da1a348d88a203ae7",
+    "scripts/tests/fixtures/push-defaults-v1.json": "29e152d69631690567e308c4272152042b6d74a1953f0e0e377077c9a71e52e7",
+    "scripts/python~/pyproject.toml": "785165834cdd0f419085847b5beaeb2b008e1127e94e4863430f08e57492a979",
+    "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d",
+    "scripts/tests/test-agent-preflight.ps1": "e49f63dddbadad076b3b4bedbcc6feb23d28e64eb20b02c501d94c3083a9e1c2"
+  },
+  "historical_validation_revision": "30b1d68f445ec5da5307c0feaf5bd0f94e74cf29",
+  "source_scope": "Current integration-validation inputs only. Historical maps and timing captures remain immutable and do not attest current-head performance.",
+  "review_corrections": {
+    "red_controls": 2,
+    "already_green": 1,
+    "changes": [
+      "Bash write failures emit the failed-key diagnostic while retaining Git exit status.",
+      "Bootstrap/protocol failure restores either the prior global native exit value or its absence."
+    ],
+    "timing_limit": "Captured timings remain historical before these corrections."
+  }
 }

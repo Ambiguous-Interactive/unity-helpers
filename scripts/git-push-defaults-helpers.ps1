@@ -79,6 +79,7 @@ function Set-RepoGitPushDefaults {
         $result.Errors = @($message)
         Write-PushDefaultsError $message
         if ($null -ne $priorExit) { $global:LASTEXITCODE = $priorExitValue }
+        else { Remove-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue }
     }
     return $result
 }

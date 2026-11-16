@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -12,6 +13,21 @@ from cli_encoding import configure_output
 PREFIX = "[validate-git-push-config]"
 EXTENSIONS = ("txt", "log", "out", "err", "tmp")
 EXPECTED = (("push.autoSetupRemote", "true"), ("push.default", "simple"))
+REPOSITORY_ENVIRONMENT = frozenset(
+    {
+        "GIT_DIR",
+        "GIT_WORK_TREE",
+        "GIT_COMMON_DIR",
+        "GIT_INDEX_FILE",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        "GIT_PREFIX",
+    }
+)
+
+
+def child_environment() -> dict[str, str]:
+    return {key: value for key, value in os.environ.items() if key not in REPOSITORY_ENVIRONMENT}
 
 
 def run_git(executable: str, root: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
@@ -22,6 +38,7 @@ def run_git(executable: str, root: Path, *arguments: str) -> subprocess.Complete
         encoding="utf-8",
         errors="replace",
         check=False,
+        env=child_environment(),
         timeout=30,
     )
 
@@ -147,6 +164,7 @@ def validate(root: Path) -> tuple[int, list[str]]:
                         encoding="utf-8",
                         errors="replace",
                         check=False,
+                        env=child_environment(),
                         timeout=30,
                     )
                     if check.returncode != 0:

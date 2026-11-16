@@ -184,6 +184,8 @@ Release admission retains the original handling of empty container fork flags, r
 branch names, and rejects non-JSON numbers and incompatible package encodings before publication.
 
 Local push-default configuration shares typed Python policy through locked uv.
+Write failures name the failed key; Bash keeps the Git failure status. Bootstrap or
+protocol failures preserve a prior native exit value or its absence.
 The Bash and PowerShell commands retain their caller-specific behavior. The dot-sourced
 PowerShell helper still returns a result table, preserves the caller's exit state and
 does not start another PowerShell host. A missing uv tool produces a failure result.
@@ -257,7 +259,9 @@ unproven generated projects. A failed move reports source and destination withou
 retrying, deleting residue or falling back to a fresh project. Release blocking
 handles after licensed work and cleanup are idle before retrying. Prune plans reject
 nonfinite space observations and consumed negative or nonfinite sizes. They stop at
-the floor without interpreting unused candidate sizes.
+the floor without interpreting unused candidate sizes. A planning failure logs and
+skips best-effort pruning before any deletion; workspace resolution and retention
+errors remain fatal.
 
 The [workspace qualification record](../performance/project-workspace-qualification.json)
 retains original implementations, host comparisons and paired Linux measurements.
@@ -267,6 +271,12 @@ on the measured deep artifact path improved from 343.74 → 39.46 ms. These resu
 include Python startup, retain both regressions and do not measure Windows, shallow
 paths, complete Unity jobs or statistical significance. No runner file lock is
 resolved by this migration.
+
+Read-only push validation honors the explicit repository even when inherited
+repository-location variables identify another Git directory. Child Git reads and
+the credential checker retain configuration variables, including `GIT_CONFIG_*`.
+The hook-text PowerShell wrapper resolves null, empty or whitespace-only roots to
+its own repository. An explicit nonblank root stays authoritative.
 
 Hook executable-mode validation runs through locked Python with
 `npm run validate:hook-perms`; the shell validation and test commands remain launchers.
@@ -283,7 +293,9 @@ The [qualification record](../performance/hook-permissions-qualification.json)
 retains original CLI decisions, the original shell driver and portable repair controls.
 The original bare chmod operation could stage working-file content; the coordinated
 repair preserves the staged blob even when working content differs. Diagnostics are
-plain text. Seven alternating Linux pairs after two warmup pairs measured
+plain text. The historical capture at `0d814246` used its recorded tooling configuration;
+later integration hashes do not rebind those measurements. Seven alternating Linux
+pairs after two warmup pairs measured
 3.59 → 36.12 ms for healthy validation, 3.74 → 36.37 ms for rejection and
 7.18 → 376.11 ms for repair. All startup regressions are retained, including the
 native coordinator launch cost. These results do not measure Windows, complete

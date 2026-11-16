@@ -18,7 +18,7 @@
   ],
   "source_sha256": {
     "scripts/hook_validation.py": "90601ee531ada366d8505c63c574afe9aad1ae2bc196e1e2dc81e7f5586cfe3b",
-    "scripts/tests/test_hook_validation.py": "c14dfdbaec605869c3250df3ea798f0f61179255902192d91ee05c7bc1dc514e",
+    "scripts/tests/test_hook_validation.py": "be93c7c4b428347132621e0971a52b02f7bf95aa7f69120cbb9f9b9cba236b94",
     "scripts/tests/fixtures/hook-validation-v1.json": "2776c1d642b3fea115b7e0340d0ed789d2dc5eb6ffb0c94ee8f2e390b012c059"
   },
   "measurement": {
@@ -294,5 +294,13 @@
     "scripts/tests/test_hook_validation.py": "bcc82c45fec052061faa75999b2113eb3e1bffa66becc8af85d92feab8994a45",
     "scripts/tests/fixtures/hook-validation-v1.json": "543ee31c13a97ec417a30666a2e20d4f1b834c0bb21e99cf464ab9fa4587f878"
   },
-  "frozen_fixture_scope": "24 minimal original-CLI observations. A separate 24-case original run against full real hooks reached the same statuses; retained raw source inputs and diagnostics use the recorded original commit and source hash."
+  "frozen_fixture_scope": "24 minimal original-CLI observations. A separate 24-case original run against full real hooks reached the same statuses; retained raw source inputs and diagnostics use the recorded original commit and source hash.",
+  "historical_validation_source_sha256": {
+    "scripts/hook_validation.py": "90601ee531ada366d8505c63c574afe9aad1ae2bc196e1e2dc81e7f5586cfe3b",
+    "scripts/tests/test_hook_validation.py": "c14dfdbaec605869c3250df3ea798f0f61179255902192d91ee05c7bc1dc514e",
+    "scripts/tests/fixtures/hook-validation-v1.json": "2776c1d642b3fea115b7e0340d0ed789d2dc5eb6ffb0c94ee8f2e390b012c059"
+  },
+  "source_scope": "Current integration-validation inputs only. Historical maps and timing captures remain immutable and do not attest current-head performance.",
+  "registered_controls": 54,
+  "review_root_fallback": "The compatibility PowerShell wrapper maps null, empty and whitespace-only RepoRoot to its own repository; an explicit nonblank root remains authoritative."
 }

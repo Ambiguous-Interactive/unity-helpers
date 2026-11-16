@@ -119,7 +119,6 @@ def configure(root: str, profile: str) -> Result:
             if written.returncode:
                 return fail(
                     f"Failed to set {key}",
-                    display=profile == "powershell",
                     status=1 if profile == "powershell" else written.returncode,
                 )
             result.messages.append(("success", f"{key} = {expected}"))

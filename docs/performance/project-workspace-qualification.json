@@ -6,7 +6,7 @@
   "original_controls": 63,
   "frozen_decisions": 61,
   "additional_native_boundary_cases": 3,
-  "registered_controls": 100,
+  "registered_controls": 101,
   "framework_controls": 48,
   "evidence": [
     "Original 63-control native driver passes before migration and from its byte-verified frozen source against the migrated adapter.",
@@ -18,7 +18,8 @@
     "Protocol errors, BOM provenance encodings, linked ancestors, bounded provenance reads and nonfinite prune observations are covered.",
     "Three review controls reproduced an unreadable-pointer false absence and two nonfinite native early-return bypasses. Explicit stat errors and native finite checks correct these failures.",
     "The native path adapter normalizes both separator forms; Windows execution of the frozen comparisons remains a CI gate, not an inferred success.",
-    "Five native exit-status controls fail before correction and pass afterward: successful and failed calls preserve prior or undefined global LASTEXITCODE, and actual child status is read despite a caller-local shadow. The adapter captures the prior scalar before invocation and restores it in finally."
+    "Five native exit-status controls fail before correction and pass afterward: successful and failed calls preserve prior or undefined global LASTEXITCODE, and actual child status is read despite a caller-local shadow. The adapter captures the prior scalar before invocation and restores it in finally.",
+    "A planning exception reproduced a fatal best-effort prune before correction. Planning failure now logs and returns before deletion; workspace-resolution and retention errors remain fatal."
   ],
   "native_exceptions": [
     "PowerShell host comparison, DateTime conversion and Sort-Object ordering marshal ordered candidates without replacing culture or unstable equal-key behavior.",
@@ -1705,9 +1706,21 @@
           }
         ]
       }
-    ]
+    ],
+    "captured_revision": "2e599eb9f391180faec32dd8ac0f9685bd63c4c7"
   },
   "source_sha256": {
+    "scripts/unity/project_workspace.py": "57cf0d06d4d777853f2eef6e9c76952125fbfac1a262d3df38358d46a6cf0c85",
+    "scripts/unity/lib/project-workspace.ps1": "c5904ea91dccbac89732cf2d0f0697c3200eb59e84347a5f011dac971d2568a9",
+    "scripts/tests/test_project_workspace.py": "8f651eacbef4000e9fc98f5d41b4f8acb3aee6b4524684cb4b3fe7d2df2042cc",
+    "scripts/tests/test-project-workspace.ps1": "55c5300ff280015e726b1e2264b06d90380119c44f68e908bf0b5501cfa9e904",
+    "scripts/tests/fixtures/project-workspace-v1.json": "30058f8a29b69a61e505c2bbaae12aa36e45287b15911c102764292132264682",
+    "scripts/python~/pyproject.toml": "93a93f1faf4243715a8e3c10022b76dd65d1422bb1255343448852bfbadb3a28",
+    "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d",
+    "package.json": "0a02a1488907f5b9cef22f6bac4574a2e594ecfc9b011621d877729ce5239f4c",
+    "scripts/tests/test-run-contract-tests.js": "6505e5bbcb285d539d9a2226d89ae594fdbc271193b14814e6123dff556e0cec"
+  },
+  "historical_validation_source_sha256": {
     "scripts/unity/project_workspace.py": "57cf0d06d4d777853f2eef6e9c76952125fbfac1a262d3df38358d46a6cf0c85",
     "scripts/unity/lib/project-workspace.ps1": "4d9d8329f6f231a32b1a05e3ee6f0c3fad841c51c380c397eba6b83e5edf766c",
     "scripts/tests/test_project_workspace.py": "b7607f96f4f29eeec9556d0912660537060da483d4d4fa9b0d476be49bc4f1bd",
@@ -1717,5 +1730,7 @@
     "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d",
     "package.json": "232876fb844e6f83caa8ad7dabafa316b4f28e8c4bd647c0cec4471016ad97a6",
     "scripts/tests/test-run-contract-tests.js": "fa1229cfdd7f7a7ceaa64bd6cac6d950aa94e1d5c5adfca8ae41f3efd88c5156"
-  }
+  },
+  "historical_validation_revision": "2e599eb9f391180faec32dd8ac0f9685bd63c4c7",
+  "source_scope": "Current integration-validation inputs only. Historical maps and timing captures remain immutable and do not attest current-head performance."
 }

@@ -180,11 +180,16 @@ function Invoke-PersistentProjectPrune {
             }
     )
 
-    $plan = Get-PersistentProjectPruneOrder `
-        -Candidates $candidates `
-        -FreeBytes $freeBytes `
-        -MinimumFreeBytes $minimumFreeBytes `
-        -KeepName $KeepName
+    try {
+        $plan = Get-PersistentProjectPruneOrder `
+            -Candidates $candidates `
+            -FreeBytes $freeBytes `
+            -MinimumFreeBytes $minimumFreeBytes `
+            -KeepName $KeepName
+    } catch {
+        Write-Host "::notice::Persistent Unity project prune skipped; planning failed: $($_.Exception.Message)"
+        return @()
+    }
 
     $deleted = New-Object System.Collections.Generic.List[string]
     foreach ($name in $plan) {

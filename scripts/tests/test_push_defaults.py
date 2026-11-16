@@ -109,7 +109,11 @@ def test_original_profiles(
     result = defaults.configure(str(root), str(case["profile"]))
     assert result.exit_code == case["status"]
     rendered = "\n".join(defaults.render(result.messages, str(case["profile"])))
-    assert normalized(rendered, root) == case["stdout"]
+    expected_output = str(case["stdout"])
+    if case["profile"] == "bash" and scenario in ("fail-first", "fail-second"):
+        failed_key = "push.autoSetupRemote" if scenario == "fail-first" else "push.default"
+        expected_output += "\n" + defaults.MARKERS["error"] + " Failed to set " + failed_key
+    assert normalized(rendered, root) == expected_output
     if case["result"] is not None:
         legacy = result.legacy_result()
         legacy["Errors"] = [normalized(value, root) for value in result.errors]
@@ -477,3 +481,60 @@ def test_native_failure_preserves_prior_exit_state(tmp_path: Path, missing_uv: b
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert b"AFTER_HELPER" in result.stdout
+
+
+def test_review_bash_write_failure_emits_failed_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    def command(arguments: list[str]) -> subprocess.CompletedProcess[bytes]:
+        if "--version" in arguments:
+            return subprocess.CompletedProcess(arguments, 0, b"git version 2.51.1\n", b"")
+        if "rev-parse" in arguments:
+            return subprocess.CompletedProcess(arguments, 0, b".git\n", b"")
+        return subprocess.CompletedProcess(arguments, 2, b"", b"owned write failure")
+
+    monkeypatch.setattr(defaults, "run_git", command)
+    result = defaults.configure("owned", "bash")
+    assert result.exit_code == 2
+    assert any(
+        "Failed to set push.autoSetupRemote" in line
+        for line in defaults.render(result.messages, "bash")
+    )
+
+
+@pytest.mark.parametrize("present", [False, True])
+def test_review_bootstrap_failure_restores_native_exit_state(tmp_path: Path, present: bool) -> None:
+    script = tmp_path / "bootstrap.ps1"
+    setup = (
+        "$global:LASTEXITCODE=79"
+        if present
+        else "Remove-Variable LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue"
+    )
+    script.write_text(
+        "param([string]$Helper,[string]$Root)\n"
+        ". $Helper\nfunction uv { $global:LASTEXITCODE=43; Write-Output 'invalid-json' }\n"
+        + setup
+        + "\n$r=Set-RepoGitPushDefaults -RepoRoot $Root\n"
+        "$v=Get-Variable LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue\n"
+        "@{ success=$r.Success; present=($null -ne $v); value=$(if ($null -ne $v) {$v.Value}) } | ConvertTo-Json -Compress\n",
+        encoding="utf-8",
+    )
+    executable = shutil.which("pwsh")
+    assert executable is not None
+    result = subprocess.run(
+        [
+            executable,
+            "-NoProfile",
+            "-File",
+            str(script),
+            str(ROOT / "scripts/git-push-defaults-helpers.ps1"),
+            str(tmp_path),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout.splitlines()[-1]) == {
+        "success": False,
+        "present": present,
+        "value": 79 if present else None,
+    }
