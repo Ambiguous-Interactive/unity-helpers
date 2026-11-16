@@ -7,7 +7,7 @@
   },
   "source_sha256": {
     "scripts/push_validation.py": "dd39b782eb983aa1283c5d5f604d9606e5b4d516b2ae3eb8afaca03348d7cd8e",
-    "scripts/tests/test_push_validation.py": "a81a4ffcdd8c2997607aea43dd953836e836e31d33af4f93b155fae579019bdf",
+    "scripts/tests/test_push_validation.py": "441037527ec7b4f5ec204c621c120139c0c840c9bdde0fb3ee9b6c2c1193b775",
     "scripts/tests/fixtures/push-validation-v1.json": "8c5253505db054c9b2a2085e50f61d8c03409c786707a6450c116dbc729ef81e"
   },
   "original_controls": 38,
@@ -325,6 +325,6 @@
       "Apply and verify fixture executable mode through its actual Bash host, as the original fixture did; include validator diagnostics in a failed recheck."
     ],
     "linux_evidence": "52 typed controls, 13 Repo Lint runner contracts and 33 normalization controls pass. The two obsolete contract failures reproduced locally before correction.",
-    "windows_limit": "Corrected native Windows execution remains pending CI. Do not replace the integration with a platform skip or claim an unmeasured Windows fix."
+    "windows_limit": "Head a54ac94b still fails the native Windows healthy recheck although its Bash executable probes pass. The assertion now prints every diagnostic without pytest representation truncation. Root cause and native Windows qualification remain pending; no platform skip or production checker change."
   }
 }

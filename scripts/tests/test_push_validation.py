@@ -211,7 +211,11 @@ def test_real_container_credential_postcondition(
     assert result.returncode == 0, result.stdout + result.stderr
     before = {p.relative_to(root): p.read_bytes() for p in root.rglob("*") if p.is_file()}
     status, diagnostics = push.validate(root)
-    assert status == 0, {"diagnostics": diagnostics, "executable_before_native_chmod": mode_before}
+    if status:
+        pytest.fail(
+            "\n".join([f"Executable probe before chmod: {mode_before}", *diagnostics]),
+            pytrace=False,
+        )
     assert {p.relative_to(root): p.read_bytes() for p in root.rglob("*") if p.is_file()} == before
     Path(os.environ["GIT_CONFIG_GLOBAL"]).write_text("", encoding="utf-8")
     Path(os.environ["GIT_CONFIG_SYSTEM"]).write_text("", encoding="utf-8")
