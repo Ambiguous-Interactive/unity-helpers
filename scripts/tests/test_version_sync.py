@@ -283,7 +283,7 @@ def test_readonly_later_destination_refused_before_any_publication(tmp_path: Pat
         path.chmod(mode)
 
 
-def test_symlink_to_authored_file_refused_before_any_publication(tmp_path: Path) -> None:
+def test_linked_destination_refused_before_any_publication(tmp_path: Path) -> None:
     root = tmp_path / "repo"
     case = selected_case("banner")
     files = cast("dict[str, str | None]", case["files"])
@@ -296,8 +296,9 @@ def test_symlink_to_authored_file_refused_before_any_publication(tmp_path: Path)
     except OSError as error:
         pytest.skip(f"This host cannot create the controlled file symlink: {error}")
     before = outside.read_bytes()
-    with pytest.raises(ValueError, match=r"redirect|symbolic|symlink"):
+    with pytest.raises(ValueError, match=r"^Refusing a linked skill path:"):
         sync.synchronize(root, "banner")
+    assert selected.is_symlink()
     assert outside.read_bytes() == before
     assert snapshot(root, files) == files
 

@@ -13,7 +13,7 @@
     "scripts/git-staging-helpers.ps1": "6106ab0d95cf64cc30b0e6314d6a8cc5555ab56c7610e3fb3986f1153592f957",
     "scripts/python~/pyproject.toml": "d892b5634c1936a19f4ca97dad3fcdd5ad5c7e028e70c8da499f29ede7b844d7",
     "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d",
-    "scripts/tests/test_version_sync.py": "7f63f0401b2ab1cd6994cc3ca86c457dfc40b40fbf633067a65c8ef33b60d91b"
+    "scripts/tests/test_version_sync.py": "88902e2ebdd53db28aba25a4b3faf2ba944cda39db9db2875f46c956b26450f5"
   },
   "platform": "Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.36",
   "filesystem": "tmpfs",
@@ -432,6 +432,7 @@
       "Match actual text tags outside XML comments and CDATA; retain comment bytes and quoted attributes."
     ],
     "timing_limit": "All timing rows are historical before these banner corrections and do not measure corrected source. Prior source seals remain under timing_capture_sha256.",
-    "retained_misses": "Banner rewrite regressions and effectively flat small-template rewrite medians remain historical evidence, not current-source performance claims."
+    "retained_misses": "Banner rewrite regressions and effectively flat small-template rewrite medians remain historical evidence, not current-source performance claims.",
+    "linked_destination_control": "Renaming the test removed an accidental match against the temporary directory name and reproduced the claimed failure. The corrected anchored refusal diagnostic reaches link and file-preservation assertions."
   }
 }
