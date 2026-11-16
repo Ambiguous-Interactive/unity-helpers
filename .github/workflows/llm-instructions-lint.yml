@@ -13,6 +13,16 @@ on:
       - "scripts/tests/test_pr_feedback.py"
       - "scripts/python~/**"
       - "scripts/lint-llm-instructions.ps1"
+      - "scripts/lint_llm_instructions.py"
+      - "scripts/generate_skills_index.py"
+      - "scripts/migrate_agent_skills.py"
+      - "scripts/tests/test_skills_tooling.py"
+      - "scripts/tests/fixtures/skills-index-v1.json"
+      - "scripts/tests/fixtures/skill-splits-v1.json"
+      - "scripts/tests/fixtures/instruction-policy-v1.json"
+      - "scripts/generate_agent_skill_stubs.py"
+      - "scripts/check_runner.py"
+      - "scripts/run_node_bin.py"
       - "scripts/generate-skills-index.ps1"
       - "scripts/generate-agent-skill-stubs.mjs"
       - "scripts/migrate-agent-skills.mjs"
@@ -35,6 +45,16 @@ on:
       - "scripts/tests/test_pr_feedback.py"
       - "scripts/python~/**"
       - "scripts/lint-llm-instructions.ps1"
+      - "scripts/lint_llm_instructions.py"
+      - "scripts/generate_skills_index.py"
+      - "scripts/migrate_agent_skills.py"
+      - "scripts/tests/test_skills_tooling.py"
+      - "scripts/tests/fixtures/skills-index-v1.json"
+      - "scripts/tests/fixtures/skill-splits-v1.json"
+      - "scripts/tests/fixtures/instruction-policy-v1.json"
+      - "scripts/generate_agent_skill_stubs.py"
+      - "scripts/check_runner.py"
+      - "scripts/run_node_bin.py"
       - "scripts/generate-skills-index.ps1"
       - "scripts/generate-agent-skill-stubs.mjs"
       - "scripts/migrate-agent-skills.mjs"
@@ -104,41 +124,22 @@ jobs:
 
       - name: Test LLM instructions lint
         shell: pwsh
-        run: ./scripts/tests/test-llm-instructions-lint.ps1 -VerboseOutput
+        run: uv run --quiet --project scripts/python~ --locked pytest scripts/tests/test_skills_tooling.py -q
 
       - name: Validate authorship policy
         shell: pwsh
-        run: ./scripts/lint-llm-instructions.ps1 -AuthorshipPolicyOnly
+        run: uv run --quiet --project scripts/python~ --locked --no-dev python scripts/lint_llm_instructions.py --authorship-policy-only
 
       - name: Test skill size linter
         shell: pwsh
         run: uv run --project scripts/python~ --locked pytest scripts/tests/test_skill_sizes.py -q
 
       - name: Test agent skill migration and discovery
-        run: node ./scripts/tests/test-agent-skill-migration.mjs
+        run: uv run --quiet --project scripts/python~ --locked pytest scripts/tests/test_skills_tooling.py -k "split or stub_rename" -q
 
       - name: Check skill file sizes
         shell: pwsh
         run: uv run --project scripts/python~ --locked --no-dev python scripts/lint_skill_sizes.py --verbose
 
       - name: Validate skills index is up-to-date
-        # Regenerate the file and fail if it differs from the committed bytes. This
-        # is the cross-OS guard: if Windows and Ubuntu generate different content,
-        # one leg's git diff is non-empty. The lint step above also asserts this,
-        # plus encoding (no BOM / LF) and generator determinism.
-        shell: pwsh
-        run: |
-          # The generator explicitly exits 0 on success and 1 for a missing skills
-          # directory. Surface nonzero status; terminating errors abort this step.
-          # The git-status check below detects drift or an uncommitted index.md.
-          ./scripts/generate-skills-index.ps1
-          if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          # --porcelain catches BOTH a drifted (modified) and a never-committed
-          # (untracked) index.md, unlike `git diff` which ignores untracked files.
-          $status = git status --porcelain -- .llm/skills/index.md
-          if ($status) {
-            Write-Host "::error::.llm/skills/index.md is out of date or uncommitted. Run: pwsh -NoProfile -File scripts/generate-skills-index.ps1 and commit it."
-            git diff -- .llm/skills/index.md
-            exit 1
-          }
-          Write-Host "Skills index is up-to-date."
+        run: uv run --quiet --project scripts/python~ --locked --no-dev python scripts/generate_skills_index.py --check

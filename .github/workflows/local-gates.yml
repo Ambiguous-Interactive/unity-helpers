@@ -179,7 +179,7 @@ jobs:
         working-directory: unity-helpers
         env:
           AGENT_CHECK_BASE: ${{ github.event.pull_request.base.sha || 'HEAD^' }}
-        run: node scripts/agent-check.js --tier pr --base "$AGENT_CHECK_BASE" --plan --json
+        run: uv run --quiet --project scripts/python~ --locked --no-dev python scripts/agent_check.py --tier pr --base "$AGENT_CHECK_BASE" --plan --json
 
       - name: Run contract suites
         working-directory: unity-helpers
@@ -315,6 +315,7 @@ jobs:
         shell: pwsh
         run: >-
           uv run --project scripts/python~ --locked pytest
+          scripts/tests/test_agent_check.py scripts/tests/test_release_tag.py scripts/tests/test_release_tools.py scripts/tests/test_npm_package.py
           scripts/tests/test_meta_lint.py scripts/tests/test_markdown_checks.py
           scripts/tests/test_runner_maintenance_matrix.py scripts/tests/test_check_runner.py
           scripts/tests/test_preserve_attributes.py scripts/tests/test_doc_identifiers.py

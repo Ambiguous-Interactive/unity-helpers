@@ -218,7 +218,20 @@
     "id": "agent-skill-migration",
     "name": "Agent skill migration and discovery",
     "run": "npm run test:agent-skill-migration",
-    "inputs": ["@tooling"]
+    "inputs": [
+      "@tooling",
+      "scripts/generate_skills_index.py",
+      "scripts/migrate_agent_skills.py",
+      "scripts/lint_llm_instructions.py",
+      "scripts/generate-skills-index.ps1",
+      "scripts/migrate-agent-skills.mjs",
+      "scripts/lint-llm-instructions.ps1",
+      "scripts/tests/test_skills_tooling.py",
+      "scripts/tests/fixtures/skills-index-v1.json",
+      "scripts/tests/fixtures/skill-splits-v1.json",
+      "scripts/tests/fixtures/instruction-policy-v1.json",
+      ".github/workflows/llm-instructions-lint.yml"
+    ]
   },
   {
     "id": "skill-stubs",
@@ -800,7 +813,15 @@
     "id": "verify-release-tag",
     "name": "Release tag contract",
     "run": "npm run test:verify-release-tag",
-    "inputs": ["@tooling"]
+    "inputs": [
+      "@tooling",
+      "scripts/ci/verify-release-tag.ps1",
+      "scripts/ci/verify_release_tag.py",
+      "scripts/tests/test-verify-release-tag.ps1",
+      "scripts/tests/test_release_tag.py",
+      "scripts/tests/fixtures/release-tag-v1.json",
+      ".github/workflows/release.yml"
+    ]
   },
   {
     "id": "perf-tools",
@@ -858,6 +879,9 @@
     "inputs": [
       "@tooling",
       "scripts/agent-check.js",
+      "scripts/agent_check.py",
+      "scripts/tests/test_agent_check.py",
+      "scripts/tests/fixtures/agent-check-v1.json",
       "scripts/tests/test-agent-check.js",
       "scripts/check_registries.py",
       "scripts/contracts-checks.json"

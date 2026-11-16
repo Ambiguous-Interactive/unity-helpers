@@ -1,0 +1,2072 @@
+{
+  "source": "ea385c59daeaa57522c13b52c1c7271643d02b7c",
+  "cases": [
+    {
+      "files": [],
+      "tier": "iterate",
+      "expected": {
+        "tier": "iterate",
+        "status": "not-applicable",
+        "files": [],
+        "unity": "none",
+        "reasons": [],
+        "commands": [],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": [
+          "unaffected checks",
+          "publication preflight; run tier pr before publication",
+          "unselected contract suites; retain the task's focused behavior witness",
+          "full native compatibility matrix unless escalated"
+        ]
+      }
+    },
+    {
+      "files": [],
+      "tier": "pr",
+      "expected": {
+        "tier": "pr",
+        "status": "not-applicable",
+        "files": [],
+        "unity": "none",
+        "reasons": [],
+        "commands": [],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": ["unaffected checks", "full native compatibility matrix unless escalated"]
+      }
+    },
+    {
+      "files": [],
+      "tier": "full",
+      "expected": {
+        "tier": "full",
+        "status": "selected",
+        "files": [],
+        "unity": "full",
+        "reasons": [],
+        "commands": [
+          ["npm", "run", "lint:repo"],
+          ["npm", "run", "validate:tests"],
+          ["npm", "run", "typecheck:unity"],
+          ["npm", "run", "typecheck:controls"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": []
+      }
+    },
+    {
+      "files": ["docs/guide.md"],
+      "tier": "iterate",
+      "expected": {
+        "tier": "iterate",
+        "status": "selected",
+        "files": ["docs/guide.md"],
+        "unity": "none",
+        "reasons": [
+          {
+            "file": "docs/guide.md",
+            "coverage": "none",
+            "reason": "documentation or instructions"
+          }
+        ],
+        "commands": [["npm", "run", "lint:docs"]],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": [
+          "unaffected checks",
+          "publication preflight; run tier pr before publication",
+          "unselected contract suites; retain the task's focused behavior witness",
+          "full native compatibility matrix unless escalated"
+        ]
+      }
+    },
+    {
+      "files": ["docs/guide.md"],
+      "tier": "pr",
+      "expected": {
+        "tier": "pr",
+        "status": "selected",
+        "files": ["docs/guide.md"],
+        "unity": "none",
+        "reasons": [
+          {
+            "file": "docs/guide.md",
+            "coverage": "none",
+            "reason": "documentation or instructions"
+          }
+        ],
+        "commands": [
+          ["pwsh", "-NoProfile", "-File", "scripts/agent-preflight.ps1", "-Paths", "docs/guide.md"],
+          ["npm", "run", "lint:repo", "--", "--files", "docs/guide.md"],
+          ["npm", "run", "validate:tests", "--", "--files", "docs/guide.md"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": ["unaffected checks", "full native compatibility matrix unless escalated"]
+      }
+    },
+    {
+      "files": ["docs/guide.md"],
+      "tier": "full",
+      "expected": {
+        "tier": "full",
+        "status": "selected",
+        "files": ["docs/guide.md"],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": "docs/guide.md",
+            "coverage": "none",
+            "reason": "documentation or instructions"
+          }
+        ],
+        "commands": [
+          ["npm", "run", "lint:repo"],
+          ["npm", "run", "validate:tests"],
+          ["npm", "run", "typecheck:unity"],
+          ["npm", "run", "typecheck:controls"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": []
+      }
+    },
+    {
+      "files": ["docs/guide.md.meta"],
+      "tier": "iterate",
+      "expected": {
+        "tier": "iterate",
+        "status": "selected",
+        "files": ["docs/guide.md.meta"],
+        "unity": "none",
+        "reasons": [
+          {
+            "file": "docs/guide.md.meta",
+            "coverage": "none",
+            "reason": "documentation or instructions"
+          }
+        ],
+        "commands": [
+          [
+            "pwsh",
+            "-NoProfile",
+            "-File",
+            "scripts/agent-preflight.ps1",
+            "-Paths",
+            "docs/guide.md.meta"
+          ]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": [
+          "unaffected checks",
+          "publication preflight; run tier pr before publication",
+          "unselected contract suites; retain the task's focused behavior witness",
+          "full native compatibility matrix unless escalated"
+        ]
+      }
+    },
+    {
+      "files": ["docs/guide.md.meta"],
+      "tier": "pr",
+      "expected": {
+        "tier": "pr",
+        "status": "selected",
+        "files": ["docs/guide.md.meta"],
+        "unity": "none",
+        "reasons": [
+          {
+            "file": "docs/guide.md.meta",
+            "coverage": "none",
+            "reason": "documentation or instructions"
+          }
+        ],
+        "commands": [
+          [
+            "pwsh",
+            "-NoProfile",
+            "-File",
+            "scripts/agent-preflight.ps1",
+            "-Paths",
+            "docs/guide.md.meta"
+          ],
+          ["npm", "run", "lint:repo", "--", "--files", "docs/guide.md.meta"],
+          ["npm", "run", "validate:tests", "--", "--files", "docs/guide.md.meta"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": ["unaffected checks", "full native compatibility matrix unless escalated"]
+      }
+    },
+    {
+      "files": ["docs/guide.md.meta"],
+      "tier": "full",
+      "expected": {
+        "tier": "full",
+        "status": "selected",
+        "files": ["docs/guide.md.meta"],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": "docs/guide.md.meta",
+            "coverage": "none",
+            "reason": "documentation or instructions"
+          }
+        ],
+        "commands": [
+          ["npm", "run", "lint:repo"],
+          ["npm", "run", "validate:tests"],
+          ["npm", "run", "typecheck:unity"],
+          ["npm", "run", "typecheck:controls"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": []
+      }
+    },
+    {
+      "files": ["docs/run.sh"],
+      "tier": "iterate",
+      "expected": {
+        "tier": "iterate",
+        "status": "selected",
+        "files": ["docs/run.sh"],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": "docs/run.sh",
+            "coverage": "full",
+            "reason": "compatibility-sensitive or unknown input"
+          }
+        ],
+        "commands": [["npm", "run", "typecheck:unity"]],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": [
+          "unaffected checks",
+          "publication preflight; run tier pr before publication",
+          "unselected contract suites; retain the task's focused behavior witness",
+          "full native compatibility matrix unless escalated"
+        ]
+      }
+    },
+    {
+      "files": ["docs/run.sh"],
+      "tier": "pr",
+      "expected": {
+        "tier": "pr",
+        "status": "selected",
+        "files": ["docs/run.sh"],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": "docs/run.sh",
+            "coverage": "full",
+            "reason": "compatibility-sensitive or unknown input"
+          }
+        ],
+        "commands": [
+          ["pwsh", "-NoProfile", "-File", "scripts/agent-preflight.ps1", "-Paths", "docs/run.sh"],
+          ["npm", "run", "typecheck:unity"],
+          ["npm", "run", "lint:repo", "--", "--files", "docs/run.sh"],
+          ["npm", "run", "validate:tests", "--", "--files", "docs/run.sh"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": ["unaffected checks", "full native compatibility matrix unless escalated"]
+      }
+    },
+    {
+      "files": ["docs/run.sh"],
+      "tier": "full",
+      "expected": {
+        "tier": "full",
+        "status": "selected",
+        "files": ["docs/run.sh"],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": "docs/run.sh",
+            "coverage": "full",
+            "reason": "compatibility-sensitive or unknown input"
+          }
+        ],
+        "commands": [
+          ["npm", "run", "lint:repo"],
+          ["npm", "run", "validate:tests"],
+          ["npm", "run", "typecheck:unity"],
+          ["npm", "run", "typecheck:controls"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": []
+      }
+    },
+    {
+      "files": [".agents/run.js"],
+      "tier": "iterate",
+      "expected": {
+        "tier": "iterate",
+        "status": "selected",
+        "files": [".agents/run.js"],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": ".agents/run.js",
+            "coverage": "full",
+            "reason": "compatibility-sensitive or unknown input"
+          }
+        ],
+        "commands": [
+          ["pwsh", "-NoProfile", "-File", "scripts/agent-preflight.ps1", "-Paths", ".agents/run.js"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": [
+          "unaffected checks",
+          "publication preflight; run tier pr before publication",
+          "unselected contract suites; retain the task's focused behavior witness",
+          "full native compatibility matrix unless escalated"
+        ]
+      }
+    },
+    {
+      "files": [".agents/run.js"],
+      "tier": "pr",
+      "expected": {
+        "tier": "pr",
+        "status": "selected",
+        "files": [".agents/run.js"],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": ".agents/run.js",
+            "coverage": "full",
+            "reason": "compatibility-sensitive or unknown input"
+          }
+        ],
+        "commands": [
+          [
+            "pwsh",
+            "-NoProfile",
+            "-File",
+            "scripts/agent-preflight.ps1",
+            "-Paths",
+            ".agents/run.js"
+          ],
+          ["npm", "run", "lint:repo", "--", "--files", ".agents/run.js"],
+          ["npm", "run", "validate:tests", "--", "--files", ".agents/run.js"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": ["unaffected checks", "full native compatibility matrix unless escalated"]
+      }
+    },
+    {
+      "files": [".agents/run.js"],
+      "tier": "full",
+      "expected": {
+        "tier": "full",
+        "status": "selected",
+        "files": [".agents/run.js"],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": ".agents/run.js",
+            "coverage": "full",
+            "reason": "compatibility-sensitive or unknown input"
+          }
+        ],
+        "commands": [
+          ["npm", "run", "lint:repo"],
+          ["npm", "run", "validate:tests"],
+          ["npm", "run", "typecheck:unity"],
+          ["npm", "run", "typecheck:controls"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": []
+      }
+    },
+    {
+      "files": ["Runtime/Utils/WallMath.cs"],
+      "tier": "iterate",
+      "expected": {
+        "tier": "iterate",
+        "status": "selected",
+        "files": ["Runtime/Utils/WallMath.cs"],
+        "unity": "latest",
+        "reasons": [
+          {
+            "file": "Runtime/Utils/WallMath.cs",
+            "coverage": "latest",
+            "reason": "ordinary C#"
+          }
+        ],
+        "commands": [["npm", "run", "typecheck:iterate", "--", "runtime"]],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": [
+          "unaffected checks",
+          "publication preflight; run tier pr before publication",
+          "unselected contract suites; retain the task's focused behavior witness",
+          "full native compatibility matrix unless escalated"
+        ]
+      }
+    },
+    {
+      "files": ["Runtime/Utils/WallMath.cs"],
+      "tier": "pr",
+      "expected": {
+        "tier": "pr",
+        "status": "selected",
+        "files": ["Runtime/Utils/WallMath.cs"],
+        "unity": "latest",
+        "reasons": [
+          {
+            "file": "Runtime/Utils/WallMath.cs",
+            "coverage": "latest",
+            "reason": "ordinary C#"
+          }
+        ],
+        "commands": [
+          [
+            "pwsh",
+            "-NoProfile",
+            "-File",
+            "scripts/agent-preflight.ps1",
+            "-Paths",
+            "Runtime/Utils/WallMath.cs"
+          ],
+          ["npm", "run", "typecheck:unity"],
+          ["npm", "run", "lint:repo", "--", "--files", "Runtime/Utils/WallMath.cs"],
+          ["npm", "run", "validate:tests", "--", "--files", "Runtime/Utils/WallMath.cs"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": ["unaffected checks", "full native compatibility matrix unless escalated"]
+      }
+    },
+    {
+      "files": ["Runtime/Utils/WallMath.cs"],
+      "tier": "full",
+      "expected": {
+        "tier": "full",
+        "status": "selected",
+        "files": ["Runtime/Utils/WallMath.cs"],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": "Runtime/Utils/WallMath.cs",
+            "coverage": "latest",
+            "reason": "ordinary C#"
+          }
+        ],
+        "commands": [
+          ["npm", "run", "lint:repo"],
+          ["npm", "run", "validate:tests"],
+          ["npm", "run", "typecheck:unity"],
+          ["npm", "run", "typecheck:controls"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": []
+      }
+    },
+    {
+      "files": ["Runtime/Core/Serialization/Serializer.cs"],
+      "tier": "iterate",
+      "expected": {
+        "tier": "iterate",
+        "status": "selected",
+        "files": ["Runtime/Core/Serialization/Serializer.cs"],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": "Runtime/Core/Serialization/Serializer.cs",
+            "coverage": "full",
+            "reason": "compatibility-sensitive or unknown input"
+          }
+        ],
+        "commands": [["npm", "run", "typecheck:iterate", "--", "runtime"]],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": [
+          "unaffected checks",
+          "publication preflight; run tier pr before publication",
+          "unselected contract suites; retain the task's focused behavior witness",
+          "full native compatibility matrix unless escalated"
+        ]
+      }
+    },
+    {
+      "files": ["Runtime/Core/Serialization/Serializer.cs"],
+      "tier": "pr",
+      "expected": {
+        "tier": "pr",
+        "status": "selected",
+        "files": ["Runtime/Core/Serialization/Serializer.cs"],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": "Runtime/Core/Serialization/Serializer.cs",
+            "coverage": "full",
+            "reason": "compatibility-sensitive or unknown input"
+          }
+        ],
+        "commands": [
+          [
+            "pwsh",
+            "-NoProfile",
+            "-File",
+            "scripts/agent-preflight.ps1",
+            "-Paths",
+            "Runtime/Core/Serialization/Serializer.cs"
+          ],
+          ["npm", "run", "typecheck:unity"],
+          ["npm", "run", "lint:repo", "--", "--files", "Runtime/Core/Serialization/Serializer.cs"],
+          [
+            "npm",
+            "run",
+            "validate:tests",
+            "--",
+            "--files",
+            "Runtime/Core/Serialization/Serializer.cs"
+          ]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": ["unaffected checks", "full native compatibility matrix unless escalated"]
+      }
+    },
+    {
+      "files": ["Runtime/Core/Serialization/Serializer.cs"],
+      "tier": "full",
+      "expected": {
+        "tier": "full",
+        "status": "selected",
+        "files": ["Runtime/Core/Serialization/Serializer.cs"],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": "Runtime/Core/Serialization/Serializer.cs",
+            "coverage": "full",
+            "reason": "compatibility-sensitive or unknown input"
+          }
+        ],
+        "commands": [
+          ["npm", "run", "lint:repo"],
+          ["npm", "run", "validate:tests"],
+          ["npm", "run", "typecheck:unity"],
+          ["npm", "run", "typecheck:controls"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": []
+      }
+    },
+    {
+      "files": ["Runtime/Integrations/A.cs"],
+      "tier": "iterate",
+      "expected": {
+        "tier": "iterate",
+        "status": "selected",
+        "files": ["Runtime/Integrations/A.cs"],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": "Runtime/Integrations/A.cs",
+            "coverage": "full",
+            "reason": "compatibility-sensitive or unknown input"
+          }
+        ],
+        "commands": [["npm", "run", "typecheck:iterate", "--", "integrations"]],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": [
+          "unaffected checks",
+          "publication preflight; run tier pr before publication",
+          "unselected contract suites; retain the task's focused behavior witness",
+          "full native compatibility matrix unless escalated"
+        ]
+      }
+    },
+    {
+      "files": ["Runtime/Integrations/A.cs"],
+      "tier": "pr",
+      "expected": {
+        "tier": "pr",
+        "status": "selected",
+        "files": ["Runtime/Integrations/A.cs"],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": "Runtime/Integrations/A.cs",
+            "coverage": "full",
+            "reason": "compatibility-sensitive or unknown input"
+          }
+        ],
+        "commands": [
+          [
+            "pwsh",
+            "-NoProfile",
+            "-File",
+            "scripts/agent-preflight.ps1",
+            "-Paths",
+            "Runtime/Integrations/A.cs"
+          ],
+          ["npm", "run", "typecheck:unity"],
+          ["npm", "run", "lint:repo", "--", "--files", "Runtime/Integrations/A.cs"],
+          ["npm", "run", "validate:tests", "--", "--files", "Runtime/Integrations/A.cs"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": ["unaffected checks", "full native compatibility matrix unless escalated"]
+      }
+    },
+    {
+      "files": ["Runtime/Integrations/A.cs"],
+      "tier": "full",
+      "expected": {
+        "tier": "full",
+        "status": "selected",
+        "files": ["Runtime/Integrations/A.cs"],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": "Runtime/Integrations/A.cs",
+            "coverage": "full",
+            "reason": "compatibility-sensitive or unknown input"
+          }
+        ],
+        "commands": [
+          ["npm", "run", "lint:repo"],
+          ["npm", "run", "validate:tests"],
+          ["npm", "run", "typecheck:unity"],
+          ["npm", "run", "typecheck:controls"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": []
+      }
+    },
+    {
+      "files": ["Editor/Thing.cs"],
+      "tier": "iterate",
+      "expected": {
+        "tier": "iterate",
+        "status": "selected",
+        "files": ["Editor/Thing.cs"],
+        "unity": "latest",
+        "reasons": [
+          {
+            "file": "Editor/Thing.cs",
+            "coverage": "latest",
+            "reason": "ordinary C#"
+          }
+        ],
+        "commands": [["npm", "run", "typecheck:iterate", "--", "editor"]],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": [
+          "unaffected checks",
+          "publication preflight; run tier pr before publication",
+          "unselected contract suites; retain the task's focused behavior witness",
+          "full native compatibility matrix unless escalated"
+        ]
+      }
+    },
+    {
+      "files": ["Editor/Thing.cs"],
+      "tier": "pr",
+      "expected": {
+        "tier": "pr",
+        "status": "selected",
+        "files": ["Editor/Thing.cs"],
+        "unity": "latest",
+        "reasons": [
+          {
+            "file": "Editor/Thing.cs",
+            "coverage": "latest",
+            "reason": "ordinary C#"
+          }
+        ],
+        "commands": [
+          [
+            "pwsh",
+            "-NoProfile",
+            "-File",
+            "scripts/agent-preflight.ps1",
+            "-Paths",
+            "Editor/Thing.cs"
+          ],
+          ["npm", "run", "typecheck:unity"],
+          ["npm", "run", "lint:repo", "--", "--files", "Editor/Thing.cs"],
+          ["npm", "run", "validate:tests", "--", "--files", "Editor/Thing.cs"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": ["unaffected checks", "full native compatibility matrix unless escalated"]
+      }
+    },
+    {
+      "files": ["Editor/Thing.cs"],
+      "tier": "full",
+      "expected": {
+        "tier": "full",
+        "status": "selected",
+        "files": ["Editor/Thing.cs"],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": "Editor/Thing.cs",
+            "coverage": "latest",
+            "reason": "ordinary C#"
+          }
+        ],
+        "commands": [
+          ["npm", "run", "lint:repo"],
+          ["npm", "run", "validate:tests"],
+          ["npm", "run", "typecheck:unity"],
+          ["npm", "run", "typecheck:controls"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": []
+      }
+    },
+    {
+      "files": ["Tests/Core/Shared.cs"],
+      "tier": "iterate",
+      "expected": {
+        "tier": "iterate",
+        "status": "selected",
+        "files": ["Tests/Core/Shared.cs"],
+        "unity": "latest",
+        "reasons": [
+          {
+            "file": "Tests/Core/Shared.cs",
+            "coverage": "latest",
+            "reason": "ordinary C#"
+          }
+        ],
+        "commands": [
+          ["npm", "run", "typecheck:iterate", "--", "tests"],
+          ["npm", "run", "typecheck:iterate", "--", "editor-tests"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": [
+          "unaffected checks",
+          "publication preflight; run tier pr before publication",
+          "unselected contract suites; retain the task's focused behavior witness",
+          "full native compatibility matrix unless escalated"
+        ]
+      }
+    },
+    {
+      "files": ["Tests/Core/Shared.cs"],
+      "tier": "pr",
+      "expected": {
+        "tier": "pr",
+        "status": "selected",
+        "files": ["Tests/Core/Shared.cs"],
+        "unity": "latest",
+        "reasons": [
+          {
+            "file": "Tests/Core/Shared.cs",
+            "coverage": "latest",
+            "reason": "ordinary C#"
+          }
+        ],
+        "commands": [
+          [
+            "pwsh",
+            "-NoProfile",
+            "-File",
+            "scripts/agent-preflight.ps1",
+            "-Paths",
+            "Tests/Core/Shared.cs"
+          ],
+          ["npm", "run", "typecheck:unity"],
+          ["npm", "run", "lint:repo", "--", "--files", "Tests/Core/Shared.cs"],
+          ["npm", "run", "validate:tests", "--", "--files", "Tests/Core/Shared.cs"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": ["unaffected checks", "full native compatibility matrix unless escalated"]
+      }
+    },
+    {
+      "files": ["Tests/Core/Shared.cs"],
+      "tier": "full",
+      "expected": {
+        "tier": "full",
+        "status": "selected",
+        "files": ["Tests/Core/Shared.cs"],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": "Tests/Core/Shared.cs",
+            "coverage": "latest",
+            "reason": "ordinary C#"
+          }
+        ],
+        "commands": [
+          ["npm", "run", "lint:repo"],
+          ["npm", "run", "validate:tests"],
+          ["npm", "run", "typecheck:unity"],
+          ["npm", "run", "typecheck:controls"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": []
+      }
+    },
+    {
+      "files": ["Tests/Runtime/DeletedFixture.cs"],
+      "tier": "iterate",
+      "expected": {
+        "tier": "iterate",
+        "status": "selected",
+        "files": ["Tests/Runtime/DeletedFixture.cs"],
+        "unity": "latest",
+        "reasons": [
+          {
+            "file": "Tests/Runtime/DeletedFixture.cs",
+            "coverage": "latest",
+            "reason": "ordinary C#"
+          }
+        ],
+        "commands": [["npm", "run", "typecheck:iterate", "--", "tests"]],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": [
+          "unaffected checks",
+          "publication preflight; run tier pr before publication",
+          "unselected contract suites; retain the task's focused behavior witness",
+          "full native compatibility matrix unless escalated"
+        ]
+      }
+    },
+    {
+      "files": ["Tests/Runtime/DeletedFixture.cs"],
+      "tier": "pr",
+      "expected": {
+        "tier": "pr",
+        "status": "selected",
+        "files": ["Tests/Runtime/DeletedFixture.cs"],
+        "unity": "latest",
+        "reasons": [
+          {
+            "file": "Tests/Runtime/DeletedFixture.cs",
+            "coverage": "latest",
+            "reason": "ordinary C#"
+          }
+        ],
+        "commands": [
+          [
+            "pwsh",
+            "-NoProfile",
+            "-File",
+            "scripts/agent-preflight.ps1",
+            "-Paths",
+            "Tests/Runtime/DeletedFixture.cs"
+          ],
+          ["npm", "run", "typecheck:unity"],
+          ["npm", "run", "lint:repo", "--", "--files", "Tests/Runtime/DeletedFixture.cs"],
+          ["npm", "run", "validate:tests", "--", "--files", "Tests/Runtime/DeletedFixture.cs"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": ["unaffected checks", "full native compatibility matrix unless escalated"]
+      }
+    },
+    {
+      "files": ["Tests/Runtime/DeletedFixture.cs"],
+      "tier": "full",
+      "expected": {
+        "tier": "full",
+        "status": "selected",
+        "files": ["Tests/Runtime/DeletedFixture.cs"],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": "Tests/Runtime/DeletedFixture.cs",
+            "coverage": "latest",
+            "reason": "ordinary C#"
+          }
+        ],
+        "commands": [
+          ["npm", "run", "lint:repo"],
+          ["npm", "run", "validate:tests"],
+          ["npm", "run", "typecheck:unity"],
+          ["npm", "run", "typecheck:controls"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": []
+      }
+    },
+    {
+      "files": ["Generator~/Generator.cs"],
+      "tier": "iterate",
+      "expected": {
+        "tier": "iterate",
+        "status": "selected",
+        "files": ["Generator~/Generator.cs"],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": "Generator~/Generator.cs",
+            "coverage": "full",
+            "reason": "compatibility-sensitive or unknown input"
+          }
+        ],
+        "commands": [["npm", "run", "typecheck:unity"]],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": [
+          "unaffected checks",
+          "publication preflight; run tier pr before publication",
+          "unselected contract suites; retain the task's focused behavior witness",
+          "full native compatibility matrix unless escalated"
+        ]
+      }
+    },
+    {
+      "files": ["Generator~/Generator.cs"],
+      "tier": "pr",
+      "expected": {
+        "tier": "pr",
+        "status": "selected",
+        "files": ["Generator~/Generator.cs"],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": "Generator~/Generator.cs",
+            "coverage": "full",
+            "reason": "compatibility-sensitive or unknown input"
+          }
+        ],
+        "commands": [
+          [
+            "pwsh",
+            "-NoProfile",
+            "-File",
+            "scripts/agent-preflight.ps1",
+            "-Paths",
+            "Generator~/Generator.cs"
+          ],
+          ["npm", "run", "typecheck:unity"],
+          ["npm", "run", "lint:repo", "--", "--files", "Generator~/Generator.cs"],
+          ["npm", "run", "validate:tests", "--", "--files", "Generator~/Generator.cs"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": ["unaffected checks", "full native compatibility matrix unless escalated"]
+      }
+    },
+    {
+      "files": ["Generator~/Generator.cs"],
+      "tier": "full",
+      "expected": {
+        "tier": "full",
+        "status": "selected",
+        "files": ["Generator~/Generator.cs"],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": "Generator~/Generator.cs",
+            "coverage": "full",
+            "reason": "compatibility-sensitive or unknown input"
+          }
+        ],
+        "commands": [
+          ["npm", "run", "lint:repo"],
+          ["npm", "run", "validate:tests"],
+          ["npm", "run", "typecheck:unity"],
+          ["npm", "run", "typecheck:controls"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": []
+      }
+    },
+    {
+      "files": ["unknown.config"],
+      "tier": "iterate",
+      "expected": {
+        "tier": "iterate",
+        "status": "selected",
+        "files": ["unknown.config"],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": "unknown.config",
+            "coverage": "full",
+            "reason": "compatibility-sensitive or unknown input"
+          }
+        ],
+        "commands": [["npm", "run", "typecheck:unity"]],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": [
+          "unaffected checks",
+          "publication preflight; run tier pr before publication",
+          "unselected contract suites; retain the task's focused behavior witness",
+          "full native compatibility matrix unless escalated"
+        ]
+      }
+    },
+    {
+      "files": ["unknown.config"],
+      "tier": "pr",
+      "expected": {
+        "tier": "pr",
+        "status": "selected",
+        "files": ["unknown.config"],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": "unknown.config",
+            "coverage": "full",
+            "reason": "compatibility-sensitive or unknown input"
+          }
+        ],
+        "commands": [
+          [
+            "pwsh",
+            "-NoProfile",
+            "-File",
+            "scripts/agent-preflight.ps1",
+            "-Paths",
+            "unknown.config"
+          ],
+          ["npm", "run", "typecheck:unity"],
+          ["npm", "run", "lint:repo", "--", "--files", "unknown.config"],
+          ["npm", "run", "validate:tests", "--", "--files", "unknown.config"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": ["unaffected checks", "full native compatibility matrix unless escalated"]
+      }
+    },
+    {
+      "files": ["unknown.config"],
+      "tier": "full",
+      "expected": {
+        "tier": "full",
+        "status": "selected",
+        "files": ["unknown.config"],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": "unknown.config",
+            "coverage": "full",
+            "reason": "compatibility-sensitive or unknown input"
+          }
+        ],
+        "commands": [
+          ["npm", "run", "lint:repo"],
+          ["npm", "run", "validate:tests"],
+          ["npm", "run", "typecheck:unity"],
+          ["npm", "run", "typecheck:controls"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": []
+      }
+    },
+    {
+      "files": ["scripts/agent-check.js"],
+      "tier": "iterate",
+      "expected": {
+        "tier": "iterate",
+        "status": "selected",
+        "files": ["scripts/agent-check.js"],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": "scripts/agent-check.js",
+            "coverage": "full",
+            "reason": "compatibility-sensitive or unknown input"
+          }
+        ],
+        "commands": [["node", "scripts/run-contract-tests.js", "--only", "agent-check"]],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": [
+          "unaffected checks",
+          "publication preflight; run tier pr before publication",
+          "unselected contract suites; retain the task's focused behavior witness",
+          "full native compatibility matrix unless escalated"
+        ]
+      }
+    },
+    {
+      "files": ["scripts/agent-check.js"],
+      "tier": "pr",
+      "expected": {
+        "tier": "pr",
+        "status": "selected",
+        "files": ["scripts/agent-check.js"],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": "scripts/agent-check.js",
+            "coverage": "full",
+            "reason": "compatibility-sensitive or unknown input"
+          }
+        ],
+        "commands": [
+          [
+            "pwsh",
+            "-NoProfile",
+            "-File",
+            "scripts/agent-preflight.ps1",
+            "-Paths",
+            "scripts/agent-check.js"
+          ],
+          ["npm", "run", "lint:repo", "--", "--files", "scripts/agent-check.js"],
+          ["npm", "run", "validate:tests", "--", "--files", "scripts/agent-check.js"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": ["unaffected checks", "full native compatibility matrix unless escalated"]
+      }
+    },
+    {
+      "files": ["scripts/agent-check.js"],
+      "tier": "full",
+      "expected": {
+        "tier": "full",
+        "status": "selected",
+        "files": ["scripts/agent-check.js"],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": "scripts/agent-check.js",
+            "coverage": "full",
+            "reason": "compatibility-sensitive or unknown input"
+          }
+        ],
+        "commands": [
+          ["npm", "run", "lint:repo"],
+          ["npm", "run", "validate:tests"],
+          ["npm", "run", "typecheck:unity"],
+          ["npm", "run", "typecheck:controls"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": []
+      }
+    },
+    {
+      "files": ["scripts/unity/resolve-test-matrix.js"],
+      "tier": "iterate",
+      "expected": {
+        "tier": "iterate",
+        "status": "selected",
+        "files": ["scripts/unity/resolve-test-matrix.js"],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": "scripts/unity/resolve-test-matrix.js",
+            "coverage": "full",
+            "reason": "compatibility-sensitive or unknown input"
+          }
+        ],
+        "commands": [
+          [
+            "node",
+            "scripts/run-contract-tests.js",
+            "--only",
+            "unity-acceptance-workflow,nullable-consumer-matrix,unity-grouped-modes"
+          ]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": [
+          "unaffected checks",
+          "publication preflight; run tier pr before publication",
+          "unselected contract suites; retain the task's focused behavior witness",
+          "full native compatibility matrix unless escalated"
+        ]
+      }
+    },
+    {
+      "files": ["scripts/unity/resolve-test-matrix.js"],
+      "tier": "pr",
+      "expected": {
+        "tier": "pr",
+        "status": "selected",
+        "files": ["scripts/unity/resolve-test-matrix.js"],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": "scripts/unity/resolve-test-matrix.js",
+            "coverage": "full",
+            "reason": "compatibility-sensitive or unknown input"
+          }
+        ],
+        "commands": [
+          [
+            "pwsh",
+            "-NoProfile",
+            "-File",
+            "scripts/agent-preflight.ps1",
+            "-Paths",
+            "scripts/unity/resolve-test-matrix.js"
+          ],
+          ["npm", "run", "lint:repo", "--", "--files", "scripts/unity/resolve-test-matrix.js"],
+          ["npm", "run", "validate:tests", "--", "--files", "scripts/unity/resolve-test-matrix.js"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": ["unaffected checks", "full native compatibility matrix unless escalated"]
+      }
+    },
+    {
+      "files": ["scripts/unity/resolve-test-matrix.js"],
+      "tier": "full",
+      "expected": {
+        "tier": "full",
+        "status": "selected",
+        "files": ["scripts/unity/resolve-test-matrix.js"],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": "scripts/unity/resolve-test-matrix.js",
+            "coverage": "full",
+            "reason": "compatibility-sensitive or unknown input"
+          }
+        ],
+        "commands": [
+          ["npm", "run", "lint:repo"],
+          ["npm", "run", "validate:tests"],
+          ["npm", "run", "typecheck:unity"],
+          ["npm", "run", "typecheck:controls"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": []
+      }
+    },
+    {
+      "files": [".github/workflows/unity-tests.yml"],
+      "tier": "iterate",
+      "expected": {
+        "tier": "iterate",
+        "status": "selected",
+        "files": [".github/workflows/unity-tests.yml"],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": ".github/workflows/unity-tests.yml",
+            "coverage": "full",
+            "reason": "compatibility-sensitive or unknown input"
+          }
+        ],
+        "commands": [
+          [
+            "node",
+            "scripts/run-contract-tests.js",
+            "--only",
+            "watchdog-cancellation,unity-workflow-matrix-contract,unity-acceptance-workflow,unity-grouped-modes"
+          ]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": [
+          "unaffected checks",
+          "publication preflight; run tier pr before publication",
+          "unselected contract suites; retain the task's focused behavior witness",
+          "full native compatibility matrix unless escalated"
+        ]
+      }
+    },
+    {
+      "files": [".github/workflows/unity-tests.yml"],
+      "tier": "pr",
+      "expected": {
+        "tier": "pr",
+        "status": "selected",
+        "files": [".github/workflows/unity-tests.yml"],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": ".github/workflows/unity-tests.yml",
+            "coverage": "full",
+            "reason": "compatibility-sensitive or unknown input"
+          }
+        ],
+        "commands": [
+          [
+            "pwsh",
+            "-NoProfile",
+            "-File",
+            "scripts/agent-preflight.ps1",
+            "-Paths",
+            ".github/workflows/unity-tests.yml"
+          ],
+          ["npm", "run", "lint:repo", "--", "--files", ".github/workflows/unity-tests.yml"],
+          ["npm", "run", "validate:tests", "--", "--files", ".github/workflows/unity-tests.yml"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": ["unaffected checks", "full native compatibility matrix unless escalated"]
+      }
+    },
+    {
+      "files": [".github/workflows/unity-tests.yml"],
+      "tier": "full",
+      "expected": {
+        "tier": "full",
+        "status": "selected",
+        "files": [".github/workflows/unity-tests.yml"],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": ".github/workflows/unity-tests.yml",
+            "coverage": "full",
+            "reason": "compatibility-sensitive or unknown input"
+          }
+        ],
+        "commands": [
+          ["npm", "run", "lint:repo"],
+          ["npm", "run", "validate:tests"],
+          ["npm", "run", "typecheck:unity"],
+          ["npm", "run", "typecheck:controls"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": []
+      }
+    },
+    {
+      "files": ["Tests/Runtime/Helper/WallMathDistributionTests.cs"],
+      "tier": "iterate",
+      "expected": {
+        "tier": "iterate",
+        "status": "selected",
+        "files": ["Tests/Runtime/Helper/WallMathDistributionTests.cs"],
+        "unity": "latest",
+        "reasons": [
+          {
+            "file": "Tests/Runtime/Helper/WallMathDistributionTests.cs",
+            "coverage": "latest",
+            "reason": "ordinary C#"
+          }
+        ],
+        "commands": [
+          [
+            "npm",
+            "run",
+            "typecheck:iterate",
+            "--",
+            "tests",
+            "--files",
+            "Tests/Runtime/Helper/WallMathDistributionTests.cs"
+          ]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": [
+          "unaffected checks",
+          "publication preflight; run tier pr before publication",
+          "unselected contract suites; retain the task's focused behavior witness",
+          "full native compatibility matrix unless escalated"
+        ]
+      }
+    },
+    {
+      "files": ["Tests/Runtime/Helper/WallMathDistributionTests.cs"],
+      "tier": "pr",
+      "expected": {
+        "tier": "pr",
+        "status": "selected",
+        "files": ["Tests/Runtime/Helper/WallMathDistributionTests.cs"],
+        "unity": "latest",
+        "reasons": [
+          {
+            "file": "Tests/Runtime/Helper/WallMathDistributionTests.cs",
+            "coverage": "latest",
+            "reason": "ordinary C#"
+          }
+        ],
+        "commands": [
+          [
+            "pwsh",
+            "-NoProfile",
+            "-File",
+            "scripts/agent-preflight.ps1",
+            "-Paths",
+            "Tests/Runtime/Helper/WallMathDistributionTests.cs"
+          ],
+          ["npm", "run", "typecheck:unity"],
+          [
+            "npm",
+            "run",
+            "lint:repo",
+            "--",
+            "--files",
+            "Tests/Runtime/Helper/WallMathDistributionTests.cs"
+          ],
+          [
+            "npm",
+            "run",
+            "validate:tests",
+            "--",
+            "--files",
+            "Tests/Runtime/Helper/WallMathDistributionTests.cs"
+          ]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": ["unaffected checks", "full native compatibility matrix unless escalated"]
+      }
+    },
+    {
+      "files": ["Tests/Runtime/Helper/WallMathDistributionTests.cs"],
+      "tier": "full",
+      "expected": {
+        "tier": "full",
+        "status": "selected",
+        "files": ["Tests/Runtime/Helper/WallMathDistributionTests.cs"],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": "Tests/Runtime/Helper/WallMathDistributionTests.cs",
+            "coverage": "latest",
+            "reason": "ordinary C#"
+          }
+        ],
+        "commands": [
+          ["npm", "run", "lint:repo"],
+          ["npm", "run", "validate:tests"],
+          ["npm", "run", "typecheck:unity"],
+          ["npm", "run", "typecheck:controls"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": []
+      }
+    },
+    {
+      "files": ["Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs"],
+      "tier": "iterate",
+      "expected": {
+        "tier": "iterate",
+        "status": "selected",
+        "files": ["Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs"],
+        "unity": "latest",
+        "reasons": [
+          {
+            "file": "Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs",
+            "coverage": "latest",
+            "reason": "ordinary C#"
+          }
+        ],
+        "commands": [
+          [
+            "npm",
+            "run",
+            "typecheck:iterate",
+            "--",
+            "editor-tests",
+            "--files",
+            "Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs"
+          ]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": [
+          "unaffected checks",
+          "publication preflight; run tier pr before publication",
+          "unselected contract suites; retain the task's focused behavior witness",
+          "full native compatibility matrix unless escalated"
+        ]
+      }
+    },
+    {
+      "files": ["Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs"],
+      "tier": "pr",
+      "expected": {
+        "tier": "pr",
+        "status": "selected",
+        "files": ["Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs"],
+        "unity": "latest",
+        "reasons": [
+          {
+            "file": "Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs",
+            "coverage": "latest",
+            "reason": "ordinary C#"
+          }
+        ],
+        "commands": [
+          [
+            "pwsh",
+            "-NoProfile",
+            "-File",
+            "scripts/agent-preflight.ps1",
+            "-Paths",
+            "Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs"
+          ],
+          ["npm", "run", "typecheck:unity"],
+          [
+            "npm",
+            "run",
+            "lint:repo",
+            "--",
+            "--files",
+            "Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs"
+          ],
+          [
+            "npm",
+            "run",
+            "validate:tests",
+            "--",
+            "--files",
+            "Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs"
+          ]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": ["unaffected checks", "full native compatibility matrix unless escalated"]
+      }
+    },
+    {
+      "files": ["Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs"],
+      "tier": "full",
+      "expected": {
+        "tier": "full",
+        "status": "selected",
+        "files": ["Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs"],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": "Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs",
+            "coverage": "latest",
+            "reason": "ordinary C#"
+          }
+        ],
+        "commands": [
+          ["npm", "run", "lint:repo"],
+          ["npm", "run", "validate:tests"],
+          ["npm", "run", "typecheck:unity"],
+          ["npm", "run", "typecheck:controls"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": []
+      }
+    },
+    {
+      "files": ["docs/a.md", "new.config"],
+      "tier": "iterate",
+      "expected": {
+        "tier": "iterate",
+        "status": "selected",
+        "files": ["docs/a.md", "new.config"],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": "docs/a.md",
+            "coverage": "none",
+            "reason": "documentation or instructions"
+          },
+          {
+            "file": "new.config",
+            "coverage": "full",
+            "reason": "compatibility-sensitive or unknown input"
+          }
+        ],
+        "commands": [
+          ["npm", "run", "typecheck:unity"],
+          ["npm", "run", "lint:docs"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": [
+          "unaffected checks",
+          "publication preflight; run tier pr before publication",
+          "unselected contract suites; retain the task's focused behavior witness",
+          "full native compatibility matrix unless escalated"
+        ]
+      }
+    },
+    {
+      "files": ["docs/a.md", "new.config"],
+      "tier": "pr",
+      "expected": {
+        "tier": "pr",
+        "status": "selected",
+        "files": ["docs/a.md", "new.config"],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": "docs/a.md",
+            "coverage": "none",
+            "reason": "documentation or instructions"
+          },
+          {
+            "file": "new.config",
+            "coverage": "full",
+            "reason": "compatibility-sensitive or unknown input"
+          }
+        ],
+        "commands": [
+          [
+            "pwsh",
+            "-NoProfile",
+            "-File",
+            "scripts/agent-preflight.ps1",
+            "-Paths",
+            "docs/a.md",
+            "new.config"
+          ],
+          ["npm", "run", "typecheck:unity"],
+          ["npm", "run", "lint:repo", "--", "--files", "docs/a.md", "new.config"],
+          ["npm", "run", "validate:tests", "--", "--files", "docs/a.md", "new.config"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": ["unaffected checks", "full native compatibility matrix unless escalated"]
+      }
+    },
+    {
+      "files": ["docs/a.md", "new.config"],
+      "tier": "full",
+      "expected": {
+        "tier": "full",
+        "status": "selected",
+        "files": ["docs/a.md", "new.config"],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": "docs/a.md",
+            "coverage": "none",
+            "reason": "documentation or instructions"
+          },
+          {
+            "file": "new.config",
+            "coverage": "full",
+            "reason": "compatibility-sensitive or unknown input"
+          }
+        ],
+        "commands": [
+          ["npm", "run", "lint:repo"],
+          ["npm", "run", "validate:tests"],
+          ["npm", "run", "typecheck:unity"],
+          ["npm", "run", "typecheck:controls"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": []
+      }
+    },
+    {
+      "files": [
+        "Tests/Runtime/Helper/WallMathDistributionTests.cs",
+        "Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs.meta"
+      ],
+      "tier": "iterate",
+      "expected": {
+        "tier": "iterate",
+        "status": "selected",
+        "files": [
+          "Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs.meta",
+          "Tests/Runtime/Helper/WallMathDistributionTests.cs"
+        ],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": "Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs.meta",
+            "coverage": "full",
+            "reason": "compatibility-sensitive or unknown input"
+          },
+          {
+            "file": "Tests/Runtime/Helper/WallMathDistributionTests.cs",
+            "coverage": "latest",
+            "reason": "ordinary C#"
+          }
+        ],
+        "commands": [
+          ["npm", "run", "typecheck:iterate", "--", "editor-tests"],
+          [
+            "npm",
+            "run",
+            "typecheck:iterate",
+            "--",
+            "tests",
+            "--files",
+            "Tests/Runtime/Helper/WallMathDistributionTests.cs"
+          ]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": [
+          "unaffected checks",
+          "publication preflight; run tier pr before publication",
+          "unselected contract suites; retain the task's focused behavior witness",
+          "full native compatibility matrix unless escalated"
+        ]
+      }
+    },
+    {
+      "files": [
+        "Tests/Runtime/Helper/WallMathDistributionTests.cs",
+        "Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs.meta"
+      ],
+      "tier": "pr",
+      "expected": {
+        "tier": "pr",
+        "status": "selected",
+        "files": [
+          "Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs.meta",
+          "Tests/Runtime/Helper/WallMathDistributionTests.cs"
+        ],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": "Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs.meta",
+            "coverage": "full",
+            "reason": "compatibility-sensitive or unknown input"
+          },
+          {
+            "file": "Tests/Runtime/Helper/WallMathDistributionTests.cs",
+            "coverage": "latest",
+            "reason": "ordinary C#"
+          }
+        ],
+        "commands": [
+          [
+            "pwsh",
+            "-NoProfile",
+            "-File",
+            "scripts/agent-preflight.ps1",
+            "-Paths",
+            "Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs.meta",
+            "Tests/Runtime/Helper/WallMathDistributionTests.cs"
+          ],
+          ["npm", "run", "typecheck:unity"],
+          [
+            "npm",
+            "run",
+            "lint:repo",
+            "--",
+            "--files",
+            "Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs.meta",
+            "Tests/Runtime/Helper/WallMathDistributionTests.cs"
+          ],
+          [
+            "npm",
+            "run",
+            "validate:tests",
+            "--",
+            "--files",
+            "Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs.meta",
+            "Tests/Runtime/Helper/WallMathDistributionTests.cs"
+          ]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": ["unaffected checks", "full native compatibility matrix unless escalated"]
+      }
+    },
+    {
+      "files": [
+        "Tests/Runtime/Helper/WallMathDistributionTests.cs",
+        "Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs.meta"
+      ],
+      "tier": "full",
+      "expected": {
+        "tier": "full",
+        "status": "selected",
+        "files": [
+          "Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs.meta",
+          "Tests/Runtime/Helper/WallMathDistributionTests.cs"
+        ],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": "Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs.meta",
+            "coverage": "full",
+            "reason": "compatibility-sensitive or unknown input"
+          },
+          {
+            "file": "Tests/Runtime/Helper/WallMathDistributionTests.cs",
+            "coverage": "latest",
+            "reason": "ordinary C#"
+          }
+        ],
+        "commands": [
+          ["npm", "run", "lint:repo"],
+          ["npm", "run", "validate:tests"],
+          ["npm", "run", "typecheck:unity"],
+          ["npm", "run", "typecheck:controls"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": []
+      }
+    },
+    {
+      "files": [
+        "Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs",
+        "Tests/Runtime/Helper/WallMathDistributionTests.cs.meta"
+      ],
+      "tier": "iterate",
+      "expected": {
+        "tier": "iterate",
+        "status": "selected",
+        "files": [
+          "Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs",
+          "Tests/Runtime/Helper/WallMathDistributionTests.cs.meta"
+        ],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": "Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs",
+            "coverage": "latest",
+            "reason": "ordinary C#"
+          },
+          {
+            "file": "Tests/Runtime/Helper/WallMathDistributionTests.cs.meta",
+            "coverage": "full",
+            "reason": "compatibility-sensitive or unknown input"
+          }
+        ],
+        "commands": [
+          [
+            "npm",
+            "run",
+            "typecheck:iterate",
+            "--",
+            "editor-tests",
+            "--files",
+            "Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs"
+          ],
+          ["npm", "run", "typecheck:iterate", "--", "tests"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": [
+          "unaffected checks",
+          "publication preflight; run tier pr before publication",
+          "unselected contract suites; retain the task's focused behavior witness",
+          "full native compatibility matrix unless escalated"
+        ]
+      }
+    },
+    {
+      "files": [
+        "Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs",
+        "Tests/Runtime/Helper/WallMathDistributionTests.cs.meta"
+      ],
+      "tier": "pr",
+      "expected": {
+        "tier": "pr",
+        "status": "selected",
+        "files": [
+          "Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs",
+          "Tests/Runtime/Helper/WallMathDistributionTests.cs.meta"
+        ],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": "Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs",
+            "coverage": "latest",
+            "reason": "ordinary C#"
+          },
+          {
+            "file": "Tests/Runtime/Helper/WallMathDistributionTests.cs.meta",
+            "coverage": "full",
+            "reason": "compatibility-sensitive or unknown input"
+          }
+        ],
+        "commands": [
+          [
+            "pwsh",
+            "-NoProfile",
+            "-File",
+            "scripts/agent-preflight.ps1",
+            "-Paths",
+            "Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs",
+            "Tests/Runtime/Helper/WallMathDistributionTests.cs.meta"
+          ],
+          ["npm", "run", "typecheck:unity"],
+          [
+            "npm",
+            "run",
+            "lint:repo",
+            "--",
+            "--files",
+            "Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs",
+            "Tests/Runtime/Helper/WallMathDistributionTests.cs.meta"
+          ],
+          [
+            "npm",
+            "run",
+            "validate:tests",
+            "--",
+            "--files",
+            "Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs",
+            "Tests/Runtime/Helper/WallMathDistributionTests.cs.meta"
+          ]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": ["unaffected checks", "full native compatibility matrix unless escalated"]
+      }
+    },
+    {
+      "files": [
+        "Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs",
+        "Tests/Runtime/Helper/WallMathDistributionTests.cs.meta"
+      ],
+      "tier": "full",
+      "expected": {
+        "tier": "full",
+        "status": "selected",
+        "files": [
+          "Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs",
+          "Tests/Runtime/Helper/WallMathDistributionTests.cs.meta"
+        ],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": "Tests/Editor/Sprites/Cropper/SpriteCropperMathTests.cs",
+            "coverage": "latest",
+            "reason": "ordinary C#"
+          },
+          {
+            "file": "Tests/Runtime/Helper/WallMathDistributionTests.cs.meta",
+            "coverage": "full",
+            "reason": "compatibility-sensitive or unknown input"
+          }
+        ],
+        "commands": [
+          ["npm", "run", "lint:repo"],
+          ["npm", "run", "validate:tests"],
+          ["npm", "run", "typecheck:unity"],
+          ["npm", "run", "typecheck:controls"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": []
+      }
+    },
+    {
+      "files": ["./docs/guide.md", "docs/guide.md"],
+      "tier": "iterate",
+      "expected": {
+        "tier": "iterate",
+        "status": "selected",
+        "files": ["docs/guide.md"],
+        "unity": "none",
+        "reasons": [
+          {
+            "file": "docs/guide.md",
+            "coverage": "none",
+            "reason": "documentation or instructions"
+          }
+        ],
+        "commands": [["npm", "run", "lint:docs"]],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": [
+          "unaffected checks",
+          "publication preflight; run tier pr before publication",
+          "unselected contract suites; retain the task's focused behavior witness",
+          "full native compatibility matrix unless escalated"
+        ]
+      }
+    },
+    {
+      "files": ["./docs/guide.md", "docs/guide.md"],
+      "tier": "pr",
+      "expected": {
+        "tier": "pr",
+        "status": "selected",
+        "files": ["docs/guide.md"],
+        "unity": "none",
+        "reasons": [
+          {
+            "file": "docs/guide.md",
+            "coverage": "none",
+            "reason": "documentation or instructions"
+          }
+        ],
+        "commands": [
+          ["pwsh", "-NoProfile", "-File", "scripts/agent-preflight.ps1", "-Paths", "docs/guide.md"],
+          ["npm", "run", "lint:repo", "--", "--files", "docs/guide.md"],
+          ["npm", "run", "validate:tests", "--", "--files", "docs/guide.md"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": ["unaffected checks", "full native compatibility matrix unless escalated"]
+      }
+    },
+    {
+      "files": ["./docs/guide.md", "docs/guide.md"],
+      "tier": "full",
+      "expected": {
+        "tier": "full",
+        "status": "selected",
+        "files": ["docs/guide.md"],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": "docs/guide.md",
+            "coverage": "none",
+            "reason": "documentation or instructions"
+          }
+        ],
+        "commands": [
+          ["npm", "run", "lint:repo"],
+          ["npm", "run", "validate:tests"],
+          ["npm", "run", "typecheck:unity"],
+          ["npm", "run", "typecheck:controls"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": []
+      }
+    },
+    {
+      "files": ["docs/.md", "docs/😀.md"],
+      "tier": "iterate",
+      "expected": {
+        "tier": "iterate",
+        "status": "selected",
+        "files": ["docs/😀.md", "docs/.md"],
+        "unity": "none",
+        "reasons": [
+          {
+            "file": "docs/😀.md",
+            "coverage": "none",
+            "reason": "documentation or instructions"
+          },
+          {
+            "file": "docs/.md",
+            "coverage": "none",
+            "reason": "documentation or instructions"
+          }
+        ],
+        "commands": [["npm", "run", "lint:docs"]],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": [
+          "unaffected checks",
+          "publication preflight; run tier pr before publication",
+          "unselected contract suites; retain the task's focused behavior witness",
+          "full native compatibility matrix unless escalated"
+        ]
+      }
+    },
+    {
+      "files": ["docs/.md", "docs/😀.md"],
+      "tier": "pr",
+      "expected": {
+        "tier": "pr",
+        "status": "selected",
+        "files": ["docs/😀.md", "docs/.md"],
+        "unity": "none",
+        "reasons": [
+          {
+            "file": "docs/😀.md",
+            "coverage": "none",
+            "reason": "documentation or instructions"
+          },
+          {
+            "file": "docs/.md",
+            "coverage": "none",
+            "reason": "documentation or instructions"
+          }
+        ],
+        "commands": [
+          [
+            "pwsh",
+            "-NoProfile",
+            "-File",
+            "scripts/agent-preflight.ps1",
+            "-Paths",
+            "docs/😀.md",
+            "docs/.md"
+          ],
+          ["npm", "run", "lint:repo", "--", "--files", "docs/😀.md", "docs/.md"],
+          ["npm", "run", "validate:tests", "--", "--files", "docs/😀.md", "docs/.md"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": ["unaffected checks", "full native compatibility matrix unless escalated"]
+      }
+    },
+    {
+      "files": ["docs/.md", "docs/😀.md"],
+      "tier": "full",
+      "expected": {
+        "tier": "full",
+        "status": "selected",
+        "files": ["docs/😀.md", "docs/.md"],
+        "unity": "full",
+        "reasons": [
+          {
+            "file": "docs/😀.md",
+            "coverage": "none",
+            "reason": "documentation or instructions"
+          },
+          {
+            "file": "docs/.md",
+            "coverage": "none",
+            "reason": "documentation or instructions"
+          }
+        ],
+        "commands": [
+          ["npm", "run", "lint:repo"],
+          ["npm", "run", "validate:tests"],
+          ["npm", "run", "typecheck:unity"],
+          ["npm", "run", "typecheck:controls"]
+        ],
+        "nativeExecution": "not performed by this runner; use the real Unity fixture runner or CI",
+        "omitted": []
+      }
+    }
+  ]
+}

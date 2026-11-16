@@ -485,6 +485,8 @@ runTest("no linter in scripts/ has been left unreachable", () => {
   // (#453). An allowlist whose entries are prose excuses whatever is put in it -- the quiet half of
   // #445, one level up: the thing named still exists, so nothing goes red.
   const runElsewhere = new Map([
+    ["scripts/validate-npm-package.ps1", "npm-package-controls"],
+
     ["scripts/lint-comparison-direction.js", "comparison-controls"],
     ["scripts/validate-build-lock-action-inputs.js", "policy-controls"],
     ["scripts/check-code-fence-syntax.sh", "fence-controls"],
@@ -506,7 +508,8 @@ runTest("no linter in scripts/ has been left unreachable", () => {
     ["scripts/lint-license-headers.ps1", "csharp-controls"],
     ["scripts/lint-conditional-call-chains.ps1", "csharp-controls"],
     ["scripts/lint-odin-undo-safety.ps1", "csharp-controls"],
-    ["scripts/lint-llm-instructions.ps1", "workflow"],
+    ["scripts/lint-llm-instructions.ps1", "skills-controls"],
+    ["scripts/lint_llm_instructions.py", "workflow"],
     ["scripts/lint-skill-sizes.ps1", "size-controls"],
     ["scripts/lint-unity-test-modules.ps1", "module-controls"],
     ["scripts/lint_unity_test_modules.py", "workflow"],
@@ -520,6 +523,14 @@ runTest("no linter in scripts/ has been left unreachable", () => {
   // Only the kinds something actually claims. A registered predicate nothing uses is a dead branch
   // inside the one test whose whole point is that a claim has to be executable.
   const owners = new Map([
+    [
+      "npm-package-controls",
+      (file) => registeredControlsInvoke(file, "scripts/tests/test_npm_package.py")
+    ],
+    [
+      "skills-controls",
+      (file) => registeredControlsInvoke(file, "scripts/tests/test_skills_tooling.py")
+    ],
     [
       "comparison-controls",
       (file) => registeredControlsInvoke(file, "scripts/tests/test_comparison_direction.py")

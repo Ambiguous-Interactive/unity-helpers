@@ -1,0 +1,158 @@
+{
+  "issue": 859,
+  "pull_request": "https://github.com/Ambiguous-Interactive/unity-helpers/pull/1214",
+  "captured_utc": "2026-11-16T09:14:18.260151+00:00",
+  "reviewed_parent_commit": "46b19f5ca3af2bbf75794cbe79254e878114510b",
+  "source_sha256": {
+    "scripts/agent-check.js": "13301aef7e62db9da2eaea25460ca0d260647fafe0e3db2a16410da167d887a7",
+    "scripts/agent_check.py": "98d68930f13336d3edca02df3c2b73367e0d5504e99c626d15eb3f4a2c8e2af9",
+    "scripts/check_registries.py": "688185e971a52e3dc7bc449be0861eec633d624d6d705ab2b5c41c315342b726",
+    "scripts/generate_skills_index.py": "f83e9909615d4fb2244eb1dcbcb7a256f7fe213dfb6f40e6f71f82fd9b8c1842",
+    "scripts/lint_llm_instructions.py": "eda487ecf8db7c95fd3aae8d9e06507eedb00e9efaba74eede25dbc6d76cf106",
+    "scripts/migrate_agent_skills.py": "e831aba3556f6a82678c347ee3aec95a4c43f89697bb86347029c51be3ecb868",
+    "scripts/release_tools.py": "ef04087ec4a6fe972346f4ce4d37285575501e62290140903e318e4f412e49ba",
+    "scripts/validate_npm_package.py": "e83c52442bc3b9d896b74dd289b5d87450de27a7b3b0ea074ff1f25e8aa5508d",
+    "scripts/python~/pyproject.toml": "df739d2193f6b3756ac65b7d52dfb415e2b39f1eab0fe1aa1c85bd4008f24aee",
+    "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d"
+  },
+  "local_toolchain": {
+    "host": "Linux x86_64 tmpfs",
+    "uv": "0.13.8",
+    "node": "22.23.4",
+    "python": "3.14.10"
+  },
+  "regressions": {
+    "combined_cases_passed": 521,
+    "strict_sources": 164,
+    "strict_tools": ["Ruff", "mypy", "Pyright"],
+    "round_two_skill_cases_passed": 122,
+    "round_three_skill_cases_passed": 123
+  },
+  "initial_windows_failures": [
+    {
+      "job": "https://github.com/Ambiguous-Interactive/unity-helpers/actions/runs/43831349924/job/133177180844",
+      "failed": 6,
+      "passed": 90,
+      "classification": "CLI formatter ignore rules skipped explicit manifests under Temp paths; index stdout underwent platform newline translation."
+    },
+    {
+      "job": "https://github.com/Ambiguous-Interactive/unity-helpers/actions/runs/43831350018/job/133177181729",
+      "failed": 19,
+      "passed": 2485,
+      "skipped": 56,
+      "classification": "Archive path ownership rejected the generated temporary archive. A canonical-parent alias reproduces that branch locally; the native log does not show both compared paths, so the exact Windows alias remains unconfirmed. Separately, the registry CLI leaked its text protocol into subsequent JSON runner controls."
+    }
+  ],
+  "portability_corrections": [
+    "Explicit generated manifests use an owned empty ignore file and with-node-modules to match the original Prettier API. Invalid formatter configuration still fails before publication.",
+    "The newly owned npm temporary root is canonicalized once. The archive child must still be a physical owned file.",
+    "The registry CLI restores its caller output protocol on success and failure."
+  ],
+  "review_dispositions": [
+    {
+      "comment": "https://github.com/Ambiguous-Interactive/unity-helpers/pull/1214#discussion_r4583536297",
+      "subject": "agent bridge framing",
+      "change": "Capture child stdout in the bridge response; retain the response shape.",
+      "evidence": "Non-newline child stdout returned status seven through the actual Node export."
+    },
+    {
+      "comment": "https://github.com/Ambiguous-Interactive/unity-helpers/pull/1214#discussion_r4583536308",
+      "subject": "bridge stderr",
+      "change": "Forward captured child stderr on successful bridge completion.",
+      "evidence": "Line-terminated and fragment stdout controls retain child diagnostics and status."
+    },
+    {
+      "comment": "https://github.com/Ambiguous-Interactive/unity-helpers/pull/1214#discussion_r4583536313",
+      "subject": "source filename case",
+      "change": "Link to the original source filename; preserve label and ordering.",
+      "evidence": "The frozen incorrect UPPER.md output remains retained; UPPER.MD resolves."
+    },
+    {
+      "comment": "https://github.com/Ambiguous-Interactive/unity-helpers/pull/1214#discussion_r4583536316",
+      "subject": "encoding-only repair",
+      "change": "Publish expected bytes for BOM-only and CRLF-only fix requests.",
+      "evidence": "Both encoding-only mutations fail before the fix and pass afterward."
+    },
+    {
+      "comment": "https://github.com/Ambiguous-Interactive/unity-helpers/pull/1214#discussion_r4583536321",
+      "subject": "skill code fences",
+      "change": "Require valid complete closing fence lines in masks and link rewriting.",
+      "evidence": "Literal marker suffixes, split boundaries and heading indentation are covered."
+    },
+    {
+      "comment": "https://github.com/Ambiguous-Interactive/unity-helpers/pull/1214#discussion_r4583536325",
+      "subject": "reference ownership",
+      "change": "Refuse an existing destination not owned by the selected split.",
+      "evidence": "An authored reference and oversized source both remain byte-identical on refusal."
+    },
+    {
+      "comment": "https://github.com/Ambiguous-Interactive/unity-helpers/pull/1214#discussion_r4583536330",
+      "subject": "recoverable publication",
+      "change": "Validate and stage the complete selected batch with original backups before replacements.",
+      "evidence": "Read-only later sources, later source writes and manifest writes cannot lose a split on retry. Failed rollback retains a journal and blocks silent retry."
+    },
+    {
+      "comment": "https://github.com/Ambiguous-Interactive/unity-helpers/pull/1214#discussion_r4583536336",
+      "subject": "release version admission",
+      "change": "Require fully matched ASCII version components.",
+      "evidence": "Retain the original newline acceptance observation while explicitly rejecting that legacy result."
+    },
+    {
+      "comment": "https://github.com/Ambiguous-Interactive/unity-helpers/pull/1214#discussion_r4583536345",
+      "subject": "release code fences",
+      "change": "Require closing-fence suffix and indentation rules.",
+      "evidence": "Tilde and backtick literal markers and four-space false closers preserve example headings."
+    },
+    {
+      "comment": "https://github.com/Ambiguous-Interactive/unity-helpers/pull/1214#discussion_r4583536347",
+      "subject": "dangling lockfile",
+      "change": "Validate a dangling lockfile link before the absence branch.",
+      "evidence": "Release inputs remain unchanged and the link remains present."
+    },
+    {
+      "comment": "https://github.com/Ambiguous-Interactive/unity-helpers/pull/1214#discussion_r4583536353",
+      "subject": "LF stdout",
+      "change": "Write the generated index through the UTF-8 byte stream.",
+      "evidence": "A CRLF-translating text wrapper no longer changes index stdout bytes."
+    },
+    {
+      "comment": "https://github.com/Ambiguous-Interactive/unity-helpers/pull/1214#discussion_r4583536356",
+      "subject": "Unity directory roots",
+      "change": "Require every Unity content root to be a directory.",
+      "evidence": "All six root-as-file mutations are rejected."
+    }
+  ],
+  "retained_review_context": [
+    "The generic web-framework serializer suggestion does not apply to a command-line JSON bridge; json.dumps remains the serializer.",
+    "The retained formatter concern is resolved by actual Temp/node_modules reproductions: the formatter returned exit zero with unformatted input and skipped invalid configuration.",
+    "The original small-JSON API probe incorrectly expected multiline formatting. Its actual single-line formatted output and corrected verdict are retained in session evidence."
+  ],
+  "publication_recovery": {
+    "directory": ".llm/.skill-migration-recovery",
+    "normal_failure": "Roll back attempted replacements and retain original file modes.",
+    "rollback_failure_or_interruption": "Retain before/after files and recovery.json. Later migration and check commands refuse pending recovery.",
+    "unblock": "Inspect recovery.json and its recorded owned paths and hashes. First save later authored edits separately. Restore each remaining backup by replacement. Verify a missing backup against before_sha256; remove a published path only when the journal says no original file existed. Remove the recovery directory only after the original batch has been restored, then reapply authored edits and retry the whole migration.",
+    "limits": "Filesystem operations cannot guarantee rollback when the operating system refuses restoration. A hard process termination can leave recovery work. No automatic deletion of pending recovery state is permitted."
+  },
+  "performance_scope": "Existing paired timing records describe their captured source hashes before these correctness and portability fixes. No new timing or native Windows performance claim is made for the corrected implementation.",
+  "native_windows_verification": {
+    "revision": "f85fb5ff6fd58e4fe9c6ae40ec4f97897c6fea11",
+    "instructions": "https://github.com/Ambiguous-Interactive/unity-helpers/actions/runs/43838987839/job/133202629058",
+    "assembly_tools": "https://github.com/Ambiguous-Interactive/unity-helpers/actions/runs/43838987901/job/133202629616",
+    "result": "Both Windows jobs passed on the corrected revision. This establishes the retained Windows controls, not Windows performance."
+  },
+  "raw_evidence": "Original and corrected captures, failing/passing logs and full masked CI job logs remain in ignored session evidence.",
+  "round_two_review": {
+    "comment": "https://github.com/Ambiguous-Interactive/unity-helpers/pull/1214#discussion_r4583996838",
+    "red": "Five failures and two already-passing controls reproduced reference edits during formatting, reference/source/manifest edits during staging, and rollback overwriting a later edit.",
+    "change": "Capture raw bytes when reading every manifest, source and reference. Compare all inputs after formatting and staging, each destination before its replacement, and the resulting batch before successful cleanup. Rollback restores only unchanged published bytes; preserve other edits and retain recovery evidence.",
+    "controls": "Nine focused controls cover formatting, staging, between-replacement edits, and an edit to an already published router.",
+    "limits": "Comparisons are immediately before replacement, not filesystem compare-and-swap. Keep noncooperating editors and writers idle during migration. Manual recovery must save later edits before restoring backups."
+  },
+  "round_three_review": {
+    "comment": "https://github.com/Ambiguous-Interactive/unity-helpers/pull/1214#discussion_r4584165569",
+    "red": "Ownership validation raised ValueError during rollback and stopped restoration of earlier destinations. The control failed before the fix.",
+    "change": "Record ownership refusal alongside filesystem rollback failures and continue restoring other destinations. Preserve recovery evidence and report original publication error, recovery location and instructions.",
+    "controls": "The focused fault-injection test verifies independent destinations restore, unsafe ownership remains untouched, backups persist and the diagnostic includes the original failure and recovery instructions."
+  }
+}

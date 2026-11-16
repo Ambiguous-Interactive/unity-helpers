@@ -367,6 +367,13 @@ runTest("no contract test in scripts/tests/ has been left unreachable", () => {
   // consolidation trades a loud failure (a chain that visibly lost an entry) for a quiet one (a
   // suite that still exists and no longer runs). The excuse is a PREDICATE, not prose.
   const runElsewhere = new Map([
+    ["scripts/tests/test-npm-package-signature.ps1", "npm-package-controls"],
+    ["scripts/tests/test-npm-package-changelog.ps1", "npm-package-controls"],
+
+    ["scripts/tests/test-release-tools.ps1", "release-helper-controls"],
+    ["scripts/tests/test-agent-skill-migration.mjs", "skills-controls"],
+    ["scripts/tests/test-verify-release-tag.ps1", "release-tag-controls"],
+    ["scripts/tests/test-agent-check.js", "agent-controls"],
     ["scripts/tests/test-lint-comparison-direction.js", "comparison-controls"],
     ["scripts/tests/test-typecheck-controls.js", "typecheck-controls"],
     ["scripts/tests/test-build-lock-action-input-parser.js", "policy-controls"],
@@ -389,7 +396,7 @@ runTest("no contract test in scripts/tests/ has been left unreachable", () => {
     ["scripts/tests/test-lint-odin-undo-safety.ps1", "csharp-controls"],
     ["scripts/tests/test-lint-unity-file-naming.ps1", "naming-controls"],
     ["scripts/tests/test-lint-skill-sizes.ps1", "size-controls"],
-    ["scripts/tests/test-llm-instructions-lint.ps1", "workflow"],
+    ["scripts/tests/test-llm-instructions-lint.ps1", "skills-controls"],
     ["scripts/tests/test-protobuf-candidate.py", "workflow"],
     ["scripts/tests/test_pr_feedback.py", "workflow"],
     ["scripts/tests/test_meta_lint.py", "workflow"],
@@ -400,6 +407,26 @@ runTest("no contract test in scripts/tests/ has been left unreachable", () => {
     ["scripts/tests/test-sync-issue-template-versions.ps1", "workflow"]
   ]);
   const owners = new Map([
+    [
+      "npm-package-controls",
+      (file) => registeredControlsInvoke(file, "scripts/tests/test_npm_package.py")
+    ],
+    [
+      "release-helper-controls",
+      (file) => registeredControlsInvoke(file, "scripts/tests/test_release_tools.py")
+    ],
+    [
+      "skills-controls",
+      (file) => registeredControlsInvoke(file, "scripts/tests/test_skills_tooling.py")
+    ],
+    [
+      "release-tag-controls",
+      (file) => registeredControlsInvoke(file, "scripts/tests/test_release_tag.py")
+    ],
+    [
+      "agent-controls",
+      (file) => registeredControlsInvoke(file, "scripts/tests/test_agent_check.py")
+    ],
     [
       "typecheck-controls",
       (file) => registeredControlsInvoke(file, "scripts/tests/test_typecheck_controls.py")

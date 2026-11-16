@@ -6,8 +6,6 @@ import fnmatch
 import json
 import os
 import re
-import shutil
-import subprocess
 import sys
 from dataclasses import replace
 from pathlib import Path
@@ -164,6 +162,7 @@ def affected_checks(
 
 def main(argv: list[str] | None = None) -> int:
     configure_output()
+    previous_output = check_runner.OUTPUT_FORMAT
     check_runner.OUTPUT_FORMAT = "text"
     arguments = list(sys.argv[1:] if argv is None else argv)
     try:
@@ -207,22 +206,9 @@ def main(argv: list[str] | None = None) -> int:
                 raise ValueError("--base requires a revision")
             base = arguments[index + 1]
             del arguments[index : index + 2]
-            node = shutil.which("node")
-            if node is None:
-                raise ValueError("Node is required for shared affected-path inventory")
-            inventory = subprocess.run(  # noqa: S603 - fixed local planner, revision passed as a literal argument.
-                [node, str(ROOT / "scripts/agent-check.js"), "--base", base, "--plan", "--json"],
-                cwd=ROOT,
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                check=False,
-            )
-            if inventory.returncode != 0:
-                raise ValueError(f"Affected inventory failed: {inventory.stderr.strip()}")
-            selected_files = check_runner.strings(
-                mapping(cast("object", json.loads(inventory.stdout)))["files"]
-            )
+            from agent_check import changed_files
+
+            selected_files = changed_files(base)
             checks = affected_checks(checks, selected_files)
             if not checks:
                 print("Not applicable: no affected checks selected; no validation performed.")
@@ -256,6 +242,8 @@ def main(argv: list[str] | None = None) -> int:
     except (OSError, ValueError, KeyError, re.error) as error:
         print(f"Check registry failed: {error}", file=sys.stderr)
         return 1
+    finally:
+        check_runner.OUTPUT_FORMAT = previous_output
 
 
 if __name__ == "__main__":
