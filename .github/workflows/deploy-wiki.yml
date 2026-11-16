@@ -298,13 +298,6 @@ jobs:
           # Stage all changes
           git add -A
 
-          # Check for changes again (in case force_sync but no actual changes)
-          if git diff --staged --quiet; then
-            echo "::notice::No changes to commit (force_sync enabled but content identical)"
-            verify_wiki_revision
-            exit 0
-          fi
-
           # Dry run mode
           if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
             echo "🔍 DRY RUN MODE - Changes that would be committed:"
@@ -312,6 +305,13 @@ jobs:
             echo ""
             echo "Commit message would be:"
             echo "$COMMIT_MSG"
+            exit 0
+          fi
+
+          # Verify unchanged content against the current remote
+          if git diff --staged --quiet; then
+            echo "::notice::No content changes to commit; verifying current remote revision"
+            verify_wiki_revision
             exit 0
           fi
 
@@ -339,10 +339,10 @@ jobs:
               echo "❌ **Wiki sync failed** - Publication was not verified. Review the failed step."
             elif [ "${{ needs.check-wiki.outputs.wiki_exists }}" = "false" ]; then
               echo "⚠️ **Wiki not available** - Please enable and initialize the wiki first."
-            elif [ "${{ steps.changes.outputs.has_changes }}" = "false" ] && [ "${{ github.event.inputs.force_sync }}" != "true" ]; then
-              echo "✅ **No changes detected** - Wiki is already up to date."
             elif [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
               echo "🔍 **Dry run completed** - No changes were pushed."
+            elif [ "${{ steps.changes.outputs.has_changes }}" = "false" ] && [ "${{ github.event.inputs.force_sync }}" != "true" ]; then
+              echo "✅ **No changes detected** - Wiki is already up to date."
             elif [ "${{ steps.publish.outcome }}" = "success" ] && [ -n "${{ steps.publish.outputs.wiki_revision }}" ]; then
               echo "✅ **Wiki synced successfully** - Verified revision: ${{ steps.publish.outputs.wiki_revision }}"
             else

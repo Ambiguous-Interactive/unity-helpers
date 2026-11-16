@@ -938,15 +938,39 @@ class TestWikiPublication:
             assert result.returncode != 0
             assert not (tmp_path / "output").exists()
 
-    def test_dry_run_does_not_publish(self, tmp_path: Path) -> None:
+    @pytest.mark.parametrize("diff_exit", ["0", "1"])
+    @pytest.mark.parametrize("remote", ["expected-sha", "advanced-sha"])
+    def test_dry_run_does_not_publish(self, tmp_path: Path, diff_exit: str, remote: str) -> None:
         result = self.run_step(
-            "Commit and push to wiki", tmp_path, **{"github.event.inputs.dry_run": "true"}
+            "Commit and push to wiki",
+            tmp_path,
+            DIFF_EXIT=diff_exit,
+            REMOTE_SHA=remote,
+            **{"github.event.inputs.dry_run": "true"},
         )
         assert result.returncode == 0
         calls = (tmp_path / "calls").read_text()
         assert "push " not in calls
         assert "commit " not in calls
+        assert "ls-remote " not in calls
         assert not (tmp_path / "output").exists()
+
+    @pytest.mark.parametrize("changes", ["true", "false"])
+    def test_successful_dry_run_summary(self, tmp_path: Path, changes: str) -> None:
+        result = self.run_step(
+            "Summary",
+            tmp_path,
+            **{
+                "github.event.inputs.dry_run": "true",
+                "steps.changes.outputs.has_changes": changes,
+                "steps.publish.outputs.wiki_revision": "",
+            },
+        )
+        assert result.returncode == 0
+        summary = (tmp_path / "summary").read_text()
+        assert "Dry run completed" in summary
+        assert "synced successfully" not in summary
+        assert "already up to date" not in summary
 
     @pytest.mark.parametrize("dry_run", ["true", "false"])
     def test_failure_summary_never_claims_success(self, tmp_path: Path, dry_run: str) -> None:
