@@ -2306,6 +2306,7 @@ function Initialize-EphemeralScriptingDefines {
 --- !u!129 &1
 PlayerSettings:
   serializedVersion: 26
+  activeInputHandler: 0
   scriptingDefineSymbols:
     Standalone: $quotedSymbols
 "@

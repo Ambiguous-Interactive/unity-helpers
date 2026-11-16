@@ -1718,7 +1718,11 @@
     "scripts/python~/pyproject.toml": "93a93f1faf4243715a8e3c10022b76dd65d1422bb1255343448852bfbadb3a28",
     "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d",
     "package.json": "0a02a1488907f5b9cef22f6bac4574a2e594ecfc9b011621d877729ce5239f4c",
-    "scripts/tests/test-run-contract-tests.js": "6505e5bbcb285d539d9a2226d89ae594fdbc271193b14814e6123dff556e0cec"
+    "scripts/tests/test-run-contract-tests.js": "6505e5bbcb285d539d9a2226d89ae594fdbc271193b14814e6123dff556e0cec",
+    "scripts/unity/run-ci-tests.ps1": "3f5c10c15cc1d0c996f73a19972aca73d5c938d95154904fa28ce4c07a0110f3",
+    "scripts/unity/lib/test-framework-evidence.ps1": "64c4331b85223edb2afbe8ccf10e1545b705819ff1e804f3a2a0483a7cb03e77",
+    "scripts/tests/test_ci_modes.py": "91483580e4a82bb0b6b8585dc5dc5ad02445458bbac178e3c0812d6f8bb52431",
+    "scripts/tests/test-unity-framework-workspace.ps1": "b284afbedd096d7678d3a829afee26e17a466674be0598026ba38f0a740e882a"
   },
   "historical_validation_source_sha256": {
     "scripts/unity/project_workspace.py": "57cf0d06d4d777853f2eef6e9c76952125fbfac1a262d3df38358d46a6cf0c85",
@@ -1732,5 +1736,17 @@
     "scripts/tests/test-run-contract-tests.js": "fa1229cfdd7f7a7ceaa64bd6cac6d950aa94e1d5c5adfca8ae41f3efd88c5156"
   },
   "historical_validation_revision": "2e599eb9f391180faec32dd8ac0f9685bd63c4c7",
-  "source_scope": "Current integration-validation inputs only. Historical maps and timing captures remain immutable and do not attest current-head performance."
+  "source_scope": "Current integration-validation inputs only. Historical maps and timing captures remain immutable and do not attest current-head performance.",
+  "input_bootstrap_correction": {
+    "failed_head": "44140b62bad296a88d87adc33d1cbb62c44c49a0",
+    "failed_run_id": 43948192652,
+    "failed_job_id": 133583603498,
+    "observed_failure": "Five unchanged LayeredImageTests failed in both SINGLE_THREADED PlayMode and Standalone. Stack traces originate in UnityEngine.InputForUI.InputManagerProvider reading UnityEngine.Input with the new input backend selected. License cleanup was confirmed.",
+    "configuration_defect": "The Unity 6 define bootstrap pre-created a minimal PlayerSettings file without activeInputHandler. The generated manifest does not install com.unity.inputsystem.",
+    "correction": "Seed activeInputHandler=0 alongside scripting defines; version the existing generation fingerprint with player-input-manager-v1. Existing supplied settings remain byte-for-byte intact. Prior generated workspaces and Libraries are preserved under their earlier identity.",
+    "primary_sdk_reference": "https://github.com/Unity-Technologies/InputSystem/blob/develop/Packages/com.unity.inputsystem/InputSystem/Editor/Settings/EditorPlayerSettingHelpers.cs",
+    "red_controls": "Three native generated-settings cases failed before the new input field; the cache-generation isolation control also failed before the fingerprint version.",
+    "local_recovery": "Eight bootstrap/settings-preservation controls, framework workspace controls and 184 native acceptance orchestration controls pass. Full current-source Unity qualification remains pending.",
+    "limits": "The native exception demonstrates the selected backend but does not provide an archived PlayerSettings file. The generated-settings controls prove the omitted field. No LayeredImage assertion changed and no error suppression was added."
+  }
 }

@@ -249,6 +249,11 @@ phases, with at most two phases active. Each retains a ten-minute job limit. The
 `Assembly tools (Windows)` aggregate requires both phases to succeed; cancellation,
 skips and failures cannot pass it. All previously selected suites remain registered.
 
+Unity 6 projects that seed scripting defines also select the legacy Input Manager
+used by their generated package manifest. The generation fingerprint includes this
+bootstrap policy, so earlier generated settings and Libraries keep their old
+workspace identity. Existing caller-supplied settings remain authoritative.
+
 Unity project workspace selection and retention planning use locked typed Python behind
 `scripts/unity/lib/project-workspace.ps1`. Run `npm run test:project-workspace` for
 original-host comparisons, filesystem controls and compatibility launchers.
