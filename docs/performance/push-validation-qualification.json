@@ -347,6 +347,14 @@
     "run": 43888195302,
     "broad_control_result": "3375 passed, 56 skipped, 11 subtests passed in 513.45 seconds; this includes the corrected native fixture and error-status controls.",
     "retained_gate_limit": "The Local Gates run is cancelled, not green. Cancellation occurred during the following analyzer step near the configured ten-minute job bound. No assertion failure appeared in the corrected broad suite.",
-    "next_evidence": "Add duration reporting for the twenty slowest broad-suite controls so the next run identifies optimization subjects. Keep the same test selection and ten-minute job bound. Do not retry the cancelled run unchanged or claim complete Windows qualification."
+    "next_evidence": "Add duration reporting for the twenty slowest broad-suite controls so the next run identifies optimization subjects. Keep the same test selection and ten-minute job bound. Do not retry the cancelled run unchanged or claim complete Windows qualification.",
+    "follow_up": {
+      "source_head": "20af3f619fd9e0a8e4ef29e437fdead1695be69b",
+      "job": 133382342377,
+      "run": 43891140257,
+      "conclusion": "success",
+      "job_seconds": 383,
+      "limit": "This later hosted run passes with the same test selection and ten-minute bound. Retain the earlier cancelled run. Different hosted observations do not establish that duration reporting accelerated execution."
+    }
   }
 }
