@@ -1,0 +1,442 @@
+{
+  "original_commit": "ba14170adbf9f2019b3b43f800f4d519358472cf",
+  "original_source_sha256": {
+    "scripts/sync-banner-version.ps1": "4c05c349da2479f61ddb4f600bec77569bcc078ec2a086cc6f64b572e20621e8",
+    "scripts/sync-issue-template-versions.ps1": "9270fc92c9190dde047da2328d08110948ccccd3ac335c11e93d5bf26076ea15",
+    "scripts/git-staging-helpers.ps1": "6106ab0d95cf64cc30b0e6314d6a8cc5555ab56c7610e3fb3986f1153592f957"
+  },
+  "source_sha256": {
+    "scripts/version_sync.py": "92124656b2e2864bf55fcaf11e3745b045ee4cc3f8ed89b3142270a5ac1c65b7",
+    "scripts/stage-version-sync-files.ps1": "dbb04a35a1edcae1f3cf88d54175c798fa33476b3db4b9931fd17fd3d4cbbeed",
+    "scripts/sync-banner-version.ps1": "40a87a1c4ef824a69219eef2848d9ef1cf08af9b6d8cf3b04d4e34c39d9a806f",
+    "scripts/sync-issue-template-versions.ps1": "5662dc9feba6a2172931cc9f156dc4a551a320f7f620108f3e46667cd1d76725",
+    "scripts/git-staging-helpers.ps1": "6106ab0d95cf64cc30b0e6314d6a8cc5555ab56c7610e3fb3986f1153592f957",
+    "scripts/python~/pyproject.toml": "d892b5634c1936a19f4ca97dad3fcdd5ad5c7e028e70c8da499f29ede7b844d7",
+    "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d",
+    "scripts/tests/test_version_sync.py": "139773aac78de51beb513fedff4638f36665ab241732a6a428c332109ec1fefb"
+  },
+  "platform": "Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.36",
+  "filesystem": "tmpfs",
+  "toolchain": {
+    "uv": "uv 0.13.8 (x86_64-unknown-linux-gnu)",
+    "python": "Python 3.14.10",
+    "powershell": "7.5.3"
+  },
+  "observations": {
+    "banner-small-noop": {
+      "kind": "banner",
+      "size": "small",
+      "state": "noop",
+      "paired_ms": [
+        {
+          "original": 303.087825,
+          "python": 54.01979
+        },
+        {
+          "python": 53.874523,
+          "original": 303.630307
+        },
+        {
+          "original": 310.105657,
+          "python": 53.903352
+        },
+        {
+          "python": 54.16257,
+          "original": 314.999861
+        },
+        {
+          "original": 291.426272,
+          "python": 53.421028
+        },
+        {
+          "python": 53.951917,
+          "original": 292.778005
+        },
+        {
+          "original": 303.248292,
+          "python": 55.565805
+        }
+      ],
+      "median_ms": {
+        "original": 303.248292,
+        "python": 53.951917
+      }
+    },
+    "banner-small-rewrite": {
+      "kind": "banner",
+      "size": "small",
+      "state": "rewrite",
+      "paired_ms": [
+        {
+          "original": 326.801385,
+          "python": 346.535924
+        },
+        {
+          "python": 352.320741,
+          "original": 349.74822
+        },
+        {
+          "original": 321.022562,
+          "python": 354.713802
+        },
+        {
+          "python": 344.6719,
+          "original": 370.298914
+        },
+        {
+          "original": 375.598195,
+          "python": 353.512041
+        },
+        {
+          "python": 365.06129,
+          "original": 345.446654
+        },
+        {
+          "original": 349.088254,
+          "python": 360.635044
+        }
+      ],
+      "median_ms": {
+        "original": 349.088254,
+        "python": 353.512041
+      }
+    },
+    "banner-large-noop": {
+      "kind": "banner",
+      "size": "large",
+      "state": "noop",
+      "paired_ms": [
+        {
+          "original": 295.913891,
+          "python": 55.467499
+        },
+        {
+          "python": 54.098192,
+          "original": 305.546305
+        },
+        {
+          "original": 322.784527,
+          "python": 55.301412
+        },
+        {
+          "python": 52.653801,
+          "original": 337.142883
+        },
+        {
+          "original": 292.721411,
+          "python": 52.974306
+        },
+        {
+          "python": 53.395541,
+          "original": 298.833938
+        },
+        {
+          "original": 322.033799,
+          "python": 54.234388
+        }
+      ],
+      "median_ms": {
+        "original": 305.546305,
+        "python": 54.098192
+      }
+    },
+    "banner-large-rewrite": {
+      "kind": "banner",
+      "size": "large",
+      "state": "rewrite",
+      "paired_ms": [
+        {
+          "original": 355.816657,
+          "python": 357.61335
+        },
+        {
+          "python": 353.38006,
+          "original": 369.547457
+        },
+        {
+          "original": 331.980388,
+          "python": 373.759312
+        },
+        {
+          "python": 349.087856,
+          "original": 345.961909
+        },
+        {
+          "original": 342.020891,
+          "python": 374.133545
+        },
+        {
+          "python": 363.080886,
+          "original": 333.613475
+        },
+        {
+          "original": 346.192548,
+          "python": 359.795758
+        }
+      ],
+      "median_ms": {
+        "original": 345.961909,
+        "python": 359.795758
+      }
+    },
+    "templates-small-noop": {
+      "kind": "templates",
+      "size": "small",
+      "state": "noop",
+      "paired_ms": [
+        {
+          "original": 348.937509,
+          "python": 67.273105
+        },
+        {
+          "python": 58.788716,
+          "original": 352.794545
+        },
+        {
+          "original": 331.69633,
+          "python": 53.752393
+        },
+        {
+          "python": 55.167805,
+          "original": 336.087604
+        },
+        {
+          "original": 323.848921,
+          "python": 54.129941
+        },
+        {
+          "python": 52.733085,
+          "original": 333.742971
+        },
+        {
+          "original": 312.647299,
+          "python": 53.261494
+        }
+      ],
+      "median_ms": {
+        "original": 333.742971,
+        "python": 54.129941
+      }
+    },
+    "templates-small-rewrite": {
+      "kind": "templates",
+      "size": "small",
+      "state": "rewrite",
+      "paired_ms": [
+        {
+          "original": 337.191423,
+          "python": 366.987858
+        },
+        {
+          "python": 355.628404,
+          "original": 362.386271
+        },
+        {
+          "original": 359.90039,
+          "python": 356.223407
+        },
+        {
+          "python": 343.955723,
+          "original": 355.539734
+        },
+        {
+          "original": 360.168821,
+          "python": 346.026397
+        },
+        {
+          "python": 373.340307,
+          "original": 348.037044
+        },
+        {
+          "original": 339.885834,
+          "python": 346.921892
+        }
+      ],
+      "median_ms": {
+        "original": 355.539734,
+        "python": 355.628404
+      }
+    },
+    "templates-large-noop": {
+      "kind": "templates",
+      "size": "large",
+      "state": "noop",
+      "paired_ms": [
+        {
+          "original": 342.409503,
+          "python": 54.624867
+        },
+        {
+          "python": 54.901281,
+          "original": 323.713641
+        },
+        {
+          "original": 326.03986,
+          "python": 55.380647
+        },
+        {
+          "python": 55.82096,
+          "original": 337.416296
+        },
+        {
+          "original": 355.035486,
+          "python": 53.998021
+        },
+        {
+          "python": 53.956615,
+          "original": 341.779827
+        },
+        {
+          "original": 319.507509,
+          "python": 54.253381
+        }
+      ],
+      "median_ms": {
+        "original": 337.416296,
+        "python": 54.624867
+      }
+    },
+    "templates-large-rewrite": {
+      "kind": "templates",
+      "size": "large",
+      "state": "rewrite",
+      "paired_ms": [
+        {
+          "original": 393.218117,
+          "python": 359.066808
+        },
+        {
+          "python": 347.327934,
+          "original": 373.202801
+        },
+        {
+          "original": 373.832363,
+          "python": 362.134406
+        },
+        {
+          "python": 374.745325,
+          "original": 391.424141
+        },
+        {
+          "original": 367.942376,
+          "python": 354.349981
+        },
+        {
+          "python": 361.197969,
+          "original": 387.055462
+        },
+        {
+          "original": 354.309175,
+          "python": 370.97174
+        }
+      ],
+      "median_ms": {
+        "original": 373.832363,
+        "python": 361.197969
+      }
+    },
+    "powershell-parent-banner-noop": {
+      "paired_ms": [
+        {
+          "original": 147.2798,
+          "python": 93.268
+        },
+        {
+          "python": 97.1251,
+          "original": 154.7477
+        },
+        {
+          "original": 145.0658,
+          "python": 94.712
+        },
+        {
+          "python": 90.5989,
+          "original": 164.688
+        },
+        {
+          "original": 143.7213,
+          "python": 90.4648
+        },
+        {
+          "python": 92.1436,
+          "original": 153.4649
+        },
+        {
+          "original": 145.6476,
+          "python": 91.6575
+        }
+      ],
+      "median_ms": {
+        "original": 147.2798,
+        "python": 92.1436
+      },
+      "scope": "Inner elapsed time in a fresh PowerShell parent invoking the script once; excludes parent startup, not a complete Git commit."
+    }
+  },
+  "scope": "Seven alternating fresh-process pairs per size and update state, after two warmups per arm. Private fixture repositories and indexes reset before each command; stdout, resulting file hashes and staged inventories agree in every pair. Shared helper sources and locked Python inputs remain unchanged. GIT_* and VIRTUAL_ENV excluded only in this controlled harness. No Windows, cold machine or complete hook/CI speed claim.",
+  "issue": 859,
+  "original_observations": {
+    "fixture": "scripts/tests/fixtures/version-sync-v1.json",
+    "sha256": "8d2b8085ee374d34c5e46e6a23e0358c9b4cc0d87da13263248ba0a6e21fb398",
+    "synchronization_cases": 40,
+    "banner_validation_cases": 10,
+    "retained_legacy_rejections": [
+      "numeric/LF/dollar banner metadata",
+      "scalar/duplicate canonical/overflow/Unicode template versions",
+      "same-line template sentinels",
+      "five old read-only validator false positives"
+    ]
+  },
+  "unchanged_imported_helpers_sha256": {
+    "scripts/check_runner.py": "74c60ac74ec9691e119abda574b99a4f7c5d9903003e6dfd4ac20abc603ffc92",
+    "scripts/generate_skills_index.py": "f83e9909615d4fb2244eb1dcbcb7a256f7fe213dfb6f40e6f71f82fd9b8c1842",
+    "scripts/generate_agent_skill_stubs.py": "9949ff2b40523bd998d6c679dfac6d028c568b1631a698c08c7b7c581e228b88"
+  },
+  "validation": {
+    "typed_cases_passed": 72,
+    "strict_sources": 168,
+    "active_hook_integration_passed": 51,
+    "hook_call_guard_controls_passed": 21,
+    "contract_gates": "Version synchronization, contract ownership and script synchronization gates pass. Script synchronization retains 162 controls, including actual banner/context final-LF publication tests.",
+    "red_green": "Entry-point controls fail before the port. A later read-only destination control exposes an initial partial write; preflight now refuses every known non-writable target before publishing. All original records remain frozen; stronger metadata and real-field validation controls retain rejected legacy results."
+  },
+  "native_index_exception": {
+    "adapter": "scripts/stage-version-sync-files.ps1",
+    "purpose": "Delegate only batched Git staging to the unchanged shared PowerShell mutex/retry coordinator. JSON stdin preserves literal file paths and the active GIT_INDEX_FILE. Do not replace it with raw git add or claim the remaining general Git helper migration is complete.",
+    "verified": "An owned alternate index stages both generated refs and preserves unrelated staged content while leaving the default index and its existing lock unchanged. A held active lock remains untouched and exit128 propagates.",
+    "limits": "This preserves the existing coordinator policy, including its mutex fallback behavior. It does not establish stronger global mutual exclusion or change credential permissions."
+  },
+  "publication_limits": "Each selected file is replaced atomically. Keep other writers idle; snapshot checks are not conditional replacement. This is not a transaction across files and the index. Later I/O or staging failure can leave working files updated; inspect selected files and the active index before retrying. Missing optional repair inputs retain warnings/skips, while the read-only validator and real-repository dropdown tests require their actual subjects.",
+  "old_shell_source_checks": "Retired the old version driver Bash-shim grep checks rather than presenting empty source matches as coverage. Active hook behavior remains covered by 51 integration controls and 21 falsifiable hook-call guards.",
+  "raw_evidence": {
+    "receipt_sha256": "82dd619b890a399b398053ab28f17a8da6032d2174815a0b500b06e894c3cffd",
+    "location": "Ignored session evidence retains all warmup/measured output, resulting file hashes, staged inventories, input files and the parent driver.",
+    "initial_refusal": "The first controller refused normalized Git blob bytes that did not match the captured CRLF checkout source seals. It captured no timings. Restoring exact checkout bytes matched every original seal before measurements."
+  },
+  "retained_performance_misses": "Banner rewrites are slower at both retained sizes; small template rewrite medians are effectively equal. Do not describe those paths as speedups or infer statistical significance from seven pairs. No-op and inner-parent measurements improve on this host; the Windows coordinator path remains a host dependency.",
+  "timing_capture_sha256": {
+    "scripts/version_sync.py": "6abdabdc5ba66a6fe3b436ba058b4d2ce029ad7fea109bde8d5bfc5438a5a041",
+    "scripts/stage-version-sync-files.ps1": "dbb04a35a1edcae1f3cf88d54175c798fa33476b3db4b9931fd17fd3d4cbbeed",
+    "scripts/sync-banner-version.ps1": "40a87a1c4ef824a69219eef2848d9ef1cf08af9b6d8cf3b04d4e34c39d9a806f",
+    "scripts/sync-issue-template-versions.ps1": "5662dc9feba6a2172931cc9f156dc4a551a320f7f620108f3e46667cd1d76725",
+    "scripts/git-staging-helpers.ps1": "6106ab0d95cf64cc30b0e6314d6a8cc5555ab56c7610e3fb3986f1153592f957",
+    "scripts/python~/pyproject.toml": "d892b5634c1936a19f4ca97dad3fcdd5ad5c7e028e70c8da499f29ede7b844d7",
+    "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d"
+  },
+  "review_corrections": {
+    "controls": 91,
+    "new_red": 7,
+    "new_already_green": 2,
+    "changes": [
+      "Check and repair every matching badge and repeated context version field.",
+      "Match actual text tags outside XML comments and CDATA; retain comment bytes and quoted attributes."
+    ],
+    "timing_limit": "All timing rows are historical before these banner corrections and do not measure corrected source. Prior source seals remain under timing_capture_sha256.",
+    "retained_misses": "Banner rewrite regressions and effectively flat small-template rewrite medians remain historical evidence, not current-source performance claims.",
+    "linked_destination_control": "Renaming the test removed an accidental match against the temporary directory name and reproduced the claimed failure. The corrected anchored refusal diagnostic reaches link and file-preservation assertions.",
+    "embedded_xml_red": 7,
+    "embedded_xml_already_green": 1,
+    "version_length_controls": 2,
+    "embedded_xml_repair": "Compare literal version characters independently from opaque XML source regions. Replace only version character spans, retaining comments and CDATA byte-for-byte, including when a region splits the version or the replacement changes its length."
+  }
+}

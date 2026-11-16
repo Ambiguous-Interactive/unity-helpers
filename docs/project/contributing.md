@@ -183,6 +183,45 @@ Claims still prevent retries after uncertain mutations. CLI stdout and summaries
 Release admission retains the original handling of empty container fork flags, requires string
 branch names, and rejects non-JSON numbers and incompatible package encodings before publication.
 
+Version reference synchronization uses `scripts/version_sync.py` through locked uv.
+The PowerShell entry points remain launchers. Content rules, sorting and validation run in
+Python; batched staging delegates to the unchanged PowerShell mutex and retry helper.
+This native coordinator preserves the active alternate index and existing contention policy.
+Default template synchronization reads the tracked manifest; release preparation alone adds
+a package version. Local tags and remote releases cannot add dropdown entries.
+
+The read-only `check-banner` command checks every actual text badge and repeated version field.
+Commented and CDATA text cannot satisfy a badge check; repairs retain those bytes. It rejects
+five retained false positives from the old substring checks. The regression suite retains
+40 original synchronization observations and ten original validation observations, including
+malformed metadata that now fails before writes. Missing optional repair inputs still produce
+warnings. The validator and repository dropdown checks require their real input files.
+
+Before the later banner validation corrections, seven alternating fresh-process pairs after
+two warmups per arm on Linux tmpfs measured:
+
+| Command and input           | Original PowerShell | Python through uv |
+| --------------------------- | ------------------: | ----------------: |
+| Banner, small, unchanged    |           303.25 ms |          53.95 ms |
+| Banner, small, rewrite      |           349.09 ms |         353.51 ms |
+| Banner, large, unchanged    |           305.55 ms |          54.10 ms |
+| Banner, large, rewrite      |           345.96 ms |         359.80 ms |
+| Templates, small, unchanged |           333.74 ms |          54.13 ms |
+| Templates, small, rewrite   |           355.54 ms |         355.63 ms |
+| Templates, large, unchanged |           337.42 ms |          54.62 ms |
+| Templates, large, rewrite   |           373.83 ms |         361.20 ms |
+
+Banner rewrites are slower at both sizes. Small template rewrite medians are effectively equal.
+A separate call inside an already running PowerShell parent measured 147.28 → 92.14 ms,
+excluding parent startup. The [qualification record](../performance/version-sync-qualification.json)
+retains every pair, source seals, fixtures and limits. These historical rows do not measure the
+corrected banner implementation, Windows, cold-machine, complete Git-commit or CI speed.
+
+Known non-writable destinations fail before any file is replaced. Hard-linked authored aliases
+stay unchanged. Each selected file publishes atomically; keep other writers idle. Publication
+is not a transaction across files and the index. A later I/O or staging failure can leave working
+files updated. Inspect the selected files and active index before retrying.
+
 Skill indexing, instruction validation and skill-split migration also use typed Python.
 The PowerShell and Node entry points remain tested compatibility launchers. The generator
 preserves the canonical index bytes and ordinal basename order. Links retain the actual source filename. Its `--check` mode reads the

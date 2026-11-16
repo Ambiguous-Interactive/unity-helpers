@@ -110,10 +110,11 @@ jobs:
           uv run --quiet --project scripts/python~ --locked --no-dev python scripts/release_tools.py prepare --bump="${BUMP}" --version="${EXPLICIT_VERSION}"
 
       - name: Sync generated version references
-        shell: pwsh
+        shell: bash
         run: |
-          ./scripts/sync-banner-version.ps1
-          ./scripts/sync-issue-template-versions.ps1 -AddPackageVersion
+          set -euo pipefail
+          uv run --quiet --project scripts/python~ --locked --no-dev python scripts/version_sync.py banner
+          uv run --quiet --project scripts/python~ --locked --no-dev python scripts/version_sync.py templates --add-package-version
           uv run --quiet --project scripts/python~ --locked --no-dev python scripts/release_tools.py sync-upm
 
       - name: Validate prepared release tree

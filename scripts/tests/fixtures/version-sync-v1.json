@@ -1,0 +1,1317 @@
+{
+  "source_commit": "ba14170adbf9f2019b3b43f800f4d519358472cf",
+  "source_sha256": {
+    "scripts/sync-banner-version.ps1": "4c05c349da2479f61ddb4f600bec77569bcc078ec2a086cc6f64b572e20621e8",
+    "scripts/sync-issue-template-versions.ps1": "9270fc92c9190dde047da2328d08110948ccccd3ac335c11e93d5bf26076ea15",
+    "scripts/git-staging-helpers.ps1": "6106ab0d95cf64cc30b0e6314d6a8cc5555ab56c7610e3fb3986f1153592f957"
+  },
+  "cases": [
+    {
+      "kind": "banner",
+      "name": "rewrite",
+      "files": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "add_version": false,
+      "git": true,
+      "exit": 0,
+      "stdout": "Found version: v1.2.3\nUpdated banner version to: v1.2.3\nStaged: <ROOT>/docs/images/unity-helpers-banner.svg\nUpdated .llm/context.md version to: 1.2.3\nStaged: <ROOT>/.llm/context.md\n",
+      "stderr": "",
+      "after": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.3</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.3\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "staged": [".llm/context.md", "docs/images/unity-helpers-banner.svg"]
+    },
+    {
+      "kind": "banner",
+      "name": "already-current",
+      "files": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.3</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.3\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "add_version": false,
+      "git": true,
+      "exit": 0,
+      "stdout": "Found version: v1.2.3\nBanner already has correct version: v1.2.3\n.llm/context.md already has correct version: 1.2.3\n",
+      "stderr": "",
+      "after": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.3</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.3\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "staged": []
+    },
+    {
+      "kind": "banner",
+      "name": "no-git",
+      "files": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "add_version": false,
+      "git": false,
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Write-Error: <ROOT>/scripts/sync-banner-version.ps1:30:5\nLine |\n  30 |      Write-Error $_.Exception.Message\n     |      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n     | git rev-parse --git-dir failed; ensure this script runs inside a git\n     | repository.\n",
+      "after": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "staged": []
+    },
+    {
+      "kind": "banner",
+      "name": "missing-package",
+      "files": {
+        "package.json": null,
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "add_version": false,
+      "git": true,
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Write-Error: <ROOT>/scripts/sync-banner-version.ps1:42:5\nLine |\n  42 |      Write-Error \"package.json not found at: $packageJsonPath\"\n     |      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n     | package.json not found at:\n     | <ROOT>/package.json\n",
+      "after": {
+        "package.json": null,
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "staged": []
+    },
+    {
+      "kind": "banner",
+      "name": "invalid-json",
+      "files": {
+        "package.json": "{",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "add_version": false,
+      "git": true,
+      "exit": 1,
+      "stdout": "",
+      "stderr": "ConvertFrom-Json: <ROOT>/scripts/sync-banner-version.ps1:47:52\nLine |\n  47 |  $packageJson = Get-Content $packageJsonPath -Raw | ConvertFrom-Json\n     |                                                     ~~~~~~~~~~~~~~~~\n     | Conversion from JSON failed with error: Unexpected end when reading\n     | JSON. Path '', line 1, position 1.\n",
+      "after": {
+        "package.json": "{",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "staged": []
+    },
+    {
+      "kind": "banner",
+      "name": "missing-version",
+      "files": {
+        "package.json": "{}",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "add_version": false,
+      "git": true,
+      "exit": 1,
+      "stdout": "",
+      "stderr": "sync-banner-version.ps1: The property 'version' cannot be found on this object. Verify that the property exists.\n",
+      "after": {
+        "package.json": "{}",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "staged": []
+    },
+    {
+      "kind": "banner",
+      "name": "empty-version",
+      "files": {
+        "package.json": "{\"version\":\"\"}",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "add_version": false,
+      "git": true,
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Write-Error: <ROOT>/scripts/sync-banner-version.ps1:51:5\nLine |\n  51 |      Write-Error 'Could not read version from package.json'\n     |      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n     | Could not read version from package.json\n",
+      "after": {
+        "package.json": "{\"version\":\"\"}",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "staged": []
+    },
+    {
+      "kind": "banner",
+      "name": "numeric-version",
+      "files": {
+        "package.json": "{\"version\":123}",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "add_version": false,
+      "git": true,
+      "exit": 0,
+      "stdout": "Found version: v123\nUpdated banner version to: v123\nStaged: <ROOT>/docs/images/unity-helpers-banner.svg\nUpdated .llm/context.md version to: 123\nStaged: <ROOT>/.llm/context.md\n",
+      "stderr": "",
+      "after": {
+        "package.json": "{\"version\":123}",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v123</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 123\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "staged": [".llm/context.md", "docs/images/unity-helpers-banner.svg"]
+    },
+    {
+      "kind": "banner",
+      "name": "prerelease",
+      "files": {
+        "package.json": "{\"version\":\"1.2.3-beta\"}",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "add_version": false,
+      "git": true,
+      "exit": 0,
+      "stdout": "Found version: v1.2.3-beta\nUpdated banner version to: v1.2.3-beta\nStaged: <ROOT>/docs/images/unity-helpers-banner.svg\nUpdated .llm/context.md version to: 1.2.3-beta\nStaged: <ROOT>/.llm/context.md\n",
+      "stderr": "",
+      "after": {
+        "package.json": "{\"version\":\"1.2.3-beta\"}",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.3-beta</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.3-beta\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "staged": [".llm/context.md", "docs/images/unity-helpers-banner.svg"]
+    },
+    {
+      "kind": "banner",
+      "name": "lf-version",
+      "files": {
+        "package.json": "{\"version\":\"1.2.3\\nInjected\"}",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "add_version": false,
+      "git": true,
+      "exit": 0,
+      "stdout": "Found version: v1.2.3\nInjected\nUpdated banner version to: v1.2.3\nInjected\nStaged: <ROOT>/docs/images/unity-helpers-banner.svg\nUpdated .llm/context.md version to: 1.2.3\nInjected\nStaged: <ROOT>/.llm/context.md\n",
+      "stderr": "",
+      "after": {
+        "package.json": "{\"version\":\"1.2.3\\nInjected\"}",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.3\nInjected</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.3\nInjected\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "staged": [".llm/context.md", "docs/images/unity-helpers-banner.svg"]
+    },
+    {
+      "kind": "banner",
+      "name": "dollar-version",
+      "files": {
+        "package.json": "{\"version\":\"1.2.3$1\"}",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "add_version": false,
+      "git": true,
+      "exit": 0,
+      "stdout": "Found version: v1.2.3$1\nUpdated banner version to: v1.2.3$1\nStaged: <ROOT>/docs/images/unity-helpers-banner.svg\nUpdated .llm/context.md version to: 1.2.3$1\nStaged: <ROOT>/.llm/context.md\n",
+      "stderr": "",
+      "after": {
+        "package.json": "{\"version\":\"1.2.3$1\"}",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.3$1</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.3$1\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "staged": [".llm/context.md", "docs/images/unity-helpers-banner.svg"]
+    },
+    {
+      "kind": "banner",
+      "name": "missing-banner",
+      "files": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": null,
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "add_version": false,
+      "git": true,
+      "exit": 0,
+      "stdout": "Found version: v1.2.3\nBanner SVG not found at: <ROOT>/docs/images/unity-helpers-banner.svg, skipping.\nUpdated .llm/context.md version to: 1.2.3\nStaged: <ROOT>/.llm/context.md\n",
+      "stderr": "",
+      "after": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": null,
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.3\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "staged": [".llm/context.md"]
+    },
+    {
+      "kind": "banner",
+      "name": "missing-context",
+      "files": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": null,
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "add_version": false,
+      "git": true,
+      "exit": 0,
+      "stdout": "Found version: v1.2.3\nUpdated banner version to: v1.2.3\nStaged: <ROOT>/docs/images/unity-helpers-banner.svg\n.llm/context.md not found, skipping.\n",
+      "stderr": "",
+      "after": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.3</text></svg>\n",
+        ".llm/context.md": null,
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "staged": ["docs/images/unity-helpers-banner.svg"]
+    },
+    {
+      "kind": "banner",
+      "name": "missing-pattern",
+      "files": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg>No version</svg>\n",
+        ".llm/context.md": "# No version field\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "add_version": false,
+      "git": true,
+      "exit": 0,
+      "stdout": "Found version: v1.2.3\nNo version pattern found in SVG, skipping.\nNo version pattern found in .llm/context.md, skipping.\n",
+      "stderr": "",
+      "after": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg>No version</svg>\n",
+        ".llm/context.md": "# No version field\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "staged": []
+    },
+    {
+      "kind": "banner",
+      "name": "crlf",
+      "files": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\r\n",
+        ".llm/context.md": "# Guidelines\r\n\r\n**Version**: 1.2.2\r\n\r\nAuthored content.\r\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "add_version": false,
+      "git": true,
+      "exit": 0,
+      "stdout": "Found version: v1.2.3\nUpdated banner version to: v1.2.3\nStaged: <ROOT>/docs/images/unity-helpers-banner.svg\nUpdated .llm/context.md version to: 1.2.3\nStaged: <ROOT>/.llm/context.md\n",
+      "stderr": "",
+      "after": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.3</text></svg>\n",
+        ".llm/context.md": "# Guidelines\r\n\r\n**Version**: 1.2.3\r\n\r\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "staged": [".llm/context.md", "docs/images/unity-helpers-banner.svg"]
+    },
+    {
+      "kind": "banner",
+      "name": "bom",
+      "files": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "﻿<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "﻿# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "add_version": false,
+      "git": true,
+      "exit": 0,
+      "stdout": "Found version: v1.2.3\nUpdated banner version to: v1.2.3\nStaged: <ROOT>/docs/images/unity-helpers-banner.svg\nUpdated .llm/context.md version to: 1.2.3\nStaged: <ROOT>/.llm/context.md\n",
+      "stderr": "",
+      "after": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.3</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.3\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "staged": [".llm/context.md", "docs/images/unity-helpers-banner.svg"]
+    },
+    {
+      "kind": "banner",
+      "name": "multiple-badges",
+      "files": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text><text>v2.0.0</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "add_version": false,
+      "git": true,
+      "exit": 0,
+      "stdout": "Found version: v1.2.3\nUpdated banner version to: v1.2.3\nStaged: <ROOT>/docs/images/unity-helpers-banner.svg\nUpdated .llm/context.md version to: 1.2.3\nStaged: <ROOT>/.llm/context.md\n",
+      "stderr": "",
+      "after": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.3</text><text>v1.2.3</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.3\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "staged": [".llm/context.md", "docs/images/unity-helpers-banner.svg"]
+    },
+    {
+      "kind": "banner",
+      "name": "trailing-whitespace",
+      "files": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n \t\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n \t\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "add_version": false,
+      "git": true,
+      "exit": 0,
+      "stdout": "Found version: v1.2.3\nUpdated banner version to: v1.2.3\nStaged: <ROOT>/docs/images/unity-helpers-banner.svg\nUpdated .llm/context.md version to: 1.2.3\nStaged: <ROOT>/.llm/context.md\n",
+      "stderr": "",
+      "after": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.3</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.3\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "staged": [".llm/context.md", "docs/images/unity-helpers-banner.svg"]
+    },
+    {
+      "kind": "templates",
+      "name": "rewrite",
+      "files": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "add_version": false,
+      "git": true,
+      "exit": 0,
+      "stdout": "Total unique versions collected: 3\nVersions (sorted): 1.2.3, 1.2.2, 0.0.1\nbug_report.yml: updated version dropdown.\nfeature_request.yml: updated version dropdown.\nStaged: <ROOT>/.github/ISSUE_TEMPLATE/bug_report.yml, <ROOT>/.github/ISSUE_TEMPLATE/feature_request.yml\n",
+      "stderr": "",
+      "after": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"1.2.3\"\n  - \"1.2.2\"\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"1.2.3\"\n  - \"1.2.2\"\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "staged": [
+        ".github/ISSUE_TEMPLATE/bug_report.yml",
+        ".github/ISSUE_TEMPLATE/feature_request.yml"
+      ]
+    },
+    {
+      "kind": "templates",
+      "name": "no-git",
+      "files": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "add_version": false,
+      "git": false,
+      "exit": 0,
+      "stdout": "WARNING: Git is not available or not in a repository: git rev-parse --git-dir failed; ensure this script runs inside a git repository.\nWARNING: Continuing without staging.\nTotal unique versions collected: 3\nVersions (sorted): 1.2.3, 1.2.2, 0.0.1\nbug_report.yml: updated version dropdown.\nfeature_request.yml: updated version dropdown.\n",
+      "stderr": "",
+      "after": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"1.2.3\"\n  - \"1.2.2\"\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"1.2.3\"\n  - \"1.2.2\"\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "staged": []
+    },
+    {
+      "kind": "templates",
+      "name": "release-add",
+      "files": {
+        "package.json": "{\"version\":\"9.9.9\"}",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "add_version": true,
+      "git": true,
+      "exit": 0,
+      "stdout": "Total unique versions collected: 4\nVersions (sorted): 9.9.9, 1.2.3, 1.2.2, 0.0.1\nIssue template version manifest: added 9.9.9.\nbug_report.yml: updated version dropdown.\nfeature_request.yml: updated version dropdown.\nStaged: <ROOT>/.github/issue-template-versions.json, <ROOT>/.github/ISSUE_TEMPLATE/bug_report.yml, <ROOT>/.github/ISSUE_TEMPLATE/feature_request.yml\n",
+      "stderr": "",
+      "after": {
+        "package.json": "{\"version\":\"9.9.9\"}",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\n  \"versions\": [\n    \"9.9.9\",\n    \"1.2.3\",\n    \"1.2.2\",\n    \"0.0.1\"\n  ]\n}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"9.9.9\"\n  - \"1.2.3\"\n  - \"1.2.2\"\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"9.9.9\"\n  - \"1.2.3\"\n  - \"1.2.2\"\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "staged": [
+        ".github/ISSUE_TEMPLATE/bug_report.yml",
+        ".github/ISSUE_TEMPLATE/feature_request.yml",
+        ".github/issue-template-versions.json"
+      ]
+    },
+    {
+      "kind": "templates",
+      "name": "reject-unlisted",
+      "files": {
+        "package.json": "{\"version\":\"9.9.9\"}",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "add_version": false,
+      "git": true,
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Write-Error: <ROOT>/scripts/sync-issue-template-versions.ps1:110:9\nLine |\n 110 |          Write-Error \"package.json version '$pkgVersion' is not listed …\n     |          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n     | package.json version '9.9.9' is not listed in\n     | <ROOT>/.github/issue-template-versions.json. Run release preparation to add it.\n",
+      "after": {
+        "package.json": "{\"version\":\"9.9.9\"}",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "staged": []
+    },
+    {
+      "kind": "templates",
+      "name": "manifest-missing",
+      "files": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": null,
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "add_version": false,
+      "git": true,
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Write-Error: <ROOT>/scripts/sync-issue-template-versions.ps1:67:5\nLine |\n  67 |      Write-Error \"Issue template version manifest not found at: $manif …\n     |      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n     | Issue template version manifest not found at:\n     | <ROOT>/.github/issue-template-versions.json\n",
+      "after": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": null,
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "staged": []
+    },
+    {
+      "kind": "templates",
+      "name": "manifest-invalid-json",
+      "files": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "add_version": false,
+      "git": true,
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Write-Error: <ROOT>/scripts/sync-issue-template-versions.ps1:80:69\nLine |\n  80 |  … ed to parse issue template version manifest: $($_.Exception.Message)\"\n     |                                                   ~~~~~~~~~~~~~~~~~~~~\n     | Failed to parse issue template version manifest: Conversion from JSON\n     | failed with error: Unexpected end when reading JSON. Path '', line 1,\n     | position 1.\n",
+      "after": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "staged": []
+    },
+    {
+      "kind": "templates",
+      "name": "manifest-empty",
+      "files": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\":[]}",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "add_version": false,
+      "git": true,
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Write-Error: <ROOT>/scripts/sync-issue-template-versions.ps1:85:5\nLine |\n  85 |      Write-Error \"No versions listed in $manifestPath. Cannot update t …\n     |      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n     | No versions listed in\n     | <ROOT>/.github/issue-template-versions.json. Cannot update templates.\n",
+      "after": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\":[]}",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "staged": []
+    },
+    {
+      "kind": "templates",
+      "name": "manifest-scalar",
+      "files": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\":\"1.2.3\"}",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "add_version": false,
+      "git": true,
+      "exit": 0,
+      "stdout": "Total unique versions collected: 1\nVersions (sorted): 1.2.3\nbug_report.yml: updated version dropdown.\nfeature_request.yml: updated version dropdown.\nStaged: <ROOT>/.github/ISSUE_TEMPLATE/bug_report.yml, <ROOT>/.github/ISSUE_TEMPLATE/feature_request.yml\n",
+      "stderr": "",
+      "after": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\":\"1.2.3\"}",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"1.2.3\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"1.2.3\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "staged": [
+        ".github/ISSUE_TEMPLATE/bug_report.yml",
+        ".github/ISSUE_TEMPLATE/feature_request.yml"
+      ]
+    },
+    {
+      "kind": "templates",
+      "name": "manifest-duplicate",
+      "files": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\":[\"1.2.3\",\"1.2.3\"]}",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "add_version": false,
+      "git": true,
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Write-Error: <ROOT>/scripts/sync-issue-template-versions.ps1:80:69\nLine |\n  80 |  … ed to parse issue template version manifest: $($_.Exception.Message)\"\n     |                                                   ~~~~~~~~~~~~~~~~~~~~\n     | Failed to parse issue template version manifest: Invalid or duplicate\n     | issue template version: '1.2.3'.\n",
+      "after": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\":[\"1.2.3\",\"1.2.3\"]}",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "staged": []
+    },
+    {
+      "kind": "templates",
+      "name": "manifest-nonstrict",
+      "files": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\":[\"1.2.3-beta\"]}",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "add_version": false,
+      "git": true,
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Write-Error: <ROOT>/scripts/sync-issue-template-versions.ps1:80:69\nLine |\n  80 |  … ed to parse issue template version manifest: $($_.Exception.Message)\"\n     |                                                   ~~~~~~~~~~~~~~~~~~~~\n     | Failed to parse issue template version manifest: Invalid or duplicate\n     | issue template version: '1.2.3-beta'.\n",
+      "after": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\":[\"1.2.3-beta\"]}",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "staged": []
+    },
+    {
+      "kind": "templates",
+      "name": "manifest-leading-zero",
+      "files": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\":[\"01.2.3\",\"1.2.3\"]}",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "add_version": false,
+      "git": true,
+      "exit": 0,
+      "stdout": "Total unique versions collected: 2\nVersions (sorted): 1.2.3, 1.2.3\nbug_report.yml: updated version dropdown.\nfeature_request.yml: updated version dropdown.\nStaged: <ROOT>/.github/ISSUE_TEMPLATE/bug_report.yml, <ROOT>/.github/ISSUE_TEMPLATE/feature_request.yml\n",
+      "stderr": "",
+      "after": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\":[\"01.2.3\",\"1.2.3\"]}",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"1.2.3\"\n  - \"1.2.3\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"1.2.3\"\n  - \"1.2.3\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "staged": [
+        ".github/ISSUE_TEMPLATE/bug_report.yml",
+        ".github/ISSUE_TEMPLATE/feature_request.yml"
+      ]
+    },
+    {
+      "kind": "templates",
+      "name": "manifest-overflow",
+      "files": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\":[\"2147483648.0.0\",\"1.2.3\"]}",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "add_version": false,
+      "git": true,
+      "exit": 0,
+      "stdout": "Total unique versions collected: 2\nVersions (sorted): 1.2.3, 2147483648.0.0\nbug_report.yml: updated version dropdown.\nfeature_request.yml: updated version dropdown.\nStaged: <ROOT>/.github/ISSUE_TEMPLATE/bug_report.yml, <ROOT>/.github/ISSUE_TEMPLATE/feature_request.yml\n",
+      "stderr": "",
+      "after": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\":[\"2147483648.0.0\",\"1.2.3\"]}",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"1.2.3\"\n  - \"2147483648.0.0\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"1.2.3\"\n  - \"2147483648.0.0\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "staged": [
+        ".github/ISSUE_TEMPLATE/bug_report.yml",
+        ".github/ISSUE_TEMPLATE/feature_request.yml"
+      ]
+    },
+    {
+      "kind": "templates",
+      "name": "manifest-unicode",
+      "files": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\":[\"١.2.3\",\"1.2.3\"]}",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "add_version": false,
+      "git": true,
+      "exit": 0,
+      "stdout": "Total unique versions collected: 2\nVersions (sorted): 1.2.3, ١.2.3\nbug_report.yml: updated version dropdown.\nfeature_request.yml: updated version dropdown.\nStaged: <ROOT>/.github/ISSUE_TEMPLATE/bug_report.yml, <ROOT>/.github/ISSUE_TEMPLATE/feature_request.yml\n",
+      "stderr": "",
+      "after": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\":[\"١.2.3\",\"1.2.3\"]}",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"1.2.3\"\n  - \"١.2.3\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"1.2.3\"\n  - \"١.2.3\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "staged": [
+        ".github/ISSUE_TEMPLATE/bug_report.yml",
+        ".github/ISSUE_TEMPLATE/feature_request.yml"
+      ]
+    },
+    {
+      "kind": "templates",
+      "name": "manifest-lf",
+      "files": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\":[\"1.2.3\\n\"]}",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "add_version": false,
+      "git": true,
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Write-Error: <ROOT>/scripts/sync-issue-template-versions.ps1:110:9\nLine |\n 110 |          Write-Error \"package.json version '$pkgVersion' is not listed …\n     |          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n     | package.json version '1.2.3' is not listed in\n     | <ROOT>/.github/issue-template-versions.json. Run release preparation to add it.\n",
+      "after": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\":[\"1.2.3\\n\"]}",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "staged": []
+    },
+    {
+      "kind": "templates",
+      "name": "missing-one",
+      "files": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": null,
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "add_version": false,
+      "git": true,
+      "exit": 0,
+      "stdout": "Total unique versions collected: 3\nVersions (sorted): 1.2.3, 1.2.2, 0.0.1\nWARNING: Template file not found, skipping: <ROOT>/.github/ISSUE_TEMPLATE/bug_report.yml\nfeature_request.yml: updated version dropdown.\nStaged: <ROOT>/.github/ISSUE_TEMPLATE/feature_request.yml\n",
+      "stderr": "",
+      "after": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": null,
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"1.2.3\"\n  - \"1.2.2\"\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "staged": [".github/ISSUE_TEMPLATE/feature_request.yml"]
+    },
+    {
+      "kind": "templates",
+      "name": "no-sentinels",
+      "files": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: no markers\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "add_version": false,
+      "git": true,
+      "exit": 0,
+      "stdout": "Total unique versions collected: 3\nVersions (sorted): 1.2.3, 1.2.2, 0.0.1\nWARNING: Sentinel comments not found in bug_report.yml, skipping.\nfeature_request.yml: updated version dropdown.\nStaged: <ROOT>/.github/ISSUE_TEMPLATE/feature_request.yml\n",
+      "stderr": "",
+      "after": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: no markers\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"1.2.3\"\n  - \"1.2.2\"\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "staged": [".github/ISSUE_TEMPLATE/feature_request.yml"]
+    },
+    {
+      "kind": "templates",
+      "name": "reverse-sentinels",
+      "files": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "# <!-- END AUTO-UPDATED: package-versions -->\n# <!-- AUTO-UPDATED: package-versions -->\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "add_version": false,
+      "git": true,
+      "exit": 0,
+      "stdout": "Total unique versions collected: 3\nVersions (sorted): 1.2.3, 1.2.2, 0.0.1\nWARNING: Sentinel comments are misordered in bug_report.yml, skipping.\nfeature_request.yml: updated version dropdown.\nStaged: <ROOT>/.github/ISSUE_TEMPLATE/feature_request.yml\n",
+      "stderr": "",
+      "after": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "# <!-- END AUTO-UPDATED: package-versions -->\n# <!-- AUTO-UPDATED: package-versions -->\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"1.2.3\"\n  - \"1.2.2\"\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "staged": [".github/ISSUE_TEMPLATE/feature_request.yml"]
+    },
+    {
+      "kind": "templates",
+      "name": "crlf",
+      "files": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\r\noptions:\r\n  # <!-- AUTO-UPDATED: package-versions -->\r\n  - \"0.0.1\"\r\n  - \"Other\"\r\n  # <!-- END AUTO-UPDATED: package-versions -->\r\nother: preserved\r\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "add_version": false,
+      "git": true,
+      "exit": 0,
+      "stdout": "Total unique versions collected: 3\nVersions (sorted): 1.2.3, 1.2.2, 0.0.1\nbug_report.yml: updated version dropdown.\nfeature_request.yml: updated version dropdown.\nStaged: <ROOT>/.github/ISSUE_TEMPLATE/bug_report.yml, <ROOT>/.github/ISSUE_TEMPLATE/feature_request.yml\n",
+      "stderr": "",
+      "after": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"1.2.3\"\n  - \"1.2.2\"\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"1.2.3\"\n  - \"1.2.2\"\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "staged": [
+        ".github/ISSUE_TEMPLATE/bug_report.yml",
+        ".github/ISSUE_TEMPLATE/feature_request.yml"
+      ]
+    },
+    {
+      "kind": "templates",
+      "name": "bom",
+      "files": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "﻿name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "add_version": false,
+      "git": true,
+      "exit": 0,
+      "stdout": "Total unique versions collected: 3\nVersions (sorted): 1.2.3, 1.2.2, 0.0.1\nbug_report.yml: updated version dropdown.\nfeature_request.yml: updated version dropdown.\nStaged: <ROOT>/.github/ISSUE_TEMPLATE/bug_report.yml, <ROOT>/.github/ISSUE_TEMPLATE/feature_request.yml\n",
+      "stderr": "",
+      "after": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"1.2.3\"\n  - \"1.2.2\"\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"1.2.3\"\n  - \"1.2.2\"\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "staged": [
+        ".github/ISSUE_TEMPLATE/bug_report.yml",
+        ".github/ISSUE_TEMPLATE/feature_request.yml"
+      ]
+    },
+    {
+      "kind": "templates",
+      "name": "no-final-newline",
+      "files": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "add_version": false,
+      "git": true,
+      "exit": 0,
+      "stdout": "Total unique versions collected: 3\nVersions (sorted): 1.2.3, 1.2.2, 0.0.1\nbug_report.yml: updated version dropdown.\nfeature_request.yml: updated version dropdown.\nStaged: <ROOT>/.github/ISSUE_TEMPLATE/bug_report.yml, <ROOT>/.github/ISSUE_TEMPLATE/feature_request.yml\n",
+      "stderr": "",
+      "after": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"1.2.3\"\n  - \"1.2.2\"\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"1.2.3\"\n  - \"1.2.2\"\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "staged": [
+        ".github/ISSUE_TEMPLATE/bug_report.yml",
+        ".github/ISSUE_TEMPLATE/feature_request.yml"
+      ]
+    },
+    {
+      "kind": "templates",
+      "name": "different-indentation",
+      "files": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n    # <!-- AUTO-UPDATED: package-versions -->\n    - \"0.0.1\"\n    - \"Other\"\n    # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "add_version": false,
+      "git": true,
+      "exit": 0,
+      "stdout": "Total unique versions collected: 3\nVersions (sorted): 1.2.3, 1.2.2, 0.0.1\nbug_report.yml: updated version dropdown.\nfeature_request.yml: updated version dropdown.\nStaged: <ROOT>/.github/ISSUE_TEMPLATE/bug_report.yml, <ROOT>/.github/ISSUE_TEMPLATE/feature_request.yml\n",
+      "stderr": "",
+      "after": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n    # <!-- AUTO-UPDATED: package-versions -->\n    - \"1.2.3\"\n    - \"1.2.2\"\n    - \"0.0.1\"\n    - \"Other\"\n    # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"1.2.3\"\n  - \"1.2.2\"\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "staged": [
+        ".github/ISSUE_TEMPLATE/bug_report.yml",
+        ".github/ISSUE_TEMPLATE/feature_request.yml"
+      ]
+    },
+    {
+      "kind": "templates",
+      "name": "same-line",
+      "files": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "prefix # <!-- AUTO-UPDATED: package-versions --> old # <!-- END AUTO-UPDATED: package-versions --> trailing\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "add_version": false,
+      "git": true,
+      "exit": 0,
+      "stdout": "Total unique versions collected: 3\nVersions (sorted): 1.2.3, 1.2.2, 0.0.1\nbug_report.yml: updated version dropdown.\nfeature_request.yml: updated version dropdown.\nStaged: <ROOT>/.github/ISSUE_TEMPLATE/bug_report.yml, <ROOT>/.github/ISSUE_TEMPLATE/feature_request.yml\n",
+      "stderr": "",
+      "after": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidelines\n\n**Version**: 1.2.2\n\nAuthored content.\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "prefix # <!-- AUTO-UPDATED: package-versions -->\nprefix - \"1.2.3\"\nprefix - \"1.2.2\"\nprefix - \"0.0.1\"\nprefix - \"Other\"\nprefix # <!-- END AUTO-UPDATED: package-versions -->\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"1.2.3\"\n  - \"1.2.2\"\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "staged": [
+        ".github/ISSUE_TEMPLATE/bug_report.yml",
+        ".github/ISSUE_TEMPLATE/feature_request.yml"
+      ]
+    }
+  ],
+  "check_workflow_sha256": "50e0da109f8d88a6ea37809e9e4fd60c27d1bdc14a751ad77ad9e2e6e7c9b38c",
+  "checks": [
+    {
+      "name": "valid",
+      "files": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.3</text></svg>\n",
+        ".llm/context.md": "# Guidance\n\n**Version**: 1.2.3\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "exit": 0,
+      "stdout": "Package version: 1.2.3\nBanner SVG contains version 1.2.3\n.llm/context.md contains version 1.2.3\nAll version references are in sync.\n",
+      "stderr": ""
+    },
+    {
+      "name": "missing-banner",
+      "files": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": null,
+        ".llm/context.md": "# Guidance\n\n**Version**: 1.2.3\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "exit": 1,
+      "stdout": "Package version: 1.2.3\n::error::Banner SVG not found at docs/images/unity-helpers-banner.svg\n",
+      "stderr": ""
+    },
+    {
+      "name": "missing-context",
+      "files": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.3</text></svg>\n",
+        ".llm/context.md": null,
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "exit": 1,
+      "stdout": "Package version: 1.2.3\nBanner SVG contains version 1.2.3\n::error::.llm/context.md not found at .llm/context.md\n",
+      "stderr": ""
+    },
+    {
+      "name": "wrong-banner",
+      "files": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidance\n\n**Version**: 1.2.3\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "exit": 1,
+      "stdout": "Package version: 1.2.3\n::error::Banner SVG does not contain version 1.2.3\n",
+      "stderr": ""
+    },
+    {
+      "name": "wrong-context",
+      "files": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.3</text></svg>\n",
+        ".llm/context.md": "# Guidance\n\n**Version**: 1.2.2\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "exit": 1,
+      "stdout": "Package version: 1.2.3\nBanner SVG contains version 1.2.3\n::error::.llm/context.md does not contain version 1.2.3\n",
+      "stderr": ""
+    },
+    {
+      "name": "comment-only",
+      "files": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><!-- 1.2.3 --><text>v1.2.2</text></svg>\n",
+        ".llm/context.md": "# Guidance\n\n**Version**: 1.2.3\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "exit": 0,
+      "stdout": "Package version: 1.2.3\nBanner SVG contains version 1.2.3\n.llm/context.md contains version 1.2.3\nAll version references are in sync.\n",
+      "stderr": ""
+    },
+    {
+      "name": "unrelated-context",
+      "files": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.3</text></svg>\n",
+        ".llm/context.md": "# Guidance\n\n**Version**: 1.2.2\n\nVersion notes for 1.2.3\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "exit": 0,
+      "stdout": "Package version: 1.2.3\nBanner SVG contains version 1.2.3\n.llm/context.md contains version 1.2.3\nAll version references are in sync.\n",
+      "stderr": ""
+    },
+    {
+      "name": "empty-version",
+      "files": {
+        "package.json": "{\"version\":\"\"}",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.3</text></svg>\n",
+        ".llm/context.md": "# Guidance\n\n**Version**: 1.2.3\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "exit": 0,
+      "stdout": "Package version: \nBanner SVG contains version \n.llm/context.md contains version \nAll version references are in sync.\n",
+      "stderr": ""
+    },
+    {
+      "name": "numeric-version",
+      "files": {
+        "package.json": "{\"version\":123}",
+        "docs/images/unity-helpers-banner.svg": "<svg>v123</svg>\n",
+        ".llm/context.md": "Version: 123\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "exit": 0,
+      "stdout": "Package version: 123\nBanner SVG contains version 123\n.llm/context.md contains version 123\nAll version references are in sync.\n",
+      "stderr": ""
+    },
+    {
+      "name": "prefix-match",
+      "files": {
+        "package.json": "{\"version\": \"1.2.3\"}\n",
+        "docs/images/unity-helpers-banner.svg": "<svg><text>v1.2.30</text></svg>\n",
+        ".llm/context.md": "**Version**: 1.2.30\n",
+        ".github/issue-template-versions.json": "{\"versions\": [\"1.2.3\", \"1.2.2\", \"0.0.1\"]}\n",
+        ".github/ISSUE_TEMPLATE/bug_report.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        ".github/ISSUE_TEMPLATE/feature_request.yml": "name: Demo\noptions:\n  # <!-- AUTO-UPDATED: package-versions -->\n  - \"0.0.1\"\n  - \"Other\"\n  # <!-- END AUTO-UPDATED: package-versions -->\nother: preserved\n",
+        "authored.txt": "Unrelated authored data.\n"
+      },
+      "exit": 0,
+      "stdout": "Package version: 1.2.3\nBanner SVG contains version 1.2.3\n.llm/context.md contains version 1.2.3\nAll version references are in sync.\n",
+      "stderr": ""
+    }
+  ]
+}

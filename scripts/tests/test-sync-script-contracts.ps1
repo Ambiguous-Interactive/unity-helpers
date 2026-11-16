@@ -74,66 +74,6 @@ function Test-AppearsBefore {
 function Get-RepoRoot {  return (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
 }
 
-function Assert-NoNewlineWriteHasFinalLfNormalization {
-  param(
-    [string]$ScriptPath,
-    [string]$ValueVariable,
-    [string]$TestName
-  )
-
-  if (-not (Test-Path $ScriptPath)) {
-    Write-TestResult -TestName $TestName -Passed $false -Message "Missing file: $ScriptPath"
-    return
-  }
-
-  $lines = @(Get-Content -Path $ScriptPath)
-  $setContentNeedle = '-Value $' + $ValueVariable + ' -NoNewline'
-  $normalizationNeedle = '$' + $ValueVariable + ' = $' + $ValueVariable + '.TrimEnd() + "`n"'
-
-  $matchingIndices = @()
-  for ($i = 0; $i -lt $lines.Count; $i++) {
-    if ($lines[$i].Contains('Set-Content') -and $lines[$i].Contains($setContentNeedle)) {
-      $matchingIndices += $i
-    }
-  }
-
-  if ($matchingIndices.Count -eq 0) {
-    Write-TestResult -TestName $TestName -Passed $false -Message "No Set-Content -NoNewline write found for variable '$ValueVariable'."
-    return
-  }
-
-  $violations = @()
-  foreach ($index in $matchingIndices) {
-    # Keep this window broad enough to tolerate nearby comment churn while still
-    # requiring normalization to occur before the write call.
-    $windowStart = [Math]::Max(0, $index - 10)
-    $windowEnd = $index - 1
-    $window = @()
-    if ($windowStart -le $windowEnd) {
-      $window = $lines[$windowStart..$windowEnd]
-    }
-    $hasNormalization = $false
-    foreach ($windowLine in $window) {
-      if ($windowLine.Contains($normalizationNeedle)) {
-        $hasNormalization = $true
-        break
-      }
-    }
-
-    if (-not $hasNormalization) {
-      $lineNumber = $index + 1
-      $violations += "line $lineNumber"
-    }
-  }
-
-  if ($violations.Count -gt 0) {
-    Write-TestResult -TestName $TestName -Passed $false -Message "Missing final-LF normalization near $($violations -join ', ')."
-  }
-  else {
-    Write-TestResult -TestName $TestName -Passed $true
-  }
-}
-
 function Run-SyncScriptContractTests {
   Write-Host ""
   Write-Host "Sync script newline-safety contracts:" -ForegroundColor Magenta
@@ -147,15 +87,11 @@ function Run-SyncScriptContractTests {
   Write-TestResult -TestName 'Documentation synchronization preserves read-only checks and final LF' `
     -Passed ($LASTEXITCODE -eq 0)
 
-  Assert-NoNewlineWriteHasFinalLfNormalization `
-    -ScriptPath (Join-Path $repoRoot 'scripts/sync-banner-version.ps1') `
-    -ValueVariable 'updatedContent' `
-    -TestName 'sync-banner-version.ps1 normalizes SVG content before -NoNewline write'
+  & uv run --quiet --project (Join-Path $repoRoot 'scripts/python~') --locked pytest `
+    (Join-Path $repoRoot 'scripts/tests/test_version_sync.py') -q -k banner_final_lf
+  Write-TestResult -TestName 'Version publication preserves final LF in banner and context files' `
+    -Passed ($LASTEXITCODE -eq 0)
 
-  Assert-NoNewlineWriteHasFinalLfNormalization `
-    -ScriptPath (Join-Path $repoRoot 'scripts/sync-banner-version.ps1') `
-    -ValueVariable 'updatedContextContent' `
-    -TestName 'sync-banner-version.ps1 normalizes context content before -NoNewline write'
 }
 
 function Run-AgentValidationContractTests {
