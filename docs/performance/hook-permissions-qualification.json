@@ -1,0 +1,843 @@
+{
+  "scope": "Hook index-mode validation through locked typed Python; issue #859 remains unfinished.",
+  "original_commit": "aa22e920da0ec2a91437b52e171689f3c3b809b7",
+  "original_source_sha256": "e5ff2d684cd20275b71dadc27f0ef14eeb3e0fb5c5a111e108d434d138b0fb62",
+  "source_sha256": {
+    "scripts/hook_permissions.py": "556e4b17e6c3f627bd1aee0a0b4e219e82efd94baf1425474dd1032fc9c2aa3e",
+    "scripts/tests/test_hook_permissions.py": "85b698c5c669d02e8c3a0508973d88e2754a70d43c031012f5033b1a43aa0110",
+    "scripts/set-hook-index-mode.ps1": "5d32fa396e1fdb4f49c9612712b3392e4d585dcd94afe0da99b4a0aea6828db3",
+    "scripts/git-staging-helpers.ps1": "fe0089a801c4b181db6878fc1c64e5824bfc8aee296cbaa4ac6af473b6c7b80f",
+    "scripts/tests/fixtures/hook-permissions-v1.json": "e0632628efff18af59de80f0dd06699be04fc2d3b8bd1e8c4036bea393019a4a",
+    "scripts/validate-hook-permissions.sh": "0da28ba2ef88e88f79b799c9d96bb55aeffe17250156f4ab5a32c032d4506541",
+    "scripts/tests/test-validate-hook-permissions.sh": "86dbf34acb677981e3d273fe0b8d9d95bc03451a96b846dabaded7e647da5163",
+    "scripts/python~/pyproject.toml": "f1c03081409e9b6abaf03c5c87ef37f56c7ace60b36c672220d9b98307e03f0f",
+    "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d",
+    "package.json": "1ec1c3b87047bee95bb28ce3c8eda2be14ae0ec5e453a1d0d99526a5ed68260d",
+    ".github/workflows/local-gates.yml": "f4d1375ef0741f7f343c54213d3d3180717517c570b6fcdcd796066cb1828780",
+    "scripts/tests/test-run-contract-tests.js": "45869e1624e471f38bbde8c96abfeefc0b3ccefbefffe241b8781658a810e234"
+  },
+  "original_controls": 11,
+  "frozen_cli_decisions": 16,
+  "registered_controls": 54,
+  "evidence": [
+    "Original 11-control shell driver passes before migration and against the migrated entry point.",
+    "51 typed controls and all 91 existing version-synchronization controls pass with the extended native coordinator.",
+    "Two directory metadata controls reproduced unhandled errors before correction; directory access failures now return visible failure.",
+    "Native mode-only witnesses preserve staged blobs, tags and debug flags for ordinary, assume-unchanged, skip-worktree, combined and intent-to-add entries.",
+    "Literal space, wildcard, Unicode, nested, POSIX control and quote paths, mixed flags in one batch, linked worktrees, alternate indexes and held index locks are exercised.",
+    "Empty subjects, malformed records, Git read errors, deadlines, missing tools, unmerged entries, symbolic links and false-success child responses cannot pass.",
+    "The native adapter preserves a leading-dash path; incompatible content-update and executable-only switches return 64 without touching the index."
+  ],
+  "original_dirty_content_red_witness": [
+    {
+      "case": "original-fix-stages-working-content",
+      "status": 0,
+      "before_blob": "19d9cc8584ac2c7dcf57d2680375e80f099dc481",
+      "after_blob": "b8d041e39da713592693a6e2d6af4a02a9c7a265",
+      "stdout": "\n\u001b[0;34m── Validating git hook file permissions ──\u001b[0m\n\u001b[0;34m  INFO\u001b[0m .githooks/pre-commit: fixing permissions (100644 -> 100755)...\n\u001b[0;32m  PASS\u001b[0m .githooks/pre-commit (fixed to 100755)\n\n\u001b[0;34m── Summary ──\u001b[0m\n  Files checked: 1\n\u001b[0;32mAll hook entrypoint permissions are correct (fixed).\u001b[0m\n",
+      "stderr": ""
+    }
+  ],
+  "native_mode_only_witnesses": [
+    {
+      "case": "normal",
+      "adapter_status": 0,
+      "same_blob_tag_flags": true,
+      "mode": "100755"
+    },
+    {
+      "case": "assume",
+      "adapter_status": 0,
+      "same_blob_tag_flags": true,
+      "mode": "100755"
+    },
+    {
+      "case": "skip",
+      "adapter_status": 0,
+      "same_blob_tag_flags": true,
+      "mode": "100755"
+    },
+    {
+      "case": "both",
+      "adapter_status": 0,
+      "same_blob_tag_flags": true,
+      "mode": "100755"
+    },
+    {
+      "case": "intent",
+      "adapter_status": 0,
+      "same_blob_tag_flags": true,
+      "mode": "100755"
+    }
+  ],
+  "native_source_evidence": {
+    "repository": "https://github.com/git/git/blob/v2.51.1/builtin/update-index.c",
+    "source_blob": "2380f3ccd68c8ce0ac4b221dbf84f18b9a430811",
+    "reason": "update_one returns before reading working-file content when assume-unchanged is explicitly set or cleared; the outer loop then calls chmod_path. Match the existing tag case to preserve that flag. Do not use bare update-index --chmod or git add for a mode-only repair."
+  },
+  "contract": [
+    "Read NUL-delimited staged entries. Only extensionless basenames under .githooks are subjects, including nested entries.",
+    "Require stage zero and mode 100755. Fail empty audits, unmerged entries and unsupported repair modes.",
+    "The native PowerShell adapter retains the existing shared mutex, index-lock wait and retry coordinator. The normal staging path is unchanged.",
+    "Repair only executable modes; preserve staged blobs and assume-unchanged, skip-worktree and intent-to-add settings. Verify readback before success and respect the active alternate index and other writers locks.",
+    "Keep noncooperating index writers idle. This is not a compare-and-swap across the Python census, coordinator and readback. A failed readback after mutation requires inspection before retry; no rollback is claimed.",
+    "Git reads have 30-second deadlines. Index mutation retains the native coordinator lifecycle; no parent deadline is imposed around an in-flight shared index write."
+  ],
+  "native_exception": "The existing PowerShell/.NET process mutex and retry coordinator remains a justified host boundary shared with other index writers. Hook selection, index parsing, validation and final readback run in typed Python. Current flag reads and native argument construction stay inside the native critical section. No replacement locking architecture is introduced.",
+  "measurement": {
+    "original_commit": "aa22e920da0ec2a91437b52e171689f3c3b809b7",
+    "original_source_sha256": "e5ff2d684cd20275b71dadc27f0ef14eeb3e0fb5c5a111e108d434d138b0fb62",
+    "source_sha256": {
+      "scripts/hook_permissions.py": "47d45f22950c9e31918544e401a36fc718fd9ea54b2d4076f1512d0bb8b6bc7f",
+      "scripts/git-staging-helpers.ps1": "fe0089a801c4b181db6878fc1c64e5824bfc8aee296cbaa4ac6af473b6c7b80f",
+      "scripts/set-hook-index-mode.ps1": "5d32fa396e1fdb4f49c9612712b3392e4d585dcd94afe0da99b4a0aea6828db3",
+      "scripts/python~/pyproject.toml": "f1c03081409e9b6abaf03c5c87ef37f56c7ace60b36c672220d9b98307e03f0f",
+      "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d"
+    },
+    "method": "Two warmup pairs and seven alternating fresh-process pairs per four-hook case. One serial owner, isolated Git configuration, equal status/checked count/staged blob and final mode gates. Repair fixture has no unstaged content; dirty-content correctness is covered separately.",
+    "host": "Linux x86_64; /tmp worktree and fixtures on tmpfs; Python3.14.10, uv0.13.8, PowerShell7.5.3, Git2.51.1",
+    "median_ms": {
+      "healthy": {
+        "original": 3.58997,
+        "python": 36.116724
+      },
+      "reject": {
+        "original": 3.742115,
+        "python": 36.372468
+      },
+      "repair": {
+        "original": 7.179696,
+        "python": 376.105654
+      }
+    },
+    "samples": [
+      {
+        "case": "healthy",
+        "pair": -2,
+        "warmup": true,
+        "arm": "original",
+        "ms": 3.420076,
+        "status": 0,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "380cc61bbf461f06414354bd64f2bdcacd0078da578ae57aa216b44acc622834",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "healthy",
+        "pair": -2,
+        "warmup": true,
+        "arm": "python",
+        "ms": 35.589782,
+        "status": 0,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "7a209fc51a70766e09097c03224661a284f8c4681a12816d4ed99390fc36252b",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "healthy",
+        "pair": -1,
+        "warmup": true,
+        "arm": "python",
+        "ms": 35.680986,
+        "status": 0,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "7a209fc51a70766e09097c03224661a284f8c4681a12816d4ed99390fc36252b",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "healthy",
+        "pair": -1,
+        "warmup": true,
+        "arm": "original",
+        "ms": 3.391748,
+        "status": 0,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "380cc61bbf461f06414354bd64f2bdcacd0078da578ae57aa216b44acc622834",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "healthy",
+        "pair": 0,
+        "warmup": false,
+        "arm": "original",
+        "ms": 3.238348,
+        "status": 0,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "380cc61bbf461f06414354bd64f2bdcacd0078da578ae57aa216b44acc622834",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "healthy",
+        "pair": 0,
+        "warmup": false,
+        "arm": "python",
+        "ms": 36.062636,
+        "status": 0,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "7a209fc51a70766e09097c03224661a284f8c4681a12816d4ed99390fc36252b",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "healthy",
+        "pair": 1,
+        "warmup": false,
+        "arm": "python",
+        "ms": 36.735663,
+        "status": 0,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "7a209fc51a70766e09097c03224661a284f8c4681a12816d4ed99390fc36252b",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "healthy",
+        "pair": 1,
+        "warmup": false,
+        "arm": "original",
+        "ms": 3.531218,
+        "status": 0,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "380cc61bbf461f06414354bd64f2bdcacd0078da578ae57aa216b44acc622834",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "healthy",
+        "pair": 2,
+        "warmup": false,
+        "arm": "original",
+        "ms": 3.704851,
+        "status": 0,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "380cc61bbf461f06414354bd64f2bdcacd0078da578ae57aa216b44acc622834",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "healthy",
+        "pair": 2,
+        "warmup": false,
+        "arm": "python",
+        "ms": 36.010152,
+        "status": 0,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "7a209fc51a70766e09097c03224661a284f8c4681a12816d4ed99390fc36252b",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "healthy",
+        "pair": 3,
+        "warmup": false,
+        "arm": "python",
+        "ms": 36.116724,
+        "status": 0,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "7a209fc51a70766e09097c03224661a284f8c4681a12816d4ed99390fc36252b",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "healthy",
+        "pair": 3,
+        "warmup": false,
+        "arm": "original",
+        "ms": 3.676045,
+        "status": 0,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "380cc61bbf461f06414354bd64f2bdcacd0078da578ae57aa216b44acc622834",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "healthy",
+        "pair": 4,
+        "warmup": false,
+        "arm": "original",
+        "ms": 3.55418,
+        "status": 0,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "380cc61bbf461f06414354bd64f2bdcacd0078da578ae57aa216b44acc622834",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "healthy",
+        "pair": 4,
+        "warmup": false,
+        "arm": "python",
+        "ms": 36.766029,
+        "status": 0,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "7a209fc51a70766e09097c03224661a284f8c4681a12816d4ed99390fc36252b",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "healthy",
+        "pair": 5,
+        "warmup": false,
+        "arm": "python",
+        "ms": 35.458719,
+        "status": 0,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "7a209fc51a70766e09097c03224661a284f8c4681a12816d4ed99390fc36252b",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "healthy",
+        "pair": 5,
+        "warmup": false,
+        "arm": "original",
+        "ms": 4.319193,
+        "status": 0,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "380cc61bbf461f06414354bd64f2bdcacd0078da578ae57aa216b44acc622834",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "healthy",
+        "pair": 6,
+        "warmup": false,
+        "arm": "original",
+        "ms": 3.58997,
+        "status": 0,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "380cc61bbf461f06414354bd64f2bdcacd0078da578ae57aa216b44acc622834",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "healthy",
+        "pair": 6,
+        "warmup": false,
+        "arm": "python",
+        "ms": 36.164274,
+        "status": 0,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "7a209fc51a70766e09097c03224661a284f8c4681a12816d4ed99390fc36252b",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "reject",
+        "pair": -2,
+        "warmup": true,
+        "arm": "original",
+        "ms": 3.539329,
+        "status": 1,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "54b5420ef6f68bf87aac4b13f4a78b04670a08a7be72a1af34d3bdb8a37acbcb",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "reject",
+        "pair": -2,
+        "warmup": true,
+        "arm": "python",
+        "ms": 34.994645,
+        "status": 1,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "462591b6826b816794c7e2d9a3fbfc961aaeef96024486073dd2605fb0eb6377",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "reject",
+        "pair": -1,
+        "warmup": true,
+        "arm": "python",
+        "ms": 36.796028,
+        "status": 1,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "462591b6826b816794c7e2d9a3fbfc961aaeef96024486073dd2605fb0eb6377",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "reject",
+        "pair": -1,
+        "warmup": true,
+        "arm": "original",
+        "ms": 3.441239,
+        "status": 1,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "54b5420ef6f68bf87aac4b13f4a78b04670a08a7be72a1af34d3bdb8a37acbcb",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "reject",
+        "pair": 0,
+        "warmup": false,
+        "arm": "original",
+        "ms": 3.758434,
+        "status": 1,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "54b5420ef6f68bf87aac4b13f4a78b04670a08a7be72a1af34d3bdb8a37acbcb",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "reject",
+        "pair": 0,
+        "warmup": false,
+        "arm": "python",
+        "ms": 36.372468,
+        "status": 1,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "462591b6826b816794c7e2d9a3fbfc961aaeef96024486073dd2605fb0eb6377",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "reject",
+        "pair": 1,
+        "warmup": false,
+        "arm": "python",
+        "ms": 35.70154,
+        "status": 1,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "462591b6826b816794c7e2d9a3fbfc961aaeef96024486073dd2605fb0eb6377",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "reject",
+        "pair": 1,
+        "warmup": false,
+        "arm": "original",
+        "ms": 3.69819,
+        "status": 1,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "54b5420ef6f68bf87aac4b13f4a78b04670a08a7be72a1af34d3bdb8a37acbcb",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "reject",
+        "pair": 2,
+        "warmup": false,
+        "arm": "original",
+        "ms": 3.742115,
+        "status": 1,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "54b5420ef6f68bf87aac4b13f4a78b04670a08a7be72a1af34d3bdb8a37acbcb",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "reject",
+        "pair": 2,
+        "warmup": false,
+        "arm": "python",
+        "ms": 38.222026,
+        "status": 1,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "462591b6826b816794c7e2d9a3fbfc961aaeef96024486073dd2605fb0eb6377",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "reject",
+        "pair": 3,
+        "warmup": false,
+        "arm": "python",
+        "ms": 35.376826,
+        "status": 1,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "462591b6826b816794c7e2d9a3fbfc961aaeef96024486073dd2605fb0eb6377",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "reject",
+        "pair": 3,
+        "warmup": false,
+        "arm": "original",
+        "ms": 4.141151,
+        "status": 1,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "54b5420ef6f68bf87aac4b13f4a78b04670a08a7be72a1af34d3bdb8a37acbcb",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "reject",
+        "pair": 4,
+        "warmup": false,
+        "arm": "original",
+        "ms": 3.452011,
+        "status": 1,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "54b5420ef6f68bf87aac4b13f4a78b04670a08a7be72a1af34d3bdb8a37acbcb",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "reject",
+        "pair": 4,
+        "warmup": false,
+        "arm": "python",
+        "ms": 36.792619,
+        "status": 1,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "462591b6826b816794c7e2d9a3fbfc961aaeef96024486073dd2605fb0eb6377",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "reject",
+        "pair": 5,
+        "warmup": false,
+        "arm": "python",
+        "ms": 37.160569,
+        "status": 1,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "462591b6826b816794c7e2d9a3fbfc961aaeef96024486073dd2605fb0eb6377",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "reject",
+        "pair": 5,
+        "warmup": false,
+        "arm": "original",
+        "ms": 3.810224,
+        "status": 1,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "54b5420ef6f68bf87aac4b13f4a78b04670a08a7be72a1af34d3bdb8a37acbcb",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "reject",
+        "pair": 6,
+        "warmup": false,
+        "arm": "original",
+        "ms": 3.736428,
+        "status": 1,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "54b5420ef6f68bf87aac4b13f4a78b04670a08a7be72a1af34d3bdb8a37acbcb",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "reject",
+        "pair": 6,
+        "warmup": false,
+        "arm": "python",
+        "ms": 35.160895,
+        "status": 1,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "462591b6826b816794c7e2d9a3fbfc961aaeef96024486073dd2605fb0eb6377",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "repair",
+        "pair": -2,
+        "warmup": true,
+        "arm": "original",
+        "ms": 7.153451,
+        "status": 0,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "6e24c114eabf41a62e063fdaae1a2812da15e072352ab13f605781a1ff5e2790",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "repair",
+        "pair": -2,
+        "warmup": true,
+        "arm": "python",
+        "ms": 350.82746,
+        "status": 0,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "8531fd9f4a80eb41f2114c482485a0cf920340f6d01f27a01859cad3693d49ca",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "repair",
+        "pair": -1,
+        "warmup": true,
+        "arm": "python",
+        "ms": 366.294496,
+        "status": 0,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "8531fd9f4a80eb41f2114c482485a0cf920340f6d01f27a01859cad3693d49ca",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "repair",
+        "pair": -1,
+        "warmup": true,
+        "arm": "original",
+        "ms": 6.670863,
+        "status": 0,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "6e24c114eabf41a62e063fdaae1a2812da15e072352ab13f605781a1ff5e2790",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "repair",
+        "pair": 0,
+        "warmup": false,
+        "arm": "original",
+        "ms": 7.499052,
+        "status": 0,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "6e24c114eabf41a62e063fdaae1a2812da15e072352ab13f605781a1ff5e2790",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "repair",
+        "pair": 0,
+        "warmup": false,
+        "arm": "python",
+        "ms": 383.906534,
+        "status": 0,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "8531fd9f4a80eb41f2114c482485a0cf920340f6d01f27a01859cad3693d49ca",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "repair",
+        "pair": 1,
+        "warmup": false,
+        "arm": "python",
+        "ms": 350.037557,
+        "status": 0,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "8531fd9f4a80eb41f2114c482485a0cf920340f6d01f27a01859cad3693d49ca",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "repair",
+        "pair": 1,
+        "warmup": false,
+        "arm": "original",
+        "ms": 7.228319,
+        "status": 0,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "6e24c114eabf41a62e063fdaae1a2812da15e072352ab13f605781a1ff5e2790",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "repair",
+        "pair": 2,
+        "warmup": false,
+        "arm": "original",
+        "ms": 6.774469,
+        "status": 0,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "6e24c114eabf41a62e063fdaae1a2812da15e072352ab13f605781a1ff5e2790",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "repair",
+        "pair": 2,
+        "warmup": false,
+        "arm": "python",
+        "ms": 383.623906,
+        "status": 0,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "8531fd9f4a80eb41f2114c482485a0cf920340f6d01f27a01859cad3693d49ca",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "repair",
+        "pair": 3,
+        "warmup": false,
+        "arm": "python",
+        "ms": 372.326597,
+        "status": 0,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "8531fd9f4a80eb41f2114c482485a0cf920340f6d01f27a01859cad3693d49ca",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "repair",
+        "pair": 3,
+        "warmup": false,
+        "arm": "original",
+        "ms": 7.086308,
+        "status": 0,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "6e24c114eabf41a62e063fdaae1a2812da15e072352ab13f605781a1ff5e2790",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "repair",
+        "pair": 4,
+        "warmup": false,
+        "arm": "original",
+        "ms": 6.873382,
+        "status": 0,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "6e24c114eabf41a62e063fdaae1a2812da15e072352ab13f605781a1ff5e2790",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "repair",
+        "pair": 4,
+        "warmup": false,
+        "arm": "python",
+        "ms": 363.520127,
+        "status": 0,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "8531fd9f4a80eb41f2114c482485a0cf920340f6d01f27a01859cad3693d49ca",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "repair",
+        "pair": 5,
+        "warmup": false,
+        "arm": "python",
+        "ms": 376.105654,
+        "status": 0,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "8531fd9f4a80eb41f2114c482485a0cf920340f6d01f27a01859cad3693d49ca",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "repair",
+        "pair": 5,
+        "warmup": false,
+        "arm": "original",
+        "ms": 7.412575,
+        "status": 0,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "6e24c114eabf41a62e063fdaae1a2812da15e072352ab13f605781a1ff5e2790",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "repair",
+        "pair": 6,
+        "warmup": false,
+        "arm": "original",
+        "ms": 7.179696,
+        "status": 0,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "6e24c114eabf41a62e063fdaae1a2812da15e072352ab13f605781a1ff5e2790",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "case": "repair",
+        "pair": 6,
+        "warmup": false,
+        "arm": "python",
+        "ms": 380.371714,
+        "status": 0,
+        "checked": 4,
+        "blob_and_mode_gate": true,
+        "stdout_sha256": "8531fd9f4a80eb41f2114c482485a0cf920340f6d01f27a01859cad3693d49ca",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "limits": "Retain all startup regressions, including native coordinator launch cost for repair. No Windows, cold provisioning, whole-hook or CI timing claim. Seven pairs do not establish statistical significance.",
+    "tooling_environment": "The parent VIRTUAL_ENV points at the shared root environment; uv selects the explicitly named project environment and emits a mismatch diagnostic. Captured stderr hashes retain this host-specific cost. No shared root environment is used by the measured child.",
+    "captured_revision": "0d81424666c1f8206b3a2a31f15968f3dc8b3b09",
+    "source_scope": "Historical measured candidate at the recorded revision; verify the retained measurement.source_sha256 against that checkout."
+  },
+  "pre_directory_handling_measurement": {
+    "source_sha256": {
+      "scripts/hook_permissions.py": "eb67cb2d964a1b0877c1e1850e391b8c9af5b2487a0ba76564a048f79ee8fa31",
+      "scripts/git-staging-helpers.ps1": "fe0089a801c4b181db6878fc1c64e5824bfc8aee296cbaa4ac6af473b6c7b80f",
+      "scripts/set-hook-index-mode.ps1": "5d32fa396e1fdb4f49c9612712b3392e4d585dcd94afe0da99b4a0aea6828db3",
+      "scripts/python~/pyproject.toml": "f1c03081409e9b6abaf03c5c87ef37f56c7ace60b36c672220d9b98307e03f0f",
+      "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d"
+    },
+    "median_ms": {
+      "healthy": {
+        "original": 3.704332,
+        "python": 36.340963
+      },
+      "reject": {
+        "original": 3.562527,
+        "python": 35.876982
+      },
+      "repair": {
+        "original": 6.996777,
+        "python": 364.492309
+      }
+    },
+    "limit": "Earlier source observations are retained; use the final sealed measurement above for the corrected implementation."
+  },
+  "controller_sha256": "7def4548c2935856c5a0751bdfdee35f890b35a16ba2da06ad75032af11dc484",
+  "limits": [
+    "The measured CLI startup regressions are retained. Native coordinator launch adds repair cost; no speed improvement is claimed.",
+    "At local capture, native Windows qualification was pending CI. POSIX-only invalid filename and symbolic-link fixtures are separate from portable mode controls; subsequent PR checks record host qualification.",
+    "The original colored output is now plain deterministic diagnostics; decision/status/subject-count parity is captured, not byte-for-byte console styling."
+  ],
+  "captured_utc": "2026-11-16T15:42:46.012643+00:00",
+  "required_checks": "Full hook regression aggregate, fast pre-push safety check, strict Ruff/mypy/Pyright and strict documentation build pass.",
+  "ownership_gate": "The contract-runner orphan gate reproduced red after the npm route moved. Register the retained shell test launcher through registeredControlsInvoke and the Python controls that actually execute it. All 15 contract-runner assertions pass; all 13 Repo Lint runner assertions also passed.",
+  "historical_validation_source_sha256": {
+    "scripts/hook_permissions.py": "47d45f22950c9e31918544e401a36fc718fd9ea54b2d4076f1512d0bb8b6bc7f",
+    "scripts/tests/test_hook_permissions.py": "300f35a744bdef40a5934ea17fd7c8399f7f91728551d4ac77aa8511de02466e",
+    "scripts/set-hook-index-mode.ps1": "5d32fa396e1fdb4f49c9612712b3392e4d585dcd94afe0da99b4a0aea6828db3",
+    "scripts/git-staging-helpers.ps1": "fe0089a801c4b181db6878fc1c64e5824bfc8aee296cbaa4ac6af473b6c7b80f",
+    "scripts/tests/fixtures/hook-permissions-v1.json": "e0632628efff18af59de80f0dd06699be04fc2d3b8bd1e8c4036bea393019a4a",
+    "scripts/validate-hook-permissions.sh": "0da28ba2ef88e88f79b799c9d96bb55aeffe17250156f4ab5a32c032d4506541",
+    "scripts/tests/test-validate-hook-permissions.sh": "86dbf34acb677981e3d273fe0b8d9d95bc03451a96b846dabaded7e647da5163",
+    "scripts/python~/pyproject.toml": "f1c03081409e9b6abaf03c5c87ef37f56c7ace60b36c672220d9b98307e03f0f",
+    "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d",
+    "package.json": "1ec1c3b87047bee95bb28ce3c8eda2be14ae0ec5e453a1d0d99526a5ed68260d",
+    ".github/workflows/local-gates.yml": "50eb09408704c8c8846dde714e45d187e7bc0a8397e6d803dce3f979c6c9d3b0",
+    "scripts/tests/test-run-contract-tests.js": "45869e1624e471f38bbde8c96abfeefc0b3ccefbefffe241b8781658a810e234"
+  },
+  "historical_validation_revision": "0d81424666c1f8206b3a2a31f15968f3dc8b3b09",
+  "source_scope": "Current integration-validation inputs only. Historical maps and timing captures remain immutable and do not attest current-head performance.",
+  "before_windows_phase_partition_workflow_sha256": "f95b4749203ac8ee1054cfcf5474084fbfb54e7f3d6cbbffd740e8e9e883903d",
+  "before_native_stack_rebase_source_sha256": {
+    "scripts/hook_permissions.py": "47d45f22950c9e31918544e401a36fc718fd9ea54b2d4076f1512d0bb8b6bc7f",
+    "scripts/tests/test_hook_permissions.py": "300f35a744bdef40a5934ea17fd7c8399f7f91728551d4ac77aa8511de02466e",
+    "scripts/set-hook-index-mode.ps1": "5d32fa396e1fdb4f49c9612712b3392e4d585dcd94afe0da99b4a0aea6828db3",
+    "scripts/git-staging-helpers.ps1": "fe0089a801c4b181db6878fc1c64e5824bfc8aee296cbaa4ac6af473b6c7b80f",
+    "scripts/tests/fixtures/hook-permissions-v1.json": "e0632628efff18af59de80f0dd06699be04fc2d3b8bd1e8c4036bea393019a4a",
+    "scripts/validate-hook-permissions.sh": "0da28ba2ef88e88f79b799c9d96bb55aeffe17250156f4ab5a32c032d4506541",
+    "scripts/tests/test-validate-hook-permissions.sh": "86dbf34acb677981e3d273fe0b8d9d95bc03451a96b846dabaded7e647da5163",
+    "scripts/python~/pyproject.toml": "93a93f1faf4243715a8e3c10022b76dd65d1422bb1255343448852bfbadb3a28",
+    "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d",
+    "package.json": "0a02a1488907f5b9cef22f6bac4574a2e594ecfc9b011621d877729ce5239f4c",
+    ".github/workflows/local-gates.yml": "1f8be32cb6eebc59894b755734ff1fa831f5b8bc18867fdb16d60a28cc9fc1df",
+    "scripts/tests/test-run-contract-tests.js": "6505e5bbcb285d539d9a2226d89ae594fdbc271193b14814e6123dff556e0cec"
+  },
+  "before_repair_hint_source_sha256": {
+    "scripts/hook_permissions.py": "47d45f22950c9e31918544e401a36fc718fd9ea54b2d4076f1512d0bb8b6bc7f",
+    "scripts/tests/test_hook_permissions.py": "300f35a744bdef40a5934ea17fd7c8399f7f91728551d4ac77aa8511de02466e"
+  },
+  "repair_hint_correction": {
+    "review": "https://github.com/Ambiguous-Interactive/unity-helpers/pull/1220#discussion_r4592498711",
+    "red": "Three selected-repository controls failed before correction: ordinary, spaced and apostrophe/dollar paths.",
+    "green": "All 54 hook-permission controls pass locally. Each added control executes the displayed Bash command from another directory and verifies the selected repository becomes executable while staged/working content and the launcher repository index remain unchanged.",
+    "behavior": "Shell-quote the launcher and selected root and include --repo-root in the repair hint.",
+    "performance_limit": "Historical source/timing maps remain immutable; no fresh performance improvement is claimed."
+  }
+}

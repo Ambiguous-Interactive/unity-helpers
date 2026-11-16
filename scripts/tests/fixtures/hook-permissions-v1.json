@@ -1,0 +1,175 @@
+{
+  "original_sha256": "e5ff2d684cd20275b71dadc27f0ef14eeb3e0fb5c5a111e108d434d138b0fb62",
+  "cases": [
+    {
+      "name": "good",
+      "files": {
+        "pre-commit": "100755"
+      },
+      "arguments": [],
+      "status": 0,
+      "checked": 1,
+      "stdout": "\n\u2500\u2500 Validating git hook file permissions \u2500\u2500\n  PASS .githooks/pre-commit (100755 - executable)\n\n\u2500\u2500 Summary \u2500\u2500\n  Files checked: 1\nAll hook entrypoints have executable permissions.\n",
+      "stderr": ""
+    },
+    {
+      "name": "bad",
+      "files": {
+        "pre-commit": "100644"
+      },
+      "arguments": [],
+      "status": 1,
+      "checked": 1,
+      "stdout": "\n\u2500\u2500 Validating git hook file permissions \u2500\u2500\n  FAIL .githooks/pre-commit (100644 - NOT executable)\n         Expected: 100755 (executable)\n         Actual:   100644 (non-executable)\n         Fix with: git update-index --chmod=+x .githooks/pre-commit\n\n\u2500\u2500 Summary \u2500\u2500\n  Files checked: 1\n\n1 file(s) missing executable permissions.\nGit silently skips non-executable hook files.\n\nFix all at once:\n  <ROOT>/scripts/validate-hook-permissions.sh --fix\nOr fix individually:\n  git update-index --chmod=+x .githooks/<file>\n",
+      "stderr": ""
+    },
+    {
+      "name": "fix",
+      "files": {
+        "pre-commit": "100644"
+      },
+      "arguments": ["--fix"],
+      "status": 0,
+      "checked": 1,
+      "stdout": "\n\u2500\u2500 Validating git hook file permissions \u2500\u2500\n  INFO .githooks/pre-commit: fixing permissions (100644 -> 100755)...\n  PASS .githooks/pre-commit (fixed to 100755)\n\n\u2500\u2500 Summary \u2500\u2500\n  Files checked: 1\nAll hook entrypoint permissions are correct (fixed).\n",
+      "stderr": ""
+    },
+    {
+      "name": "healthy-fix",
+      "files": {
+        "pre-commit": "100755"
+      },
+      "arguments": ["--fix"],
+      "status": 0,
+      "checked": 1,
+      "stdout": "\n\u2500\u2500 Validating git hook file permissions \u2500\u2500\n  PASS .githooks/pre-commit (100755 - executable)\n\n\u2500\u2500 Summary \u2500\u2500\n  Files checked: 1\nAll hook entrypoint permissions are correct (fixed).\n",
+      "stderr": ""
+    },
+    {
+      "name": "companion",
+      "files": {
+        "pre-commit": "100755",
+        "pre-commit.ps1": "100644"
+      },
+      "arguments": [],
+      "status": 0,
+      "checked": 1,
+      "stdout": "\n\u2500\u2500 Validating git hook file permissions \u2500\u2500\n  PASS .githooks/pre-commit (100755 - executable)\n\n\u2500\u2500 Summary \u2500\u2500\n  Files checked: 1\nAll hook entrypoints have executable permissions.\n",
+      "stderr": ""
+    },
+    {
+      "name": "dotted-only",
+      "files": {
+        "pre-commit.ps1": "100644"
+      },
+      "arguments": [],
+      "status": 1,
+      "checked": null,
+      "stdout": "\n\u2500\u2500 Validating git hook file permissions \u2500\u2500\n  WARNING: No tracked files found in .githooks/\n  Make sure hook files are committed to git.\n",
+      "stderr": ""
+    },
+    {
+      "name": "nested",
+      "files": {
+        "folder.name/pre-commit": "100755"
+      },
+      "arguments": [],
+      "status": 0,
+      "checked": 1,
+      "stdout": "\n\u2500\u2500 Validating git hook file permissions \u2500\u2500\n  PASS .githooks/folder.name/pre-commit (100755 - executable)\n\n\u2500\u2500 Summary \u2500\u2500\n  Files checked: 1\nAll hook entrypoints have executable permissions.\n",
+      "stderr": ""
+    },
+    {
+      "name": "literal-space",
+      "files": {
+        "pre commit": "100755"
+      },
+      "arguments": [],
+      "status": 0,
+      "checked": 1,
+      "stdout": "\n\u2500\u2500 Validating git hook file permissions \u2500\u2500\n  PASS .githooks/pre commit (100755 - executable)\n\n\u2500\u2500 Summary \u2500\u2500\n  Files checked: 1\nAll hook entrypoints have executable permissions.\n",
+      "stderr": ""
+    },
+    {
+      "name": "multiple-good",
+      "files": {
+        "pre-commit": "100755",
+        "pre-push": "100755"
+      },
+      "arguments": [],
+      "status": 0,
+      "checked": 2,
+      "stdout": "\n\u2500\u2500 Validating git hook file permissions \u2500\u2500\n  PASS .githooks/pre-commit (100755 - executable)\n  PASS .githooks/pre-push (100755 - executable)\n\n\u2500\u2500 Summary \u2500\u2500\n  Files checked: 2\nAll hook entrypoints have executable permissions.\n",
+      "stderr": ""
+    },
+    {
+      "name": "mixed",
+      "files": {
+        "pre-commit": "100755",
+        "pre-push": "100644"
+      },
+      "arguments": [],
+      "status": 1,
+      "checked": 2,
+      "stdout": "\n\u2500\u2500 Validating git hook file permissions \u2500\u2500\n  PASS .githooks/pre-commit (100755 - executable)\n  FAIL .githooks/pre-push (100644 - NOT executable)\n         Expected: 100755 (executable)\n         Actual:   100644 (non-executable)\n         Fix with: git update-index --chmod=+x .githooks/pre-push\n\n\u2500\u2500 Summary \u2500\u2500\n  Files checked: 2\n\n1 file(s) missing executable permissions.\nGit silently skips non-executable hook files.\n\nFix all at once:\n  <ROOT>/scripts/validate-hook-permissions.sh --fix\nOr fix individually:\n  git update-index --chmod=+x .githooks/<file>\n",
+      "stderr": ""
+    },
+    {
+      "name": "multiple-fix",
+      "files": {
+        "pre-commit": "100644",
+        "pre-push": "100644"
+      },
+      "arguments": ["--fix"],
+      "status": 0,
+      "checked": 2,
+      "stdout": "\n\u2500\u2500 Validating git hook file permissions \u2500\u2500\n  INFO .githooks/pre-commit: fixing permissions (100644 -> 100755)...\n  PASS .githooks/pre-commit (fixed to 100755)\n  INFO .githooks/pre-push: fixing permissions (100644 -> 100755)...\n  PASS .githooks/pre-push (fixed to 100755)\n\n\u2500\u2500 Summary \u2500\u2500\n  Files checked: 2\nAll hook entrypoint permissions are correct (fixed).\n",
+      "stderr": ""
+    },
+    {
+      "name": "empty",
+      "files": {},
+      "arguments": [],
+      "status": 1,
+      "checked": null,
+      "stdout": "\n\u2500\u2500 Validating git hook file permissions \u2500\u2500\n  WARNING: No tracked files found in .githooks/\n  Make sure hook files are committed to git.\n",
+      "stderr": ""
+    },
+    {
+      "name": "missing-directory",
+      "files": null,
+      "arguments": [],
+      "status": 1,
+      "checked": null,
+      "stdout": "Error: .githooks directory not found.\n",
+      "stderr": ""
+    },
+    {
+      "name": "help",
+      "files": {},
+      "arguments": ["--help"],
+      "status": 0,
+      "checked": null,
+      "stdout": "Git Hook Permissions Validation Script\n\nUsage: <ROOT>/scripts/validate-hook-permissions.sh [OPTIONS]\n\nOptions:\n  --fix               Fix non-executable hook files (git update-index --chmod=+x)\n  --repo-root <dir>   Repository to validate (default: this script's repository)\n  --help              Show this help message\n\nChecks:\n  Verifies extensionless files in .githooks/ are tracked as 100755\n  (executable) in the git index. Git silently skips non-executable hook files.\n\nFix manually:\n  git update-index --chmod=+x .githooks/<file>\n",
+      "stderr": ""
+    },
+    {
+      "name": "unknown",
+      "files": {},
+      "arguments": ["--unknown"],
+      "status": 1,
+      "checked": null,
+      "stdout": "Unknown option: --unknown\nGit Hook Permissions Validation Script\n\nUsage: <ROOT>/scripts/validate-hook-permissions.sh [OPTIONS]\n\nOptions:\n  --fix               Fix non-executable hook files (git update-index --chmod=+x)\n  --repo-root <dir>   Repository to validate (default: this script's repository)\n  --help              Show this help message\n\nChecks:\n  Verifies extensionless files in .githooks/ are tracked as 100755\n  (executable) in the git index. Git silently skips non-executable hook files.\n\nFix manually:\n  git update-index --chmod=+x .githooks/<file>\n",
+      "stderr": ""
+    },
+    {
+      "name": "missing-argument",
+      "files": {},
+      "arguments": ["--repo-root"],
+      "status": 1,
+      "checked": null,
+      "stdout": "--repo-root requires a directory argument\n",
+      "stderr": ""
+    }
+  ]
+}

@@ -24,7 +24,7 @@
     "scripts/configure-git-defaults.ps1": "baaec0cff0871ad8c4f8f6ecf64974ce93ef51d124c5c5bdeaad007b04d1a205",
     "scripts/tests/test_push_defaults.py": "97839ffb6211b755319902ecd4b2a159a962427437492c3cd6da962c99358185",
     "scripts/tests/fixtures/push-defaults-v1.json": "29e152d69631690567e308c4272152042b6d74a1953f0e0e377077c9a71e52e7",
-    "scripts/python~/pyproject.toml": "785165834cdd0f419085847b5beaeb2b008e1127e94e4863430f08e57492a979",
+    "scripts/python~/pyproject.toml": "f1c03081409e9b6abaf03c5c87ef37f56c7ace60b36c672220d9b98307e03f0f",
     "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d",
     "scripts/tests/test-agent-preflight.ps1": "e49f63dddbadad076b3b4bedbcc6feb23d28e64eb20b02c501d94c3083a9e1c2"
   },
