@@ -8,11 +8,8 @@ const { spawnSync } = require("node:child_process");
 const yaml = require("yaml");
 const { generatedWorkflow, target } = require("../unity/generate-compatibility-workflow");
 const { resolveCompatibilityMatrix, latestVersion } = require("../unity/resolve-test-matrix");
-const { requireCompatibility } = require("../release-tools/require-native-unity-export");
 const root = path.resolve(__dirname, "../..");
 const versions = require("../../.github/unity-versions.json").all;
-const sha = "a".repeat(40);
-const repository = "Ambiguous-Interactive/unity-helpers";
 
 test("compatibility is generated from the canonical licensed jobs and has separate reporting", async () => {
   const generated = await generatedWorkflow(root);
@@ -112,76 +109,6 @@ test("push selects latest and manual retains full qualification", () => {
   } finally {
     fs.rmSync(scratch, { recursive: true, force: true });
   }
-});
-
-test("release requires every older version and the aggregate in the latest exact-source attempt", async () => {
-  const run = {
-    id: 3,
-    run_attempt: 2,
-    head_sha: sha,
-    repository: { full_name: repository },
-    head_repository: { full_name: repository },
-    path: ".github/workflows/unity-compatibility.yml",
-    event: "workflow_dispatch",
-    head_branch: "main",
-    status: "completed",
-    conclusion: "success"
-  };
-  const jobs = [
-    ...versions.slice(0, -1).map((version) => `Compatibility Unity ${version} (selected modes)`),
-    "Unity Compatibility Success"
-  ].map((name) => ({
-    name,
-    run_id: 3,
-    run_attempt: 2,
-    status: "completed",
-    conclusion: "success"
-  }));
-  const probe = (runs, currentJobs) =>
-    requireCompatibility(repository, sha, async (endpoint) =>
-      endpoint.includes("/workflows/") ? { workflow_runs: runs } : { jobs: currentJobs }
-    );
-  assert.equal(await probe([run], jobs), 3);
-  for (const conclusion of ["failure", "skipped", "cancelled", null]) {
-    await assert.rejects(probe([{ ...run, conclusion }], jobs), /not completed successfully/);
-    for (let index = 0; index < jobs.length; ++index)
-      await assert.rejects(
-        probe(
-          [run],
-          jobs.map((job, i) => (i === index ? { ...job, conclusion } : job))
-        ),
-        /one successful/
-      );
-  }
-  for (let index = 0; index < jobs.length; ++index) {
-    await assert.rejects(
-      probe(
-        [run],
-        jobs.filter((_, i) => i !== index)
-      ),
-      /one successful/
-    );
-    await assert.rejects(probe([run], [...jobs, jobs[index]]), /one successful/);
-    await assert.rejects(
-      probe(
-        [run],
-        jobs.map((job, i) => (i === index ? { ...job, run_attempt: 1 } : job))
-      ),
-      /one successful/
-    );
-  }
-  for (const changes of [
-    { head_sha: "b".repeat(40) },
-    { head_branch: "feature" },
-    { event: "pull_request" },
-    { head_repository: { full_name: "outside/repo" } },
-    { status: "in_progress" }
-  ])
-    await assert.rejects(probe([{ ...run, ...changes }], jobs), /not completed successfully/);
-  await assert.rejects(
-    probe([run, { ...run, id: 4, conclusion: "failure" }], jobs),
-    /not completed successfully/
-  );
 });
 
 test("ordinary manual qualification uses concurrent modes while diagnostic and acceptance captures remain sequential", () => {

@@ -162,6 +162,27 @@ left its input files unchanged. The [qualification record](../performance/releas
 retains the raw rows and source identities. These are local warm observations; release-job,
 cold-machine and Windows performance remain unverified.
 
+Automatic release publication and native release evidence checks use
+`scripts/release_automation.py` through locked uv. The Node CLI paths remain launchers;
+their former internal test imports have moved to the typed suite. `npm run test:auto-publish-release`
+replays 565 original decisions and exercises permanent publication claims, ambiguous mutation
+responses, pagination limits and exact-source validation. Native export requires the current
+run attempt, all six ordered cleanup steps, and independent older-editor compatibility jobs.
+Workflow permissions, trusted checkout refs and concurrency policies retain their original controls.
+
+Seven alternating Linux tmpfs process pairs with pinned uv 0.13.8 and Node 22.23.4 measured
+fixture publication orchestration at 19.30 → 50.57 ms for four workflow runs, and
+20.00 → 51.53 ms for 1,004 runs. Python is slower at both sizes. These fixture APIs perform
+no network calls or real release mutations. The
+[qualification record](../performance/release-orchestration-qualification.json) retains every
+pair and source hash. It does not measure production publication or Windows speed. HTTP requests
+refuse redirects. Each request uses an owned Python child with a parent-enforced 30-second
+deadline. The token travels through stdin, and a timed-out child is killed and reaped.
+This adds process startup to actual HTTP calls; the fixture timings do not measure that cost.
+Claims still prevent retries after uncertain mutations. CLI stdout and summaries retain LF bytes. The timing rows predate later admission corrections and do not measure the corrected source.
+Release admission retains the original handling of empty container fork flags, requires string
+branch names, and rejects non-JSON numbers and incompatible package encodings before publication.
+
 Skill indexing, instruction validation and skill-split migration also use typed Python.
 The PowerShell and Node entry points remain tested compatibility launchers. The generator
 preserves the canonical index bytes and ordinal basename order. Links retain the actual source filename. Its `--check` mode reads the
