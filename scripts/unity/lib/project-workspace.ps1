@@ -1,31 +1,32 @@
-#!/usr/bin/env pwsh
-# project-workspace.ps1 - where the generated Unity test project and its Library live.
-#
-# Dot-sourceable library (NO param() block, just function definitions) so the
-# path/prune logic can be unit-tested with plain pwsh without triggering
-# run-ci-tests.ps1's main / mandatory param() prompts.
-#
-# WHY THIS EXISTS
-#   The generated project's `Library` is Unity's import database plus its
-#   compiled assemblies -- pure derived state, and the single biggest lever on
-#   how long a Unity leg takes. It used to live under the repo's gitignored
-#   `.artifacts/` tree, INSIDE $GITHUB_WORKSPACE. `actions/checkout` runs
-#   `git clean -ffdx` on every job, and `-x` means gitignored: every CI job
-#   deleted the Library the previous job had just built, on the same disk,
-#   minutes earlier. `actions/cache` then paid to download it back.
-#
-#   Pointing the project at a root OUTSIDE the workspace makes `git clean`
-#   structurally unable to reach it, so a self-hosted runner reuses its own
-#   local copy. Run artifacts (logs, results.xml) deliberately STAY inside the
-#   workspace -- those are per-run outputs the workflow uploads, not reusable
-#   state.
-#
-# Functions:
-#   Get-UnityProjectLeafName        - pure <version>-<mode>[-<scope>] leaf name.
-#   Resolve-UnityProjectWorkspace   - resolves project + cache roots from the
-#                                     explicit path / persistent root / repo default.
-#   Get-PersistentProjectPruneOrder - pure LRU prune plan for a free-space floor.
-#   Invoke-PersistentProjectPrune   - applies that plan on disk.
+# Native filesystem and PowerShell comparison boundary for typed workspace policy.
+function Invoke-UnityWorkspacePolicy {
+    param([Parameter(Mandatory = $true)][hashtable]$Request)
+    $priorExitVariable = Get-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue
+    $hadExitVariable = $null -ne $priorExitVariable
+    $priorExitCode = if ($hadExitVariable) { $priorExitVariable.Value } else { $null }
+    try {
+        $scriptsRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+        $project = Join-Path $scriptsRoot 'python~'
+        $module = Join-Path $scriptsRoot 'unity/project_workspace.py'
+        $payload = ConvertTo-Json -InputObject $Request -Depth 10 -Compress -EscapeHandling EscapeNonAscii
+        $output = @($payload | & uv run --project $project --locked python $module)
+        $status = $global:LASTEXITCODE
+        $document = [System.Text.Json.JsonDocument]::Parse(($output -join "`n"))
+        try {
+            $root = $document.RootElement
+            $errorText = $root.GetProperty('error').GetString()
+            if ($status -ne 0 -or -not [string]::IsNullOrEmpty($errorText)) {
+                throw "Workspace policy failed: $errorText"
+            }
+            return $root.GetProperty('value').Clone()
+        }
+        finally { $document.Dispose() }
+    }
+    finally {
+        if ($hadExitVariable) { $global:LASTEXITCODE = $priorExitCode }
+        else { Remove-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue }
+    }
+}
 
 function Get-UnityProjectLeafName {
     param(
@@ -34,43 +35,15 @@ function Get-UnityProjectLeafName {
         [string]$Scope,
         [switch]$ShareEditorProject
     )
-
-    if ($ShareEditorProject -and $Mode -eq 'playmode') {
-        $Mode = 'editmode'
+    if ($ShareEditorProject -and $Mode -eq 'playmode') { $Mode = 'editmode' }
+    $value = Invoke-UnityWorkspacePolicy @{
+        action = 'leaf'; version = $Version; mode = $Mode; scope = [string]$Scope
+        share_editor = [bool]$ShareEditorProject
     }
-
-    if ([string]::IsNullOrWhiteSpace($Scope)) {
-        return "$Version-$Mode"
-    }
-
-    return "$Version-$Mode-$($Scope.Trim())"
+    return $value.GetString()
 }
 
 function Resolve-UnityProjectWorkspace {
-    <#
-    .SYNOPSIS
-        Resolve where the generated Unity project and the UPM caches live.
-
-    .DESCRIPTION
-        Precedence, highest first:
-          1. -ExplicitProjectPath  (an operator/caller override; used verbatim)
-          2. -PersistentRoot       (CI: a directory OUTSIDE $GITHUB_WORKSPACE)
-          3. $RepoRoot/.artifacts/unity/projects (the local-developer default)
-
-        Returns a hashtable with:
-          ProjectPath  - the generated project directory for this leg
-          CacheRoot    - the UPM/npm/git-lfs cache root for this Unity version
-          Persistent   - $true when the location survives `git clean -ffdx`
-          PruneRoot    - the parent holding sibling legs' projects, or '' when
-                         not persistent (never prune a developer's .artifacts)
-          LeafName     - the per-leg directory name
-          LegacyProjectPath - the original path before generation isolation
-
-        GenerationFingerprint isolates generated compiler inputs while retaining
-        package download caches. Explicit project paths remain authoritative.
-
-        Pure apart from path normalization: creates nothing, reads nothing.
-    #>
     param(
         [Parameter(Mandatory = $true)][string]$RepoRoot,
         [Parameter(Mandatory = $true)][string]$Version,
@@ -81,50 +54,19 @@ function Resolve-UnityProjectWorkspace {
         [string]$PersistentRoot,
         [string]$GenerationFingerprint
     )
-
-    $leaf = Get-UnityProjectLeafName -Version $Version -Mode $Mode -Scope $Scope -ShareEditorProject:$ShareEditorProject
-    $repoProjects = Join-Path (Join-Path (Join-Path $RepoRoot '.artifacts') 'unity') 'projects'
-    $repoCaches = Join-Path (Join-Path (Join-Path $RepoRoot '.artifacts') 'unity') 'cache'
-
-    if (-not [string]::IsNullOrWhiteSpace($ExplicitProjectPath)) {
-        return @{
-            LegacyProjectPath = $ExplicitProjectPath
-            ProjectPath = $ExplicitProjectPath
-            CacheRoot = Join-Path $repoCaches $Version
-            Persistent = $false
-            PruneRoot = ''
-            LeafName = $leaf
-        }
+    if ($ShareEditorProject -and $Mode -eq 'playmode') { $Mode = 'editmode' }
+    $value = Invoke-UnityWorkspacePolicy @{
+        action = 'workspace'; repo = $RepoRoot; version = $Version; mode = $Mode
+        scope = [string]$Scope; share_editor = [bool]$ShareEditorProject
+        explicit = [string]$ExplicitProjectPath; persistent = [string]$PersistentRoot
+        fingerprint = [string]$GenerationFingerprint
     }
-
-    $legacyLeaf = $leaf
-    if (-not [string]::IsNullOrWhiteSpace($GenerationFingerprint)) {
-        if ($GenerationFingerprint -cnotmatch '^[a-f0-9]{16}$') { throw 'Project generation fingerprint must contain sixteen lowercase hexadecimal characters.' }
-        $identity = [Text.Encoding]::UTF8.GetBytes($legacyLeaf + "`n" + $GenerationFingerprint)
-        $leaf = 'f-' + [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($identity)).ToLowerInvariant().Substring(0, 16)
+    $result = @{}
+    foreach ($key in @('LegacyProjectPath', 'ProjectPath', 'CacheRoot', 'PruneRoot', 'LeafName')) {
+        $result[$key] = $value.GetProperty($key).GetString()
     }
-
-    if (-not [string]::IsNullOrWhiteSpace($PersistentRoot)) {
-        $root = $PersistentRoot.Trim()
-        $projectsRoot = Join-Path $root 'projects'
-        return @{
-            LegacyProjectPath = Join-Path $projectsRoot $legacyLeaf
-            ProjectPath = Join-Path $projectsRoot $leaf
-            CacheRoot = Join-Path (Join-Path $root 'cache') $Version
-            Persistent = $true
-            PruneRoot = $projectsRoot
-            LeafName = $leaf
-        }
-    }
-
-    return @{
-        LegacyProjectPath = Join-Path $repoProjects $legacyLeaf
-        ProjectPath = Join-Path $repoProjects $leaf
-        CacheRoot = Join-Path $repoCaches $Version
-        Persistent = $false
-        PruneRoot = ''
-        LeafName = $leaf
-    }
+    $result.Persistent = $value.GetProperty('Persistent').GetBoolean()
+    return $result
 }
 
 function Move-UnityProjectWithMigrationResidue {
@@ -133,108 +75,48 @@ function Move-UnityProjectWithMigrationResidue {
         [Parameter(Mandatory = $true)][string]$Project,
         [switch]$ExplicitProject
     )
-
-    $projectPath = [IO.Path]::GetFullPath($Project)
-    $retainedRoot = Join-Path (Split-Path -Parent (Split-Path -Parent $projectPath)) 'retained-projects'
-    foreach ($path in @($projectPath, (Join-Path $projectPath 'Assets/Editor'),
-            (Join-Path $projectPath 'Library/WallstopOdinMigrationApply'), $retainedRoot)) {
-        $ancestor = $path
-        while (-not [string]::IsNullOrWhiteSpace($ancestor)) {
-            if (Test-Path -LiteralPath $ancestor -ErrorAction Stop) {
-                $item = Get-Item -LiteralPath $ancestor -Force -ErrorAction Stop
-                if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
-                    throw "Generated project isolation refuses linked paths: $ancestor"
-                }
-            }
-            $ancestor = Split-Path -Parent $ancestor
-        }
+    $value = Invoke-UnityWorkspacePolicy @{
+        action = 'retention-plan'; project = $Project; explicit = [bool]$ExplicitProject
     }
-    if (-not (Test-Path -LiteralPath $projectPath -PathType Container -ErrorAction Stop)) {
-        return
-    }
-
-    $reasons = New-Object System.Collections.Generic.List[string]
-    $pointerRelative = 'Library/WallstopOdinMigrationApply/active.txt'
-    if (Test-Path -LiteralPath (Join-Path $projectPath $pointerRelative) -ErrorAction Stop) {
-        $reasons.Add($pointerRelative)
-    }
-    $assets = Join-Path $projectPath 'Assets'
-    if (Test-Path -LiteralPath $assets -PathType Container -ErrorAction Stop) {
-        foreach ($entry in @(Get-ChildItem -LiteralPath $assets -Directory -Force -ErrorAction Stop)) {
-            if ($entry.Name -match '^Odin(ApplyIntegration|ImportVerification|BoundConversion|SceneScope|MigrationImport|MigrationReferences|PairedPreview|LiveAddress)-[0-9a-f]{32}$') {
-                $reasons.Add('Assets/' + $entry.Name)
-            }
-        }
-    }
-    if ($reasons.Count -eq 0) { return }
-    if ($ExplicitProject) {
-        throw "Migration residue remains in explicit project '$projectPath'. Preserve and isolate that project before running tests."
-    }
-    $configurator = Get-Item -LiteralPath (Join-Path $projectPath 'Assets/Editor/UhCiTestConfigurator.cs') -Force -ErrorAction Stop
-    if ($configurator.PSIsContainer -or ($configurator.Attributes -band [IO.FileAttributes]::ReparsePoint) -or
-        $configurator.Length -gt 65536 -or
-        [IO.File]::ReadAllText($configurator.FullName) -notmatch 'public static class UhCiTestConfigurator\b') {
-        throw 'Migration residue was found, but generated project provenance could not be established.'
-    }
-
-    $retainedPath = Join-Path $retainedRoot ((Split-Path -Leaf $projectPath) + '-' + [guid]::NewGuid().ToString('N'))
+    if ($value.ValueKind -eq [System.Text.Json.JsonValueKind]::Null) { return }
+    $projectPath = $value.GetProperty('OriginalPath').GetString()
+    $retainedRoot = $value.GetProperty('RetainedRoot').GetString()
+    $retainedPath = $value.GetProperty('RetainedPath').GetString()
     [void][IO.Directory]::CreateDirectory($retainedRoot)
-    [IO.Directory]::Move($projectPath, $retainedPath)
+    try { [IO.Directory]::Move($projectPath, $retainedPath) }
+    catch { throw "Generated project retention move failed from '$projectPath' to '$retainedPath': $($_.Exception.Message)" }
+    $reasons = @($value.GetProperty('Reasons').EnumerateArray() | ForEach-Object { $_.GetString() })
     [pscustomobject]@{
         OriginalPath = $projectPath
         RetainedPath = $retainedPath
-        Reasons = $reasons.ToArray()
+        Reasons = $reasons
         CapturedUtc = [datetime]::UtcNow.ToString('o')
     }
 }
 
 function Get-PersistentProjectPruneOrder {
-    <#
-    .SYNOPSIS
-        Decide which sibling projects to delete to get back above a free-space floor.
-
-    .DESCRIPTION
-        Pure planner so the policy is testable without a real disk. Given the
-        candidate directories (name, last-use timestamp, size in bytes), the
-        current free bytes, and the floor, returns the names to delete in
-        least-recently-used-first order, stopping as soon as the projected free
-        space clears the floor.
-
-        -KeepName is never returned: the leg about to run must keep its own
-        project, because deleting it is exactly the cold import this whole
-        mechanism exists to avoid.
-
-        Returns @() when already above the floor or when nothing is prunable.
-    #>
     param(
         [Parameter(Mandatory = $true)][AllowEmptyCollection()][object[]]$Candidates,
         [Parameter(Mandatory = $true)][double]$FreeBytes,
         [Parameter(Mandatory = $true)][double]$MinimumFreeBytes,
         [string]$KeepName
     )
-
-    if ($FreeBytes -ge $MinimumFreeBytes) {
-        return @()
+    if (-not [double]::IsFinite($FreeBytes) -or -not [double]::IsFinite($MinimumFreeBytes)) {
+        throw 'Prune free-space values must be finite.'
     }
-
-    $prunable = @(
-        $Candidates |
-            Where-Object { $null -ne $_ } |
-            Where-Object { $_.Name -ne $KeepName } |
-            Sort-Object -Property @{ Expression = { [datetime]$_.LastUsed } }
-    )
-
-    $planned = New-Object System.Collections.Generic.List[string]
-    $projectedFree = $FreeBytes
-    foreach ($candidate in $prunable) {
-        if ($projectedFree -ge $MinimumFreeBytes) {
-            break
-        }
-        $planned.Add([string]$candidate.Name)
-        $projectedFree += [double]$candidate.SizeBytes
+    if ($FreeBytes -ge $MinimumFreeBytes) { return @() }
+    $ordered = @($Candidates | Where-Object { $null -ne $_ -and $_.Name -ne $KeepName } |
+        Sort-Object -Property @{ Expression = { [datetime]$_.LastUsed } })
+    $rows = New-Object System.Collections.Generic.List[object]
+    foreach ($candidate in $ordered) {
+        $rows.Add(@{ name = [string]$candidate.Name; size = $candidate.SizeBytes })
     }
-
-    return $planned.ToArray()
+    $value = Invoke-UnityWorkspacePolicy @{
+        action = 'prune-plan'; candidates = $rows.ToArray()
+        free = $FreeBytes.ToString('R', [Globalization.CultureInfo]::InvariantCulture)
+        minimum = $MinimumFreeBytes.ToString('R', [Globalization.CultureInfo]::InvariantCulture)
+    }
+    return @($value.EnumerateArray() | ForEach-Object { $_.GetString() })
 }
 
 function Invoke-PersistentProjectPrune {
@@ -298,11 +180,16 @@ function Invoke-PersistentProjectPrune {
             }
     )
 
-    $plan = Get-PersistentProjectPruneOrder `
-        -Candidates $candidates `
-        -FreeBytes $freeBytes `
-        -MinimumFreeBytes $minimumFreeBytes `
-        -KeepName $KeepName
+    try {
+        $plan = Get-PersistentProjectPruneOrder `
+            -Candidates $candidates `
+            -FreeBytes $freeBytes `
+            -MinimumFreeBytes $minimumFreeBytes `
+            -KeepName $KeepName
+    } catch {
+        Write-Host "::notice::Persistent Unity project prune skipped; planning failed: $($_.Exception.Message)"
+        return @()
+    }
 
     $deleted = New-Object System.Collections.Generic.List[string]
     foreach ($name in $plan) {

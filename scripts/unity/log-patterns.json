@@ -1,0 +1,76 @@
+{
+  "Catastrophic": [
+    {
+      "UseSimple": true,
+      "Label": "PrecompiledAssemblyException",
+      "Pattern": "PrecompiledAssemblyException"
+    },
+    {
+      "UseSimple": true,
+      "Label": "CompilationFailedException",
+      "Pattern": "CompilationFailedException"
+    },
+    {
+      "UseSimple": true,
+      "Label": "Multiple precompiled assemblies with the same name",
+      "Pattern": "Multiple precompiled assemblies with the same name"
+    },
+    {
+      "UseSimple": false,
+      "Label": "error CS\\d+",
+      "Pattern": "error CS\\d+"
+    },
+    {
+      "UseSimple": false,
+      "Label": "warning CS8032",
+      "Pattern": "warning CS8032"
+    },
+    {
+      "UseSimple": false,
+      "Label": "Package [id] cannot be found (bad/missing UPM manifest id)",
+      "Pattern": "Package \\[[^\\]]+\\] cannot be found"
+    },
+    {
+      "UseSimple": true,
+      "Label": "WaitForEndOfFrame yielded under -batchmode (UnityTest hangs headless; writes total=0 results.xml)",
+      "Pattern": "WaitForEndOfFrame, which is not evoked in batchmode"
+    },
+    {
+      "UseSimple": true,
+      "Label": "Fatal error in the Mono runtime (native abort mid-run; usually leaves a misleading total=0 results.xml)",
+      "Pattern": "fatal error in the mono runtime"
+    },
+    {
+      "UseSimple": true,
+      "Label": "Mono crash executing native code (native or managed boundary abort)",
+      "Pattern": "Got a UNKNOWN while executing native code"
+    },
+    {
+      "UseSimple": false,
+      "Label": "IL2CPP/AOT missing code (no ahead-of-time code for a closed generic; names the exact unrootable type, e.g. StructValueChecker`1)",
+      "Pattern": "no ahead of time \\(AOT\\) code was generated"
+    },
+    {
+      "UseSimple": true,
+      "Label": "ExecutionEngineException (IL2CPP/AOT generic-instantiation failure on a standalone player)",
+      "Pattern": "System.ExecutionEngineException"
+    }
+  ],
+  "Environment": [
+    {
+      "UseSimple": true,
+      "Label": "Licensing client signature validation failed (issue #657; final cleanup is evaluated separately)",
+      "Pattern": "while verifying Licensing Client signature"
+    },
+    {
+      "UseSimple": true,
+      "Label": "Licensing client ignored after failing validation (issue #657)",
+      "Pattern": "LicensingClient has failed validation"
+    },
+    {
+      "UseSimple": true,
+      "Label": "Licensing IPC channel absent at connection attempt (issue #657)",
+      "Pattern": "failed because channel doesn't exist"
+    }
+  ]
+}

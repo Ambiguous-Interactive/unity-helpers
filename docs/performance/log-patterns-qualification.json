@@ -1,0 +1,1668 @@
+{
+  "scope": "Shared Unity log catalogue and native-report scanner; issue #859 remains unfinished.",
+  "captured_utc": "2026-11-16T17:13:50.748203+00:00",
+  "original_source_sha256": "ceb8153621983700a2fbe24b6cef2cef3bdca566577aaa572851c023a0d54771",
+  "registered_controls": 37,
+  "linux_result": "36 passed, one Windows-specific sharing control skipped.",
+  "original_environment_controls": 45,
+  "original_catalogue": {
+    "catastrophic_patterns": 11,
+    "environment_patterns": 3,
+    "native_consumers": 3
+  },
+  "captured_summary_cases": 19,
+  "evidence": [
+    "Original native pattern-sync and all 45 environment-warning controls pass before migration and through the current registered typed suite.",
+    "Every host executes the byte-verified original implementation and current adapter for all catalogue entries and 19 log cases.",
+    "BOM encodings, CR/LF variants, non-ASCII ordinal exclusions, missing/directory inputs, capped locations, partial reads and unreadable files retain original observations.",
+    "Two incomplete protocol responses incorrectly reported observed before validation; two failures and 28 initial passes are retained. The corrected adapter validates state, counters, locations and truncation.",
+    "Native caller exit status is preserved on success and failure. Catalogue data loads without Python and each returned catalogue remains independently mutable.",
+    "The first relative-option fixture changed PowerShell location without changing process CWD. Its failure is retained; the corrected fixture launches with the same owned working directory.",
+    "Native read handles are released after successful and failed child completion. The owned Windows active-writer comparison remains pending Windows CI.",
+    "The first ownership check found the new typed test unreachable. The lint registry now invokes its actual npm route, whose controls execute the retained native consumers.",
+    "Combined-stack Windows qualification now explicitly runs the new workspace and log suites before the metadata suite. Verbose per-test progress preserves cancellation context without changing the existing ten-minute bound or metadata selection."
+  ],
+  "native_exceptions": [
+    "Host catalogue loading remains native to support diagnostics when Python bootstrap is unavailable. Matching continues through each existing native regex consumer.",
+    "A native OpenRead handle retains FileShare.Read while the typed scanner reads. Nested finally releases the handle and restores caller exit status. This is a host filesystem boundary, not a replacement mutex or licensing lifecycle."
+  ],
+  "primary_sdk_reference": "https://learn.microsoft.com/en-us/dotnet/api/system.io.file.openread?view=net-10.0",
+  "retained_limits": [
+    "Windows active-writer qualification is recorded separately below; the POSIX permission fixture skips on Windows.",
+    "Diagnostic observations do not establish test success, a native exit fix, license return or final cleanup.",
+    "The existing Windows runner lock and parent PR cancellation remain separate blockers. No handle killing, private activation-log access, native Unity execution or Unity MCP call occurred.",
+    "This family does not complete the remaining #859 scripting scope."
+  ],
+  "measurement": {
+    "host": "Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.36",
+    "filesystem": "Owned source worktree on tmpfs; measured log fixtures on the shared Windows-backed 9p mount.",
+    "method": "Two warmup pairs then seven alternating original/typed pairs in an existing PowerShell parent. Dot-source outside the timed call; exact expected counts, states, catalogue sizes and bounded locations checked.",
+    "medians_ms": {
+      "catalogue": {
+        "original": 0.107,
+        "typed": 0.5947
+      },
+      "tiny": {
+        "original": 4.0906,
+        "typed": 49.9001
+      },
+      "large": {
+        "original": 88.4378,
+        "typed": 101.039
+      },
+      "scale32": {
+        "original": 688.7117,
+        "typed": 460.6998
+      }
+    },
+    "pairs": [
+      {
+        "pair": -2,
+        "milliseconds": 3.687,
+        "scenario": "catalogue",
+        "variant": "original"
+      },
+      {
+        "pair": -2,
+        "milliseconds": 37.7762,
+        "scenario": "tiny",
+        "variant": "original"
+      },
+      {
+        "pair": -2,
+        "milliseconds": 109.9719,
+        "scenario": "large",
+        "variant": "original"
+      },
+      {
+        "pair": -2,
+        "milliseconds": 733.9899,
+        "scenario": "scale32",
+        "variant": "original"
+      },
+      {
+        "pair": -2,
+        "milliseconds": 27.9727,
+        "scenario": "catalogue",
+        "variant": "typed"
+      },
+      {
+        "pair": -2,
+        "milliseconds": 74.1442,
+        "scenario": "tiny",
+        "variant": "typed"
+      },
+      {
+        "pair": -2,
+        "milliseconds": 105.0468,
+        "scenario": "large",
+        "variant": "typed"
+      },
+      {
+        "pair": -2,
+        "milliseconds": 494.6219,
+        "scenario": "scale32",
+        "variant": "typed"
+      },
+      {
+        "pair": -1,
+        "milliseconds": 1.1844,
+        "scenario": "catalogue",
+        "variant": "typed"
+      },
+      {
+        "pair": -1,
+        "milliseconds": 51.8503,
+        "scenario": "tiny",
+        "variant": "typed"
+      },
+      {
+        "pair": -1,
+        "milliseconds": 111.4938,
+        "scenario": "large",
+        "variant": "typed"
+      },
+      {
+        "pair": -1,
+        "milliseconds": 542.7503,
+        "scenario": "scale32",
+        "variant": "typed"
+      },
+      {
+        "pair": -1,
+        "milliseconds": 0.1966,
+        "scenario": "catalogue",
+        "variant": "original"
+      },
+      {
+        "pair": -1,
+        "milliseconds": 5.0265,
+        "scenario": "tiny",
+        "variant": "original"
+      },
+      {
+        "pair": -1,
+        "milliseconds": 97.8593,
+        "scenario": "large",
+        "variant": "original"
+      },
+      {
+        "pair": -1,
+        "milliseconds": 746.0602,
+        "scenario": "scale32",
+        "variant": "original"
+      },
+      {
+        "pair": 0,
+        "milliseconds": 0.1784,
+        "scenario": "catalogue",
+        "variant": "original"
+      },
+      {
+        "pair": 0,
+        "milliseconds": 4.4147,
+        "scenario": "tiny",
+        "variant": "original"
+      },
+      {
+        "pair": 0,
+        "milliseconds": 92.9582,
+        "scenario": "large",
+        "variant": "original"
+      },
+      {
+        "pair": 0,
+        "milliseconds": 746.1222,
+        "scenario": "scale32",
+        "variant": "original"
+      },
+      {
+        "pair": 0,
+        "milliseconds": 1.0131,
+        "scenario": "catalogue",
+        "variant": "typed"
+      },
+      {
+        "pair": 0,
+        "milliseconds": 53.3628,
+        "scenario": "tiny",
+        "variant": "typed"
+      },
+      {
+        "pair": 0,
+        "milliseconds": 96.0645,
+        "scenario": "large",
+        "variant": "typed"
+      },
+      {
+        "pair": 0,
+        "milliseconds": 469.5641,
+        "scenario": "scale32",
+        "variant": "typed"
+      },
+      {
+        "pair": 1,
+        "milliseconds": 0.5583,
+        "scenario": "catalogue",
+        "variant": "typed"
+      },
+      {
+        "pair": 1,
+        "milliseconds": 49.5378,
+        "scenario": "tiny",
+        "variant": "typed"
+      },
+      {
+        "pair": 1,
+        "milliseconds": 109.5834,
+        "scenario": "large",
+        "variant": "typed"
+      },
+      {
+        "pair": 1,
+        "milliseconds": 481.4219,
+        "scenario": "scale32",
+        "variant": "typed"
+      },
+      {
+        "pair": 1,
+        "milliseconds": 0.107,
+        "scenario": "catalogue",
+        "variant": "original"
+      },
+      {
+        "pair": 1,
+        "milliseconds": 4.1305,
+        "scenario": "tiny",
+        "variant": "original"
+      },
+      {
+        "pair": 1,
+        "milliseconds": 88.4378,
+        "scenario": "large",
+        "variant": "original"
+      },
+      {
+        "pair": 1,
+        "milliseconds": 761.7015,
+        "scenario": "scale32",
+        "variant": "original"
+      },
+      {
+        "pair": 2,
+        "milliseconds": 0.1291,
+        "scenario": "catalogue",
+        "variant": "original"
+      },
+      {
+        "pair": 2,
+        "milliseconds": 4.0906,
+        "scenario": "tiny",
+        "variant": "original"
+      },
+      {
+        "pair": 2,
+        "milliseconds": 89.2966,
+        "scenario": "large",
+        "variant": "original"
+      },
+      {
+        "pair": 2,
+        "milliseconds": 688.7117,
+        "scenario": "scale32",
+        "variant": "original"
+      },
+      {
+        "pair": 2,
+        "milliseconds": 0.6066,
+        "scenario": "catalogue",
+        "variant": "typed"
+      },
+      {
+        "pair": 2,
+        "milliseconds": 50.0322,
+        "scenario": "tiny",
+        "variant": "typed"
+      },
+      {
+        "pair": 2,
+        "milliseconds": 100.4498,
+        "scenario": "large",
+        "variant": "typed"
+      },
+      {
+        "pair": 2,
+        "milliseconds": 441.0325,
+        "scenario": "scale32",
+        "variant": "typed"
+      },
+      {
+        "pair": 3,
+        "milliseconds": 0.4295,
+        "scenario": "catalogue",
+        "variant": "typed"
+      },
+      {
+        "pair": 3,
+        "milliseconds": 49.9001,
+        "scenario": "tiny",
+        "variant": "typed"
+      },
+      {
+        "pair": 3,
+        "milliseconds": 98.0782,
+        "scenario": "large",
+        "variant": "typed"
+      },
+      {
+        "pair": 3,
+        "milliseconds": 450.0408,
+        "scenario": "scale32",
+        "variant": "typed"
+      },
+      {
+        "pair": 3,
+        "milliseconds": 0.1054,
+        "scenario": "catalogue",
+        "variant": "original"
+      },
+      {
+        "pair": 3,
+        "milliseconds": 5.7347,
+        "scenario": "tiny",
+        "variant": "original"
+      },
+      {
+        "pair": 3,
+        "milliseconds": 84.588,
+        "scenario": "large",
+        "variant": "original"
+      },
+      {
+        "pair": 3,
+        "milliseconds": 671.3309,
+        "scenario": "scale32",
+        "variant": "original"
+      },
+      {
+        "pair": 4,
+        "milliseconds": 0.1302,
+        "scenario": "catalogue",
+        "variant": "original"
+      },
+      {
+        "pair": 4,
+        "milliseconds": 3.7871,
+        "scenario": "tiny",
+        "variant": "original"
+      },
+      {
+        "pair": 4,
+        "milliseconds": 88.977,
+        "scenario": "large",
+        "variant": "original"
+      },
+      {
+        "pair": 4,
+        "milliseconds": 668.457,
+        "scenario": "scale32",
+        "variant": "original"
+      },
+      {
+        "pair": 4,
+        "milliseconds": 0.5947,
+        "scenario": "catalogue",
+        "variant": "typed"
+      },
+      {
+        "pair": 4,
+        "milliseconds": 51.3679,
+        "scenario": "tiny",
+        "variant": "typed"
+      },
+      {
+        "pair": 4,
+        "milliseconds": 101.039,
+        "scenario": "large",
+        "variant": "typed"
+      },
+      {
+        "pair": 4,
+        "milliseconds": 458.7212,
+        "scenario": "scale32",
+        "variant": "typed"
+      },
+      {
+        "pair": 5,
+        "milliseconds": 0.4491,
+        "scenario": "catalogue",
+        "variant": "typed"
+      },
+      {
+        "pair": 5,
+        "milliseconds": 48.7396,
+        "scenario": "tiny",
+        "variant": "typed"
+      },
+      {
+        "pair": 5,
+        "milliseconds": 104.7864,
+        "scenario": "large",
+        "variant": "typed"
+      },
+      {
+        "pair": 5,
+        "milliseconds": 469.4987,
+        "scenario": "scale32",
+        "variant": "typed"
+      },
+      {
+        "pair": 5,
+        "milliseconds": 0.0891,
+        "scenario": "catalogue",
+        "variant": "original"
+      },
+      {
+        "pair": 5,
+        "milliseconds": 3.4487,
+        "scenario": "tiny",
+        "variant": "original"
+      },
+      {
+        "pair": 5,
+        "milliseconds": 84.8989,
+        "scenario": "large",
+        "variant": "original"
+      },
+      {
+        "pair": 5,
+        "milliseconds": 662.9834,
+        "scenario": "scale32",
+        "variant": "original"
+      },
+      {
+        "pair": 6,
+        "milliseconds": 0.1058,
+        "scenario": "catalogue",
+        "variant": "original"
+      },
+      {
+        "pair": 6,
+        "milliseconds": 3.9594,
+        "scenario": "tiny",
+        "variant": "original"
+      },
+      {
+        "pair": 6,
+        "milliseconds": 87.151,
+        "scenario": "large",
+        "variant": "original"
+      },
+      {
+        "pair": 6,
+        "milliseconds": 691.8629,
+        "scenario": "scale32",
+        "variant": "original"
+      },
+      {
+        "pair": 6,
+        "milliseconds": 0.7449,
+        "scenario": "catalogue",
+        "variant": "typed"
+      },
+      {
+        "pair": 6,
+        "milliseconds": 48.0645,
+        "scenario": "tiny",
+        "variant": "typed"
+      },
+      {
+        "pair": 6,
+        "milliseconds": 104.6169,
+        "scenario": "large",
+        "variant": "typed"
+      },
+      {
+        "pair": 6,
+        "milliseconds": 460.6998,
+        "scenario": "scale32",
+        "variant": "typed"
+      }
+    ],
+    "fixture_bytes": {
+      "tiny.log": 23,
+      "large.log": 4194304,
+      "scale32.log": 33554432
+    },
+    "fixture_sha256": {
+      "tiny.log": "19e95455eef3466ad66472b978fbf0d9b68e49741757c2b7c632dffd2836f362",
+      "large.log": "ba1231f9db5890e76519ce0d6ba7cd0844f7185f83542d7a0e7555ca18442922",
+      "scale32.log": "b413bd3c97f5c1eeecb2db3ea7e9ec6ab498b386695a341fab31bda6ac264f42"
+    },
+    "script": "param([string]$Original, [string]$Current, [string]$Root)\n$ErrorActionPreference='Stop'\n$records=[Collections.Generic.List[object]]::new()\nforeach ($pair in -2..6) {\n    $variants=@('original','typed')\n    if ($pair % 2 -ne 0) { [array]::Reverse($variants) }\n    foreach ($variant in $variants) {\n        if ($variant -eq 'original') { . $Original } else { . $Current }\n        foreach ($scenario in @('catalogue','tiny','large','scale32')) {\n            $clock=[Diagnostics.Stopwatch]::StartNew()\n            if ($scenario -eq 'catalogue') { $value=@{Catastrophic=@(Get-CatastrophicPatterns); Environment=@(Get-EnvironmentWarningPatterns)} }\n            else { $value=Get-NativeReportSummary -LogPath (Join-Path $Root ($scenario+'.log')) }\n            $clock.Stop()\n            if ($scenario -eq 'catalogue') {\n                if ($value.Catastrophic.Count -ne 11 -or $value.Environment.Count -ne 3 -or $value.Catastrophic[0].Label -ne 'PrecompiledAssemblyException') { throw 'Catalogue decision mismatch.' }\n            } else {\n                if ($value.State -ne 'observed') { throw 'Scanner failed.' }\n                if ($scenario -eq 'tiny' -and ($value.NativeReportHeaderCount -ne 1 -or $value.UnknownNativeConditionCount -ne 0 -or $value.LocationsTruncated)) { throw 'Tiny scan mismatch.' }\n                $expected = if ($scenario -eq 'scale32') { 256 } else { 32 }\n                if ($scenario -in @('large','scale32') -and ($value.NativeReportHeaderCount -ne $expected -or $value.UnknownNativeConditionCount -ne $expected -or -not $value.LocationsTruncated -or $value.NativeReportHeaderLines.Count -ne 8 -or $value.UnknownNativeConditionLines.Count -ne 8)) { throw 'Large scan mismatch.' }\n            }\n            $records.Add(@{pair=$pair; variant=$variant; scenario=$scenario; milliseconds=$clock.Elapsed.TotalMilliseconds})\n        }\n    }\n}\nConvertTo-Json -InputObject $records.ToArray() -Depth 5 -Compress\n",
+    "stderr_sha256": "faa78e375e9b072b2a46a31f1a1674ffd186e03c76e5c9a141a5b72720d91a15",
+    "earlier_captures": [
+      {
+        "file": "log-patterns-pairs.json",
+        "sha256": "6a2eb64042177e03e93622f0f580ade3c4cfbbcf305bb7719a2a158d3da3d57e",
+        "pairs": [
+          {
+            "variant": "original",
+            "pair": -2,
+            "milliseconds": 3.9924,
+            "scenario": "catalogue"
+          },
+          {
+            "variant": "original",
+            "pair": -2,
+            "milliseconds": 39.4955,
+            "scenario": "tiny"
+          },
+          {
+            "variant": "original",
+            "pair": -2,
+            "milliseconds": 107.6165,
+            "scenario": "large"
+          },
+          {
+            "variant": "typed",
+            "pair": -2,
+            "milliseconds": 24.3643,
+            "scenario": "catalogue"
+          },
+          {
+            "variant": "typed",
+            "pair": -2,
+            "milliseconds": 65.1894,
+            "scenario": "tiny"
+          },
+          {
+            "variant": "typed",
+            "pair": -2,
+            "milliseconds": 102.595,
+            "scenario": "large"
+          },
+          {
+            "variant": "typed",
+            "pair": -1,
+            "milliseconds": 0.6802,
+            "scenario": "catalogue"
+          },
+          {
+            "variant": "typed",
+            "pair": -1,
+            "milliseconds": 50.1471,
+            "scenario": "tiny"
+          },
+          {
+            "variant": "typed",
+            "pair": -1,
+            "milliseconds": 101.3746,
+            "scenario": "large"
+          },
+          {
+            "variant": "original",
+            "pair": -1,
+            "milliseconds": 0.1262,
+            "scenario": "catalogue"
+          },
+          {
+            "variant": "original",
+            "pair": -1,
+            "milliseconds": 5.023,
+            "scenario": "tiny"
+          },
+          {
+            "variant": "original",
+            "pair": -1,
+            "milliseconds": 102.4652,
+            "scenario": "large"
+          },
+          {
+            "variant": "original",
+            "pair": 0,
+            "milliseconds": 0.2363,
+            "scenario": "catalogue"
+          },
+          {
+            "variant": "original",
+            "pair": 0,
+            "milliseconds": 3.9136,
+            "scenario": "tiny"
+          },
+          {
+            "variant": "original",
+            "pair": 0,
+            "milliseconds": 94.0331,
+            "scenario": "large"
+          },
+          {
+            "variant": "typed",
+            "pair": 0,
+            "milliseconds": 1.2986,
+            "scenario": "catalogue"
+          },
+          {
+            "variant": "typed",
+            "pair": 0,
+            "milliseconds": 51.1242,
+            "scenario": "tiny"
+          },
+          {
+            "variant": "typed",
+            "pair": 0,
+            "milliseconds": 101.5206,
+            "scenario": "large"
+          },
+          {
+            "variant": "typed",
+            "pair": 1,
+            "milliseconds": 0.7304,
+            "scenario": "catalogue"
+          },
+          {
+            "variant": "typed",
+            "pair": 1,
+            "milliseconds": 50.0639,
+            "scenario": "tiny"
+          },
+          {
+            "variant": "typed",
+            "pair": 1,
+            "milliseconds": 103.87,
+            "scenario": "large"
+          },
+          {
+            "variant": "original",
+            "pair": 1,
+            "milliseconds": 0.1723,
+            "scenario": "catalogue"
+          },
+          {
+            "variant": "original",
+            "pair": 1,
+            "milliseconds": 3.8658,
+            "scenario": "tiny"
+          },
+          {
+            "variant": "original",
+            "pair": 1,
+            "milliseconds": 89.5142,
+            "scenario": "large"
+          },
+          {
+            "variant": "original",
+            "pair": 2,
+            "milliseconds": 0.17,
+            "scenario": "catalogue"
+          },
+          {
+            "variant": "original",
+            "pair": 2,
+            "milliseconds": 3.7371,
+            "scenario": "tiny"
+          },
+          {
+            "variant": "original",
+            "pair": 2,
+            "milliseconds": 96.0174,
+            "scenario": "large"
+          },
+          {
+            "variant": "typed",
+            "pair": 2,
+            "milliseconds": 1.222,
+            "scenario": "catalogue"
+          },
+          {
+            "variant": "typed",
+            "pair": 2,
+            "milliseconds": 50.4139,
+            "scenario": "tiny"
+          },
+          {
+            "variant": "typed",
+            "pair": 2,
+            "milliseconds": 103.8465,
+            "scenario": "large"
+          },
+          {
+            "variant": "typed",
+            "pair": 3,
+            "milliseconds": 1.3311,
+            "scenario": "catalogue"
+          },
+          {
+            "variant": "typed",
+            "pair": 3,
+            "milliseconds": 55.5651,
+            "scenario": "tiny"
+          },
+          {
+            "variant": "typed",
+            "pair": 3,
+            "milliseconds": 106.1905,
+            "scenario": "large"
+          },
+          {
+            "variant": "original",
+            "pair": 3,
+            "milliseconds": 0.1622,
+            "scenario": "catalogue"
+          },
+          {
+            "variant": "original",
+            "pair": 3,
+            "milliseconds": 4.328,
+            "scenario": "tiny"
+          },
+          {
+            "variant": "original",
+            "pair": 3,
+            "milliseconds": 85.6619,
+            "scenario": "large"
+          },
+          {
+            "variant": "original",
+            "pair": 4,
+            "milliseconds": 0.2456,
+            "scenario": "catalogue"
+          },
+          {
+            "variant": "original",
+            "pair": 4,
+            "milliseconds": 4.7183,
+            "scenario": "tiny"
+          },
+          {
+            "variant": "original",
+            "pair": 4,
+            "milliseconds": 85.427,
+            "scenario": "large"
+          },
+          {
+            "variant": "typed",
+            "pair": 4,
+            "milliseconds": 1.2202,
+            "scenario": "catalogue"
+          },
+          {
+            "variant": "typed",
+            "pair": 4,
+            "milliseconds": 51.9403,
+            "scenario": "tiny"
+          },
+          {
+            "variant": "typed",
+            "pair": 4,
+            "milliseconds": 101.6522,
+            "scenario": "large"
+          },
+          {
+            "variant": "typed",
+            "pair": 5,
+            "milliseconds": 1.4461,
+            "scenario": "catalogue"
+          },
+          {
+            "variant": "typed",
+            "pair": 5,
+            "milliseconds": 52.1798,
+            "scenario": "tiny"
+          },
+          {
+            "variant": "typed",
+            "pair": 5,
+            "milliseconds": 119.3116,
+            "scenario": "large"
+          },
+          {
+            "variant": "original",
+            "pair": 5,
+            "milliseconds": 0.214,
+            "scenario": "catalogue"
+          },
+          {
+            "variant": "original",
+            "pair": 5,
+            "milliseconds": 4.2825,
+            "scenario": "tiny"
+          },
+          {
+            "variant": "original",
+            "pair": 5,
+            "milliseconds": 96.2389,
+            "scenario": "large"
+          },
+          {
+            "variant": "original",
+            "pair": 6,
+            "milliseconds": 0.1947,
+            "scenario": "catalogue"
+          },
+          {
+            "variant": "original",
+            "pair": 6,
+            "milliseconds": 3.4502,
+            "scenario": "tiny"
+          },
+          {
+            "variant": "original",
+            "pair": 6,
+            "milliseconds": 85.0939,
+            "scenario": "large"
+          },
+          {
+            "variant": "typed",
+            "pair": 6,
+            "milliseconds": 1.1231,
+            "scenario": "catalogue"
+          },
+          {
+            "variant": "typed",
+            "pair": 6,
+            "milliseconds": 50.3986,
+            "scenario": "tiny"
+          },
+          {
+            "variant": "typed",
+            "pair": 6,
+            "milliseconds": 103.0097,
+            "scenario": "large"
+          }
+        ]
+      },
+      {
+        "file": "log-patterns-ascii-pairs.json",
+        "sha256": "e8eb666e0a4f13048db94c91acd4aef5f76be0f5e4c22072f0f4e881de28ab3f",
+        "pairs": [
+          {
+            "variant": "original",
+            "scenario": "catalogue",
+            "milliseconds": 3.5784,
+            "pair": -2
+          },
+          {
+            "variant": "original",
+            "scenario": "tiny",
+            "milliseconds": 36.6212,
+            "pair": -2
+          },
+          {
+            "variant": "original",
+            "scenario": "large",
+            "milliseconds": 105.8966,
+            "pair": -2
+          },
+          {
+            "variant": "typed",
+            "scenario": "catalogue",
+            "milliseconds": 22.7038,
+            "pair": -2
+          },
+          {
+            "variant": "typed",
+            "scenario": "tiny",
+            "milliseconds": 63.1645,
+            "pair": -2
+          },
+          {
+            "variant": "typed",
+            "scenario": "large",
+            "milliseconds": 99.6548,
+            "pair": -2
+          },
+          {
+            "variant": "typed",
+            "scenario": "catalogue",
+            "milliseconds": 0.6112,
+            "pair": -1
+          },
+          {
+            "variant": "typed",
+            "scenario": "tiny",
+            "milliseconds": 49.4417,
+            "pair": -1
+          },
+          {
+            "variant": "typed",
+            "scenario": "large",
+            "milliseconds": 97.3986,
+            "pair": -1
+          },
+          {
+            "variant": "original",
+            "scenario": "catalogue",
+            "milliseconds": 0.1416,
+            "pair": -1
+          },
+          {
+            "variant": "original",
+            "scenario": "tiny",
+            "milliseconds": 4.3078,
+            "pair": -1
+          },
+          {
+            "variant": "original",
+            "scenario": "large",
+            "milliseconds": 105.9752,
+            "pair": -1
+          },
+          {
+            "variant": "original",
+            "scenario": "catalogue",
+            "milliseconds": 0.2376,
+            "pair": 0
+          },
+          {
+            "variant": "original",
+            "scenario": "tiny",
+            "milliseconds": 3.8336,
+            "pair": 0
+          },
+          {
+            "variant": "original",
+            "scenario": "large",
+            "milliseconds": 98.2676,
+            "pair": 0
+          },
+          {
+            "variant": "typed",
+            "scenario": "catalogue",
+            "milliseconds": 1.2003,
+            "pair": 0
+          },
+          {
+            "variant": "typed",
+            "scenario": "tiny",
+            "milliseconds": 48.686,
+            "pair": 0
+          },
+          {
+            "variant": "typed",
+            "scenario": "large",
+            "milliseconds": 100.4316,
+            "pair": 0
+          },
+          {
+            "variant": "typed",
+            "scenario": "catalogue",
+            "milliseconds": 1.3121,
+            "pair": 1
+          },
+          {
+            "variant": "typed",
+            "scenario": "tiny",
+            "milliseconds": 54.042,
+            "pair": 1
+          },
+          {
+            "variant": "typed",
+            "scenario": "large",
+            "milliseconds": 100.1554,
+            "pair": 1
+          },
+          {
+            "variant": "original",
+            "scenario": "catalogue",
+            "milliseconds": 0.1648,
+            "pair": 1
+          },
+          {
+            "variant": "original",
+            "scenario": "tiny",
+            "milliseconds": 4.4063,
+            "pair": 1
+          },
+          {
+            "variant": "original",
+            "scenario": "large",
+            "milliseconds": 93.5045,
+            "pair": 1
+          },
+          {
+            "variant": "original",
+            "scenario": "catalogue",
+            "milliseconds": 0.201,
+            "pair": 2
+          },
+          {
+            "variant": "original",
+            "scenario": "tiny",
+            "milliseconds": 4.3897,
+            "pair": 2
+          },
+          {
+            "variant": "original",
+            "scenario": "large",
+            "milliseconds": 98.5942,
+            "pair": 2
+          },
+          {
+            "variant": "typed",
+            "scenario": "catalogue",
+            "milliseconds": 1.2338,
+            "pair": 2
+          },
+          {
+            "variant": "typed",
+            "scenario": "tiny",
+            "milliseconds": 48.3587,
+            "pair": 2
+          },
+          {
+            "variant": "typed",
+            "scenario": "large",
+            "milliseconds": 101.4192,
+            "pair": 2
+          },
+          {
+            "variant": "typed",
+            "scenario": "catalogue",
+            "milliseconds": 1.0158,
+            "pair": 3
+          },
+          {
+            "variant": "typed",
+            "scenario": "tiny",
+            "milliseconds": 49.8146,
+            "pair": 3
+          },
+          {
+            "variant": "typed",
+            "scenario": "large",
+            "milliseconds": 120.4539,
+            "pair": 3
+          },
+          {
+            "variant": "original",
+            "scenario": "catalogue",
+            "milliseconds": 0.3023,
+            "pair": 3
+          },
+          {
+            "variant": "original",
+            "scenario": "tiny",
+            "milliseconds": 5.2512,
+            "pair": 3
+          },
+          {
+            "variant": "original",
+            "scenario": "large",
+            "milliseconds": 92.1829,
+            "pair": 3
+          },
+          {
+            "variant": "original",
+            "scenario": "catalogue",
+            "milliseconds": 0.2202,
+            "pair": 4
+          },
+          {
+            "variant": "original",
+            "scenario": "tiny",
+            "milliseconds": 3.7553,
+            "pair": 4
+          },
+          {
+            "variant": "original",
+            "scenario": "large",
+            "milliseconds": 86.9979,
+            "pair": 4
+          },
+          {
+            "variant": "typed",
+            "scenario": "catalogue",
+            "milliseconds": 1.1692,
+            "pair": 4
+          },
+          {
+            "variant": "typed",
+            "scenario": "tiny",
+            "milliseconds": 47.801,
+            "pair": 4
+          },
+          {
+            "variant": "typed",
+            "scenario": "large",
+            "milliseconds": 97.5151,
+            "pair": 4
+          },
+          {
+            "variant": "typed",
+            "scenario": "catalogue",
+            "milliseconds": 1.0013,
+            "pair": 5
+          },
+          {
+            "variant": "typed",
+            "scenario": "tiny",
+            "milliseconds": 49.721,
+            "pair": 5
+          },
+          {
+            "variant": "typed",
+            "scenario": "large",
+            "milliseconds": 97.4762,
+            "pair": 5
+          },
+          {
+            "variant": "original",
+            "scenario": "catalogue",
+            "milliseconds": 0.1166,
+            "pair": 5
+          },
+          {
+            "variant": "original",
+            "scenario": "tiny",
+            "milliseconds": 3.5767,
+            "pair": 5
+          },
+          {
+            "variant": "original",
+            "scenario": "large",
+            "milliseconds": 87.0066,
+            "pair": 5
+          },
+          {
+            "variant": "original",
+            "scenario": "catalogue",
+            "milliseconds": 0.1496,
+            "pair": 6
+          },
+          {
+            "variant": "original",
+            "scenario": "tiny",
+            "milliseconds": 3.8438,
+            "pair": 6
+          },
+          {
+            "variant": "original",
+            "scenario": "large",
+            "milliseconds": 98.6163,
+            "pair": 6
+          },
+          {
+            "variant": "typed",
+            "scenario": "catalogue",
+            "milliseconds": 0.9822,
+            "pair": 6
+          },
+          {
+            "variant": "typed",
+            "scenario": "tiny",
+            "milliseconds": 57.3306,
+            "pair": 6
+          },
+          {
+            "variant": "typed",
+            "scenario": "large",
+            "milliseconds": 113.3264,
+            "pair": 6
+          }
+        ]
+      },
+      {
+        "file": "log-patterns-scale-pairs.json",
+        "sha256": "6841b28a5734784ff2d171ae82b95b8353412a7b3c22c90c80697ebfaba8026a",
+        "pairs": [
+          {
+            "scenario": "catalogue",
+            "pair": -2,
+            "milliseconds": 3.1974,
+            "variant": "original"
+          },
+          {
+            "scenario": "tiny",
+            "pair": -2,
+            "milliseconds": 39.3563,
+            "variant": "original"
+          },
+          {
+            "scenario": "large",
+            "pair": -2,
+            "milliseconds": 106.66,
+            "variant": "original"
+          },
+          {
+            "scenario": "scale32",
+            "pair": -2,
+            "milliseconds": 723.6072,
+            "variant": "original"
+          },
+          {
+            "scenario": "catalogue",
+            "pair": -2,
+            "milliseconds": 26.182,
+            "variant": "typed"
+          },
+          {
+            "scenario": "tiny",
+            "pair": -2,
+            "milliseconds": 68.6453,
+            "variant": "typed"
+          },
+          {
+            "scenario": "large",
+            "pair": -2,
+            "milliseconds": 100.1463,
+            "variant": "typed"
+          },
+          {
+            "scenario": "scale32",
+            "pair": -2,
+            "milliseconds": 461.1024,
+            "variant": "typed"
+          },
+          {
+            "scenario": "catalogue",
+            "pair": -1,
+            "milliseconds": 1.0518,
+            "variant": "typed"
+          },
+          {
+            "scenario": "tiny",
+            "pair": -1,
+            "milliseconds": 50.2361,
+            "variant": "typed"
+          },
+          {
+            "scenario": "large",
+            "pair": -1,
+            "milliseconds": 98.0005,
+            "variant": "typed"
+          },
+          {
+            "scenario": "scale32",
+            "pair": -1,
+            "milliseconds": 450.2183,
+            "variant": "typed"
+          },
+          {
+            "scenario": "catalogue",
+            "pair": -1,
+            "milliseconds": 0.2255,
+            "variant": "original"
+          },
+          {
+            "scenario": "tiny",
+            "pair": -1,
+            "milliseconds": 6.4579,
+            "variant": "original"
+          },
+          {
+            "scenario": "large",
+            "pair": -1,
+            "milliseconds": 89.5595,
+            "variant": "original"
+          },
+          {
+            "scenario": "scale32",
+            "pair": -1,
+            "milliseconds": 681.9871,
+            "variant": "original"
+          },
+          {
+            "scenario": "catalogue",
+            "pair": 0,
+            "milliseconds": 0.203,
+            "variant": "original"
+          },
+          {
+            "scenario": "tiny",
+            "pair": 0,
+            "milliseconds": 3.6794,
+            "variant": "original"
+          },
+          {
+            "scenario": "large",
+            "pair": 0,
+            "milliseconds": 84.3961,
+            "variant": "original"
+          },
+          {
+            "scenario": "scale32",
+            "pair": 0,
+            "milliseconds": 673.6708,
+            "variant": "original"
+          },
+          {
+            "scenario": "catalogue",
+            "pair": 0,
+            "milliseconds": 1.1041,
+            "variant": "typed"
+          },
+          {
+            "scenario": "tiny",
+            "pair": 0,
+            "milliseconds": 47.1624,
+            "variant": "typed"
+          },
+          {
+            "scenario": "large",
+            "pair": 0,
+            "milliseconds": 102.1071,
+            "variant": "typed"
+          },
+          {
+            "scenario": "scale32",
+            "pair": 0,
+            "milliseconds": 439.3073,
+            "variant": "typed"
+          },
+          {
+            "scenario": "catalogue",
+            "pair": 1,
+            "milliseconds": 0.5146,
+            "variant": "typed"
+          },
+          {
+            "scenario": "tiny",
+            "pair": 1,
+            "milliseconds": 45.8566,
+            "variant": "typed"
+          },
+          {
+            "scenario": "large",
+            "pair": 1,
+            "milliseconds": 100.4603,
+            "variant": "typed"
+          },
+          {
+            "scenario": "scale32",
+            "pair": 1,
+            "milliseconds": 464.5281,
+            "variant": "typed"
+          },
+          {
+            "scenario": "catalogue",
+            "pair": 1,
+            "milliseconds": 0.1223,
+            "variant": "original"
+          },
+          {
+            "scenario": "tiny",
+            "pair": 1,
+            "milliseconds": 4.349,
+            "variant": "original"
+          },
+          {
+            "scenario": "large",
+            "pair": 1,
+            "milliseconds": 88.7231,
+            "variant": "original"
+          },
+          {
+            "scenario": "scale32",
+            "pair": 1,
+            "milliseconds": 696.1499,
+            "variant": "original"
+          },
+          {
+            "scenario": "catalogue",
+            "pair": 2,
+            "milliseconds": 0.1278,
+            "variant": "original"
+          },
+          {
+            "scenario": "tiny",
+            "pair": 2,
+            "milliseconds": 3.9847,
+            "variant": "original"
+          },
+          {
+            "scenario": "large",
+            "pair": 2,
+            "milliseconds": 85.9227,
+            "variant": "original"
+          },
+          {
+            "scenario": "scale32",
+            "pair": 2,
+            "milliseconds": 658.5824,
+            "variant": "original"
+          },
+          {
+            "scenario": "catalogue",
+            "pair": 2,
+            "milliseconds": 0.5979,
+            "variant": "typed"
+          },
+          {
+            "scenario": "tiny",
+            "pair": 2,
+            "milliseconds": 48.6553,
+            "variant": "typed"
+          },
+          {
+            "scenario": "large",
+            "pair": 2,
+            "milliseconds": 102.3805,
+            "variant": "typed"
+          },
+          {
+            "scenario": "scale32",
+            "pair": 2,
+            "milliseconds": 446.3719,
+            "variant": "typed"
+          },
+          {
+            "scenario": "catalogue",
+            "pair": 3,
+            "milliseconds": 0.4726,
+            "variant": "typed"
+          },
+          {
+            "scenario": "tiny",
+            "pair": 3,
+            "milliseconds": 49.5417,
+            "variant": "typed"
+          },
+          {
+            "scenario": "large",
+            "pair": 3,
+            "milliseconds": 99.1197,
+            "variant": "typed"
+          },
+          {
+            "scenario": "scale32",
+            "pair": 3,
+            "milliseconds": 448.242,
+            "variant": "typed"
+          },
+          {
+            "scenario": "catalogue",
+            "pair": 3,
+            "milliseconds": 0.1026,
+            "variant": "original"
+          },
+          {
+            "scenario": "tiny",
+            "pair": 3,
+            "milliseconds": 3.6326,
+            "variant": "original"
+          },
+          {
+            "scenario": "large",
+            "pair": 3,
+            "milliseconds": 86.2473,
+            "variant": "original"
+          },
+          {
+            "scenario": "scale32",
+            "pair": 3,
+            "milliseconds": 678.8115,
+            "variant": "original"
+          },
+          {
+            "scenario": "catalogue",
+            "pair": 4,
+            "milliseconds": 0.1352,
+            "variant": "original"
+          },
+          {
+            "scenario": "tiny",
+            "pair": 4,
+            "milliseconds": 5.485,
+            "variant": "original"
+          },
+          {
+            "scenario": "large",
+            "pair": 4,
+            "milliseconds": 99.6675,
+            "variant": "original"
+          },
+          {
+            "scenario": "scale32",
+            "pair": 4,
+            "milliseconds": 657.9388,
+            "variant": "original"
+          },
+          {
+            "scenario": "catalogue",
+            "pair": 4,
+            "milliseconds": 0.5541,
+            "variant": "typed"
+          },
+          {
+            "scenario": "tiny",
+            "pair": 4,
+            "milliseconds": 49.9968,
+            "variant": "typed"
+          },
+          {
+            "scenario": "large",
+            "pair": 4,
+            "milliseconds": 117.5441,
+            "variant": "typed"
+          },
+          {
+            "scenario": "scale32",
+            "pair": 4,
+            "milliseconds": 474.8182,
+            "variant": "typed"
+          },
+          {
+            "scenario": "catalogue",
+            "pair": 5,
+            "milliseconds": 0.4023,
+            "variant": "typed"
+          },
+          {
+            "scenario": "tiny",
+            "pair": 5,
+            "milliseconds": 54.733,
+            "variant": "typed"
+          },
+          {
+            "scenario": "large",
+            "pair": 5,
+            "milliseconds": 105.1508,
+            "variant": "typed"
+          },
+          {
+            "scenario": "scale32",
+            "pair": 5,
+            "milliseconds": 460.4408,
+            "variant": "typed"
+          },
+          {
+            "scenario": "catalogue",
+            "pair": 5,
+            "milliseconds": 0.1047,
+            "variant": "original"
+          },
+          {
+            "scenario": "tiny",
+            "pair": 5,
+            "milliseconds": 4.1772,
+            "variant": "original"
+          },
+          {
+            "scenario": "large",
+            "pair": 5,
+            "milliseconds": 89.9327,
+            "variant": "original"
+          },
+          {
+            "scenario": "scale32",
+            "pair": 5,
+            "milliseconds": 689.7644,
+            "variant": "original"
+          },
+          {
+            "scenario": "catalogue",
+            "pair": 6,
+            "milliseconds": 0.1006,
+            "variant": "original"
+          },
+          {
+            "scenario": "tiny",
+            "pair": 6,
+            "milliseconds": 4.1379,
+            "variant": "original"
+          },
+          {
+            "scenario": "large",
+            "pair": 6,
+            "milliseconds": 88.3758,
+            "variant": "original"
+          },
+          {
+            "scenario": "scale32",
+            "pair": 6,
+            "milliseconds": 688.1328,
+            "variant": "original"
+          },
+          {
+            "scenario": "catalogue",
+            "pair": 6,
+            "milliseconds": 0.7528,
+            "variant": "typed"
+          },
+          {
+            "scenario": "tiny",
+            "pair": 6,
+            "milliseconds": 48.3208,
+            "variant": "typed"
+          },
+          {
+            "scenario": "large",
+            "pair": 6,
+            "milliseconds": 106.1754,
+            "variant": "typed"
+          },
+          {
+            "scenario": "scale32",
+            "pair": 6,
+            "milliseconds": 447.8035,
+            "variant": "typed"
+          }
+        ]
+      }
+    ],
+    "earlier_three_scenario_script": "param([string]$Original, [string]$Current, [string]$Root)\n$ErrorActionPreference='Stop'\n$records=[Collections.Generic.List[object]]::new()\nforeach ($pair in -2..6) {\n    $variants=@('original','typed')\n    if ($pair % 2 -ne 0) { [array]::Reverse($variants) }\n    foreach ($variant in $variants) {\n        if ($variant -eq 'original') { . $Original } else { . $Current }\n        foreach ($scenario in @('catalogue','tiny','large')) {\n            $clock=[Diagnostics.Stopwatch]::StartNew()\n            if ($scenario -eq 'catalogue') { $value=@{Catastrophic=@(Get-CatastrophicPatterns); Environment=@(Get-EnvironmentWarningPatterns)} }\n            else { $value=Get-NativeReportSummary -LogPath (Join-Path $Root ($scenario+'.log')) }\n            $clock.Stop()\n            if ($scenario -eq 'catalogue') {\n                if ($value.Catastrophic.Count -ne 11 -or $value.Environment.Count -ne 3 -or $value.Catastrophic[0].Label -ne 'PrecompiledAssemblyException') { throw 'Catalogue decision mismatch.' }\n            } else {\n                if ($value.State -ne 'observed') { throw 'Scanner failed.' }\n                if ($scenario -eq 'tiny' -and ($value.NativeReportHeaderCount -ne 1 -or $value.UnknownNativeConditionCount -ne 0 -or $value.LocationsTruncated)) { throw 'Tiny scan mismatch.' }\n                if ($scenario -eq 'large' -and ($value.NativeReportHeaderCount -ne 32 -or $value.UnknownNativeConditionCount -ne 32 -or -not $value.LocationsTruncated -or $value.NativeReportHeaderLines.Count -ne 8 -or $value.UnknownNativeConditionLines.Count -ne 8)) { throw 'Large scan mismatch.' }\n            }\n            $records.Add(@{pair=$pair; variant=$variant; scenario=$scenario; milliseconds=$clock.Elapsed.TotalMilliseconds})\n        }\n    }\n}\nConvertTo-Json -InputObject $records.ToArray() -Depth 5 -Compress\n",
+    "previous_native_adapter": "# Host consumers retain native regex matching, including bootstrap-failure diagnostics.\r\nfunction Get-CatastrophicPatterns {\r\n    [CmdletBinding()]\r\n    param()\r\n    $catalogue = Get-Content -LiteralPath (Join-Path $PSScriptRoot '../log-patterns.json') -Raw -ErrorAction Stop | ConvertFrom-Json -AsHashtable\r\n    if ($catalogue.Catastrophic -isnot [array] -or $catalogue.Catastrophic.Count -eq 0) { throw 'Missing catastrophic pattern catalogue.' }\r\n    return $catalogue.Catastrophic\r\n}\r\n\r\nfunction Get-EnvironmentWarningPatterns {\r\n    [CmdletBinding()]\r\n    param()\r\n    $catalogue = Get-Content -LiteralPath (Join-Path $PSScriptRoot '../log-patterns.json') -Raw -ErrorAction Stop | ConvertFrom-Json -AsHashtable\r\n    if ($catalogue.Environment -isnot [array] -or $catalogue.Environment.Count -eq 0) { throw 'Missing environment warning catalogue.' }\r\n    return $catalogue.Environment\r\n}\r\n\r\nfunction Get-NativeReportSummary {\r\n    param([string]$LogPath)\r\n    $summary = [ordered]@{\r\n        State = 'missing-log'; NativeReportHeaderCount = 0; UnknownNativeConditionCount = 0\r\n        NativeReportHeaderLines = @(); UnknownNativeConditionLines = @(); LocationsTruncated = $false\r\n    }\r\n    if ([string]::IsNullOrWhiteSpace($LogPath) -or -not (Test-Path -LiteralPath $LogPath -PathType Leaf)) { return $summary }\r\n    $priorExitVariable = Get-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue\r\n    $hadExitVariable = $null -ne $priorExitVariable\r\n    $priorExitCode = if ($hadExitVariable) { $priorExitVariable.Value } else { $null }\r\n    try {\r\n        $scriptsRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)\r\n        $output = @(& uv run --project (Join-Path $scriptsRoot 'python~') --locked python (Join-Path $scriptsRoot 'unity/native_report_summary.py') \"--log-path=$LogPath\")\r\n        if ($global:LASTEXITCODE -ne 0) { throw 'Native report scanner failed.' }\r\n        $value = ($output -join \"`n\") | ConvertFrom-Json -AsHashtable -ErrorAction Stop\r\n        if ($value -isnot [Collections.IDictionary] -or $value.Count -ne 6 -or\r\n            $value.State -notin @('missing-log', 'observed', 'unreadable-log') -or\r\n            $value.LocationsTruncated -isnot [bool]) { throw 'Invalid native report scanner response.' }\r\n        foreach ($group in @('NativeReportHeader', 'UnknownNativeCondition')) {\r\n            $count = $value[$group + 'Count']\r\n            $lines = $value[$group + 'Lines']\r\n            if (($count -isnot [int] -and $count -isnot [long]) -or $count -lt 0 -or\r\n                $lines -isnot [array] -or $lines.Count -ne [Math]::Min($count, 8)) {\r\n                throw 'Invalid native report scanner counters.'\r\n            }\r\n            foreach ($line in $lines) {\r\n                if (($line -isnot [int] -and $line -isnot [long]) -or $line -le 0) { throw 'Invalid native report scanner location.' }\r\n            }\r\n        }\r\n        if ($value.LocationsTruncated -ne ($value.NativeReportHeaderCount -gt 8 -or $value.UnknownNativeConditionCount -gt 8)) {\r\n            throw 'Invalid native report scanner truncation.'\r\n        }\r\n        return $value\r\n    }\r\n    catch {\r\n        $summary.State = 'unreadable-log'\r\n        Write-Warning \"Native report observations unavailable: $($_.Exception.Message)\"\r\n        return $summary\r\n    }\r\n    finally {\r\n        if ($hadExitVariable) { $global:LASTEXITCODE = $priorExitCode }\r\n        else { Remove-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue }\r\n    }\r\n}\r\n",
+    "notes": [
+      "Catalogue, tiny-log and 4 MiB startup regressions remain explicit. The 32 MiB scaling observation does not replace them.",
+      "ASCII lines use lower directly; non-ASCII lines use ASCII-only translation to preserve original ordinal exclusions. No cross-capture causal speedup is claimed.",
+      "Inherited VIRTUAL_ENV mismatch diagnostics are included in timed uv calls; uv selects the explicit owned project.",
+      "No statistical significance, Windows or complete Unity-job improvement is claimed."
+    ]
+  },
+  "source_sha256": {
+    "scripts/unity/native_report_summary.py": "112be1cc9dbe15065b6319baa5f832100e3462cf6f5dbf6b96b845daee14e367",
+    "scripts/unity/lib/catastrophic-patterns.ps1": "6ad47013623de5e773f79c98ec24b85af72160bbb1d413be3b84b4b4dd09cbca",
+    "scripts/unity/log-patterns.json": "d7d7c6b6b8cac4a12ac79da13de6e2138e3708e2b285648a066b0b2d1dd52f88",
+    "scripts/tests/test_log_patterns.py": "ea3e978f3e17081636cab47a9c250aa3741705851d2158a184bd97185995b588",
+    "scripts/tests/fixtures/log-patterns-v1.json": "b3289507517f8908f937e9c077745f3f3f7e5974f659dcd044d706e5cc32bd14",
+    "scripts/python~/pyproject.toml": "93a93f1faf4243715a8e3c10022b76dd65d1422bb1255343448852bfbadb3a28",
+    "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d",
+    "package.json": "0a02a1488907f5b9cef22f6bac4574a2e594ecfc9b011621d877729ce5239f4c",
+    "scripts/lint-checks.json": "96d0226865d7e906a66c2d85169c3df1ebd23ad91149a67d633637108dbac1d8",
+    "scripts/tests/test-run-contract-tests.js": "6505e5bbcb285d539d9a2226d89ae594fdbc271193b14814e6123dff556e0cec",
+    ".github/workflows/local-gates.yml": "1f8be32cb6eebc59894b755734ff1fa831f5b8bc18867fdb16d60a28cc9fc1df",
+    "scripts/tests/test_typecheck_controls.py": "be454a5826fbbf350084ad76764c46b184c862cab7ff1818d5859b526756d12e"
+  },
+  "windows_qualification": {
+    "head": "8609dd853522b78d9bd1c3da344a15f4c3df5a25",
+    "job": 133480135740,
+    "workspace_and_log_adapter_step": {
+      "passed": 135,
+      "skipped": 2,
+      "seconds": 18.91
+    },
+    "owned_active_writer_control": "Passed on Windows; recorded in the duration output at 0.32 seconds.",
+    "scanner_source_sha256": "112be1cc9dbe15065b6319baa5f832100e3462cf6f5dbf6b96b845daee14e367",
+    "native_adapter_sha256": "6ad47013623de5e773f79c98ec24b85af72160bbb1d413be3b84b4b4dd09cbca",
+    "scope": "This proves the unchanged scanner implementation and its Windows sharing boundary at the recorded head, not all later review corrections or a Windows performance improvement."
+  },
+  "windows_ci_partition": {
+    "reason": "Current-head Windows job 133507258107 reached its ten-minute limit after setup, strict checks, workspace/log controls and 2600 broad-suite passes. Its interruption does not establish executable lookup as the dominant cost.",
+    "previous_workflow_sha256": "f95b4749203ac8ee1054cfcf5474084fbfb54e7f3d6cbbffd740e8e9e883903d",
+    "selection": "All 50 existing test files remain selected exactly once across metadata and orchestration phases; original compiler exclusions remain unchanged.",
+    "bounds": "At most two isolated Windows phases run concurrently, each with the unchanged ten-minute job limit. The stable aggregate rejects every non-success phase result.",
+    "controls": "Missing phase red witness; full-selection, bounded-concurrency and actual aggregate commands tested, including failure, cancellation, skip and empty results.",
+    "qualification": {
+      "head": "26f0013dd06619ff2af7d87d9c74a241c6a2e8da",
+      "run_id": 43946365068,
+      "metadata_job_id": 133577047077,
+      "orchestration_job_id": 133577047341,
+      "aggregate_job_id": 133582072149,
+      "conclusion": "All three jobs succeeded.",
+      "metadata_job_seconds": 487,
+      "orchestration_job_seconds": 185,
+      "assembly_controls": "109 passed, two platform skips.",
+      "workspace_log_controls": "136 passed, two platform skips in 27.68 seconds.",
+      "metadata_controls": "3387 passed, 75 platform skips in 346.06 seconds.",
+      "orchestration_controls": "98 passed, 11 subtests passed in 128.49 seconds.",
+      "compiler_controls": "26 passed, two skips, 16 existing exclusions in 11.88 seconds.",
+      "limit": "Actual completion within each ten-minute phase bound; no paired Windows speedup or whole-Unity-job improvement claim."
+    }
+  },
+  "workspace_lock_followup": {
+    "issue": 1223,
+    "state_change": "Owner reported the DAD-MACHINE blocking directory was released after the failed 89ab8d70 native run. The holder and release mechanism were not captured.",
+    "scope": "Manual host recovery enables the next normal licensed qualification; it does not prove this migration fixed workspace cleanup. Original sharing failures remain retained."
+  }
+}

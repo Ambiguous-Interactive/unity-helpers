@@ -1,0 +1,389 @@
+{
+  "original_source_sha256": "ceb8153621983700a2fbe24b6cef2cef3bdca566577aaa572851c023a0d54771",
+  "original_source": "#!/usr/bin/env pwsh\r\n# Single source of truth for the Unity log pattern lists: the \"catastrophic pattern\" list\r\n# below, and the environment-warning list at the end of this file.\r\n#\r\n# These regexes/substrings, when present in a Unity editor or player log, indicate a\r\n# CATASTROPHIC failure (compile error, bad UPM manifest, headless coroutine stall, native\r\n# Mono abort) rather than an ordinary test failure -- the editor typically exits before\r\n# producing a usable NUnit results.xml, so they must be surfaced as the real cause.\r\n#\r\n# THREE call sites consume this list:\r\n#   - scripts/unity/run-ci-tests.ps1                       ($script:CatastrophicPatterns)\r\n#   - .github/actions/verify-unity-results/action.yml      ($patterns)\r\n#   - .github/actions/dump-unity-log-tail/action.yml       ($patterns)\r\n#\r\n# They previously held byte-identical inline copies that DRIFTED (the `Package [id] cannot\r\n# be found` entry once fell out of both action files) and tripped yamllint line-length (>200)\r\n# on the long Label strings. Dot-source this file and call Get-CatastrophicPatterns instead\r\n# of re-declaring the array. Enforced mechanically by\r\n# scripts/tests/test-catastrophic-pattern-sync.ps1 (which now asserts single-sourcing, not\r\n# textual equality).\r\n#\r\n# Each entry: @{ Label = <human-readable>; Pattern = <regex or substring>; UseSimple = <bool> }\r\n#   UseSimple = $true  -> Select-String -SimpleMatch (literal substring)\r\n#   UseSimple = $false -> Select-String regex\r\n\r\nfunction Get-CatastrophicPatterns {\r\n    [CmdletBinding()]\r\n    param()\r\n\r\n    return @(\r\n        @{ Label = 'PrecompiledAssemblyException'; Pattern = 'PrecompiledAssemblyException'; UseSimple = $true }\r\n        @{ Label = 'CompilationFailedException'; Pattern = 'CompilationFailedException'; UseSimple = $true }\r\n        @{ Label = 'Multiple precompiled assemblies with the same name'; Pattern = 'Multiple precompiled assemblies with the same name'; UseSimple = $true }\r\n        @{ Label = 'error CS\\d+'; Pattern = 'error CS\\d+'; UseSimple = $false }\r\n        @{ Label = 'warning CS8032'; Pattern = 'warning CS8032'; UseSimple = $false }\r\n        @{ Label = 'Package [id] cannot be found (bad/missing UPM manifest id)'; Pattern = 'Package \\[[^\\]]+\\] cannot be found'; UseSimple = $false }\r\n        @{ Label = 'WaitForEndOfFrame yielded under -batchmode (UnityTest hangs headless; writes total=0 results.xml)'; Pattern = 'WaitForEndOfFrame, which is not evoked in batchmode'; UseSimple = $true }\r\n        @{ Label = 'Fatal error in the Mono runtime (native abort mid-run; usually leaves a misleading total=0 results.xml)'; Pattern = 'fatal error in the mono runtime'; UseSimple = $true }\r\n        @{ Label = 'Mono crash executing native code (native or managed boundary abort)'; Pattern = 'Got a UNKNOWN while executing native code'; UseSimple = $true }\r\n        @{ Label = 'IL2CPP/AOT missing code (no ahead-of-time code for a closed generic; names the exact unrootable type, e.g. StructValueChecker`1)'; Pattern = 'no ahead of time \\(AOT\\) code was generated'; UseSimple = $false }\r\n        @{ Label = 'ExecutionEngineException (IL2CPP/AOT generic-instantiation failure on a standalone player)'; Pattern = 'System.ExecutionEngineException'; UseSimple = $true }\r\n    )\r\n}\r\n\r\nfunction Get-NativeReportSummary {\r\n    param([string]$LogPath)\r\n    $summary = [ordered]@{\r\n        State = 'missing-log'; NativeReportHeaderCount = 0; UnknownNativeConditionCount = 0\r\n        NativeReportHeaderLines = @(); UnknownNativeConditionLines = @(); LocationsTruncated = $false\r\n    }\r\n    if ([string]::IsNullOrWhiteSpace($LogPath) -or -not (Test-Path -LiteralPath $LogPath -PathType Leaf)) { return $summary }\r\n    try {\r\n        $lineNumber = 0\r\n        foreach ($line in [IO.File]::ReadLines($LogPath)) {\r\n            ++$lineNumber\r\n            if (0 -le $line.IndexOf('Native Crash Reporting', [StringComparison]::OrdinalIgnoreCase)) {\r\n                ++$summary.NativeReportHeaderCount\r\n                if ($summary.NativeReportHeaderLines.Count -lt 8) { $summary.NativeReportHeaderLines += $lineNumber }\r\n                else { $summary.LocationsTruncated = $true }\r\n            }\r\n            if (0 -le $line.IndexOf('Got a UNKNOWN while executing native code', [StringComparison]::OrdinalIgnoreCase)) {\r\n                ++$summary.UnknownNativeConditionCount\r\n                if ($summary.UnknownNativeConditionLines.Count -lt 8) { $summary.UnknownNativeConditionLines += $lineNumber }\r\n                else { $summary.LocationsTruncated = $true }\r\n            }\r\n        }\r\n        $summary.State = 'observed'\r\n    } catch { $summary.State = 'unreadable-log' }\r\n    return $summary\r\n}\r\n\r\n\r\n# ENVIRONMENT WARNING PATTERNS: a Unity leg can pass every test and still be sick.\r\n#\r\n# Measured on run 33365150391 (issue #657): the runner's copy of\r\n# Unity.Licensing.Client.exe failed its own signature check, Unity logged\r\n# \"LicensingClient has failed validation; ignoring\" and carried on, so the suite ran\r\n# and every test passed -- and the leg then failed forty minutes later at\r\n# return-unity-license with \"return-missing-positive-evidence\". Later runs observed\r\n# the same signature warning followed by confirmed cleanup. Report the observed\r\n# log message; the final cleanup receipt determines cleanup health.\r\n#\r\n# Keep these as WARNINGS. Preserve the observations in the job summary without\r\n# changing test acceptance or predicting the independent cleanup result.\r\nfunction Get-EnvironmentWarningPatterns {\r\n    [CmdletBinding()]\r\n    param()\r\n\r\n    return @(\r\n        @{ Label = 'Licensing client signature validation failed (issue #657; final cleanup is evaluated separately)'; Pattern = 'while verifying Licensing Client signature'; UseSimple = $true }\r\n        @{ Label = 'Licensing client ignored after failing validation (issue #657)'; Pattern = 'LicensingClient has failed validation'; UseSimple = $true }\r\n        @{ Label = 'Licensing IPC channel absent at connection attempt (issue #657)'; Pattern = 'failed because channel doesn''t exist'; UseSimple = $true }\r\n    )\r\n}\r\n",
+  "capture_driver": "param([string]$Helper, [string]$Root)\n$ErrorActionPreference = 'Stop'\n. $Helper\n$cases = [Console]::In.ReadToEnd() | ConvertFrom-Json -AsHashtable\n$observations = [Collections.Generic.List[object]]::new()\nforeach ($case in $cases) {\n    $path = if ($case.name -eq 'blank') { '  ' } else { Join-Path $Root ($case.name + '.log') }\n    if ($case.kind -eq 'file') { [IO.File]::WriteAllBytes($path, [Convert]::FromBase64String($case.bytes)) }\n    if ($case.kind -eq 'directory') { [void][IO.Directory]::CreateDirectory($path) }\n    $observations.Add(@{ name=$case.name; value=(Get-NativeReportSummary -LogPath $path) })\n}\n@{catastrophic=@(Get-CatastrophicPatterns); environment=@(Get-EnvironmentWarningPatterns); observations=$observations.ToArray()} | ConvertTo-Json -Depth 12 -Compress\n",
+  "cases": [
+    {
+      "name": "blank",
+      "kind": "missing",
+      "bytes": ""
+    },
+    {
+      "name": "missing",
+      "kind": "missing",
+      "bytes": ""
+    },
+    {
+      "name": "directory",
+      "kind": "directory",
+      "bytes": ""
+    },
+    {
+      "name": "empty",
+      "kind": "file",
+      "bytes": ""
+    },
+    {
+      "name": "clean",
+      "kind": "file",
+      "bytes": "aGVhbHRoeQo="
+    },
+    {
+      "name": "both",
+      "kind": "file",
+      "bytes": "TmF0aXZlIENyYXNoIFJlcG9ydGluZwpHb3QgYSBVTktOT1dOIHdoaWxlIGV4ZWN1dGluZyBuYXRpdmUgY29kZQo="
+    },
+    {
+      "name": "same-line",
+      "kind": "file",
+      "bytes": "TmF0aXZlIENyYXNoIFJlcG9ydGluZyAvIEdvdCBhIFVOS05PV04gd2hpbGUgZXhlY3V0aW5nIG5hdGl2ZSBjb2Rl"
+    },
+    {
+      "name": "mixed-case",
+      "kind": "file",
+      "bytes": "bkF0SXZFIGNSYVNoIHJFcE9yVGlOZw1Hb1QgYSBVbktuT3dOIHdIaUxlIEV4RWNVdEluRyBuQXRJdkUgY09kRQ=="
+    },
+    {
+      "name": "eight",
+      "kind": "file",
+      "bytes": "TmF0aXZlIENyYXNoIFJlcG9ydGluZwpHb3QgYSBVTktOT1dOIHdoaWxlIGV4ZWN1dGluZyBuYXRpdmUgY29kZQpOYXRpdmUgQ3Jhc2ggUmVwb3J0aW5nCkdvdCBhIFVOS05PV04gd2hpbGUgZXhlY3V0aW5nIG5hdGl2ZSBjb2RlCk5hdGl2ZSBDcmFzaCBSZXBvcnRpbmcKR290IGEgVU5LTk9XTiB3aGlsZSBleGVjdXRpbmcgbmF0aXZlIGNvZGUKTmF0aXZlIENyYXNoIFJlcG9ydGluZwpHb3QgYSBVTktOT1dOIHdoaWxlIGV4ZWN1dGluZyBuYXRpdmUgY29kZQpOYXRpdmUgQ3Jhc2ggUmVwb3J0aW5nCkdvdCBhIFVOS05PV04gd2hpbGUgZXhlY3V0aW5nIG5hdGl2ZSBjb2RlCk5hdGl2ZSBDcmFzaCBSZXBvcnRpbmcKR290IGEgVU5LTk9XTiB3aGlsZSBleGVjdXRpbmcgbmF0aXZlIGNvZGUKTmF0aXZlIENyYXNoIFJlcG9ydGluZwpHb3QgYSBVTktOT1dOIHdoaWxlIGV4ZWN1dGluZyBuYXRpdmUgY29kZQpOYXRpdmUgQ3Jhc2ggUmVwb3J0aW5nCkdvdCBhIFVOS05PV04gd2hpbGUgZXhlY3V0aW5nIG5hdGl2ZSBjb2RlCg=="
+    },
+    {
+      "name": "nine",
+      "kind": "file",
+      "bytes": "TmF0aXZlIENyYXNoIFJlcG9ydGluZwpHb3QgYSBVTktOT1dOIHdoaWxlIGV4ZWN1dGluZyBuYXRpdmUgY29kZQpOYXRpdmUgQ3Jhc2ggUmVwb3J0aW5nCkdvdCBhIFVOS05PV04gd2hpbGUgZXhlY3V0aW5nIG5hdGl2ZSBjb2RlCk5hdGl2ZSBDcmFzaCBSZXBvcnRpbmcKR290IGEgVU5LTk9XTiB3aGlsZSBleGVjdXRpbmcgbmF0aXZlIGNvZGUKTmF0aXZlIENyYXNoIFJlcG9ydGluZwpHb3QgYSBVTktOT1dOIHdoaWxlIGV4ZWN1dGluZyBuYXRpdmUgY29kZQpOYXRpdmUgQ3Jhc2ggUmVwb3J0aW5nCkdvdCBhIFVOS05PV04gd2hpbGUgZXhlY3V0aW5nIG5hdGl2ZSBjb2RlCk5hdGl2ZSBDcmFzaCBSZXBvcnRpbmcKR290IGEgVU5LTk9XTiB3aGlsZSBleGVjdXRpbmcgbmF0aXZlIGNvZGUKTmF0aXZlIENyYXNoIFJlcG9ydGluZwpHb3QgYSBVTktOT1dOIHdoaWxlIGV4ZWN1dGluZyBuYXRpdmUgY29kZQpOYXRpdmUgQ3Jhc2ggUmVwb3J0aW5nCkdvdCBhIFVOS05PV04gd2hpbGUgZXhlY3V0aW5nIG5hdGl2ZSBjb2RlCk5hdGl2ZSBDcmFzaCBSZXBvcnRpbmcKR290IGEgVU5LTk9XTiB3aGlsZSBleGVjdXRpbmcgbmF0aXZlIGNvZGUK"
+    },
+    {
+      "name": "unicode-newline",
+      "kind": "file",
+      "bytes": "eMKFTmF0aXZlIENyYXNoIFJlcG9ydGluZ+KAqEdvdCBhIFVOS05PV04gd2hpbGUgZXhlY3V0aW5nIG5hdGl2ZSBjb2Rl"
+    },
+    {
+      "name": "long-s",
+      "kind": "file",
+      "bytes": "TmF0aXZlIENyYcW/aCBSZXBvcnRpbmcKR290IGEgVU5LTk9XTiB3aGlsZSBleGVjdXRpbmcgbmF0aXZlIGNvZGU="
+    },
+    {
+      "name": "dotless-i",
+      "kind": "file",
+      "bytes": "TmF0xLF2ZSBDcmFzaCBSZXBvcnRpbmc="
+    },
+    {
+      "name": "utf8-bom",
+      "kind": "file",
+      "bytes": "77u/TmF0aXZlIENyYXNoIFJlcG9ydGluZw0K"
+    },
+    {
+      "name": "utf16",
+      "kind": "file",
+      "bytes": "//5OAGEAdABpAHYAZQAgAEMAcgBhAHMAaAAgAFIAZQBwAG8AcgB0AGkAbgBnAAoA"
+    },
+    {
+      "name": "utf32",
+      "kind": "file",
+      "bytes": "//4AAE4AAABhAAAAdAAAAGkAAAB2AAAAZQAAACAAAABDAAAAcgAAAGEAAABzAAAAaAAAACAAAABSAAAAZQAAAHAAAABvAAAAcgAAAHQAAABpAAAAbgAAAGcAAAAKAAAA"
+    },
+    {
+      "name": "cr-only",
+      "kind": "file",
+      "bytes": "Y2xlYW4NTmF0aXZlIENyYXNoIFJlcG9ydGluZw0="
+    },
+    {
+      "name": "mixed-endings",
+      "kind": "file",
+      "bytes": "Y2xlYW4NCk5hdGl2ZSBDcmFzaCBSZXBvcnRpbmcNR290IGEgVU5LTk9XTiB3aGlsZSBleGVjdXRpbmcgbmF0aXZlIGNvZGUK"
+    },
+    {
+      "name": "replacement",
+      "kind": "file",
+      "bytes": "/05hdGl2ZSBDcmFzaCBSZXBvcnRpbmcK"
+    }
+  ],
+  "linux_observations": {
+    "observations": [
+      {
+        "value": {
+          "State": "missing-log",
+          "NativeReportHeaderCount": 0,
+          "UnknownNativeConditionCount": 0,
+          "NativeReportHeaderLines": [],
+          "UnknownNativeConditionLines": [],
+          "LocationsTruncated": false
+        },
+        "name": "blank"
+      },
+      {
+        "value": {
+          "State": "missing-log",
+          "NativeReportHeaderCount": 0,
+          "UnknownNativeConditionCount": 0,
+          "NativeReportHeaderLines": [],
+          "UnknownNativeConditionLines": [],
+          "LocationsTruncated": false
+        },
+        "name": "missing"
+      },
+      {
+        "value": {
+          "State": "missing-log",
+          "NativeReportHeaderCount": 0,
+          "UnknownNativeConditionCount": 0,
+          "NativeReportHeaderLines": [],
+          "UnknownNativeConditionLines": [],
+          "LocationsTruncated": false
+        },
+        "name": "directory"
+      },
+      {
+        "value": {
+          "State": "observed",
+          "NativeReportHeaderCount": 0,
+          "UnknownNativeConditionCount": 0,
+          "NativeReportHeaderLines": [],
+          "UnknownNativeConditionLines": [],
+          "LocationsTruncated": false
+        },
+        "name": "empty"
+      },
+      {
+        "value": {
+          "State": "observed",
+          "NativeReportHeaderCount": 0,
+          "UnknownNativeConditionCount": 0,
+          "NativeReportHeaderLines": [],
+          "UnknownNativeConditionLines": [],
+          "LocationsTruncated": false
+        },
+        "name": "clean"
+      },
+      {
+        "value": {
+          "State": "observed",
+          "NativeReportHeaderCount": 1,
+          "UnknownNativeConditionCount": 1,
+          "NativeReportHeaderLines": [1],
+          "UnknownNativeConditionLines": [2],
+          "LocationsTruncated": false
+        },
+        "name": "both"
+      },
+      {
+        "value": {
+          "State": "observed",
+          "NativeReportHeaderCount": 1,
+          "UnknownNativeConditionCount": 1,
+          "NativeReportHeaderLines": [1],
+          "UnknownNativeConditionLines": [1],
+          "LocationsTruncated": false
+        },
+        "name": "same-line"
+      },
+      {
+        "value": {
+          "State": "observed",
+          "NativeReportHeaderCount": 1,
+          "UnknownNativeConditionCount": 1,
+          "NativeReportHeaderLines": [1],
+          "UnknownNativeConditionLines": [2],
+          "LocationsTruncated": false
+        },
+        "name": "mixed-case"
+      },
+      {
+        "value": {
+          "State": "observed",
+          "NativeReportHeaderCount": 8,
+          "UnknownNativeConditionCount": 8,
+          "NativeReportHeaderLines": [1, 3, 5, 7, 9, 11, 13, 15],
+          "UnknownNativeConditionLines": [2, 4, 6, 8, 10, 12, 14, 16],
+          "LocationsTruncated": false
+        },
+        "name": "eight"
+      },
+      {
+        "value": {
+          "State": "observed",
+          "NativeReportHeaderCount": 9,
+          "UnknownNativeConditionCount": 9,
+          "NativeReportHeaderLines": [1, 3, 5, 7, 9, 11, 13, 15],
+          "UnknownNativeConditionLines": [2, 4, 6, 8, 10, 12, 14, 16],
+          "LocationsTruncated": true
+        },
+        "name": "nine"
+      },
+      {
+        "value": {
+          "State": "observed",
+          "NativeReportHeaderCount": 1,
+          "UnknownNativeConditionCount": 1,
+          "NativeReportHeaderLines": [1],
+          "UnknownNativeConditionLines": [1],
+          "LocationsTruncated": false
+        },
+        "name": "unicode-newline"
+      },
+      {
+        "value": {
+          "State": "observed",
+          "NativeReportHeaderCount": 0,
+          "UnknownNativeConditionCount": 1,
+          "NativeReportHeaderLines": [],
+          "UnknownNativeConditionLines": [2],
+          "LocationsTruncated": false
+        },
+        "name": "long-s"
+      },
+      {
+        "value": {
+          "State": "observed",
+          "NativeReportHeaderCount": 0,
+          "UnknownNativeConditionCount": 0,
+          "NativeReportHeaderLines": [],
+          "UnknownNativeConditionLines": [],
+          "LocationsTruncated": false
+        },
+        "name": "dotless-i"
+      },
+      {
+        "value": {
+          "State": "observed",
+          "NativeReportHeaderCount": 1,
+          "UnknownNativeConditionCount": 0,
+          "NativeReportHeaderLines": [1],
+          "UnknownNativeConditionLines": [],
+          "LocationsTruncated": false
+        },
+        "name": "utf8-bom"
+      },
+      {
+        "value": {
+          "State": "observed",
+          "NativeReportHeaderCount": 1,
+          "UnknownNativeConditionCount": 0,
+          "NativeReportHeaderLines": [1],
+          "UnknownNativeConditionLines": [],
+          "LocationsTruncated": false
+        },
+        "name": "utf16"
+      },
+      {
+        "value": {
+          "State": "observed",
+          "NativeReportHeaderCount": 1,
+          "UnknownNativeConditionCount": 0,
+          "NativeReportHeaderLines": [1],
+          "UnknownNativeConditionLines": [],
+          "LocationsTruncated": false
+        },
+        "name": "utf32"
+      },
+      {
+        "value": {
+          "State": "observed",
+          "NativeReportHeaderCount": 1,
+          "UnknownNativeConditionCount": 0,
+          "NativeReportHeaderLines": [2],
+          "UnknownNativeConditionLines": [],
+          "LocationsTruncated": false
+        },
+        "name": "cr-only"
+      },
+      {
+        "value": {
+          "State": "observed",
+          "NativeReportHeaderCount": 1,
+          "UnknownNativeConditionCount": 1,
+          "NativeReportHeaderLines": [2],
+          "UnknownNativeConditionLines": [3],
+          "LocationsTruncated": false
+        },
+        "name": "mixed-endings"
+      },
+      {
+        "value": {
+          "State": "observed",
+          "NativeReportHeaderCount": 1,
+          "UnknownNativeConditionCount": 0,
+          "NativeReportHeaderLines": [1],
+          "UnknownNativeConditionLines": [],
+          "LocationsTruncated": false
+        },
+        "name": "replacement"
+      }
+    ],
+    "environment": [
+      {
+        "UseSimple": true,
+        "Label": "Licensing client signature validation failed (issue #657; final cleanup is evaluated separately)",
+        "Pattern": "while verifying Licensing Client signature"
+      },
+      {
+        "UseSimple": true,
+        "Label": "Licensing client ignored after failing validation (issue #657)",
+        "Pattern": "LicensingClient has failed validation"
+      },
+      {
+        "UseSimple": true,
+        "Label": "Licensing IPC channel absent at connection attempt (issue #657)",
+        "Pattern": "failed because channel doesn't exist"
+      }
+    ],
+    "catastrophic": [
+      {
+        "UseSimple": true,
+        "Label": "PrecompiledAssemblyException",
+        "Pattern": "PrecompiledAssemblyException"
+      },
+      {
+        "UseSimple": true,
+        "Label": "CompilationFailedException",
+        "Pattern": "CompilationFailedException"
+      },
+      {
+        "UseSimple": true,
+        "Label": "Multiple precompiled assemblies with the same name",
+        "Pattern": "Multiple precompiled assemblies with the same name"
+      },
+      {
+        "UseSimple": false,
+        "Label": "error CS\\d+",
+        "Pattern": "error CS\\d+"
+      },
+      {
+        "UseSimple": false,
+        "Label": "warning CS8032",
+        "Pattern": "warning CS8032"
+      },
+      {
+        "UseSimple": false,
+        "Label": "Package [id] cannot be found (bad/missing UPM manifest id)",
+        "Pattern": "Package \\[[^\\]]+\\] cannot be found"
+      },
+      {
+        "UseSimple": true,
+        "Label": "WaitForEndOfFrame yielded under -batchmode (UnityTest hangs headless; writes total=0 results.xml)",
+        "Pattern": "WaitForEndOfFrame, which is not evoked in batchmode"
+      },
+      {
+        "UseSimple": true,
+        "Label": "Fatal error in the Mono runtime (native abort mid-run; usually leaves a misleading total=0 results.xml)",
+        "Pattern": "fatal error in the mono runtime"
+      },
+      {
+        "UseSimple": true,
+        "Label": "Mono crash executing native code (native or managed boundary abort)",
+        "Pattern": "Got a UNKNOWN while executing native code"
+      },
+      {
+        "UseSimple": false,
+        "Label": "IL2CPP/AOT missing code (no ahead-of-time code for a closed generic; names the exact unrootable type, e.g. StructValueChecker`1)",
+        "Pattern": "no ahead of time \\(AOT\\) code was generated"
+      },
+      {
+        "UseSimple": true,
+        "Label": "ExecutionEngineException (IL2CPP/AOT generic-instantiation failure on a standalone player)",
+        "Pattern": "System.ExecutionEngineException"
+      }
+    ]
+  }
+}
