@@ -340,5 +340,13 @@
     "controls": "Three red helper-read controls for Git exits 2, 3 and 128 now fail visibly; the absent-key exit 1 remains green. All 56 typed controls pass. Generated broken and healthy Bash checker bytes are asserted as LF on every host.",
     "changes": "Report credential.helper lookup statuses other than 0 or 1 as errors. Use explicit LF fixture writes on Windows.",
     "timing_limit": "Raw pairs above describe the pre-review implementation, retained with their timing seals; no current corrected-source timing or Windows speed claim."
+  },
+  "windows_correctness_and_budget_observation": {
+    "source_head": "168e26a186db79c719802b83c3fc4add31d96ae4",
+    "job": 133372159613,
+    "run": 43888195302,
+    "broad_control_result": "3375 passed, 56 skipped, 11 subtests passed in 513.45 seconds; this includes the corrected native fixture and error-status controls.",
+    "retained_gate_limit": "The Local Gates run is cancelled, not green. Cancellation occurred during the following analyzer step near the configured ten-minute job bound. No assertion failure appeared in the corrected broad suite.",
+    "next_evidence": "Add duration reporting for the twenty slowest broad-suite controls so the next run identifies optimization subjects. Keep the same test selection and ten-minute job bound. Do not retry the cancelled run unchanged or claim complete Windows qualification."
   }
 }

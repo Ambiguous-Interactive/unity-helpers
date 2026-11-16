@@ -335,7 +335,8 @@ jobs:
           scripts/tests/test_code_samples.py
           scripts/tests/test_skill_sizes.py scripts/tests/test_comment_block_form.py
           scripts/tests/test_doc_links.py
-          scripts/tests/test_lifecycle_lint.py scripts/tests/test_yaml_lint.py scripts/tests/test_no_regions.py scripts/tests/test_dependabot.py scripts/tests/test_doc_samples.py -q
+          scripts/tests/test_lifecycle_lint.py scripts/tests/test_yaml_lint.py scripts/tests/test_no_regions.py scripts/tests/test_dependabot.py scripts/tests/test_doc_samples.py
+          -q --durations=20
 
       - name: Verify compiler payload publication on Windows
         shell: pwsh
