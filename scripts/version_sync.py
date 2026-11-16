@@ -28,13 +28,20 @@ BANNER_VERSION = re.compile(
     r"(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?"
 )
 BANNER_PATTERN = re.compile(
-    r"""<text\b(?:[^<>"']|"[^"]*"|'[^']*')*(?P<badge>>v\d+\.\d+\.\d+[^<]*</text>)""",
+    r"""<text\b(?:[^<>"']|"[^"]*"|'[^']*')*(?<!/)>(?P<body>[^<]*)</text>""",
     re.IGNORECASE,
 )
+BANNER_TEXT_PATTERN = re.compile(r"v\d+\.\d+\.\d+[^<]*", re.IGNORECASE)
 XML_NON_TEXT = re.compile(r"<!--.*?(?:-->|$)|<!\[CDATA\[.*?(?:\]\]>|$)", re.DOTALL)
 CONTEXT_PATTERN = re.compile(
     r"^\*\*Version\*\*:\s+\d+\.\d+\.\d+[^\r\n]*", re.MULTILINE | re.IGNORECASE
 )
+
+
+@dataclass(frozen=True)
+class Badge:
+    version: str
+    source_spans: tuple[tuple[int, int], ...]
 
 
 @dataclass(frozen=True)
@@ -92,18 +99,39 @@ def package_version(root: Path, inputs: dict[Path, bytes | None], *, banner: boo
     return value
 
 
-def banner_badges(content: str) -> list[re.Match[str]]:
+def banner_badges(content: str) -> list[Badge]:
     masked = XML_NON_TEXT.sub(lambda match: " " * len(match[0]), content)
-    return list(BANNER_PATTERN.finditer(masked))
+    badges: list[Badge] = []
+    for match in BANNER_PATTERN.finditer(masked):
+        start, end = match.span("body")
+        previous = start
+        spans: list[tuple[int, int]] = []
+        for opaque in XML_NON_TEXT.finditer(content, start, end):
+            if previous < opaque.start():
+                spans.append((previous, opaque.start()))
+            previous = opaque.end()
+        if previous < end:
+            spans.append((previous, end))
+        visible = "".join(content[left:right] for left, right in spans)
+        if BANNER_TEXT_PATTERN.fullmatch(visible):
+            badges.append(Badge(visible, tuple(spans)))
+    return badges
 
 
-def replace_badges(content: str, badges: list[re.Match[str]], replacement: str) -> str:
+def replace_badges(content: str, badges: list[Badge], replacement: str) -> str:
     parts: list[str] = []
     previous = 0
     for badge in badges:
-        start, end = badge.span("badge")
-        parts.extend((content[previous:start], replacement))
-        previous = end
+        offset = 0
+        for index, (start, end) in enumerate(badge.source_spans):
+            text = (
+                replacement[offset:]
+                if index == len(badge.source_spans) - 1
+                else replacement[offset : offset + end - start]
+            )
+            parts.extend((content[previous:start], text))
+            previous = end
+            offset += end - start
     parts.append(content[previous:])
     return "".join(parts).rstrip() + "\n"
 
@@ -118,11 +146,11 @@ def banner_plan(root: Path) -> Plan:
     if content is None:
         messages.append(f"Banner SVG not found at: {banner}, skipping.")
     else:
-        replacement = f">v{version}</text>"
+        replacement = f"v{version}"
         badges = banner_badges(content)
         if not badges:
             messages.append("No version pattern found in SVG, skipping.")
-        elif all(badge["badge"].casefold() == replacement.casefold() for badge in badges):
+        elif all(badge.version.casefold() == replacement.casefold() for badge in badges):
             messages.append(f"Banner already has correct version: v{version}")
         else:
             changes.append(Change(banner, replace_badges(content, badges, replacement)))
@@ -158,9 +186,7 @@ def check_banner(root: Path) -> int:
         raise ValueError("Banner validation requires both version references.")
     badges = banner_badges(banner)
     headings = list(CONTEXT_PATTERN.finditer(context))
-    if not badges or any(
-        badge["badge"].casefold() != f">v{version}</text>".casefold() for badge in badges
-    ):
+    if not badges or any(badge.version.casefold() != f"v{version}".casefold() for badge in badges):
         raise ValueError(f"Banner SVG version badge does not match package version {version}.")
     if not headings or any(
         heading[0].casefold() != f"**Version**: {version}".casefold() for heading in headings
