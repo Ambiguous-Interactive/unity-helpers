@@ -2015,5 +2015,17 @@
   "post_capture_corrections": {
     "record": "python-tooling-portability-qualification.json",
     "scope": "Recorded timings remain bound to the original captured source. Later correctness and portability fixes were not remeasured."
+  },
+  "post_capture_feedback_identity_correction": {
+    "trigger": "PR #1216 inline comment 4585786849 and associated review 5920058641 expose different Copilot logins for the same Bot user ID 175728472; #859 comment 6917340859 tracks the correction.",
+    "source_sha256": {
+      "scripts/pr_feedback.py": "adf49ffec7d1e0ba0359ef29396a167cda4dd367d020fb48d9644f561492ef59",
+      "scripts/tests/test_pr_feedback.py": "e1505f78e5e7113c1eacbd80811ff88066d6fcf25ee468c6929a65f4f50c61ef",
+      "scripts/tests/test_skills_tooling.py": "68d217595b5dc81e50829eea69a14d8696c3b541936d260beb56463c39173b1f"
+    },
+    "evidence": "The report-level alias control failed before correction. All 90 offline controls now pass, including 28 unproven-identity cases, duplicate review IDs and absent review. Fetched records remain unchanged. Strict Ruff, mypy and Pyright pass.",
+    "limits": "Only inline identities from the current PR are correlated with their associated, already trusted Bot review by matching positive integer user IDs and unique review ID. Display names and repository association do not confer trust. Existing timing/source captures above remain historical; no performance claim is made for this correction.",
+    "policy_mutation_correction": "Three frozen byte-fragment controls failed before exercising the linter after source insertion. Retain exact frozen fragments when present; otherwise mutate the current span matched by the unchanged frozen policy regex. The captured fragment must still satisfy that same regex. All 123 skill-tooling controls pass, including every policy rejection. An initial first-match-only mutation attempt missed three repeated requirements; retain global exact-fragment replacement.",
+    "nonmutation_review_correction": "Review5921689669 correctly identified that JSON round-tripping made the report fixture snapshot insufficient to prove nonmutation of fetched records. A direct input snapshot control now checks the actual correlation inputs and returned canonical login. A deliberate in-place mutation passes the old report check but fails the new direct control; all 91 production controls pass without the injected candidate. No production behavior change."
   }
 }
