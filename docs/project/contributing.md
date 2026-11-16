@@ -183,6 +183,50 @@ Claims still prevent retries after uncertain mutations. CLI stdout and summaries
 Release admission retains the original handling of empty container fork flags, requires string
 branch names, and rejects non-JSON numbers and incompatible package encodings before publication.
 
+The read-only Git push gate runs through locked Python with
+`npm run validate:git-push-config`. Its retained PowerShell commands delegate to
+the same validator and controls. The gate checks local push defaults, classifies
+hook output artifacts, and preserves the existing container credential postcondition.
+It changes no configuration or files. The existing Bash checker runs only when a
+Dev Containers helper is registered; it reads configuration and declared host names,
+and does not request a token. Git reads and the checker have 30-second process deadlines.
+
+The [qualification record](../performance/push-validation-qualification.json)
+retains 39 original CLI observations and 60 typed controls. The real container
+integration uses disposable Git configuration. A PowerShell probe verifies the
+case-sensitive versus case-insensitive filename boundary. Historical measurements from
+seven alternating Linux pairs after two warmup pairs were 298.45 → 41.40 ms for a clean
+fixture and 575.73 → 66.68 ms with 30 hook artifacts. The receipt seals that pre-review
+implementation; the corrected credential-read error handling has no new timing claim.
+These fixture timings exclude the container checker and do not measure Windows,
+complete pushes or CI. Host configuration helpers remain separate migration scope.
+
+Hook text validation runs through locked Python with
+`npm run validate:hook-sync`. The retained PowerShell validator and test commands
+delegate to that implementation. Required tokens and forbidden merge-hook startup
+tokens keep their case-insensitive presence rules. These rules also match comments;
+they do not parse or execute PowerShell. UTF-8, UTF-16 and UTF-32 BOM files retain their original behavior. Empty,
+unreadable, and malformed hook files fail. The previous validator incorrectly accepted empty hook files.
+
+The [qualification record](../performance/hook-validation-qualification.json)
+retains 24 original CLI observations and the three intentional empty-file corrections.
+The 54 controls cover each required and forbidden token, both retained launchers,
+and the current hooks. Seven alternating Linux pairs measured median CLI times of
+204.70 ms for PowerShell and 37.11 ms for locked uv/Python after two warmup pairs.
+These observations concern this no-op validator on one host; they do not measure
+whole hooks, Windows or CI.
+
+Read-only push validation honors the explicit repository even when inherited
+repository-location variables identify another Git directory. Child Git reads and
+the credential checker retain configuration variables, including `GIT_CONFIG_*`.
+The hook-text PowerShell wrapper resolves null, empty or whitespace-only roots to
+its own repository. An explicit nonblank root stays authoritative.
+
+Unity 6 projects that seed scripting defines also select the legacy Input Manager
+used by their generated package manifest. The generation fingerprint includes this
+bootstrap policy, so earlier generated settings and Libraries keep their old
+workspace identity. Existing caller-supplied settings remain authoritative.
+
 Version reference synchronization uses `scripts/version_sync.py` through locked uv.
 The PowerShell entry points remain launchers. Content rules, sorting and validation run in
 Python; batched staging delegates to the unchanged PowerShell mutex and retry helper.

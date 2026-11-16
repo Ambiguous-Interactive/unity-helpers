@@ -1,0 +1,218 @@
+{
+  "source_sha256": "eef319ac42540f5d3db0c9ad8fa8a9fbd71dd34814095b9795a6a3dc733fa327",
+  "cases": [
+    {
+      "name": "baseline",
+      "files": {
+        "pre-commit.ps1": "scripts/sync-banner-version.ps1\nscripts/sync-issue-template-versions.ps1",
+        "pre-push.ps1": "[Console]::In.ReadToEnd\nlocalSha\nremoteSha\nallChanged",
+        "pre-merge-commit.ps1": "pre-commit.ps1\n& $preCommit @HookArgs\nexit $LASTEXITCODE"
+      },
+      "status": 0
+    },
+    {
+      "name": "upper",
+      "files": {
+        "pre-commit.ps1": "SCRIPTS/SYNC-BANNER-VERSION.PS1\nSCRIPTS/SYNC-ISSUE-TEMPLATE-VERSIONS.PS1",
+        "pre-push.ps1": "[CONSOLE]::IN.READTOEND\nLOCALSHA\nREMOTESHA\nALLCHANGED",
+        "pre-merge-commit.ps1": "PRE-COMMIT.PS1\n& $PRECOMMIT @HOOKARGS\nEXIT $LASTEXITCODE"
+      },
+      "status": 0
+    },
+    {
+      "name": "lower",
+      "files": {
+        "pre-commit.ps1": "scripts/sync-banner-version.ps1\nscripts/sync-issue-template-versions.ps1",
+        "pre-push.ps1": "[console]::in.readtoend\nlocalsha\nremotesha\nallchanged",
+        "pre-merge-commit.ps1": "pre-commit.ps1\n& $precommit @hookargs\nexit $lastexitcode"
+      },
+      "status": 0
+    },
+    {
+      "name": "minimal",
+      "files": {
+        "pre-commit.ps1": "scripts/sync-banner-version.ps1\nscripts/sync-issue-template-versions.ps1",
+        "pre-push.ps1": "[Console]::In.ReadToEnd\nlocalSha\nremoteSha\nallChanged",
+        "pre-merge-commit.ps1": "pre-commit.ps1\n& $preCommit @HookArgs\nexit $LASTEXITCODE"
+      },
+      "status": 0
+    },
+    {
+      "name": "comments",
+      "files": {
+        "pre-commit.ps1": "# scripts/sync-banner-version.ps1\n# scripts/sync-issue-template-versions.ps1",
+        "pre-push.ps1": "# [Console]::In.ReadToEnd\n# localSha\n# remoteSha\n# allChanged",
+        "pre-merge-commit.ps1": "# pre-commit.ps1\n# & $preCommit @HookArgs\n# exit $LASTEXITCODE"
+      },
+      "status": 0
+    },
+    {
+      "name": "missing-pre-commit.ps1",
+      "files": {
+        "pre-push.ps1": "[Console]::In.ReadToEnd\nlocalSha\nremoteSha\nallChanged",
+        "pre-merge-commit.ps1": "pre-commit.ps1\n& $preCommit @HookArgs\nexit $LASTEXITCODE"
+      },
+      "status": 1
+    },
+    {
+      "name": "empty-pre-commit.ps1",
+      "files": {
+        "pre-commit.ps1": "",
+        "pre-push.ps1": "[Console]::In.ReadToEnd\nlocalSha\nremoteSha\nallChanged",
+        "pre-merge-commit.ps1": "pre-commit.ps1\n& $preCommit @HookArgs\nexit $LASTEXITCODE"
+      },
+      "status": 0
+    },
+    {
+      "name": "missing-pre-commit.ps1-0",
+      "files": {
+        "pre-commit.ps1": "REMOVED\nscripts/sync-issue-template-versions.ps1",
+        "pre-push.ps1": "[Console]::In.ReadToEnd\nlocalSha\nremoteSha\nallChanged",
+        "pre-merge-commit.ps1": "pre-commit.ps1\n& $preCommit @HookArgs\nexit $LASTEXITCODE"
+      },
+      "status": 1
+    },
+    {
+      "name": "missing-pre-commit.ps1-1",
+      "files": {
+        "pre-commit.ps1": "scripts/sync-banner-version.ps1\nREMOVED",
+        "pre-push.ps1": "[Console]::In.ReadToEnd\nlocalSha\nremoteSha\nallChanged",
+        "pre-merge-commit.ps1": "pre-commit.ps1\n& $preCommit @HookArgs\nexit $LASTEXITCODE"
+      },
+      "status": 1
+    },
+    {
+      "name": "missing-pre-push.ps1",
+      "files": {
+        "pre-commit.ps1": "scripts/sync-banner-version.ps1\nscripts/sync-issue-template-versions.ps1",
+        "pre-merge-commit.ps1": "pre-commit.ps1\n& $preCommit @HookArgs\nexit $LASTEXITCODE"
+      },
+      "status": 1
+    },
+    {
+      "name": "empty-pre-push.ps1",
+      "files": {
+        "pre-commit.ps1": "scripts/sync-banner-version.ps1\nscripts/sync-issue-template-versions.ps1",
+        "pre-push.ps1": "",
+        "pre-merge-commit.ps1": "pre-commit.ps1\n& $preCommit @HookArgs\nexit $LASTEXITCODE"
+      },
+      "status": 0
+    },
+    {
+      "name": "missing-pre-push.ps1-0",
+      "files": {
+        "pre-commit.ps1": "scripts/sync-banner-version.ps1\nscripts/sync-issue-template-versions.ps1",
+        "pre-push.ps1": "REMOVED\nlocalSha\nremoteSha\nallChanged",
+        "pre-merge-commit.ps1": "pre-commit.ps1\n& $preCommit @HookArgs\nexit $LASTEXITCODE"
+      },
+      "status": 1
+    },
+    {
+      "name": "missing-pre-push.ps1-1",
+      "files": {
+        "pre-commit.ps1": "scripts/sync-banner-version.ps1\nscripts/sync-issue-template-versions.ps1",
+        "pre-push.ps1": "[Console]::In.ReadToEnd\nREMOVED\nremoteSha\nallChanged",
+        "pre-merge-commit.ps1": "pre-commit.ps1\n& $preCommit @HookArgs\nexit $LASTEXITCODE"
+      },
+      "status": 1
+    },
+    {
+      "name": "missing-pre-push.ps1-2",
+      "files": {
+        "pre-commit.ps1": "scripts/sync-banner-version.ps1\nscripts/sync-issue-template-versions.ps1",
+        "pre-push.ps1": "[Console]::In.ReadToEnd\nlocalSha\nREMOVED\nallChanged",
+        "pre-merge-commit.ps1": "pre-commit.ps1\n& $preCommit @HookArgs\nexit $LASTEXITCODE"
+      },
+      "status": 1
+    },
+    {
+      "name": "missing-pre-push.ps1-3",
+      "files": {
+        "pre-commit.ps1": "scripts/sync-banner-version.ps1\nscripts/sync-issue-template-versions.ps1",
+        "pre-push.ps1": "[Console]::In.ReadToEnd\nlocalSha\nremoteSha\nREMOVED",
+        "pre-merge-commit.ps1": "pre-commit.ps1\n& $preCommit @HookArgs\nexit $LASTEXITCODE"
+      },
+      "status": 1
+    },
+    {
+      "name": "missing-pre-merge-commit.ps1",
+      "files": {
+        "pre-commit.ps1": "scripts/sync-banner-version.ps1\nscripts/sync-issue-template-versions.ps1",
+        "pre-push.ps1": "[Console]::In.ReadToEnd\nlocalSha\nremoteSha\nallChanged"
+      },
+      "status": 1
+    },
+    {
+      "name": "empty-pre-merge-commit.ps1",
+      "files": {
+        "pre-commit.ps1": "scripts/sync-banner-version.ps1\nscripts/sync-issue-template-versions.ps1",
+        "pre-push.ps1": "[Console]::In.ReadToEnd\nlocalSha\nremoteSha\nallChanged",
+        "pre-merge-commit.ps1": ""
+      },
+      "status": 0
+    },
+    {
+      "name": "missing-pre-merge-commit.ps1-0",
+      "files": {
+        "pre-commit.ps1": "scripts/sync-banner-version.ps1\nscripts/sync-issue-template-versions.ps1",
+        "pre-push.ps1": "[Console]::In.ReadToEnd\nlocalSha\nremoteSha\nallChanged",
+        "pre-merge-commit.ps1": "REMOVED\n& $preCommit @HookArgs\nexit $LASTEXITCODE"
+      },
+      "status": 1
+    },
+    {
+      "name": "missing-pre-merge-commit.ps1-1",
+      "files": {
+        "pre-commit.ps1": "scripts/sync-banner-version.ps1\nscripts/sync-issue-template-versions.ps1",
+        "pre-push.ps1": "[Console]::In.ReadToEnd\nlocalSha\nremoteSha\nallChanged",
+        "pre-merge-commit.ps1": "pre-commit.ps1\nREMOVED\nexit $LASTEXITCODE"
+      },
+      "status": 1
+    },
+    {
+      "name": "missing-pre-merge-commit.ps1-2",
+      "files": {
+        "pre-commit.ps1": "scripts/sync-banner-version.ps1\nscripts/sync-issue-template-versions.ps1",
+        "pre-push.ps1": "[Console]::In.ReadToEnd\nlocalSha\nremoteSha\nallChanged",
+        "pre-merge-commit.ps1": "pre-commit.ps1\n& $preCommit @HookArgs\nREMOVED"
+      },
+      "status": 1
+    },
+    {
+      "name": "forbidden-0",
+      "files": {
+        "pre-commit.ps1": "scripts/sync-banner-version.ps1\nscripts/sync-issue-template-versions.ps1",
+        "pre-push.ps1": "[Console]::In.ReadToEnd\nlocalSha\nremoteSha\nallChanged",
+        "pre-merge-commit.ps1": "pre-commit.ps1\n& $preCommit @HookArgs\nexit $LASTEXITCODE\nGet-Process -Id $PID"
+      },
+      "status": 1
+    },
+    {
+      "name": "forbidden-1",
+      "files": {
+        "pre-commit.ps1": "scripts/sync-banner-version.ps1\nscripts/sync-issue-template-versions.ps1",
+        "pre-push.ps1": "[Console]::In.ReadToEnd\nlocalSha\nremoteSha\nallChanged",
+        "pre-merge-commit.ps1": "pre-commit.ps1\n& $preCommit @HookArgs\nexit $LASTEXITCODE\nGet-Command pwsh"
+      },
+      "status": 1
+    },
+    {
+      "name": "forbidden-2",
+      "files": {
+        "pre-commit.ps1": "scripts/sync-banner-version.ps1\nscripts/sync-issue-template-versions.ps1",
+        "pre-push.ps1": "[Console]::In.ReadToEnd\nlocalSha\nremoteSha\nallChanged",
+        "pre-merge-commit.ps1": "pre-commit.ps1\n& $preCommit @HookArgs\nexit $LASTEXITCODE\n& $pwshPath"
+      },
+      "status": 1
+    },
+    {
+      "name": "forbidden-3",
+      "files": {
+        "pre-commit.ps1": "scripts/sync-banner-version.ps1\nscripts/sync-issue-template-versions.ps1",
+        "pre-push.ps1": "[Console]::In.ReadToEnd\nlocalSha\nremoteSha\nallChanged",
+        "pre-merge-commit.ps1": "pre-commit.ps1\n& $preCommit @HookArgs\nexit $LASTEXITCODE\n$invokeArgs +="
+      },
+      "status": 1
+    }
+  ]
+}

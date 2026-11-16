@@ -1,0 +1,368 @@
+{
+  "scope": "Read-only Git push validation through locked typed Python; issue #859 remains unfinished.",
+  "original_commit": "da937cf9386f634cf46a4e8e311dae18146ba11b",
+  "original_source_sha256": {
+    "validate-git-push-config.ps1": "7681a440c7d0e621ca581f5c29747cb614a094204965fc13657b19a8f6cc3172",
+    "git-path-helpers.ps1": "fd4ac97ea238bc1b874db567cfcd5375be6f77bf3e7245caaa0f21c91d1d160d"
+  },
+  "source_sha256": {
+    "scripts/push_validation.py": "ce9a413fe694e453d7bfa694895a6592e47a6cca94d68e373b209845df95ac45",
+    "scripts/tests/test_push_validation.py": "8eca5040cc9b1c9619c84709d5d18cfb8e6fcc09eb875f1cbe710b158234cc7b",
+    "scripts/tests/fixtures/push-validation-v1.json": "8c5253505db054c9b2a2085e50f61d8c03409c786707a6450c116dbc729ef81e"
+  },
+  "original_controls": 38,
+  "frozen_cli_observations": 39,
+  "typed_controls": 52,
+  "preserved_contract": [
+    "Read local push defaults, compare trimmed values without case sensitivity, and fail on missing or incorrect values.",
+    "Recognize hook artifact stems and five extensions in the repository root and .githooks. Preserve ignored, unignored and check-ignore-error classifications. Never delete an artifact.",
+    "Inspect container helper configuration only when the existing host checker is present. Invoke the unchanged read-only Bash checker only when a Dev Containers helper is registered. Never invoke a credential helper to retrieve a token.",
+    "Anchor Git reads at the selected root even when invoked elsewhere. Keep token and credential permissions unchanged."
+  ],
+  "stability": [
+    "Git reads and the owned host checker have 30-second process deadlines and fail visibly.",
+    "Artifact diagnostic ordering is deterministic across Python hash seeds.",
+    "Unavailable roots, Git and applicable Bash failures cannot report success."
+  ],
+  "host_boundaries": [
+    "The frozen original host is case sensitive. The upper-extension alternative for a case-insensitive filesystem is labeled inferred in the fixture; an independent PowerShell literal-path probe verifies the host semantics.",
+    "The real container integration runs only when Bash can access repository files. A missing or incompatible host Bash is explicitly skipped for that integration; the applicable missing-Bash validator failure is still tested separately.",
+    "The unchanged Bash checker and push-default configuration helpers retain their host contracts; this cohort does not complete their remaining migration scope."
+  ],
+  "measurement": {
+    "host": "Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.36",
+    "filesystem": "tmpfs",
+    "toolchain": {
+      "uv": "0.13.8",
+      "python": "3.14.10",
+      "powershell": "7.5.3"
+    },
+    "method": "Two warmup pairs then seven alternating fresh-process pairs per fixture size, using isolated Git configuration and temporary repositories. Original and migrated exit statuses and sorted diagnostic lines agree in every observation.",
+    "samples": [
+      {
+        "size": 0,
+        "pair": 0,
+        "kind": "original",
+        "ms": 298.497948,
+        "status": 0,
+        "stdout_sha256": "120ac0f877ef73688a7ad21020a73db6c6d1ec54cec8b50642bf9485bc3e21df",
+        "stderr_hex": ""
+      },
+      {
+        "size": 0,
+        "pair": 0,
+        "kind": "python",
+        "ms": 41.362337,
+        "status": 0,
+        "stdout_sha256": "120ac0f877ef73688a7ad21020a73db6c6d1ec54cec8b50642bf9485bc3e21df",
+        "stderr_hex": ""
+      },
+      {
+        "size": 0,
+        "pair": 1,
+        "kind": "python",
+        "ms": 41.401075,
+        "status": 0,
+        "stdout_sha256": "120ac0f877ef73688a7ad21020a73db6c6d1ec54cec8b50642bf9485bc3e21df",
+        "stderr_hex": ""
+      },
+      {
+        "size": 0,
+        "pair": 1,
+        "kind": "original",
+        "ms": 298.445824,
+        "status": 0,
+        "stdout_sha256": "120ac0f877ef73688a7ad21020a73db6c6d1ec54cec8b50642bf9485bc3e21df",
+        "stderr_hex": ""
+      },
+      {
+        "size": 0,
+        "pair": 2,
+        "kind": "original",
+        "ms": 295.276917,
+        "status": 0,
+        "stdout_sha256": "120ac0f877ef73688a7ad21020a73db6c6d1ec54cec8b50642bf9485bc3e21df",
+        "stderr_hex": ""
+      },
+      {
+        "size": 0,
+        "pair": 2,
+        "kind": "python",
+        "ms": 41.409157,
+        "status": 0,
+        "stdout_sha256": "120ac0f877ef73688a7ad21020a73db6c6d1ec54cec8b50642bf9485bc3e21df",
+        "stderr_hex": ""
+      },
+      {
+        "size": 0,
+        "pair": 3,
+        "kind": "python",
+        "ms": 40.667644,
+        "status": 0,
+        "stdout_sha256": "120ac0f877ef73688a7ad21020a73db6c6d1ec54cec8b50642bf9485bc3e21df",
+        "stderr_hex": ""
+      },
+      {
+        "size": 0,
+        "pair": 3,
+        "kind": "original",
+        "ms": 279.860644,
+        "status": 0,
+        "stdout_sha256": "120ac0f877ef73688a7ad21020a73db6c6d1ec54cec8b50642bf9485bc3e21df",
+        "stderr_hex": ""
+      },
+      {
+        "size": 0,
+        "pair": 4,
+        "kind": "original",
+        "ms": 282.981234,
+        "status": 0,
+        "stdout_sha256": "120ac0f877ef73688a7ad21020a73db6c6d1ec54cec8b50642bf9485bc3e21df",
+        "stderr_hex": ""
+      },
+      {
+        "size": 0,
+        "pair": 4,
+        "kind": "python",
+        "ms": 43.543691,
+        "status": 0,
+        "stdout_sha256": "120ac0f877ef73688a7ad21020a73db6c6d1ec54cec8b50642bf9485bc3e21df",
+        "stderr_hex": ""
+      },
+      {
+        "size": 0,
+        "pair": 5,
+        "kind": "python",
+        "ms": 40.4088,
+        "status": 0,
+        "stdout_sha256": "120ac0f877ef73688a7ad21020a73db6c6d1ec54cec8b50642bf9485bc3e21df",
+        "stderr_hex": ""
+      },
+      {
+        "size": 0,
+        "pair": 5,
+        "kind": "original",
+        "ms": 321.159878,
+        "status": 0,
+        "stdout_sha256": "120ac0f877ef73688a7ad21020a73db6c6d1ec54cec8b50642bf9485bc3e21df",
+        "stderr_hex": ""
+      },
+      {
+        "size": 0,
+        "pair": 6,
+        "kind": "original",
+        "ms": 307.504629,
+        "status": 0,
+        "stdout_sha256": "120ac0f877ef73688a7ad21020a73db6c6d1ec54cec8b50642bf9485bc3e21df",
+        "stderr_hex": ""
+      },
+      {
+        "size": 0,
+        "pair": 6,
+        "kind": "python",
+        "ms": 41.939282,
+        "status": 0,
+        "stdout_sha256": "120ac0f877ef73688a7ad21020a73db6c6d1ec54cec8b50642bf9485bc3e21df",
+        "stderr_hex": ""
+      },
+      {
+        "size": 30,
+        "pair": 0,
+        "kind": "original",
+        "ms": 556.989767,
+        "status": 1,
+        "stdout_sha256": "3652a6487a424af87fea98c0c94114265da9e46f6a240922c66e483f45cc70da",
+        "stderr_hex": ""
+      },
+      {
+        "size": 30,
+        "pair": 0,
+        "kind": "python",
+        "ms": 65.389163,
+        "status": 1,
+        "stdout_sha256": "3652a6487a424af87fea98c0c94114265da9e46f6a240922c66e483f45cc70da",
+        "stderr_hex": ""
+      },
+      {
+        "size": 30,
+        "pair": 1,
+        "kind": "python",
+        "ms": 65.205609,
+        "status": 1,
+        "stdout_sha256": "3652a6487a424af87fea98c0c94114265da9e46f6a240922c66e483f45cc70da",
+        "stderr_hex": ""
+      },
+      {
+        "size": 30,
+        "pair": 1,
+        "kind": "original",
+        "ms": 595.138283,
+        "status": 1,
+        "stdout_sha256": "3652a6487a424af87fea98c0c94114265da9e46f6a240922c66e483f45cc70da",
+        "stderr_hex": ""
+      },
+      {
+        "size": 30,
+        "pair": 2,
+        "kind": "original",
+        "ms": 555.158049,
+        "status": 1,
+        "stdout_sha256": "3652a6487a424af87fea98c0c94114265da9e46f6a240922c66e483f45cc70da",
+        "stderr_hex": ""
+      },
+      {
+        "size": 30,
+        "pair": 2,
+        "kind": "python",
+        "ms": 63.444458,
+        "status": 1,
+        "stdout_sha256": "3652a6487a424af87fea98c0c94114265da9e46f6a240922c66e483f45cc70da",
+        "stderr_hex": ""
+      },
+      {
+        "size": 30,
+        "pair": 3,
+        "kind": "python",
+        "ms": 67.230147,
+        "status": 1,
+        "stdout_sha256": "3652a6487a424af87fea98c0c94114265da9e46f6a240922c66e483f45cc70da",
+        "stderr_hex": ""
+      },
+      {
+        "size": 30,
+        "pair": 3,
+        "kind": "original",
+        "ms": 563.0531,
+        "status": 1,
+        "stdout_sha256": "3652a6487a424af87fea98c0c94114265da9e46f6a240922c66e483f45cc70da",
+        "stderr_hex": ""
+      },
+      {
+        "size": 30,
+        "pair": 4,
+        "kind": "original",
+        "ms": 601.088282,
+        "status": 1,
+        "stdout_sha256": "3652a6487a424af87fea98c0c94114265da9e46f6a240922c66e483f45cc70da",
+        "stderr_hex": ""
+      },
+      {
+        "size": 30,
+        "pair": 4,
+        "kind": "python",
+        "ms": 67.422248,
+        "status": 1,
+        "stdout_sha256": "3652a6487a424af87fea98c0c94114265da9e46f6a240922c66e483f45cc70da",
+        "stderr_hex": ""
+      },
+      {
+        "size": 30,
+        "pair": 5,
+        "kind": "python",
+        "ms": 70.537318,
+        "status": 1,
+        "stdout_sha256": "3652a6487a424af87fea98c0c94114265da9e46f6a240922c66e483f45cc70da",
+        "stderr_hex": ""
+      },
+      {
+        "size": 30,
+        "pair": 5,
+        "kind": "original",
+        "ms": 575.728399,
+        "status": 1,
+        "stdout_sha256": "3652a6487a424af87fea98c0c94114265da9e46f6a240922c66e483f45cc70da",
+        "stderr_hex": ""
+      },
+      {
+        "size": 30,
+        "pair": 6,
+        "kind": "original",
+        "ms": 615.067257,
+        "status": 1,
+        "stdout_sha256": "3652a6487a424af87fea98c0c94114265da9e46f6a240922c66e483f45cc70da",
+        "stderr_hex": ""
+      },
+      {
+        "size": 30,
+        "pair": 6,
+        "kind": "python",
+        "ms": 66.675826,
+        "status": 1,
+        "stdout_sha256": "3652a6487a424af87fea98c0c94114265da9e46f6a240922c66e483f45cc70da",
+        "stderr_hex": ""
+      }
+    ],
+    "median_ms": {
+      "0": {
+        "original": 298.445824,
+        "python": 41.401075
+      },
+      "30": {
+        "original": 575.728399,
+        "python": 66.675826
+      }
+    },
+    "limits": [
+      "One Linux host with empty disposable system/global credential configuration. Real credential checker integration is correctness-tested separately, not timed here.",
+      "No Windows, cold provisioning, full Git push, whole hook or CI performance claim. Seven pairs do not establish statistical significance."
+    ]
+  },
+  "timing_capture_sha256": {
+    "scripts/push_validation.py": "dd39b782eb983aa1283c5d5f604d9606e5b4d516b2ae3eb8afaca03348d7cd8e",
+    "scripts/tests/test_push_validation.py": "4dbf85881cee9d7e61d34ec62c47110ad4f73a81e716f55cfd774da391db36d9",
+    "scripts/tests/fixtures/push-validation-v1.json": "8c5253505db054c9b2a2085e50f61d8c03409c786707a6450c116dbc729ef81e"
+  },
+  "ci_corrections": {
+    "source_head": "c3680417b4b20bcde973479d986686aa2210b003",
+    "observed_failures": [
+      "The Repo Lint ownership contract still claimed the retired PowerShell entry point was called by pre-push.",
+      "The normalization suite grepped the retired implementation instead of executing the npm route.",
+      "The Windows fixture failed its healthy postcondition recheck without diagnostic output."
+    ],
+    "corrections": [
+      "Use the registered executable compatibility controls as the launcher owner.",
+      "Execute the real npm pre-push route against broken and healthy owned checkers.",
+      "Apply and verify fixture executable mode through its actual Bash host, as the original fixture did; include validator diagnostics in a failed recheck."
+    ],
+    "linux_evidence": "52 typed controls, 13 Repo Lint runner contracts and 33 normalization controls pass. The two obsolete contract failures reproduced locally before correction.",
+    "windows_limit": "Linux controls and strict gates pass; native Windows confirmation remains pending CI. Retain the failed mode hypothesis and full diagnostic job rather than claim executable chmod fixed this mismatch.",
+    "windows_root_cause": "Job133361036214 on96ba97bd proves executable mode is healthy. MSYS rewrites the normalizer helper argument from !/c/... to !C:/... while the unchanged container checker expects the POSIX spelling. This is a native-Windows fixture boundary, not a production checker permission defect.",
+    "windows_correction": "Only the disposable fixture normalizer subprocess excludes !/ argument prefixes via the MSYS argument-conversion exclusion setting. Assert exact helper readback against the actual Bash pwd before the healthy postcondition. Other path conversion remains active.",
+    "windows_source": "https://www.msys2.org/docs/filesystem-paths/"
+  },
+  "before_review_source_sha256": {
+    "scripts/push_validation.py": "dd39b782eb983aa1283c5d5f604d9606e5b4d516b2ae3eb8afaca03348d7cd8e",
+    "scripts/tests/test_push_validation.py": "519e73b74929b8413bd96c7b9f950130d6eb8849fb58ae7a99381a3c6fafc07d",
+    "scripts/tests/fixtures/push-validation-v1.json": "8c5253505db054c9b2a2085e50f61d8c03409c786707a6450c116dbc729ef81e"
+  },
+  "review_correction": {
+    "review": 5921784192,
+    "controls": "Three red helper-read controls for Git exits 2, 3 and 128 now fail visibly; the absent-key exit 1 remains green. All 56 typed controls pass. Generated broken and healthy Bash checker bytes are asserted as LF on every host.",
+    "changes": "Report credential.helper lookup statuses other than 0 or 1 as errors. Use explicit LF fixture writes on Windows.",
+    "timing_limit": "Raw pairs above describe the pre-review implementation, retained with their timing seals; no current corrected-source timing or Windows speed claim."
+  },
+  "windows_correctness_and_budget_observation": {
+    "source_head": "168e26a186db79c719802b83c3fc4add31d96ae4",
+    "job": 133372159613,
+    "run": 43888195302,
+    "broad_control_result": "3375 passed, 56 skipped, 11 subtests passed in 513.45 seconds; this includes the corrected native fixture and error-status controls.",
+    "retained_gate_limit": "The Local Gates run is cancelled, not green. Cancellation occurred during the following analyzer step near the configured ten-minute job bound. No assertion failure appeared in the corrected broad suite.",
+    "next_evidence": "Add duration reporting for the twenty slowest broad-suite controls so the next run identifies optimization subjects. Keep the same test selection and ten-minute job bound. Do not retry the cancelled run unchanged or claim complete Windows qualification.",
+    "follow_up": {
+      "source_head": "20af3f619fd9e0a8e4ef29e437fdead1695be69b",
+      "job": 133382342377,
+      "run": 43891140257,
+      "conclusion": "success",
+      "job_seconds": 383,
+      "limit": "This later hosted run passes with the same test selection and ten-minute bound. Retain the earlier cancelled run. Different hosted observations do not establish that duration reporting accelerated execution."
+    }
+  },
+  "historical_validation_source_sha256": {
+    "scripts/push_validation.py": "121170f18c6e7dceebcaf7c84588fecc818e4d1e117e57ee650cc13327d73ff7",
+    "scripts/tests/test_push_validation.py": "8c797688eb54ac8a89b5fc745ec64a0eec3da3465eadb51ef722ee6790b209b8",
+    "scripts/tests/fixtures/push-validation-v1.json": "8c5253505db054c9b2a2085e50f61d8c03409c786707a6450c116dbc729ef81e"
+  },
+  "source_scope": "Current integration-validation inputs only. Historical maps and timing captures remain immutable and do not attest current-head performance.",
+  "registered_controls": 60,
+  "review_environment_boundary": "Child Git reads and the Bash checker remove repository-location overrides while retaining configuration variables. API and both CLI wrappers cannot validate another GIT_DIR in place of the explicit repository."
+}

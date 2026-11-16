@@ -1084,7 +1084,8 @@ def test_new_project_seeds_global_defines_before_editor_import(
     )
     document = cast("dict[str, object]", yaml.safe_load("\n".join(lines[3:])))
     player = cast("dict[str, object]", document["PlayerSettings"])
-    assert set(player) == {"serializedVersion", "scriptingDefineSymbols"}
+    assert set(player) == {"serializedVersion", "scriptingDefineSymbols", "activeInputHandler"}
+    assert player["activeInputHandler"] == 0
     assert player["serializedVersion"] == 26
     assert player["scriptingDefineSymbols"] == {"Standalone": expected}
 

@@ -517,12 +517,16 @@ runTest("no linter in scripts/ has been left unreachable", () => {
     ["scripts/lint-csharp-format.ps1", "preflight"],
     ["scripts/lint_csharp_format.py", "formatter-launcher"],
     ["scripts/lint_meta_files.py", "preflight"],
-    ["scripts/validate-git-push-config.ps1", "prepush"]
+    ["scripts/validate-git-push-config.ps1", "push-config-controls"]
   ]);
 
   // Only the kinds something actually claims. A registered predicate nothing uses is a dead branch
   // inside the one test whose whole point is that a claim has to be executable.
   const owners = new Map([
+    [
+      "push-config-controls",
+      (file) => registeredControlsInvoke(file, "scripts/tests/test_push_validation.py")
+    ],
     [
       "npm-package-controls",
       (file) => registeredControlsInvoke(file, "scripts/tests/test_npm_package.py")
@@ -620,8 +624,7 @@ runTest("no linter in scripts/ has been left unreachable", () => {
       (file) =>
         fileInvokes("scripts/agent-preflight.ps1", "scripts/lint-csharp-format.ps1") &&
         fileInvokes("scripts/lint-csharp-format.ps1", path.posix.basename(file))
-    ],
-    ["prepush", (file) => scriptPathsIn(expandNpmScript("validate:prepush")).has(file)]
+    ]
   ]);
 
   const reachable = new Set([
