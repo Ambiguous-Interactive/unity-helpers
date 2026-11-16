@@ -545,7 +545,7 @@
   {
     "id": "catastrophic-pattern-sync",
     "name": "Catastrophic pattern sync",
-    "run": "pwsh -NoProfile -File scripts/tests/test-catastrophic-pattern-sync.ps1 -VerboseOutput",
+    "run": "npm run test:catastrophic-pattern-sync",
     "inputs": ["@tooling"]
   },
   {

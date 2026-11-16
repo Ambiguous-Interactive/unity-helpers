@@ -1,45 +1,18 @@
-#!/usr/bin/env pwsh
-# Single source of truth for the Unity log pattern lists: the "catastrophic pattern" list
-# below, and the environment-warning list at the end of this file.
-#
-# These regexes/substrings, when present in a Unity editor or player log, indicate a
-# CATASTROPHIC failure (compile error, bad UPM manifest, headless coroutine stall, native
-# Mono abort) rather than an ordinary test failure -- the editor typically exits before
-# producing a usable NUnit results.xml, so they must be surfaced as the real cause.
-#
-# THREE call sites consume this list:
-#   - scripts/unity/run-ci-tests.ps1                       ($script:CatastrophicPatterns)
-#   - .github/actions/verify-unity-results/action.yml      ($patterns)
-#   - .github/actions/dump-unity-log-tail/action.yml       ($patterns)
-#
-# They previously held byte-identical inline copies that DRIFTED (the `Package [id] cannot
-# be found` entry once fell out of both action files) and tripped yamllint line-length (>200)
-# on the long Label strings. Dot-source this file and call Get-CatastrophicPatterns instead
-# of re-declaring the array. Enforced mechanically by
-# scripts/tests/test-catastrophic-pattern-sync.ps1 (which now asserts single-sourcing, not
-# textual equality).
-#
-# Each entry: @{ Label = <human-readable>; Pattern = <regex or substring>; UseSimple = <bool> }
-#   UseSimple = $true  -> Select-String -SimpleMatch (literal substring)
-#   UseSimple = $false -> Select-String regex
-
+# Host consumers retain native regex matching, including bootstrap-failure diagnostics.
 function Get-CatastrophicPatterns {
     [CmdletBinding()]
     param()
+    $catalogue = Get-Content -LiteralPath (Join-Path $PSScriptRoot '../log-patterns.json') -Raw -ErrorAction Stop | ConvertFrom-Json -AsHashtable
+    if ($catalogue.Catastrophic -isnot [array] -or $catalogue.Catastrophic.Count -eq 0) { throw 'Missing catastrophic pattern catalogue.' }
+    return $catalogue.Catastrophic
+}
 
-    return @(
-        @{ Label = 'PrecompiledAssemblyException'; Pattern = 'PrecompiledAssemblyException'; UseSimple = $true }
-        @{ Label = 'CompilationFailedException'; Pattern = 'CompilationFailedException'; UseSimple = $true }
-        @{ Label = 'Multiple precompiled assemblies with the same name'; Pattern = 'Multiple precompiled assemblies with the same name'; UseSimple = $true }
-        @{ Label = 'error CS\d+'; Pattern = 'error CS\d+'; UseSimple = $false }
-        @{ Label = 'warning CS8032'; Pattern = 'warning CS8032'; UseSimple = $false }
-        @{ Label = 'Package [id] cannot be found (bad/missing UPM manifest id)'; Pattern = 'Package \[[^\]]+\] cannot be found'; UseSimple = $false }
-        @{ Label = 'WaitForEndOfFrame yielded under -batchmode (UnityTest hangs headless; writes total=0 results.xml)'; Pattern = 'WaitForEndOfFrame, which is not evoked in batchmode'; UseSimple = $true }
-        @{ Label = 'Fatal error in the Mono runtime (native abort mid-run; usually leaves a misleading total=0 results.xml)'; Pattern = 'fatal error in the mono runtime'; UseSimple = $true }
-        @{ Label = 'Mono crash executing native code (native or managed boundary abort)'; Pattern = 'Got a UNKNOWN while executing native code'; UseSimple = $true }
-        @{ Label = 'IL2CPP/AOT missing code (no ahead-of-time code for a closed generic; names the exact unrootable type, e.g. StructValueChecker`1)'; Pattern = 'no ahead of time \(AOT\) code was generated'; UseSimple = $false }
-        @{ Label = 'ExecutionEngineException (IL2CPP/AOT generic-instantiation failure on a standalone player)'; Pattern = 'System.ExecutionEngineException'; UseSimple = $true }
-    )
+function Get-EnvironmentWarningPatterns {
+    [CmdletBinding()]
+    param()
+    $catalogue = Get-Content -LiteralPath (Join-Path $PSScriptRoot '../log-patterns.json') -Raw -ErrorAction Stop | ConvertFrom-Json -AsHashtable
+    if ($catalogue.Environment -isnot [array] -or $catalogue.Environment.Count -eq 0) { throw 'Missing environment warning catalogue.' }
+    return $catalogue.Environment
 }
 
 function Get-NativeReportSummary {
@@ -49,46 +22,45 @@ function Get-NativeReportSummary {
         NativeReportHeaderLines = @(); UnknownNativeConditionLines = @(); LocationsTruncated = $false
     }
     if ([string]::IsNullOrWhiteSpace($LogPath) -or -not (Test-Path -LiteralPath $LogPath -PathType Leaf)) { return $summary }
+    $priorExitVariable = Get-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue
+    $hadExitVariable = $null -ne $priorExitVariable
+    $priorExitCode = if ($hadExitVariable) { $priorExitVariable.Value } else { $null }
+    $nativeReader = $null
     try {
-        $lineNumber = 0
-        foreach ($line in [IO.File]::ReadLines($LogPath)) {
-            ++$lineNumber
-            if (0 -le $line.IndexOf('Native Crash Reporting', [StringComparison]::OrdinalIgnoreCase)) {
-                ++$summary.NativeReportHeaderCount
-                if ($summary.NativeReportHeaderLines.Count -lt 8) { $summary.NativeReportHeaderLines += $lineNumber }
-                else { $summary.LocationsTruncated = $true }
+        $nativeReader = [IO.File]::OpenRead($LogPath)
+        $scriptsRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+        $output = @(& uv run --project (Join-Path $scriptsRoot 'python~') --locked python (Join-Path $scriptsRoot 'unity/native_report_summary.py') "--log-path=$LogPath")
+        if ($global:LASTEXITCODE -ne 0) { throw 'Native report scanner failed.' }
+        $value = ($output -join "`n") | ConvertFrom-Json -AsHashtable -ErrorAction Stop
+        if ($value -isnot [Collections.IDictionary] -or $value.Count -ne 6 -or
+            $value.State -notin @('missing-log', 'observed', 'unreadable-log') -or
+            $value.LocationsTruncated -isnot [bool]) { throw 'Invalid native report scanner response.' }
+        foreach ($group in @('NativeReportHeader', 'UnknownNativeCondition')) {
+            $count = $value[$group + 'Count']
+            $lines = $value[$group + 'Lines']
+            if (($count -isnot [int] -and $count -isnot [long]) -or $count -lt 0 -or
+                $lines -isnot [array] -or $lines.Count -ne [Math]::Min($count, 8)) {
+                throw 'Invalid native report scanner counters.'
             }
-            if (0 -le $line.IndexOf('Got a UNKNOWN while executing native code', [StringComparison]::OrdinalIgnoreCase)) {
-                ++$summary.UnknownNativeConditionCount
-                if ($summary.UnknownNativeConditionLines.Count -lt 8) { $summary.UnknownNativeConditionLines += $lineNumber }
-                else { $summary.LocationsTruncated = $true }
+            foreach ($line in $lines) {
+                if (($line -isnot [int] -and $line -isnot [long]) -or $line -le 0) { throw 'Invalid native report scanner location.' }
             }
         }
-        $summary.State = 'observed'
-    } catch { $summary.State = 'unreadable-log' }
-    return $summary
-}
-
-
-# ENVIRONMENT WARNING PATTERNS: a Unity leg can pass every test and still be sick.
-#
-# Measured on run 33365150391 (issue #657): the runner's copy of
-# Unity.Licensing.Client.exe failed its own signature check, Unity logged
-# "LicensingClient has failed validation; ignoring" and carried on, so the suite ran
-# and every test passed -- and the leg then failed forty minutes later at
-# return-unity-license with "return-missing-positive-evidence". Later runs observed
-# the same signature warning followed by confirmed cleanup. Report the observed
-# log message; the final cleanup receipt determines cleanup health.
-#
-# Keep these as WARNINGS. Preserve the observations in the job summary without
-# changing test acceptance or predicting the independent cleanup result.
-function Get-EnvironmentWarningPatterns {
-    [CmdletBinding()]
-    param()
-
-    return @(
-        @{ Label = 'Licensing client signature validation failed (issue #657; final cleanup is evaluated separately)'; Pattern = 'while verifying Licensing Client signature'; UseSimple = $true }
-        @{ Label = 'Licensing client ignored after failing validation (issue #657)'; Pattern = 'LicensingClient has failed validation'; UseSimple = $true }
-        @{ Label = 'Licensing IPC channel absent at connection attempt (issue #657)'; Pattern = 'failed because channel doesn''t exist'; UseSimple = $true }
-    )
+        if ($value.LocationsTruncated -ne ($value.NativeReportHeaderCount -gt 8 -or $value.UnknownNativeConditionCount -gt 8)) {
+            throw 'Invalid native report scanner truncation.'
+        }
+        return $value
+    }
+    catch {
+        $summary.State = 'unreadable-log'
+        Write-Warning "Native report observations unavailable: $($_.Exception.Message)"
+        return $summary
+    }
+    finally {
+        try { if ($null -ne $nativeReader) { $nativeReader.Dispose() } }
+        finally {
+            if ($hadExitVariable) { $global:LASTEXITCODE = $priorExitCode }
+            else { Remove-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue }
+        }
+    }
 }

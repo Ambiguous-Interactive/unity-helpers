@@ -218,6 +218,29 @@ pairs after two warmup pairs measured 298.45 → 41.40 ms for a clean fixture an
 checker and do not measure Windows, complete pushes or CI. Host configuration helpers
 remain separate migration scope.
 
+Unity failure patterns and environment warnings share the declarative catalogue in
+`scripts/unity/log-patterns.json`. Native consumers retain their existing regex engine
+and can load the catalogue when Python bootstrap is unavailable. Licensing warnings
+remain observations; independent cleanup receipts determine cleanup health.
+
+`npm run test:catastrophic-pattern-sync` runs the typed scanner controls and the
+original native consumer checks. Native-report summaries stream through locked Python,
+preserve BOM and line-ending behavior, count all observations and retain at most eight
+locations for each marker. Read failures retain delivered observations with an
+`unreadable-log` state. Child or malformed-protocol failures cannot claim observations.
+The adapter preserves prior or undefined native exit status and closes its native
+read handle on success and failure. The native handle retains
+[FileShare.Read semantics](https://learn.microsoft.com/en-us/dotnet/api/system.io.file.openread?view=net-10.0).
+
+The [log qualification record](../performance/log-patterns-qualification.json)
+retains the original implementation, all pattern values, host profiles and performance
+misses. Seven alternating pairs after two warmup pairs in an existing PowerShell parent
+measured catalogue loading at 0.11 → 0.59 ms, a tiny scan at 4.09 → 49.90 ms and a
+4 MiB scan at 88.44 → 101.04 ms. These all regressed. A 32 MiB scan improved from
+688.71 → 460.70 ms on the measured shared 9p fixture. Earlier captures remain retained;
+these observations do not establish Windows, full-job or statistically significant
+improvements. The owned Windows writer-sharing control requires Windows CI.
+
 Unity project workspace selection and retention planning use locked typed Python behind
 `scripts/unity/lib/project-workspace.ps1`. Run `npm run test:project-workspace` for
 original-host comparisons, filesystem controls and compatibility launchers.

@@ -1355,6 +1355,15 @@
     {
       "filename": ["scripts/tests/fixtures/project-workspace-v1.json", "cspell.json"],
       "words": ["lfs", "cnotmatch", "ceq", "stra", "dfe", "STRASSE"]
+    },
+    {
+      "filename": ["scripts/tests/fixtures/log-patterns-v1.json", "cspell.json"],
+      "words": ["doesn"],
+      "ignoreRegExpList": ["/\"bytes\":\\s*\"[A-Za-z0-9+/=]*\"/g"]
+    },
+    {
+      "filename": ["docs/performance/log-patterns-qualification.json", "cspell.json"],
+      "words": ["isnot"]
     }
   ]
 }
