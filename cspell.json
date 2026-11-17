@@ -993,7 +993,8 @@
         "notin",
         "tmpfs",
         "moz",
-        "mcr"
+        "mcr",
+        "esbenp"
       ]
     }
   ],

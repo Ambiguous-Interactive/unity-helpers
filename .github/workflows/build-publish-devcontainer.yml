@@ -29,6 +29,9 @@ jobs:
       - name: Validate Dockerfile download URLs
         run: bash scripts/validate-devcontainer-urls.sh
 
+      - name: Setup Python tooling
+        uses: ./.github/actions/setup-python-tools
+
       - name: Validate devcontainer config
         shell: pwsh
         run: ./scripts/validate-devcontainer-config.ps1 -VerboseOutput
