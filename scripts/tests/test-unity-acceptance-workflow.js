@@ -1000,9 +1000,11 @@ assert.match(
   directSelection,
   /run: uv run --project scripts\/python~ --locked --no-dev python scripts\/unity\/native_build_selection\.py direct/
 );
+const setupPythonIndex = matrixConfig.indexOf("uses: ./.github/actions/setup-python-tools");
+assert.ok(setupPythonIndex >= 0, "Python tooling setup must exist in matrix-config");
 assert.ok(
-  matrixConfig.indexOf("uses: ./.github/actions/setup-python-tools") <
-    matrixConfig.indexOf(directSelection)
+  setupPythonIndex < matrixConfig.indexOf(directSelection),
+  "Python tooling setup must precede Direct selection"
 );
 assert.match(directSelection, /UH_NATIVE_DIAGNOSTICS: \$\{\{ inputs.native-diagnostics \}\}/);
 assert.match(directSelection, /UH_NATIVE_MODE: \$\{\{ inputs.test-mode \}\}/);
