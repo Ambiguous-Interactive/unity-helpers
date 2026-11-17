@@ -333,3 +333,20 @@ def test_reports_progress_while_a_network_probe_is_pending(tmp_path: Path) -> No
     assert child.returncode == 0, stderr
     assert b"Devcontainer Download URL Validation" in stdout
     assert ready, "The validator buffered all progress until the download probe finished."
+
+
+@pytest.mark.skipif(os.name == "nt", reason="The compatibility shell is tested on Linux.")
+def test_shell_test_launcher_collects_the_registered_suite(tmp_path: Path) -> None:
+    bash = shutil.which("bash")
+    assert bash is not None
+    result = subprocess.run(
+        [bash, str(ROOT / "scripts/tests/test-validate-devcontainer-urls.sh"), "--collect-only"],
+        cwd=tmp_path,
+        capture_output=True,
+        encoding="utf-8",
+        timeout=30,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "test_shell_test_launcher_collects_the_registered_suite" in result.stdout
+    assert re.search(r"\b[1-9][0-9]* tests collected\b", result.stdout)

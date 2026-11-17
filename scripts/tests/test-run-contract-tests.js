@@ -484,7 +484,11 @@ runTest("no contract test in scripts/tests/ has been left unreachable", () => {
     ],
     [
       "devcontainer-url-controls",
-      (file) => registeredControlsInvoke(file, "scripts/tests/test_devcontainer_urls.py")
+      (file) =>
+        registeredControlsInvoke(file, "scripts/tests/test_devcontainer_urls.py") &&
+        /subprocess\.run\(\s*\[\s*bash,\s*str\(ROOT \/ "scripts\/tests\/test-validate-devcontainer-urls\.sh"\),\s*"--collect-only",?\s*\]/.test(
+          fs.readFileSync(path.join(repoRoot, "scripts/tests/test_devcontainer_urls.py"), "utf8")
+        )
     ],
     [
       "devcontainer-controls",

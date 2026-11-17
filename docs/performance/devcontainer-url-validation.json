@@ -98,10 +98,11 @@
   "qualification": {
     "frozenDecisions": 25,
     "originalAssertionsBeforeAndThroughPort": 51,
-    "pythonCases": 34,
+    "pythonCases": 35,
     "liveUrlProbesPassed": 34,
     "retainedRed": "The first Python candidate used a different ANSI color for tool names. Sixteen exact stream controls failed. Restoring the original color made those controls pass.",
-    "streamingRed": "The initial Python port buffered its entire stdout until the curl subprocess exited. The subprocess pipe control reproduced the delay and now passes with line buffering."
+    "streamingRed": "The initial Python port buffered its entire stdout until the curl subprocess exited. The subprocess pipe control reproduced the delay and now passes with line buffering.",
+    "launcherReview": "The registry falsely accepted an executable-permission assertion as launcher execution. The stricter ownership predicate failed before the real collection control was added. Replacing the launcher with an error also fails the control."
   },
   "limits": "Local list command measurements only. Network probes, cold hosts and overall CI are outside this timing scope. Malformed shell fragments are outside Dockerfile download declaration syntax.",
   "previousCapture": {
