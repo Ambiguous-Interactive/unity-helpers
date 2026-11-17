@@ -651,6 +651,7 @@ def test_windows_phases_preserve_every_suite_and_bounded_concurrency() -> None:
         "scripts/tests/test_editmode_shards.py",
         "scripts/tests/test_fixture_assets.py",
         "scripts/tests/test_frozen_files.py",
+        "scripts/tests/test_github_pages_css.py",
         "scripts/tests/test_gitignore_docs.py",
         "scripts/tests/test_hook_permissions.py",
         "scripts/tests/test_hook_validation.py",
