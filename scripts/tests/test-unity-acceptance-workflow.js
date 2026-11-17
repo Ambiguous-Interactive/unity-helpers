@@ -420,7 +420,7 @@ for (const file of fs.readdirSync(workflowDirectory).filter((name) => /\.ya?ml$/
         for (const status of ["success", "failure", "cancelled"]) {
           const context = {
             github: { event_name: "workflow_dispatch" },
-            inputs: { acceptance: "all" },
+            inputs: { acceptance: "all", "latest-mode-scheduling": "combined" },
             needs: {
               "matrix-config": {
                 outputs: {
@@ -428,7 +428,7 @@ for (const file of fs.readdirSync(workflowDirectory).filter((name) => /\.ya?ml$/
                 }
               }
             },
-            matrix: {},
+            matrix: { "unity-version": "6000.6.0f1" },
             success: status === "success",
             failure: status === "failure",
             cancelled: status === "cancelled",
@@ -436,7 +436,8 @@ for (const file of fs.readdirSync(workflowDirectory).filter((name) => /\.ya?ml$/
               {},
               {
                 get: (_, id) => ({
-                  outcome: id === "checkout" ? checkoutOutcome : status
+                  outcome: id === "checkout" ? checkoutOutcome : status,
+                  outputs: { st_editmode: status, st_playmode: status, st_standalone: status }
                 })
               }
             )
@@ -563,7 +564,7 @@ const readbackOriginalJobPredicates = {
   "unity-tests":
     "!cancelled() &&\n        (github.event_name != 'pull_request' ||\n          github.event.pull_request.head.repo.full_name == github.repository) &&\n        (github.event_name != 'push' || github.ref_protected) &&\n        needs.matrix-config.result == 'success' &&\n        needs.runner-preflight.result == 'success' &&\n        needs.matrix-config.outputs.test-modes != '[]' &&\n        needs.matrix-config.outputs.superseded != 'true'",
   "unity-tests-single-threaded":
-    "!cancelled() &&\n        (github.event_name != 'pull_request' ||\n          github.event.pull_request.head.repo.full_name == github.repository) &&\n        (github.event_name != 'push' || github.ref_protected) &&\n        needs.matrix-config.result == 'success' &&\n        needs.runner-preflight.result == 'success' &&\n        needs.matrix-config.outputs.superseded != 'true'",
+    "!cancelled() &&\n        (github.event_name != 'pull_request' ||\n          github.event.pull_request.head.repo.full_name == github.repository) &&\n        (github.event_name != 'push' || github.ref_protected) &&\n        !(github.event_name == 'workflow_dispatch' && inputs.latest-mode-scheduling == 'combined') &&\n        needs.matrix-config.result == 'success' &&\n        needs.runner-preflight.result == 'success' &&\n        needs.matrix-config.outputs.superseded != 'true'",
   "unitypackage-smoke":
     "!cancelled() &&\n        (github.event_name != 'pull_request' ||\n          github.event.pull_request.head.repo.full_name == github.repository) &&\n        (github.event_name != 'push' || github.ref_protected) &&\n        needs.matrix-config.result == 'success' &&\n        needs.runner-preflight.result == 'success' &&\n        needs.matrix-config.outputs.superseded != 'true'",
   "unity-tests-aggregate": "always()",
@@ -1530,7 +1531,8 @@ for (const name of [
             FORK_PR: String(fork),
             DEPENDABOT_PR: String(dependabot),
             RUNNER_PREFLIGHT_RESULT: preflight,
-            UNITY_TESTS_RESULT: licensed
+            UNITY_TESTS_RESULT: licensed,
+            UH_COMBINED: "false"
           }
         });
         assert.ifError(result.error);
@@ -1540,6 +1542,33 @@ for (const name of [
           `${name}: ${JSON.stringify({ fork, dependabot, preflight, licensed })}: ${result.stderr}`
         );
         historicalAggregateControls++;
+      }
+    }
+  }
+  if (name === "unity-tests-single-threaded-aggregate") {
+    for (const preflight of outcomes) {
+      for (const split of outcomes) {
+        for (const combined of outcomes) {
+          const result = spawnSync("bash", ["-c", program], {
+            encoding: "utf8",
+            env: {
+              ...process.env,
+              FORK_PR: "false",
+              DEPENDABOT_PR: "false",
+              RUNNER_PREFLIGHT_RESULT: preflight,
+              UNITY_TESTS_RESULT: split,
+              UH_COMBINED: "true",
+              UH_COMBINED_RESULT: combined
+            }
+          });
+          assert.ifError(result.error);
+          assert.equal(
+            result.status === 0,
+            preflight === "success" && split === "skipped" && combined === "success",
+            `${name}: ${JSON.stringify({ preflight, split, combined })}: ${result.stderr}`
+          );
+          historicalAggregateControls++;
+        }
       }
     }
   }

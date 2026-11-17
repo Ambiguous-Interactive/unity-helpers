@@ -31,6 +31,14 @@ on:
           - editmode
           - playmode
           - standalone
+      latest-mode-scheduling:
+        description: "Run a paired latest-editor comparison with split or combined variant jobs."
+        required: false
+        default: "split"
+        type: choice
+        options:
+          - split
+          - combined
       acceptance:
         description: "Additional native acceptance; normal selected tests still run."
         required: false
@@ -292,6 +300,14 @@ jobs:
           UH_READBACK_RUN_ID: ${{ inputs.native-readback-run-id }}
         run: |
           if ($env:UH_READBACK_RUN_ID -cnotmatch '^[1-9][0-9]{0,19}$') { throw 'Build readback requires an explicit original source run ID.' }
+
+      - name: Validate combined sibling selection
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.latest-mode-scheduling == 'combined' }}
+        env:
+          UH_CAN_COMBINE: >-
+            ${{ inputs.unity-version == '6000.6.0f1' && inputs.test-mode == 'all' && inputs.acceptance == 'none' &&
+            !inputs.fresh-conversion && !inputs.native-diagnostics && !inputs.native-loader-snaps-comparison }}
+        run: test "$UH_CAN_COMBINE" = true
 
       - name: Validate native comparison selection
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.native-loader-snaps-comparison }}
@@ -701,10 +717,15 @@ jobs:
           GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
           UH_PARALLEL_ASSEMBLY_PROFILES: ${{ needs.matrix-config.outputs.integration-assembly-profiles }}
           UH_PARALLEL_SELECTED_MODES: ${{ needs.matrix-config.outputs.test-modes }}
+          UH_COMBINE_LATEST: ${{ github.event_name == 'workflow_dispatch' && inputs.latest-mode-scheduling == 'combined' && matrix.unity-version == '6000.6.0f1' }}
+          UH_PARALLEL_SINGLE_THREADED_SELECTED_MODES: '["editmode","playmode","standalone"]'
+          UH_PARALLEL_SINGLE_THREADED_ASSEMBLY_PROFILES: ${{ needs.matrix-config.outputs.core-assembly-profiles }}
         run: |
           $ErrorActionPreference = 'Stop'
           ./scripts/unity/assert-no-active-unity-editor.ps1
-          uv run --project scripts/python~ --locked --no-dev python scripts/unity/run_ci_modes.py --version '${{ matrix.unity-version }}' --editmode-shards 2 --max-workers 5
+          $variant = @()
+          if ($env:UH_COMBINE_LATEST -eq 'true') { $variant += '--with-single-threaded' }
+          uv run --project scripts/python~ --locked --no-dev python scripts/unity/run_ci_modes.py --version '${{ matrix.unity-version }}' --editmode-shards 2 --max-workers 5 @variant
           if ($LASTEXITCODE -ne 0) { throw 'One or more concurrent Unity modes failed.' }
           ./scripts/unity/assert-no-active-unity-editor.ps1
 
@@ -1456,6 +1477,231 @@ jobs:
           $ErrorActionPreference = 'Stop'
           ./scripts/unity/assert-test-mode-outcomes.ps1
 
+      - name: Report slowest EditMode tests (SINGLE_THREADED)
+        if: >-
+          ${{ github.event_name == 'workflow_dispatch' && inputs.latest-mode-scheduling == 'combined' && matrix.unity-version == '6000.6.0f1' &&
+            always() }}
+        shell: pwsh
+        run: |
+          $results = '.artifacts/unity/${{ matrix.unity-version }}-editmode-single-threaded/results.xml'
+          if (Test-Path -LiteralPath $results) {
+            ./scripts/unity/report-slow-tests.ps1 -ResultsPath $results -Top 30 -FixtureBudgetSeconds 120 -StepSummary
+          } else {
+            Write-Host "::notice::No results.xml at $results to report slow tests."
+          }
+
+      - name: Report slowest PlayMode tests (SINGLE_THREADED)
+        if: >-
+          ${{ github.event_name == 'workflow_dispatch' && inputs.latest-mode-scheduling == 'combined' && matrix.unity-version == '6000.6.0f1' &&
+            always() }}
+        shell: pwsh
+        run: |
+          $results = '.artifacts/unity/${{ matrix.unity-version }}-playmode-single-threaded/results.xml'
+          if (Test-Path -LiteralPath $results) {
+            ./scripts/unity/report-slow-tests.ps1 -ResultsPath $results -Top 30 -FixtureBudgetSeconds 120 -StepSummary
+          } else {
+            Write-Host "::notice::No results.xml at $results to report slow tests."
+          }
+
+      - name: Report slowest Standalone tests (SINGLE_THREADED)
+        if: >-
+          ${{ github.event_name == 'workflow_dispatch' && inputs.latest-mode-scheduling == 'combined' && matrix.unity-version == '6000.6.0f1' &&
+            always() }}
+        shell: pwsh
+        run: |
+          $results = '.artifacts/unity/${{ matrix.unity-version }}-standalone-single-threaded/results.xml'
+          if (Test-Path -LiteralPath $results) {
+            ./scripts/unity/report-slow-tests.ps1 -ResultsPath $results -Top 30 -FixtureBudgetSeconds 120 -StepSummary
+          } else {
+            Write-Host "::notice::No results.xml at $results to report slow tests."
+          }
+
+      - name: Dump EditMode log tail on failure (SINGLE_THREADED)
+        if: >-
+          ${{ github.event_name == 'workflow_dispatch' && inputs.latest-mode-scheduling == 'combined' && matrix.unity-version == '6000.6.0f1' &&
+            always() && steps.checkout.outcome == 'success' && steps.run_modes.outputs.st_editmode != 'success' }}
+        uses: ./.github/actions/dump-unity-log-tail
+        with:
+          results-dir: .artifacts/unity/${{ matrix.unity-version }}-editmode-single-threaded
+          label: Unity ${{ matrix.unity-version }} editmode (SINGLE_THREADED)
+
+      - name: Dump PlayMode log tail on failure (SINGLE_THREADED)
+        if: >-
+          ${{ github.event_name == 'workflow_dispatch' && inputs.latest-mode-scheduling == 'combined' && matrix.unity-version == '6000.6.0f1' &&
+            always() && steps.checkout.outcome == 'success' && steps.run_modes.outputs.st_playmode != 'success' }}
+        uses: ./.github/actions/dump-unity-log-tail
+        with:
+          results-dir: .artifacts/unity/${{ matrix.unity-version }}-playmode-single-threaded
+          label: Unity ${{ matrix.unity-version }} playmode (SINGLE_THREADED)
+
+      - name: Dump Standalone log tail on failure (SINGLE_THREADED)
+        if: >-
+          ${{ github.event_name == 'workflow_dispatch' && inputs.latest-mode-scheduling == 'combined' && matrix.unity-version == '6000.6.0f1' &&
+            always() && steps.checkout.outcome == 'success' && steps.run_modes.outputs.st_standalone != 'success' }}
+        uses: ./.github/actions/dump-unity-log-tail
+        with:
+          results-dir: .artifacts/unity/${{ matrix.unity-version }}-standalone-single-threaded
+          label: Unity ${{ matrix.unity-version }} standalone (SINGLE_THREADED)
+
+      - name: Verify EditMode tests actually ran (SINGLE_THREADED)
+        id: verify_st_editmode
+        if: >-
+          ${{ github.event_name == 'workflow_dispatch' && inputs.latest-mode-scheduling == 'combined' && matrix.unity-version == '6000.6.0f1' &&
+            always() && !cancelled() }}
+        continue-on-error: true
+        uses: ./.github/actions/verify-unity-results
+        with:
+          results-dir: .artifacts/unity/${{ matrix.unity-version }}-editmode-single-threaded
+          label: Unity ${{ matrix.unity-version }} editmode (SINGLE_THREADED)
+          expected-empty: false
+          required-compilation-fixture: WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration.OdinMigrationDictionaryCompilationTests
+          unity-version: ${{ matrix.unity-version }}
+
+      - name: Verify PlayMode tests actually ran (SINGLE_THREADED)
+        id: verify_st_playmode
+        if: >-
+          ${{ github.event_name == 'workflow_dispatch' && inputs.latest-mode-scheduling == 'combined' && matrix.unity-version == '6000.6.0f1' &&
+            always() && !cancelled() }}
+        continue-on-error: true
+        uses: ./.github/actions/verify-unity-results
+        with:
+          results-dir: .artifacts/unity/${{ matrix.unity-version }}-playmode-single-threaded
+          label: Unity ${{ matrix.unity-version }} playmode (SINGLE_THREADED)
+          expected-empty: false
+
+      - name: Verify Standalone tests actually ran (SINGLE_THREADED)
+        id: verify_st_standalone
+        if: >-
+          ${{ github.event_name == 'workflow_dispatch' && inputs.latest-mode-scheduling == 'combined' && matrix.unity-version == '6000.6.0f1' &&
+            always() && !cancelled() }}
+        continue-on-error: true
+        uses: ./.github/actions/verify-unity-results
+        with:
+          results-dir: .artifacts/unity/${{ matrix.unity-version }}-standalone-single-threaded
+          label: Unity ${{ matrix.unity-version }} standalone (SINGLE_THREADED)
+          expected-empty: false
+
+      # LEAK GUARD: Unity writes its license identity into unity.log and
+      # configure.log while it activates. GitHub masks a registered secret in
+      # the rendered job log, but it never rewrites the bytes of an uploaded
+      # artifact, so the upload below would hand the serial to anyone who can
+      # download it. Scrub the tree after the last Unity invocation and before
+      # the first upload that can carry a log.
+      #
+      # This runner has no Node on PATH, and the redactor is a Node script.
+
+      - name: Redact credentials from EditMode artifacts (SINGLE_THREADED)
+        id: redact_st_editmode
+        if: >-
+          ${{ github.event_name == 'workflow_dispatch' && inputs.latest-mode-scheduling == 'combined' && matrix.unity-version == '6000.6.0f1' &&
+            always() && steps.checkout.outcome == 'success' }}
+        continue-on-error: true
+        timeout-minutes: 2
+        uses: ./.github/actions/redact-unity-artifacts
+        with:
+          paths: |
+            .artifacts/unity/${{ matrix.unity-version }}-editmode-single-threaded
+            .artifacts/unity/${{ matrix.unity-version }}-e1-single-threaded
+
+      - name: Upload EditMode artifacts (SINGLE_THREADED)
+        id: upload_st_editmode
+        if: >-
+          ${{ github.event_name == 'workflow_dispatch' && inputs.latest-mode-scheduling == 'combined' && matrix.unity-version == '6000.6.0f1' &&
+            always() && steps.redact_st_editmode.outcome == 'success' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: unity-${{ matrix.unity-version }}-editmode-single-threaded
+          path: .artifacts/unity/${{ matrix.unity-version }}-editmode-single-threaded
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload separate EditMode shard artifacts (SINGLE_THREADED)
+        if: >-
+          ${{ github.event_name == 'workflow_dispatch' && inputs.latest-mode-scheduling == 'combined' && matrix.unity-version == '6000.6.0f1' &&
+            always() && steps.redact_st_editmode.outcome == 'success' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: unity-${{ matrix.unity-version }}-editmode-shard-single-threaded
+          path: .artifacts/unity/${{ matrix.unity-version }}-e1-single-threaded
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Redact credentials from PlayMode artifacts (SINGLE_THREADED)
+        id: redact_st_playmode
+        if: >-
+          ${{ github.event_name == 'workflow_dispatch' && inputs.latest-mode-scheduling == 'combined' && matrix.unity-version == '6000.6.0f1' &&
+            always() && steps.checkout.outcome == 'success' }}
+        continue-on-error: true
+        timeout-minutes: 2
+        uses: ./.github/actions/redact-unity-artifacts
+        with:
+          paths: .artifacts/unity/${{ matrix.unity-version }}-playmode-single-threaded
+
+      - name: Upload PlayMode artifacts (SINGLE_THREADED)
+        id: upload_st_playmode
+        if: >-
+          ${{ github.event_name == 'workflow_dispatch' && inputs.latest-mode-scheduling == 'combined' && matrix.unity-version == '6000.6.0f1' &&
+            always() && steps.redact_st_playmode.outcome == 'success' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: unity-${{ matrix.unity-version }}-playmode-single-threaded
+          path: .artifacts/unity/${{ matrix.unity-version }}-playmode-single-threaded
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Redact credentials from Standalone artifacts (SINGLE_THREADED)
+        id: redact_st_standalone
+        if: >-
+          ${{ github.event_name == 'workflow_dispatch' && inputs.latest-mode-scheduling == 'combined' && matrix.unity-version == '6000.6.0f1' &&
+            always() && steps.checkout.outcome == 'success' }}
+        continue-on-error: true
+        timeout-minutes: 2
+        uses: ./.github/actions/redact-unity-artifacts
+        with:
+          paths: .artifacts/unity/${{ matrix.unity-version }}-standalone-single-threaded
+
+      - name: Upload Standalone artifacts (SINGLE_THREADED)
+        id: upload_st_standalone
+        if: >-
+          ${{ github.event_name == 'workflow_dispatch' && inputs.latest-mode-scheduling == 'combined' && matrix.unity-version == '6000.6.0f1' &&
+            always() && steps.redact_st_standalone.outcome == 'success' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: unity-${{ matrix.unity-version }}-standalone-single-threaded
+          path: .artifacts/unity/${{ matrix.unity-version }}-standalone-single-threaded
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Require every SINGLE_THREADED Unity mode
+        id: require_st_modes
+        if: >-
+          ${{ github.event_name == 'workflow_dispatch' && inputs.latest-mode-scheduling == 'combined' && matrix.unity-version == '6000.6.0f1' &&
+            always() && !cancelled() }}
+        shell: pwsh
+        env:
+          CONTROLLER: ${{ steps.run_modes.outcome }}
+          SELECTED_MODES: '["editmode","playmode","standalone"]'
+          EDITMODE_RUN: ${{ steps.run_modes.outputs.st_editmode }}
+          EDITMODE_VERIFY: ${{ steps.verify_st_editmode.outcome }}
+          EDITMODE_REDACT: ${{ steps.redact_st_editmode.outcome }}
+          EDITMODE_UPLOAD: ${{ steps.upload_st_editmode.outcome }}
+          PLAYMODE_RUN: ${{ steps.run_modes.outputs.st_playmode }}
+          PLAYMODE_VERIFY: ${{ steps.verify_st_playmode.outcome }}
+          PLAYMODE_REDACT: ${{ steps.redact_st_playmode.outcome }}
+          PLAYMODE_UPLOAD: ${{ steps.upload_st_playmode.outcome }}
+          STANDALONE_RUN: ${{ steps.run_modes.outputs.st_standalone }}
+          STANDALONE_VERIFY: ${{ steps.verify_st_standalone.outcome }}
+          STANDALONE_REDACT: ${{ steps.redact_st_standalone.outcome }}
+          STANDALONE_UPLOAD: ${{ steps.upload_st_standalone.outcome }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:CONTROLLER -cne 'success') { throw 'The combined controller did not complete.' }
+          ./scripts/unity/assert-test-mode-outcomes.ps1
+
       - name: Require confirmed Unity cleanup
         if: always()
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-confirmed-unity-cleanup@720ef47f9ab352fbc9403363ca63ae8c487a2442 # v1.18.1
@@ -1507,6 +1753,7 @@ jobs:
         (github.event_name != 'pull_request' ||
           github.event.pull_request.head.repo.full_name == github.repository) &&
         (github.event_name != 'push' || github.ref_protected) &&
+        !(github.event_name == 'workflow_dispatch' && inputs.latest-mode-scheduling == 'combined') &&
         needs.matrix-config.result == 'success' &&
         needs.runner-preflight.result == 'success' &&
         needs.matrix-config.outputs.superseded != 'true'
@@ -2331,6 +2578,7 @@ jobs:
     needs:
       - runner-preflight
       - unity-tests-single-threaded
+      - unity-tests
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
@@ -2339,6 +2587,8 @@ jobs:
         env:
           RUNNER_PREFLIGHT_RESULT: ${{ needs.runner-preflight.result }}
           UNITY_TESTS_RESULT: ${{ needs.unity-tests-single-threaded.result }}
+          UH_COMBINED: ${{ github.event_name == 'workflow_dispatch' && inputs.latest-mode-scheduling == 'combined' }}
+          UH_COMBINED_RESULT: ${{ needs.unity-tests.result }}
           FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
           DEPENDABOT_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]' }}
         run: |
@@ -2346,6 +2596,10 @@ jobs:
           if [ "${FORK_PR}" = "true" ] || [ "${DEPENDABOT_PR}" = "true" ]; then
             test "${RUNNER_PREFLIGHT_RESULT}" = skipped
             test "${UNITY_TESTS_RESULT}" = skipped
+          elif [ "$UH_COMBINED" = true ]; then
+            test "${RUNNER_PREFLIGHT_RESULT}" = success
+            test "${UNITY_TESTS_RESULT}" = skipped
+            test "$UH_COMBINED_RESULT" = success
           else
             test "${RUNNER_PREFLIGHT_RESULT}" = success
             test "${UNITY_TESTS_RESULT}" = success
@@ -2448,6 +2702,7 @@ jobs:
           RUNNER_PREFLIGHT_RESULT: ${{ needs.runner-preflight.result }}
           UNITY_TESTS_RESULT: ${{ needs.unity-tests.result }}
           SINGLE_THREADED_RESULT: ${{ needs.unity-tests-single-threaded.result }}
+          UH_COMBINED: ${{ github.event_name == 'workflow_dispatch' && inputs.latest-mode-scheduling == 'combined' }}
           UNITYPACKAGE_SMOKE_RESULT: ${{ needs.unitypackage-smoke.result }}
         run: |
           set -euo pipefail
@@ -2554,7 +2809,11 @@ jobs:
           require_result "matrix-config" "${MATRIX_CONFIG_RESULT}" "success"
           require_result "runner-preflight" "${RUNNER_PREFLIGHT_RESULT}" "success"
           require_result "unity-tests" "${UNITY_TESTS_RESULT}" "success"
-          require_result "unity-tests-single-threaded" "${SINGLE_THREADED_RESULT}" "success"
+          if [ "$UH_COMBINED" = true ]; then
+            require_result "unity-tests-single-threaded" "${SINGLE_THREADED_RESULT}" "skipped"
+          else
+            require_result "unity-tests-single-threaded" "${SINGLE_THREADED_RESULT}" "success"
+          fi
           require_result "unitypackage-smoke" "${UNITYPACKAGE_SMOKE_RESULT}" "success"
 
           if [ "${failed}" = "true" ]; then

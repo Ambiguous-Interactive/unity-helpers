@@ -449,10 +449,15 @@ jobs:
           GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
           UH_PARALLEL_ASSEMBLY_PROFILES: ${{ needs.matrix-config.outputs.integration-assembly-profiles }}
           UH_PARALLEL_SELECTED_MODES: ${{ needs.matrix-config.outputs.test-modes }}
+          UH_COMBINE_LATEST: ${{ github.event_name == 'workflow_dispatch' && 'split' == 'combined' && matrix.unity-version == '6000.6.0f1' }}
+          UH_PARALLEL_SINGLE_THREADED_SELECTED_MODES: '["editmode","playmode","standalone"]'
+          UH_PARALLEL_SINGLE_THREADED_ASSEMBLY_PROFILES: ${{ needs.matrix-config.outputs.core-assembly-profiles }}
         run: |
           $ErrorActionPreference = 'Stop'
           ./scripts/unity/assert-no-active-unity-editor.ps1
-          uv run --project scripts/python~ --locked --no-dev python scripts/unity/run_ci_modes.py --version '${{ matrix.unity-version }}' --editmode-shards 2 --max-workers 5
+          $variant = @()
+          if ($env:UH_COMBINE_LATEST -eq 'true') { $variant += '--with-single-threaded' }
+          uv run --project scripts/python~ --locked --no-dev python scripts/unity/run_ci_modes.py --version '${{ matrix.unity-version }}' --editmode-shards 2 --max-workers 5 @variant
           if ($LASTEXITCODE -ne 0) { throw 'One or more concurrent Unity modes failed.' }
           ./scripts/unity/assert-no-active-unity-editor.ps1
 

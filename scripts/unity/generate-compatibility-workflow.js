@@ -28,6 +28,13 @@ function renderCompatibilityWorkflow(source) {
       (_, name) =>
         `    name: ${id === "unity-tests-aggregate" ? "Unity Compatibility Success" : `Compatibility ${name}`}`
     );
+    block = block
+      .split(/(?=^      - name: )/m)
+      .filter((section) => {
+        const condition = section.match(/^        if:[^\n]*(?:\n {10,}[^\n]*)*/m)?.[0];
+        return !condition?.includes("inputs.latest-mode-scheduling");
+      })
+      .join("");
     block = block.replace(/inputs\.([a-z][a-z0-9-]*)/g, (_, input) => {
       if (
         [
@@ -38,6 +45,7 @@ function renderCompatibilityWorkflow(source) {
       )
         return "''";
       if (input === "acceptance") return "'none'";
+      if (input === "latest-mode-scheduling") return "'split'";
       if (input === "test-mode") return "'all'";
       const flags = [
         "fresh-conversion",
