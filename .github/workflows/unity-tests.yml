@@ -1523,7 +1523,8 @@ jobs:
       - name: Dump EditMode log tail on failure (SINGLE_THREADED)
         if: >-
           ${{ needs.matrix-config.outputs.combine-variants == 'true' && matrix.unity-version == '6000.6.0f1' &&
-            (github.event_name != 'pull_request' || contains(fromJSON(needs.matrix-config.outputs.test-modes), 'editmode')) && always() && steps.checkout.outcome == 'success' && steps.run_modes.outputs.st_editmode != 'success' }}
+            (github.event_name != 'pull_request' || contains(fromJSON(needs.matrix-config.outputs.test-modes), 'editmode')) && always() &&
+            steps.checkout.outcome == 'success' && steps.run_modes.outputs.st_editmode != 'success' }}
         uses: ./.github/actions/dump-unity-log-tail
         with:
           results-dir: .artifacts/unity/${{ matrix.unity-version }}-editmode-single-threaded
@@ -1532,7 +1533,8 @@ jobs:
       - name: Dump PlayMode log tail on failure (SINGLE_THREADED)
         if: >-
           ${{ needs.matrix-config.outputs.combine-variants == 'true' && matrix.unity-version == '6000.6.0f1' &&
-            (github.event_name != 'pull_request' || contains(fromJSON(needs.matrix-config.outputs.test-modes), 'playmode')) && always() && steps.checkout.outcome == 'success' && steps.run_modes.outputs.st_playmode != 'success' }}
+            (github.event_name != 'pull_request' || contains(fromJSON(needs.matrix-config.outputs.test-modes), 'playmode')) && always() &&
+            steps.checkout.outcome == 'success' && steps.run_modes.outputs.st_playmode != 'success' }}
         uses: ./.github/actions/dump-unity-log-tail
         with:
           results-dir: .artifacts/unity/${{ matrix.unity-version }}-playmode-single-threaded
@@ -1541,7 +1543,8 @@ jobs:
       - name: Dump Standalone log tail on failure (SINGLE_THREADED)
         if: >-
           ${{ needs.matrix-config.outputs.combine-variants == 'true' && matrix.unity-version == '6000.6.0f1' &&
-            (github.event_name != 'pull_request' || contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone')) && always() && steps.checkout.outcome == 'success' && steps.run_modes.outputs.st_standalone != 'success' }}
+            (github.event_name != 'pull_request' || contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone')) && always() &&
+            steps.checkout.outcome == 'success' && steps.run_modes.outputs.st_standalone != 'success' }}
         uses: ./.github/actions/dump-unity-log-tail
         with:
           results-dir: .artifacts/unity/${{ matrix.unity-version }}-standalone-single-threaded
