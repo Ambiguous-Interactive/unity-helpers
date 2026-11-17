@@ -75,6 +75,33 @@ def test_original_executable_decisions(
     assert snapshot(tmp_path) == before
 
 
+@pytest.mark.parametrize(
+    ("language", "alias"),
+    [
+        ("shellscript", "\u017fhellscript"),
+        ("markdown", "mar\u212adown"),
+        ("javascript", "javascr\u0131pt"),
+    ],
+)
+def test_original_ordinal_language_rejections(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], language: str, alias: str
+) -> None:
+    configuration = CORPUS["base"][".devcontainer/devcontainer.json"]
+    populate(
+        tmp_path,
+        {".devcontainer/devcontainer.json": configuration.replace(f"[{language}]", f"[{alias}]")},
+    )
+    before = snapshot(tmp_path)
+    assert checker.main(["--repo-root", str(tmp_path)]) == 1
+    output = capsys.readouterr()
+    assert f"[{language}]" in output.err
+    assert (
+        "devcontainer.json is missing 1 explicit formatter assignment(s). See warnings above."
+        in output.err
+    )
+    assert snapshot(tmp_path) == before
+
+
 def test_repository_passes() -> None:
     assert checker.main([]) == 0
 

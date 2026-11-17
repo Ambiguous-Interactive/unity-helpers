@@ -82,7 +82,10 @@ def validate(root: Path, *, verbose: bool = False) -> int:
             "org.opencontainers.image.source=https://github.com/${{ github.repository }}",
             "must publish an org.opencontainers.image.source label so GHCR links the image to this repository.",
         ),
-        (SELF_VALIDATION, "must run validate-devcontainer-config.ps1 before publishing to GHCR."),
+        (
+            SELF_VALIDATION,
+            "must run validate-devcontainer-config.ps1 before publishing to GHCR.",
+        ),
     ]:
         if token not in publication:
             raise ValueError("build-publish-devcontainer.yml " + message)
@@ -102,7 +105,10 @@ def validate(root: Path, *, verbose: bool = False) -> int:
         print("Devcontainer image namespace and GHCR publish metadata are valid.")
     entries: dict[str, str] = {}
     for language in re.findall(r'"\[(\w+)\]"', configuration):
-        entries.setdefault(language.casefold(), language)
+        # Expected identifiers are ASCII; Unicode case folding accepts aliases that
+        # the original OrdinalIgnoreCase set rejects (for example, a long s).
+        key = language.lower() if language.isascii() else language
+        entries.setdefault(key, language)
     if verbose:
         print("Found devcontainer formatter entries for: " + ", ".join(entries.values()))
     missing = [entry for entry in LANGUAGES if entry[0] not in entries]

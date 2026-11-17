@@ -115,14 +115,14 @@ compatibility launchers. The gate preserves the image namespace, cache tags, pub
 workflow coverage and eleven required language-entry checks. Its retained text patterns check
 entry presence; they do not validate arbitrary JSON/YAML schemas or formatter values.
 
-`npm run test:validate-devcontainer-config` replays 33 original executable decisions. All 22 original
+`npm run test:validate-devcontainer-config` replays 36 original executable decisions. All 22 original
 suite assertions pass before and through the port. Additional controls cover five original BOM
-encodings, Unicode/foreign-directory launchers, failures without input mutation, and Python setup
+encodings, ordinal language-identifier casing, Unicode/foreign-directory launchers, failures without input mutation, and Python setup
 before publication validation. PowerShell's error framing remains host presentation; failure
 status and actionable message text are preserved. All 184 Python files join strict checks.
 
 Seven alternating Linux tmpfs process pairs after two warmups per arm measured repository
-validation at 284.74 → 40.83 ms and a 500-workflow fixture at 334.68 → 43.43 ms, including uv startup.
+validation at 279.06 → 42.45 ms and a 500-workflow fixture at 331.75 → 43.26 ms, including uv startup.
 Every pair matches successful stdout/stderr and exit status and retains input/source hashes.
 The [qualification record](../performance/devcontainer-config-qualification.json) preserves those
 observations, original decisions and setup limitations. Windows, cold-host and whole-CI speed
