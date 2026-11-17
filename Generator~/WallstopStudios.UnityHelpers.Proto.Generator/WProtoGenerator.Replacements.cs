@@ -306,23 +306,18 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 writer.Line("public int MeasureSubtype(in " + qualified + " value)" + Writer.Open);
                 writer.Indent();
                 writer.Line("int size = 0;");
-                EmitIncludeDispatch(
-                    writer,
-                    contract,
-                    qualified,
-                    includes,
-                    include =>
-                        "size += "
-                        + Proto
-                        + ".WProtoSizes.TagSize("
-                        + include.Tag
-                        + ") + "
-                        + Proto
-                        + ".WProtoSizes.MessageSize("
-                        + include.Formatter
-                        + ", "
-                        + include.Local
-                        + ");"
+                EmitIncludeDispatch(writer, contract, qualified, includes, include =>
+                    "size += "
+                    + Proto
+                    + ".WProtoSizes.TagSize("
+                    + include.Tag
+                    + ") + "
+                    + Proto
+                    + ".WProtoSizes.MessageSize("
+                    + include.Formatter
+                    + ", "
+                    + include.Local
+                    + ");"
                 );
                 writer.Line("return size;");
                 writer.Outdent();
@@ -336,19 +331,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         + Writer.Open
                 );
                 writer.Indent();
-                EmitIncludeDispatch(
-                    writer,
-                    contract,
-                    qualified,
-                    includes,
-                    include =>
-                        "if (!writer.TryWriteMessage("
-                        + include.Tag
-                        + ", "
-                        + include.Formatter
-                        + ", "
-                        + include.Local
-                        + "))"
+                EmitIncludeDispatch(writer, contract, qualified, includes, include =>
+                    "if (!writer.TryWriteMessage("
+                    + include.Tag
+                    + ", "
+                    + include.Formatter
+                    + ", "
+                    + include.Local
+                    + "))"
                 );
                 writer.Line("return true;");
                 writer.Outdent();

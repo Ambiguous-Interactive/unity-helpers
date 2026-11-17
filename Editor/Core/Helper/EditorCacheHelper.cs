@@ -176,10 +176,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
         {
             (int, int) key = (page, totalPages);
 
-            return PaginationLabelCache.GetOrAdd(
-                key,
-                static k =>
-                    "Page " + GetCachedIntString(k.Item1) + " / " + GetCachedIntString(k.Item2)
+            return PaginationLabelCache.GetOrAdd(key, static k =>
+                "Page " + GetCachedIntString(k.Item1) + " / " + GetCachedIntString(k.Item2)
             );
         }
 

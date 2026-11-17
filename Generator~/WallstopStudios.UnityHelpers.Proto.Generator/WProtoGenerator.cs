@@ -2382,23 +2382,18 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
             else
             {
-                EmitIncludeDispatch(
-                    writer,
-                    contract,
-                    qualified,
-                    includes,
-                    include =>
-                        "size += "
-                        + Proto
-                        + ".WProtoSizes.TagSize("
-                        + include.Tag
-                        + ") + "
-                        + Proto
-                        + ".WProtoSizes.MessageSize("
-                        + include.Formatter
-                        + ", "
-                        + include.Local
-                        + ");"
+                EmitIncludeDispatch(writer, contract, qualified, includes, include =>
+                    "size += "
+                    + Proto
+                    + ".WProtoSizes.TagSize("
+                    + include.Tag
+                    + ") + "
+                    + Proto
+                    + ".WProtoSizes.MessageSize("
+                    + include.Formatter
+                    + ", "
+                    + include.Local
+                    + ");"
                 );
             }
 
@@ -2462,19 +2457,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
             else
             {
-                EmitIncludeDispatch(
-                    writer,
-                    contract,
-                    qualified,
-                    includes,
-                    include =>
-                        "if (!writer.TryWriteMessage("
-                        + include.Tag
-                        + ", "
-                        + include.Formatter
-                        + ", "
-                        + include.Local
-                        + "))"
+                EmitIncludeDispatch(writer, contract, qualified, includes, include =>
+                    "if (!writer.TryWriteMessage("
+                    + include.Tag
+                    + ", "
+                    + include.Formatter
+                    + ", "
+                    + include.Local
+                    + "))"
                 );
             }
 
@@ -4509,8 +4499,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     )
                 )
                 {
-                    Location location =
-                        protobufContract.ApplicationSyntaxReference?.GetSyntax().GetLocation()
+                    Location location = protobufContract
+                        .ApplicationSyntaxReference?.GetSyntax()
+                        .GetLocation()
                         ?? FirstLocation(symbol);
                     context.ReportDiagnostic(
                         Diagnostic.Create(

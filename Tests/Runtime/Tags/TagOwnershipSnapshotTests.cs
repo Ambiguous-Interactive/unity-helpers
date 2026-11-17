@@ -31,14 +31,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             );
             TagHandler tags = entity.GetComponent<TagHandler>();
             tags.ApplyTag(OtherTag);
-            AttributeEffect effect = CreateEffect(
-                OwnedTag,
-                authored =>
-                {
-                    authored.effectTags.Add(OwnedTag);
-                    authored.effectTags.Add(OwnedTag);
-                }
-            );
+            AttributeEffect effect = CreateEffect(OwnedTag, authored =>
+            {
+                authored.effectTags.Add(OwnedTag);
+                authored.effectTags.Add(OwnedTag);
+            });
             EffectHandle handle = EffectHandle.CreateInstance(effect);
             tags.ForceApplyTags(handle);
             if (destroysAsset)
@@ -99,16 +96,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             TagHandler tags = entity.GetComponent<TagHandler>();
             for (int i = 0; i < 2; ++i)
             {
-                AttributeEffect effect = CreateEffect(
-                    OwnedTag + i,
-                    authored => authored.effectTags.Add(OwnedTag)
+                AttributeEffect effect = CreateEffect(OwnedTag + i, authored =>
+                    authored.effectTags.Add(OwnedTag)
                 );
                 tags.ForceApplyTags(EffectHandle.CreateInstance(effect));
             }
             string survivingTag = matchesRemovedTag ? OwnedTag : OtherTag;
-            AttributeEffect replacement = CreateEffect(
-                nameof(replacement),
-                authored => authored.effectTags.Add(survivingTag)
+            AttributeEffect replacement = CreateEffect(nameof(replacement), authored =>
+                authored.effectTags.Add(survivingTag)
             );
             EffectHandle survivor = default;
             bool replaced = false;
@@ -175,19 +170,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             TagHandler tags = entity.GetComponent<TagHandler>();
             tags.ApplyTag(OwnedTag);
             tags.ApplyTag(OwnedTag);
-            AttributeEffect original = CreateEffect(
-                nameof(original),
-                authored => authored.effectTags.Add(OwnedTag)
+            AttributeEffect original = CreateEffect(nameof(original), authored =>
+                authored.effectTags.Add(OwnedTag)
             );
             tags.ForceApplyTags(EffectHandle.CreateInstance(original));
-            AttributeEffect replacement = CreateEffect(
-                nameof(replacement),
-                authored =>
-                {
-                    authored.effectTags.Add(OwnedTag);
-                    authored.effectTags.Add(OwnedTag);
-                }
-            );
+            AttributeEffect replacement = CreateEffect(nameof(replacement), authored =>
+            {
+                authored.effectTags.Add(OwnedTag);
+                authored.effectTags.Add(OwnedTag);
+            });
             EffectHandle survivor = EffectHandle.CreateInstance(replacement);
             bool replaced = false;
             tags.OnTagCountChanged += (changed, count) =>
@@ -237,14 +228,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 typeof(TagHandler)
             );
             TagHandler tags = entity.GetComponent<TagHandler>();
-            AttributeEffect effect = CreateEffect(
-                OwnedTag,
-                authored =>
-                {
-                    authored.effectTags.Add(OwnedTag);
-                    authored.effectTags.Add("Unapplied");
-                }
-            );
+            AttributeEffect effect = CreateEffect(OwnedTag, authored =>
+            {
+                authored.effectTags.Add(OwnedTag);
+                authored.effectTags.Add("Unapplied");
+            });
             EffectHandle handle = EffectHandle.CreateInstance(effect);
             bool replaced = false;
             tags.OnTagAdded += added =>
@@ -288,9 +276,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             );
             TagHandler tags = entity.GetComponent<TagHandler>();
             tags.ApplyTag(OtherTag);
-            AttributeEffect effect = CreateEffect(
-                OwnedTag,
-                authored => authored.effectTags.Add(OwnedTag)
+            AttributeEffect effect = CreateEffect(OwnedTag, authored =>
+                authored.effectTags.Add(OwnedTag)
             );
             EffectHandle handle = EffectHandle.CreateInstance(effect);
             tags.OnTagAdded += added =>
@@ -315,14 +302,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 typeof(TagHandler)
             );
             TagHandler tags = entity.GetComponent<TagHandler>();
-            AttributeEffect effect = CreateEffect(
-                OwnedTag,
-                authored =>
-                {
-                    authored.effectTags.Add(OwnedTag);
-                    authored.effectTags.Add(OtherTag);
-                }
-            );
+            AttributeEffect effect = CreateEffect(OwnedTag, authored =>
+            {
+                authored.effectTags.Add(OwnedTag);
+                authored.effectTags.Add(OtherTag);
+            });
             int notifications = 0;
             tags.OnTagAdded += added =>
             {
@@ -349,14 +333,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 typeof(TagHandler)
             );
             TagHandler tags = entity.GetComponent<TagHandler>();
-            AttributeEffect effect = CreateEffect(
-                OwnedTag,
-                authored =>
-                {
-                    authored.effectTags.Add(OwnedTag);
-                    authored.effectTags.Add(OtherTag);
-                }
-            );
+            AttributeEffect effect = CreateEffect(OwnedTag, authored =>
+            {
+                authored.effectTags.Add(OwnedTag);
+                authored.effectTags.Add(OtherTag);
+            });
             tags.OnTagAdded += added => effect.effectTags.Clear();
             Assert.DoesNotThrow(() => tags.ForceApplyEffect(effect));
             Assert.IsTrue(tags.HasTag(OwnedTag));
@@ -402,14 +383,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 typeof(TagHandler)
             );
             TagHandler tags = entity.GetComponent<TagHandler>();
-            AttributeEffect effect = CreateEffect(
-                OwnedTag,
-                authored =>
-                {
-                    authored.effectTags.Add(OwnedTag);
-                    authored.effectTags.Add(OtherTag);
-                }
-            );
+            AttributeEffect effect = CreateEffect(OwnedTag, authored =>
+            {
+                authored.effectTags.Add(OwnedTag);
+                authored.effectTags.Add(OtherTag);
+            });
             EffectHandle handle = EffectHandle.CreateInstance(effect);
             tags.OnTagAdded += added =>
             {

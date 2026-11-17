@@ -67,14 +67,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         {
             return new[]
             {
-                new TreeSpec(
-                    "KDTree3D (Balanced)",
-                    points => new KdTree3D<Vector3>(points, p => p)
-                ),
-                new TreeSpec(
-                    "KDTree3D (Unbalanced)",
-                    points => new KdTree3D<Vector3>(points, p => p, balanced: false)
-                ),
+                new TreeSpec("KDTree3D (Balanced)", points => new KdTree3D<Vector3>(points, p =>
+                    p
+                )),
+                new TreeSpec("KDTree3D (Unbalanced)", points => new KdTree3D<Vector3>(
+                    points,
+                    p => p,
+                    balanced: false
+                )),
                 new TreeSpec("OctTree3D", points => new OctTree3D<Vector3>(points, p => p)),
                 new TreeSpec("RTree3D", points => new RTree3D<Vector3>(points, CreatePointBounds)),
             };
@@ -108,27 +108,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             int width = dataset.GridSize.x;
             int height = dataset.GridSize.y;
             int depth = dataset.GridSize.z;
-            Parallel.For(
-                0,
-                depth,
-                z =>
+            Parallel.For(0, depth, z =>
+            {
+                int layerOffset = z * width * height;
+                for (int y = 0; y < height; ++y)
                 {
-                    int layerOffset = z * width * height;
-                    for (int y = 0; y < height; ++y)
+                    int rowOffset = layerOffset + y * width;
+                    for (int x = 0; x < width; ++x)
                     {
-                        int rowOffset = layerOffset + y * width;
-                        for (int x = 0; x < width; ++x)
+                        int index = rowOffset + x;
+                        if (points.Length <= index)
                         {
-                            int index = rowOffset + x;
-                            if (points.Length <= index)
-                            {
-                                continue;
-                            }
-                            points[index] = new Vector3(x, y, z);
+                            continue;
                         }
+                        points[index] = new Vector3(x, y, z);
                     }
                 }
-            );
+            });
 
             return points;
         }

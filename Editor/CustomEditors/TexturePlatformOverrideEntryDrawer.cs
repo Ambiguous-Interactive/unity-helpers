@@ -172,40 +172,32 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                 {
                     int capturedIndex = i;
                     bool isSelected = !wasMixed && i == currentIndex;
-                    menu.AddItem(
-                        new GUIContent(choices[i]),
-                        isSelected,
-                        () =>
+                    menu.AddItem(new GUIContent(choices[i]), isSelected, () =>
+                    {
+                        Undo.RecordObjects(
+                            serializedObject.targetObjects,
+                            "Change Platform Override"
+                        );
+                        serializedObject.Update();
+                        SerializedProperty prop = serializedObject.FindProperty(propertyPath);
+                        if (prop == null)
                         {
-                            Undo.RecordObjects(
-                                serializedObject.targetObjects,
-                                "Change Platform Override"
-                            );
-                            serializedObject.Update();
-                            SerializedProperty prop = serializedObject.FindProperty(propertyPath);
-                            if (prop == null)
-                            {
-                                return;
-                            }
-
-                            string value = choices[capturedIndex];
-                            if (
-                                string.Equals(
-                                    value,
-                                    CustomOptionLabel,
-                                    System.StringComparison.Ordinal
-                                )
-                            )
-                            {
-                                prop.stringValue = string.Empty;
-                            }
-                            else
-                            {
-                                prop.stringValue = value;
-                            }
-                            serializedObject.ApplyModifiedProperties();
+                            return;
                         }
-                    );
+
+                        string value = choices[capturedIndex];
+                        if (
+                            string.Equals(value, CustomOptionLabel, System.StringComparison.Ordinal)
+                        )
+                        {
+                            prop.stringValue = string.Empty;
+                        }
+                        else
+                        {
+                            prop.stringValue = value;
+                        }
+                        serializedObject.ApplyModifiedProperties();
+                    });
                 }
                 menu.DropDown(fieldRect);
             }

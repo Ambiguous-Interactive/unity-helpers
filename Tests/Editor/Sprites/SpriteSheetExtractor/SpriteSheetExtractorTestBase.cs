@@ -47,22 +47,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             if (ParallelThreshold <= pixels.Length)
             {
                 // Parallelize by row for cache-friendly access
-                Parallel.For(
-                    0,
-                    height,
-                    y =>
+                Parallel.For(0, height, y =>
+                {
+                    int row = y / cellHeight;
+                    int rowStart = y * width;
+                    for (int x = 0; x < width; ++x)
                     {
-                        int row = y / cellHeight;
-                        int rowStart = y * width;
-                        for (int x = 0; x < width; ++x)
-                        {
-                            int col = x / cellWidth;
-                            int spriteIndex = row * gridColumns + col;
-                            float hue = (float)spriteIndex / totalCells;
-                            pixels[rowStart + x] = Color.HSVToRGB(hue, 0.8f, 0.9f);
-                        }
+                        int col = x / cellWidth;
+                        int spriteIndex = row * gridColumns + col;
+                        float hue = (float)spriteIndex / totalCells;
+                        pixels[rowStart + x] = Color.HSVToRGB(hue, 0.8f, 0.9f);
                     }
-                );
+                });
             }
             else
             {

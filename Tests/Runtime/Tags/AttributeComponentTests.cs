@@ -63,20 +63,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             );
             TestAttributesComponent component = entity.GetComponent<TestAttributesComponent>();
 
-            AttributeEffect effect = CreateEffect(
-                "Buff",
-                e =>
-                {
-                    e.modifications.Add(
-                        new AttributeModification
-                        {
-                            attribute = nameof(TestAttributesComponent.health),
-                            action = ModificationAction.Addition,
-                            value = 5f,
-                        }
-                    );
-                }
-            );
+            AttributeEffect effect = CreateEffect("Buff", e =>
+            {
+                e.modifications.Add(
+                    new AttributeModification
+                    {
+                        attribute = nameof(TestAttributesComponent.health),
+                        action = ModificationAction.Addition,
+                        value = 5f,
+                    }
+                );
+            });
             EffectHandle handle = EffectHandle.CreateInstance(effect);
 
             component.ForceApplyAttributeModifications(handle);
@@ -98,20 +95,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             );
             TestAttributesComponent component = entity.GetComponent<TestAttributesComponent>();
 
-            AttributeEffect effect = CreateEffect(
-                "Buff",
-                e =>
-                {
-                    e.modifications.Add(
-                        new AttributeModification
-                        {
-                            attribute = nameof(TestAttributesComponent.health),
-                            action = ModificationAction.Multiplication,
-                            value = 2f,
-                        }
-                    );
-                }
-            );
+            AttributeEffect effect = CreateEffect("Buff", e =>
+            {
+                e.modifications.Add(
+                    new AttributeModification
+                    {
+                        attribute = nameof(TestAttributesComponent.health),
+                        action = ModificationAction.Multiplication,
+                        value = 2f,
+                    }
+                );
+            });
             EffectHandle handle = EffectHandle.CreateInstance(effect);
 
             component.ForceApplyAttributeModifications(handle);
@@ -136,20 +130,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             );
             TestAttributesComponent component = entity.GetComponent<TestAttributesComponent>();
 
-            AttributeEffect effect = CreateEffect(
-                "Buff",
-                e =>
-                {
-                    e.modifications.Add(
-                        new AttributeModification
-                        {
-                            attribute = nameof(TestAttributesComponent.health),
-                            action = ModificationAction.Addition,
-                            value = 5f,
-                        }
-                    );
-                }
-            );
+            AttributeEffect effect = CreateEffect("Buff", e =>
+            {
+                e.modifications.Add(
+                    new AttributeModification
+                    {
+                        attribute = nameof(TestAttributesComponent.health),
+                        action = ModificationAction.Addition,
+                        value = 5f,
+                    }
+                );
+            });
             EffectHandle handle = EffectHandle.CreateInstance(effect);
 
             component.ApplyAttributeModifications(effect.modifications, handle);
@@ -482,20 +473,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             );
             TestAttributesComponent component = entity.GetComponent<TestAttributesComponent>();
 
-            AttributeEffect effect = CreateEffect(
-                "Buff",
-                e =>
-                {
-                    e.modifications.Add(
-                        new AttributeModification
-                        {
-                            attribute = "missing",
-                            action = ModificationAction.Addition,
-                            value = 5f,
-                        }
-                    );
-                }
-            );
+            AttributeEffect effect = CreateEffect("Buff", e =>
+            {
+                e.modifications.Add(
+                    new AttributeModification
+                    {
+                        attribute = "missing",
+                        action = ModificationAction.Addition,
+                        value = 5f,
+                    }
+                );
+            });
             EffectHandle handle = EffectHandle.CreateInstance(effect);
 
             component.ForceApplyAttributeModifications(handle);

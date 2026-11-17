@@ -101,14 +101,11 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             int cancelled = 0;
             int faults = 0;
             WButtonCoroutineTicket ticket = Schedule(
-                PooledParent(
-                    child,
-                    (lease, values) =>
-                    {
-                        capturedLease = lease;
-                        capturedValues = values;
-                    }
-                ),
+                PooledParent(child, (lease, values) =>
+                {
+                    capturedLease = lease;
+                    capturedValues = values;
+                }),
                 () => Assert.Fail("Unexpected completion."),
                 exception =>
                 {

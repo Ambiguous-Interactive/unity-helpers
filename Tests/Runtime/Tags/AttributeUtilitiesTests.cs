@@ -141,13 +141,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             yield return null;
             EffectHandler effectHandler = entity.GetComponent<EffectHandler>();
 
-            AttributeEffect effect = CreateEffect(
-                "Buff",
-                e =>
-                {
-                    e.effectTags.Add("Buff");
-                }
-            );
+            AttributeEffect effect = CreateEffect("Buff", e =>
+            {
+                e.effectTags.Add("Buff");
+            });
             EffectHandle handle = effectHandler.ApplyEffect(effect).Value;
 
             List<EffectHandle> handles = entity.GetHandlesWithTag("Buff");
@@ -195,38 +192,35 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
         [Test]
         public void AttributeEffectQueryHelpersReturnExpectedResults()
         {
-            AttributeEffect effect = CreateEffect(
-                "Query",
-                e =>
-                {
-                    e.effectTags.Add("Buff");
-                    e.effectTags.Add("Shield");
-                    e.modifications.Add(
-                        new AttributeModification
-                        {
-                            attribute = nameof(TestAttributesComponent.health),
-                            action = ModificationAction.Addition,
-                            value = 5f,
-                        }
-                    );
-                    e.modifications.Add(
-                        new AttributeModification
-                        {
-                            attribute = nameof(TestAttributesComponent.armor),
-                            action = ModificationAction.Addition,
-                            value = 3f,
-                        }
-                    );
-                    e.modifications.Add(
-                        new AttributeModification
-                        {
-                            attribute = nameof(TestAttributesComponent.health),
-                            action = ModificationAction.Multiplication,
-                            value = 1.1f,
-                        }
-                    );
-                }
-            );
+            AttributeEffect effect = CreateEffect("Query", e =>
+            {
+                e.effectTags.Add("Buff");
+                e.effectTags.Add("Shield");
+                e.modifications.Add(
+                    new AttributeModification
+                    {
+                        attribute = nameof(TestAttributesComponent.health),
+                        action = ModificationAction.Addition,
+                        value = 5f,
+                    }
+                );
+                e.modifications.Add(
+                    new AttributeModification
+                    {
+                        attribute = nameof(TestAttributesComponent.armor),
+                        action = ModificationAction.Addition,
+                        value = 3f,
+                    }
+                );
+                e.modifications.Add(
+                    new AttributeModification
+                    {
+                        attribute = nameof(TestAttributesComponent.health),
+                        action = ModificationAction.Multiplication,
+                        value = 1.1f,
+                    }
+                );
+            });
 
             Assert.IsTrue(effect.HasTag("Buff"));
             Assert.IsFalse(effect.HasTag("Missing"));
@@ -260,21 +254,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             TestAttributesComponent attributes = entity.GetComponent<TestAttributesComponent>();
             TagHandler tagHandler = entity.GetComponent<TagHandler>();
 
-            AttributeEffect effect = CreateEffect(
-                "Might",
-                e =>
-                {
-                    e.effectTags.Add("Buff");
-                    e.modifications.Add(
-                        new AttributeModification
-                        {
-                            attribute = nameof(TestAttributesComponent.health),
-                            action = ModificationAction.Addition,
-                            value = 15f,
-                        }
-                    );
-                }
-            );
+            AttributeEffect effect = CreateEffect("Might", e =>
+            {
+                e.effectTags.Add("Buff");
+                e.modifications.Add(
+                    new AttributeModification
+                    {
+                        attribute = nameof(TestAttributesComponent.health),
+                        action = ModificationAction.Addition,
+                        value = 15f,
+                    }
+                );
+            });
 
             EffectHandle? handle = entity.ApplyEffect(effect);
             Assert.IsTrue(handle.HasValue);
@@ -290,21 +281,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             yield return null;
             TestAttributesComponent attributes = entity.GetComponent<TestAttributesComponent>();
 
-            AttributeEffect effect = CreateEffect(
-                "Might",
-                e =>
-                {
-                    e.resetDurationOnReapplication = false;
-                    e.modifications.Add(
-                        new AttributeModification
-                        {
-                            attribute = nameof(TestAttributesComponent.health),
-                            action = ModificationAction.Addition,
-                            value = 5f,
-                        }
-                    );
-                }
-            );
+            AttributeEffect effect = CreateEffect("Might", e =>
+            {
+                e.resetDurationOnReapplication = false;
+                e.modifications.Add(
+                    new AttributeModification
+                    {
+                        attribute = nameof(TestAttributesComponent.health),
+                        action = ModificationAction.Addition,
+                        value = 5f,
+                    }
+                );
+            });
 
             EffectHandle first = entity.ApplyEffect(effect).Value;
             attributes.notifications.Clear();
@@ -318,37 +306,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
         {
             GameObject entity = CreateTrackedGameObject("Entity", typeof(TestAttributesComponent));
             yield return null;
-            List<AttributeEffect> effects = new()
-            {
-                CreateEffect(
-                    "BuffA",
-                    e =>
-                    {
-                        e.modifications.Add(
-                            new AttributeModification
-                            {
-                                attribute = nameof(TestAttributesComponent.health),
-                                action = ModificationAction.Addition,
-                                value = 5f,
-                            }
-                        );
-                    }
-                ),
-                CreateEffect(
-                    "BuffB",
-                    e =>
-                    {
-                        e.modifications.Add(
-                            new AttributeModification
-                            {
-                                attribute = nameof(TestAttributesComponent.armor),
-                                action = ModificationAction.Addition,
-                                value = 10f,
-                            }
-                        );
-                    }
-                ),
-            };
+            List<AttributeEffect> effects = new() { CreateEffect("BuffA", e =>
+                {
+                    e.modifications.Add(
+                        new AttributeModification
+                        {
+                            attribute = nameof(TestAttributesComponent.health),
+                            action = ModificationAction.Addition,
+                            value = 5f,
+                        }
+                    );
+                }), CreateEffect("BuffB", e =>
+                {
+                    e.modifications.Add(
+                        new AttributeModification
+                        {
+                            attribute = nameof(TestAttributesComponent.armor),
+                            action = ModificationAction.Addition,
+                            value = 10f,
+                        }
+                    );
+                }) };
 
             List<EffectHandle> handles = new();
             entity.ApplyEffectsNoAlloc(effects, handles);
@@ -360,37 +338,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
         {
             GameObject entity = CreateTrackedGameObject("Entity", typeof(TestAttributesComponent));
             yield return null;
-            List<AttributeEffect> effects = new()
-            {
-                CreateEffect(
-                    "BuffA",
-                    e =>
-                    {
-                        e.modifications.Add(
-                            new AttributeModification
-                            {
-                                attribute = nameof(TestAttributesComponent.health),
-                                action = ModificationAction.Addition,
-                                value = 5f,
-                            }
-                        );
-                    }
-                ),
-                CreateEffect(
-                    "BuffB",
-                    e =>
-                    {
-                        e.modifications.Add(
-                            new AttributeModification
-                            {
-                                attribute = nameof(TestAttributesComponent.armor),
-                                action = ModificationAction.Addition,
-                                value = 10f,
-                            }
-                        );
-                    }
-                ),
-            };
+            List<AttributeEffect> effects = new() { CreateEffect("BuffA", e =>
+                {
+                    e.modifications.Add(
+                        new AttributeModification
+                        {
+                            attribute = nameof(TestAttributesComponent.health),
+                            action = ModificationAction.Addition,
+                            value = 5f,
+                        }
+                    );
+                }), CreateEffect("BuffB", e =>
+                {
+                    e.modifications.Add(
+                        new AttributeModification
+                        {
+                            attribute = nameof(TestAttributesComponent.armor),
+                            action = ModificationAction.Addition,
+                            value = 10f,
+                        }
+                    );
+                }) };
 
             List<EffectHandle> handles = entity.ApplyEffects(effects);
             Assert.AreEqual(2, handles.Count);
@@ -401,37 +369,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
         {
             GameObject entity = CreateTrackedGameObject("Entity", typeof(TestAttributesComponent));
             yield return null;
-            IEnumerable<AttributeEffect> effects = new[]
-            {
-                CreateEffect(
-                    "BuffA",
-                    e =>
-                    {
-                        e.modifications.Add(
-                            new AttributeModification
-                            {
-                                attribute = nameof(TestAttributesComponent.health),
-                                action = ModificationAction.Addition,
-                                value = 5f,
-                            }
-                        );
-                    }
-                ),
-                CreateEffect(
-                    "BuffB",
-                    e =>
-                    {
-                        e.modifications.Add(
-                            new AttributeModification
-                            {
-                                attribute = nameof(TestAttributesComponent.armor),
-                                action = ModificationAction.Addition,
-                                value = 10f,
-                            }
-                        );
-                    }
-                ),
-            };
+            IEnumerable<AttributeEffect> effects = new[] { CreateEffect("BuffA", e =>
+                {
+                    e.modifications.Add(
+                        new AttributeModification
+                        {
+                            attribute = nameof(TestAttributesComponent.health),
+                            action = ModificationAction.Addition,
+                            value = 5f,
+                        }
+                    );
+                }), CreateEffect("BuffB", e =>
+                {
+                    e.modifications.Add(
+                        new AttributeModification
+                        {
+                            attribute = nameof(TestAttributesComponent.armor),
+                            action = ModificationAction.Addition,
+                            value = 10f,
+                        }
+                    );
+                }) };
 
             entity.ApplyEffectsNoAlloc(effects);
             TestAttributesComponent attributes = entity.GetComponent<TestAttributesComponent>();
@@ -444,21 +402,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
         {
             GameObject entity = CreateTrackedGameObject("Entity", typeof(TestAttributesComponent));
             yield return null;
-            AttributeEffect effect = CreateEffect(
-                "Might",
-                e =>
-                {
-                    e.effectTags.Add("Buff");
-                    e.modifications.Add(
-                        new AttributeModification
-                        {
-                            attribute = nameof(TestAttributesComponent.health),
-                            action = ModificationAction.Addition,
-                            value = 20f,
-                        }
-                    );
-                }
-            );
+            AttributeEffect effect = CreateEffect("Might", e =>
+            {
+                e.effectTags.Add("Buff");
+                e.modifications.Add(
+                    new AttributeModification
+                    {
+                        attribute = nameof(TestAttributesComponent.health),
+                        action = ModificationAction.Addition,
+                        value = 20f,
+                    }
+                );
+            });
 
             EffectHandle handle = entity.ApplyEffect(effect).Value;
             entity.RemoveEffect(handle);
@@ -473,37 +428,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
         {
             GameObject entity = CreateTrackedGameObject("Entity", typeof(TestAttributesComponent));
             yield return null;
-            List<AttributeEffect> effects = new()
-            {
-                CreateEffect(
-                    "BuffA",
-                    e =>
-                    {
-                        e.modifications.Add(
-                            new AttributeModification
-                            {
-                                attribute = nameof(TestAttributesComponent.health),
-                                action = ModificationAction.Addition,
-                                value = 5f,
-                            }
-                        );
-                    }
-                ),
-                CreateEffect(
-                    "BuffB",
-                    e =>
-                    {
-                        e.modifications.Add(
-                            new AttributeModification
-                            {
-                                attribute = nameof(TestAttributesComponent.armor),
-                                action = ModificationAction.Addition,
-                                value = 10f,
-                            }
-                        );
-                    }
-                ),
-            };
+            List<AttributeEffect> effects = new() { CreateEffect("BuffA", e =>
+                {
+                    e.modifications.Add(
+                        new AttributeModification
+                        {
+                            attribute = nameof(TestAttributesComponent.health),
+                            action = ModificationAction.Addition,
+                            value = 5f,
+                        }
+                    );
+                }), CreateEffect("BuffB", e =>
+                {
+                    e.modifications.Add(
+                        new AttributeModification
+                        {
+                            attribute = nameof(TestAttributesComponent.armor),
+                            action = ModificationAction.Addition,
+                            value = 10f,
+                        }
+                    );
+                }) };
 
             List<EffectHandle> handles = entity.ApplyEffects(effects);
             entity.RemoveEffects(handles);
@@ -518,21 +463,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
         {
             GameObject entity = CreateTrackedGameObject("Entity", typeof(TestAttributesComponent));
             yield return null;
-            AttributeEffect effect = CreateEffect(
-                "Buff",
-                e =>
-                {
-                    e.effectTags.Add("Buff");
-                    e.modifications.Add(
-                        new AttributeModification
-                        {
-                            attribute = nameof(TestAttributesComponent.health),
-                            action = ModificationAction.Addition,
-                            value = 5f,
-                        }
-                    );
-                }
-            );
+            AttributeEffect effect = CreateEffect("Buff", e =>
+            {
+                e.effectTags.Add("Buff");
+                e.modifications.Add(
+                    new AttributeModification
+                    {
+                        attribute = nameof(TestAttributesComponent.health),
+                        action = ModificationAction.Addition,
+                        value = 5f,
+                    }
+                );
+            });
 
             Assert.IsTrue(entity.ApplyEffect(effect).HasValue);
             entity.RemoveAllEffects();
@@ -548,23 +490,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             GameObject entity = CreateTrackedGameObject("Entity", typeof(TestAttributesComponent));
             yield return null;
 
-            AttributeEffect effect = CreateEffect(
-                "Utility",
-                e =>
-                {
-                    e.duration = 0.3f;
-                    e.resetDurationOnReapplication = true;
-                    e.effectTags.Add("Buff");
-                    e.modifications.Add(
-                        new AttributeModification
-                        {
-                            attribute = nameof(TestAttributesComponent.health),
-                            action = ModificationAction.Addition,
-                            value = 5f,
-                        }
-                    );
-                }
-            );
+            AttributeEffect effect = CreateEffect("Utility", e =>
+            {
+                e.duration = 0.3f;
+                e.resetDurationOnReapplication = true;
+                e.effectTags.Add("Buff");
+                e.modifications.Add(
+                    new AttributeModification
+                    {
+                        attribute = nameof(TestAttributesComponent.health),
+                        action = ModificationAction.Addition,
+                        value = 5f,
+                    }
+                );
+            });
 
             List<string> tagsBuffer = new();
             List<EffectHandle> handlesBuffer = new();
@@ -667,14 +606,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
         {
             GameObject entity = CreateTrackedGameObject("Entity", typeof(TestAttributesComponent));
             yield return null;
-            AttributeEffect effect = CreateEffect(
-                "Policy",
-                e =>
-                {
-                    e.duration = 0.2f;
-                    e.resetDurationOnReapplication = false;
-                }
-            );
+            AttributeEffect effect = CreateEffect("Policy", e =>
+            {
+                e.duration = 0.2f;
+                e.resetDurationOnReapplication = false;
+            });
 
             EffectHandler handler = entity.GetComponent<EffectHandler>();
             EffectHandle handle = handler.ApplyEffect(effect, currentTime: -10f).Value;

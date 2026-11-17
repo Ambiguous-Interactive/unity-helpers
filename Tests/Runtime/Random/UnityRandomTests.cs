@@ -135,10 +135,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         [Parallelizable(ParallelScope.None)]
         public void ProtobufSnapshotResumesMixedDraws(bool seeded, int gaussianDraws)
         {
-            AssertSnapshotContinuation(
-                seeded,
-                gaussianDraws,
-                state => Serializer.ProtoDeserialize<RandomState>(Serializer.ProtoSerialize(state))
+            AssertSnapshotContinuation(seeded, gaussianDraws, state =>
+                Serializer.ProtoDeserialize<RandomState>(Serializer.ProtoSerialize(state))
             );
         }
 
@@ -152,10 +150,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         [Parallelizable(ParallelScope.None)]
         public void JsonSnapshotResumesMixedDraws(bool seeded, int gaussianDraws)
         {
-            AssertSnapshotContinuation(
-                seeded,
-                gaussianDraws,
-                state => Serializer.JsonDeserialize<RandomState>(Serializer.JsonStringify(state))
+            AssertSnapshotContinuation(seeded, gaussianDraws, state =>
+                Serializer.JsonDeserialize<RandomState>(Serializer.JsonStringify(state))
             );
         }
 

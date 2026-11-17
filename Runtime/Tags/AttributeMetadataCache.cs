@@ -375,8 +375,8 @@ namespace WallstopStudios.UnityHelpers.Tags
                             continue;
                         }
 
-                        RelationalFieldMetadata[] fields =
-                            metadata.fields ?? Array.Empty<RelationalFieldMetadata>();
+                        RelationalFieldMetadata[] fields = metadata.fields
+                            ?? Array.Empty<RelationalFieldMetadata>();
 
                         relationalFieldsLookup[relationalType] = fields;
 
@@ -761,10 +761,10 @@ namespace WallstopStudios.UnityHelpers.Tags
                 return typeNameComparison;
             }
 
-            RelationalFieldMetadata[] leftFields =
-                left.fields ?? Array.Empty<RelationalFieldMetadata>();
-            RelationalFieldMetadata[] rightFields =
-                right.fields ?? Array.Empty<RelationalFieldMetadata>();
+            RelationalFieldMetadata[] leftFields = left.fields
+                ?? Array.Empty<RelationalFieldMetadata>();
+            RelationalFieldMetadata[] rightFields = right.fields
+                ?? Array.Empty<RelationalFieldMetadata>();
 
             int lengthComparison = leftFields.Length.CompareTo(rightFields.Length);
             if (lengthComparison != 0)

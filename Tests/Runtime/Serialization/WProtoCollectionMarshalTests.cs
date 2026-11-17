@@ -95,9 +95,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 hashSet.Add(300);
                 hashSet.Add(-7);
             }
-            yield return Sample.Wrapped(
-                hashSet,
-                restored => CollectionAssert.AreEquivalent(hashSet.ToList(), restored.ToList())
+            yield return Sample.Wrapped(hashSet, restored =>
+                CollectionAssert.AreEquivalent(hashSet.ToList(), restored.ToList())
             );
 
             SerializableSortedSet<int> sortedSet = new SerializableSortedSet<int>();
@@ -107,9 +106,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 sortedSet.Add(1);
                 sortedSet.Add(9);
             }
-            yield return Sample.Wrapped(
-                sortedSet,
-                restored => CollectionAssert.AreEqual(sortedSet.ToList(), restored.ToList())
+            yield return Sample.Wrapped(sortedSet, restored =>
+                CollectionAssert.AreEqual(sortedSet.ToList(), restored.ToList())
             );
 
             SerializableDictionary<string, int> dictionary =
@@ -119,17 +117,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 dictionary.Add("a", 1);
                 dictionary.Add("b", 300);
             }
-            yield return Sample.Wrapped(
-                dictionary,
-                restored =>
+            yield return Sample.Wrapped(dictionary, restored =>
+            {
+                Assert.AreEqual(dictionary.Count, restored.Count);
+                foreach (KeyValuePair<string, int> entry in dictionary)
                 {
-                    Assert.AreEqual(dictionary.Count, restored.Count);
-                    foreach (KeyValuePair<string, int> entry in dictionary)
-                    {
-                        Assert.AreEqual(entry.Value, restored.ValueFor(entry.Key));
-                    }
+                    Assert.AreEqual(entry.Value, restored.ValueFor(entry.Key));
                 }
-            );
+            });
 
             SerializableSortedDictionary<string, int> sortedDictionary =
                 new SerializableSortedDictionary<string, int>();
@@ -138,22 +133,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 sortedDictionary.Add("b", 2);
                 sortedDictionary.Add("a", 1);
             }
-            yield return Sample.Wrapped(
-                sortedDictionary,
-                restored =>
+            yield return Sample.Wrapped(sortedDictionary, restored =>
+            {
+                Assert.AreEqual(sortedDictionary.Count, restored.Count);
+                CollectionAssert.AreEqual(sortedDictionary.Keys.ToList(), restored.Keys.ToList());
+                foreach (KeyValuePair<string, int> pair in sortedDictionary)
                 {
-                    Assert.AreEqual(sortedDictionary.Count, restored.Count);
-                    CollectionAssert.AreEqual(
-                        sortedDictionary.Keys.ToList(),
-                        restored.Keys.ToList()
-                    );
-                    foreach (KeyValuePair<string, int> pair in sortedDictionary)
-                    {
-                        Assert.IsTrue(restored.TryGetValue(pair.Key, out int actual));
-                        Assert.AreEqual(pair.Value, actual);
-                    }
+                    Assert.IsTrue(restored.TryGetValue(pair.Key, out int actual));
+                    Assert.AreEqual(pair.Value, actual);
                 }
-            );
+            });
 
             Deque<int> deque = new Deque<int>(16);
             if (!empty)
@@ -162,14 +151,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 deque.PushBack(2);
                 deque.PushFront(0);
             }
-            yield return Sample.Special(
-                deque,
-                restored =>
-                {
-                    CollectionAssert.AreEqual(deque.ToArray(), restored.ToArray());
-                    Assert.AreEqual(deque.Capacity, restored.Capacity);
-                }
-            );
+            yield return Sample.Special(deque, restored =>
+            {
+                CollectionAssert.AreEqual(deque.ToArray(), restored.ToArray());
+                Assert.AreEqual(deque.Capacity, restored.Capacity);
+            });
 
             CyclicBuffer<int> buffer = new CyclicBuffer<int>(3);
             if (!empty)
@@ -179,18 +165,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 buffer.Add(3);
                 buffer.Add(4);
             }
-            yield return Sample.Special(
-                buffer,
-                restored =>
+            yield return Sample.Special(buffer, restored =>
+            {
+                Assert.AreEqual(buffer.Count, restored.Count);
+                Assert.AreEqual(buffer.Capacity, restored.Capacity);
+                for (int index = 0; index < buffer.Count; ++index)
                 {
-                    Assert.AreEqual(buffer.Count, restored.Count);
-                    Assert.AreEqual(buffer.Capacity, restored.Capacity);
-                    for (int index = 0; index < buffer.Count; ++index)
-                    {
-                        Assert.AreEqual(buffer[index], restored[index]);
-                    }
+                    Assert.AreEqual(buffer[index], restored[index]);
                 }
-            );
+            });
 
             SparseSet sparse = new SparseSet(64);
             if (!empty)
@@ -198,14 +181,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 sparse.TryAdd(3);
                 sparse.TryAdd(40);
             }
-            yield return Sample.Special(
-                sparse,
-                restored =>
-                {
-                    CollectionAssert.AreEquivalent(sparse.ToArray(), restored.ToArray());
-                    Assert.AreEqual(sparse.Capacity, restored.Capacity);
-                }
-            );
+            yield return Sample.Special(sparse, restored =>
+            {
+                CollectionAssert.AreEquivalent(sparse.ToArray(), restored.ToArray());
+                Assert.AreEqual(sparse.Capacity, restored.Capacity);
+            });
         }
 
         [TestCase(false)]

@@ -73,8 +73,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 UnityEngine.Object[] liveInstances = Array.Empty<UnityEngine.Object>();
                 try
                 {
-                    liveInstances =
-                        registration.findLiveInstances() ?? Array.Empty<UnityEngine.Object>();
+                    liveInstances = registration.findLiveInstances()
+                        ?? Array.Empty<UnityEngine.Object>();
                 }
                 catch (Exception ex)
                 {

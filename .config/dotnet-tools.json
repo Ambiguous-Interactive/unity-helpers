@@ -4,9 +4,7 @@
   "tools": {
     "CSharpier": {
       "version": "1.4.0",
-      "commands": [
-        "csharpier"
-      ],
+      "commands": ["csharpier"],
       "rollForward": false
     }
   }

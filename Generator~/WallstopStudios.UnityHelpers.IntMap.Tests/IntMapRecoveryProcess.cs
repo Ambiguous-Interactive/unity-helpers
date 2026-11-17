@@ -55,11 +55,10 @@ namespace WallstopStudios.UnityHelpers.IntMap.Tests
             }
             else
             {
-                VerifyRecovery<RecoveryValue>(
-                    32768,
-                    insertZero,
-                    static key => new RecoveryValue { data = key + 17 }
-                );
+                VerifyRecovery<RecoveryValue>(32768, insertZero, static key => new RecoveryValue
+                {
+                    data = key + 17,
+                });
             }
             Console.WriteLine(PassMarker + " preserves the map and all views.");
         }

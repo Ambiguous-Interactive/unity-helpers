@@ -1236,8 +1236,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 byte[] bytes;
                 try
                 {
-                    bytes =
-                        byteContents
+                    bytes = byteContents
                         ?? (
                             textContents == null
                                 ? Array.Empty<byte>()

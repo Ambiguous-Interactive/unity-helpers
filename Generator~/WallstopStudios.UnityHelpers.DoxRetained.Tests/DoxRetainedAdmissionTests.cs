@@ -183,11 +183,8 @@ namespace WallstopStudios.UnityHelpers.DoxRetained.Tests
             if (string.Equals(id, "dox-settings-retained", StringComparison.Ordinal))
             {
                 SettingsModel expected = Settings();
-                Verify(
-                    model,
-                    input,
-                    expected,
-                    (first, second) => CheckMap(first.settings, second.settings)
+                Verify(model, input, expected, (first, second) =>
+                    CheckMap(first.settings, second.settings)
                 );
                 SettingsOracle independent = proxy.Deserialize<SettingsOracle>(
                     new ReadOnlyMemory<byte>(input),
@@ -406,18 +403,15 @@ namespace WallstopStudios.UnityHelpers.DoxRetained.Tests
         public void InventoryRejectsChangedCapturedBytes(string changedFile)
         {
             Assert.Throws<AssertionException>(() =>
-                DoxRetainedCorpus.Validate(
-                    DoxRetainedCorpus.ReadInventory(),
-                    file =>
+                DoxRetainedCorpus.Validate(DoxRetainedCorpus.ReadInventory(), file =>
+                {
+                    byte[] bytes = DoxRetainedCorpus.Read(file);
+                    if (string.Equals(file, changedFile, StringComparison.Ordinal))
                     {
-                        byte[] bytes = DoxRetainedCorpus.Read(file);
-                        if (string.Equals(file, changedFile, StringComparison.Ordinal))
-                        {
-                            bytes[0] ^= 1;
-                        }
-                        return bytes;
+                        bytes[0] ^= 1;
                     }
-                )
+                    return bytes;
+                })
             );
         }
 

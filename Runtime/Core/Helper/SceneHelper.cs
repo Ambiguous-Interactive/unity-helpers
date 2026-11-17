@@ -138,9 +138,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 throw;
             }
 
-            return new DeferredDisposalResult<T[]>(
-                result,
-                () => DisposeSceneAsync(sceneScope, context, mainThreadId)
+            return new DeferredDisposalResult<T[]>(result, () =>
+                DisposeSceneAsync(sceneScope, context, mainThreadId)
             );
         }
 

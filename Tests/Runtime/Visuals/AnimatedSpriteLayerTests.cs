@@ -25,17 +25,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         [Test]
         public void ConstructingFromEnumerablePreservesFrameOrder()
         {
-            Sprite first = VisualsTestHelpers.CreateSprite(
-                _trackedObjects,
-                2,
-                2,
-                (_, _) => new Color(1f, 0f, 0f, 1f)
+            Sprite first = VisualsTestHelpers.CreateSprite(_trackedObjects, 2, 2, (_, _) =>
+                new Color(1f, 0f, 0f, 1f)
             );
-            Sprite second = VisualsTestHelpers.CreateSprite(
-                _trackedObjects,
-                2,
-                2,
-                (_, _) => new Color(0f, 1f, 0f, 1f)
+            Sprite second = VisualsTestHelpers.CreateSprite(_trackedObjects, 2, 2, (_, _) =>
+                new Color(0f, 1f, 0f, 1f)
             );
 
             AnimatedSpriteLayer layer = new(YieldSprites(first, second), alpha: 0.5f);
@@ -124,11 +118,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         [Test]
         public void AlphaIsClampedToValidRange()
         {
-            Sprite frame = VisualsTestHelpers.CreateSprite(
-                _trackedObjects,
-                1,
-                1,
-                (_, _) => new Color(1f, 0f, 0f, 1f)
+            Sprite frame = VisualsTestHelpers.CreateSprite(_trackedObjects, 1, 1, (_, _) =>
+                new Color(1f, 0f, 0f, 1f)
             );
 
             AnimatedSpriteLayer high = new(new[] { frame }, alpha: 3f);
@@ -151,17 +142,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         [Test]
         public void EqualsComparesFramesOffsetsAndAlpha()
         {
-            Sprite frameA = VisualsTestHelpers.CreateSprite(
-                _trackedObjects,
-                1,
-                1,
-                (_, _) => new Color(0f, 1f, 0f, 1f)
+            Sprite frameA = VisualsTestHelpers.CreateSprite(_trackedObjects, 1, 1, (_, _) =>
+                new Color(0f, 1f, 0f, 1f)
             );
-            Sprite frameB = VisualsTestHelpers.CreateSprite(
-                _trackedObjects,
-                1,
-                1,
-                (_, _) => new Color(0f, 0f, 1f, 1f)
+            Sprite frameB = VisualsTestHelpers.CreateSprite(_trackedObjects, 1, 1, (_, _) =>
+                new Color(0f, 0f, 1f, 1f)
             );
 
             AnimatedSpriteLayer left = new(new[] { frameA, frameB }, alpha: 0.75f);

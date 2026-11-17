@@ -25,10 +25,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
 
             string[] attributeNames = new[] { "Gamma", "Alpha", "Beta" };
 
-            string alphaAttributesTypeName =
-                typeof(AlphaAttributesComponent).AssemblyQualifiedName ?? string.Empty;
-            string bravoAttributesTypeName =
-                typeof(BravoAttributesComponent).AssemblyQualifiedName ?? string.Empty;
+            string alphaAttributesTypeName = typeof(AlphaAttributesComponent).AssemblyQualifiedName
+                ?? string.Empty;
+            string bravoAttributesTypeName = typeof(BravoAttributesComponent).AssemblyQualifiedName
+                ?? string.Empty;
 
             AttributeMetadataCache.TypeFieldMetadata alphaTypeMetadata = new(
                 alphaAttributesTypeName,
@@ -40,10 +40,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 new[] { "zetaField", "alphaField" }
             );
 
-            string alphaRelationalTypeName =
-                typeof(AlphaRelationalComponent).AssemblyQualifiedName ?? string.Empty;
-            string bravoRelationalTypeName =
-                typeof(BravoRelationalComponent).AssemblyQualifiedName ?? string.Empty;
+            string alphaRelationalTypeName = typeof(AlphaRelationalComponent).AssemblyQualifiedName
+                ?? string.Empty;
+            string bravoRelationalTypeName = typeof(BravoRelationalComponent).AssemblyQualifiedName
+                ?? string.Empty;
 
             AttributeMetadataCache.RelationalFieldMetadata[] alphaRelationalFields =
                 new AttributeMetadataCache.RelationalFieldMetadata[]
@@ -159,8 +159,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 ScriptableObject.CreateInstance<AttributeMetadataCache>()
             );
 
-            string alphaAttributesTypeName =
-                typeof(AlphaAttributesComponent).AssemblyQualifiedName ?? string.Empty;
+            string alphaAttributesTypeName = typeof(AlphaAttributesComponent).AssemblyQualifiedName
+                ?? string.Empty;
             AttributeMetadataCache.TypeFieldMetadata alphaTypeMetadata = new(
                 alphaAttributesTypeName,
                 new[] { "zetaField", "alphaField" }

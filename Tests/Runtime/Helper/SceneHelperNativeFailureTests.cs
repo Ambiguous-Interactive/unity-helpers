@@ -39,14 +39,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         {
             object payload = new object();
             int[] callbacks = new int[1];
-            SceneHelper.SceneLoadScope scope = new(
-                path,
-                (scene, mode) =>
-                {
-                    ++callbacks[0];
-                    GC.KeepAlive(payload);
-                }
-            );
+            SceneHelper.SceneLoadScope scope = new(path, (scene, mode) =>
+            {
+                ++callbacks[0];
+                GC.KeepAlive(payload);
+            });
             return (scope, new WeakReference(payload), callbacks);
         }
 

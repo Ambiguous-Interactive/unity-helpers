@@ -1354,11 +1354,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             ) { }
 
         protected SerializableHashSet(SerializationInfo info, StreamingContext context)
-            : base(
-                info,
-                context,
-                (serializationInfo, streamingContext) =>
-                    new StorageSet(serializationInfo, streamingContext)
+            : base(info, context, (serializationInfo, streamingContext) =>
+                new StorageSet(serializationInfo, streamingContext)
             ) { }
 
         /// <summary>

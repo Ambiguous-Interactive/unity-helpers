@@ -183,9 +183,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             ("ascending duplicates", static (i, _) => i / 3),
             ("descending duplicates", static (i, count) => (count - i) / 3),
             ("descending pairs", static (i, count) => (count - i) / 2),
-            (
-                "strict descent then equals",
-                static (i, count) => (count - i) % 5 == 0 ? count - i : 0
+            ("strict descent then equals", static (i, count) =>
+                (count - i) % 5 == 0 ? count - i : 0
             ),
             ("all equal", static (_, _) => 0),
             ("sawtooth duplicates", static (i, count) => (i % Math.Max(1, count / 4)) / 2),
@@ -240,31 +239,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             yield return new SortDataset("Empty", () => Array.Empty<int>());
             yield return new SortDataset("Single", () => new[] { 42 });
             yield return new SortDataset("TwoElements", () => new[] { 5, -1 });
-            yield return new SortDataset(
-                "AlreadySorted",
-                () => Enumerable.Range(-10, 21).ToArray()
+            yield return new SortDataset("AlreadySorted", () =>
+                Enumerable.Range(-10, 21).ToArray()
             );
-            yield return new SortDataset(
-                "ReverseSorted",
-                () => Enumerable.Range(0, 32).Reverse().ToArray()
+            yield return new SortDataset("ReverseSorted", () =>
+                Enumerable.Range(0, 32).Reverse().ToArray()
             );
-            yield return new SortDataset(
-                "PrimeLength",
-                () => Enumerable.Range(0, 31).Select(i => (i * 13 % 17) - 20).ToArray()
+            yield return new SortDataset("PrimeLength", () =>
+                Enumerable.Range(0, 31).Select(i => (i * 13 % 17) - 20).ToArray()
             );
-            yield return new SortDataset(
-                "SquareGrid225",
-                () => BuildRandomDataset(225, seed: 1337)
+            yield return new SortDataset("SquareGrid225", () =>
+                BuildRandomDataset(225, seed: 1337)
             );
             yield return new SortDataset("Random64", () => BuildRandomDataset(64, seed: 42));
             yield return new SortDataset("Random257", () => BuildRandomDataset(257, seed: 99));
-            yield return new SortDataset(
-                "ExtremeValues",
-                () => new[] { int.MaxValue, int.MinValue, 0, -1, 1, int.MaxValue }
+            yield return new SortDataset("ExtremeValues", () =>
+                new[] { int.MaxValue, int.MinValue, 0, -1, 1, int.MaxValue }
             );
-            yield return new SortDataset(
-                "Duplicates",
-                () => new[] { 5, 1, 5, 2, 2, 3, 3, 3, 4, 4, -1, -1 }
+            yield return new SortDataset("Duplicates", () =>
+                new[] { 5, 1, 5, 2, 2, 3, 3, 3, 4, 4, -1, -1 }
             );
         }
 

@@ -234,9 +234,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static Func<int, IList> GetListWithCapacityCreatorCached(Type elementType)
         {
-            return ListWithCapacityCreators.GetOrAdd(
-                elementType,
-                static type => GetListWithCapacityCreator(type)
+            return ListWithCapacityCreators.GetOrAdd(elementType, static type =>
+                GetListWithCapacityCreator(type)
             );
         }
 
@@ -249,9 +248,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static Func<int, object> GetHashSetWithCapacityCreatorCached(Type elementType)
         {
-            return HashSetWithCapacityCreators.GetOrAdd(
-                elementType,
-                static type => GetHashSetWithCapacityCreator(type)
+            return HashSetWithCapacityCreators.GetOrAdd(elementType, static type =>
+                GetHashSetWithCapacityCreator(type)
             );
         }
 
@@ -530,20 +528,17 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
             return fields;
 #else
-            return FieldArrayCache.GetOrAdd(
-                key,
-                static k =>
+            return FieldArrayCache.GetOrAdd(key, static k =>
+            {
+                try
                 {
-                    try
-                    {
-                        return k.type.GetFields(k.flags);
-                    }
-                    catch
-                    {
-                        return Array.Empty<FieldInfo>();
-                    }
+                    return k.type.GetFields(k.flags);
                 }
-            );
+                catch
+                {
+                    return Array.Empty<FieldInfo>();
+                }
+            });
 #endif
         }
 
@@ -591,9 +586,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
             return cachedFields;
 #else
-            return InstanceFieldsIncludingBaseTypesCache.GetOrAdd(
-                type,
-                static key => BuildInstanceFieldsIncludingBaseTypes(key)
+            return InstanceFieldsIncludingBaseTypesCache.GetOrAdd(type, static key =>
+                BuildInstanceFieldsIncludingBaseTypes(key)
             );
 #endif
         }
@@ -1527,36 +1521,30 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 throw new ArgumentNullException(nameof(elementType));
             }
 
-            return HashSetClearers.GetOrAdd(
-                elementType,
-                static type =>
+            return HashSetClearers.GetOrAdd(elementType, static type =>
+            {
+                Type hashSetType = typeof(HashSet<>).MakeGenericType(type);
+                MethodInfo clearMethod = hashSetType.GetMethod("Clear", Type.EmptyTypes);
+                if (clearMethod == null)
                 {
-                    Type hashSetType = typeof(HashSet<>).MakeGenericType(type);
-                    MethodInfo clearMethod = hashSetType.GetMethod("Clear", Type.EmptyTypes);
-                    if (clearMethod == null)
-                    {
-                        return _ => { };
-                    }
-#if SUPPORT_EXPRESSION_COMPILE
-                    if (ExpressionsEnabled)
-                    {
-                        try
-                        {
-                            ParameterExpression target = Expression.Parameter(
-                                typeof(object),
-                                "set"
-                            );
-                            UnaryExpression cast = Expression.Convert(target, hashSetType);
-                            MethodCallExpression call = Expression.Call(cast, clearMethod);
-                            return Expression.Lambda<Action<object>>(call, target).Compile();
-                        }
-                        catch { }
-                    }
-#endif
-                    MethodInfo closedMethod = clearMethod;
-                    return set => closedMethod.Invoke(set, Array.Empty<object>());
+                    return _ => { };
                 }
-            );
+#if SUPPORT_EXPRESSION_COMPILE
+                if (ExpressionsEnabled)
+                {
+                    try
+                    {
+                        ParameterExpression target = Expression.Parameter(typeof(object), "set");
+                        UnaryExpression cast = Expression.Convert(target, hashSetType);
+                        MethodCallExpression call = Expression.Call(cast, clearMethod);
+                        return Expression.Lambda<Action<object>>(call, target).Compile();
+                    }
+                    catch { }
+                }
+#endif
+                MethodInfo closedMethod = clearMethod;
+                return set => closedMethod.Invoke(set, Array.Empty<object>());
+            });
         }
 
         /// <summary>
@@ -2171,9 +2159,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             return factory;
 #else
-            return TypedArrayBuilders<TSource>.Builders.GetOrAdd(
-                elementType,
-                static type => CreateTypedArrayBuilder<TSource>(type)
+            return TypedArrayBuilders<TSource>.Builders.GetOrAdd(elementType, static type =>
+                CreateTypedArrayBuilder<TSource>(type)
             );
 #endif
         }
@@ -3397,9 +3384,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static Func<object, bool> GetEnabledPropertyGetterCached(Type componentType)
         {
-            return EnabledPropertyGetters.GetOrAdd(
-                componentType,
-                static type => BuildEnabledPropertyGetter(type)
+            return EnabledPropertyGetters.GetOrAdd(componentType, static type =>
+                BuildEnabledPropertyGetter(type)
             );
         }
 #endif
@@ -5233,8 +5219,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         private static Func<object, object[], object> BuildIndexerGetterIL(PropertyInfo property)
         {
-            MethodInfo getter =
-                property.GetGetMethod(true)
+            MethodInfo getter = property.GetGetMethod(true)
                 ?? throw new ArgumentException("Indexer has no getter", nameof(property));
 
             DynamicMethod dynamicMethod = CreateMemberDynamicMethod(
@@ -5279,8 +5264,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         private static Action<object, object, object[]> BuildIndexerSetterIL(PropertyInfo property)
         {
-            MethodInfo setter =
-                property.GetSetMethod(true)
+            MethodInfo setter = property.GetSetMethod(true)
                 ?? throw new ArgumentException("Indexer has no setter", nameof(property));
 
             DynamicMethod dynamicMethod = CreateMemberDynamicMethod(

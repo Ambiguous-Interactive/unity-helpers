@@ -1171,10 +1171,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 );
 #if !SINGLE_THREADED
                 return (Func<TInstance, TValue>)
-                    TypedPropertyGetters.GetOrAdd(
-                        key,
-                        static cacheKey =>
-                            BuildTypedPropertyGetter<TInstance, TValue>(cacheKey.property)
+                    TypedPropertyGetters.GetOrAdd(key, static cacheKey =>
+                        BuildTypedPropertyGetter<TInstance, TValue>(cacheKey.property)
                     );
 #else
                 if (!TypedPropertyGetters.TryGetValue(key, out Delegate del))
@@ -1201,10 +1199,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 );
 #if !SINGLE_THREADED
                 return (Action<TInstance, TValue>)
-                    TypedPropertySetters.GetOrAdd(
-                        key,
-                        static cacheKey =>
-                            BuildTypedPropertySetter<TInstance, TValue>(cacheKey.property)
+                    TypedPropertySetters.GetOrAdd(key, static cacheKey =>
+                        BuildTypedPropertySetter<TInstance, TValue>(cacheKey.property)
                     );
 #else
                 if (!TypedPropertySetters.TryGetValue(key, out Delegate del))
@@ -1225,9 +1221,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 (PropertyInfo property, Type) key = (property, typeof(TValue));
 #if !SINGLE_THREADED
                 return (Func<TValue>)
-                    TypedStaticPropertyGetters.GetOrAdd(
-                        key,
-                        static cacheKey => BuildTypedStaticPropertyGetter<TValue>(cacheKey.property)
+                    TypedStaticPropertyGetters.GetOrAdd(key, static cacheKey =>
+                        BuildTypedStaticPropertyGetter<TValue>(cacheKey.property)
                     );
 #else
                 if (!TypedStaticPropertyGetters.TryGetValue(key, out Delegate del))
@@ -1248,9 +1243,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 (PropertyInfo property, Type) key = (property, typeof(TValue));
 #if !SINGLE_THREADED
                 return (Action<TValue>)
-                    TypedStaticPropertySetters.GetOrAdd(
-                        key,
-                        static cacheKey => BuildTypedStaticPropertySetter<TValue>(cacheKey.property)
+                    TypedStaticPropertySetters.GetOrAdd(key, static cacheKey =>
+                        BuildTypedStaticPropertySetter<TValue>(cacheKey.property)
                     );
 #else
                 if (!TypedStaticPropertySetters.TryGetValue(key, out Delegate del))
@@ -4120,9 +4114,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
                 return (Func<TReturn>)del;
 #else
-                Delegate del = TypedStaticInvoker0.GetOrAdd(
-                    method,
-                    static m => BuildTypedStaticInvoker0<TReturn>(m)
+                Delegate del = TypedStaticInvoker0.GetOrAdd(method, static m =>
+                    BuildTypedStaticInvoker0<TReturn>(m)
                 );
                 return (Func<TReturn>)del;
 #endif
@@ -4144,9 +4137,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
                 return (Func<T1, TReturn>)del;
 #else
-                Delegate del = TypedStaticInvoker1.GetOrAdd(
-                    method,
-                    static m => BuildTypedStaticInvoker1<T1, TReturn>(m)
+                Delegate del = TypedStaticInvoker1.GetOrAdd(method, static m =>
+                    BuildTypedStaticInvoker1<T1, TReturn>(m)
                 );
                 return (Func<T1, TReturn>)del;
 #endif
@@ -4168,9 +4160,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
                 return (Func<T1, T2, TReturn>)del;
 #else
-                Delegate del = TypedStaticInvoker2.GetOrAdd(
-                    method,
-                    static m => BuildTypedStaticInvoker2<T1, T2, TReturn>(m)
+                Delegate del = TypedStaticInvoker2.GetOrAdd(method, static m =>
+                    BuildTypedStaticInvoker2<T1, T2, TReturn>(m)
                 );
                 return (Func<T1, T2, TReturn>)del;
 #endif
@@ -4195,9 +4186,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
                 return (Func<T1, T2, T3, TReturn>)del;
 #else
-                Delegate del = TypedStaticInvoker3.GetOrAdd(
-                    method,
-                    static m => BuildTypedStaticInvoker3<T1, T2, T3, TReturn>(m)
+                Delegate del = TypedStaticInvoker3.GetOrAdd(method, static m =>
+                    BuildTypedStaticInvoker3<T1, T2, T3, TReturn>(m)
                 );
                 return (Func<T1, T2, T3, TReturn>)del;
 #endif
@@ -4223,9 +4213,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
                 return (Func<T1, T2, T3, T4, TReturn>)del;
 #else
-                Delegate del = TypedStaticInvoker4.GetOrAdd(
-                    method,
-                    static m => BuildTypedStaticInvoker4<T1, T2, T3, T4, TReturn>(m)
+                Delegate del = TypedStaticInvoker4.GetOrAdd(method, static m =>
+                    BuildTypedStaticInvoker4<T1, T2, T3, T4, TReturn>(m)
                 );
                 return (Func<T1, T2, T3, T4, TReturn>)del;
 #endif
@@ -4245,9 +4234,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
                 return (Action)del;
 #else
-                Delegate del = TypedStaticAction0.GetOrAdd(
-                    method,
-                    static m => BuildStaticActionInvoker0(m)
+                Delegate del = TypedStaticAction0.GetOrAdd(method, static m =>
+                    BuildStaticActionInvoker0(m)
                 );
                 return (Action)del;
 #endif
@@ -4267,9 +4255,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
                 return (Action<T1>)del;
 #else
-                Delegate del = TypedStaticAction1.GetOrAdd(
-                    method,
-                    static m => BuildStaticActionInvoker1<T1>(m)
+                Delegate del = TypedStaticAction1.GetOrAdd(method, static m =>
+                    BuildStaticActionInvoker1<T1>(m)
                 );
                 return (Action<T1>)del;
 #endif
@@ -4289,9 +4276,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
                 return (Action<T1, T2>)del;
 #else
-                Delegate del = TypedStaticAction2.GetOrAdd(
-                    method,
-                    static m => BuildStaticActionInvoker2<T1, T2>(m)
+                Delegate del = TypedStaticAction2.GetOrAdd(method, static m =>
+                    BuildStaticActionInvoker2<T1, T2>(m)
                 );
                 return (Action<T1, T2>)del;
 #endif
@@ -4313,9 +4299,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
                 return (Action<T1, T2, T3>)del;
 #else
-                Delegate del = TypedStaticAction3.GetOrAdd(
-                    method,
-                    static m => BuildStaticActionInvoker3<T1, T2, T3>(m)
+                Delegate del = TypedStaticAction3.GetOrAdd(method, static m =>
+                    BuildStaticActionInvoker3<T1, T2, T3>(m)
                 );
                 return (Action<T1, T2, T3>)del;
 #endif
@@ -4337,9 +4322,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
                 return (Action<T1, T2, T3, T4>)del;
 #else
-                Delegate del = TypedStaticAction4.GetOrAdd(
-                    method,
-                    static m => BuildStaticActionInvoker4<T1, T2, T3, T4>(m)
+                Delegate del = TypedStaticAction4.GetOrAdd(method, static m =>
+                    BuildStaticActionInvoker4<T1, T2, T3, T4>(m)
                 );
                 return (Action<T1, T2, T3, T4>)del;
 #endif
@@ -5028,8 +5012,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     throw new ArgumentNullException(nameof(property));
                 }
 
-                MethodInfo getMethod =
-                    property.GetGetMethod(true)
+                MethodInfo getMethod = property.GetGetMethod(true)
                     ?? throw new ArgumentException(
                         $"Property {property?.Name} has no getter",
                         nameof(property)
@@ -5075,8 +5058,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     throw new ArgumentNullException(nameof(property));
                 }
 
-                MethodInfo setMethod =
-                    property.GetSetMethod(true)
+                MethodInfo setMethod = property.GetSetMethod(true)
                     ?? throw new ArgumentException(
                         $"Property {property?.Name} has no setter",
                         nameof(property)
@@ -5122,8 +5104,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     throw new ArgumentNullException(nameof(property));
                 }
 
-                MethodInfo getMethod =
-                    property.GetGetMethod(true)
+                MethodInfo getMethod = property.GetGetMethod(true)
                     ?? throw new ArgumentException(
                         $"Property {property?.Name} has no getter",
                         nameof(property)
@@ -5156,8 +5137,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     throw new ArgumentNullException(nameof(property));
                 }
 
-                MethodInfo setMethod =
-                    property.GetSetMethod(true)
+                MethodInfo setMethod = property.GetSetMethod(true)
                     ?? throw new ArgumentException(
                         $"Property {property?.Name} has no setter",
                         nameof(property)

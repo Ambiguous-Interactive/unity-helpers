@@ -34,13 +34,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 maxTicks = 1,
             };
 
-            AttributeEffect effect = CreateEffect(
-                "Lifecycle",
-                e =>
-                {
-                    e.periodicEffects.Add(periodicDefinition);
-                }
-            );
+            AttributeEffect effect = CreateEffect("Lifecycle", e =>
+            {
+                e.periodicEffects.Add(periodicDefinition);
+            });
 
             RecordingEffectBehavior behavior = Track(
                 ScriptableObject.CreateInstance<RecordingEffectBehavior>()
@@ -122,13 +119,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 maxTicks = 3,
             };
 
-            AttributeEffect effect = CreateEffect(
-                "Periodic",
-                e =>
-                {
-                    e.periodicEffects.Add(periodicDefinition);
-                }
-            );
+            AttributeEffect effect = CreateEffect("Periodic", e =>
+            {
+                e.periodicEffects.Add(periodicDefinition);
+            });
 
             RecordingEffectBehavior behavior = Track(
                 ScriptableObject.CreateInstance<RecordingEffectBehavior>()
@@ -180,13 +174,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 maxTicks = 1,
             };
 
-            AttributeEffect effect = CreateEffect(
-                "Update Lifecycle",
-                e =>
-                {
-                    e.periodicEffects.Add(periodicDefinition);
-                }
-            );
+            AttributeEffect effect = CreateEffect("Update Lifecycle", e =>
+            {
+                e.periodicEffects.Add(periodicDefinition);
+            });
 
             RecordingEffectBehavior behavior = Track(
                 ScriptableObject.CreateInstance<RecordingEffectBehavior>()

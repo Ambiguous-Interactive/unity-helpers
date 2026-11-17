@@ -737,13 +737,9 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             return comparer == null
                 ? throw new ArgumentNullException(nameof(comparer))
-                : SortedSetCache.GetOrAdd(
-                    comparer,
-                    static inComparer => new WallstopGenericPool<SortedSet<T>>(
-                        () => new SortedSet<T>(inComparer),
-                        onRelease: set => set.Clear()
-                    )
-                );
+                : SortedSetCache.GetOrAdd(comparer, static inComparer => new WallstopGenericPool<
+                    SortedSet<T>
+                >(() => new SortedSet<T>(inComparer), onRelease: set => set.Clear()));
         }
 
         /// <summary>
@@ -757,13 +753,9 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             return comparer == null
                 ? throw new ArgumentNullException(nameof(comparer))
-                : HashSetCache.GetOrAdd(
-                    comparer,
-                    static inComparer => new WallstopGenericPool<HashSet<T>>(
-                        () => new HashSet<T>(inComparer),
-                        onRelease: set => set.Clear()
-                    )
-                );
+                : HashSetCache.GetOrAdd(comparer, static inComparer => new WallstopGenericPool<
+                    HashSet<T>
+                >(() => new HashSet<T>(inComparer), onRelease: set => set.Clear()));
         }
 
         /// <summary>
@@ -916,13 +908,12 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             return comparer == null
                 ? throw new ArgumentNullException(nameof(comparer))
-                : DictionaryCache.GetOrAdd(
-                    comparer,
-                    static inComparer => new WallstopGenericPool<Dictionary<TKey, TValue>>(
-                        () => new Dictionary<TKey, TValue>(inComparer),
-                        onRelease: dictionary => dictionary.Clear()
-                    )
-                );
+                : DictionaryCache.GetOrAdd(comparer, static inComparer => new WallstopGenericPool<
+                    Dictionary<TKey, TValue>
+                >(
+                    () => new Dictionary<TKey, TValue>(inComparer),
+                    onRelease: dictionary => dictionary.Clear()
+                ));
         }
 
         /// <summary>
@@ -1245,10 +1236,10 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             MaxPoolSize = options?.MaxPoolSize ?? PoolOptions<T>.DefaultMaxPoolSize;
             MinRetainCount = options?.MinRetainCount ?? PoolOptions<T>.DefaultMinRetainCount;
-            IdleTimeoutSeconds =
-                options?.IdleTimeoutSeconds ?? PoolOptions<T>.DefaultIdleTimeoutSeconds;
-            PurgeIntervalSeconds =
-                options?.PurgeIntervalSeconds ?? PoolOptions<T>.DefaultPurgeIntervalSeconds;
+            IdleTimeoutSeconds = options?.IdleTimeoutSeconds
+                ?? PoolOptions<T>.DefaultIdleTimeoutSeconds;
+            PurgeIntervalSeconds = options?.PurgeIntervalSeconds
+                ?? PoolOptions<T>.DefaultPurgeIntervalSeconds;
             Triggers = options?.Triggers ?? PurgeTrigger.Periodic;
             OnPurge = options?.OnPurge;
 
@@ -1257,14 +1248,14 @@ namespace WallstopStudios.UnityHelpers.Utils
             bool useIntelligent = options?.UseIntelligentPurging ?? effectiveOptions.Enabled;
             UseIntelligentPurging = useIntelligent;
             WarmRetainCount = options?.WarmRetainCount ?? effectiveOptions.WarmRetainCount;
-            MaxPurgesPerOperation =
-                options?.MaxPurgesPerOperation ?? effectiveOptions.MaxPurgesPerOperation;
+            MaxPurgesPerOperation = options?.MaxPurgesPerOperation
+                ?? effectiveOptions.MaxPurgesPerOperation;
 
-            float rollingWindow =
-                options?.RollingWindowSeconds ?? effectiveOptions.RollingWindowSeconds;
+            float rollingWindow = options?.RollingWindowSeconds
+                ?? effectiveOptions.RollingWindowSeconds;
             float hysteresis = options?.HysteresisSeconds ?? effectiveOptions.HysteresisSeconds;
-            float spikeThreshold =
-                options?.SpikeThresholdMultiplier ?? effectiveOptions.SpikeThresholdMultiplier;
+            float spikeThreshold = options?.SpikeThresholdMultiplier
+                ?? effectiveOptions.SpikeThresholdMultiplier;
             float bufferMult = options?.BufferMultiplier ?? effectiveOptions.BufferMultiplier;
 
             _usageTracker = new PoolUsageTracker(
@@ -2350,10 +2341,10 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             _maxPoolSize = options?.MaxPoolSize ?? PoolOptions<T>.DefaultMaxPoolSize;
             _minRetainCount = options?.MinRetainCount ?? PoolOptions<T>.DefaultMinRetainCount;
-            _idleTimeoutSeconds =
-                options?.IdleTimeoutSeconds ?? PoolOptions<T>.DefaultIdleTimeoutSeconds;
-            _purgeIntervalSeconds =
-                options?.PurgeIntervalSeconds ?? PoolOptions<T>.DefaultPurgeIntervalSeconds;
+            _idleTimeoutSeconds = options?.IdleTimeoutSeconds
+                ?? PoolOptions<T>.DefaultIdleTimeoutSeconds;
+            _purgeIntervalSeconds = options?.PurgeIntervalSeconds
+                ?? PoolOptions<T>.DefaultPurgeIntervalSeconds;
             _triggers = (int)(options?.Triggers ?? PurgeTrigger.Periodic);
             OnPurge = options?.OnPurge;
 
@@ -2367,11 +2358,11 @@ namespace WallstopStudios.UnityHelpers.Utils
                 options?.MaxPurgesPerOperation ?? effectiveOptions.MaxPurgesPerOperation
             );
 
-            float rollingWindow =
-                options?.RollingWindowSeconds ?? effectiveOptions.RollingWindowSeconds;
+            float rollingWindow = options?.RollingWindowSeconds
+                ?? effectiveOptions.RollingWindowSeconds;
             float hysteresis = options?.HysteresisSeconds ?? effectiveOptions.HysteresisSeconds;
-            float spikeThreshold =
-                options?.SpikeThresholdMultiplier ?? effectiveOptions.SpikeThresholdMultiplier;
+            float spikeThreshold = options?.SpikeThresholdMultiplier
+                ?? effectiveOptions.SpikeThresholdMultiplier;
             float bufferMult = options?.BufferMultiplier ?? effectiveOptions.BufferMultiplier;
 
             _usageTracker = new PoolUsageTracker(

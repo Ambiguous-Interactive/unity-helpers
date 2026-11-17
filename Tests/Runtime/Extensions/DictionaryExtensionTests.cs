@@ -31,14 +31,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.AreEqual(100, value);
             Assert.AreEqual(value, dictionary["test"]);
 
-            int newValue = dictionary.GetOrAdd(
-                "test",
-                () =>
-                {
-                    Assert.Fail("Value Producer should not have been called!");
-                    return 200;
-                }
-            );
+            int newValue = dictionary.GetOrAdd("test", () =>
+            {
+                Assert.Fail("Value Producer should not have been called!");
+                return 200;
+            });
             Assert.AreEqual(100, newValue);
 
             newValue = dictionary.GetOrAdd("test2", () => 300);
@@ -50,35 +47,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         public void GetOrAddKeyValueProducer()
         {
             Dictionary<string, int> dictionary = new();
-            int value = dictionary.GetOrAdd(
-                "test",
-                key =>
-                {
-                    Assert.AreEqual("test", key);
-                    return 100;
-                }
-            );
+            int value = dictionary.GetOrAdd("test", key =>
+            {
+                Assert.AreEqual("test", key);
+                return 100;
+            });
             Assert.AreEqual(100, value);
             Assert.AreEqual(value, dictionary["test"]);
 
-            int newValue = dictionary.GetOrAdd(
-                "test",
-                key =>
-                {
-                    Assert.Fail("Value Producer should not have been called!");
-                    return 200;
-                }
-            );
+            int newValue = dictionary.GetOrAdd("test", key =>
+            {
+                Assert.Fail("Value Producer should not have been called!");
+                return 200;
+            });
             Assert.AreEqual(100, newValue);
 
-            newValue = dictionary.GetOrAdd(
-                "test2",
-                key =>
-                {
-                    Assert.AreEqual("test2", key);
-                    return 300;
-                }
-            );
+            newValue = dictionary.GetOrAdd("test2", key =>
+            {
+                Assert.AreEqual("test2", key);
+                return 300;
+            });
             Assert.AreEqual(300, newValue);
             Assert.AreEqual(100, dictionary["test"]);
         }
@@ -104,14 +92,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.AreEqual(100, value);
             Assert.IsFalse(dictionary.ContainsKey("test"));
             dictionary["test"] = 150;
-            value = dictionary.GetOrElse(
-                "test",
-                () =>
-                {
-                    Assert.Fail("Producer should not be called.");
-                    return 100;
-                }
-            );
+            value = dictionary.GetOrElse("test", () =>
+            {
+                Assert.Fail("Producer should not be called.");
+                return 100;
+            });
             Assert.AreEqual(150, value);
             Assert.AreEqual(150, dictionary["test"]);
         }
@@ -120,25 +105,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         public void GetOrElseKeyValueProducer()
         {
             Dictionary<string, int> dictionary = new();
-            int value = dictionary.GetOrElse(
-                "test",
-                key =>
-                {
-                    Assert.AreEqual("test", key);
-                    return 100;
-                }
-            );
+            int value = dictionary.GetOrElse("test", key =>
+            {
+                Assert.AreEqual("test", key);
+                return 100;
+            });
             Assert.AreEqual(100, value);
             Assert.IsFalse(dictionary.ContainsKey("test"));
             dictionary["test"] = 150;
-            value = dictionary.GetOrElse(
-                "test",
-                () =>
-                {
-                    Assert.Fail("Producer should not be called.");
-                    return 100;
-                }
-            );
+            value = dictionary.GetOrElse("test", () =>
+            {
+                Assert.Fail("Producer should not be called.");
+                return 100;
+            });
             Assert.AreEqual(150, value);
             Assert.AreEqual(150, dictionary["test"]);
         }
@@ -190,36 +169,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         public void TryAdd()
         {
             Dictionary<string, int> dictionary = new();
-            int value = dictionary.TryAdd(
-                "test",
-                key =>
-                {
-                    Assert.AreEqual("test", key);
-                    return 150;
-                }
-            );
+            int value = dictionary.TryAdd("test", key =>
+            {
+                Assert.AreEqual("test", key);
+                return 150;
+            });
             Assert.AreEqual(150, value);
             Assert.AreEqual(value, dictionary["test"]);
 
-            value = dictionary.TryAdd(
-                "test",
-                key =>
-                {
-                    Assert.Fail("Creator should not have been called.");
-                    return 200;
-                }
-            );
+            value = dictionary.TryAdd("test", key =>
+            {
+                Assert.Fail("Creator should not have been called.");
+                return 200;
+            });
             Assert.AreEqual(150, value);
             Assert.AreEqual(value, dictionary["test"]);
 
-            value = dictionary.TryAdd(
-                "test2",
-                key =>
-                {
-                    Assert.AreEqual("test2", key);
-                    return 350;
-                }
-            );
+            value = dictionary.TryAdd("test2", key =>
+            {
+                Assert.AreEqual("test2", key);
+                return 350;
+            });
             Assert.AreEqual(350, value);
             Assert.AreEqual(value, dictionary["test2"]);
             Assert.AreEqual(150, dictionary["test"]);
@@ -590,9 +560,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             IReadOnlyDictionary<string, int> left = new Dictionary<string, int>() { ["a"] = 1 };
             IReadOnlyDictionary<string, int> right = new Dictionary<string, int>() { ["b"] = 2 };
 
-            Dictionary<string, int> merged = left.Merge(
-                right,
-                () => new Dictionary<string, int>(10)
+            Dictionary<string, int> merged = left.Merge(right, () =>
+                new Dictionary<string, int>(10)
             );
             Assert.AreEqual(2, merged.Count);
             Assert.AreEqual(1, merged["a"]);
@@ -619,9 +588,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 ["b"] = 3,
             };
 
-            Dictionary<string, int> diff = left.Difference(
-                right,
-                () => new Dictionary<string, int>(10)
+            Dictionary<string, int> diff = left.Difference(right, () =>
+                new Dictionary<string, int>(10)
             );
             Assert.AreEqual(2, diff.Count);
             Assert.AreEqual(2, diff["a"]);
@@ -742,10 +710,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         public void ConcurrentDictionaryAddOrUpdateHandlesParallelWrites()
         {
             ConcurrentDictionary<string, int> dictionary = new();
-            Parallel.For(
-                0,
-                1000,
-                _ => dictionary.AddOrUpdate("counter", _ => 1, (_, existing) => existing + 1)
+            Parallel.For(0, 1000, _ =>
+                dictionary.AddOrUpdate("counter", _ => 1, (_, existing) => existing + 1)
             );
 
             Assert.IsTrue(dictionary.TryGetValue("counter", out int value));

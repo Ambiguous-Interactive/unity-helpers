@@ -57,17 +57,12 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 cache.Set("old", retained);
                 Assert.AreSame(
                     sentinel,
-                    Assert.Throws<InvalidOperationException>(() =>
-                        cache.GetOrAdd(
-                            "new",
-                            _ =>
-                            {
-                                cache.Set("new", winner);
-                                failLookup = true;
-                                return incoming;
-                            }
-                        )
-                    )
+                    Assert.Throws<InvalidOperationException>(() => cache.GetOrAdd("new", _ =>
+                        {
+                            cache.Set("new", winner);
+                            failLookup = true;
+                            return incoming;
+                        }))
                 );
                 failLookup = false;
                 Assert.AreEqual(2, cache.Count);
@@ -168,16 +163,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 cache.Set("survivor", survivor);
                 Assert.AreSame(
                     sentinel,
-                    Assert.Throws<InvalidOperationException>(() =>
-                        cache.GetOrAdd(
-                            "new",
-                            _ =>
-                            {
-                                failSelection = true;
-                                return incoming;
-                            }
-                        )
-                    )
+                    Assert.Throws<InvalidOperationException>(() => cache.GetOrAdd("new", _ =>
+                        {
+                            failSelection = true;
+                            return incoming;
+                        }))
                 );
                 failSelection = false;
                 Assert.AreEqual(3, admissionTimeCalls);

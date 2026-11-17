@@ -275,15 +275,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 new Dictionary<string, string>
                 {
                     ["commit"] = Environment.GetEnvironmentVariable("UH_PERF_COMMIT") ?? "unknown",
-                    ["baseCommit"] =
-                        Environment.GetEnvironmentVariable("UH_PERF_BASE_COMMIT") ?? "unknown",
+                    ["baseCommit"] = Environment.GetEnvironmentVariable("UH_PERF_BASE_COMMIT")
+                        ?? "unknown",
                     ["unityVersion"] = unityVersion,
                     ["backend"] = BenchmarkRuntimeIdentity.Backend,
                     ["frameworkDescription"] = RuntimeInformation.FrameworkDescription,
-                    ["codeGeneration"] =
-                        Environment.GetEnvironmentVariable("UH_PERF_CODE_GENERATION") ?? "unknown",
-                    ["optimization"] =
-                        Environment.GetEnvironmentVariable("UH_PERF_OPTIMIZATION") ?? "unknown",
+                    ["codeGeneration"] = Environment.GetEnvironmentVariable(
+                        "UH_PERF_CODE_GENERATION"
+                    ) ?? "unknown",
+                    ["optimization"] = Environment.GetEnvironmentVariable("UH_PERF_OPTIMIZATION")
+                        ?? "unknown",
                     ["buildConfiguration"] = buildConfiguration,
                     ["operatingSystem"] = operatingSystem,
                     ["cpu"] = cpu,

@@ -43,9 +43,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         ) CreateCapturedScope()
         {
             object payload = new object();
-            SceneHelper.SceneLoadScope scope = new(
-                PackedScenePath,
-                (scene, mode) => GC.KeepAlive(payload)
+            SceneHelper.SceneLoadScope scope = new(PackedScenePath, (scene, mode) =>
+                GC.KeepAlive(payload)
             );
             return (scope, new WeakReference(payload));
         }
@@ -170,15 +169,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Scene callbackScene = default;
             LoadSceneMode callbackMode = default;
             int callbacks = 0;
-            SceneHelper.SceneLoadScope borrowedScope = new(
-                target.name,
-                (scene, mode) =>
-                {
-                    callbackScene = scene;
-                    callbackMode = mode;
-                    ++callbacks;
-                }
-            );
+            SceneHelper.SceneLoadScope borrowedScope = new(target.name, (scene, mode) =>
+            {
+                callbackScene = scene;
+                callbackMode = mode;
+                ++callbacks;
+            });
             TrackAsyncDisposal(borrowedScope.DisposeAsync);
             Assert.IsTrue(borrowedScope.LoadTask.IsCompletedSuccessfully);
             Assert.AreEqual(target, callbackScene);
@@ -356,14 +352,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Task disposal = null;
             int callbacks = 0;
             int scenesBefore = SceneManager.sceneCount;
-            scope = new SceneHelper.SceneLoadScope(
-                PackedScenePath,
-                (scene, mode) =>
-                {
-                    ++callbacks;
-                    disposal = scope.DisposeAsync().AsTask();
-                }
-            );
+            scope = new SceneHelper.SceneLoadScope(PackedScenePath, (scene, mode) =>
+            {
+                ++callbacks;
+                disposal = scope.DisposeAsync().AsTask();
+            });
             TrackAsyncDisposal(scope.DisposeAsync);
             yield return WaitForCompletion(scope.LoadTask);
             Assert.IsTrue(scope.LoadTask.IsCompletedSuccessfully);
@@ -408,24 +401,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Scene secondCallback = default;
             int firstCallbacks = 0;
             int secondCallbacks = 0;
-            SceneHelper.SceneLoadScope first = new(
-                PackedScenePath,
-                (scene, mode) =>
-                {
-                    firstCallback = scene;
-                    ++firstCallbacks;
-                }
-            );
+            SceneHelper.SceneLoadScope first = new(PackedScenePath, (scene, mode) =>
+            {
+                firstCallback = scene;
+                ++firstCallbacks;
+            });
             TrackAsyncDisposal(first.DisposeAsync);
             Assert.IsFalse(first.LoadTask.IsCompleted);
-            SceneHelper.SceneLoadScope second = new(
-                PackedScenePath,
-                (scene, mode) =>
-                {
-                    secondCallback = scene;
-                    ++secondCallbacks;
-                }
-            );
+            SceneHelper.SceneLoadScope second = new(PackedScenePath, (scene, mode) =>
+            {
+                secondCallback = scene;
+                ++secondCallbacks;
+            });
             TrackAsyncDisposal(second.DisposeAsync);
             yield return WaitForCompletion(first.LoadTask);
             yield return WaitForCompletion(second.LoadTask);
@@ -461,14 +448,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             );
             Scene owned = default;
             int scenesBefore = SceneManager.sceneCount;
-            SceneHelper.SceneLoadScope scope = new(
-                PackedScenePath,
-                (scene, mode) =>
-                {
-                    owned = scene;
-                    throw failure;
-                }
-            );
+            SceneHelper.SceneLoadScope scope = new(PackedScenePath, (scene, mode) =>
+            {
+                owned = scene;
+                throw failure;
+            });
             TrackAsyncDisposal(async () =>
             {
                 try

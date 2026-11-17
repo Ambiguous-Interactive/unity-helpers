@@ -153,9 +153,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// </summary>
         public static string FindPackageRootPath(string startDirectory)
         {
-            return FindRootPath(
-                startDirectory,
-                path => File.Exists(Path.Combine(path, "package.json"))
+            return FindRootPath(startDirectory, path =>
+                File.Exists(Path.Combine(path, "package.json"))
             );
         }
 

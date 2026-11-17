@@ -157,13 +157,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
             );
             Array.Reverse(documents);
             string twin = "--- !u!" + string.Join("--- !u!", documents);
-            twin = Regex.Replace(
-                twin,
-                @"(?<=&)[1-8](?=\s)|(?<=fileID: )[1-8](?=})",
-                match =>
-                    (60 - int.Parse(match.Value)).ToString(
-                        System.Globalization.CultureInfo.InvariantCulture
-                    )
+            twin = Regex.Replace(twin, @"(?<=&)[1-8](?=\s)|(?<=fileID: )[1-8](?=})", match =>
+                (60 - int.Parse(match.Value)).ToString(
+                    System.Globalization.CultureInfo.InvariantCulture
+                )
             );
             string canonical = SceneCanonicalizer.CanonicalizeYaml(yaml);
             Assert.That(SceneCanonicalizer.CanonicalizeYaml(twin), Is.EqualTo(canonical));
@@ -181,13 +178,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
             );
             Array.Reverse(documents);
             string twin = "--- !u!" + string.Join("--- !u!", documents);
-            twin = Regex.Replace(
-                twin,
-                @"(?<=&)[1-6](?=\s)|(?<=fileID: )[1-6](?=})",
-                match =>
-                    (60 - int.Parse(match.Value)).ToString(
-                        System.Globalization.CultureInfo.InvariantCulture
-                    )
+            twin = Regex.Replace(twin, @"(?<=&)[1-6](?=\s)|(?<=fileID: )[1-6](?=})", match =>
+                (60 - int.Parse(match.Value)).ToString(
+                    System.Globalization.CultureInfo.InvariantCulture
+                )
             );
             string canonical = SceneCanonicalizer.CanonicalizeYaml(yaml);
             Assert.That(SceneCanonicalizer.CanonicalizeYaml(twin), Is.EqualTo(canonical));
@@ -285,13 +279,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
             );
             Array.Reverse(documents);
             string twin = "--- !u!" + string.Join("--- !u!", documents);
-            twin = Regex.Replace(
-                twin,
-                @"(?<=&)[1-8](?=\s)|(?<=fileID: )[1-8](?=})",
-                match =>
-                    (60 - int.Parse(match.Value)).ToString(
-                        System.Globalization.CultureInfo.InvariantCulture
-                    )
+            twin = Regex.Replace(twin, @"(?<=&)[1-8](?=\s)|(?<=fileID: )[1-8](?=})", match =>
+                (60 - int.Parse(match.Value)).ToString(
+                    System.Globalization.CultureInfo.InvariantCulture
+                )
             );
             string canonical = SceneCanonicalizer.CanonicalizeYaml(yaml);
             Assert.That(SceneCanonicalizer.CanonicalizeYaml(twin), Is.EqualTo(canonical));

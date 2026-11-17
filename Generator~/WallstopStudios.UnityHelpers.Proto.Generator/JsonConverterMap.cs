@@ -127,8 +127,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             foreach (Pair pair in Pairs(compilation.Assembly))
             {
-                Location location =
-                    pair.Attribute.ApplicationSyntaxReference?.GetSyntax().GetLocation()
+                Location location = pair.Attribute.ApplicationSyntaxReference?.GetSyntax()
+                    .GetLocation()
                     ?? Location.None;
 
                 if (!seen.Add(pair.Serialized))

@@ -18,14 +18,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public IEnumerator DisposeAsyncInvokesDelegate()
         {
             bool disposed = false;
-            DeferredDisposalResult<int> result = new(
-                7,
-                async () =>
-                {
-                    await Task.Yield();
-                    disposed = true;
-                }
-            );
+            DeferredDisposalResult<int> result = new(7, async () =>
+            {
+                await Task.Yield();
+                disposed = true;
+            });
 
             Assert.AreEqual(7, result.result);
 

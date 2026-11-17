@@ -71,11 +71,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             int branchFactor = DefaultBranchFactor
         )
         {
-            elements =
-                points?.ToImmutableArray() ?? throw new ArgumentNullException(nameof(points));
+            elements = points?.ToImmutableArray()
+                ?? throw new ArgumentNullException(nameof(points));
 
-            Func<T, Bounds> transformer =
-                elementTransformer ?? throw new ArgumentNullException(nameof(elementTransformer));
+            Func<T, Bounds> transformer = elementTransformer
+                ?? throw new ArgumentNullException(nameof(elementTransformer));
 
             int elementCount = elements.Length;
             _elementData = new ElementData[elementCount];

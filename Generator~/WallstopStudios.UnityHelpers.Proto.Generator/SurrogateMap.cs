@@ -94,8 +94,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     continue;
                 }
 
-                Location location =
-                    attribute.ApplicationSyntaxReference?.GetSyntax().GetLocation()
+                Location location = attribute.ApplicationSyntaxReference?.GetSyntax().GetLocation()
                     ?? Location.None;
 
                 if (!IsContract(surrogate))

@@ -394,9 +394,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 Is.EqualTo(1)
             );
             Assert.That(
-                ((ReadOnlySpan<int>)source).LastIndexOf(
-                    7,
-                    static (value, target) => value == target
+                ((ReadOnlySpan<int>)source).LastIndexOf(7, static (value, target) =>
+                    value == target
                 ),
                 Is.EqualTo(3)
             );

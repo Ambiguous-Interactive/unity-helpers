@@ -30,14 +30,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             List<EffectHandle> handles = new();
             for (int i = 0; i < 3; ++i)
             {
-                AttributeEffect effect = CreateEffect(
-                    "Expiring" + i,
-                    authored =>
-                    {
-                        authored.duration = 5f;
-                        authored.resetDurationOnReapplication = true;
-                    }
-                );
+                AttributeEffect effect = CreateEffect("Expiring" + i, authored =>
+                {
+                    authored.duration = 5f;
+                    authored.resetDurationOnReapplication = true;
+                });
                 handles.Add(handler.ApplyEffect(effect, 0f).Value);
             }
 

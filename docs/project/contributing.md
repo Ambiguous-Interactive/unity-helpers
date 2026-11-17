@@ -959,6 +959,8 @@ refused because they hide member names. Size and reference-identity queries rema
 The positive controls require plain, escaped, formatted and interpolated calls to be found.
 Separate sources exercise format characters without an ordinary spelling that could mask a prefilter regression.
 
+CSharpier 1.4 requires .NET SDK 10. The devcontainer installs SDK 10.0.403 alongside SDK 9.0.320.
+
 Stack-allocation and memory-access checks use the existing Roslyn policy tool and require .NET SDK 9.0.320.
 CI installs that SDK into an isolated runner directory and verifies the selected version.
 A newer SDK preinstalled on the runner cannot override the declared compiler.

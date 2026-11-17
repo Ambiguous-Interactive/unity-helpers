@@ -2089,8 +2089,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         internal static SerializedProperty ResolveValuesArray(SerializedProperty dictionaryProperty)
         {
             return dictionaryProperty.FindPropertyRelative(
-                    SerializableDictionarySerializedPropertyNames.Values
-                )
+                SerializableDictionarySerializedPropertyNames.Values
+            )
                 ?? dictionaryProperty.FindPropertyRelative(
                     SerializableDictionarySerializedPropertyNames.BoxedValues
                 );
@@ -2514,8 +2514,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             return element.FindPropertyRelative(
-                    SerializableDictionarySerializedPropertyNames.BoxedValueData
-                ) ?? element;
+                SerializableDictionarySerializedPropertyNames.BoxedValueData
+            ) ?? element;
         }
 
         private static GUIContent GetNullKeyIconContent(string tooltip)
@@ -3650,10 +3650,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return false;
             }
 
-            Func<SerializedObject, bool> applyFunc =
-                applyWithUndo ?? (static so => so.ApplyModifiedProperties());
-            Func<SerializedObject, bool> fallbackFunc =
-                applyWithoutUndo ?? (static so => so.ApplyModifiedPropertiesWithoutUndo());
+            Func<SerializedObject, bool> applyFunc = applyWithUndo
+                ?? (static so => so.ApplyModifiedProperties());
+            Func<SerializedObject, bool> fallbackFunc = applyWithoutUndo
+                ?? (static so => so.ApplyModifiedPropertiesWithoutUndo());
 
             bool hadChangesBefore = serializedObject.hasModifiedProperties;
             if (applyFunc(serializedObject))
@@ -7648,8 +7648,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 }
                 else
                 {
-                    GUIStyle footerStyle =
-                        ReorderableList.defaultBehaviours.footerBackground ?? "RL Footer";
+                    GUIStyle footerStyle = ReorderableList.defaultBehaviours.footerBackground
+                        ?? "RL Footer";
                     footerStyle.Draw(rect, GUIContent.none, false, false, false, false);
                 }
             }
@@ -7870,80 +7870,62 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             if (showSort)
             {
-                DrawFooterButton(
-                    sortRect,
-                    sortContent,
-                    "Sort",
-                    sortEnabled,
-                    () =>
+                DrawFooterButton(sortRect, sortContent, "Sort", sortEnabled, () =>
+                {
+                    if (!sortEnabled)
                     {
-                        if (!sortEnabled)
-                        {
-                            return;
-                        }
-
-                        SortDictionaryEntries(
-                            dictionaryProperty,
-                            keysProperty,
-                            valuesProperty,
-                            keyType,
-                            valueType,
-                            comparison,
-                            pagination,
-                            list
-                        );
+                        return;
                     }
-                );
+
+                    SortDictionaryEntries(
+                        dictionaryProperty,
+                        keysProperty,
+                        valuesProperty,
+                        keyType,
+                        valueType,
+                        comparison,
+                        pagination,
+                        list
+                    );
+                });
             }
 
             if (showClear)
             {
-                DrawFooterButton(
-                    clearRect,
-                    clearAllContent,
-                    "ClearAll",
-                    canClear,
-                    () =>
+                DrawFooterButton(clearRect, clearAllContent, "ClearAll", canClear, () =>
+                {
+                    bool confirmed = EditorUtility.DisplayDialog(
+                        "Clear Dictionary",
+                        "Remove all entries from this dictionary?",
+                        "Clear",
+                        "Cancel"
+                    );
+                    if (confirmed)
                     {
-                        bool confirmed = EditorUtility.DisplayDialog(
-                            "Clear Dictionary",
-                            "Remove all entries from this dictionary?",
-                            "Clear",
-                            "Cancel"
+                        ClearDictionary(
+                            dictionaryProperty,
+                            keysProperty,
+                            valuesProperty,
+                            pagination,
+                            list
                         );
-                        if (confirmed)
-                        {
-                            ClearDictionary(
-                                dictionaryProperty,
-                                keysProperty,
-                                valuesProperty,
-                                pagination,
-                                list
-                            );
-                        }
                     }
-                );
+                });
             }
 
             if (showRemove)
             {
-                DrawFooterButton(
-                    removeRect,
-                    removeContent,
-                    "Remove",
-                    canRemove,
-                    () =>
-                    {
-                        RemoveEntryAtIndex(
-                            selectedGlobalIndex,
-                            list,
-                            dictionaryProperty,
-                            keysProperty,
-                            valuesProperty,
-                            pagination
-                        );
-                    }
-                );
+                DrawFooterButton(removeRect, removeContent, "Remove", canRemove, () =>
+                {
+                    RemoveEntryAtIndex(
+                        selectedGlobalIndex,
+                        list,
+                        dictionaryProperty,
+                        keysProperty,
+                        valuesProperty,
+                        pagination
+                    );
+                });
             }
 
             return;

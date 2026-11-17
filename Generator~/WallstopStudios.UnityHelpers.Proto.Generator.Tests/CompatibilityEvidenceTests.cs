@@ -299,10 +299,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             CSharpCompilation compilation = CompatibilityInventory.Compile(
                 Array.Empty<SyntaxTree>()
             );
-            INamedTypeSymbol type =
-                compilation.GetTypeByMetadataName(
-                    typeof(CompatibilityEvidenceTests).Namespace + "." + fixture
-                )
+            INamedTypeSymbol type = compilation.GetTypeByMetadataName(
+                typeof(CompatibilityEvidenceTests).Namespace + "." + fixture
+            )
                 ?? compilation.GetTypeByMetadataName(
                     typeof(WProtoConsumerMigrationTests).Namespace + "." + fixture
                 );

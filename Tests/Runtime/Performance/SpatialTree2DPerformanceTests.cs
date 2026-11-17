@@ -66,14 +66,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         {
             return new[]
             {
-                new TreeSpec(
-                    "KDTree2D (Balanced)",
-                    points => new KdTree2D<Vector2>(points, p => p)
-                ),
-                new TreeSpec(
-                    "KDTree2D (Unbalanced)",
-                    points => new KdTree2D<Vector2>(points, p => p, balanced: false)
-                ),
+                new TreeSpec("KDTree2D (Balanced)", points => new KdTree2D<Vector2>(points, p =>
+                    p
+                )),
+                new TreeSpec("KDTree2D (Unbalanced)", points => new KdTree2D<Vector2>(
+                    points,
+                    p => p,
+                    balanced: false
+                )),
                 new TreeSpec("QuadTree2D", points => new QuadTree2D<Vector2>(points, p => p)),
                 new TreeSpec("RTree2D", points => new RTree2D<Vector2>(points, CreatePointBounds)),
             };
@@ -113,26 +113,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 
             int height = dataset.GridSize.y;
 
-            Parallel.For(
-                0,
-                height,
-                y =>
+            Parallel.For(0, height, y =>
+            {
+                int rowOffset = y * width;
+
+                for (int x = 0; x < width; ++x)
                 {
-                    int rowOffset = y * width;
+                    int index = rowOffset + x;
 
-                    for (int x = 0; x < width; ++x)
+                    if (points.Length <= index)
                     {
-                        int index = rowOffset + x;
-
-                        if (points.Length <= index)
-                        {
-                            continue;
-                        }
-
-                        points[index] = new Vector2(x, y);
+                        continue;
                     }
+
+                    points[index] = new Vector2(x, y);
                 }
-            );
+            });
 
             return points;
         }

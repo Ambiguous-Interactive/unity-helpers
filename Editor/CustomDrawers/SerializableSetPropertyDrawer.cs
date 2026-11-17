@@ -1935,8 +1935,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return false;
             }
 
-            object targetValue =
-                current
+            object targetValue = current
                 ?? CloneComplexValue(
                     SerializableDictionaryPropertyDrawer.GetDefaultValue(type),
                     type
@@ -3867,8 +3866,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                             propertyPath,
                             isSortedSet
                         );
-                        float listHeight =
-                            list?.GetHeight()
+                        float listHeight = list?.GetHeight()
                             ?? GetPaginationHeaderHeight()
                                 + EditorGUIUtility.singleLineHeight
                                     * Mathf.Max(1, Mathf.Min(totalCount, pagination.pageSize))
@@ -3876,8 +3874,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                         Rect listRect = new(position.x, y, position.width, listHeight);
                         if (list != null && Event.current.type == EventType.Repaint)
                         {
-                            GUIStyle listBackgroundStyle =
-                                ReorderableList.defaultBehaviours.boxBackground ?? GUI.skin.box;
+                            GUIStyle listBackgroundStyle = ReorderableList
+                                .defaultBehaviours
+                                .boxBackground
+                                ?? GUI.skin.box;
                             float headerHeight = Mathf.Max(0f, list.headerHeight);
                             float footerHeight = Mathf.Max(0f, list.footerHeight);
                             float bodyHeight = Mathf.Max(
@@ -4082,8 +4082,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     isSortedSet
                 );
 
-                float listHeight =
-                    list?.GetHeight()
+                float listHeight = list?.GetHeight()
                     ?? GetPaginationHeaderHeight()
                         + EditorGUIUtility.singleLineHeight
                             * Mathf.Max(1, Mathf.Min(totalCount, pagination.pageSize))
@@ -5295,8 +5294,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             if (Event.current.type == EventType.Repaint)
             {
-                GUIStyle footerStyle =
-                    ReorderableList.defaultBehaviours.footerBackground ?? "RL Footer";
+                GUIStyle footerStyle = ReorderableList.defaultBehaviours.footerBackground
+                    ?? "RL Footer";
                 footerStyle.Draw(rect, GUIContent.none, false, false, false, false);
                 DrawSetBodyTopBorder(new Rect(rect.x, rect.y, rect.width, 1f));
             }

@@ -134,27 +134,22 @@ namespace WallstopStudios.UnityHelpers.SchemaConformance.Tests
         [Test]
         public async Task DefaultScalarsKeepAbsentNullablePresence()
         {
-            await Verify(
-                new InteropScalars(),
-                nameof(InteropScalars),
-                string.Empty,
-                actual =>
-                {
-                    Assert.IsTrue(actual != null);
-                    Assert.AreEqual(0, actual.Signed);
-                    Assert.AreEqual(0, actual.WideSigned);
-                    Assert.AreEqual(0, actual.Unsigned);
-                    Assert.AreEqual(0, actual.WideUnsigned);
-                    Assert.AreEqual(0, actual.ZigZag);
-                    Assert.AreEqual(0, actual.Single);
-                    Assert.AreEqual(0, actual.Double);
-                    Assert.IsFalse(actual.Enabled);
-                    Assert.AreEqual('\0', actual.Character);
-                    Assert.IsTrue(actual.Text == null);
-                    Assert.IsTrue(actual.Bytes == null);
-                    Assert.IsFalse(actual.Optional.HasValue);
-                }
-            );
+            await Verify(new InteropScalars(), nameof(InteropScalars), string.Empty, actual =>
+            {
+                Assert.IsTrue(actual != null);
+                Assert.AreEqual(0, actual.Signed);
+                Assert.AreEqual(0, actual.WideSigned);
+                Assert.AreEqual(0, actual.Unsigned);
+                Assert.AreEqual(0, actual.WideUnsigned);
+                Assert.AreEqual(0, actual.ZigZag);
+                Assert.AreEqual(0, actual.Single);
+                Assert.AreEqual(0, actual.Double);
+                Assert.IsFalse(actual.Enabled);
+                Assert.AreEqual('\0', actual.Character);
+                Assert.IsTrue(actual.Text == null);
+                Assert.IsTrue(actual.Bytes == null);
+                Assert.IsFalse(actual.Optional.HasValue);
+            });
         }
 
         [Test]

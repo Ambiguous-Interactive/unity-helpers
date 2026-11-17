@@ -262,15 +262,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 case 3:
                     AssertLegacyDictionaryComparer<
                         SerializableSortedDictionary<string, int, SerializableDictionary.Cache<int>>
-                    >(
-                        count,
-                        operation,
-                        static () =>
-                            new SerializableSortedDictionary<
-                                string,
-                                int,
-                                SerializableDictionary.Cache<int>
-                            >(new SortedDictionary<string, int>(StringComparer.Ordinal))
+                    >(count, operation, static () =>
+                        new SerializableSortedDictionary<
+                            string,
+                            int,
+                            SerializableDictionary.Cache<int>
+                        >(new SortedDictionary<string, int>(StringComparer.Ordinal))
                     );
                     break;
                 default:

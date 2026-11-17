@@ -97,8 +97,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             float? jitterOverride = null
         )
         {
-            _valueProducer =
-                valueProducer ?? throw new ArgumentNullException(nameof(valueProducer));
+            _valueProducer = valueProducer
+                ?? throw new ArgumentNullException(nameof(valueProducer));
             if (!(0f <= cacheTtl && cacheTtl <= float.MaxValue))
             {
                 throw new ArgumentException(nameof(cacheTtl));

@@ -546,31 +546,27 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             int len = input.Length;
-            return string.Create(
-                len,
-                input,
-                static (span, src) =>
+            return string.Create(len, input, static (span, src) =>
+            {
+                int write = 0;
+                for (int read = src.Length - 1; 0 <= read; --read)
                 {
-                    int write = 0;
-                    for (int read = src.Length - 1; 0 <= read; --read)
+                    char current = src[read];
+                    if (
+                        0 < read
+                        && char.IsLowSurrogate(current)
+                        && char.IsHighSurrogate(src[read - 1])
+                    )
                     {
-                        char current = src[read];
-                        if (
-                            0 < read
-                            && char.IsLowSurrogate(current)
-                            && char.IsHighSurrogate(src[read - 1])
-                        )
-                        {
-                            span[write++] = src[read - 1];
-                            span[write++] = current;
-                            --read;
-                            continue;
-                        }
-
+                        span[write++] = src[read - 1];
                         span[write++] = current;
+                        --read;
+                        continue;
                     }
+
+                    span[write++] = current;
                 }
-            );
+            });
         }
 
         public static string RemoveWhitespace(this string input)
@@ -828,21 +824,17 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             int oldLen = oldValue.Length;
             int newLen = input.Length - oldLen + (newValue?.Length ?? 0);
-            return string.Create(
-                newLen,
-                (input, index, oldLen, newValue),
-                static (dst, state) =>
+            return string.Create(newLen, (input, index, oldLen, newValue), static (dst, state) =>
+            {
+                state.input.AsSpan(0, state.index).CopyTo(dst);
+                int pos = state.index;
+                if (state.newValue != null)
                 {
-                    state.input.AsSpan(0, state.index).CopyTo(dst);
-                    int pos = state.index;
-                    if (state.newValue != null)
-                    {
-                        state.newValue.AsSpan().CopyTo(dst.Slice(pos));
-                        pos += state.newValue.Length;
-                    }
-                    state.input.AsSpan(state.index + state.oldLen).CopyTo(dst.Slice(pos));
+                    state.newValue.AsSpan().CopyTo(dst.Slice(pos));
+                    pos += state.newValue.Length;
                 }
-            );
+                state.input.AsSpan(state.index + state.oldLen).CopyTo(dst.Slice(pos));
+            });
         }
 
         public static string ReplaceLast(this string input, string oldValue, string newValue)
@@ -860,21 +852,17 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             int oldLen = oldValue.Length;
             int newLen = input.Length - oldLen + (newValue?.Length ?? 0);
-            return string.Create(
-                newLen,
-                (input, index, oldLen, newValue),
-                static (dst, state) =>
+            return string.Create(newLen, (input, index, oldLen, newValue), static (dst, state) =>
+            {
+                state.input.AsSpan(0, state.index).CopyTo(dst);
+                int pos = state.index;
+                if (state.newValue != null)
                 {
-                    state.input.AsSpan(0, state.index).CopyTo(dst);
-                    int pos = state.index;
-                    if (state.newValue != null)
-                    {
-                        state.newValue.AsSpan().CopyTo(dst.Slice(pos));
-                        pos += state.newValue.Length;
-                    }
-                    state.input.AsSpan(state.index + state.oldLen).CopyTo(dst.Slice(pos));
+                    state.newValue.AsSpan().CopyTo(dst.Slice(pos));
+                    pos += state.newValue.Length;
                 }
-            );
+                state.input.AsSpan(state.index + state.oldLen).CopyTo(dst.Slice(pos));
+            });
         }
 
         public static string ToCase(this string value, StringCase stringCase)

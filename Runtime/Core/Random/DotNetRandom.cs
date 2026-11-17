@@ -76,17 +76,20 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         public static DotNetRandom Instance => ThreadLocalRandom<DotNetRandom>.Instance;
 
-        private static readonly FieldInfo SeedArrayField =
-            typeof(Random).GetField("SeedArray", RandomFieldFlags)
-            ?? typeof(Random).GetField("_seedArray", RandomFieldFlags);
+        private static readonly FieldInfo SeedArrayField = typeof(Random).GetField(
+            "SeedArray",
+            RandomFieldFlags
+        ) ?? typeof(Random).GetField("_seedArray", RandomFieldFlags);
 
-        private static readonly FieldInfo InextField =
-            typeof(Random).GetField("inext", RandomFieldFlags)
-            ?? typeof(Random).GetField("_inext", RandomFieldFlags);
+        private static readonly FieldInfo InextField = typeof(Random).GetField(
+            "inext",
+            RandomFieldFlags
+        ) ?? typeof(Random).GetField("_inext", RandomFieldFlags);
 
-        private static readonly FieldInfo InextpField =
-            typeof(Random).GetField("inextp", RandomFieldFlags)
-            ?? typeof(Random).GetField("_inextp", RandomFieldFlags);
+        private static readonly FieldInfo InextpField = typeof(Random).GetField(
+            "inextp",
+            RandomFieldFlags
+        ) ?? typeof(Random).GetField("_inextp", RandomFieldFlags);
 
         private static readonly Func<Random, int[]> SeedArrayGetter = TryCreateGetter<int[]>(
             SeedArrayField

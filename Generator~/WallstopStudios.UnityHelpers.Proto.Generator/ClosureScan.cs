@@ -130,8 +130,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                             model,
                             memberAttributes
                         );
-                        resolved =
-                            model.GetTypeInfo(type).Type
+                        resolved = model.GetTypeInfo(type).Type
                             ?? model.GetSymbolInfo(type).Symbol as ITypeSymbol;
                     }
                     else if (node is ImplicitArrayCreationExpressionSyntax)
@@ -156,10 +155,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         resolved = model.GetTypeInfo(invocation).Type;
                         if (model.GetSymbolInfo(invocation).Symbol is IMethodSymbol method)
                         {
-                            method =
-                                (
-                                    model.GetOperation(invocation) as IInvocationOperation
-                                )?.TargetMethod
+                            method = (
+                                model.GetOperation(invocation) as IInvocationOperation
+                            )?.TargetMethod
                                 ?? method;
                             bool api = serializationMethods.Contains(method.OriginalDefinition);
                             if (

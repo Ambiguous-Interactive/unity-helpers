@@ -289,8 +289,8 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         )
         {
             for (
-                ControlFlowRegion region =
-                    completedFinally?.EnclosingRegion ?? source.EnclosingRegion;
+                ControlFlowRegion region = completedFinally?.EnclosingRegion
+                    ?? source.EnclosingRegion;
                 region != null;
                 region = region.EnclosingRegion
             )

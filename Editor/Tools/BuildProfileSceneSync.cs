@@ -257,8 +257,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     serialized.ApplyModifiedPropertiesWithoutUndo();
                     EditorUtility.SetDirty(profile);
                     changed = false;
-                    error =
-                        saveFailure ?? "Unity did not persist the changed build profile: " + path;
+                    error = saveFailure
+                        ?? "Unity did not persist the changed build profile: " + path;
                     return false;
                 }
             }

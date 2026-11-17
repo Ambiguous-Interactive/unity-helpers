@@ -574,9 +574,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             TextureFormat format = TextureFormat.RGBA32
         )
         {
-            return DynamicFixtures.GetOrAdd(
-                key,
-                _ => CreateDynamicSpriteSheet(key, width, height, columns, rows, format)
+            return DynamicFixtures.GetOrAdd(key, _ =>
+                CreateDynamicSpriteSheet(key, width, height, columns, rows, format)
             );
         }
 

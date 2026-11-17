@@ -212,6 +212,12 @@ else
     fail "validator resolves .NET SDK archive URLs for both architectures" "$validator_sdk_output"
 fi
 
+if grep -Fq 'csharpier_sdk|10.0.403|x64|arm64|https://builds.dotnet.microsoft.com/dotnet/Sdk/{VERSION}/dotnet-sdk-{VERSION}-linux-{ARCH}.tar.gz' <<< "$validator_sdk_output"; then
+    pass "validator resolves the .NET SDK needed by CSharpier for both architectures"
+else
+    fail "validator resolves the .NET SDK needed by CSharpier for both architectures" "$validator_sdk_output"
+fi
+
 manifest_csharpier_version="$(node -e 'const fs = require("node:fs"); process.stdout.write(JSON.parse(fs.readFileSync(process.argv[1], "utf8")).tools.CSharpier.version);' "$REPO_ROOT/.config/dotnet-tools.json")"
 image_csharpier_version="$(sed -n 's/^RUN dotnet tool install -g csharpier --version \([0-9.]*\).*/\1/p' "$DOCKERFILE")"
 if [[ "$manifest_csharpier_version" == "$image_csharpier_version" ]]; then

@@ -58,8 +58,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Base
         {
             _serializedObject = property?.serializedObject;
             _propertyPath = property?.propertyPath ?? string.Empty;
-            string resolvedLabel =
-                labelText ?? property?.displayName ?? property?.name ?? string.Empty;
+            string resolvedLabel = labelText
+                ?? property?.displayName
+                ?? property?.name
+                ?? string.Empty;
             label = resolvedLabel;
             _labelContent = new GUIContent(resolvedLabel);
         }

@@ -49,8 +49,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             foreach (Pair pair in Pairs(compilation.Assembly))
             {
-                Location location =
-                    pair.Attribute.ApplicationSyntaxReference?.GetSyntax().GetLocation()
+                Location location = pair.Attribute.ApplicationSyntaxReference?.GetSyntax()
+                    .GetLocation()
                     ?? Location.None;
 
                 if (pair.Declared == null || pair.Root == null)
@@ -215,8 +215,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 }
 
                 // Nameability needs its own report so skipped registrations never disappear silently.
-                Location location =
-                    pair.Attribute.ApplicationSyntaxReference?.GetSyntax().GetLocation()
+                Location location = pair.Attribute.ApplicationSyntaxReference?.GetSyntax()
+                    .GetLocation()
                     ?? Location.None;
                 if (
                     TypeNaming.ReportIfUnnameable(

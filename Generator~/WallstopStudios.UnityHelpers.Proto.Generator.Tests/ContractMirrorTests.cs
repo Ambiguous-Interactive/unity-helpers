@@ -1247,8 +1247,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                         continue;
                     }
 
-                    SeparatedSyntaxList<AttributeArgumentSyntax> arguments =
-                        attribute.ArgumentList?.Arguments ?? default;
+                    SeparatedSyntaxList<AttributeArgumentSyntax> arguments = attribute
+                        .ArgumentList
+                        ?.Arguments
+                        ?? default;
                     if (arguments.Count < 2)
                     {
                         continue;

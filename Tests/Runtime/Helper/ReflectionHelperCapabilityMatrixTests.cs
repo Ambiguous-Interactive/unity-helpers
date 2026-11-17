@@ -82,68 +82,56 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [TestCaseSource(nameof(CapabilityModes))]
         public void FieldGetterBoxedSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    TestClass instance = new() { intValue = 37 };
-                    FieldInfo field = typeof(TestClass).GetField(nameof(TestClass.intValue));
-                    Func<object, object> getter = ReflectionHelpers.GetFieldGetter(field);
-                    Assert.AreEqual(37, getter(instance));
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                TestClass instance = new() { intValue = 37 };
+                FieldInfo field = typeof(TestClass).GetField(nameof(TestClass.intValue));
+                Func<object, object> getter = ReflectionHelpers.GetFieldGetter(field);
+                Assert.AreEqual(37, getter(instance));
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void FieldSetterBoxedSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    TestClass instance = new();
-                    FieldInfo field = typeof(TestClass).GetField(nameof(TestClass.intValue));
-                    Action<object, object> setter = ReflectionHelpers.GetFieldSetter(field);
-                    setter(instance, 91);
-                    Assert.AreEqual(91, instance.intValue);
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                TestClass instance = new();
+                FieldInfo field = typeof(TestClass).GetField(nameof(TestClass.intValue));
+                Action<object, object> setter = ReflectionHelpers.GetFieldSetter(field);
+                setter(instance, 91);
+                Assert.AreEqual(91, instance.intValue);
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void FieldGetterTypedSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    TestClass instance = new() { intValue = 73 };
-                    FieldInfo field = typeof(TestClass).GetField(nameof(TestClass.intValue));
-                    Func<TestClass, int> getter = ReflectionHelpers.GetFieldGetter<TestClass, int>(
-                        field
-                    );
-                    Assert.AreEqual(73, getter(instance));
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                TestClass instance = new() { intValue = 73 };
+                FieldInfo field = typeof(TestClass).GetField(nameof(TestClass.intValue));
+                Func<TestClass, int> getter = ReflectionHelpers.GetFieldGetter<TestClass, int>(
+                    field
+                );
+                Assert.AreEqual(73, getter(instance));
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void FieldSetterTypedSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    FieldInfo field = typeof(TestClass).GetField(nameof(TestClass.intValue));
-                    FieldSetter<TestClass, int> setter = ReflectionHelpers.GetFieldSetter<
-                        TestClass,
-                        int
-                    >(field);
-                    TestClass instance = new();
-                    setter(ref instance, 82);
-                    Assert.AreEqual(82, instance.intValue);
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                FieldInfo field = typeof(TestClass).GetField(nameof(TestClass.intValue));
+                FieldSetter<TestClass, int> setter = ReflectionHelpers.GetFieldSetter<
+                    TestClass,
+                    int
+                >(field);
+                TestClass instance = new();
+                setter(ref instance, 82);
+                Assert.AreEqual(82, instance.intValue);
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
@@ -153,18 +141,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             try
             {
                 TestClass.StaticIntValue = 144;
-                RunInCapabilityMode(
-                    mode,
-                    () =>
-                    {
-                        FieldInfo field = typeof(TestClass).GetField(
-                            nameof(TestClass.StaticIntValue),
-                            BindingFlags.Static | BindingFlags.Public
-                        );
-                        Func<object> getter = ReflectionHelpers.GetStaticFieldGetter(field);
-                        Assert.AreEqual(144, getter());
-                    }
-                );
+                RunInCapabilityMode(mode, () =>
+                {
+                    FieldInfo field = typeof(TestClass).GetField(
+                        nameof(TestClass.StaticIntValue),
+                        BindingFlags.Static | BindingFlags.Public
+                    );
+                    Func<object> getter = ReflectionHelpers.GetStaticFieldGetter(field);
+                    Assert.AreEqual(144, getter());
+                });
             }
             finally
             {
@@ -178,19 +163,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             int original = TestClass.StaticIntValue;
             try
             {
-                RunInCapabilityMode(
-                    mode,
-                    () =>
-                    {
-                        FieldInfo field = typeof(TestClass).GetField(
-                            nameof(TestClass.StaticIntValue),
-                            BindingFlags.Static | BindingFlags.Public
-                        );
-                        Action<object> setter = ReflectionHelpers.GetStaticFieldSetter(field);
-                        setter(256);
-                        Assert.AreEqual(256, TestClass.StaticIntValue);
-                    }
-                );
+                RunInCapabilityMode(mode, () =>
+                {
+                    FieldInfo field = typeof(TestClass).GetField(
+                        nameof(TestClass.StaticIntValue),
+                        BindingFlags.Static | BindingFlags.Public
+                    );
+                    Action<object> setter = ReflectionHelpers.GetStaticFieldSetter(field);
+                    setter(256);
+                    Assert.AreEqual(256, TestClass.StaticIntValue);
+                });
             }
             finally
             {
@@ -205,18 +187,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             try
             {
                 TestClass.StaticIntValue = 512;
-                RunInCapabilityMode(
-                    mode,
-                    () =>
-                    {
-                        FieldInfo field = typeof(TestClass).GetField(
-                            nameof(TestClass.StaticIntValue),
-                            BindingFlags.Static | BindingFlags.Public
-                        );
-                        Func<int> getter = ReflectionHelpers.GetStaticFieldGetter<int>(field);
-                        Assert.AreEqual(512, getter());
-                    }
-                );
+                RunInCapabilityMode(mode, () =>
+                {
+                    FieldInfo field = typeof(TestClass).GetField(
+                        nameof(TestClass.StaticIntValue),
+                        BindingFlags.Static | BindingFlags.Public
+                    );
+                    Func<int> getter = ReflectionHelpers.GetStaticFieldGetter<int>(field);
+                    Assert.AreEqual(512, getter());
+                });
             }
             finally
             {
@@ -230,19 +209,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             int original = TestClass.StaticIntValue;
             try
             {
-                RunInCapabilityMode(
-                    mode,
-                    () =>
-                    {
-                        FieldInfo field = typeof(TestClass).GetField(
-                            nameof(TestClass.StaticIntValue),
-                            BindingFlags.Static | BindingFlags.Public
-                        );
-                        Action<int> setter = ReflectionHelpers.GetStaticFieldSetter<int>(field);
-                        setter(1024);
-                        Assert.AreEqual(1024, TestClass.StaticIntValue);
-                    }
-                );
+                RunInCapabilityMode(mode, () =>
+                {
+                    FieldInfo field = typeof(TestClass).GetField(
+                        nameof(TestClass.StaticIntValue),
+                        BindingFlags.Static | BindingFlags.Public
+                    );
+                    Action<int> setter = ReflectionHelpers.GetStaticFieldSetter<int>(field);
+                    setter(1024);
+                    Assert.AreEqual(1024, TestClass.StaticIntValue);
+                });
             }
             finally
             {
@@ -1005,56 +981,47 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [TestCaseSource(nameof(CapabilityModes))]
         public void PropertyGetterBoxedSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    VariantPropertyClass instance = new() { ObjectProperty = "value" };
-                    PropertyInfo property = typeof(VariantPropertyClass).GetProperty(
-                        nameof(VariantPropertyClass.ObjectProperty)
-                    );
-                    Func<object, object> getter = ReflectionHelpers.GetPropertyGetter(property);
-                    Assert.AreEqual("value", getter(instance));
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                VariantPropertyClass instance = new() { ObjectProperty = "value" };
+                PropertyInfo property = typeof(VariantPropertyClass).GetProperty(
+                    nameof(VariantPropertyClass.ObjectProperty)
+                );
+                Func<object, object> getter = ReflectionHelpers.GetPropertyGetter(property);
+                Assert.AreEqual("value", getter(instance));
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void PropertySetterBoxedSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    VariantPropertyClass instance = new();
-                    PropertyInfo property = typeof(VariantPropertyClass).GetProperty(
-                        nameof(VariantPropertyClass.ObjectProperty)
-                    );
-                    Action<object, object> setter = ReflectionHelpers.GetPropertySetter(property);
-                    setter(instance, "assigned");
-                    Assert.AreEqual("assigned", instance.ObjectProperty);
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                VariantPropertyClass instance = new();
+                PropertyInfo property = typeof(VariantPropertyClass).GetProperty(
+                    nameof(VariantPropertyClass.ObjectProperty)
+                );
+                Action<object, object> setter = ReflectionHelpers.GetPropertySetter(property);
+                setter(instance, "assigned");
+                Assert.AreEqual("assigned", instance.ObjectProperty);
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void PropertyGetterTypedSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    TestPropertyClass instance = new() { InstanceProperty = 18 };
-                    PropertyInfo property = typeof(TestPropertyClass).GetProperty(
-                        nameof(TestPropertyClass.InstanceProperty)
-                    );
-                    Func<TestPropertyClass, int> getter = ReflectionHelpers.GetPropertyGetter<
-                        TestPropertyClass,
-                        int
-                    >(property);
-                    Assert.AreEqual(18, getter(instance));
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                TestPropertyClass instance = new() { InstanceProperty = 18 };
+                PropertyInfo property = typeof(TestPropertyClass).GetProperty(
+                    nameof(TestPropertyClass.InstanceProperty)
+                );
+                Func<TestPropertyClass, int> getter = ReflectionHelpers.GetPropertyGetter<
+                    TestPropertyClass,
+                    int
+                >(property);
+                Assert.AreEqual(18, getter(instance));
+            });
         }
 
         [Test]
@@ -1897,22 +1864,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [TestCaseSource(nameof(CapabilityModes))]
         public void PropertySetterTypedSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    TestPropertyClass instance = new();
-                    PropertyInfo property = typeof(TestPropertyClass).GetProperty(
-                        nameof(TestPropertyClass.InstanceProperty)
-                    );
-                    Action<TestPropertyClass, int> setter = ReflectionHelpers.GetPropertySetter<
-                        TestPropertyClass,
-                        int
-                    >(property);
-                    setter(instance, 27);
-                    Assert.AreEqual(27, instance.InstanceProperty);
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                TestPropertyClass instance = new();
+                PropertyInfo property = typeof(TestPropertyClass).GetProperty(
+                    nameof(TestPropertyClass.InstanceProperty)
+                );
+                Action<TestPropertyClass, int> setter = ReflectionHelpers.GetPropertySetter<
+                    TestPropertyClass,
+                    int
+                >(property);
+                setter(instance, 27);
+                Assert.AreEqual(27, instance.InstanceProperty);
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
@@ -1922,18 +1886,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             try
             {
                 TestPropertyClass.StaticProperty = 64;
-                RunInCapabilityMode(
-                    mode,
-                    () =>
-                    {
-                        PropertyInfo property = typeof(TestPropertyClass).GetProperty(
-                            nameof(TestPropertyClass.StaticProperty),
-                            BindingFlags.Static | BindingFlags.Public
-                        );
-                        Func<object, object> getter = ReflectionHelpers.GetPropertyGetter(property);
-                        Assert.AreEqual(64, getter(null));
-                    }
-                );
+                RunInCapabilityMode(mode, () =>
+                {
+                    PropertyInfo property = typeof(TestPropertyClass).GetProperty(
+                        nameof(TestPropertyClass.StaticProperty),
+                        BindingFlags.Static | BindingFlags.Public
+                    );
+                    Func<object, object> getter = ReflectionHelpers.GetPropertyGetter(property);
+                    Assert.AreEqual(64, getter(null));
+                });
             }
             finally
             {
@@ -2062,21 +2023,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             int original = TestPropertyClass.StaticProperty;
             try
             {
-                RunInCapabilityMode(
-                    mode,
-                    () =>
-                    {
-                        PropertyInfo property = typeof(TestPropertyClass).GetProperty(
-                            nameof(TestPropertyClass.StaticProperty),
-                            BindingFlags.Static | BindingFlags.Public
-                        );
-                        Action<object, object> setter = ReflectionHelpers.GetPropertySetter(
-                            property
-                        );
-                        setter(null, 91);
-                        Assert.AreEqual(91, TestPropertyClass.StaticProperty);
-                    }
-                );
+                RunInCapabilityMode(mode, () =>
+                {
+                    PropertyInfo property = typeof(TestPropertyClass).GetProperty(
+                        nameof(TestPropertyClass.StaticProperty),
+                        BindingFlags.Static | BindingFlags.Public
+                    );
+                    Action<object, object> setter = ReflectionHelpers.GetPropertySetter(property);
+                    setter(null, 91);
+                    Assert.AreEqual(91, TestPropertyClass.StaticProperty);
+                });
             }
             finally
             {
@@ -2091,18 +2047,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             try
             {
                 TestPropertyClass.StaticProperty = 333;
-                RunInCapabilityMode(
-                    mode,
-                    () =>
-                    {
-                        PropertyInfo property = typeof(TestPropertyClass).GetProperty(
-                            nameof(TestPropertyClass.StaticProperty),
-                            BindingFlags.Static | BindingFlags.Public
-                        );
-                        Func<int> getter = ReflectionHelpers.GetStaticPropertyGetter<int>(property);
-                        Assert.AreEqual(333, getter());
-                    }
-                );
+                RunInCapabilityMode(mode, () =>
+                {
+                    PropertyInfo property = typeof(TestPropertyClass).GetProperty(
+                        nameof(TestPropertyClass.StaticProperty),
+                        BindingFlags.Static | BindingFlags.Public
+                    );
+                    Func<int> getter = ReflectionHelpers.GetStaticPropertyGetter<int>(property);
+                    Assert.AreEqual(333, getter());
+                });
             }
             finally
             {
@@ -2116,21 +2069,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             int original = TestPropertyClass.StaticProperty;
             try
             {
-                RunInCapabilityMode(
-                    mode,
-                    () =>
-                    {
-                        PropertyInfo property = typeof(TestPropertyClass).GetProperty(
-                            nameof(TestPropertyClass.StaticProperty),
-                            BindingFlags.Static | BindingFlags.Public
-                        );
-                        Action<int> setter = ReflectionHelpers.GetStaticPropertySetter<int>(
-                            property
-                        );
-                        setter(444);
-                        Assert.AreEqual(444, TestPropertyClass.StaticProperty);
-                    }
-                );
+                RunInCapabilityMode(mode, () =>
+                {
+                    PropertyInfo property = typeof(TestPropertyClass).GetProperty(
+                        nameof(TestPropertyClass.StaticProperty),
+                        BindingFlags.Static | BindingFlags.Public
+                    );
+                    Action<int> setter = ReflectionHelpers.GetStaticPropertySetter<int>(property);
+                    setter(444);
+                    Assert.AreEqual(444, TestPropertyClass.StaticProperty);
+                });
             }
             finally
             {
@@ -2141,861 +2089,710 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [TestCaseSource(nameof(CapabilityModes))]
         public void IndexerGetterSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    IndexerClass instance = new() { [5] = 99 };
-                    PropertyInfo indexer = typeof(IndexerClass).GetProperty("Item");
-                    Func<object, object[], object> getter = ReflectionHelpers.GetIndexerGetter(
-                        indexer
-                    );
-                    Assert.AreEqual(99, getter(instance, new object[] { 5 }));
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                IndexerClass instance = new() { [5] = 99 };
+                PropertyInfo indexer = typeof(IndexerClass).GetProperty("Item");
+                Func<object, object[], object> getter = ReflectionHelpers.GetIndexerGetter(indexer);
+                Assert.AreEqual(99, getter(instance, new object[] { 5 }));
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void IndexerSetterSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    IndexerClass instance = new();
-                    PropertyInfo indexer = typeof(IndexerClass).GetProperty("Item");
-                    Action<object, object, object[]> setter = ReflectionHelpers.GetIndexerSetter(
-                        indexer
-                    );
-                    setter(instance, 111, new object[] { 7 });
-                    Assert.AreEqual(111, instance[7]);
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                IndexerClass instance = new();
+                PropertyInfo indexer = typeof(IndexerClass).GetProperty("Item");
+                Action<object, object, object[]> setter = ReflectionHelpers.GetIndexerSetter(
+                    indexer
+                );
+                setter(instance, 111, new object[] { 7 });
+                Assert.AreEqual(111, instance[7]);
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void MethodInvokerBoxedInstanceSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    MethodInfo method = typeof(TestMethodClass).GetMethod(
-                        nameof(TestMethodClass.InstanceMethodWithParam)
-                    );
-                    Func<object, object[], object> invoker = ReflectionHelpers.GetMethodInvoker(
-                        method
-                    );
-                    object result = invoker(new TestMethodClass(), new object[] { "abcd" });
-                    Assert.AreEqual(4, result);
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                MethodInfo method = typeof(TestMethodClass).GetMethod(
+                    nameof(TestMethodClass.InstanceMethodWithParam)
+                );
+                Func<object, object[], object> invoker = ReflectionHelpers.GetMethodInvoker(method);
+                object result = invoker(new TestMethodClass(), new object[] { "abcd" });
+                Assert.AreEqual(4, result);
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void MethodInvokerBoxedStaticSupportsCapabilities(CapabilityMode mode)
         {
             TestMethodClass.ResetStatic();
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    MethodInfo method = typeof(TestMethodClass).GetMethod(
-                        nameof(TestMethodClass.StaticMethodWithParam)
-                    );
-                    Func<object[], object> invoker = ReflectionHelpers.GetStaticMethodInvoker(
-                        method
-                    );
-                    object result = invoker(new object[] { 6 });
-                    Assert.AreEqual(12, result);
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                MethodInfo method = typeof(TestMethodClass).GetMethod(
+                    nameof(TestMethodClass.StaticMethodWithParam)
+                );
+                Func<object[], object> invoker = ReflectionHelpers.GetStaticMethodInvoker(method);
+                object result = invoker(new object[] { 6 });
+                Assert.AreEqual(12, result);
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void MethodInvokerTypedInstanceNoArgsSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    MethodInfo method = typeof(TestMethodClass).GetMethod(
-                        nameof(TestMethodClass.InstanceIntMethod)
-                    );
-                    Func<TestMethodClass, int> invoker = ReflectionHelpers.GetInstanceMethodInvoker<
-                        TestMethodClass,
-                        int
-                    >(method);
-                    Assert.AreEqual(100, invoker(new TestMethodClass()));
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                MethodInfo method = typeof(TestMethodClass).GetMethod(
+                    nameof(TestMethodClass.InstanceIntMethod)
+                );
+                Func<TestMethodClass, int> invoker = ReflectionHelpers.GetInstanceMethodInvoker<
+                    TestMethodClass,
+                    int
+                >(method);
+                Assert.AreEqual(100, invoker(new TestMethodClass()));
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void MethodInvokerTypedInstanceWithArgsSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    MethodInfo method = typeof(TestMethodClass).GetMethod(
-                        nameof(TestMethodClass.InstanceMethodWithParam)
+            RunInCapabilityMode(mode, () =>
+            {
+                MethodInfo method = typeof(TestMethodClass).GetMethod(
+                    nameof(TestMethodClass.InstanceMethodWithParam)
+                );
+                Func<TestMethodClass, string, int> invoker =
+                    ReflectionHelpers.GetInstanceMethodInvoker<TestMethodClass, string, int>(
+                        method
                     );
-                    Func<TestMethodClass, string, int> invoker =
-                        ReflectionHelpers.GetInstanceMethodInvoker<TestMethodClass, string, int>(
-                            method
-                        );
-                    Assert.AreEqual(3, invoker(new TestMethodClass(), "hey"));
-                }
-            );
+                Assert.AreEqual(3, invoker(new TestMethodClass(), "hey"));
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void MethodInvokerTypedInstanceThreeArgsSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    MethodInfo method = typeof(TestMethodClass).GetMethod(
-                        nameof(TestMethodClass.InstanceMethodThreeParams)
-                    );
-                    Func<TestMethodClass, int, string, bool, int> invoker =
-                        ReflectionHelpers.GetInstanceMethodInvoker<
-                            TestMethodClass,
-                            int,
-                            string,
-                            bool,
-                            int
-                        >(method);
-                    int result = invoker(new TestMethodClass(), 2, "abc", true);
-                    Assert.AreEqual(2 + 3 + 1, result);
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                MethodInfo method = typeof(TestMethodClass).GetMethod(
+                    nameof(TestMethodClass.InstanceMethodThreeParams)
+                );
+                Func<TestMethodClass, int, string, bool, int> invoker =
+                    ReflectionHelpers.GetInstanceMethodInvoker<
+                        TestMethodClass,
+                        int,
+                        string,
+                        bool,
+                        int
+                    >(method);
+                int result = invoker(new TestMethodClass(), 2, "abc", true);
+                Assert.AreEqual(2 + 3 + 1, result);
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void MethodInvokerTypedInstanceFourArgsSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    MethodInfo method = typeof(TestMethodClass).GetMethod(
-                        nameof(TestMethodClass.InstanceSumFour)
-                    );
-                    Func<TestMethodClass, int, int, int, int, int> invoker =
-                        ReflectionHelpers.GetInstanceMethodInvoker<
-                            TestMethodClass,
-                            int,
-                            int,
-                            int,
-                            int,
-                            int
-                        >(method);
-                    int result = invoker(new TestMethodClass(), 1, 2, 3, 4);
-                    Assert.AreEqual(10, result);
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                MethodInfo method = typeof(TestMethodClass).GetMethod(
+                    nameof(TestMethodClass.InstanceSumFour)
+                );
+                Func<TestMethodClass, int, int, int, int, int> invoker =
+                    ReflectionHelpers.GetInstanceMethodInvoker<
+                        TestMethodClass,
+                        int,
+                        int,
+                        int,
+                        int,
+                        int
+                    >(method);
+                int result = invoker(new TestMethodClass(), 1, 2, 3, 4);
+                Assert.AreEqual(10, result);
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void MethodInvokerTypedStaticNoArgsSupportsCapabilities(CapabilityMode mode)
         {
             TestMethodClass.ResetStatic();
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    MethodInfo method = typeof(TestMethodClass).GetMethod(
-                        nameof(TestMethodClass.StaticIntMethod)
-                    );
-                    Func<int> invoker = ReflectionHelpers.GetStaticMethodInvoker<int>(method);
-                    Assert.AreEqual(42, invoker());
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                MethodInfo method = typeof(TestMethodClass).GetMethod(
+                    nameof(TestMethodClass.StaticIntMethod)
+                );
+                Func<int> invoker = ReflectionHelpers.GetStaticMethodInvoker<int>(method);
+                Assert.AreEqual(42, invoker());
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void MethodInvokerTypedStaticOneArgSupportsCapabilities(CapabilityMode mode)
         {
             TestMethodClass.ResetStatic();
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    MethodInfo method = typeof(TestMethodClass).GetMethod(
-                        nameof(TestMethodClass.StaticMethodWithParam)
-                    );
-                    Func<int, int> invoker = ReflectionHelpers.GetStaticMethodInvoker<int, int>(
-                        method
-                    );
-                    Assert.AreEqual(20, invoker(10));
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                MethodInfo method = typeof(TestMethodClass).GetMethod(
+                    nameof(TestMethodClass.StaticMethodWithParam)
+                );
+                Func<int, int> invoker = ReflectionHelpers.GetStaticMethodInvoker<int, int>(method);
+                Assert.AreEqual(20, invoker(10));
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void MethodInvokerTypedStaticTwoArgsSupportsCapabilities(CapabilityMode mode)
         {
             TestMethodClass.ResetStatic();
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    MethodInfo method = typeof(TestMethodClass).GetMethod(
-                        nameof(TestMethodClass.StaticMethodTwoParams)
-                    );
-                    Func<int, int, int> invoker = ReflectionHelpers.GetStaticMethodInvoker<
-                        int,
-                        int,
-                        int
-                    >(method);
-                    Assert.AreEqual(15, invoker(7, 8));
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                MethodInfo method = typeof(TestMethodClass).GetMethod(
+                    nameof(TestMethodClass.StaticMethodTwoParams)
+                );
+                Func<int, int, int> invoker = ReflectionHelpers.GetStaticMethodInvoker<
+                    int,
+                    int,
+                    int
+                >(method);
+                Assert.AreEqual(15, invoker(7, 8));
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void MethodInvokerTypedStaticThreeArgsSupportsCapabilities(CapabilityMode mode)
         {
             TestMethodClass.ResetStatic();
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    MethodInfo method = typeof(TestMethodClass).GetMethod(
-                        nameof(TestMethodClass.StaticMethodMultipleParams)
-                    );
-                    Func<int, string, bool, int> invoker = ReflectionHelpers.GetStaticMethodInvoker<
-                        int,
-                        string,
-                        bool,
-                        int
-                    >(method);
-                    Assert.AreEqual(5 + 4 + 1, invoker(5, "four", true));
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                MethodInfo method = typeof(TestMethodClass).GetMethod(
+                    nameof(TestMethodClass.StaticMethodMultipleParams)
+                );
+                Func<int, string, bool, int> invoker = ReflectionHelpers.GetStaticMethodInvoker<
+                    int,
+                    string,
+                    bool,
+                    int
+                >(method);
+                Assert.AreEqual(5 + 4 + 1, invoker(5, "four", true));
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void MethodInvokerTypedStaticFourArgsSupportsCapabilities(CapabilityMode mode)
         {
             TestMethodClass.ResetStatic();
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    MethodInfo method = typeof(TestMethodClass).GetMethod(
-                        nameof(TestMethodClass.StaticMethodFourParams)
-                    );
-                    Func<int, int, int, int, int> invoker =
-                        ReflectionHelpers.GetStaticMethodInvoker<int, int, int, int, int>(method);
-                    Assert.AreEqual(22, invoker(4, 5, 6, 7));
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                MethodInfo method = typeof(TestMethodClass).GetMethod(
+                    nameof(TestMethodClass.StaticMethodFourParams)
+                );
+                Func<int, int, int, int, int> invoker = ReflectionHelpers.GetStaticMethodInvoker<
+                    int,
+                    int,
+                    int,
+                    int,
+                    int
+                >(method);
+                Assert.AreEqual(22, invoker(4, 5, 6, 7));
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void ActionInvokerStaticNoArgsSupportsCapabilities(CapabilityMode mode)
         {
             TestMethodClass.ResetStatic();
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    MethodInfo method = typeof(TestMethodClass).GetMethod(
-                        nameof(TestMethodClass.StaticVoidMethod)
-                    );
-                    Action action = ReflectionHelpers.GetStaticActionInvoker(method);
-                    action();
-                    Assert.AreEqual(1, TestMethodClass.StaticMethodCallCount);
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                MethodInfo method = typeof(TestMethodClass).GetMethod(
+                    nameof(TestMethodClass.StaticVoidMethod)
+                );
+                Action action = ReflectionHelpers.GetStaticActionInvoker(method);
+                action();
+                Assert.AreEqual(1, TestMethodClass.StaticMethodCallCount);
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void ActionInvokerStaticOneArgSupportsCapabilities(CapabilityMode mode)
         {
             TestMethodClass.ResetStatic();
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    MethodInfo method = typeof(TestMethodClass).GetMethod(
-                        nameof(TestMethodClass.StaticVoidMethodWithParam)
-                    );
-                    Action<int> action = ReflectionHelpers.GetStaticActionInvoker<int>(method);
-                    action(15);
-                    Assert.AreEqual(15, TestMethodClass.StaticMethodCallCount);
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                MethodInfo method = typeof(TestMethodClass).GetMethod(
+                    nameof(TestMethodClass.StaticVoidMethodWithParam)
+                );
+                Action<int> action = ReflectionHelpers.GetStaticActionInvoker<int>(method);
+                action(15);
+                Assert.AreEqual(15, TestMethodClass.StaticMethodCallCount);
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void ActionInvokerStaticTwoArgsSupportsCapabilities(CapabilityMode mode)
         {
             TestMethodClass.ResetStatic();
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    MethodInfo method = typeof(TestMethodClass).GetMethod(
-                        nameof(TestMethodClass.StaticActionTwo)
-                    );
-                    Action<int, int> action = ReflectionHelpers.GetStaticActionInvoker<int, int>(
-                        method
-                    );
-                    action(3, 9);
-                    Assert.AreEqual(12, TestMethodClass.StaticMethodCallCount);
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                MethodInfo method = typeof(TestMethodClass).GetMethod(
+                    nameof(TestMethodClass.StaticActionTwo)
+                );
+                Action<int, int> action = ReflectionHelpers.GetStaticActionInvoker<int, int>(
+                    method
+                );
+                action(3, 9);
+                Assert.AreEqual(12, TestMethodClass.StaticMethodCallCount);
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void ActionInvokerStaticThreeArgsSupportsCapabilities(CapabilityMode mode)
         {
             TestMethodClass.ResetStatic();
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    MethodInfo method = typeof(TestMethodClass).GetMethod(
-                        nameof(TestMethodClass.StaticActionThree)
-                    );
-                    Action<int, int, int> action = ReflectionHelpers.GetStaticActionInvoker<
-                        int,
-                        int,
-                        int
-                    >(method);
-                    action(1, 2, 3);
-                    Assert.AreEqual(6, TestMethodClass.StaticMethodCallCount);
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                MethodInfo method = typeof(TestMethodClass).GetMethod(
+                    nameof(TestMethodClass.StaticActionThree)
+                );
+                Action<int, int, int> action = ReflectionHelpers.GetStaticActionInvoker<
+                    int,
+                    int,
+                    int
+                >(method);
+                action(1, 2, 3);
+                Assert.AreEqual(6, TestMethodClass.StaticMethodCallCount);
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void ActionInvokerStaticFourArgsSupportsCapabilities(CapabilityMode mode)
         {
             TestMethodClass.ResetStatic();
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    MethodInfo method = typeof(TestMethodClass).GetMethod(
-                        nameof(TestMethodClass.StaticActionFour)
-                    );
-                    Action<int, int, int, int> action = ReflectionHelpers.GetStaticActionInvoker<
-                        int,
-                        int,
-                        int,
-                        int
-                    >(method);
-                    action(1, 1, 1, 1);
-                    Assert.AreEqual(4, TestMethodClass.StaticMethodCallCount);
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                MethodInfo method = typeof(TestMethodClass).GetMethod(
+                    nameof(TestMethodClass.StaticActionFour)
+                );
+                Action<int, int, int, int> action = ReflectionHelpers.GetStaticActionInvoker<
+                    int,
+                    int,
+                    int,
+                    int
+                >(method);
+                action(1, 1, 1, 1);
+                Assert.AreEqual(4, TestMethodClass.StaticMethodCallCount);
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void ActionInvokerInstanceOneArgSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    MethodInfo method = typeof(TestMethodClass).GetMethod(
-                        nameof(TestMethodClass.InstanceSetOne)
-                    );
-                    Action<TestMethodClass, int> action =
-                        ReflectionHelpers.GetInstanceActionInvoker<TestMethodClass, int>(method);
-                    TestMethodClass instance = new();
-                    action(instance, 21);
-                    Assert.AreEqual(21, instance.instanceMethodCallCount);
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                MethodInfo method = typeof(TestMethodClass).GetMethod(
+                    nameof(TestMethodClass.InstanceSetOne)
+                );
+                Action<TestMethodClass, int> action = ReflectionHelpers.GetInstanceActionInvoker<
+                    TestMethodClass,
+                    int
+                >(method);
+                TestMethodClass instance = new();
+                action(instance, 21);
+                Assert.AreEqual(21, instance.instanceMethodCallCount);
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void ActionInvokerInstanceTwoArgsSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    MethodInfo method = typeof(TestMethodClass).GetMethod(
-                        nameof(TestMethodClass.InstanceSetTwo)
-                    );
-                    Action<TestMethodClass, int, int> action =
-                        ReflectionHelpers.GetInstanceActionInvoker<TestMethodClass, int, int>(
-                            method
-                        );
-                    TestMethodClass instance = new();
-                    action(instance, 4, 5);
-                    Assert.AreEqual(9, instance.instanceMethodCallCount);
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                MethodInfo method = typeof(TestMethodClass).GetMethod(
+                    nameof(TestMethodClass.InstanceSetTwo)
+                );
+                Action<TestMethodClass, int, int> action =
+                    ReflectionHelpers.GetInstanceActionInvoker<TestMethodClass, int, int>(method);
+                TestMethodClass instance = new();
+                action(instance, 4, 5);
+                Assert.AreEqual(9, instance.instanceMethodCallCount);
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void ActionInvokerInstanceThreeArgsSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    MethodInfo method = typeof(TestMethodClass).GetMethod(
-                        nameof(TestMethodClass.InstanceSetThree)
+            RunInCapabilityMode(mode, () =>
+            {
+                MethodInfo method = typeof(TestMethodClass).GetMethod(
+                    nameof(TestMethodClass.InstanceSetThree)
+                );
+                Action<TestMethodClass, int, int, int> action =
+                    ReflectionHelpers.GetInstanceActionInvoker<TestMethodClass, int, int, int>(
+                        method
                     );
-                    Action<TestMethodClass, int, int, int> action =
-                        ReflectionHelpers.GetInstanceActionInvoker<TestMethodClass, int, int, int>(
-                            method
-                        );
-                    TestMethodClass instance = new();
-                    action(instance, 1, 2, 3);
-                    Assert.AreEqual(6, instance.instanceMethodCallCount);
-                }
-            );
+                TestMethodClass instance = new();
+                action(instance, 1, 2, 3);
+                Assert.AreEqual(6, instance.instanceMethodCallCount);
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void ActionInvokerInstanceFourArgsSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    MethodInfo method = typeof(TestMethodClass).GetMethod(
-                        nameof(TestMethodClass.InstanceSetFour)
+            RunInCapabilityMode(mode, () =>
+            {
+                MethodInfo method = typeof(TestMethodClass).GetMethod(
+                    nameof(TestMethodClass.InstanceSetFour)
+                );
+                Action<TestMethodClass, int, int, int, int> action =
+                    ReflectionHelpers.GetInstanceActionInvoker<TestMethodClass, int, int, int, int>(
+                        method
                     );
-                    Action<TestMethodClass, int, int, int, int> action =
-                        ReflectionHelpers.GetInstanceActionInvoker<
-                            TestMethodClass,
-                            int,
-                            int,
-                            int,
-                            int
-                        >(method);
-                    TestMethodClass instance = new();
-                    action(instance, 2, 3, 4, 5);
-                    Assert.AreEqual(14, instance.instanceMethodCallCount);
-                }
-            );
+                TestMethodClass instance = new();
+                action(instance, 2, 3, 4, 5);
+                Assert.AreEqual(14, instance.instanceMethodCallCount);
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void ConstructorInvokerBoxedSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    ConstructorInfo ctor = typeof(TestConstructorClass).GetConstructor(
-                        new[] { typeof(int), typeof(string), typeof(bool) }
-                    );
-                    Func<object[], object> invoker = ReflectionHelpers.GetConstructor(ctor);
-                    object result = invoker(new object[] { 7, "seven", true });
-                    Assert.IsInstanceOf<TestConstructorClass>(result);
-                    TestConstructorClass typed = (TestConstructorClass)result;
-                    Assert.AreEqual(7, typed.Value1);
-                    Assert.AreEqual("seven", typed.Value2);
-                    Assert.IsTrue(typed.Value3);
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                ConstructorInfo ctor = typeof(TestConstructorClass).GetConstructor(
+                    new[] { typeof(int), typeof(string), typeof(bool) }
+                );
+                Func<object[], object> invoker = ReflectionHelpers.GetConstructor(ctor);
+                object result = invoker(new object[] { 7, "seven", true });
+                Assert.IsInstanceOf<TestConstructorClass>(result);
+                TestConstructorClass typed = (TestConstructorClass)result;
+                Assert.AreEqual(7, typed.Value1);
+                Assert.AreEqual("seven", typed.Value2);
+                Assert.IsTrue(typed.Value3);
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void ParameterlessConstructorObjectSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    Func<object> creator = ReflectionHelpers.GetParameterlessConstructor(
-                        typeof(TestConstructorClass)
-                    );
-                    object instance = creator();
-                    Assert.IsInstanceOf<TestConstructorClass>(instance);
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                Func<object> creator = ReflectionHelpers.GetParameterlessConstructor(
+                    typeof(TestConstructorClass)
+                );
+                object instance = creator();
+                Assert.IsInstanceOf<TestConstructorClass>(instance);
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void ParameterlessConstructorTypedSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    Func<TestConstructorClass> creator =
-                        ReflectionHelpers.GetParameterlessConstructor<TestConstructorClass>();
-                    TestConstructorClass instance = creator();
-                    Assert.IsTrue(instance != null);
-                    Assert.AreEqual("default", instance.Value2);
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                Func<TestConstructorClass> creator =
+                    ReflectionHelpers.GetParameterlessConstructor<TestConstructorClass>();
+                TestConstructorClass instance = creator();
+                Assert.IsTrue(instance != null);
+                Assert.AreEqual("default", instance.Value2);
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void GenericParameterlessConstructorSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    Func<List<int>> creator = ReflectionHelpers.GetGenericParameterlessConstructor<
-                        List<int>
-                    >(typeof(List<>), typeof(int));
-                    List<int> list = creator();
-                    Assert.IsTrue(list != null);
-                    Assert.AreEqual(0, list.Count);
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                Func<List<int>> creator = ReflectionHelpers.GetGenericParameterlessConstructor<
+                    List<int>
+                >(typeof(List<>), typeof(int));
+                List<int> list = creator();
+                Assert.IsTrue(list != null);
+                Assert.AreEqual(0, list.Count);
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void ArrayCreatorTypeSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    Func<int, Array> creator = ReflectionHelpers.GetArrayCreator(typeof(int));
-                    Array array = creator(3);
-                    Assert.AreEqual(typeof(int[]), array.GetType());
-                    array.SetValue(5, 1);
-                    Assert.AreEqual(5, array.GetValue(1));
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                Func<int, Array> creator = ReflectionHelpers.GetArrayCreator(typeof(int));
+                Array array = creator(3);
+                Assert.AreEqual(typeof(int[]), array.GetType());
+                array.SetValue(5, 1);
+                Assert.AreEqual(5, array.GetValue(1));
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void ArrayCreatorGenericSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    Func<int, string[]> creator = ReflectionHelpers.GetArrayCreator<string>();
-                    string[] array = creator(2);
-                    array[0] = "hi";
-                    Assert.AreEqual("hi", array[0]);
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                Func<int, string[]> creator = ReflectionHelpers.GetArrayCreator<string>();
+                string[] array = creator(2);
+                array[0] = "hi";
+                Assert.AreEqual("hi", array[0]);
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void ListCreatorTypeSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    Func<IList> creator = ReflectionHelpers.GetListCreator(typeof(string));
-                    IList list = creator();
-                    list.Add("hello");
-                    Assert.AreEqual("hello", list[0]);
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                Func<IList> creator = ReflectionHelpers.GetListCreator(typeof(string));
+                IList list = creator();
+                list.Add("hello");
+                Assert.AreEqual("hello", list[0]);
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void ListCreatorGenericSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    Func<IList> creator = ReflectionHelpers.GetListCreator<int>();
-                    IList list = creator();
-                    list.Add(8);
-                    Assert.AreEqual(8, list[0]);
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                Func<IList> creator = ReflectionHelpers.GetListCreator<int>();
+                IList list = creator();
+                list.Add(8);
+                Assert.AreEqual(8, list[0]);
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void ListWithCapacityCreatorTypeSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    Func<int, IList> creator = ReflectionHelpers.GetListWithCapacityCreator(
-                        typeof(int)
-                    );
-                    IList list = creator(4);
-                    Assert.IsInstanceOf<List<int>>(list);
-                    Assert.GreaterOrEqual(((List<int>)list).Capacity, 4);
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                Func<int, IList> creator = ReflectionHelpers.GetListWithCapacityCreator(
+                    typeof(int)
+                );
+                IList list = creator(4);
+                Assert.IsInstanceOf<List<int>>(list);
+                Assert.GreaterOrEqual(((List<int>)list).Capacity, 4);
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void ListWithCapacityCreatorGenericSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    Func<int, IList> creator =
-                        ReflectionHelpers.GetListWithCapacityCreator<string>();
-                    IList list = creator(3);
-                    Assert.IsInstanceOf<List<string>>(list);
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                Func<int, IList> creator = ReflectionHelpers.GetListWithCapacityCreator<string>();
+                IList list = creator(3);
+                Assert.IsInstanceOf<List<string>>(list);
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void HashSetWithCapacityCreatorTypeSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    Func<int, object> creator = ReflectionHelpers.GetHashSetWithCapacityCreator(
-                        typeof(int)
-                    );
-                    object setObject = creator(5);
-                    Assert.IsInstanceOf<HashSet<int>>(setObject);
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                Func<int, object> creator = ReflectionHelpers.GetHashSetWithCapacityCreator(
+                    typeof(int)
+                );
+                object setObject = creator(5);
+                Assert.IsInstanceOf<HashSet<int>>(setObject);
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void HashSetWithCapacityCreatorGenericSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    Func<int, HashSet<string>> creator =
-                        ReflectionHelpers.GetHashSetWithCapacityCreator<string>();
-                    HashSet<string> set = creator(6);
-                    Assert.IsTrue(set != null);
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                Func<int, HashSet<string>> creator =
+                    ReflectionHelpers.GetHashSetWithCapacityCreator<string>();
+                HashSet<string> set = creator(6);
+                Assert.IsTrue(set != null);
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void HashSetAdderTypeSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    Action<object, object> adder = ReflectionHelpers.GetHashSetAdder(typeof(int));
-                    object set = new HashSet<int>();
-                    adder(set, 42);
-                    HashSet<int> typedSet = (HashSet<int>)set;
-                    Assert.IsTrue(typedSet.Contains(42));
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                Action<object, object> adder = ReflectionHelpers.GetHashSetAdder(typeof(int));
+                object set = new HashSet<int>();
+                adder(set, 42);
+                HashSet<int> typedSet = (HashSet<int>)set;
+                Assert.IsTrue(typedSet.Contains(42));
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void HashSetAdderGenericSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    Action<HashSet<string>, string> adder =
-                        ReflectionHelpers.GetHashSetAdder<string>();
-                    HashSet<string> set = new();
-                    adder(set, "data");
-                    Assert.IsTrue(set.Contains("data"));
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                Action<HashSet<string>, string> adder = ReflectionHelpers.GetHashSetAdder<string>();
+                HashSet<string> set = new();
+                adder(set, "data");
+                Assert.IsTrue(set.Contains("data"));
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void DictionaryWithCapacityCreatorTypeSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    Func<int, object> creator = ReflectionHelpers.GetDictionaryWithCapacityCreator(
-                        typeof(string),
-                        typeof(int)
-                    );
-                    object dictionary = creator(3);
-                    Assert.IsInstanceOf<Dictionary<string, int>>(dictionary);
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                Func<int, object> creator = ReflectionHelpers.GetDictionaryWithCapacityCreator(
+                    typeof(string),
+                    typeof(int)
+                );
+                object dictionary = creator(3);
+                Assert.IsInstanceOf<Dictionary<string, int>>(dictionary);
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void DictionaryCreatorGenericSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    Func<int, Dictionary<string, int>> creator =
-                        ReflectionHelpers.GetDictionaryCreator<string, int>();
-                    Dictionary<string, int> dictionary = creator(2);
-                    dictionary["one"] = 1;
-                    Assert.AreEqual(1, dictionary.ValueFor("one"));
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                Func<int, Dictionary<string, int>> creator = ReflectionHelpers.GetDictionaryCreator<
+                    string,
+                    int
+                >();
+                Dictionary<string, int> dictionary = creator(2);
+                dictionary["one"] = 1;
+                Assert.AreEqual(1, dictionary.ValueFor("one"));
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void CreateArraySupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    Array array = ReflectionHelpers.CreateArray(typeof(int), 2);
-                    Assert.AreEqual(typeof(int[]), array.GetType());
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                Array array = ReflectionHelpers.CreateArray(typeof(int), 2);
+                Assert.AreEqual(typeof(int[]), array.GetType());
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void CreateListWithLengthSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    IList list = ReflectionHelpers.CreateList(typeof(int), 3);
-                    Assert.That(list, Is.InstanceOf<List<int>>());
-                    Assert.That(((List<int>)list).Capacity, Is.EqualTo(3));
-                    Assert.That(list.Count, Is.EqualTo(0));
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                IList list = ReflectionHelpers.CreateList(typeof(int), 3);
+                Assert.That(list, Is.InstanceOf<List<int>>());
+                Assert.That(((List<int>)list).Capacity, Is.EqualTo(3));
+                Assert.That(list.Count, Is.EqualTo(0));
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void CreateListSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    IList list = ReflectionHelpers.CreateList(typeof(string));
-                    Assert.IsInstanceOf<List<string>>(list);
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                IList list = ReflectionHelpers.CreateList(typeof(string));
+                Assert.IsInstanceOf<List<string>>(list);
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void CreateHashSetSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    object set = ReflectionHelpers.CreateHashSet(typeof(int), 10);
-                    Assert.IsInstanceOf<HashSet<int>>(set);
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                object set = ReflectionHelpers.CreateHashSet(typeof(int), 10);
+                Assert.IsInstanceOf<HashSet<int>>(set);
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void CreateDictionarySupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    object dictionary = ReflectionHelpers.CreateDictionary(
-                        typeof(string),
-                        typeof(int),
-                        5
-                    );
-                    Assert.IsInstanceOf<Dictionary<string, int>>(dictionary);
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                object dictionary = ReflectionHelpers.CreateDictionary(
+                    typeof(string),
+                    typeof(int),
+                    5
+                );
+                Assert.IsInstanceOf<Dictionary<string, int>>(dictionary);
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void CreateInstanceSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    ConstructorInfo ctor = typeof(TestConstructorClass).GetConstructor(
-                        new[] { typeof(int), typeof(string) }
-                    );
-                    object instance = ReflectionHelpers.CreateInstance(ctor, 3, "three");
-                    Assert.IsInstanceOf<TestConstructorClass>(instance);
-                    Assert.AreEqual("three", ((TestConstructorClass)instance).Value2);
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                ConstructorInfo ctor = typeof(TestConstructorClass).GetConstructor(
+                    new[] { typeof(int), typeof(string) }
+                );
+                object instance = ReflectionHelpers.CreateInstance(ctor, 3, "three");
+                Assert.IsInstanceOf<TestConstructorClass>(instance);
+                Assert.AreEqual("three", ((TestConstructorClass)instance).Value2);
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void CreateInstanceGenericSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    TestConstructorClass instance =
-                        ReflectionHelpers.CreateInstance<TestConstructorClass>(5, "five", true);
-                    Assert.AreEqual(5, instance.Value1);
-                    Assert.IsTrue(instance.Value3);
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                TestConstructorClass instance =
+                    ReflectionHelpers.CreateInstance<TestConstructorClass>(5, "five", true);
+                Assert.AreEqual(5, instance.Value1);
+                Assert.IsTrue(instance.Value3);
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void CreateGenericInstanceSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    List<string> list = ReflectionHelpers.CreateGenericInstance<List<string>>(
-                        typeof(List<>),
-                        new[] { typeof(string) }
-                    );
-                    Assert.IsTrue(list != null);
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                List<string> list = ReflectionHelpers.CreateGenericInstance<List<string>>(
+                    typeof(List<>),
+                    new[] { typeof(string) }
+                );
+                Assert.IsTrue(list != null);
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void InvokeMethodSupportsCapabilities(CapabilityMode mode)
         {
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    MethodInfo method = typeof(TestMethodClass).GetMethod(
-                        nameof(TestMethodClass.InstanceMethodWithParam)
-                    );
-                    object result = ReflectionHelpers.InvokeMethod(
-                        method,
-                        new TestMethodClass(),
-                        "abcd"
-                    );
-                    Assert.AreEqual(4, result);
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                MethodInfo method = typeof(TestMethodClass).GetMethod(
+                    nameof(TestMethodClass.InstanceMethodWithParam)
+                );
+                object result = ReflectionHelpers.InvokeMethod(
+                    method,
+                    new TestMethodClass(),
+                    "abcd"
+                );
+                Assert.AreEqual(4, result);
+            });
         }
 
         [TestCaseSource(nameof(CapabilityModes))]
         public void InvokeStaticMethodSupportsCapabilities(CapabilityMode mode)
         {
             TestMethodClass.ResetStatic();
-            RunInCapabilityMode(
-                mode,
-                () =>
-                {
-                    MethodInfo method = typeof(TestMethodClass).GetMethod(
-                        nameof(TestMethodClass.StaticMethodWithParam)
-                    );
-                    object result = ReflectionHelpers.InvokeStaticMethod(method, 11);
-                    Assert.AreEqual(22, result);
-                }
-            );
+            RunInCapabilityMode(mode, () =>
+            {
+                MethodInfo method = typeof(TestMethodClass).GetMethod(
+                    nameof(TestMethodClass.StaticMethodWithParam)
+                );
+                object result = ReflectionHelpers.InvokeStaticMethod(method, 11);
+                Assert.AreEqual(22, result);
+            });
         }
 
         public enum CapabilityMode

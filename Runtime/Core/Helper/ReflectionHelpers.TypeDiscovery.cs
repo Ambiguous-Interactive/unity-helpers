@@ -434,9 +434,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 FieldLookup[key] = resolved;
             }
 #else
-            FieldInfo resolved = FieldLookup.GetOrAdd(
-                key,
-                static k => k.type.GetField(k.name, k.flags)
+            FieldInfo resolved = FieldLookup.GetOrAdd(key, static k =>
+                k.type.GetField(k.name, k.flags)
             );
 #endif
             field = resolved;
@@ -471,9 +470,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 PropertyLookup[key] = resolved;
             }
 #else
-            PropertyInfo resolved = PropertyLookup.GetOrAdd(
-                key,
-                static k => k.type.GetProperty(k.name, k.flags)
+            PropertyInfo resolved = PropertyLookup.GetOrAdd(key, static k =>
+                k.type.GetProperty(k.name, k.flags)
             );
 #endif
             property = resolved;

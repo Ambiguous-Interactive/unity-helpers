@@ -183,16 +183,12 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
 
             WGroupLayout layout = WGroupLayoutBuilder.Build(serializedObject, "m_Script");
 
-            Assert.That(
-                layout.TryGetGroup("Primitives", out WGroupDefinition group),
-                Is.True,
-                () => $"Primitives group should exist.\n{FormatLayoutDiagnostics(layout)}"
+            Assert.That(layout.TryGetGroup("Primitives", out WGroupDefinition group), Is.True, () =>
+                $"Primitives group should exist.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            Assert.That(
-                group.PropertyPaths,
-                Has.Count.EqualTo(4),
-                () => $"Should have 4 properties in group.\n{FormatLayoutDiagnostics(layout)}"
+            Assert.That(group.PropertyPaths, Has.Count.EqualTo(4), () =>
+                $"Should have 4 properties in group.\n{FormatLayoutDiagnostics(layout)}"
             );
             Assert.That(group.PropertyPaths, Contains.Item(nameof(SimpleFieldsTarget.intField)));
             Assert.That(group.PropertyPaths, Contains.Item(nameof(SimpleFieldsTarget.floatField)));
@@ -208,16 +204,12 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
 
             WGroupLayout layout = WGroupLayoutBuilder.Build(serializedObject, "m_Script");
 
-            Assert.That(
-                layout.TryGetGroup("Lists", out WGroupDefinition group),
-                Is.True,
-                () => $"Lists group should exist.\n{FormatLayoutDiagnostics(layout)}"
+            Assert.That(layout.TryGetGroup("Lists", out WGroupDefinition group), Is.True, () =>
+                $"Lists group should exist.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            Assert.That(
-                group.PropertyPaths,
-                Has.Count.EqualTo(3),
-                () => $"Should have 3 list properties in group.\n{FormatLayoutDiagnostics(layout)}"
+            Assert.That(group.PropertyPaths, Has.Count.EqualTo(3), () =>
+                $"Should have 3 list properties in group.\n{FormatLayoutDiagnostics(layout)}"
             );
             Assert.That(group.PropertyPaths, Contains.Item(nameof(ListFieldsTarget.intList)));
             Assert.That(group.PropertyPaths, Contains.Item(nameof(ListFieldsTarget.stringList)));
@@ -232,16 +224,12 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
 
             WGroupLayout layout = WGroupLayoutBuilder.Build(serializedObject, "m_Script");
 
-            Assert.That(
-                layout.TryGetGroup("Arrays", out WGroupDefinition group),
-                Is.True,
-                () => $"Arrays group should exist.\n{FormatLayoutDiagnostics(layout)}"
+            Assert.That(layout.TryGetGroup("Arrays", out WGroupDefinition group), Is.True, () =>
+                $"Arrays group should exist.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            Assert.That(
-                group.PropertyPaths,
-                Has.Count.EqualTo(3),
-                () => $"Should have 3 array properties in group.\n{FormatLayoutDiagnostics(layout)}"
+            Assert.That(group.PropertyPaths, Has.Count.EqualTo(3), () =>
+                $"Should have 3 array properties in group.\n{FormatLayoutDiagnostics(layout)}"
             );
             Assert.That(group.PropertyPaths, Contains.Item(nameof(ArrayFieldsTarget.intArray)));
             Assert.That(group.PropertyPaths, Contains.Item(nameof(ArrayFieldsTarget.stringArray)));
@@ -256,17 +244,12 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
 
             WGroupLayout layout = WGroupLayoutBuilder.Build(serializedObject, "m_Script");
 
-            Assert.That(
-                layout.TryGetGroup("Nested", out WGroupDefinition group),
-                Is.True,
-                () => $"Nested group should exist.\n{FormatLayoutDiagnostics(layout)}"
+            Assert.That(layout.TryGetGroup("Nested", out WGroupDefinition group), Is.True, () =>
+                $"Nested group should exist.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            Assert.That(
-                group.PropertyPaths,
-                Has.Count.EqualTo(2),
-                () =>
-                    $"Should have 2 nested properties in group.\n{FormatLayoutDiagnostics(layout)}"
+            Assert.That(group.PropertyPaths, Has.Count.EqualTo(2), () =>
+                $"Should have 2 nested properties in group.\n{FormatLayoutDiagnostics(layout)}"
             );
             Assert.That(
                 group.PropertyPaths,
@@ -407,15 +390,11 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
 
             WGroupLayout layout = WGroupLayoutBuilder.Build(serializedObject, "m_Script");
 
-            Assert.That(
-                layout.TryGetGroup("Outer", out WGroupDefinition outer),
-                Is.True,
-                () => $"Outer group should exist.\n{FormatLayoutDiagnostics(layout)}"
+            Assert.That(layout.TryGetGroup("Outer", out WGroupDefinition outer), Is.True, () =>
+                $"Outer group should exist.\n{FormatLayoutDiagnostics(layout)}"
             );
-            Assert.That(
-                layout.TryGetGroup("Inner", out WGroupDefinition inner),
-                Is.True,
-                () => $"Inner group should exist.\n{FormatLayoutDiagnostics(layout)}"
+            Assert.That(layout.TryGetGroup("Inner", out WGroupDefinition inner), Is.True, () =>
+                $"Inner group should exist.\n{FormatLayoutDiagnostics(layout)}"
             );
 
             Assert.That(
@@ -443,20 +422,14 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
 
             WGroupLayout layout = WGroupLayoutBuilder.Build(serializedObject, "m_Script");
 
-            Assert.That(
-                layout.TryGetGroup("Level1", out WGroupDefinition level1),
-                Is.True,
-                () => $"Level1 group should exist.\n{FormatLayoutDiagnostics(layout)}"
+            Assert.That(layout.TryGetGroup("Level1", out WGroupDefinition level1), Is.True, () =>
+                $"Level1 group should exist.\n{FormatLayoutDiagnostics(layout)}"
             );
-            Assert.That(
-                layout.TryGetGroup("Level2", out WGroupDefinition level2),
-                Is.True,
-                () => $"Level2 group should exist.\n{FormatLayoutDiagnostics(layout)}"
+            Assert.That(layout.TryGetGroup("Level2", out WGroupDefinition level2), Is.True, () =>
+                $"Level2 group should exist.\n{FormatLayoutDiagnostics(layout)}"
             );
-            Assert.That(
-                layout.TryGetGroup("Level3", out WGroupDefinition level3),
-                Is.True,
-                () => $"Level3 group should exist.\n{FormatLayoutDiagnostics(layout)}"
+            Assert.That(layout.TryGetGroup("Level3", out WGroupDefinition level3), Is.True, () =>
+                $"Level3 group should exist.\n{FormatLayoutDiagnostics(layout)}"
             );
 
             Assert.That(level1.HasParent, Is.False, "Level1 should not have a parent.");
@@ -472,10 +445,8 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
 
             WGroupLayout layout = WGroupLayoutBuilder.Build(serializedObject, "m_Script");
 
-            Assert.That(
-                layout.TryGetGroup("Inner", out WGroupDefinition inner),
-                Is.True,
-                () => $"Inner group should exist.\n{FormatLayoutDiagnostics(layout)}"
+            Assert.That(layout.TryGetGroup("Inner", out WGroupDefinition inner), Is.True, () =>
+                $"Inner group should exist.\n{FormatLayoutDiagnostics(layout)}"
             );
 
             Assert.That(
@@ -511,16 +482,12 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
 
             WGroupLayout layout = WGroupLayoutBuilder.Build(serializedObject, "m_Script");
 
-            Assert.That(
-                layout.TryGetGroup("Mixed", out WGroupDefinition group),
-                Is.True,
-                () => $"Mixed group should exist.\n{FormatLayoutDiagnostics(layout)}"
+            Assert.That(layout.TryGetGroup("Mixed", out WGroupDefinition group), Is.True, () =>
+                $"Mixed group should exist.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            Assert.That(
-                group.PropertyPaths,
-                Has.Count.EqualTo(5),
-                () => $"Should have 5 mixed properties.\n{FormatLayoutDiagnostics(layout)}"
+            Assert.That(group.PropertyPaths, Has.Count.EqualTo(5), () =>
+                $"Should have 5 mixed properties.\n{FormatLayoutDiagnostics(layout)}"
             );
             Assert.That(group.PropertyPaths, Contains.Item(nameof(MixedFieldsTarget.simpleInt)));
             Assert.That(group.PropertyPaths, Contains.Item(nameof(MixedFieldsTarget.listField)));
@@ -613,20 +580,14 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
 
             WGroupLayout layout = WGroupLayoutBuilder.Build(serializedObject, "m_Script");
 
-            Assert.That(
-                layout.TryGetGroup("GroupA", out WGroupDefinition groupA),
-                Is.True,
-                () => $"GroupA should exist.\n{FormatLayoutDiagnostics(layout)}"
+            Assert.That(layout.TryGetGroup("GroupA", out WGroupDefinition groupA), Is.True, () =>
+                $"GroupA should exist.\n{FormatLayoutDiagnostics(layout)}"
             );
-            Assert.That(
-                layout.TryGetGroup("GroupB", out WGroupDefinition groupB),
-                Is.True,
-                () => $"GroupB should exist.\n{FormatLayoutDiagnostics(layout)}"
+            Assert.That(layout.TryGetGroup("GroupB", out WGroupDefinition groupB), Is.True, () =>
+                $"GroupB should exist.\n{FormatLayoutDiagnostics(layout)}"
             );
-            Assert.That(
-                layout.TryGetGroup("GroupC", out WGroupDefinition groupC),
-                Is.True,
-                () => $"GroupC should exist.\n{FormatLayoutDiagnostics(layout)}"
+            Assert.That(layout.TryGetGroup("GroupC", out WGroupDefinition groupC), Is.True, () =>
+                $"GroupC should exist.\n{FormatLayoutDiagnostics(layout)}"
             );
 
             Assert.That(
@@ -689,20 +650,16 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
 
             WGroupLayout layout = WGroupLayoutBuilder.Build(serializedObject, "m_Script");
 
-            Assert.That(
-                layout.TryGetGroup("Outer", out WGroupDefinition outer),
-                Is.True,
-                () => $"Outer group should exist.\n{FormatLayoutDiagnostics(layout)}"
+            Assert.That(layout.TryGetGroup("Outer", out WGroupDefinition outer), Is.True, () =>
+                $"Outer group should exist.\n{FormatLayoutDiagnostics(layout)}"
             );
             Assert.That(
                 layout.TryGetGroup("MiddleNested", out WGroupDefinition middle),
                 Is.True,
                 () => $"MiddleNested group should exist.\n{FormatLayoutDiagnostics(layout)}"
             );
-            Assert.That(
-                layout.TryGetGroup("Deepest", out WGroupDefinition deepest),
-                Is.True,
-                () => $"Deepest group should exist.\n{FormatLayoutDiagnostics(layout)}"
+            Assert.That(layout.TryGetGroup("Deepest", out WGroupDefinition deepest), Is.True, () =>
+                $"Deepest group should exist.\n{FormatLayoutDiagnostics(layout)}"
             );
 
             Assert.That(outer.HasParent, Is.False);
@@ -729,26 +686,18 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
 
             WGroupLayout layout = WGroupLayoutBuilder.Build(serializedObject, "m_Script");
 
-            Assert.That(
-                layout.TryGetGroup(groupName, out WGroupDefinition group),
-                Is.True,
-                () => $"Group '{groupName}' should exist.\n{FormatLayoutDiagnostics(layout)}"
+            Assert.That(layout.TryGetGroup(groupName, out WGroupDefinition group), Is.True, () =>
+                $"Group '{groupName}' should exist.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            Assert.That(
-                group.PropertyPaths,
-                Has.Count.EqualTo(expectedCount),
-                () =>
-                    $"Group '{groupName}' should have {expectedCount} properties but has {group.PropertyPaths.Count}: [{string.Join(", ", group.PropertyPaths)}].\n{FormatLayoutDiagnostics(layout)}"
+            Assert.That(group.PropertyPaths, Has.Count.EqualTo(expectedCount), () =>
+                $"Group '{groupName}' should have {expectedCount} properties but has {group.PropertyPaths.Count}: [{string.Join(", ", group.PropertyPaths)}].\n{FormatLayoutDiagnostics(layout)}"
             );
 
             foreach (string expectedProperty in expectedProperties)
             {
-                Assert.That(
-                    group.PropertyPaths,
-                    Contains.Item(expectedProperty),
-                    () =>
-                        $"Group '{groupName}' should contain '{expectedProperty}'.\n{FormatLayoutDiagnostics(layout)}"
+                Assert.That(group.PropertyPaths, Contains.Item(expectedProperty), () =>
+                    $"Group '{groupName}' should contain '{expectedProperty}'.\n{FormatLayoutDiagnostics(layout)}"
                 );
             }
         }
@@ -766,17 +715,12 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
 
             WGroupLayout layout = WGroupLayoutBuilder.Build(serializedObject, "m_Script");
 
-            Assert.That(
-                layout.TryGetGroup(groupName, out WGroupDefinition group),
-                Is.True,
-                () => $"Group '{groupName}' should exist.\n{FormatLayoutDiagnostics(layout)}"
+            Assert.That(layout.TryGetGroup(groupName, out WGroupDefinition group), Is.True, () =>
+                $"Group '{groupName}' should exist.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            Assert.That(
-                group.PropertyPaths,
-                Does.Not.Contain(fieldWithEndOnly),
-                () =>
-                    $"Field '{fieldWithEndOnly}' with only [WGroupEnd] should NOT be in group '{groupName}'.\n{FormatLayoutDiagnostics(layout)}"
+            Assert.That(group.PropertyPaths, Does.Not.Contain(fieldWithEndOnly), () =>
+                $"Field '{fieldWithEndOnly}' with only [WGroupEnd] should NOT be in group '{groupName}'.\n{FormatLayoutDiagnostics(layout)}"
             );
         }
     }

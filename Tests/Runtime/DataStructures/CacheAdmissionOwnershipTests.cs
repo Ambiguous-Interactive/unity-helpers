@@ -238,14 +238,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             {
                 try
                 {
-                    return cache.GetOrAdd(
-                        "key",
-                        _ =>
-                        {
-                            Assert.IsTrue(barrier.SignalAndWait(TimeSpan.FromSeconds(5)));
-                            return failed;
-                        }
-                    );
+                    return cache.GetOrAdd("key", _ =>
+                    {
+                        Assert.IsTrue(barrier.SignalAndWait(TimeSpan.FromSeconds(5)));
+                        return failed;
+                    });
                 }
                 catch (InvalidOperationException exception)
                 {
@@ -253,16 +250,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                     return null;
                 }
             });
-            Task<MemoryStream> succeeding = Task.Run(() =>
-                cache.GetOrAdd(
-                    "key",
-                    _ =>
-                    {
-                        Assert.IsTrue(barrier.SignalAndWait(TimeSpan.FromSeconds(5)));
-                        return accepted;
-                    }
-                )
-            );
+            Task<MemoryStream> succeeding = Task.Run(() => cache.GetOrAdd("key", _ =>
+                {
+                    Assert.IsTrue(barrier.SignalAndWait(TimeSpan.FromSeconds(5)));
+                    return accepted;
+                }));
             Assert.IsTrue(
                 Task.WaitAll(new Task[] { failing, succeeding }, TimeSpan.FromSeconds(10))
             );

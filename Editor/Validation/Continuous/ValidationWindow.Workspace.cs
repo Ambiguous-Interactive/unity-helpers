@@ -364,17 +364,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 name = "builder-fix-value",
                 value = _draft.fixValue,
             };
-            Choice(
-                reportNode,
-                "Auto-fix",
-                ValidationWorkspaceSettings.Fixes,
-                _draft.fix,
-                value =>
-                {
-                    _draft.fix = value;
-                    RefreshFixValueField(fixValue, value);
-                }
-            );
+            Choice(reportNode, "Auto-fix", ValidationWorkspaceSettings.Fixes, _draft.fix, value =>
+            {
+                _draft.fix = value;
+                RefreshFixValueField(fixValue, value);
+            });
             RefreshFixValueField(fixValue, _draft.fix);
             fixValue.RegisterValueChangedCallback(changed => _draft.fixValue = changed.newValue);
             reportNode.Add(fixValue);

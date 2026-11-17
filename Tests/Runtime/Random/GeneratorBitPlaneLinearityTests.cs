@@ -73,9 +73,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             yield return Entry(nameof(DotNetRandom), () => new DotNetRandom(Seed));
             yield return Entry(nameof(FlurryBurstRandom), () => new FlurryBurstRandom(Seed));
             yield return Entry(nameof(IllusionFlow), () => new IllusionFlow(Seed));
-            yield return Entry(
-                nameof(LinearCongruentialGenerator),
-                () => new LinearCongruentialGenerator(Seed)
+            yield return Entry(nameof(LinearCongruentialGenerator), () =>
+                new LinearCongruentialGenerator(Seed)
             );
             yield return Entry(nameof(PcgRandom), () => new PcgRandom(Seed));
             yield return Entry(nameof(PhotonSpinRandom), () => new PhotonSpinRandom(Seed));

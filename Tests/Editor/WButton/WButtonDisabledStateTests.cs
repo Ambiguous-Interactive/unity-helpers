@@ -53,8 +53,8 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             {
                 if (endTime < Time.realtimeSinceStartup)
                 {
-                    string diagnostics =
-                        diagnosticsProvider?.Invoke() ?? "No diagnostics available";
+                    string diagnostics = diagnosticsProvider?.Invoke()
+                        ?? "No diagnostics available";
                     Assert.Fail(
                         $"Timed out while waiting for condition. Diagnostics: {diagnostics}"
                     );

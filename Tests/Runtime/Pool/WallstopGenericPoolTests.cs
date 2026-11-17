@@ -2380,14 +2380,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             try
             {
-                PoolPurgeSettings.ConfigureGeneric(
-                    typeof(List<>),
-                    opts =>
-                    {
-                        opts.Enabled = true;
-                        opts.IdleTimeoutSeconds = 123f;
-                    }
-                );
+                PoolPurgeSettings.ConfigureGeneric(typeof(List<>), opts =>
+                {
+                    opts.Enabled = true;
+                    opts.IdleTimeoutSeconds = 123f;
+                });
 
                 PoolPurgeEffectiveOptions effective = PoolPurgeSettings.GetEffectiveOptions<
                     List<int>
@@ -2413,13 +2410,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             try
             {
-                PoolPurgeSettings.ConfigureGeneric(
-                    typeof(List<>),
-                    opts =>
-                    {
-                        opts.IdleTimeoutSeconds = 100f;
-                    }
-                );
+                PoolPurgeSettings.ConfigureGeneric(typeof(List<>), opts =>
+                {
+                    opts.IdleTimeoutSeconds = 100f;
+                });
 
                 PoolPurgeSettings.Configure<List<int>>(opts =>
                 {
@@ -2818,14 +2812,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             try
             {
-                PoolPurgeSettings.ConfigureGeneric(
-                    typeof(List<>),
-                    opts =>
-                    {
-                        opts.Enabled = true;
-                        opts.IdleTimeoutSeconds = 100f;
-                    }
-                );
+                PoolPurgeSettings.ConfigureGeneric(typeof(List<>), opts =>
+                {
+                    opts.Enabled = true;
+                    opts.IdleTimeoutSeconds = 100f;
+                });
 
                 PoolPurgeSettings.Configure<List<List<int>>>(opts =>
                 {
