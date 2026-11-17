@@ -68,7 +68,13 @@ def test_original_executable_decisions(
     output = capsys.readouterr()
     assert case["expected"] in output.out + output.err
     if case["exit"] != 0:
-        assert case["stderr"].strip() in output.err.replace(str(tmp_path), "<ROOT>")
+        expected_error = case["stderr"].strip()
+        # Frozen Linux paths identify the same input using native separators on Windows.
+        for relative in CORPUS["base"]:
+            expected_error = expected_error.replace(
+                f"<ROOT>/{relative}", f"<ROOT>{Path('/') / relative}"
+            )
+        assert expected_error in output.err.replace(str(tmp_path), "<ROOT>")
     if case["exit"] == 0:
         assert output.out == case["stdout"]
         assert output.err == case["stderr"]

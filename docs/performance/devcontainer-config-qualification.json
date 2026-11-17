@@ -6985,5 +6985,17 @@
     "targetedTests": 332,
     "strictSources": 184
   },
-  "requalificationReason": "Final review reproduced two Unicode identifier aliases accepted by Python case folding but rejected by original OrdinalIgnoreCase. Three original executable decisions added; corrected ASCII identifier matching, two-failure red and 332-case green retained. Recaptured after configured formatting with unchanged input/source hashes; all earlier captures retained."
+  "requalificationReason": "Final review reproduced two Unicode identifier aliases accepted by Python case folding but rejected by original OrdinalIgnoreCase. Three original executable decisions added; corrected ASCII identifier matching, two-failure red and 332-case green retained. Recaptured after configured formatting with unchanged input/source hashes; all earlier captures retained.",
+  "retainedWindowsOracleFailure": {
+    "job": 133888237467,
+    "run": 44038851804,
+    "head": "5402426ebe1d8fac9b36b336f96beb82f4ce0c51",
+    "result": {
+      "failed": 3,
+      "passed": 3507,
+      "skipped": 77,
+      "seconds": 394.28
+    },
+    "cause": "Three missing-input assertions compared frozen Linux path separators against correct native Windows paths. Render only known root-relative fixture paths using host Path; retain complete error text, decisions, success streams and mutation assertions. Production measured source is unchanged. A completed corrected Windows gate is still required."
+  }
 }
