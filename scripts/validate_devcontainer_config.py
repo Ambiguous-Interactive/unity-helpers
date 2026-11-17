@@ -116,14 +116,10 @@ def validate(root: Path, *, verbose: bool = False) -> int:
         print(
             "\nWARNING: The following languages are handled by pre-commit but have no explicit "
             "devcontainer.json formatter entry:",
-            file=sys.stderr,
         )
         for language, pattern, formatter in missing:
-            print(
-                f"WARNING:   [{language}] ({pattern}) - expected formatter: {formatter}",
-                file=sys.stderr,
-            )
-        print(file=sys.stderr)
+            print(f"WARNING:   [{language}] ({pattern}) - expected formatter: {formatter}")
+        print()
         raise ValueError(
             f"devcontainer.json is missing {len(missing)} explicit formatter assignment(s). See warnings above."
         )

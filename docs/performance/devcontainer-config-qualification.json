@@ -6997,5 +6997,308 @@
       "seconds": 394.28
     },
     "cause": "Three missing-input assertions compared frozen Linux path separators against correct native Windows paths. Render only known root-relative fixture paths using host Path; retain complete error text, decisions, success streams and mutation assertions. Production measured source is unchanged. A completed corrected Windows gate is still required."
+  },
+  "formatterWarningStreamRequalification": {
+    "date": "2026-11-17",
+    "baseCommit": "bed76a21ad212c25ea1be80996896ed0b14562b3",
+    "producerHead": "5c94a5b3e112d22be5a4663fe96bde7b6e922c42",
+    "sources": {
+      "progress/.artifacts/session-20261117-devcontainer/original.ps1": "669de6a7bc730bbf2dd5d2a335fe8bc596d918ef4eb74b8936218fdc10b60a9a",
+      "scripts/validate_devcontainer_config.py": "43c296a714a53481c536d9861d393d3284047256e137d278026ff0bbdc926310",
+      "scripts/cli_encoding.py": "d946dc4bb98fc3eb66ffb1b4394625281421b346fbac364e7d9a50c99d90a9f9",
+      "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d"
+    },
+    "protocol": "Seven alternating fresh-process pairs after two warmups per arm, complete public commands including uv startup, serial execution without competing owned tests/builds/timing, exact success stdout/stderr/exit equality and unchanged input/source hashes.",
+    "environment": {
+      "platform": "Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.36",
+      "python": "3.11.2",
+      "uv": "uv 0.13.6 (x86_64-unknown-linux-gnu)",
+      "powershell": "7.5.3",
+      "filesystem": "Filesystem     Type  1K-blocks   Used Available Use% Mounted on\nnone           tmpfs  49438612 893804  48544808   2% /tmp"
+    },
+    "summaryMilliseconds": {
+      "repository": {
+        "original": 253.167755,
+        "python": 36.764651
+      },
+      "many-workflows": {
+        "original": 300.990054,
+        "python": 38.990736
+      }
+    },
+    "observations": [
+      {
+        "input": "repository",
+        "pair": 0,
+        "arm": "original",
+        "milliseconds": 258.04294,
+        "exit": 0,
+        "stdoutSha256": "45a6e37d903ced14f023e349a3317499844801951bedeecfde7e7bd9385fcd8d",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "input": "repository",
+        "pair": 0,
+        "arm": "python",
+        "milliseconds": 36.764651,
+        "exit": 0,
+        "stdoutSha256": "45a6e37d903ced14f023e349a3317499844801951bedeecfde7e7bd9385fcd8d",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "input": "repository",
+        "pair": 1,
+        "arm": "python",
+        "milliseconds": 35.149556,
+        "exit": 0,
+        "stdoutSha256": "45a6e37d903ced14f023e349a3317499844801951bedeecfde7e7bd9385fcd8d",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "input": "repository",
+        "pair": 1,
+        "arm": "original",
+        "milliseconds": 275.151309,
+        "exit": 0,
+        "stdoutSha256": "45a6e37d903ced14f023e349a3317499844801951bedeecfde7e7bd9385fcd8d",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "input": "repository",
+        "pair": 2,
+        "arm": "original",
+        "milliseconds": 273.345327,
+        "exit": 0,
+        "stdoutSha256": "45a6e37d903ced14f023e349a3317499844801951bedeecfde7e7bd9385fcd8d",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "input": "repository",
+        "pair": 2,
+        "arm": "python",
+        "milliseconds": 37.835135,
+        "exit": 0,
+        "stdoutSha256": "45a6e37d903ced14f023e349a3317499844801951bedeecfde7e7bd9385fcd8d",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "input": "repository",
+        "pair": 3,
+        "arm": "python",
+        "milliseconds": 35.698168,
+        "exit": 0,
+        "stdoutSha256": "45a6e37d903ced14f023e349a3317499844801951bedeecfde7e7bd9385fcd8d",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "input": "repository",
+        "pair": 3,
+        "arm": "original",
+        "milliseconds": 240.302006,
+        "exit": 0,
+        "stdoutSha256": "45a6e37d903ced14f023e349a3317499844801951bedeecfde7e7bd9385fcd8d",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "input": "repository",
+        "pair": 4,
+        "arm": "original",
+        "milliseconds": 219.955393,
+        "exit": 0,
+        "stdoutSha256": "45a6e37d903ced14f023e349a3317499844801951bedeecfde7e7bd9385fcd8d",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "input": "repository",
+        "pair": 4,
+        "arm": "python",
+        "milliseconds": 36.935478,
+        "exit": 0,
+        "stdoutSha256": "45a6e37d903ced14f023e349a3317499844801951bedeecfde7e7bd9385fcd8d",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "input": "repository",
+        "pair": 5,
+        "arm": "python",
+        "milliseconds": 36.054697,
+        "exit": 0,
+        "stdoutSha256": "45a6e37d903ced14f023e349a3317499844801951bedeecfde7e7bd9385fcd8d",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "input": "repository",
+        "pair": 5,
+        "arm": "original",
+        "milliseconds": 245.557254,
+        "exit": 0,
+        "stdoutSha256": "45a6e37d903ced14f023e349a3317499844801951bedeecfde7e7bd9385fcd8d",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "input": "repository",
+        "pair": 6,
+        "arm": "original",
+        "milliseconds": 253.167755,
+        "exit": 0,
+        "stdoutSha256": "45a6e37d903ced14f023e349a3317499844801951bedeecfde7e7bd9385fcd8d",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "input": "repository",
+        "pair": 6,
+        "arm": "python",
+        "milliseconds": 38.36382,
+        "exit": 0,
+        "stdoutSha256": "45a6e37d903ced14f023e349a3317499844801951bedeecfde7e7bd9385fcd8d",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "input": "many-workflows",
+        "pair": 0,
+        "arm": "original",
+        "milliseconds": 278.134105,
+        "exit": 0,
+        "stdoutSha256": "bb87e1f8d615d48e5d9bb93372f313b70215f606661a0f67834106523bd05da5",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "input": "many-workflows",
+        "pair": 0,
+        "arm": "python",
+        "milliseconds": 40.733821,
+        "exit": 0,
+        "stdoutSha256": "bb87e1f8d615d48e5d9bb93372f313b70215f606661a0f67834106523bd05da5",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "input": "many-workflows",
+        "pair": 1,
+        "arm": "python",
+        "milliseconds": 38.778539,
+        "exit": 0,
+        "stdoutSha256": "bb87e1f8d615d48e5d9bb93372f313b70215f606661a0f67834106523bd05da5",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "input": "many-workflows",
+        "pair": 1,
+        "arm": "original",
+        "milliseconds": 302.409798,
+        "exit": 0,
+        "stdoutSha256": "bb87e1f8d615d48e5d9bb93372f313b70215f606661a0f67834106523bd05da5",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "input": "many-workflows",
+        "pair": 2,
+        "arm": "original",
+        "milliseconds": 298.751304,
+        "exit": 0,
+        "stdoutSha256": "bb87e1f8d615d48e5d9bb93372f313b70215f606661a0f67834106523bd05da5",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "input": "many-workflows",
+        "pair": 2,
+        "arm": "python",
+        "milliseconds": 40.261868,
+        "exit": 0,
+        "stdoutSha256": "bb87e1f8d615d48e5d9bb93372f313b70215f606661a0f67834106523bd05da5",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "input": "many-workflows",
+        "pair": 3,
+        "arm": "python",
+        "milliseconds": 38.703488,
+        "exit": 0,
+        "stdoutSha256": "bb87e1f8d615d48e5d9bb93372f313b70215f606661a0f67834106523bd05da5",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "input": "many-workflows",
+        "pair": 3,
+        "arm": "original",
+        "milliseconds": 300.990054,
+        "exit": 0,
+        "stdoutSha256": "bb87e1f8d615d48e5d9bb93372f313b70215f606661a0f67834106523bd05da5",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "input": "many-workflows",
+        "pair": 4,
+        "arm": "original",
+        "milliseconds": 306.647058,
+        "exit": 0,
+        "stdoutSha256": "bb87e1f8d615d48e5d9bb93372f313b70215f606661a0f67834106523bd05da5",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "input": "many-workflows",
+        "pair": 4,
+        "arm": "python",
+        "milliseconds": 38.474278,
+        "exit": 0,
+        "stdoutSha256": "bb87e1f8d615d48e5d9bb93372f313b70215f606661a0f67834106523bd05da5",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "input": "many-workflows",
+        "pair": 5,
+        "arm": "python",
+        "milliseconds": 39.760638,
+        "exit": 0,
+        "stdoutSha256": "bb87e1f8d615d48e5d9bb93372f313b70215f606661a0f67834106523bd05da5",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "input": "many-workflows",
+        "pair": 5,
+        "arm": "original",
+        "milliseconds": 322.8649,
+        "exit": 0,
+        "stdoutSha256": "bb87e1f8d615d48e5d9bb93372f313b70215f606661a0f67834106523bd05da5",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "input": "many-workflows",
+        "pair": 6,
+        "arm": "original",
+        "milliseconds": 298.014751,
+        "exit": 0,
+        "stdoutSha256": "bb87e1f8d615d48e5d9bb93372f313b70215f606661a0f67834106523bd05da5",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "input": "many-workflows",
+        "pair": 6,
+        "arm": "python",
+        "milliseconds": 38.990736,
+        "exit": 0,
+        "stdoutSha256": "bb87e1f8d615d48e5d9bb93372f313b70215f606661a0f67834106523bd05da5",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "limits": [
+      "Local Linux/tmpfs measurements; no Windows, cold-host or full-job benefit is established.",
+      "The retained text-pattern policy does not validate arbitrary JSON/YAML schemas or inspect formatter values.",
+      "Original PowerShell error framing is host presentation; frozen failure decisions and actionable message text are preserved."
+    ],
+    "inputManifestSha256": {
+      "repository": "45175c7b68139eb1f877627f514e8c84a057afbe8709f07c6b93d1d56519e13e",
+      "many-workflows": "cefc3fb5ac1ce56fa546f2aded54c0b37e79d5880c002d906fcb3ddc204e1c19"
+    },
+    "inputManifestDigestFormat": "SHA-256 over sorted-key compact UTF-8 JSON without a final newline.",
+    "requalificationReason": "Restore the original missing-formatter warning stdout, with only the final error on stderr. Preserve all earlier captures.",
+    "failureStreamControls": {
+      "red": {
+        "failed": 16,
+        "passed": 37
+      },
+      "green": {
+        "passed": 53
+      }
+    }
   }
 }

@@ -67,6 +67,7 @@ def test_original_executable_decisions(
     assert checker.main(arguments) == case["exit"]
     output = capsys.readouterr()
     assert case["expected"] in output.out + output.err
+    assert output.out == case["stdout"]
     if case["exit"] != 0:
         expected_error = case["stderr"].strip()
         # Frozen Linux paths identify the same input using native separators on Windows.
@@ -74,9 +75,8 @@ def test_original_executable_decisions(
             expected_error = expected_error.replace(
                 f"<ROOT>/{relative}", f"<ROOT>{Path('/') / relative}"
             )
-        assert expected_error in output.err.replace(str(tmp_path), "<ROOT>")
-    if case["exit"] == 0:
-        assert output.out == case["stdout"]
+        assert output.err.replace(str(tmp_path), "<ROOT>") == f"ERROR: {expected_error}\n"
+    else:
         assert output.err == case["stderr"]
     assert snapshot(tmp_path) == before
 
@@ -100,7 +100,7 @@ def test_original_ordinal_language_rejections(
     before = snapshot(tmp_path)
     assert checker.main(["--repo-root", str(tmp_path)]) == 1
     output = capsys.readouterr()
-    assert f"[{language}]" in output.err
+    assert f"[{language}]" in output.out
     assert (
         "devcontainer.json is missing 1 explicit formatter assignment(s). See warnings above."
         in output.err
@@ -291,5 +291,10 @@ def test_powershell_validator_rejects_the_selected_bad_root_or_arguments(
     assert result.returncode == 1
     assert (
         "Unexpected arguments" if extra else "is missing 1 explicit formatter assignment"
-    ) in result.stdout + result.stderr
+    ) in result.stderr
+    if not extra:
+        expected = next(
+            case for case in CORPUS["cases"] if case["name"] == "missing-language-csharp"
+        )
+        assert result.stdout == expected["stdout"]
     assert snapshot(root) == before
