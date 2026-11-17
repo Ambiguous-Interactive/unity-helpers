@@ -351,6 +351,7 @@ RUN mkdir -p /home/vscode/.codex \
     /home/vscode/.copilot \
     /home/vscode/.config/gh \
     /home/vscode/.mcp-auth \
+    && chown vscode:vscode /home/vscode/.local \
     && chown -R vscode:vscode /home/vscode/.codex /home/vscode/.claude /home/vscode/.claude-zai /home/vscode/.claude-openrouter /home/vscode/.config/opencode /home/vscode/.local/share/opencode /home/vscode/.local/state/opencode /home/vscode/.config/nanocoder /home/vscode/.local/share/nanocoder /home/vscode/.copilot /home/vscode/.config/gh /home/vscode/.mcp-auth \
     && chmod 0700 /home/vscode/.codex /home/vscode/.claude /home/vscode/.claude-zai /home/vscode/.claude-openrouter /home/vscode/.config/opencode /home/vscode/.local/share/opencode /home/vscode/.local/state/opencode /home/vscode/.config/nanocoder /home/vscode/.local/share/nanocoder /home/vscode/.copilot /home/vscode/.config/gh /home/vscode/.mcp-auth
 

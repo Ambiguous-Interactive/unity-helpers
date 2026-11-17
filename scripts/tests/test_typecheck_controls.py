@@ -414,7 +414,9 @@ def sdk_guards() -> list[tuple[str, str, dict[str, object], dict[str, object]]]:
     return guards
 
 
-@pytest.mark.parametrize("guard", sdk_guards(), ids=lambda guard: f"{guard[0]}/{guard[1]}")
+@pytest.mark.parametrize(
+    "guard", sdk_guards(), ids=lambda guard: f"{guard[0]}/{guard[1]}/{guard[2]['id']}"
+)
 def test_every_installed_sdk_is_selected_and_mismatches_are_rejected(
     guard: tuple[str, str, dict[str, object], dict[str, object]], tmp_path: Path
 ) -> None:
@@ -465,8 +467,19 @@ def test_every_installed_sdk_is_selected_and_mismatches_are_rejected(
         assert (result.returncode == 0) is accepted, result.stdout + result.stderr
 
 
-def test_all_eight_sdk_installations_have_controls() -> None:
-    assert len(sdk_guards()) == 8
+def test_all_pinned_sdk_installations_have_controls() -> None:
+    guarded = sorted((file, job, str(setup["id"])) for file, job, setup, _ in sdk_guards())
+    assert guarded == [
+        ("local-gates.yml", "contract-suites", "dotnet"),
+        ("local-gates.yml", "contract-suites", "formatter-dotnet"),
+        ("local-gates.yml", "typecheck-phases", "dotnet"),
+        ("random-quality.yml", "battery", "dotnet"),
+        ("random-quality.yml", "resolve", "dotnet"),
+        ("random-quality.yml", "testu01", "dotnet"),
+        ("repo-lint.yml", "repo-lint", "dotnet"),
+        ("wproto-generator.yml", "generator", "dotnet"),
+        ("wproto-generator.yml", "generator", "retained_protobuf_dotnet"),
+    ]
 
 
 def test_both_typecheck_phases_bootstrap_python_before_commands() -> None:
