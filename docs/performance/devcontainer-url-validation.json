@@ -1,0 +1,321 @@
+{
+  "date": "2026-11-17",
+  "baseCommit": "0bcf468ea49511376a8898ef2f512ca44309d316",
+  "sourceSha256": {
+    "original-validator.sh": "8d6f827e13732775a994414d9940a2d5b460391eb6ab418ff1dde85e43eed5e1",
+    "scripts/validate_devcontainer_urls.py": "ce9ec61d00aec20bc98c8cd7404e18f3fc4eb0d0653caccb94efcc2fa2206867",
+    "scripts/cli_encoding.py": "d946dc4bb98fc3eb66ffb1b4394625281421b346fbac364e7d9a50c99d90a9f9",
+    "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d"
+  },
+  "environment": {
+    "platform": "Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.36",
+    "filesystem": "tmpfs",
+    "uv": "uv 0.13.6 (x86_64-unknown-linux-gnu)"
+  },
+  "protocol": "Seven alternating fresh-process pairs after two warm runs per arm. Complete list commands include uv startup. Each process preserved exact streams, exit status and source and input hashes.",
+  "cases": {
+    "repository": {
+      "inputSha256": "936f56cbca83aa7b7f893df8bcba4e6b58c3c5f3850ab6addeb7c34cd20042d1",
+      "status": 0,
+      "stdoutSha256": "7236453c89b55880b4055976fc1ec73d395ab512989381849ba9ee04c86db96d",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "medianMilliseconds": {
+        "bash": 97.318024,
+        "python": 33.408674
+      },
+      "pairsMilliseconds": [
+        {
+          "bash": 98.795504,
+          "python": 33.652085
+        },
+        {
+          "python": 33.366646,
+          "bash": 100.472275
+        },
+        {
+          "bash": 95.859581,
+          "python": 32.958459
+        },
+        {
+          "python": 32.823802,
+          "bash": 96.187394
+        },
+        {
+          "bash": 96.779379,
+          "python": 33.447006
+        },
+        {
+          "python": 34.244853,
+          "bash": 97.318024
+        },
+        {
+          "bash": 100.941953,
+          "python": 33.408674
+        }
+      ]
+    },
+    "120-tool-fixture": {
+      "inputSha256": "c7bae58e901ea6cafe7563efda7efaf173955d1a8ff4c246cf4a320694df33af",
+      "status": 0,
+      "stdoutSha256": "05d4e2096f012efdab235f98061dd96ed9b31433309ba9990d7363e16970030e",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "medianMilliseconds": {
+        "bash": 724.380124,
+        "python": 35.942846
+      },
+      "pairsMilliseconds": [
+        {
+          "bash": 727.571698,
+          "python": 36.477626
+        },
+        {
+          "python": 37.149695,
+          "bash": 741.047031
+        },
+        {
+          "bash": 724.380124,
+          "python": 38.215606
+        },
+        {
+          "python": 35.942846,
+          "bash": 719.858097
+        },
+        {
+          "bash": 716.241526,
+          "python": 34.296384
+        },
+        {
+          "python": 35.919725,
+          "bash": 715.847431
+        },
+        {
+          "bash": 725.171516,
+          "python": 35.479043
+        }
+      ]
+    }
+  },
+  "qualification": {
+    "frozenDecisions": 25,
+    "originalAssertionsBeforeAndThroughPort": 51,
+    "pythonCases": 35,
+    "liveUrlProbesPassed": 34,
+    "retainedRed": "The first Python candidate used a different ANSI color for tool names. Sixteen exact stream controls failed. Restoring the original color made those controls pass.",
+    "streamingRed": "The initial Python port buffered its entire stdout until the curl subprocess exited. The subprocess pipe control reproduced the delay and now passes with line buffering.",
+    "launcherReview": "The registry falsely accepted an executable-permission assertion as launcher execution. The stricter ownership predicate failed before the real collection control was added. Replacing the launcher with an error also fails the control."
+  },
+  "limits": "Local list command measurements only. Network probes, cold hosts and overall CI are outside this timing scope. Malformed shell fragments are outside Dockerfile download declaration syntax.",
+  "previousCapture": {
+    "date": "2026-11-17",
+    "baseCommit": "0bcf468ea49511376a8898ef2f512ca44309d316",
+    "sourceSha256": {
+      "original-validator.sh": "8d6f827e13732775a994414d9940a2d5b460391eb6ab418ff1dde85e43eed5e1",
+      "scripts/validate_devcontainer_urls.py": "ebf694a232e6097ce9c000d9e3e8ede7efc9a315a8547eba20615734397d7f7a",
+      "scripts/cli_encoding.py": "d946dc4bb98fc3eb66ffb1b4394625281421b346fbac364e7d9a50c99d90a9f9",
+      "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d"
+    },
+    "environment": {
+      "platform": "Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.36",
+      "filesystem": "tmpfs",
+      "uv": "uv 0.13.6 (x86_64-unknown-linux-gnu)"
+    },
+    "protocol": "Seven alternating fresh-process pairs after two warm runs per arm. Complete list commands include uv startup. Each process preserved exact streams, exit status and source and input hashes.",
+    "cases": {
+      "repository": {
+        "inputSha256": "936f56cbca83aa7b7f893df8bcba4e6b58c3c5f3850ab6addeb7c34cd20042d1",
+        "status": 0,
+        "stdoutSha256": "7236453c89b55880b4055976fc1ec73d395ab512989381849ba9ee04c86db96d",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "medianMilliseconds": {
+          "bash": 97.220088,
+          "python": 33.712601
+        },
+        "pairsMilliseconds": [
+          {
+            "bash": 98.236923,
+            "python": 33.720876
+          },
+          {
+            "python": 32.425452,
+            "bash": 100.368769
+          },
+          {
+            "bash": 96.264745,
+            "python": 35.148122
+          },
+          {
+            "python": 35.084187,
+            "bash": 97.220088
+          },
+          {
+            "bash": 96.519718,
+            "python": 32.788643
+          },
+          {
+            "python": 33.278067,
+            "bash": 95.083073
+          },
+          {
+            "bash": 97.534196,
+            "python": 33.712601
+          }
+        ]
+      },
+      "120-tool-fixture": {
+        "inputSha256": "c7bae58e901ea6cafe7563efda7efaf173955d1a8ff4c246cf4a320694df33af",
+        "status": 0,
+        "stdoutSha256": "05d4e2096f012efdab235f98061dd96ed9b31433309ba9990d7363e16970030e",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "medianMilliseconds": {
+          "bash": 719.535881,
+          "python": 36.463094
+        },
+        "pairsMilliseconds": [
+          {
+            "bash": 719.535881,
+            "python": 35.093873
+          },
+          {
+            "python": 36.252259,
+            "bash": 715.236295
+          },
+          {
+            "bash": 716.720458,
+            "python": 43.757391
+          },
+          {
+            "python": 38.659798,
+            "bash": 743.580737
+          },
+          {
+            "bash": 762.82038,
+            "python": 36.314743
+          },
+          {
+            "python": 36.463094,
+            "bash": 714.37336
+          },
+          {
+            "bash": 732.420568,
+            "python": 36.960002
+          }
+        ]
+      }
+    },
+    "qualification": {
+      "frozenDecisions": 25,
+      "originalAssertionsBeforeAndThroughPort": 51,
+      "pythonCases": 34,
+      "liveUrlProbesPassed": 34,
+      "retainedRed": "The first Python candidate used a different ANSI color for tool names. Sixteen exact stream controls failed. Restoring the original color made those controls pass.",
+      "streamingRed": "The initial Python port buffered its entire stdout until the curl subprocess exited. The subprocess pipe control reproduced the delay and now passes with line buffering."
+    },
+    "limits": "Local list command measurements only. Network probes, cold hosts and overall CI are outside this timing scope. Malformed shell fragments are outside Dockerfile download declaration syntax.",
+    "preStreamingCapture": {
+      "date": "2026-11-17",
+      "baseCommit": "0bcf468ea49511376a8898ef2f512ca44309d316",
+      "sourceSha256": {
+        "original-validator.sh": "8d6f827e13732775a994414d9940a2d5b460391eb6ab418ff1dde85e43eed5e1",
+        "scripts/validate_devcontainer_urls.py": "4c088b598272c0fba3d606c8871c80a4e68fe6bab52010e88cfa22d1f8c7c116",
+        "scripts/cli_encoding.py": "d946dc4bb98fc3eb66ffb1b4394625281421b346fbac364e7d9a50c99d90a9f9",
+        "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d"
+      },
+      "environment": {
+        "platform": "Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.36",
+        "filesystem": "tmpfs",
+        "uv": "uv 0.13.6 (x86_64-unknown-linux-gnu)"
+      },
+      "protocol": "Seven alternating fresh-process pairs after two warm runs per arm. Complete list commands include uv startup. Each process preserved exact streams, exit status and source and input hashes.",
+      "cases": {
+        "repository": {
+          "inputSha256": "936f56cbca83aa7b7f893df8bcba4e6b58c3c5f3850ab6addeb7c34cd20042d1",
+          "status": 0,
+          "stdoutSha256": "7236453c89b55880b4055976fc1ec73d395ab512989381849ba9ee04c86db96d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "medianMilliseconds": {
+            "bash": 96.021508,
+            "python": 33.072567
+          },
+          "pairsMilliseconds": [
+            {
+              "bash": 97.037916,
+              "python": 33.905733
+            },
+            {
+              "python": 33.072567,
+              "bash": 94.506278
+            },
+            {
+              "bash": 95.091337,
+              "python": 32.84093
+            },
+            {
+              "python": 33.407789,
+              "bash": 96.10292
+            },
+            {
+              "bash": 94.603916,
+              "python": 32.693151
+            },
+            {
+              "python": 32.431072,
+              "bash": 98.786356
+            },
+            {
+              "bash": 96.021508,
+              "python": 34.196187
+            }
+          ]
+        },
+        "120-tool-fixture": {
+          "inputSha256": "c7bae58e901ea6cafe7563efda7efaf173955d1a8ff4c246cf4a320694df33af",
+          "status": 0,
+          "stdoutSha256": "05d4e2096f012efdab235f98061dd96ed9b31433309ba9990d7363e16970030e",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "medianMilliseconds": {
+            "bash": 718.026202,
+            "python": 34.302524
+          },
+          "pairsMilliseconds": [
+            {
+              "bash": 711.176826,
+              "python": 34.247512
+            },
+            {
+              "python": 34.47065,
+              "bash": 720.306418
+            },
+            {
+              "bash": 737.932076,
+              "python": 34.056724
+            },
+            {
+              "python": 33.42982,
+              "bash": 718.026202
+            },
+            {
+              "bash": 715.122615,
+              "python": 37.933994
+            },
+            {
+              "python": 34.302524,
+              "bash": 713.22963
+            },
+            {
+              "bash": 923.998532,
+              "python": 65.500264
+            }
+          ]
+        }
+      },
+      "qualification": {
+        "frozenDecisions": 25,
+        "originalAssertionsBeforeAndThroughPort": 51,
+        "pythonCases": 33,
+        "liveUrlProbesPassed": 34,
+        "retainedRed": "The first Python candidate used a different ANSI color for tool names. Sixteen exact stream controls failed. Restoring the original color made those controls pass."
+      },
+      "limits": "Local list command measurements only. Network probes, cold hosts and overall CI are outside this timing scope. Malformed shell fragments are outside Dockerfile download declaration syntax."
+    }
+  }
+}

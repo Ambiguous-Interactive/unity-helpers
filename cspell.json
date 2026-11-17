@@ -1303,6 +1303,24 @@
   "caseSensitive": false,
   "overrides": [
     {
+      "filename": ["scripts/tests/fixtures/devcontainer-urls-v1.json", "cspell.json"],
+      "words": [
+        "duf",
+        "exa",
+        "eza",
+        "fzf",
+        "GPG",
+        "LFS",
+        "mitem",
+        "moreutils",
+        "ncdu",
+        "procs",
+        "Readabili",
+        "readabilipy",
+        "xzf"
+      ]
+    },
+    {
       "filename": [
         "cspell.json",
         "Generator~/WallstopStudios.UnityHelpers.DoxRetained.Tests/DoxRetainedInventory.v1.json",

@@ -128,6 +128,20 @@ The [qualification record](../performance/devcontainer-config-qualification.json
 observations, original decisions and setup limitations. Windows, cold-host and whole-CI speed
 remain unmeasured.
 
+Devcontainer download URL validation uses `scripts/validate_devcontainer_urls.py` through locked
+uv. The Bash validator and test commands remain compatibility launchers. The check discovers
+versioned GitHub and .NET downloads for amd64 and arm64, rejects apt-based PowerShell installs, and
+probes each selected URL. It keeps three HEAD attempts and uses a one-byte ranged GET only with
+curl 8.4 or newer. The offline `--contracts-only` and `--list-tools` modes make no network calls.
+
+The `test:validate-devcontainer-urls` npm command replays 25 original decisions, including exact
+streams, curl arguments and retry delays, and runs the Dockerfile's nested Lychee archive install
+for both architectures on Linux. All 51 original assertions also pass through the Python port.
+Seven paired Linux measurements of `--list-tools` measured median times of 97.32 to 33.41 ms
+on the repository Dockerfile and 724.38 to 35.94 ms on a 120-tool fixture, including uv startup.
+The [qualification record](../performance/devcontainer-url-validation.json) retains the inputs,
+source hashes, raw pairs and scope of the measurements.
+
 GitHub Pages CSS validation uses `scripts/validate_github_pages_css.py` through locked uv.
 The Bash commands remain tested compatibility launchers; npm and the lint registry call Python.
 The gate retains its fixed layout, breakpoint and accessibility checks, fail-fast errors, and
