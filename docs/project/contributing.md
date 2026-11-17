@@ -219,6 +219,29 @@ implementation; the corrected credential-read error handling has no new timing c
 These fixture timings exclude the container checker and do not measure Windows,
 complete pushes or CI. Host configuration helpers remain separate migration scope.
 
+Hook executable-mode validation runs through locked Python with
+`npm run validate:hook-perms`; the shell validation and test commands remain launchers.
+Only tracked, extensionless hook basenames are checked, including nested paths.
+The index must contain stage-zero entries with mode `100755`. Empty audits and
+unmerged entries fail. `--fix` delegates one mode batch to the existing native
+PowerShell mutex and retry coordinator. Repairs preserve staged blobs and the
+assume-unchanged, skip-worktree and intent-to-add settings. They respect alternate
+indexes and other writers' locks. Git reads have 30-second deadlines.
+Repair hints quote the launcher and selected `--repo-root`, so running a hint from
+another directory repairs the same repository that validation inspected.
+Keep noncooperating index writers idle; a failed readback after mutation requires
+inspection before retrying and does not roll back the index.
+
+The [qualification record](../performance/hook-permissions-qualification.json)
+retains original CLI decisions, the original shell driver and portable repair controls.
+The original bare chmod operation could stage working-file content; the coordinated
+repair preserves the staged blob even when working content differs. Diagnostics are
+plain text. Seven alternating Linux pairs after two warmup pairs measured
+3.59 → 36.12 ms for healthy validation, 3.74 → 36.37 ms for rejection and
+7.18 → 376.11 ms for repair. All startup regressions are retained, including the
+native coordinator launch cost. These results do not measure Windows, complete
+hooks or CI, and do not establish statistical significance.
+
 Hook text validation runs through locked Python with
 `npm run validate:hook-sync`. The retained PowerShell validator and test commands
 delegate to that implementation. Required tokens and forbidden merge-hook startup
@@ -247,7 +270,7 @@ workspace identity. Existing caller-supplied settings remain authoritative.
 
 Version reference synchronization uses `scripts/version_sync.py` through locked uv.
 The PowerShell entry points remain launchers. Content rules, sorting and validation run in
-Python; batched staging delegates to the unchanged PowerShell mutex and retry helper.
+Python; batched staging delegates to the existing PowerShell mutex and retry coordinator.
 This native coordinator preserves the active alternate index and existing contention policy.
 Default template synchronization reads the tracked manifest; release preparation alone adds
 a package version. Local tags and remote releases cannot add dropdown entries.

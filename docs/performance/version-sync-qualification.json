@@ -10,8 +10,8 @@
     "scripts/stage-version-sync-files.ps1": "dbb04a35a1edcae1f3cf88d54175c798fa33476b3db4b9931fd17fd3d4cbbeed",
     "scripts/sync-banner-version.ps1": "40a87a1c4ef824a69219eef2848d9ef1cf08af9b6d8cf3b04d4e34c39d9a806f",
     "scripts/sync-issue-template-versions.ps1": "5662dc9feba6a2172931cc9f156dc4a551a320f7f620108f3e46667cd1d76725",
-    "scripts/git-staging-helpers.ps1": "6106ab0d95cf64cc30b0e6314d6a8cc5555ab56c7610e3fb3986f1153592f957",
-    "scripts/python~/pyproject.toml": "785165834cdd0f419085847b5beaeb2b008e1127e94e4863430f08e57492a979",
+    "scripts/git-staging-helpers.ps1": "fe0089a801c4b181db6878fc1c64e5824bfc8aee296cbaa4ac6af473b6c7b80f",
+    "scripts/python~/pyproject.toml": "f1c03081409e9b6abaf03c5c87ef37f56c7ace60b36c672220d9b98307e03f0f",
     "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d",
     "scripts/tests/test_version_sync.py": "139773aac78de51beb513fedff4638f36665ab241732a6a428c332109ec1fefb"
   },
@@ -439,13 +439,37 @@
     "version_length_controls": 2,
     "embedded_xml_repair": "Compare literal version characters independently from opaque XML source regions. Replace only version character spans, retaining comments and CDATA byte-for-byte, including when a region splits the version or the replacement changes its length."
   },
-  "before_native_stack_rebase_source_sha256": {
+  "before_hook_mode_extension_source_sha256": {
     "scripts/version_sync.py": "92124656b2e2864bf55fcaf11e3745b045ee4cc3f8ed89b3142270a5ac1c65b7",
     "scripts/stage-version-sync-files.ps1": "dbb04a35a1edcae1f3cf88d54175c798fa33476b3db4b9931fd17fd3d4cbbeed",
     "scripts/sync-banner-version.ps1": "40a87a1c4ef824a69219eef2848d9ef1cf08af9b6d8cf3b04d4e34c39d9a806f",
     "scripts/sync-issue-template-versions.ps1": "5662dc9feba6a2172931cc9f156dc4a551a320f7f620108f3e46667cd1d76725",
     "scripts/git-staging-helpers.ps1": "6106ab0d95cf64cc30b0e6314d6a8cc5555ab56c7610e3fb3986f1153592f957",
     "scripts/python~/pyproject.toml": "d892b5634c1936a19f4ca97dad3fcdd5ad5c7e028e70c8da499f29ede7b844d7",
+    "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d",
+    "scripts/tests/test_version_sync.py": "139773aac78de51beb513fedff4638f36665ab241732a6a428c332109ec1fefb"
+  },
+  "hook_mode_coordinator_extension": "The shared coordinator has an opt-in executable-mode branch. The retained historical validation map identifies 0d814246, where 91 controls passed; current source hashes are integration-validation inputs. Historical timing_capture_sha256 remains bound to bd6218ab. No current-source timing claim is added.",
+  "historical_validation_source_sha256": {
+    "scripts/version_sync.py": "92124656b2e2864bf55fcaf11e3745b045ee4cc3f8ed89b3142270a5ac1c65b7",
+    "scripts/stage-version-sync-files.ps1": "dbb04a35a1edcae1f3cf88d54175c798fa33476b3db4b9931fd17fd3d4cbbeed",
+    "scripts/sync-banner-version.ps1": "40a87a1c4ef824a69219eef2848d9ef1cf08af9b6d8cf3b04d4e34c39d9a806f",
+    "scripts/sync-issue-template-versions.ps1": "5662dc9feba6a2172931cc9f156dc4a551a320f7f620108f3e46667cd1d76725",
+    "scripts/git-staging-helpers.ps1": "fe0089a801c4b181db6878fc1c64e5824bfc8aee296cbaa4ac6af473b6c7b80f",
+    "scripts/python~/pyproject.toml": "f1c03081409e9b6abaf03c5c87ef37f56c7ace60b36c672220d9b98307e03f0f",
+    "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d",
+    "scripts/tests/test_version_sync.py": "139773aac78de51beb513fedff4638f36665ab241732a6a428c332109ec1fefb"
+  },
+  "historical_validation_revision": "0d81424666c1f8206b3a2a31f15968f3dc8b3b09",
+  "source_scope": "Current integration-validation inputs only. Historical maps and timing captures remain immutable and do not attest current-head performance.",
+  "timing_capture_revision": "bd6218ab75728be9b2a3196beb588459d4b8d19b",
+  "before_native_stack_rebase_source_sha256": {
+    "scripts/version_sync.py": "92124656b2e2864bf55fcaf11e3745b045ee4cc3f8ed89b3142270a5ac1c65b7",
+    "scripts/stage-version-sync-files.ps1": "dbb04a35a1edcae1f3cf88d54175c798fa33476b3db4b9931fd17fd3d4cbbeed",
+    "scripts/sync-banner-version.ps1": "40a87a1c4ef824a69219eef2848d9ef1cf08af9b6d8cf3b04d4e34c39d9a806f",
+    "scripts/sync-issue-template-versions.ps1": "5662dc9feba6a2172931cc9f156dc4a551a320f7f620108f3e46667cd1d76725",
+    "scripts/git-staging-helpers.ps1": "fe0089a801c4b181db6878fc1c64e5824bfc8aee296cbaa4ac6af473b6c7b80f",
+    "scripts/python~/pyproject.toml": "93a93f1faf4243715a8e3c10022b76dd65d1422bb1255343448852bfbadb3a28",
     "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d",
     "scripts/tests/test_version_sync.py": "139773aac78de51beb513fedff4638f36665ab241732a6a428c332109ec1fefb"
   }
