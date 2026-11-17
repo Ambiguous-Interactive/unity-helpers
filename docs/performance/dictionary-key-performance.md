@@ -221,3 +221,24 @@ evidence, with hashes in that record.
 
 This compares with commit `10138d86`. It does not replace the original 3.7.1 consumer baseline or
 close [#1131](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1131).
+
+## Rejected nonzero guard layout
+
+A candidate keeps nonzero `TryGet` probing together and moves the direct zero-key return after it.
+The empty-count guard, hash, probe loop, values, mutation behavior and dense indices remain unchanged.
+Two serial fresh .NET 10 processes each complete 198 cells with 64 warm calls, at least 20 ms
+calibration, 21 rotating rounds, Dictionary controls and timed checksums.
+
+Hit/miss geometric candidate/main ratios are **1.00398** and **1.00491**. Both meet the preset
+early-rejection rule of at least 1.0, so the candidate is rejected without further runtime runs.
+No non-insertion cell exceeds 1.10 in both processes. Small differences near 1.0 do not establish
+a causal slowdown. All 136 existing host correctness/recovery cases pass for the candidate.
+Both captures retain zero exits, both stream ends and unchanged source/payload hashes.
+
+The [qualification record](./intmap-guard-layout-20261117.json) retains all paired cell ratios,
+process receipts, seals, the rejected diff and environment limitations. Raw sources and all rounds
+remain in ignored session storage. A fresh SDK image's failed net48 setup remains recorded;
+this triage explicitly builds net10.0 and does not qualify Mono or native players.
+The original consumer iteration and lookup tables above remain applicable: 13 of 54 lookup/insert
+cells still miss the original budget. Production `IntMap` is unchanged, and
+[#1131](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1131) remains open.

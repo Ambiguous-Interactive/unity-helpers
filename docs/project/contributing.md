@@ -108,6 +108,44 @@ results, process receipts, source hashes and the complete case inventory.
 
 ### Typed Python scripts
 
+Devcontainer configuration validation uses `scripts/validate_devcontainer_config.py` through
+locked uv. npm and Repo Lint invoke Python directly. The publish workflow provisions the shared
+Python/uv tools before its retained PowerShell command. Both PowerShell paths remain tested
+compatibility launchers. The gate preserves the image namespace, cache tags, publication metadata,
+workflow coverage and eleven required language-entry checks. Its retained text patterns check
+entry presence; they do not validate arbitrary JSON/YAML schemas or formatter values.
+
+`npm run test:validate-devcontainer-config` replays 36 original executable decisions. All 22 original
+suite assertions pass before and through the port. Additional controls cover five original BOM
+encodings, ordinal language-identifier casing, Unicode/foreign-directory launchers, failures without input mutation, and Python setup
+before publication validation. PowerShell's error framing remains host presentation; failure
+status and actionable message text are preserved. All 184 Python files join strict checks.
+
+Seven alternating Linux tmpfs process pairs after two warmups per arm measured repository
+validation at 279.06 → 42.45 ms and a 500-workflow fixture at 331.75 → 43.26 ms, including uv startup.
+Every pair matches successful stdout/stderr and exit status and retains input/source hashes.
+The [qualification record](../performance/devcontainer-config-qualification.json) preserves those
+observations, original decisions and setup limitations. Windows, cold-host and whole-CI speed
+remain unmeasured.
+
+GitHub Pages CSS validation uses `scripts/validate_github_pages_css.py` through locked uv.
+The Bash commands remain tested compatibility launchers; npm and the lint registry call Python.
+The gate retains its fixed layout, breakpoint and accessibility checks, fail-fast errors, and
+warning-only CSS heuristics. It is not a general CSS parser. It reads one regular UTF-8 file
+without changing its bytes; unreadable, invalid UTF-8 and nonregular inputs fail visibly.
+`npm run test:validate-github-pages-css` replays 56 frozen original CLI observations and checks
+the real theme, foreign-directory launchers, Unicode output, read failures and a large comment.
+
+Seven alternating fresh-process pairs after two warmups per arm on Linux tmpfs measured the
+real theme at 49.15 → 44.25 ms and a 100 KiB comment fixture at 55.23 → 42.68 ms, including uv
+startup. Every pair matches stdout, stderr and exit status and preserves inputs and source hashes.
+The [qualification record](../performance/github-pages-css-qualification.json) also retains the
+rejected initial port: its 100 KiB fixture took 4,587.62 ms because of regex backtracking.
+A real 1 MiB child and repeated declaration/media-prefix controls each timed out at five seconds
+before correction and complete afterward. Literal input-path spelling and the legacy GNU grep
+hex-color exclusions also retain original-executable red/green controls.
+These local observations do not establish Windows, cold-host or whole-CI speed.
+
 Release-tag validation uses `scripts/ci/verify_release_tag.py` through locked uv.
 The release workflow provisions the shared Python tools before validation. The PowerShell
 entry point remains compatible, including empty values and rejection of stray arguments.
