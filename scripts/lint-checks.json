@@ -284,7 +284,7 @@
   {
     "id": "github-pages-css",
     "name": "GitHub Pages CSS",
-    "run": "bash scripts/validate-github-pages-css.sh",
+    "run": "uv run --quiet --project scripts/python~ --locked --no-dev python scripts/validate_github_pages_css.py",
     "inputs": ["@tooling", "@documentation"]
   },
   {

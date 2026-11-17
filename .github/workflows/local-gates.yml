@@ -335,7 +335,7 @@ jobs:
           scripts/tests/test_npm_package.py scripts/tests/test_release_automation.py
           scripts/tests/test_version_sync.py scripts/tests/test_hook_validation.py
           scripts/tests/test_push_validation.py scripts/tests/test_push_defaults.py
-          scripts/tests/test_hook_permissions.py
+          scripts/tests/test_hook_permissions.py scripts/tests/test_github_pages_css.py
           scripts/tests/test_meta_lint.py scripts/tests/test_markdown_checks.py
           scripts/tests/test_runner_maintenance_matrix.py scripts/tests/test_check_runner.py
           scripts/tests/test_preserve_attributes.py scripts/tests/test_doc_identifiers.py

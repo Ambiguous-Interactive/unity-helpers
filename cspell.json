@@ -991,7 +991,8 @@
         "mklink",
         "ufeff",
         "notin",
-        "tmpfs"
+        "tmpfs",
+        "moz"
       ]
     }
   ],
