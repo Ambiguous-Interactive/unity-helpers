@@ -1,0 +1,27 @@
+name: Agent Metrics
+
+on:
+  workflow_dispatch:
+    inputs:
+      days:
+        description: Days to include
+        type: string
+        default: "90"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  metrics:
+    uses: Ambiguous-Interactive/review-tools/.github/workflows/agent-metrics.yml@5be72fd3d7e3041df21e0b6800b0e78e46dd0991 # v1.0.1
+    with:
+      days: ${{ fromJSON(inputs.days || '90') }}
+      timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
