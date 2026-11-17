@@ -38,8 +38,8 @@ namespace WallstopStudios.UnityHelpers.Editor
                 return null;
             }
 
-            AnimationClip[] clips =
-                controller.animationClips ?? System.Array.Empty<AnimationClip>();
+            AnimationClip[] clips = controller.animationClips
+                ?? System.Array.Empty<AnimationClip>();
             IReadOnlyList<AnimationClip> filtered = viewModel.FilterClips(
                 clips,
                 searchString,

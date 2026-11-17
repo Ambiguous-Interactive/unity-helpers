@@ -208,9 +208,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             yield return new MetadataScenario(
                 "default resources asset uses type name",
                 () =>
-                    CreateResourceAsset<TestSingleton>(
-                        "TestSingleton.asset",
-                        asset => asset.payload = "metadata"
+                    CreateResourceAsset<TestSingleton>("TestSingleton.asset", asset =>
+                        asset.payload = "metadata"
                     ),
                 typeof(TestSingleton),
                 "TestSingleton",
@@ -889,9 +888,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnityTest]
         public IEnumerator LoadsInstanceFromResourcesAsset()
         {
-            CreateResourceAsset<ResourceBackedSingleton>(
-                "ResourceBackedSingleton.asset",
-                asset => asset.payload = "from-resource"
+            CreateResourceAsset<ResourceBackedSingleton>("ResourceBackedSingleton.asset", asset =>
+                asset.payload = "from-resource"
             );
             ResourceBackedSingleton.ClearInstance();
             yield return null;
@@ -1086,22 +1084,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnityTest]
         public IEnumerator MultipleAssetsLogWarningAndSelectDeterministically()
         {
-            CreateResourceAsset<MultiAssetScriptableSingleton>(
-                "Multi/Primary.asset",
-                asset =>
-                {
-                    asset.name = "01_Primary";
-                    asset.id = "primary";
-                }
-            );
-            CreateResourceAsset<MultiAssetScriptableSingleton>(
-                "Multi/Secondary.asset",
-                asset =>
-                {
-                    asset.name = "02_Secondary";
-                    asset.id = "secondary";
-                }
-            );
+            CreateResourceAsset<MultiAssetScriptableSingleton>("Multi/Primary.asset", asset =>
+            {
+                asset.name = "01_Primary";
+                asset.id = "primary";
+            });
+            CreateResourceAsset<MultiAssetScriptableSingleton>("Multi/Secondary.asset", asset =>
+            {
+                asset.name = "02_Secondary";
+                asset.id = "secondary";
+            });
             MultiAssetScriptableSingleton.ClearInstance();
             yield return null;
 
@@ -1127,14 +1119,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                     asset.id = "ten";
                 }
             );
-            CreateResourceAsset<MultiAssetScriptableSingleton>(
-                "MultiNatural/Entry2.asset",
-                asset =>
-                {
-                    asset.name = "Entry2";
-                    asset.id = "two";
-                }
-            );
+            CreateResourceAsset<MultiAssetScriptableSingleton>("MultiNatural/Entry2.asset", asset =>
+            {
+                asset.name = "Entry2";
+                asset.id = "two";
+            });
             CreateResourceAsset<MultiAssetScriptableSingleton>(
                 "MultiNatural/Entry11.asset",
                 asset =>
@@ -1189,9 +1178,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnityTest]
         public IEnumerator ClearInstanceReloadsLatestAssetState()
         {
-            CreateResourceAsset<ResourceBackedSingleton>(
-                "ResourceBackedSingleton.asset",
-                asset => asset.payload = "first"
+            CreateResourceAsset<ResourceBackedSingleton>("ResourceBackedSingleton.asset", asset =>
+                asset.payload = "first"
             );
             ResourceBackedSingleton.ClearInstance();
             yield return null;
@@ -1202,9 +1190,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             DeleteAssetIfExists(ToFullResourcePath("ResourceBackedSingleton.asset"));
             yield return null;
 
-            CreateResourceAsset<ResourceBackedSingleton>(
-                "ResourceBackedSingleton.asset",
-                asset => asset.payload = "second"
+            CreateResourceAsset<ResourceBackedSingleton>("ResourceBackedSingleton.asset", asset =>
+                asset.payload = "second"
             );
             ResourceBackedSingleton.ClearInstance();
             yield return null;

@@ -77,11 +77,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// Initializes the set during custom serialization scenarios.
         /// </summary>
         protected SerializableSortedSet(SerializationInfo info, StreamingContext context)
-            : base(
-                info,
-                context,
-                (serializationInfo, streamingContext) =>
-                    new StorageSet(serializationInfo, streamingContext)
+            : base(info, context, (serializationInfo, streamingContext) =>
+                new StorageSet(serializationInfo, streamingContext)
             ) { }
 
         /// <summary>

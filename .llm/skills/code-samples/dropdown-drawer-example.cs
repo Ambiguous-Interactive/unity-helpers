@@ -44,21 +44,17 @@ public sealed class MySelectablePropertyDrawer : PropertyDrawer
                 {
                     int capturedIndex = i;
                     bool isSelected = i == currentIndex;
-                    menu.AddItem(
-                        new GUIContent(Options[i]),
-                        isSelected,
-                        () =>
-                        {
-                            serializedObject.Update();
-                            SerializedProperty prop = serializedObject.FindProperty(propertyPath);
-                            if (prop == null)
-                                return;
+                    menu.AddItem(new GUIContent(Options[i]), isSelected, () =>
+                    {
+                        serializedObject.Update();
+                        SerializedProperty prop = serializedObject.FindProperty(propertyPath);
+                        if (prop == null)
+                            return;
 
-                            Undo.RecordObjects(serializedObject.targetObjects, "Change Selection");
-                            prop.stringValue = Options[capturedIndex];
-                            serializedObject.ApplyModifiedProperties();
-                        }
-                    );
+                        Undo.RecordObjects(serializedObject.targetObjects, "Change Selection");
+                        prop.stringValue = Options[capturedIndex];
+                        serializedObject.ApplyModifiedProperties();
+                    });
                 }
                 menu.DropDown(fieldRect);
             }

@@ -65,60 +65,52 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             {
                 typeof(DateTime),
-                (
-                    "BclDateTime",
-                    name =>
-                        "// Replicates protobuf-net's .bcl.DateTime layout.\n"
-                        + "message "
-                        + name
-                        + " {\n"
-                        + "  sint64 value = 1;\n"
-                        + "  uint32 scale = 2;\n"
-                        + "}"
+                ("BclDateTime", name =>
+                    "// Replicates protobuf-net's .bcl.DateTime layout.\n"
+                    + "message "
+                    + name
+                    + " {\n"
+                    + "  sint64 value = 1;\n"
+                    + "  uint32 scale = 2;\n"
+                    + "}"
                 )
             },
             {
                 typeof(TimeSpan),
-                (
-                    "BclTimeSpan",
-                    name =>
-                        "// Replicates protobuf-net's .bcl.TimeSpan layout.\n"
-                        + "message "
-                        + name
-                        + " {\n"
-                        + "  sint64 value = 1;\n"
-                        + "  uint32 scale = 2;\n"
-                        + "}"
+                ("BclTimeSpan", name =>
+                    "// Replicates protobuf-net's .bcl.TimeSpan layout.\n"
+                    + "message "
+                    + name
+                    + " {\n"
+                    + "  sint64 value = 1;\n"
+                    + "  uint32 scale = 2;\n"
+                    + "}"
                 )
             },
             {
                 typeof(Guid),
-                (
-                    "BclGuid",
-                    name =>
-                        "// Replicates protobuf-net's .bcl.Guid layout: two fixed-64 halves in\n"
-                        + "// Guid.ToByteArray order; an all-zero Guid writes an empty message.\n"
-                        + "message "
-                        + name
-                        + " {\n"
-                        + "  fixed64 low = 1;\n"
-                        + "  fixed64 high = 2;\n"
-                        + "}"
+                ("BclGuid", name =>
+                    "// Replicates protobuf-net's .bcl.Guid layout: two fixed-64 halves in\n"
+                    + "// Guid.ToByteArray order; an all-zero Guid writes an empty message.\n"
+                    + "message "
+                    + name
+                    + " {\n"
+                    + "  fixed64 low = 1;\n"
+                    + "  fixed64 high = 2;\n"
+                    + "}"
                 )
             },
             {
                 typeof(decimal),
-                (
-                    "BclDecimal",
-                    name =>
-                        "// Replicates protobuf-net's .bcl.Decimal layout.\n"
-                        + "message "
-                        + name
-                        + " {\n"
-                        + "  uint64 low = 1;\n"
-                        + "  uint32 high = 2;\n"
-                        + "  uint32 sign_scale = 3;\n"
-                        + "}"
+                ("BclDecimal", name =>
+                    "// Replicates protobuf-net's .bcl.Decimal layout.\n"
+                    + "message "
+                    + name
+                    + " {\n"
+                    + "  uint64 low = 1;\n"
+                    + "  uint32 high = 2;\n"
+                    + "  uint32 sign_scale = 3;\n"
+                    + "}"
                 )
             },
         };

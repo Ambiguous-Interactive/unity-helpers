@@ -2874,8 +2874,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
 
                 string assetPath = AssetDatabase.GetAssetPath(sprite);
-                string directoryPath =
-                    Path.GetDirectoryName(assetPath).SanitizePath() ?? string.Empty;
+                string directoryPath = Path.GetDirectoryName(assetPath).SanitizePath()
+                    ?? string.Empty;
                 string frameName = StripDensitySuffix(sprite.name);
 
                 string baseName;

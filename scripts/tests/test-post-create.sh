@@ -405,6 +405,17 @@ else
         "Expected mcp-remote in install-agent-clis.sh"
 fi
 
+if awk '
+    /^USER vscode([[:space:]]|$)/ { exit }
+    /^[[:space:]]*&& chown vscode:vscode \/home\/vscode\/\.local([[:space:]]|$)/ { owns_prefix = 1 }
+    END { exit !owns_prefix }
+' "$DOCKERFILE"; then
+    pass "Dockerfile gives vscode ownership of the npm global prefix before installing tools"
+else
+    fail "Dockerfile gives vscode ownership of the npm global prefix before installing tools" \
+        "The vscode user must be able to create .local/lib and .local/bin."
+fi
+
 if grep -q '"@z_ai/mcp-server@latest"' "$DOCKERFILE" && grep -q '"mcp-remote@latest"' "$DOCKERFILE"; then
     pass "Dockerfile pre-installs Z.AI MCP runtime packages"
 else

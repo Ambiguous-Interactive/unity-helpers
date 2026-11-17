@@ -45,21 +45,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             ) = CreateEntity();
             yield return null;
 
-            AttributeEffect effect = CreateEffect(
-                "Buff",
-                e =>
-                {
-                    e.effectTags.Add("Buff");
-                    e.modifications.Add(
-                        new AttributeModification
-                        {
-                            attribute = nameof(TestAttributesComponent.health),
-                            action = ModificationAction.Addition,
-                            value = 5f,
-                        }
-                    );
-                }
-            );
+            AttributeEffect effect = CreateEffect("Buff", e =>
+            {
+                e.effectTags.Add("Buff");
+                e.modifications.Add(
+                    new AttributeModification
+                    {
+                        attribute = nameof(TestAttributesComponent.health),
+                        action = ModificationAction.Addition,
+                        value = 5f,
+                    }
+                );
+            });
 
             int appliedCount = 0;
             handler.OnEffectApplied += _ => ++appliedCount;
@@ -85,22 +82,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             ) = CreateEntity();
             yield return null;
 
-            AttributeEffect effect = CreateEffect(
-                "Instant",
-                e =>
-                {
-                    e.durationType = ModifierDurationType.Instant;
-                    e.effectTags.Add("Flash");
-                    e.modifications.Add(
-                        new AttributeModification
-                        {
-                            attribute = nameof(TestAttributesComponent.health),
-                            action = ModificationAction.Addition,
-                            value = 10f,
-                        }
-                    );
-                }
-            );
+            AttributeEffect effect = CreateEffect("Instant", e =>
+            {
+                e.durationType = ModifierDurationType.Instant;
+                e.effectTags.Add("Flash");
+                e.modifications.Add(
+                    new AttributeModification
+                    {
+                        attribute = nameof(TestAttributesComponent.health),
+                        action = ModificationAction.Addition,
+                        value = 10f,
+                    }
+                );
+            });
 
             EffectHandle? handle = entity.ApplyEffect(effect);
             Assert.IsFalse(handle.HasValue);
@@ -117,36 +111,30 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 TestAttributesComponent attributes,
                 TagHandler tags
             ) = CreateEntity();
-            AttributeEffect effectA = CreateEffect(
-                "BuffA",
-                e =>
-                {
-                    e.effectTags.Add("BuffA");
-                    e.modifications.Add(
-                        new AttributeModification
-                        {
-                            attribute = nameof(TestAttributesComponent.health),
-                            action = ModificationAction.Addition,
-                            value = 5f,
-                        }
-                    );
-                }
-            );
-            AttributeEffect effectB = CreateEffect(
-                "BuffB",
-                e =>
-                {
-                    e.effectTags.Add("BuffB");
-                    e.modifications.Add(
-                        new AttributeModification
-                        {
-                            attribute = nameof(TestAttributesComponent.armor),
-                            action = ModificationAction.Addition,
-                            value = 10f,
-                        }
-                    );
-                }
-            );
+            AttributeEffect effectA = CreateEffect("BuffA", e =>
+            {
+                e.effectTags.Add("BuffA");
+                e.modifications.Add(
+                    new AttributeModification
+                    {
+                        attribute = nameof(TestAttributesComponent.health),
+                        action = ModificationAction.Addition,
+                        value = 5f,
+                    }
+                );
+            });
+            AttributeEffect effectB = CreateEffect("BuffB", e =>
+            {
+                e.effectTags.Add("BuffB");
+                e.modifications.Add(
+                    new AttributeModification
+                    {
+                        attribute = nameof(TestAttributesComponent.armor),
+                        action = ModificationAction.Addition,
+                        value = 10f,
+                    }
+                );
+            });
 
             Assert.IsTrue(entity.ApplyEffect(effectA).HasValue);
             Assert.IsTrue(entity.ApplyEffect(effectB).HasValue);
@@ -168,22 +156,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 TestAttributesComponent attributes,
                 TagHandler tags
             ) = CreateEntity();
-            AttributeEffect effect = CreateEffect(
-                "Temporary",
-                e =>
-                {
-                    e.duration = 0f;
-                    e.effectTags.Add("Temp");
-                    e.modifications.Add(
-                        new AttributeModification
-                        {
-                            attribute = nameof(TestAttributesComponent.health),
-                            action = ModificationAction.Addition,
-                            value = 5f,
-                        }
-                    );
-                }
-            );
+            AttributeEffect effect = CreateEffect("Temporary", e =>
+            {
+                e.duration = 0f;
+                e.effectTags.Add("Temp");
+                e.modifications.Add(
+                    new AttributeModification
+                    {
+                        attribute = nameof(TestAttributesComponent.health),
+                        action = ModificationAction.Addition,
+                        value = 5f,
+                    }
+                );
+            });
 
             int removedCount = 0;
             handler.OnEffectRemoved += _ => ++removedCount;
@@ -209,13 +194,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 TagHandler tags
             ) = CreateEntity();
             CosmeticEffectData cosmetic = CreateCosmeticTemplate("Glow");
-            AttributeEffect effect = CreateEffect(
-                "Cosmetic",
-                e =>
-                {
-                    e.cosmeticEffects.Add(cosmetic);
-                }
-            );
+            AttributeEffect effect = CreateEffect("Cosmetic", e =>
+            {
+                e.cosmeticEffects.Add(cosmetic);
+            });
 
             EffectHandle handle = entity.ApplyEffect(effect).Value;
             Assert.AreEqual(1, RecordingCosmeticComponent.AppliedCount);
@@ -235,13 +217,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 TagHandler tags
             ) = CreateEntity();
             CosmeticEffectData template = CreateCosmeticTemplate("Aura", requiresInstance: true);
-            AttributeEffect effect = CreateEffect(
-                "Aura",
-                e =>
-                {
-                    e.cosmeticEffects.Add(template);
-                }
-            );
+            AttributeEffect effect = CreateEffect("Aura", e =>
+            {
+                e.cosmeticEffects.Add(template);
+            });
 
             int initialChildCount = entity.transform.childCount;
             EffectHandle handle = entity.ApplyEffect(effect).Value;
@@ -287,14 +266,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             ) = CreateEntity();
             yield return null;
 
-            AttributeEffect effect = CreateEffect(
-                "Stacking",
-                e =>
-                {
-                    e.durationType = ModifierDurationType.Infinite;
-                    e.stackingMode = EffectStackingMode.Stack;
-                }
-            );
+            AttributeEffect effect = CreateEffect("Stacking", e =>
+            {
+                e.durationType = ModifierDurationType.Infinite;
+                e.stackingMode = EffectStackingMode.Stack;
+            });
 
             EffectHandle first = handler.ApplyEffect(effect).Value;
             EffectHandle second = handler.ApplyEffect(effect).Value;
@@ -319,22 +295,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             ) = CreateEntity();
             yield return null;
 
-            AttributeEffect effect = CreateEffect(
-                "Ignore",
-                e =>
-                {
-                    e.durationType = ModifierDurationType.Infinite;
-                    e.stackingMode = EffectStackingMode.Ignore;
-                    e.modifications.Add(
-                        new AttributeModification
-                        {
-                            attribute = nameof(TestAttributesComponent.health),
-                            action = ModificationAction.Addition,
-                            value = 5f,
-                        }
-                    );
-                }
-            );
+            AttributeEffect effect = CreateEffect("Ignore", e =>
+            {
+                e.durationType = ModifierDurationType.Infinite;
+                e.stackingMode = EffectStackingMode.Ignore;
+                e.modifications.Add(
+                    new AttributeModification
+                    {
+                        attribute = nameof(TestAttributesComponent.health),
+                        action = ModificationAction.Addition,
+                        value = 5f,
+                    }
+                );
+            });
 
             EffectHandle first = handler.ApplyEffect(effect).Value;
             float afterFirst = attributes.health.CurrentValue;
@@ -358,15 +331,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             ) = CreateEntity();
             yield return null;
 
-            AttributeEffect effect = CreateEffect(
-                "RefreshNoReset",
-                e =>
-                {
-                    e.duration = 0.3f;
-                    e.stackingMode = EffectStackingMode.Refresh;
-                    e.resetDurationOnReapplication = false;
-                }
-            );
+            AttributeEffect effect = CreateEffect("RefreshNoReset", e =>
+            {
+                e.duration = 0.3f;
+                e.stackingMode = EffectStackingMode.Refresh;
+                e.resetDurationOnReapplication = false;
+            });
 
             EffectHandle handle = handler.ApplyEffect(effect, currentTime: 10f).Value;
             Assert.IsTrue(
@@ -406,27 +376,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             ) = CreateEntity();
             yield return null;
 
-            AttributeEffect effectA = CreateEffect(
-                "GroupA",
-                e =>
-                {
-                    e.durationType = ModifierDurationType.Infinite;
-                    e.stackGroup = EffectStackGroup.CustomKey;
-                    e.stackGroupKey = "shared";
-                    e.stackingMode = EffectStackingMode.Stack;
-                }
-            );
+            AttributeEffect effectA = CreateEffect("GroupA", e =>
+            {
+                e.durationType = ModifierDurationType.Infinite;
+                e.stackGroup = EffectStackGroup.CustomKey;
+                e.stackGroupKey = "shared";
+                e.stackingMode = EffectStackingMode.Stack;
+            });
 
-            AttributeEffect effectB = CreateEffect(
-                "GroupB",
-                e =>
-                {
-                    e.durationType = ModifierDurationType.Infinite;
-                    e.stackGroup = EffectStackGroup.CustomKey;
-                    e.stackGroupKey = "shared";
-                    e.stackingMode = EffectStackingMode.Stack;
-                }
-            );
+            AttributeEffect effectB = CreateEffect("GroupB", e =>
+            {
+                e.durationType = ModifierDurationType.Infinite;
+                e.stackGroup = EffectStackGroup.CustomKey;
+                e.stackGroupKey = "shared";
+                e.stackingMode = EffectStackingMode.Stack;
+            });
 
             EffectHandle a1 = handler.ApplyEffect(effectA).Value;
             EffectHandle b1 = handler.ApplyEffect(effectB).Value;
@@ -451,15 +415,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             ) = CreateEntity();
             yield return null;
 
-            AttributeEffect effect = CreateEffect(
-                "Tagged",
-                e =>
-                {
-                    e.durationType = ModifierDurationType.Infinite;
-                    e.stackingMode = EffectStackingMode.Stack;
-                    e.effectTags.Add("Shielded");
-                }
-            );
+            AttributeEffect effect = CreateEffect("Tagged", e =>
+            {
+                e.durationType = ModifierDurationType.Infinite;
+                e.stackingMode = EffectStackingMode.Stack;
+                e.effectTags.Add("Shielded");
+            });
 
             EffectHandle first = handler.ApplyEffect(effect).Value;
             EffectHandle second = handler.ApplyEffect(effect).Value;
@@ -484,14 +445,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             ) = CreateEntity();
             yield return null;
 
-            AttributeEffect effect = CreateEffect(
-                "Active",
-                e =>
-                {
-                    e.durationType = ModifierDurationType.Infinite;
-                    e.stackingMode = EffectStackingMode.Stack;
-                }
-            );
+            AttributeEffect effect = CreateEffect("Active", e =>
+            {
+                e.durationType = ModifierDurationType.Infinite;
+                e.stackingMode = EffectStackingMode.Stack;
+            });
 
             EffectHandle first = handler.ApplyEffect(effect).Value;
             EffectHandle second = handler.ApplyEffect(effect).Value;
@@ -625,28 +583,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             ) = CreateEntity();
             yield return null;
 
-            AttributeEffect effect = CreateEffect(
-                "PeriodicLimited",
-                e =>
+            AttributeEffect effect = CreateEffect("PeriodicLimited", e =>
+            {
+                e.durationType = ModifierDurationType.Infinite;
+                PeriodicEffectDefinition definition = new()
                 {
-                    e.durationType = ModifierDurationType.Infinite;
-                    PeriodicEffectDefinition definition = new()
+                    initialDelay = 0.05f,
+                    interval = 0.05f,
+                    maxTicks = 2,
+                };
+                definition.modifications.Add(
+                    new AttributeModification
                     {
-                        initialDelay = 0.05f,
-                        interval = 0.05f,
-                        maxTicks = 2,
-                    };
-                    definition.modifications.Add(
-                        new AttributeModification
-                        {
-                            attribute = nameof(TestAttributesComponent.health),
-                            action = ModificationAction.Addition,
-                            value = -10f,
-                        }
-                    );
-                    e.periodicEffects.Add(definition);
-                }
-            );
+                        attribute = nameof(TestAttributesComponent.health),
+                        action = ModificationAction.Addition,
+                        value = -10f,
+                    }
+                );
+                e.periodicEffects.Add(definition);
+            });
 
             EffectHandle handle = handler.ApplyEffect(effect, currentTime: 5f).Value;
             Assert.AreEqual(100f, attributes.health.CurrentValue, 0.01f);
@@ -691,23 +646,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             ) = CreateEntity();
             yield return null;
 
-            AttributeEffect effect = CreateEffect(
-                "PeriodicUnlimited",
-                e =>
-                {
-                    e.durationType = ModifierDurationType.Infinite;
-                    PeriodicEffectDefinition definition = new() { interval = 0.05f, maxTicks = 0 };
-                    definition.modifications.Add(
-                        new AttributeModification
-                        {
-                            attribute = nameof(TestAttributesComponent.health),
-                            action = ModificationAction.Addition,
-                            value = -5f,
-                        }
-                    );
-                    e.periodicEffects.Add(definition);
-                }
-            );
+            AttributeEffect effect = CreateEffect("PeriodicUnlimited", e =>
+            {
+                e.durationType = ModifierDurationType.Infinite;
+                PeriodicEffectDefinition definition = new() { interval = 0.05f, maxTicks = 0 };
+                definition.modifications.Add(
+                    new AttributeModification
+                    {
+                        attribute = nameof(TestAttributesComponent.health),
+                        action = ModificationAction.Addition,
+                        value = -5f,
+                    }
+                );
+                e.periodicEffects.Add(definition);
+            });
 
             EffectHandle handle = handler.ApplyEffect(effect, currentTime: 20f).Value;
             int ticks = handler.ProcessPeriodicEffects(currentTime: 20.16f, deltaTime: 0.16f);
@@ -730,23 +682,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
         {
             (_, EffectHandler handler, TestAttributesComponent attributes, _) = CreateEntity();
 
-            AttributeEffect effect = CreateEffect(
-                "PeriodicCatchUpCap",
-                e =>
-                {
-                    e.durationType = ModifierDurationType.Infinite;
-                    PeriodicEffectDefinition definition = new() { interval = 0.01f, maxTicks = 0 };
-                    definition.modifications.Add(
-                        new AttributeModification
-                        {
-                            attribute = nameof(TestAttributesComponent.health),
-                            action = ModificationAction.Addition,
-                            value = -1f,
-                        }
-                    );
-                    e.periodicEffects.Add(definition);
-                }
-            );
+            AttributeEffect effect = CreateEffect("PeriodicCatchUpCap", e =>
+            {
+                e.durationType = ModifierDurationType.Infinite;
+                PeriodicEffectDefinition definition = new() { interval = 0.01f, maxTicks = 0 };
+                definition.modifications.Add(
+                    new AttributeModification
+                    {
+                        attribute = nameof(TestAttributesComponent.health),
+                        action = ModificationAction.Addition,
+                        value = -1f,
+                    }
+                );
+                e.periodicEffects.Add(definition);
+            });
 
             EffectHandle handle = handler.ApplyEffect(effect, currentTime: 30f).Value;
             float overdueTime = 40f;
@@ -776,46 +725,43 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             ) = CreateEntity();
             yield return null;
 
-            AttributeEffect effect = CreateEffect(
-                "PeriodicMulti",
-                e =>
+            AttributeEffect effect = CreateEffect("PeriodicMulti", e =>
+            {
+                e.durationType = ModifierDurationType.Infinite;
+
+                PeriodicEffectDefinition damage = new()
                 {
-                    e.durationType = ModifierDurationType.Infinite;
-
-                    PeriodicEffectDefinition damage = new()
+                    initialDelay = 0.05f,
+                    interval = 0.05f,
+                    maxTicks = 2,
+                };
+                damage.modifications.Add(
+                    new AttributeModification
                     {
-                        initialDelay = 0.05f,
-                        interval = 0.05f,
-                        maxTicks = 2,
-                    };
-                    damage.modifications.Add(
-                        new AttributeModification
-                        {
-                            attribute = nameof(TestAttributesComponent.health),
-                            action = ModificationAction.Addition,
-                            value = -5f,
-                        }
-                    );
+                        attribute = nameof(TestAttributesComponent.health),
+                        action = ModificationAction.Addition,
+                        value = -5f,
+                    }
+                );
 
-                    PeriodicEffectDefinition armorGain = new()
+                PeriodicEffectDefinition armorGain = new()
+                {
+                    initialDelay = 0.02f,
+                    interval = 0.1f,
+                    maxTicks = 3,
+                };
+                armorGain.modifications.Add(
+                    new AttributeModification
                     {
-                        initialDelay = 0.02f,
-                        interval = 0.1f,
-                        maxTicks = 3,
-                    };
-                    armorGain.modifications.Add(
-                        new AttributeModification
-                        {
-                            attribute = nameof(TestAttributesComponent.armor),
-                            action = ModificationAction.Addition,
-                            value = 1f,
-                        }
-                    );
+                        attribute = nameof(TestAttributesComponent.armor),
+                        action = ModificationAction.Addition,
+                        value = 1f,
+                    }
+                );
 
-                    e.periodicEffects.Add(damage);
-                    e.periodicEffects.Add(armorGain);
-                }
-            );
+                e.periodicEffects.Add(damage);
+                e.periodicEffects.Add(armorGain);
+            });
 
             EffectHandle handle = handler.ApplyEffect(effect, currentTime: 50f).Value;
 
@@ -877,13 +823,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             ) = CreateEntity();
             yield return null;
 
-            AttributeEffect effect = CreateEffect(
-                "Timed",
-                e =>
-                {
-                    e.duration = 0.5f;
-                }
-            );
+            AttributeEffect effect = CreateEffect("Timed", e =>
+            {
+                e.duration = 0.5f;
+            });
 
             EffectHandle handle = handler.ApplyEffect(effect, currentTime: 70f).Value;
             Assert.IsTrue(
@@ -916,14 +859,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             ) = CreateEntity();
             yield return null;
 
-            AttributeEffect effect = CreateEffect(
-                "Refreshable",
-                e =>
-                {
-                    e.duration = 0.2f;
-                    e.resetDurationOnReapplication = true;
-                }
-            );
+            AttributeEffect effect = CreateEffect("Refreshable", e =>
+            {
+                e.duration = 0.2f;
+                e.resetDurationOnReapplication = true;
+            });
 
             EffectHandle handle = handler.ApplyEffect(effect, currentTime: 100f).Value;
             Assert.IsTrue(
@@ -995,14 +935,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             ) = CreateEntity();
             yield return null;
 
-            AttributeEffect effect = CreateEffect(
-                "Policy",
-                e =>
-                {
-                    e.duration = 0.3f;
-                    e.resetDurationOnReapplication = false;
-                }
-            );
+            AttributeEffect effect = CreateEffect("Policy", e =>
+            {
+                e.duration = 0.3f;
+                e.resetDurationOnReapplication = false;
+            });
 
             EffectHandle handle = handler.ApplyEffect(effect, currentTime: 200f).Value;
             Assert.IsTrue(
@@ -1040,23 +977,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             ) = CreateEntity();
             yield return null;
 
-            AttributeEffect effect = CreateEffect(
-                "Periodic",
-                e =>
-                {
-                    e.durationType = ModifierDurationType.Infinite;
-                    PeriodicEffectDefinition periodic = new() { interval = 0.1f, maxTicks = 3 };
-                    periodic.modifications.Add(
-                        new AttributeModification
-                        {
-                            attribute = nameof(TestAttributesComponent.health),
-                            action = ModificationAction.Addition,
-                            value = -10f,
-                        }
-                    );
-                    e.periodicEffects.Add(periodic);
-                }
-            );
+            AttributeEffect effect = CreateEffect("Periodic", e =>
+            {
+                e.durationType = ModifierDurationType.Infinite;
+                PeriodicEffectDefinition periodic = new() { interval = 0.1f, maxTicks = 3 };
+                periodic.modifications.Add(
+                    new AttributeModification
+                    {
+                        attribute = nameof(TestAttributesComponent.health),
+                        action = ModificationAction.Addition,
+                        value = -10f,
+                    }
+                );
+                e.periodicEffects.Add(periodic);
+            });
 
             EffectHandle handle = handler.ApplyEffect(effect, currentTime: 300f).Value;
             int ticks = handler.ProcessPeriodicEffects(currentTime: 300.35f, deltaTime: 0.35f);
@@ -1083,16 +1017,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             ) = CreateEntity();
             yield return null;
 
-            AttributeEffect effect = CreateEffect(
-                "Behavior",
-                e =>
-                {
-                    e.duration = 0.25f;
-                    e.periodicEffects.Add(
-                        new PeriodicEffectDefinition { interval = 0.05f, maxTicks = 2 }
-                    );
-                }
-            );
+            AttributeEffect effect = CreateEffect("Behavior", e =>
+            {
+                e.duration = 0.25f;
+                e.periodicEffects.Add(
+                    new PeriodicEffectDefinition { interval = 0.05f, maxTicks = 2 }
+                );
+            });
 
             RecordingEffectBehavior behavior = Track(
                 ScriptableObject.CreateInstance<RecordingEffectBehavior>()
@@ -1133,14 +1064,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             ) = CreateEntity();
             yield return null;
 
-            AttributeEffect effect = CreateEffect(
-                "BehaviorStacks",
-                e =>
-                {
-                    e.durationType = ModifierDurationType.Infinite;
-                    e.stackingMode = EffectStackingMode.Stack;
-                }
-            );
+            AttributeEffect effect = CreateEffect("BehaviorStacks", e =>
+            {
+                e.durationType = ModifierDurationType.Infinite;
+                e.stackingMode = EffectStackingMode.Stack;
+            });
 
             RecordingEffectBehavior behavior = Track(
                 ScriptableObject.CreateInstance<RecordingEffectBehavior>()
@@ -1172,13 +1100,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             ) = CreateEntity();
             yield return null;
 
-            AttributeEffect effect = CreateEffect(
-                "BehaviorNoPeriodic",
-                e =>
-                {
-                    e.durationType = ModifierDurationType.Infinite;
-                }
-            );
+            AttributeEffect effect = CreateEffect("BehaviorNoPeriodic", e =>
+            {
+                e.durationType = ModifierDurationType.Infinite;
+            });
 
             RecordingEffectBehavior behavior = Track(
                 ScriptableObject.CreateInstance<RecordingEffectBehavior>()
@@ -1205,15 +1130,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             ) = CreateEntity();
             yield return null;
 
-            AttributeEffect effect = CreateEffect(
-                "Stacking",
-                e =>
-                {
-                    e.durationType = ModifierDurationType.Infinite;
-                    e.stackingMode = EffectStackingMode.Stack;
-                    e.maximumStacks = 2;
-                }
-            );
+            AttributeEffect effect = CreateEffect("Stacking", e =>
+            {
+                e.durationType = ModifierDurationType.Infinite;
+                e.stackingMode = EffectStackingMode.Stack;
+                e.maximumStacks = 2;
+            });
 
             EffectHandle first = handler.ApplyEffect(effect).Value;
             EffectHandle second = handler.ApplyEffect(effect).Value;
@@ -1239,23 +1161,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             ) = CreateEntity();
             yield return null;
 
-            AttributeEffect effect = CreateEffect(
-                "InstantPeriodic",
-                e =>
-                {
-                    e.durationType = ModifierDurationType.Instant;
-                    PeriodicEffectDefinition definition = new() { interval = 0.05f, maxTicks = 1 };
-                    definition.modifications.Add(
-                        new AttributeModification
-                        {
-                            attribute = nameof(TestAttributesComponent.health),
-                            action = ModificationAction.Addition,
-                            value = -10f,
-                        }
-                    );
-                    e.periodicEffects.Add(definition);
-                }
-            );
+            AttributeEffect effect = CreateEffect("InstantPeriodic", e =>
+            {
+                e.durationType = ModifierDurationType.Instant;
+                PeriodicEffectDefinition definition = new() { interval = 0.05f, maxTicks = 1 };
+                definition.modifications.Add(
+                    new AttributeModification
+                    {
+                        attribute = nameof(TestAttributesComponent.health),
+                        action = ModificationAction.Addition,
+                        value = -10f,
+                    }
+                );
+                e.periodicEffects.Add(definition);
+            });
 
             // Emitted via the package logger, which is compiled out in a non-development player.
             ExpectWallstopLog(
@@ -1319,14 +1238,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             ) = CreateEntity();
             yield return null;
 
-            AttributeEffect effect = CreateEffect(
-                "Replace",
-                e =>
-                {
-                    e.durationType = ModifierDurationType.Infinite;
-                    e.stackingMode = EffectStackingMode.Replace;
-                }
-            );
+            AttributeEffect effect = CreateEffect("Replace", e =>
+            {
+                e.durationType = ModifierDurationType.Infinite;
+                e.stackingMode = EffectStackingMode.Replace;
+            });
 
             EffectHandle first = handler.ApplyEffect(effect).Value;
             EffectHandle second = handler.ApplyEffect(effect).Value;
@@ -1352,26 +1268,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             ) = CreateEntity();
             yield return null;
 
-            AttributeEffect effectA = CreateEffect(
-                "GroupA",
-                e =>
-                {
-                    e.durationType = ModifierDurationType.Infinite;
-                    e.stackGroup = EffectStackGroup.CustomKey;
-                    e.stackGroupKey = stackKey;
-                    e.stackingMode = EffectStackingMode.Replace;
-                }
-            );
-            AttributeEffect effectB = CreateEffect(
-                "GroupB",
-                e =>
-                {
-                    e.durationType = ModifierDurationType.Infinite;
-                    e.stackGroup = EffectStackGroup.CustomKey;
-                    e.stackGroupKey = stackKey;
-                    e.stackingMode = EffectStackingMode.Replace;
-                }
-            );
+            AttributeEffect effectA = CreateEffect("GroupA", e =>
+            {
+                e.durationType = ModifierDurationType.Infinite;
+                e.stackGroup = EffectStackGroup.CustomKey;
+                e.stackGroupKey = stackKey;
+                e.stackingMode = EffectStackingMode.Replace;
+            });
+            AttributeEffect effectB = CreateEffect("GroupB", e =>
+            {
+                e.durationType = ModifierDurationType.Infinite;
+                e.stackGroup = EffectStackGroup.CustomKey;
+                e.stackGroupKey = stackKey;
+                e.stackingMode = EffectStackingMode.Replace;
+            });
 
             EffectHandle first = handler.ApplyEffect(effectA).Value;
             EffectHandle second = handler.ApplyEffect(effectB).Value;

@@ -4365,8 +4365,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 return false;
             }
 
-            Color textColor =
-                defaultTextColor ?? WButtonColorUtility.GetReadableTextColor(buttonColor);
+            Color textColor = defaultTextColor
+                ?? WButtonColorUtility.GetReadableTextColor(buttonColor);
             WButtonCustomColor themeColor = new()
             {
                 ButtonColor = buttonColor,
@@ -4540,10 +4540,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 return false;
             }
 
-            Color resolvedSelectedText =
-                selectedTextDefault ?? WButtonColorUtility.GetReadableTextColor(selectedBackground);
-            Color resolvedInactiveText =
-                inactiveTextDefault ?? WButtonColorUtility.GetReadableTextColor(inactiveBackground);
+            Color resolvedSelectedText = selectedTextDefault
+                ?? WButtonColorUtility.GetReadableTextColor(selectedBackground);
+            Color resolvedInactiveText = inactiveTextDefault
+                ?? WButtonColorUtility.GetReadableTextColor(inactiveBackground);
 
             WEnumToggleButtonsCustomColor themeColor = new()
             {
@@ -4834,8 +4834,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 return new WButtonPaletteEntry(value.ButtonColor, value.TextColor);
             }
 
-            Color textColor =
-                defaultTextColor ?? WButtonColorUtility.GetReadableTextColor(buttonColor);
+            Color textColor = defaultTextColor
+                ?? WButtonColorUtility.GetReadableTextColor(buttonColor);
             return new WButtonPaletteEntry(buttonColor, textColor);
         }
 
@@ -4959,10 +4959,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 );
             }
 
-            Color resolvedSelectedText =
-                selectedTextDefault ?? WButtonColorUtility.GetReadableTextColor(selectedBackground);
-            Color resolvedInactiveText =
-                inactiveTextDefault ?? WButtonColorUtility.GetReadableTextColor(inactiveBackground);
+            Color resolvedSelectedText = selectedTextDefault
+                ?? WButtonColorUtility.GetReadableTextColor(selectedBackground);
+            Color resolvedInactiveText = inactiveTextDefault
+                ?? WButtonColorUtility.GetReadableTextColor(inactiveBackground);
 
             return new WEnumToggleButtonsPaletteEntry(
                 selectedBackground,

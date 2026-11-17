@@ -414,9 +414,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             {
                 return RunningLabel;
             }
-            return RunningLabelByCountCache.GetOrAdd(
-                count,
-                static c => "Running (" + GetCachedIntString(c) + ")"
+            return RunningLabelByCountCache.GetOrAdd(count, static c =>
+                "Running (" + GetCachedIntString(c) + ")"
             );
         }
 

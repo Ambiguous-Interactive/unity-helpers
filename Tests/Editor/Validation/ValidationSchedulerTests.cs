@@ -225,16 +225,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             bool restarted = false;
             try
             {
-                Assert.IsTrue(
-                    ValidationScheduler.TryStart(
-                        run,
-                        onComplete: completed =>
-                        {
-                            ++callbacks;
-                            restarted = ValidationScheduler.TryStart(PendingRun());
-                        }
-                    )
-                );
+                Assert.IsTrue(ValidationScheduler.TryStart(run, onComplete: completed =>
+                    {
+                        ++callbacks;
+                        restarted = ValidationScheduler.TryStart(PendingRun());
+                    }));
                 ValidationPreferences.Enabled = false;
                 Assert.IsTrue(run.IsCancelled);
                 Assert.IsFalse(ValidationScheduler.IsRunning);
@@ -290,22 +285,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             );
             try
             {
-                Assert.IsTrue(
-                    ValidationScheduler.TryStart(
-                        run,
-                        onComplete: completed =>
-                        {
-                            Assert.AreSame(run, completed);
-                            ValidationPreferences.Enabled = true;
-                            Assert.IsTrue(
-                                ValidationScheduler.TryStart(
-                                    next,
-                                    onComplete: _ => replacementCallbacks++
-                                )
-                            );
-                        }
-                    )
-                );
+                Assert.IsTrue(ValidationScheduler.TryStart(run, onComplete: completed =>
+                    {
+                        Assert.AreSame(run, completed);
+                        ValidationPreferences.Enabled = true;
+                        Assert.IsTrue(
+                            ValidationScheduler.TryStart(next, onComplete: _ =>
+                                replacementCallbacks++
+                            )
+                        );
+                    }));
                 ValidationScheduler.Tick();
                 Assert.IsTrue(run.IsCancelled);
                 Assert.AreEqual(boundary + 1, calls);

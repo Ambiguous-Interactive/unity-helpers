@@ -237,9 +237,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         public void FindRootPathWithExceptionInConditionReturnsCurrentPath()
         {
             string startPath = Application.dataPath;
-            string result = DirectoryHelper.FindRootPath(
-                startPath,
-                _ => throw new InvalidOperationException("Test exception")
+            string result = DirectoryHelper.FindRootPath(startPath, _ =>
+                throw new InvalidOperationException("Test exception")
             );
             Assert.AreEqual(startPath, result);
         }
@@ -551,9 +550,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         public void FindRootPathHandlesPathWithMultipleSeparators()
         {
             string testPath = Application.dataPath + "//Multiple///Separators";
-            string result = DirectoryHelper.FindRootPath(
-                testPath,
-                path => string.Equals(path, Application.dataPath, System.StringComparison.Ordinal)
+            string result = DirectoryHelper.FindRootPath(testPath, path =>
+                string.Equals(path, Application.dataPath, System.StringComparison.Ordinal)
             );
             Assert.That(result, Is.Not.Null);
         }
@@ -563,19 +561,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         {
             string startPath = Application.dataPath;
             bool exceptionThrown = false;
-            string result = DirectoryHelper.FindRootPath(
-                startPath,
-                _ =>
+            string result = DirectoryHelper.FindRootPath(startPath, _ =>
+            {
+                if (!exceptionThrown)
                 {
-                    if (!exceptionThrown)
-                    {
-                        exceptionThrown = true;
-                        throw new InvalidOperationException("test");
-                    }
-
-                    return false;
+                    exceptionThrown = true;
+                    throw new InvalidOperationException("test");
                 }
-            );
+
+                return false;
+            });
 
             Assert.AreEqual(startPath, result);
         }
@@ -1269,9 +1264,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         public void FindRootPathWithMixedSeparators()
         {
             string mixedPath = Application.dataPath + @"/SubFolder\AnotherFolder/File";
-            string result = DirectoryHelper.FindRootPath(
-                mixedPath,
-                path => string.Equals(path, Application.dataPath, System.StringComparison.Ordinal)
+            string result = DirectoryHelper.FindRootPath(mixedPath, path =>
+                string.Equals(path, Application.dataPath, System.StringComparison.Ordinal)
             );
             Assert.That(result, Is.Not.Null);
         }

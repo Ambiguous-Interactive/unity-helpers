@@ -100,8 +100,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             }
 
             SerializedProperty valueProperty = values.GetArrayElementAtIndex(index);
-            Color button =
-                valueProperty.FindPropertyRelative(buttonField)?.colorValue ?? Color.clear;
+            Color button = valueProperty.FindPropertyRelative(buttonField)?.colorValue
+                ?? Color.clear;
             Color text = valueProperty.FindPropertyRelative(textField)?.colorValue ?? Color.clear;
             return new PaletteEntrySnapshot(true, button, text);
         }
@@ -125,10 +125,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                 SerializedProperty keyProperty = keysProperty.GetArrayElementAtIndex(index);
                 SerializedProperty valueProperty = valuesProperty.GetArrayElementAtIndex(index);
                 string key = keyProperty.stringValue;
-                Color button =
-                    valueProperty.FindPropertyRelative(buttonField)?.colorValue ?? Color.clear;
-                Color text =
-                    valueProperty.FindPropertyRelative(textField)?.colorValue ?? Color.clear;
+                Color button = valueProperty.FindPropertyRelative(buttonField)?.colorValue
+                    ?? Color.clear;
+                Color text = valueProperty.FindPropertyRelative(textField)?.colorValue
+                    ?? Color.clear;
                 entries.Add(new PaletteDictionaryEntrySnapshot(key, button, text));
             }
 
@@ -167,8 +167,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             string textField
         )
         {
-            IReadOnlyList<PaletteDictionaryEntrySnapshot> entries =
-                snapshot?.Entries ?? Array.Empty<PaletteDictionaryEntrySnapshot>();
+            IReadOnlyList<PaletteDictionaryEntrySnapshot> entries = snapshot?.Entries
+                ?? Array.Empty<PaletteDictionaryEntrySnapshot>();
             OverwritePaletteDictionary(dictionaryProperty, entries, buttonField, textField);
         }
 

@@ -227,14 +227,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         public void NullResourceWithCallbackStillReleasesExactlyOnce()
         {
             int calls = 0;
-            PooledResource<string> lease = new(
-                null,
-                value =>
-                {
-                    Assert.That(value, Is.Null);
-                    ++calls;
-                }
-            );
+            PooledResource<string> lease = new(null, value =>
+            {
+                Assert.That(value, Is.Null);
+                ++calls;
+            });
             PooledResource<string> copy = lease;
             Assert.That(lease.IsHeld, Is.True);
 

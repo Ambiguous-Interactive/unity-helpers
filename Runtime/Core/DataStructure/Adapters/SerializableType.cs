@@ -1131,8 +1131,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                                 continue;
                             }
 
-                            string assemblyName =
-                                descriptor.Type?.Assembly?.GetName()?.Name ?? string.Empty;
+                            string assemblyName = descriptor.Type?.Assembly?.GetName()?.Name
+                                ?? string.Empty;
                             string disambiguated = string.IsNullOrWhiteSpace(assemblyName)
                                 ? descriptor.DisplayName
                                 : $"{descriptor.DisplayName} ({assemblyName})";
@@ -1326,8 +1326,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                                 continue;
                             }
 
-                            string assemblyQualifiedName =
-                                type.AssemblyQualifiedName ?? string.Empty;
+                            string assemblyQualifiedName = type.AssemblyQualifiedName
+                                ?? string.Empty;
                             string uniquenessKey = string.IsNullOrWhiteSpace(assemblyQualifiedName)
                                 ? $"{type.FullName ?? type.Name}|{assembly.GetName()?.Name ?? string.Empty}"
                                 : assemblyQualifiedName;

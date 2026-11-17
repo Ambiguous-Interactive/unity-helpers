@@ -245,9 +245,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Exception callbackError = new InvalidOperationException(
                 nameof(ThrowingFailureCallbackDoesNotDiscardOtherPaths)
             );
-            using LatestWriteFile writer = new(
-                writeInBackground: false,
-                onFailure: (_, _) => throw callbackError
+            using LatestWriteFile writer = new(writeInBackground: false, onFailure: (_, _) =>
+                throw callbackError
             );
             Assert.IsTrue(writer.TryEnqueueText(blocked, "bad", out Exception firstError));
             Assert.IsTrue(firstError == null);
@@ -270,19 +269,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             int callbacks = 0;
             bool accepted = false;
             bool recovered = false;
-            writer = new LatestWriteFile(
-                writeInBackground: false,
-                onFailure: (failedPath, _) =>
+            writer = new LatestWriteFile(writeInBackground: false, onFailure: (failedPath, _) =>
+            {
+                if (++callbacks != 1)
                 {
-                    if (++callbacks != 1)
-                    {
-                        return;
-                    }
-                    Directory.Delete(failedPath);
-                    accepted = writer.TryEnqueueText(failedPath, "recovered", out _);
-                    recovered = writer.Flush(out _);
+                    return;
                 }
-            );
+                Directory.Delete(failedPath);
+                accepted = writer.TryEnqueueText(failedPath, "recovered", out _);
+                recovered = writer.Flush(out _);
+            });
             using (writer)
             {
                 Assert.IsTrue(writer.TryEnqueueText(path, "first", out Exception error));

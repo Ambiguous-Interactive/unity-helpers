@@ -1692,15 +1692,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 bool[] readResults = new bool[readCount];
                 int[] depthResults = new int[readCount];
 
-                Parallel.For(
-                    0,
-                    readCount,
-                    i =>
-                    {
-                        readResults[i] = AssetDatabaseBatchHelper.IsCurrentlyBatching;
-                        depthResults[i] = AssetDatabaseBatchHelper.CurrentBatchDepth;
-                    }
-                );
+                Parallel.For(0, readCount, i =>
+                {
+                    readResults[i] = AssetDatabaseBatchHelper.IsCurrentlyBatching;
+                    depthResults[i] = AssetDatabaseBatchHelper.CurrentBatchDepth;
+                });
 
                 for (int i = 0; i < readCount; ++i)
                 {

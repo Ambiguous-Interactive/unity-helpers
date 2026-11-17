@@ -128,15 +128,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             ImageBlurTool window = Track(ScriptableObject.CreateInstance<ImageBlurTool>());
 
             Assert.DoesNotThrow(() =>
-                window.ApplyBlurToTextures(
-                    new[] { first, second },
-                    2,
-                    (_, message) =>
-                    {
-                        ++reportCount;
-                        completionMessage = message;
-                    }
-                )
+                window.ApplyBlurToTextures(new[] { first, second }, 2, (_, message) =>
+                {
+                    ++reportCount;
+                    completionMessage = message;
+                })
             );
 
             Assert.That(reportCount, Is.EqualTo(1), "The batch should show one completion report.");

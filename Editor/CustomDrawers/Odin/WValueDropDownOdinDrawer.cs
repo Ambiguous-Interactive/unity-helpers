@@ -190,10 +190,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             {
                 int capturedIndex = i;
                 bool isSelected = i == currentIndex && !hasMultipleDifferentValues;
-                menu.AddItem(
-                    new GUIContent(displayOptions[i]),
-                    isSelected,
-                    () => ApplySelection(options[capturedIndex])
+                menu.AddItem(new GUIContent(displayOptions[i]), isSelected, () =>
+                    ApplySelection(options[capturedIndex])
                 );
             }
             menu.DropDown(buttonRect);

@@ -80,8 +80,8 @@ namespace WallstopStudios.UnityHelpers.Integrations.VContainer
                     .As<AttributeMetadataCache>();
             }
 
-            RelationalSceneAssignmentOptions resolved =
-                options ?? RelationalSceneAssignmentOptions.Default;
+            RelationalSceneAssignmentOptions resolved = options
+                ?? RelationalSceneAssignmentOptions.Default;
 
             builder
                 .Register<RelationalComponentAssigner>(Lifetime.Singleton)

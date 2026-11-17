@@ -239,8 +239,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             WDropDownPopupData data = new()
             {
-                DisplayLabels =
-                    displayLabels ?? Array.ConvertAll(values, v => v?.ToString() ?? string.Empty),
+                DisplayLabels = displayLabels
+                    ?? Array.ConvertAll(values, v => v?.ToString() ?? string.Empty),
                 Tooltips = tooltips,
                 SelectedIndex = currentValueIndex,
                 PageSize = pageSize,

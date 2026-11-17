@@ -735,18 +735,15 @@ namespace WallstopStudios.UnityHelpers.Editor
             {
                 sortedDirectories[i] = list[i];
             }
-            Array.Sort(
-                sortedDirectories,
-                static (a, b) =>
+            Array.Sort(sortedDirectories, static (a, b) =>
+            {
+                int cmp = b.count.CompareTo(a.count);
+                if (cmp != 0)
                 {
-                    int cmp = b.count.CompareTo(a.count);
-                    if (cmp != 0)
-                    {
-                        return cmp;
-                    }
-                    return b.lastUsedTicks.CompareTo(a.lastUsedTicks);
+                    return cmp;
                 }
-            );
+                return b.lastUsedTicks.CompareTo(a.lastUsedTicks);
+            });
 
             if (!topOnly)
             {

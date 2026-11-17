@@ -344,14 +344,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             cache.Set("key1", 42);
             int factoryCallCount = 0;
 
-            int result = cache.GetOrAdd(
-                "key1",
-                k =>
-                {
-                    ++factoryCallCount;
-                    return 100;
-                }
-            );
+            int result = cache.GetOrAdd("key1", k =>
+            {
+                ++factoryCallCount;
+                return 100;
+            });
 
             Assert.AreEqual(42, result);
             Assert.AreEqual(0, factoryCallCount);
@@ -2641,9 +2638,8 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 .TimeProvider(TimeProvider)
                 .Build();
 
-            int result = cache.GetOrAdd(
-                "key",
-                k => throw new InvalidOperationException("Factory error")
+            int result = cache.GetOrAdd("key", k =>
+                throw new InvalidOperationException("Factory error")
             );
 
             Assert.AreEqual(default(int), result);
@@ -3764,14 +3760,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                     {
                         for (int i = 0; i < sharedKeyRange; ++i)
                         {
-                            cache.GetOrAdd(
-                                i,
-                                key =>
-                                {
-                                    System.Threading.Interlocked.Increment(ref loadCounts[key]);
-                                    return key * 2;
-                                }
-                            );
+                            cache.GetOrAdd(i, key =>
+                            {
+                                System.Threading.Interlocked.Increment(ref loadCounts[key]);
+                                return key * 2;
+                            });
                         }
                     }
                     catch (Exception ex)

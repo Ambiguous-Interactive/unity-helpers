@@ -103,14 +103,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 Longs = Array(random, () => unchecked((ulong)random.NextInt64())),
                 Flags = Array(random, () => random.Next(2) == 0),
                 Modes = Array(random, () => (Mode)random.Next(0, 3)),
-                Points = Array(
-                    random,
-                    () => new Outer.Point { X = random.Next(-9, 9), Y = random.Next(-9, 9) }
+                Points = Array(random, () =>
+                    new Outer.Point { X = random.Next(-9, 9), Y = random.Next(-9, 9) }
                 ),
                 Shorts = Array(random, () => (short)random.Next(short.MinValue, short.MaxValue)),
-                PointList = List(
-                    random,
-                    () => new Outer.Point { X = random.Next(-3, 3), Y = random.Next(-3, 3) }
+                PointList = List(random, () =>
+                    new Outer.Point { X = random.Next(-3, 3), Y = random.Next(-3, 3) }
                 ),
                 Blobs = Array(random, () => ByteElement(random)),
             };

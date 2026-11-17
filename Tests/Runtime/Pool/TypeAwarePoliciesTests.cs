@@ -397,14 +397,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void UserGenericConfigurationOverridesBuiltInDefaults()
         {
-            PoolPurgeSettings.ConfigureGeneric(
-                typeof(List<>),
-                options =>
-                {
-                    options.MinRetainCount = 5;
-                    options.IdleTimeoutSeconds = 600f;
-                }
-            );
+            PoolPurgeSettings.ConfigureGeneric(typeof(List<>), options =>
+            {
+                options.MinRetainCount = 5;
+                options.IdleTimeoutSeconds = 600f;
+            });
 
             PoolPurgeEffectiveOptions effectiveOptions = PoolPurgeSettings.GetEffectiveOptions<
                 List<string>
@@ -527,9 +524,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 settingsGenericOptions.Source
             );
 
-            PoolPurgeSettings.ConfigureGeneric(
-                typeof(Dictionary<,>),
-                options => options.MinRetainCount = 4
+            PoolPurgeSettings.ConfigureGeneric(typeof(Dictionary<,>), options =>
+                options.MinRetainCount = 4
             );
             PoolPurgeEffectiveOptions programmaticGenericOptions =
                 PoolPurgeSettings.GetEffectiveOptions(targetType);

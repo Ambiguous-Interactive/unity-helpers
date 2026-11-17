@@ -649,8 +649,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                     }
                     else if (parameter.IsParamsArray)
                     {
-                        Type elementType =
-                            parameter.ParameterType.GetElementType() ?? typeof(object);
+                        Type elementType = parameter.ParameterType.GetElementType()
+                            ?? typeof(object);
                         value = Array.CreateInstance(elementType, 0);
                     }
                 }

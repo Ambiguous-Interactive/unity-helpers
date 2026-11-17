@@ -65,14 +65,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             string[] testFiles = Directory.GetFiles(testsPath, "*.cs", SearchOption.AllDirectories);
             Assert.IsTrue(0 < testFiles.Length, "No test source files found under: " + testsPath);
             Assert.IsTrue(
-                Array.Exists(
-                    testFiles,
-                    path =>
-                        string.Equals(
-                            Path.GetFileName(path),
-                            nameof(TestNamingConventionTests) + ".cs",
-                            StringComparison.Ordinal
-                        )
+                Array.Exists(testFiles, path =>
+                    string.Equals(
+                        Path.GetFileName(path),
+                        nameof(TestNamingConventionTests) + ".cs",
+                        StringComparison.Ordinal
+                    )
                 ),
                 "The naming fixture source must belong to the scanned tree."
             );
@@ -295,27 +293,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         {
             string packagePath = GetPackagePath();
             List<string> violations = new();
-            string scannedRoot = ScanTestFiles(
-                packagePath,
-                (relativePath, lineNumber, line) =>
+            string scannedRoot = ScanTestFiles(packagePath, (relativePath, lineNumber, line) =>
+            {
+                for (
+                    Match match = TestNameAttributePattern.Match(line);
+                    match.Success;
+                    match = match.NextMatch()
+                )
                 {
-                    for (
-                        Match match = TestNameAttributePattern.Match(line);
-                        match.Success;
-                        match = match.NextMatch()
-                    )
+                    string testName = match.Groups[1].Value;
+                    if (testName.Contains('_'))
                     {
-                        string testName = match.Groups[1].Value;
-                        if (testName.Contains('_'))
-                        {
-                            violations.Add(
-                                $"{relativePath}:{lineNumber}: TestName=\"{testName}\" contains underscores. "
-                                    + "Use dot notation (e.g., \"Input.Null.ReturnsFalse\") or PascalCase."
-                            );
-                        }
+                        violations.Add(
+                            $"{relativePath}:{lineNumber}: TestName=\"{testName}\" contains underscores. "
+                                + "Use dot notation (e.g., \"Input.Null.ReturnsFalse\") or PascalCase."
+                        );
                     }
                 }
-            );
+            });
 
             Assert.IsEmpty(
                 violations,
@@ -333,27 +328,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         {
             string packagePath = GetPackagePath();
             List<string> violations = new();
-            string scannedRoot = ScanTestFiles(
-                packagePath,
-                (relativePath, lineNumber, line) =>
+            string scannedRoot = ScanTestFiles(packagePath, (relativePath, lineNumber, line) =>
+            {
+                for (
+                    Match match = SetNameMethodPattern.Match(line);
+                    match.Success;
+                    match = match.NextMatch()
+                )
                 {
-                    for (
-                        Match match = SetNameMethodPattern.Match(line);
-                        match.Success;
-                        match = match.NextMatch()
-                    )
+                    string setNameValue = match.Groups[1].Value;
+                    if (setNameValue.Contains('_'))
                     {
-                        string setNameValue = match.Groups[1].Value;
-                        if (setNameValue.Contains('_'))
-                        {
-                            violations.Add(
-                                $"{relativePath}:{lineNumber}: SetName(\"{setNameValue}\") contains underscores. "
-                                    + "Use dot notation (e.g., \"Input.Null.ReturnsFalse\") or PascalCase."
-                            );
-                        }
+                        violations.Add(
+                            $"{relativePath}:{lineNumber}: SetName(\"{setNameValue}\") contains underscores. "
+                                + "Use dot notation (e.g., \"Input.Null.ReturnsFalse\") or PascalCase."
+                        );
                     }
                 }
-            );
+            });
 
             Assert.IsEmpty(
                 violations,
@@ -477,43 +469,40 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 }
             );
 
-            string scannedRoot = ScanTestFiles(
-                packagePath,
-                (relativePath, lineNumber, line) =>
+            string scannedRoot = ScanTestFiles(packagePath, (relativePath, lineNumber, line) =>
+            {
+                for (
+                    Match match = TestNameAttributePattern.Match(line);
+                    match.Success;
+                    match = match.NextMatch()
+                )
                 {
-                    for (
-                        Match match = TestNameAttributePattern.Match(line);
-                        match.Success;
-                        match = match.NextMatch()
-                    )
+                    string testName = match.Groups[1].Value;
+                    if (testName.Contains('_'))
                     {
-                        string testName = match.Groups[1].Value;
-                        if (testName.Contains('_'))
-                        {
-                            violations.AppendLine(
-                                $"  - {relativePath}:{lineNumber}: TestName=\"{testName}\""
-                            );
-                            ++violationCount;
-                        }
-                    }
-
-                    for (
-                        Match match = SetNameMethodPattern.Match(line);
-                        match.Success;
-                        match = match.NextMatch()
-                    )
-                    {
-                        string setNameValue = match.Groups[1].Value;
-                        if (setNameValue.Contains('_'))
-                        {
-                            violations.AppendLine(
-                                $"  - {relativePath}:{lineNumber}: SetName(\"{setNameValue}\")"
-                            );
-                            ++violationCount;
-                        }
+                        violations.AppendLine(
+                            $"  - {relativePath}:{lineNumber}: TestName=\"{testName}\""
+                        );
+                        ++violationCount;
                     }
                 }
-            );
+
+                for (
+                    Match match = SetNameMethodPattern.Match(line);
+                    match.Success;
+                    match = match.NextMatch()
+                )
+                {
+                    string setNameValue = match.Groups[1].Value;
+                    if (setNameValue.Contains('_'))
+                    {
+                        violations.AppendLine(
+                            $"  - {relativePath}:{lineNumber}: SetName(\"{setNameValue}\")"
+                        );
+                        ++violationCount;
+                    }
+                }
+            });
 
             Assert.IsTrue(
                 0 < scannedAssemblies.Count,

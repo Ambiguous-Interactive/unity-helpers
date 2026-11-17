@@ -119,6 +119,13 @@ else
     fail ".devcontainer/Dockerfile exists" "Missing .devcontainer/Dockerfile"
 fi
 
+if grep -Eq '^[[:space:]]*ARG[[:space:]]+TARGETARCH[[:space:]]*$' "$DOCKERFILE" \
+    && ! grep -Eq '^[[:space:]]*ARG[[:space:]]+TARGETARCH=' "$DOCKERFILE"; then
+    pass "Dockerfile inherits the BuildKit target architecture"
+else
+    fail "Dockerfile inherits the BuildKit target architecture" "A TARGETARCH default can select x64 assets for arm64 images."
+fi
+
 assert_file_contains_literal "$DOCKERFILE" \
     'POWERSHELL_VERSION=' \
     "Dockerfile defines POWERSHELL_VERSION for release URL validation" \
@@ -210,6 +217,12 @@ if validator_sdk_output="$("$VALIDATOR" --list-tools --dockerfile .devcontainer/
     pass "validator resolves .NET SDK archive URLs for both architectures"
 else
     fail "validator resolves .NET SDK archive URLs for both architectures" "$validator_sdk_output"
+fi
+
+if grep -Fq 'csharpier_sdk|10.0.403|x64|arm64|https://builds.dotnet.microsoft.com/dotnet/Sdk/{VERSION}/dotnet-sdk-{VERSION}-linux-{ARCH}.tar.gz' <<< "$validator_sdk_output"; then
+    pass "validator resolves the .NET SDK needed by CSharpier for both architectures"
+else
+    fail "validator resolves the .NET SDK needed by CSharpier for both architectures" "$validator_sdk_output"
 fi
 
 manifest_csharpier_version="$(node -e 'const fs = require("node:fs"); process.stdout.write(JSON.parse(fs.readFileSync(process.argv[1], "utf8")).tools.CSharpier.version);' "$REPO_ROOT/.config/dotnet-tools.json")"

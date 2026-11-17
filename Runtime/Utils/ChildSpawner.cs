@@ -148,8 +148,8 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             GameObject[] prefabs = _prefabs ?? Array.Empty<GameObject>();
             GameObject[] editorOnlyPrefabs = _editorOnlyPrefabs ?? Array.Empty<GameObject>();
-            GameObject[] developmentOnlyPrefabs =
-                _developmentOnlyPrefabs ?? Array.Empty<GameObject>();
+            GameObject[] developmentOnlyPrefabs = _developmentOnlyPrefabs
+                ?? Array.Empty<GameObject>();
 
             int totalCount =
                 prefabs.Length + editorOnlyPrefabs.Length + developmentOnlyPrefabs.Length;

@@ -283,16 +283,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             RecordingEffectBehavior recording = Track(
                 ScriptableObject.CreateInstance<RecordingEffectBehavior>()
             );
-            AttributeEffect effect = CreateEffect(
-                "TickSelfRemoval",
-                e =>
-                {
-                    e.durationType = ModifierDurationType.Infinite;
-                    e.behaviors.Add(reentrant);
-                    e.behaviors.Add(recording);
-                    e.behaviors.Add(recording);
-                }
-            );
+            AttributeEffect effect = CreateEffect("TickSelfRemoval", e =>
+            {
+                e.durationType = ModifierDurationType.Infinite;
+                e.behaviors.Add(reentrant);
+                e.behaviors.Add(recording);
+                e.behaviors.Add(recording);
+            });
 
             EffectHandle handle = handler.ApplyEffect(effect).Value;
             ReentrantEffectBehavior.TickHook = context =>
@@ -427,17 +424,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             RecordingEffectBehavior recording = Track(
                 ScriptableObject.CreateInstance<RecordingEffectBehavior>()
             );
-            AttributeEffect effect = CreateEffect(
-                "PeriodicSelfRemoval",
-                e =>
-                {
-                    e.durationType = ModifierDurationType.Infinite;
-                    e.periodicEffects.Add(new PeriodicEffectDefinition { interval = 0.05f });
-                    e.periodicEffects.Add(new PeriodicEffectDefinition { interval = 0.05f });
-                    e.behaviors.Add(reentrant);
-                    e.behaviors.Add(recording);
-                }
-            );
+            AttributeEffect effect = CreateEffect("PeriodicSelfRemoval", e =>
+            {
+                e.durationType = ModifierDurationType.Infinite;
+                e.periodicEffects.Add(new PeriodicEffectDefinition { interval = 0.05f });
+                e.periodicEffects.Add(new PeriodicEffectDefinition { interval = 0.05f });
+                e.behaviors.Add(reentrant);
+                e.behaviors.Add(recording);
+            });
 
             EffectHandle handle = handler.ApplyEffect(effect, currentTime: 600f).Value;
             ReentrantEffectBehavior.PeriodicTickHook = (context, _) =>
@@ -532,14 +526,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 SecondaryTag,
                 requiresInstance: false
             );
-            AttributeEffect survivor = CreateEffect(
-                "Survivor",
-                e =>
-                {
-                    e.durationType = ModifierDurationType.Infinite;
-                    e.effectTags.Add(nameof(survivor));
-                }
-            );
+            AttributeEffect survivor = CreateEffect("Survivor", e =>
+            {
+                e.durationType = ModifierDurationType.Infinite;
+                e.effectTags.Add(nameof(survivor));
+            });
 
             _ = handler.ApplyEffect(first).Value;
             _ = handler.ApplyEffect(second).Value;
@@ -781,15 +772,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             first.requireInstance = requiresInstance;
             RecordingCosmeticComponent second = template.AddComponent<RecordingCosmeticComponent>();
             second.requireInstance = false;
-            AttributeEffect effect = CreateEffect(
-                "CosmeticSelfRemoval",
-                e =>
-                {
-                    e.durationType = ModifierDurationType.Infinite;
-                    e.effectTags.Add(LifecycleTag);
-                    e.cosmeticEffects.Add(template.GetComponent<CosmeticEffectData>());
-                }
-            );
+            AttributeEffect effect = CreateEffect("CosmeticSelfRemoval", e =>
+            {
+                e.durationType = ModifierDurationType.Infinite;
+                e.effectTags.Add(LifecycleTag);
+                e.cosmeticEffects.Add(template.GetComponent<CosmeticEffectData>());
+            });
 
             ReentrantCosmeticComponent.ApplyHook = _ => handler.RemoveAllEffects();
 
@@ -819,21 +807,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             ) = CreateEntity();
             yield return null;
 
-            AttributeEffect replaced = CreateEffect(
-                "Replaced",
-                e =>
-                {
-                    e.durationType = ModifierDurationType.Infinite;
-                    e.stackingMode = EffectStackingMode.Replace;
-                }
-            );
-            AttributeEffect bystander = CreateEffect(
-                "Bystander",
-                e =>
-                {
-                    e.durationType = ModifierDurationType.Infinite;
-                }
-            );
+            AttributeEffect replaced = CreateEffect("Replaced", e =>
+            {
+                e.durationType = ModifierDurationType.Infinite;
+                e.stackingMode = EffectStackingMode.Replace;
+            });
+            AttributeEffect bystander = CreateEffect("Bystander", e =>
+            {
+                e.durationType = ModifierDurationType.Infinite;
+            });
 
             EffectHandle first = handler.ApplyEffect(replaced).Value;
 
@@ -884,15 +866,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             ) = CreateEntity();
             yield return null;
 
-            AttributeEffect effect = CreateEffect(
-                "Capped",
-                e =>
-                {
-                    e.durationType = ModifierDurationType.Infinite;
-                    e.stackingMode = EffectStackingMode.Stack;
-                    e.maximumStacks = 2;
-                }
-            );
+            AttributeEffect effect = CreateEffect("Capped", e =>
+            {
+                e.durationType = ModifierDurationType.Infinite;
+                e.stackingMode = EffectStackingMode.Stack;
+                e.maximumStacks = 2;
+            });
 
             EffectHandle first = handler.ApplyEffect(effect).Value;
             EffectHandle second = handler.ApplyEffect(effect).Value;
@@ -945,14 +924,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                     e.duration = 0f;
                 }
             );
-            AttributeEffect survivor = CreateEffect(
-                "ExpirySurvivor",
-                e =>
-                {
-                    e.durationType = ModifierDurationType.Infinite;
-                    e.effectTags.Add(SecondaryTag);
-                }
-            );
+            AttributeEffect survivor = CreateEffect("ExpirySurvivor", e =>
+            {
+                e.durationType = ModifierDurationType.Infinite;
+                e.effectTags.Add(SecondaryTag);
+            });
 
             bool applied = false;
             bool observedActive = true;
@@ -1019,13 +995,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 TertiaryTag,
                 requiresInstance: false
             );
-            AttributeEffect survivor = CreateEffect(
-                "NestedSurvivor",
-                e =>
-                {
-                    e.durationType = ModifierDurationType.Infinite;
-                }
-            );
+            AttributeEffect survivor = CreateEffect("NestedSurvivor", e =>
+            {
+                e.durationType = ModifierDurationType.Infinite;
+            });
 
             EffectHandle outerHandle = handler.ApplyEffect(outer).Value;
             EffectHandle middleHandle = handler.ApplyEffect(middle).Value;
@@ -1127,15 +1100,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             RecordingEffectBehavior recording = Track(
                 ScriptableObject.CreateInstance<RecordingEffectBehavior>()
             );
-            AttributeEffect effect = CreateEffect(
-                "TickDestroysHandler",
-                e =>
-                {
-                    e.durationType = ModifierDurationType.Infinite;
-                    e.behaviors.Add(reentrant);
-                    e.behaviors.Add(recording);
-                }
-            );
+            AttributeEffect effect = CreateEffect("TickDestroysHandler", e =>
+            {
+                e.durationType = ModifierDurationType.Infinite;
+                e.behaviors.Add(reentrant);
+                e.behaviors.Add(recording);
+            });
 
             _ = handler.ApplyEffect(effect).Value;
             ReentrantEffectBehavior.TickHook = context =>
@@ -1187,23 +1157,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             doomed.requireInstance = requiresInstance;
             doomed.destroysDuringRemoval = destroysDuringRemoval;
 
-            AttributeEffect effect = CreateEffect(
-                "SiblingDestroyingEffect",
-                e =>
-                {
-                    e.durationType = durationType;
-                    e.effectTags.Add(LifecycleTag);
-                    e.modifications.Add(
-                        new AttributeModification
-                        {
-                            attribute = nameof(TestAttributesComponent.health),
-                            action = ModificationAction.Addition,
-                            value = -30f,
-                        }
-                    );
-                    e.cosmeticEffects.Add(template.GetComponent<CosmeticEffectData>());
-                }
-            );
+            AttributeEffect effect = CreateEffect("SiblingDestroyingEffect", e =>
+            {
+                e.durationType = durationType;
+                e.effectTags.Add(LifecycleTag);
+                e.modifications.Add(
+                    new AttributeModification
+                    {
+                        attribute = nameof(TestAttributesComponent.health),
+                        action = ModificationAction.Addition,
+                        value = -30f,
+                    }
+                );
+                e.cosmeticEffects.Add(template.GetComponent<CosmeticEffectData>());
+            });
 
             EffectHandle? handle = handler.ApplyEffect(effect);
 
@@ -1240,29 +1207,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             (_, EffectHandler handler, TestAttributesComponent attributes, _) = CreateEntity();
             yield return null;
 
-            AttributeEffect effect = CreateEffect(
-                "TwoModifications",
-                e =>
-                {
-                    e.durationType = ModifierDurationType.Infinite;
-                    e.modifications.Add(
-                        new AttributeModification
-                        {
-                            attribute = nameof(TestAttributesComponent.health),
-                            action = ModificationAction.Addition,
-                            value = 5f,
-                        }
-                    );
-                    e.modifications.Add(
-                        new AttributeModification
-                        {
-                            attribute = nameof(TestAttributesComponent.armor),
-                            action = ModificationAction.Addition,
-                            value = 7f,
-                        }
-                    );
-                }
-            );
+            AttributeEffect effect = CreateEffect("TwoModifications", e =>
+            {
+                e.durationType = ModifierDurationType.Infinite;
+                e.modifications.Add(
+                    new AttributeModification
+                    {
+                        attribute = nameof(TestAttributesComponent.health),
+                        action = ModificationAction.Addition,
+                        value = 5f,
+                    }
+                );
+                e.modifications.Add(
+                    new AttributeModification
+                    {
+                        attribute = nameof(TestAttributesComponent.armor),
+                        action = ModificationAction.Addition,
+                        value = 7f,
+                    }
+                );
+            });
 
             float baselineArmor = attributes.armor.CurrentValue;
 
@@ -1333,15 +1297,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             (_, EffectHandler handler, _, TagHandler tags) = CreateEntity();
             yield return null;
 
-            AttributeEffect effect = CreateEffect(
-                "TwoTags",
-                e =>
-                {
-                    e.durationType = ModifierDurationType.Infinite;
-                    e.effectTags.Add(LifecycleTag);
-                    e.effectTags.Add(SecondaryTag);
-                }
-            );
+            AttributeEffect effect = CreateEffect("TwoTags", e =>
+            {
+                e.durationType = ModifierDurationType.Infinite;
+                e.effectTags.Add(LifecycleTag);
+                e.effectTags.Add(SecondaryTag);
+            });
 
             bool torn = false;
             tags.OnTagAdded += tag =>
@@ -1383,23 +1344,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             (_, EffectHandler handler, _, TagHandler tags) = CreateEntity();
             yield return null;
 
-            AttributeEffect owner = CreateEffect(
-                "TagOwner",
-                e =>
-                {
-                    e.durationType = ModifierDurationType.Infinite;
-                    e.effectTags.Add(SecondaryTag);
-                }
-            );
-            AttributeEffect thrower = CreateEffect(
-                "TagThrower",
-                e =>
-                {
-                    e.durationType = ModifierDurationType.Infinite;
-                    e.effectTags.Add(LifecycleTag);
-                    e.effectTags.Add(SecondaryTag);
-                }
-            );
+            AttributeEffect owner = CreateEffect("TagOwner", e =>
+            {
+                e.durationType = ModifierDurationType.Infinite;
+                e.effectTags.Add(SecondaryTag);
+            });
+            AttributeEffect thrower = CreateEffect("TagThrower", e =>
+            {
+                e.durationType = ModifierDurationType.Infinite;
+                e.effectTags.Add(LifecycleTag);
+                e.effectTags.Add(SecondaryTag);
+            });
 
             EffectHandle? ownerHandle = handler.ApplyEffect(owner);
             yield return null;
@@ -1456,15 +1411,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             recording.requireInstance = false;
             CosmeticEffectData cosmetic = template.GetComponent<CosmeticEffectData>();
 
-            AttributeEffect effect = CreateEffect(
-                "RefreshedCosmetic",
-                e =>
-                {
-                    e.durationType = ModifierDurationType.Infinite;
-                    e.stackingMode = EffectStackingMode.Refresh;
-                    e.cosmeticEffects.Add(cosmetic);
-                }
-            );
+            AttributeEffect effect = CreateEffect("RefreshedCosmetic", e =>
+            {
+                e.durationType = ModifierDurationType.Infinite;
+                e.stackingMode = EffectStackingMode.Refresh;
+                e.cosmeticEffects.Add(cosmetic);
+            });
 
             EffectHandle? first = handler.ApplyEffect(effect);
             yield return null;
@@ -1503,25 +1455,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             ReentrantEffectBehavior behavior = Track(
                 ScriptableObject.CreateInstance<ReentrantEffectBehavior>()
             );
-            return CreateEffect(
-                name,
-                e =>
-                {
-                    e.durationType = ModifierDurationType.Infinite;
-                    e.effectTags.Add(effectTag);
-                    e.modifications.Add(
-                        new AttributeModification
-                        {
-                            attribute = nameof(TestAttributesComponent.health),
-                            action = ModificationAction.Addition,
-                            value = 5f,
-                        }
-                    );
-                    e.cosmeticEffects.Add(cosmetic);
-                    e.behaviors.Add(behavior);
-                    configure?.Invoke(e);
-                }
-            );
+            return CreateEffect(name, e =>
+            {
+                e.durationType = ModifierDurationType.Infinite;
+                e.effectTags.Add(effectTag);
+                e.modifications.Add(
+                    new AttributeModification
+                    {
+                        attribute = nameof(TestAttributesComponent.health),
+                        action = ModificationAction.Addition,
+                        value = 5f,
+                    }
+                );
+                e.cosmeticEffects.Add(cosmetic);
+                e.behaviors.Add(behavior);
+                configure?.Invoke(e);
+            });
         }
 
         private CosmeticEffectData CreateReentrantCosmetic(string name, bool requiresInstance)

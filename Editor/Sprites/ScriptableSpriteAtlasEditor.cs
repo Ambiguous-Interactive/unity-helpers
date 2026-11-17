@@ -223,10 +223,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         internal SerializedObject GetSerializedConfig(ScriptableSpriteAtlas config)
         {
-            return _serializedConfigs.GetOrAdd(
-                config,
-                static newConfig => new SerializedObject(newConfig)
-            );
+            return _serializedConfigs.GetOrAdd(config, static newConfig => new SerializedObject(
+                newConfig
+            ));
         }
 
         internal void LoadAtlasConfigs()

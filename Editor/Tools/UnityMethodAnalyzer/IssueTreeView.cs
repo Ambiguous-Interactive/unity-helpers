@@ -286,24 +286,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
 
                 if (!string.IsNullOrWhiteSpace(filePath))
                 {
-                    menu.AddItem(
-                        new GUIContent("Open File"),
-                        false,
-                        () =>
+                    menu.AddItem(new GUIContent("Open File"), false, () =>
+                    {
+                        int lineNumber = issueItem.LineNumber;
+                        if (issue != null)
                         {
-                            int lineNumber = issueItem.LineNumber;
-                            if (issue != null)
-                            {
-                                lineNumber = issue.LineNumber;
-                            }
-
-                            OnOpenFile?.Invoke(filePath, lineNumber);
+                            lineNumber = issue.LineNumber;
                         }
-                    );
-                    menu.AddItem(
-                        new GUIContent("Reveal in File Browser"),
-                        false,
-                        () => OnRevealInExplorer?.Invoke(filePath)
+
+                        OnOpenFile?.Invoke(filePath, lineNumber);
+                    });
+                    menu.AddItem(new GUIContent("Reveal in File Browser"), false, () =>
+                        OnRevealInExplorer?.Invoke(filePath)
                     );
                 }
 
@@ -314,28 +308,20 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                         menu.AddSeparator("");
                     }
 
-                    menu.AddItem(
-                        new GUIContent("Copy Issue as JSON"),
-                        false,
-                        () => OnCopyIssueAsJson?.Invoke(issue)
+                    menu.AddItem(new GUIContent("Copy Issue as JSON"), false, () =>
+                        OnCopyIssueAsJson?.Invoke(issue)
                     );
-                    menu.AddItem(
-                        new GUIContent("Copy Issue as Markdown"),
-                        false,
-                        () => OnCopyIssueAsMarkdown?.Invoke(issue)
+                    menu.AddItem(new GUIContent("Copy Issue as Markdown"), false, () =>
+                        OnCopyIssueAsMarkdown?.Invoke(issue)
                     );
                 }
 
                 menu.AddSeparator("");
-                menu.AddItem(
-                    new GUIContent("Copy All Issues as JSON"),
-                    false,
-                    () => OnCopyAllAsJson?.Invoke()
+                menu.AddItem(new GUIContent("Copy All Issues as JSON"), false, () =>
+                    OnCopyAllAsJson?.Invoke()
                 );
-                menu.AddItem(
-                    new GUIContent("Copy All Issues as Markdown"),
-                    false,
-                    () => OnCopyAllAsMarkdown?.Invoke()
+                menu.AddItem(new GUIContent("Copy All Issues as Markdown"), false, () =>
+                    OnCopyAllAsMarkdown?.Invoke()
                 );
 
                 menu.ShowAsContext();

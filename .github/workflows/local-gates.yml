@@ -162,6 +162,24 @@ jobs:
           set -euo pipefail
           timeout 2m uv run --project scripts/python~ --locked --no-dev --group proof python scripts/random-quality/verify-bounded-sampling.py
 
+      - name: Setup .NET for CSharpier
+        id: formatter-dotnet
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/unity-helpers-dotnet
+        with:
+          dotnet-version: "10.0.403"
+
+      - name: Require the installed CSharpier SDK
+        shell: bash
+        env:
+          EXPECTED_DOTNET_SDK: ${{ steps.formatter-dotnet.outputs.dotnet-version }}
+        run: |
+          set -euo pipefail
+          selected_sdk="$(dotnet --version)"
+          printf 'Selected CSharpier SDK: %s\n' "$selected_sdk"
+          test "$selected_sdk" = "${EXPECTED_DOTNET_SDK:?Missing installed CSharpier SDK version}"
+
       # The pre-commit integration suite drives scripts/format-staged-csharp.ps1, which shells out to
       # CSharpier. Without the restore it would exercise a missing tool rather than the binding.
       - name: Restore .NET tools

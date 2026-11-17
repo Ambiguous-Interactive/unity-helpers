@@ -208,8 +208,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             if (currentValue is SerializableType serializableType)
             {
-                currentAssemblyQualifiedName =
-                    serializableType.AssemblyQualifiedName ?? string.Empty;
+                currentAssemblyQualifiedName = serializableType.AssemblyQualifiedName
+                    ?? string.Empty;
             }
 
             int currentIndex = Array.IndexOf(options, currentAssemblyQualifiedName);
@@ -296,10 +296,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             {
                 int capturedIndex = i;
                 bool isSelected = i == currentIndex && !hasMultipleDifferentValues;
-                menu.AddItem(
-                    new GUIContent(displayOptions[i]),
-                    isSelected,
-                    () => applySelection(options[capturedIndex])
+                menu.AddItem(new GUIContent(displayOptions[i]), isSelected, () =>
+                    applySelection(options[capturedIndex])
                 );
             }
             menu.DropDown(buttonRect);

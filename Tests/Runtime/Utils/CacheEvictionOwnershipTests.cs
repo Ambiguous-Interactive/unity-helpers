@@ -35,9 +35,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public void ABoundEvictionReleasesTheLeastRecentlyUsedEntry()
         {
             List<KeyValuePair<string, string>> released = new();
-            using Cache<string, string> cache = CreateCache<string, string>(
-                3,
-                (key, value) => released.Add(new KeyValuePair<string, string>(key, value))
+            using Cache<string, string> cache = CreateCache<string, string>(3, (key, value) =>
+                released.Add(new KeyValuePair<string, string>(key, value))
             );
             cache.Set("a", "valueA");
             cache.Set("b", "valueB");
@@ -58,9 +57,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         {
             Cache<string, string> cache = null;
             List<bool> insertVisible = new();
-            cache = CreateCache<string, string>(
-                2,
-                (_, _) => insertVisible.Add(cache.ContainsKey("c"))
+            cache = CreateCache<string, string>(2, (_, _) =>
+                insertVisible.Add(cache.ContainsKey("c"))
             );
             using (cache)
             {
@@ -77,9 +75,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public void ReplacingAValueReleasesTheOneItReplaced()
         {
             List<string> released = new();
-            using Cache<string, string> cache = CreateCache<string, string>(
-                8,
-                (_, value) => released.Add(value)
+            using Cache<string, string> cache = CreateCache<string, string>(8, (_, value) =>
+                released.Add(value)
             );
             cache.Set("a", "first");
             cache.Set("a", "second");
@@ -129,9 +126,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public void ReplacingAnEqualValueTypeReleasesNothing()
         {
             List<int> released = new();
-            using Cache<string, int> cache = CreateCache<string, int>(
-                8,
-                (_, value) => released.Add(value)
+            using Cache<string, int> cache = CreateCache<string, int>(8, (_, value) =>
+                released.Add(value)
             );
             cache.Set("a", 42);
             cache.Set("a", 42);
@@ -145,9 +141,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public void ClearReleasesEveryEntry()
         {
             List<string> released = new();
-            using Cache<string, string> cache = CreateCache<string, string>(
-                8,
-                (_, value) => released.Add(value)
+            using Cache<string, string> cache = CreateCache<string, string>(8, (_, value) =>
+                released.Add(value)
             );
             cache.Set("a", "valueA");
             cache.Set("b", "valueB");
@@ -163,9 +158,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public void TryRemoveReleasesNothing()
         {
             List<string> released = new();
-            using Cache<string, string> cache = CreateCache<string, string>(
-                8,
-                (_, value) => released.Add(value)
+            using Cache<string, string> cache = CreateCache<string, string>(8, (_, value) =>
+                released.Add(value)
             );
             cache.Set("a", "valueA");
             Assert.IsTrue(cache.TryRemove("a", out string removed));
@@ -240,28 +234,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             EqualResource firstCreated = null;
             EqualResource secondCreated = null;
 
-            Task<EqualResource> first = Task.Run(() =>
-                cache.GetOrAdd(
-                    "key",
-                    _ =>
-                    {
-                        barrier.SignalAndWait();
-                        firstCreated = new EqualResource("first");
-                        return firstCreated;
-                    }
-                )
-            );
-            Task<EqualResource> second = Task.Run(() =>
-                cache.GetOrAdd(
-                    "key",
-                    _ =>
-                    {
-                        barrier.SignalAndWait();
-                        secondCreated = new EqualResource("second");
-                        return secondCreated;
-                    }
-                )
-            );
+            Task<EqualResource> first = Task.Run(() => cache.GetOrAdd("key", _ =>
+                {
+                    barrier.SignalAndWait();
+                    firstCreated = new EqualResource("first");
+                    return firstCreated;
+                }));
+            Task<EqualResource> second = Task.Run(() => cache.GetOrAdd("key", _ =>
+                {
+                    barrier.SignalAndWait();
+                    secondCreated = new EqualResource("second");
+                    return secondCreated;
+                }));
 
             Assert.IsTrue(Task.WaitAll(new Task[] { first, second }, TimeSpan.FromSeconds(5)));
             Assert.AreSame(first.Result, second.Result);
@@ -277,22 +261,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public void GetOrAddFactoryCanDisposeCacheAndReleasesItsUnstoredResult()
         {
             List<string> released = new();
-            Cache<string, string> cache = CreateCache<string, string>(
-                8,
-                (_, value) => released.Add(value)
+            Cache<string, string> cache = CreateCache<string, string>(8, (_, value) =>
+                released.Add(value)
             );
 
             string result = null;
-            Assert.DoesNotThrow(() =>
-                result = cache.GetOrAdd(
-                    "key",
-                    _ =>
-                    {
-                        cache.Dispose();
-                        return "created";
-                    }
-                )
-            );
+            Assert.DoesNotThrow(() => result = cache.GetOrAdd("key", _ =>
+                {
+                    cache.Dispose();
+                    return "created";
+                }));
 
             Assert.IsTrue(result == null);
             Assert.AreEqual(new[] { "created" }, released);

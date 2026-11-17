@@ -199,26 +199,22 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 {
                     int capturedIndex = i;
                     bool isSelected = i == currentIndex && !property.hasMultipleDifferentValues;
-                    menu.AddItem(
-                        new GUIContent(displayLabels[i]),
-                        isSelected,
-                        () =>
+                    menu.AddItem(new GUIContent(displayLabels[i]), isSelected, () =>
+                    {
+                        serializedObject.Update();
+                        SerializedProperty prop = serializedObject.FindProperty(propertyPath);
+                        if (prop == null)
                         {
-                            serializedObject.Update();
-                            SerializedProperty prop = serializedObject.FindProperty(propertyPath);
-                            if (prop == null)
-                            {
-                                return;
-                            }
-
-                            Undo.RecordObjects(
-                                serializedObject.targetObjects,
-                                "Change StringInList Selection"
-                            );
-                            ApplySelection(prop, options, capturedIndex);
-                            serializedObject.ApplyModifiedProperties();
+                            return;
                         }
-                    );
+
+                        Undo.RecordObjects(
+                            serializedObject.targetObjects,
+                            "Change StringInList Selection"
+                        );
+                        ApplySelection(prop, options, capturedIndex);
+                        serializedObject.ApplyModifiedProperties();
+                    });
                 }
                 menu.DropDown(fieldRect);
             }
@@ -459,8 +455,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     GetSerializableTypeStringProperty(property);
                 if (assemblyQualifiedNameProperty != null)
                 {
-                    assemblyQualifiedNameProperty.stringValue =
-                        options[optionIndex] ?? string.Empty;
+                    assemblyQualifiedNameProperty.stringValue = options[optionIndex]
+                        ?? string.Empty;
                 }
             }
         }
@@ -764,8 +760,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                         GetSerializableTypeStringProperty(property);
                     if (assemblyQualifiedNameProperty != null)
                     {
-                        string selectionValue =
-                            assemblyQualifiedNameProperty.stringValue ?? string.Empty;
+                        string selectionValue = assemblyQualifiedNameProperty.stringValue
+                            ?? string.Empty;
                         return Array.IndexOf(_options, selectionValue);
                     }
                 }

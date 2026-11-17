@@ -745,14 +745,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             try
             {
-                Parallel.For(
-                    0,
-                    100,
-                    _ =>
-                    {
-                        GlobalPoolRegistry.EnforceBudget();
-                    }
-                );
+                Parallel.For(0, 100, _ =>
+                {
+                    GlobalPoolRegistry.EnforceBudget();
+                });
 
                 foreach (WallstopGenericPool<TestPoolItem> pool in pools)
                 {
@@ -834,18 +830,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             List<WallstopGenericPool<TestPoolItem>> pools = new();
             object poolsLock = new();
 
-            Parallel.For(
-                0,
-                100,
-                _ =>
+            Parallel.For(0, 100, _ =>
+            {
+                WallstopGenericPool<TestPoolItem> pool = CreateTestPool();
+                lock (poolsLock)
                 {
-                    WallstopGenericPool<TestPoolItem> pool = CreateTestPool();
-                    lock (poolsLock)
-                    {
-                        pools.Add(pool);
-                    }
+                    pools.Add(pool);
                 }
-            );
+            });
 
             Assert.AreEqual(100, GlobalPoolRegistry.RegisteredCount);
 

@@ -134,24 +134,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             laterRenderer.enabled = false;
             addedRenderer.enabled = false;
 
-            root.transform.EnableRendererRecursively<SpriteRenderer>(
-                true,
-                renderer =>
+            root.transform.EnableRendererRecursively<SpriteRenderer>(true, renderer =>
+            {
+                if (renderer == firstRenderer)
                 {
-                    if (renderer == firstRenderer)
+                    if (addSibling)
                     {
-                        if (addSibling)
-                        {
-                            added.transform.SetParent(root.transform);
-                        }
-                        else
-                        {
-                            later.transform.SetParent(null);
-                        }
+                        added.transform.SetParent(root.transform);
                     }
-                    return false;
+                    else
+                    {
+                        later.transform.SetParent(null);
+                    }
                 }
-            );
+                return false;
+            });
 
             Assert.That(firstRenderer.enabled, Is.True);
             Assert.That(root.transform.childCount, Is.EqualTo(addSibling ? 3 : 1));
@@ -205,9 +202,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsTrue(three.GetComponent<CircleCollider2D>().enabled);
             Assert.IsTrue(four.GetComponent<CircleCollider2D>().enabled);
 
-            two.transform.EnableRendererRecursively<SpriteRenderer>(
-                false,
-                renderer => renderer.gameObject == three
+            two.transform.EnableRendererRecursively<SpriteRenderer>(false, renderer =>
+                renderer.gameObject == three
             );
 
             Assert.IsTrue(one.GetComponent<SpriteRenderer>().enabled);
@@ -220,9 +216,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsTrue(three.GetComponent<CircleCollider2D>().enabled);
             Assert.IsTrue(four.GetComponent<CircleCollider2D>().enabled);
 
-            one.transform.EnableRendererRecursively<SpriteRenderer>(
-                true,
-                renderer => renderer.gameObject == four
+            one.transform.EnableRendererRecursively<SpriteRenderer>(true, renderer =>
+                renderer.gameObject == four
             );
 
             Assert.IsTrue(one.GetComponent<SpriteRenderer>().enabled);
@@ -291,9 +286,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsTrue(three.GetComponent<CircleCollider2D>().enabled);
             Assert.IsTrue(four.GetComponent<CircleCollider2D>().enabled);
 
-            two.transform.EnableRecursively<CircleCollider2D>(
-                false,
-                collider => collider.gameObject == three
+            two.transform.EnableRecursively<CircleCollider2D>(false, collider =>
+                collider.gameObject == three
             );
 
             Assert.IsTrue(one.GetComponent<SpriteRenderer>().enabled);
@@ -306,9 +300,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsTrue(three.GetComponent<CircleCollider2D>().enabled);
             Assert.IsFalse(four.GetComponent<CircleCollider2D>().enabled);
 
-            one.transform.EnableRecursively<CircleCollider2D>(
-                true,
-                collider => collider.gameObject == four
+            one.transform.EnableRecursively<CircleCollider2D>(true, collider =>
+                collider.gameObject == four
             );
 
             Assert.IsTrue(one.GetComponent<SpriteRenderer>().enabled);

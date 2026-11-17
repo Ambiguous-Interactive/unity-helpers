@@ -156,43 +156,40 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 }
                 ReloadSuppressions();
                 RefreshSettings();
-                Say(
-                    suppress ? "Issue suppressed." : "Suppression restored.",
-                    () =>
+                Say(suppress ? "Issue suppressed." : "Suppression restored.", () =>
+                {
+                    try
                     {
-                        try
-                        {
-                            if (
-                                !DurableFile.TryCompareThenReplaceAllText(
-                                    DefaultSuppressionsPath,
-                                    true,
-                                    updated,
-                                    previous,
-                                    out bool undone,
-                                    out Exception undoError
-                                )
+                        if (
+                            !DurableFile.TryCompareThenReplaceAllText(
+                                DefaultSuppressionsPath,
+                                true,
+                                updated,
+                                previous,
+                                out bool undone,
+                                out Exception undoError
                             )
-                            {
-                                Say("Could not undo suppression: " + undoError.Message);
-                                return;
-                            }
-                            if (!undone)
-                            {
-                                Say(
-                                    "The suppression file changed since this action. Reload it before editing again."
-                                );
-                                return;
-                            }
-                            ReloadSuppressions();
-                            RefreshSettings();
-                            Say("Suppression change undone.");
-                        }
-                        catch (Exception thrown)
+                        )
                         {
-                            Say("Could not undo suppression: " + thrown.Message);
+                            Say("Could not undo suppression: " + undoError.Message);
+                            return;
                         }
+                        if (!undone)
+                        {
+                            Say(
+                                "The suppression file changed since this action. Reload it before editing again."
+                            );
+                            return;
+                        }
+                        ReloadSuppressions();
+                        RefreshSettings();
+                        Say("Suppression change undone.");
                     }
-                );
+                    catch (Exception thrown)
+                    {
+                        Say("Could not undo suppression: " + thrown.Message);
+                    }
+                });
             }
             catch (Exception thrown)
             {

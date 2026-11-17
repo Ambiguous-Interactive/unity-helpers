@@ -124,16 +124,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             ("organPipe", static (index, size) => index < size / 2 ? index : size - index),
             ("sawtooth", static (index, _) => index % 8),
             ("duplicateHeavy", static (index, _) => (index * 7) % 3),
-            (
-                "extremes",
-                static (index, _) =>
-                    index % 3 == 0 ? int.MinValue
-                    : index % 3 == 1 ? int.MaxValue
-                    : 0
-            ),
-            (
-                "adversarialPivot",
-                static (index, size) => index % 2 == 0 ? index / 2 : size - 1 - (index / 2)
+            ("extremes", static (index, _) => index % 3 == 0 ? int.MinValue
+                : index % 3 == 1 ? int.MaxValue
+                : 0),
+            ("adversarialPivot", static (index, size) =>
+                index % 2 == 0 ? index / 2 : size - 1 - (index / 2)
             ),
             ("plateauThenDescent", static (index, size) => index < size / 2 ? 0 : size - index),
             ("nearlySorted", static (index, _) => index % 16 == 0 ? index + 5 : index),

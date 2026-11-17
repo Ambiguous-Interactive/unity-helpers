@@ -2765,8 +2765,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
             Assert.That(refreshedList.count, Is.EqualTo(1));
 
-            float resolvedHeight =
-                refreshedList.elementHeightCallback?.Invoke(0) ?? refreshedList.elementHeight;
+            float resolvedHeight = refreshedList.elementHeightCallback?.Invoke(0)
+                ?? refreshedList.elementHeight;
             Assert.That(
                 resolvedHeight,
                 Is.GreaterThan(0f),

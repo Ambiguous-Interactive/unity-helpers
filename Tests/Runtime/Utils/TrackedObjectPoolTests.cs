@@ -290,23 +290,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             TrackedObjectPool<Texture2D> pool = null;
             Texture2D nestedTaken = null;
             bool callbackRan = false;
-            pool = new TrackedObjectPool<Texture2D>(
-                producer: NewTexture,
-                onTake: texture =>
+            pool = new TrackedObjectPool<Texture2D>(producer: NewTexture, onTake: texture =>
+            {
+                if (callbackRan)
                 {
-                    if (callbackRan)
-                    {
-                        return;
-                    }
-                    callbackRan = true;
-                    Assert.IsTrue(pool.Release(texture));
-                    if (reacquire)
-                    {
-                        Assert.IsTrue(pool.TryTake(out nestedTaken));
-                        Assert.AreSame(texture, nestedTaken);
-                    }
+                    return;
                 }
-            );
+                callbackRan = true;
+                Assert.IsTrue(pool.Release(texture));
+                if (reacquire)
+                {
+                    Assert.IsTrue(pool.TryTake(out nestedTaken));
+                    Assert.AreSame(texture, nestedTaken);
+                }
+            });
 
             Assert.IsFalse(pool.TryTake(out Texture2D outerTaken));
             Assert.IsTrue(ReferenceEquals(outerTaken, null));
@@ -328,25 +325,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Texture2D earlierTaken = null;
             Texture2D nestedTaken = null;
             bool changeOwnership = false;
-            pool = new TrackedObjectPool<Texture2D>(
-                producer: NewTexture,
-                onTake: texture =>
+            pool = new TrackedObjectPool<Texture2D>(producer: NewTexture, onTake: texture =>
+            {
+                if (!changeOwnership)
                 {
-                    if (!changeOwnership)
-                    {
-                        return;
-                    }
-                    changeOwnership = false;
-                    if (releaseEarlierItem)
-                    {
-                        Assert.IsTrue(pool.Release(earlierTaken));
-                    }
-                    else
-                    {
-                        Assert.IsTrue(pool.TryTake(out nestedTaken));
-                    }
+                    return;
                 }
-            );
+                changeOwnership = false;
+                if (releaseEarlierItem)
+                {
+                    Assert.IsTrue(pool.Release(earlierTaken));
+                }
+                else
+                {
+                    Assert.IsTrue(pool.TryTake(out nestedTaken));
+                }
+            });
             Assert.IsTrue(pool.TryTake(out earlierTaken));
             changeOwnership = true;
 
@@ -430,18 +424,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public void DisposalContinuesAfterADestructionCallbackThrows()
         {
             int destroyCount = 0;
-            TrackedObjectPool<Texture2D> pool = new(
-                producer: NewTexture,
-                onDestroy: texture =>
+            TrackedObjectPool<Texture2D> pool = new(producer: NewTexture, onDestroy: texture =>
+            {
+                ++destroyCount;
+                if (destroyCount == 1)
                 {
-                    ++destroyCount;
-                    if (destroyCount == 1)
-                    {
-                        throw new InvalidOperationException("PoolDestroyProbe");
-                    }
-                    Object.DestroyImmediate(texture); // UNH-SUPPRESS: continued destruction after a callback failure is the subject
+                    throw new InvalidOperationException("PoolDestroyProbe");
                 }
-            );
+                Object.DestroyImmediate(texture); // UNH-SUPPRESS: continued destruction after a callback failure is the subject
+            });
             Assert.IsTrue(pool.TryTake(out Texture2D first));
             Assert.IsTrue(pool.TryTake(out Texture2D second));
             Assert.IsTrue(pool.Release(second));

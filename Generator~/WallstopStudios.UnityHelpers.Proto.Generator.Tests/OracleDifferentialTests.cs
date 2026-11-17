@@ -581,9 +581,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             // Separate fixtures avoid asking the oracle to read collection shapes it cannot deserialize.
             using (MemoryStream stream = new MemoryStream(Parse(OracleHex(value))))
             {
-                Assert.Throws(
-                    Is.InstanceOf<Exception>(),
-                    () => ProtoBuf.Serializer.Deserialize<ConstructedCollectionContract>(stream)
+                Assert.Throws(Is.InstanceOf<Exception>(), () =>
+                    ProtoBuf.Serializer.Deserialize<ConstructedCollectionContract>(stream)
                 );
             }
         }

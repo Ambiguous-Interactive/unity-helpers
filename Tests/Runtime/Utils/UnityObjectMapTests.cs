@@ -255,29 +255,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 map.GetOrAdd(key, _ => throw new InvalidOperationException())
             );
             Assert.That(map.Count, Is.Zero);
-            int result = map.GetOrAdd(
-                key,
-                item =>
-                {
-                    map.TrySet(item, 7);
-                    return 8;
-                }
-            );
+            int result = map.GetOrAdd(key, item =>
+            {
+                map.TrySet(item, 7);
+                return 8;
+            });
             Assert.That(result, Is.EqualTo(7));
             Assert.That(map.TryGetValue(key, out int stored), Is.True);
             Assert.That(stored, Is.EqualTo(7));
             map.Clear();
-            Assert.That(
-                map.GetOrAdd(
-                    key,
-                    _ =>
-                    {
-                        map.Dispose();
-                        return 9;
-                    }
-                ),
-                Is.Zero
-            );
+            Assert.That(map.GetOrAdd(key, _ =>
+                {
+                    map.Dispose();
+                    return 9;
+                }), Is.Zero);
             Assert.That(map.Count, Is.Zero);
         }
 

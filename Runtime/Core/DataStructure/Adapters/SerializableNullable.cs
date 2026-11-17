@@ -426,18 +426,14 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 
             Type[] arguments = type.GetGenericArguments();
             Type valueType = arguments[0];
-            return ConverterCache.GetOrAdd(
-                valueType,
-                static value =>
-                {
-                    Type converterType =
-                        typeof(SerializableNullableJsonConverter<>).MakeGenericType(value);
-                    Func<object> creator = ReflectionHelpers.GetParameterlessConstructor(
-                        converterType
-                    );
-                    return (JsonConverter)creator();
-                }
-            );
+            return ConverterCache.GetOrAdd(valueType, static value =>
+            {
+                Type converterType = typeof(SerializableNullableJsonConverter<>).MakeGenericType(
+                    value
+                );
+                Func<object> creator = ReflectionHelpers.GetParameterlessConstructor(converterType);
+                return (JsonConverter)creator();
+            });
         }
     }
 

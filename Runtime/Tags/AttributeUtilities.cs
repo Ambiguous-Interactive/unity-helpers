@@ -866,51 +866,48 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// </example>
         public static Dictionary<string, FieldInfo> GetAttributeFields(Type type)
         {
-            return AttributeFields.GetOrAdd(
-                type,
-                static inputType =>
+            return AttributeFields.GetOrAdd(type, static inputType =>
+            {
+                AttributeMetadataCache cache = AttributeMetadataCache.Instance;
+                if (cache != null && cache.TryGetFieldNames(inputType, out string[] fieldNames))
                 {
-                    AttributeMetadataCache cache = AttributeMetadataCache.Instance;
-                    if (cache != null && cache.TryGetFieldNames(inputType, out string[] fieldNames))
+                    Dictionary<string, FieldInfo> result = new(
+                        fieldNames.Length,
+                        StringComparer.Ordinal
+                    );
+                    foreach (string fieldName in fieldNames)
                     {
-                        Dictionary<string, FieldInfo> result = new(
-                            fieldNames.Length,
-                            StringComparer.Ordinal
+                        FieldInfo field = ReflectionHelpers.GetInstanceFieldIncludingBaseTypes(
+                            inputType,
+                            fieldName
                         );
-                        foreach (string fieldName in fieldNames)
+                        if (field != null && field.FieldType == typeof(Attribute))
                         {
-                            FieldInfo field = ReflectionHelpers.GetInstanceFieldIncludingBaseTypes(
-                                inputType,
-                                fieldName
-                            );
-                            if (field != null && field.FieldType == typeof(Attribute))
-                            {
-                                result[fieldName] = field;
-                            }
+                            result[fieldName] = field;
                         }
-                        return result;
                     }
-                    else
-                    {
-                        FieldInfo[] fields = ReflectionHelpers.GetInstanceFieldsIncludingBaseTypes(
-                            inputType
-                        );
-                        Dictionary<string, FieldInfo> result = new(
-                            fields.Length,
-                            StringComparer.Ordinal
-                        );
-                        foreach (FieldInfo field in fields)
-                        {
-                            if (field.FieldType == typeof(Attribute))
-                            {
-                                result[field.Name] = field;
-                            }
-                        }
-
-                        return result;
-                    }
+                    return result;
                 }
-            );
+                else
+                {
+                    FieldInfo[] fields = ReflectionHelpers.GetInstanceFieldsIncludingBaseTypes(
+                        inputType
+                    );
+                    Dictionary<string, FieldInfo> result = new(
+                        fields.Length,
+                        StringComparer.Ordinal
+                    );
+                    foreach (FieldInfo field in fields)
+                    {
+                        if (field.FieldType == typeof(Attribute))
+                        {
+                            result[field.Name] = field;
+                        }
+                    }
+
+                    return result;
+                }
+            });
         }
 
         /// <summary>
@@ -930,58 +927,54 @@ namespace WallstopStudios.UnityHelpers.Tags
             Type type
         )
         {
-            return OptimizedAttributeFields.GetOrAdd(
-                type,
-                static inputType =>
+            return OptimizedAttributeFields.GetOrAdd(type, static inputType =>
+            {
+                AttributeMetadataCache cache = AttributeMetadataCache.Instance;
+                if (cache != null && cache.TryGetFieldNames(inputType, out string[] fieldNames))
                 {
-                    AttributeMetadataCache cache = AttributeMetadataCache.Instance;
-                    if (cache != null && cache.TryGetFieldNames(inputType, out string[] fieldNames))
+                    Dictionary<string, Func<object, Attribute>> result = new(
+                        fieldNames.Length,
+                        StringComparer.Ordinal
+                    );
+                    foreach (string fieldName in fieldNames)
                     {
-                        Dictionary<string, Func<object, Attribute>> result = new(
-                            fieldNames.Length,
-                            StringComparer.Ordinal
+                        FieldInfo field = ReflectionHelpers.GetInstanceFieldIncludingBaseTypes(
+                            inputType,
+                            fieldName
                         );
-                        foreach (string fieldName in fieldNames)
+                        if (field != null && field.FieldType == typeof(Attribute))
                         {
-                            FieldInfo field = ReflectionHelpers.GetInstanceFieldIncludingBaseTypes(
-                                inputType,
-                                fieldName
+                            result[fieldName] = ReflectionHelpers.GetFieldGetter<object, Attribute>(
+                                field
                             );
-                            if (field != null && field.FieldType == typeof(Attribute))
-                            {
-                                result[fieldName] = ReflectionHelpers.GetFieldGetter<
-                                    object,
-                                    Attribute
-                                >(field);
-                            }
                         }
-
-                        return result;
                     }
-                    else
-                    {
-                        FieldInfo[] fields = ReflectionHelpers.GetInstanceFieldsIncludingBaseTypes(
-                            inputType
-                        );
-                        Dictionary<string, Func<object, Attribute>> result = new(
-                            fields.Length,
-                            StringComparer.Ordinal
-                        );
-                        foreach (FieldInfo field in fields)
-                        {
-                            if (field.FieldType == typeof(Attribute))
-                            {
-                                result[field.Name] = ReflectionHelpers.GetFieldGetter<
-                                    object,
-                                    Attribute
-                                >(field);
-                            }
-                        }
 
-                        return result;
-                    }
+                    return result;
                 }
-            );
+                else
+                {
+                    FieldInfo[] fields = ReflectionHelpers.GetInstanceFieldsIncludingBaseTypes(
+                        inputType
+                    );
+                    Dictionary<string, Func<object, Attribute>> result = new(
+                        fields.Length,
+                        StringComparer.Ordinal
+                    );
+                    foreach (FieldInfo field in fields)
+                    {
+                        if (field.FieldType == typeof(Attribute))
+                        {
+                            result[field.Name] = ReflectionHelpers.GetFieldGetter<
+                                object,
+                                Attribute
+                            >(field);
+                        }
+                    }
+
+                    return result;
+                }
+            });
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]

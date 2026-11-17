@@ -126,10 +126,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [TestCase(false, -3)]
         public void ScaleThrowsWhenWidthIsNotPositive(bool useBilinear, int newWidth)
         {
-            Texture2D texture = _textureHelper.CreateTextureWithFactory(
-                2,
-                2,
-                (x, y) => new Color(x, y, 0f, 1f)
+            Texture2D texture = _textureHelper.CreateTextureWithFactory(2, 2, (x, y) =>
+                new Color(x, y, 0f, 1f)
             );
             Assert.Throws<ArgumentOutOfRangeException>(() =>
                 InvokeScale(texture, newWidth, 2, useBilinear)
@@ -142,10 +140,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [TestCase(false, -5)]
         public void ScaleThrowsWhenHeightIsNotPositive(bool useBilinear, int newHeight)
         {
-            Texture2D texture = _textureHelper.CreateTextureWithFactory(
-                2,
-                2,
-                (x, y) => new Color(x, y, 0f, 1f)
+            Texture2D texture = _textureHelper.CreateTextureWithFactory(2, 2, (x, y) =>
+                new Color(x, y, 0f, 1f)
             );
             Assert.Throws<ArgumentOutOfRangeException>(() =>
                 InvokeScale(texture, 2, newHeight, useBilinear)
@@ -156,10 +152,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [TestCase(false)]
         public void ScaleThrowsWhenTextureIsNotReadable(bool useBilinear)
         {
-            Texture2D texture = _textureHelper.CreateTextureWithFactory(
-                2,
-                2,
-                (x, y) => new Color(x, y, 0f, 1f)
+            Texture2D texture = _textureHelper.CreateTextureWithFactory(2, 2, (x, y) =>
+                new Color(x, y, 0f, 1f)
             );
             texture.Apply(updateMipmaps: false, makeNoLongerReadable: true);
             Assert.Throws<UnityException>(() => InvokeScale(texture, 1, 1, useBilinear));
@@ -252,10 +246,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [Test]
         public void PointScalingKeepsTextureReadable()
         {
-            Texture2D texture = _textureHelper.CreateTextureWithFactory(
-                3,
-                3,
-                (x, y) => new Color(x, y, 0f, 1f)
+            Texture2D texture = _textureHelper.CreateTextureWithFactory(3, 3, (x, y) =>
+                new Color(x, y, 0f, 1f)
             );
             TextureScale.Point(texture, 3, 3);
             Assert.IsTrue(texture.isReadable);

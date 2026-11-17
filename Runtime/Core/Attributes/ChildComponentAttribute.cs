@@ -228,9 +228,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
         internal static FieldMetadata<ChildComponentAttribute>[] GetOrCreateFields(Type type)
         {
-            return FieldsByType.GetOrAdd(
-                type,
-                static t => GetFieldMetadata<ChildComponentAttribute>(t)
+            return FieldsByType.GetOrAdd(type, static t =>
+                GetFieldMetadata<ChildComponentAttribute>(t)
             );
         }
 

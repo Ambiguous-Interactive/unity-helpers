@@ -84,8 +84,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 throw new ArgumentNullException(nameof(elementTransformer));
             }
 
-            elements =
-                points?.ToImmutableArray() ?? throw new ArgumentNullException(nameof(points));
+            elements = points?.ToImmutableArray()
+                ?? throw new ArgumentNullException(nameof(points));
             int elementCount = elements.Length;
             _positionsX = elementCount == 0 ? Array.Empty<float>() : new float[elementCount];
             _positionsY = elementCount == 0 ? Array.Empty<float>() : new float[elementCount];

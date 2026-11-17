@@ -2,13 +2,12 @@
 FROM mcr.microsoft.com/devcontainers/dotnet:2.3.2-9.0-bookworm
 
 # Architecture for downloading binaries (supports amd64 and arm64)
-ARG TARGETARCH=amd64
+ARG TARGETARCH
 
 # Set non-interactive frontend for apt to avoid prompts
 ENV DEBIAN_FRONTEND=noninteractive
 
 # The current devcontainer base trails the supported .NET 9 servicing release.
-ENV DOTNET_SDK_VERSION=9.0.320 DOTNET_VERSION=9.0.22 ASPNET_VERSION=9.0.22
 RUN DOTNET_SDK_VERSION="9.0.320" \
     && case "${TARGETARCH}" in \
         amd64) DOTNET_SDK_ARCH="x64" ; DOTNET_SDK_SHA512="eb371100b5c40641a812b3683bfda1772f0b69e5232091293c715d49eb837f52174b9b9a93375d692bddbfd1d57005f1a9aa774b4b30276665b0c0b1a9b66427" ;; \
@@ -22,6 +21,21 @@ RUN DOTNET_SDK_VERSION="9.0.320" \
     && tar -xzf /tmp/dotnet-sdk.tar.gz -C /usr/share/dotnet \
     && rm -f /tmp/dotnet-sdk.tar.gz \
     && test "$(dotnet --version)" = "${DOTNET_SDK_VERSION}"
+
+# CSharpier 1.4 requires .NET 10. Keep .NET 9 for the repository's net9.0 tools.
+RUN CSHARPIER_SDK_VERSION="10.0.403" \
+    && case "${TARGETARCH}" in \
+        amd64) CSHARPIER_SDK_ARCH="x64" ; CSHARPIER_SDK_SHA512="b7b3d8461cf98b07d2552ce9199702fa3ad010ac2671a5f8cd5136f7534e50f6855ba7bbb02b11494563f1d04156276a31cda1103b900e5eecd0d9473dc7b9c5" ;; \
+        arm64) CSHARPIER_SDK_ARCH="arm64" ; CSHARPIER_SDK_SHA512="0966aa2b70f4677b8319be9df447a78a0dcd6164836425b55a68fd714f4023feb87b4cac21b9a996b79472ad54487cd0adcd2a9dfd570e2b2a1d26423a2baa9b" ;; \
+        *) echo "Unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac \
+    && curl -fsSL "https://builds.dotnet.microsoft.com/dotnet/Sdk/${CSHARPIER_SDK_VERSION}/dotnet-sdk-${CSHARPIER_SDK_VERSION}-linux-${CSHARPIER_SDK_ARCH}.tar.gz" -o /tmp/csharpier-sdk.tar.gz \
+    && echo "${CSHARPIER_SDK_SHA512}  /tmp/csharpier-sdk.tar.gz" | sha512sum -c - \
+    && tar -xzf /tmp/csharpier-sdk.tar.gz -C /usr/share/dotnet \
+    && rm -f /tmp/csharpier-sdk.tar.gz \
+    && test "$(dotnet --version)" = "${CSHARPIER_SDK_VERSION}"
+
+ENV DOTNET_SDK_VERSION=10.0.403 DOTNET_VERSION=10.0.14 ASPNET_VERSION=10.0.14
 
 # Fix: Remove the Yarn repository with expired GPG key
 # The base image includes yarn repo, but the GPG key (23E7166788B63E1E) expired.
@@ -337,6 +351,7 @@ RUN mkdir -p /home/vscode/.codex \
     /home/vscode/.copilot \
     /home/vscode/.config/gh \
     /home/vscode/.mcp-auth \
+    && chown vscode:vscode /home/vscode/.local \
     && chown -R vscode:vscode /home/vscode/.codex /home/vscode/.claude /home/vscode/.claude-zai /home/vscode/.claude-openrouter /home/vscode/.config/opencode /home/vscode/.local/share/opencode /home/vscode/.local/state/opencode /home/vscode/.config/nanocoder /home/vscode/.local/share/nanocoder /home/vscode/.copilot /home/vscode/.config/gh /home/vscode/.mcp-auth \
     && chmod 0700 /home/vscode/.codex /home/vscode/.claude /home/vscode/.claude-zai /home/vscode/.claude-openrouter /home/vscode/.config/opencode /home/vscode/.local/share/opencode /home/vscode/.local/state/opencode /home/vscode/.config/nanocoder /home/vscode/.local/share/nanocoder /home/vscode/.copilot /home/vscode/.config/gh /home/vscode/.mcp-auth
 
@@ -349,7 +364,7 @@ RUN mkdir -p /home/vscode/.npm \
 
 # Install CSharpier as a global .NET tool for the vscode user
 USER vscode
-RUN dotnet tool install -g csharpier --version 1.3.0
+RUN dotnet tool install -g csharpier --version 1.4.0
 
 # Point npm's global prefix at a user-owned directory so `npm install -g` works
 # without sudo for the vscode user (npm docs: "resolving EACCES permissions

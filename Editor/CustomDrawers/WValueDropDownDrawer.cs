@@ -1634,26 +1634,22 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 {
                     int capturedIndex = i;
                     bool isSelected = i == currentIndex && !property.hasMultipleDifferentValues;
-                    menu.AddItem(
-                        new GUIContent(displayLabels[i]),
-                        isSelected,
-                        () =>
+                    menu.AddItem(new GUIContent(displayLabels[i]), isSelected, () =>
+                    {
+                        serializedObject.Update();
+                        SerializedProperty prop = serializedObject.FindProperty(propertyPath);
+                        if (prop == null)
                         {
-                            serializedObject.Update();
-                            SerializedProperty prop = serializedObject.FindProperty(propertyPath);
-                            if (prop == null)
-                            {
-                                return;
-                            }
-
-                            Undo.RecordObjects(
-                                serializedObject.targetObjects,
-                                "Change ValueDropDown Selection"
-                            );
-                            ApplyOption(prop, options[capturedIndex]);
-                            serializedObject.ApplyModifiedProperties();
+                            return;
                         }
-                    );
+
+                        Undo.RecordObjects(
+                            serializedObject.targetObjects,
+                            "Change ValueDropDown Selection"
+                        );
+                        ApplyOption(prop, options[capturedIndex]);
+                        serializedObject.ApplyModifiedProperties();
+                    });
                 }
                 menu.DropDown(fieldRect);
             }

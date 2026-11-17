@@ -47,14 +47,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
         {
             GameObject entity = CreateTrackedGameObject("TrackedBlankTag", typeof(TagHandler));
             TagHandler handler = entity.GetComponent<TagHandler>();
-            AttributeEffect effect = CreateEffect(
-                "BlankAndValidTags",
-                item =>
-                {
-                    item.effectTags.Add(tag);
-                    item.effectTags.Add(MarkedTag);
-                }
-            );
+            AttributeEffect effect = CreateEffect("BlankAndValidTags", item =>
+            {
+                item.effectTags.Add(tag);
+                item.effectTags.Add(MarkedTag);
+            });
             EffectHandle handle = EffectHandle.CreateInstance(effect);
             int events = 0;
             handler.OnTagAdded += _ => ++events;
@@ -118,13 +115,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             GameObject entity = CreateTrackedGameObject("Tags", typeof(TagHandler));
             TagHandler handler = entity.GetComponent<TagHandler>();
 
-            AttributeEffect effect = CreateEffect(
-                "Buff",
-                e =>
-                {
-                    e.effectTags.Add("Buff");
-                }
-            );
+            AttributeEffect effect = CreateEffect("Buff", e =>
+            {
+                e.effectTags.Add("Buff");
+            });
             EffectHandle handle = EffectHandle.CreateInstance(effect);
 
             int addedCount = 0;
@@ -142,13 +136,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             GameObject entity = CreateTrackedGameObject("Tags", typeof(TagHandler));
             TagHandler handler = entity.GetComponent<TagHandler>();
 
-            AttributeEffect effect = CreateEffect(
-                "Buff",
-                e =>
-                {
-                    e.effectTags.Add("Buff");
-                }
-            );
+            AttributeEffect effect = CreateEffect("Buff", e =>
+            {
+                e.effectTags.Add("Buff");
+            });
             EffectHandle handle = EffectHandle.CreateInstance(effect);
 
             handler.ForceApplyTags(handle);
@@ -206,13 +197,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             TagHandler handler = entity.GetComponent<TagHandler>();
             EffectHandler effectHandler = entity.GetComponent<EffectHandler>();
 
-            AttributeEffect effect = CreateEffect(
-                "Buff",
-                e =>
-                {
-                    e.effectTags.Add("Buff");
-                }
-            );
+            AttributeEffect effect = CreateEffect("Buff", e =>
+            {
+                e.effectTags.Add("Buff");
+            });
             EffectHandle handle = effectHandler.ApplyEffect(effect).Value;
 
             List<EffectHandle> handles = new();
@@ -274,13 +262,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             TagHandler handler = entity.GetComponent<TagHandler>();
             EffectHandler effectHandler = entity.GetComponent<EffectHandler>();
 
-            AttributeEffect effect = CreateEffect(
-                "Buff",
-                e =>
-                {
-                    e.effectTags.Add("Buff");
-                }
-            );
+            AttributeEffect effect = CreateEffect("Buff", e =>
+            {
+                e.effectTags.Add("Buff");
+            });
             EffectHandle handle = effectHandler.ApplyEffect(effect).Value;
 
             List<EffectHandle> removed = handler.RemoveTag("Buff");
@@ -308,28 +293,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             GameObject entity = CreateTrackedGameObject("Tags", typeof(TagHandler));
             TagHandler handler = entity.GetComponent<TagHandler>();
 
-            AttributeEffect stunAndMark = CreateEffect(
-                "StunAndMark",
-                e =>
-                {
-                    e.effectTags.Add(StunnedTag);
-                    e.effectTags.Add(MarkedTag);
-                }
-            );
-            AttributeEffect stun = CreateEffect(
-                "Stun",
-                e =>
-                {
-                    e.effectTags.Add(StunnedTag);
-                }
-            );
-            AttributeEffect root = CreateEffect(
-                "Root",
-                e =>
-                {
-                    e.effectTags.Add(RootedTag);
-                }
-            );
+            AttributeEffect stunAndMark = CreateEffect("StunAndMark", e =>
+            {
+                e.effectTags.Add(StunnedTag);
+                e.effectTags.Add(MarkedTag);
+            });
+            AttributeEffect stun = CreateEffect("Stun", e =>
+            {
+                e.effectTags.Add(StunnedTag);
+            });
+            AttributeEffect root = CreateEffect("Root", e =>
+            {
+                e.effectTags.Add(RootedTag);
+            });
 
             EffectHandle stunAndMarkHandle = EffectHandle.CreateInstance(stunAndMark);
             EffectHandle stunHandle = EffectHandle.CreateInstance(stun);

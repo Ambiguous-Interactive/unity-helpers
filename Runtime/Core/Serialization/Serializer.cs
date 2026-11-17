@@ -2774,8 +2774,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             try
             {
                 ReadOnlySpan<byte> span = new(data, 0, length);
-                JsonSerializerOptions resolvedOptions =
-                    options ?? SerializerEncoding.NormalJsonOptions;
+                JsonSerializerOptions resolvedOptions = options
+                    ?? SerializerEncoding.NormalJsonOptions;
                 if (limits != null)
                 {
                     WJsonReadBudget.Enforce(
@@ -2996,9 +2996,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             }
 
             // Root inference is deterministic; publish one winning result for concurrent callers.
-            Type resolved = ProtobufRootCache.GetOrAdd(
-                declared,
-                static declaredType => ComputeProtobufRootType(declaredType)
+            Type resolved = ProtobufRootCache.GetOrAdd(declared, static declaredType =>
+                ComputeProtobufRootType(declaredType)
             );
             return resolved == NoRootMarker ? null : resolved;
         }
@@ -3390,8 +3389,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             JsonSerializerOptions options
         )
         {
-            JsonIgnoreCondition condition =
-                options?.DefaultIgnoreCondition ?? JsonIgnoreCondition.Never;
+            JsonIgnoreCondition condition = options?.DefaultIgnoreCondition
+                ?? JsonIgnoreCondition.Never;
 
             JsonIgnoreAttribute ignore = null;
             try

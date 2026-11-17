@@ -5022,8 +5022,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         /// <param name="entry">The sprite sheet entry to draw override fields for.</param>
         private void DrawPerSheetOverrideFields(SpriteSheetEntry entry)
         {
-            ExtractionMode previousExtractionMode =
-                entry._extractionModeOverride ?? _extractionMode;
+            ExtractionMode previousExtractionMode = entry._extractionModeOverride
+                ?? _extractionMode;
             entry._extractionModeOverride = (ExtractionMode)
                 EditorGUILayout.EnumPopup(
                     new GUIContent("Extraction Mode", "How sprites are extracted from this sheet."),
@@ -5041,8 +5041,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 using (new EditorGUI.IndentLevelScope())
                 {
-                    GridSizeMode previousGridSizeMode =
-                        entry._gridSizeModeOverride ?? _gridSizeMode;
+                    GridSizeMode previousGridSizeMode = entry._gridSizeModeOverride
+                        ?? _gridSizeMode;
                     entry._gridSizeModeOverride = (GridSizeMode)
                         EditorGUILayout.EnumPopup(
                             new GUIContent(
@@ -5143,8 +5143,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         {
                             bool entryIsUniformGrid =
                                 newAlgorithm == AutoDetectionAlgorithm.UniformGrid;
-                            int currentExpectedCount =
-                                entry._expectedSpriteCountOverride ?? _expectedSpriteCountHint;
+                            int currentExpectedCount = entry._expectedSpriteCountOverride
+                                ?? _expectedSpriteCountHint;
                             int newExpectedCount = EditorGUILayout.IntField(
                                 new GUIContent(
                                     entryIsUniformGrid
@@ -5174,8 +5174,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             }
                         }
 
-                        bool currentSnapValue =
-                            entry._snapToTextureDivisorOverride ?? _snapToTextureDivisor;
+                        bool currentSnapValue = entry._snapToTextureDivisorOverride
+                            ?? _snapToTextureDivisor;
                         bool newSnapValue = EditorGUILayout.Toggle(
                             new GUIContent(
                                 "Snap to Divisor",
@@ -5388,10 +5388,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
                     string entryName = Path.GetFileName(sourceEntry._assetPath);
                     int capturedIndex = i;
-                    menu.AddItem(
-                        new GUIContent(entryName),
-                        false,
-                        () => CopySettingsFromEntry(_discoveredSheets[capturedIndex], entry)
+                    menu.AddItem(new GUIContent(entryName), false, () =>
+                        CopySettingsFromEntry(_discoveredSheets[capturedIndex], entry)
                     );
                 }
 

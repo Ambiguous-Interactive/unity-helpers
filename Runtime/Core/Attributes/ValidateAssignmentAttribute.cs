@@ -207,42 +207,35 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
         private static FieldInfo[] GetOrAdd(Type objectType)
         {
-            return FieldsByType.GetOrAdd(
-                objectType,
-                static type =>
+            return FieldsByType.GetOrAdd(objectType, static type =>
+            {
+                FieldInfo[] allFields = ReflectionHelpers.GetInstanceFieldsIncludingBaseTypes(type);
+
+                if (allFields.Length == 0)
                 {
-                    FieldInfo[] allFields = ReflectionHelpers.GetInstanceFieldsIncludingBaseTypes(
-                        type
-                    );
-
-                    if (allFields.Length == 0)
-                    {
-                        return Array.Empty<FieldInfo>();
-                    }
-
-                    using PooledResource<List<FieldInfo>> bufferResource =
-                        Buffers<FieldInfo>.List.Get(out List<FieldInfo> result);
-                    foreach (FieldInfo field in allFields)
-                    {
-                        if (
-                            field.IsAttributeDefined<ValidateAssignmentAttribute>(
-                                out _,
-                                inherit: false
-                            )
-                        )
-                        {
-                            result.Add(field);
-                        }
-                    }
-
-                    if (result.Count == 0)
-                    {
-                        return Array.Empty<FieldInfo>();
-                    }
-
-                    return result.ToArray();
+                    return Array.Empty<FieldInfo>();
                 }
-            );
+
+                using PooledResource<List<FieldInfo>> bufferResource = Buffers<FieldInfo>.List.Get(
+                    out List<FieldInfo> result
+                );
+                foreach (FieldInfo field in allFields)
+                {
+                    if (
+                        field.IsAttributeDefined<ValidateAssignmentAttribute>(out _, inherit: false)
+                    )
+                    {
+                        result.Add(field);
+                    }
+                }
+
+                if (result.Count == 0)
+                {
+                    return Array.Empty<FieldInfo>();
+                }
+
+                return result.ToArray();
+            });
         }
 
         private static bool IsInvalid(IEnumerable enumerable)

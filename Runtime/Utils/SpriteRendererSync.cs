@@ -79,8 +79,8 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             if (matchOrderInLayer)
             {
-                _spriteRenderer.sortingOrder =
-                    DynamicSortingOrderOverride ?? localToMatch.sortingOrder;
+                _spriteRenderer.sortingOrder = DynamicSortingOrderOverride
+                    ?? localToMatch.sortingOrder;
             }
 
             _spriteRenderer.size = localToMatch.size;

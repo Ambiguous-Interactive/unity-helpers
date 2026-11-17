@@ -263,10 +263,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         {
             if (dictionary is ConcurrentDictionary<K, V> concurrentDictionary)
             {
-                return concurrentDictionary.AddOrUpdate(
-                    key,
-                    creator,
-                    static (_, existingValue) => existingValue
+                return concurrentDictionary.AddOrUpdate(key, creator, static (_, existingValue) =>
+                    existingValue
                 );
             }
 

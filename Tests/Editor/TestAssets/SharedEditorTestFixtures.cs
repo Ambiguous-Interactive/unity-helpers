@@ -245,9 +245,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
             }
 
             string fullKey = type.FullName + "::" + key;
-            return DynamicFixtures.GetOrAdd(
-                fullKey,
-                _ => CreateDynamicFixtureByType(type, key, persist)
+            return DynamicFixtures.GetOrAdd(fullKey, _ =>
+                CreateDynamicFixtureByType(type, key, persist)
             );
         }
 

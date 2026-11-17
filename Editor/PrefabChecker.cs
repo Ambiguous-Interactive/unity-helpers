@@ -425,29 +425,24 @@ namespace WallstopStudios.UnityHelpers.Editor
             Dictionary<Type, List<FieldInfo>> cache
         )
         {
-            return cache.GetOrAdd(
-                componentType,
-                static type =>
+            return cache.GetOrAdd(componentType, static type =>
+            {
+                FieldInfo[] fields = ReflectionHelpers.GetInstanceFieldsIncludingBaseTypes(type);
+                int len = fields.Length;
+                List<FieldInfo> list = new(len);
+                for (int i = 0; i < len; ++i)
                 {
-                    FieldInfo[] fields = ReflectionHelpers.GetInstanceFieldsIncludingBaseTypes(
-                        type
-                    );
-                    int len = fields.Length;
-                    List<FieldInfo> list = new(len);
-                    for (int i = 0; i < len; ++i)
+                    FieldInfo field = fields[i];
+                    bool include =
+                        field.IsPublic
+                        || field.IsAttributeDefined<SerializeField>(out _, inherit: true);
+                    if (include)
                     {
-                        FieldInfo field = fields[i];
-                        bool include =
-                            field.IsPublic
-                            || field.IsAttributeDefined<SerializeField>(out _, inherit: true);
-                        if (include)
-                        {
-                            list.Add(field);
-                        }
+                        list.Add(field);
                     }
-                    return list;
                 }
-            );
+                return list;
+            });
         }
 
         private static int ValidateNoNullsInLists(
@@ -460,27 +455,24 @@ namespace WallstopStudios.UnityHelpers.Editor
             int issueCount = 0;
             Type componentType = component.GetType();
 
-            List<FieldInfo> listFields = ListFieldsByType.GetOrAdd(
-                componentType,
-                static type =>
+            List<FieldInfo> listFields = ListFieldsByType.GetOrAdd(componentType, static type =>
+            {
+                IEnumerable<FieldInfo> baseFields = GetFieldsToCheck(type, FieldsByType);
+                List<FieldInfo> res = new();
+                foreach (FieldInfo f in baseFields.AsValueEnumerableRequired())
                 {
-                    IEnumerable<FieldInfo> baseFields = GetFieldsToCheck(type, FieldsByType);
-                    List<FieldInfo> res = new();
-                    foreach (FieldInfo f in baseFields.AsValueEnumerableRequired())
+                    if (f == null)
                     {
-                        if (f == null)
-                        {
-                            continue;
-                        }
-                        Type ft = f.FieldType;
-                        if (typeof(IEnumerable).IsAssignableFrom(ft) && ft != typeof(string))
-                        {
-                            res.Add(f);
-                        }
+                        continue;
                     }
-                    return res;
+                    Type ft = f.FieldType;
+                    if (typeof(IEnumerable).IsAssignableFrom(ft) && ft != typeof(string))
+                    {
+                        res.Add(f);
+                    }
                 }
-            );
+                return res;
+            });
             foreach (FieldInfo field in listFields)
             {
                 object fieldValue = field.GetValue(component);
@@ -604,22 +596,19 @@ namespace WallstopStudios.UnityHelpers.Editor
             int issueCount = 0;
             Type componentType = component.GetType();
 
-            List<FieldInfo> stringFields = StringFieldsByType.GetOrAdd(
-                componentType,
-                static type =>
+            List<FieldInfo> stringFields = StringFieldsByType.GetOrAdd(componentType, static type =>
+            {
+                IEnumerable<FieldInfo> baseFields = GetFieldsToCheck(type, FieldsByType);
+                List<FieldInfo> res = new();
+                foreach (FieldInfo f in baseFields.AsValueEnumerableRequired())
                 {
-                    IEnumerable<FieldInfo> baseFields = GetFieldsToCheck(type, FieldsByType);
-                    List<FieldInfo> res = new();
-                    foreach (FieldInfo f in baseFields.AsValueEnumerableRequired())
+                    if (f != null && f.FieldType == typeof(string))
                     {
-                        if (f != null && f.FieldType == typeof(string))
-                        {
-                            res.Add(f);
-                        }
+                        res.Add(f);
                     }
-                    return res;
                 }
-            );
+                return res;
+            });
             foreach (FieldInfo field in stringFields)
             {
                 object fieldValue = field.GetValue(component);
@@ -1077,22 +1066,19 @@ namespace WallstopStudios.UnityHelpers.Editor
             int issueCount = 0;
             Type componentType = component.GetType();
 
-            List<FieldInfo> objFields = ObjectFieldsByType.GetOrAdd(
-                componentType,
-                static type =>
+            List<FieldInfo> objFields = ObjectFieldsByType.GetOrAdd(componentType, static type =>
+            {
+                IEnumerable<FieldInfo> baseFields = GetFieldsToCheck(type, FieldsByType);
+                List<FieldInfo> res = new();
+                foreach (FieldInfo f in baseFields.AsValueEnumerableRequired())
                 {
-                    IEnumerable<FieldInfo> baseFields = GetFieldsToCheck(type, FieldsByType);
-                    List<FieldInfo> res = new();
-                    foreach (FieldInfo f in baseFields.AsValueEnumerableRequired())
+                    if (f != null && typeof(Object).IsAssignableFrom(f.FieldType))
                     {
-                        if (f != null && typeof(Object).IsAssignableFrom(f.FieldType))
-                        {
-                            res.Add(f);
-                        }
+                        res.Add(f);
                     }
-                    return res;
                 }
-            );
+                return res;
+            });
             foreach (FieldInfo field in objFields)
             {
                 bool hasValidateAttribute = field.IsAttributeDefined<ValidateAssignmentAttribute>(

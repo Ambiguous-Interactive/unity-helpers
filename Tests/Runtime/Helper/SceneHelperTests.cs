@@ -68,9 +68,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         {
             int initialSceneCount = SceneManager.sceneCount;
             bool callbackInvoked = false;
-            SceneHelper.SceneLoadScope scope = new(
-                scenePath,
-                (scene, mode) => callbackInvoked = true
+            SceneHelper.SceneLoadScope scope = new(scenePath, (scene, mode) =>
+                callbackInvoked = true
             );
             TrackAsyncDisposal(scope.DisposeAsync);
             Assert.IsFalse(callbackInvoked);
@@ -188,16 +187,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             int initialSceneCount = SceneManager.sceneCount;
             bool callbackInvoked = false;
 
-            SceneHelper.SceneLoadScope scope = new(
-                TestScenePath,
-                (scene, mode) =>
+            SceneHelper.SceneLoadScope scope = new(TestScenePath, (scene, mode) =>
+            {
+                if (string.Equals(scene.path, TestScenePath, System.StringComparison.Ordinal))
                 {
-                    if (string.Equals(scene.path, TestScenePath, System.StringComparison.Ordinal))
-                    {
-                        callbackInvoked = true;
-                    }
+                    callbackInvoked = true;
                 }
-            );
+            });
 
             TrackAsyncDisposal(scope.DisposeAsync);
             float timeout = Time.time + 5f;
@@ -256,16 +252,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             SceneManager.SetActiveScene(loadedScene);
 
             bool callbackInvoked = false;
-            SceneHelper.SceneLoadScope scope = new(
-                TestScenePath,
-                (scene, mode) =>
+            SceneHelper.SceneLoadScope scope = new(TestScenePath, (scene, mode) =>
+            {
+                if (string.Equals(scene.path, TestScenePath, System.StringComparison.Ordinal))
                 {
-                    if (string.Equals(scene.path, TestScenePath, System.StringComparison.Ordinal))
-                    {
-                        callbackInvoked = true;
-                    }
+                    callbackInvoked = true;
                 }
-            );
+            });
 
             Assert.IsTrue(callbackInvoked, "Active scene should trigger immediate callback.");
 

@@ -767,23 +767,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
         )
         {
             string cacheKey = $"{testKey}_{Path.GetFileName(sourceTexturePath)}";
-            return DynamicFixtures.GetOrAdd(
-                cacheKey,
-                _ =>
+            return DynamicFixtures.GetOrAdd(cacheKey, _ =>
+            {
+                EnsureDynamicDirectory();
+                string fileName = Path.GetFileName(sourceTexturePath);
+                string destPath = $"{DynamicAssetsDir}/{testKey}_{fileName}".SanitizePath();
+                AssetDatabase.CopyAsset(sourceTexturePath, destPath);
+                AssetDatabaseBatchHelper.RefreshIfNotBatching();
+                return new DynamicTextureFixture
                 {
-                    EnsureDynamicDirectory();
-                    string fileName = Path.GetFileName(sourceTexturePath);
-                    string destPath = $"{DynamicAssetsDir}/{testKey}_{fileName}".SanitizePath();
-                    AssetDatabase.CopyAsset(sourceTexturePath, destPath);
-                    AssetDatabaseBatchHelper.RefreshIfNotBatching();
-                    return new DynamicTextureFixture
-                    {
-                        AssetPath = destPath,
-                        Texture = AssetDatabase.LoadAssetAtPath<Texture2D>(destPath),
-                        Importer = AssetImporter.GetAtPath(destPath) as TextureImporter,
-                    };
-                }
-            );
+                    AssetPath = destPath,
+                    Texture = AssetDatabase.LoadAssetAtPath<Texture2D>(destPath),
+                    Importer = AssetImporter.GetAtPath(destPath) as TextureImporter,
+                };
+            });
         }
 
         /// <summary>
@@ -801,9 +798,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
         )
         {
             string cacheKey = $"{width}x{height}_{testKey}";
-            return DimensionFixtures.GetOrAdd(
-                cacheKey,
-                _ => CreateDynamicFixtureForDimension(width, height, testKey)
+            return DimensionFixtures.GetOrAdd(cacheKey, _ =>
+                CreateDynamicFixtureForDimension(width, height, testKey)
             );
         }
 
