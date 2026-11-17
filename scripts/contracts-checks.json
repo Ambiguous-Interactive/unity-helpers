@@ -281,6 +281,11 @@
     "inputs": ["@tooling"]
   },
   {
+    "id": "validate-devcontainer-urls",
+    "name": "Devcontainer URL validator contracts",
+    "run": "npm run test:validate-devcontainer-urls"
+  },
+  {
     "id": "validate-devcontainer-config",
     "name": "Devcontainer configuration validator self-test",
     "run": "npm run test:validate-devcontainer-config",

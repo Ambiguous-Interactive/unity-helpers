@@ -368,7 +368,7 @@
     "test:agent-preflight": "pwsh -NoProfile -File scripts/tests/test-agent-preflight.ps1",
     "test:git-staging-helpers": "bash scripts/tests/test-git-staging-helpers.sh",
     "test:deprecated-external-links": "pwsh -NoProfile -File scripts/tests/test-deprecated-external-links.ps1 -VerboseOutput",
-    "test:validate-devcontainer-urls": "bash scripts/tests/test-validate-devcontainer-urls.sh",
+    "test:validate-devcontainer-urls": "uv run --quiet --project scripts/python~ --locked pytest scripts/tests/test_devcontainer_urls.py -q",
     "test:final-newline": "bash scripts/tests/test-final-newline.sh",
     "test:post-create": "bash scripts/tests/test-post-create.sh",
     "test:ai-backends": "bash scripts/tests/test-ai-backends.sh",

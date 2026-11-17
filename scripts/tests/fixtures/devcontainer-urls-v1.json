@@ -1,0 +1,444 @@
+{
+  "provenance": {
+    "originalCommit": "5e416d44f45557ab917c7abec94dbeb4b3f8a6de",
+    "validatorSha256": "8d6f827e13732775a994414d9940a2d5b460391eb6ab418ff1dde85e43eed5e1",
+    "suiteSha256": "d0e494cb5186f9b5a097999eb162ae61b22a50e4c01dc7f073882dcbaee1cd3b",
+    "repositoryListCommit": "0bcf468ea49511376a8898ef2f512ca44309d316",
+    "repositoryDockerfileBlobSha256": "13c919bc5e8711f57ac91b8610b9c6430cdf71e97699438dbf8e4c09a4fd7be4"
+  },
+  "cases": {
+    "fixture_fail": {
+      "args": ["--contracts-only"],
+      "dockerfile": "FROM debian:12\nRUN apt-get update \\\n    && apt-get install -y --no-install-recommends \\\n    git \\\n    powershell \\\n    curl\n",
+      "network": null,
+      "exit": 1,
+      "stdout": "========================================\nDevcontainer Download URL Validation\nDockerfile: <DOCKERFILE>\n========================================\n\n",
+      "stderr": "\u001b[0;31mDetected apt-based PowerShell install in Dockerfile:\u001b[0m\n2:RUN apt-get update \\     && apt-get install -y --no-install-recommends \\     git \\     powershell \\     curl\nUse PowerShell release tarballs with TARGETARCH mapping (amd64=x64, arm64=arm64).\n",
+      "calls": []
+    },
+    "fixture_pass": {
+      "args": ["--contracts-only"],
+      "dockerfile": "FROM debian:12\nARG TARGETARCH\nRUN POWERSHELL_VERSION=\"7.5.3\" \\\n    && case \"${TARGETARCH}\" in \\\n        amd64) POWERSHELL_ARCH=\"x64\" ;; \\\n        arm64) POWERSHELL_ARCH=\"arm64\" ;; \\\n        *) exit 1 ;; \\\n    esac \\\n    && curl -fsSL \"https://github.com/PowerShell/PowerShell/releases/download/v${POWERSHELL_VERSION}/powershell-${POWERSHELL_VERSION}-linux-${POWERSHELL_ARCH}.tar.gz\" \\\n    | tar -xz -C /opt/pwsh\n",
+      "network": null,
+      "exit": 0,
+      "stdout": "========================================\nDevcontainer Download URL Validation\nDockerfile: <DOCKERFILE>\n========================================\n\nContract checks passed (no URL probing requested).\n",
+      "stderr": "",
+      "calls": []
+    },
+    "fixture_comment_ok": {
+      "args": ["--contracts-only"],
+      "dockerfile": "FROM debian:12\n# RUN apt-get install -y powershell\nRUN echo \"no apt powershell here\"\n",
+      "network": null,
+      "exit": 0,
+      "stdout": "========================================\nDevcontainer Download URL Validation\nDockerfile: <DOCKERFILE>\n========================================\n\nContract checks passed (no URL probing requested).\n",
+      "stderr": "",
+      "calls": []
+    },
+    "fixture_case_fail": {
+      "args": ["--contracts-only"],
+      "dockerfile": "FROM debian:12\nRUN apt-get install -y PowerShell\n",
+      "network": null,
+      "exit": 1,
+      "stdout": "========================================\nDevcontainer Download URL Validation\nDockerfile: <DOCKERFILE>\n========================================\n\n",
+      "stderr": "\u001b[0;31mDetected apt-based PowerShell install in Dockerfile:\u001b[0m\n2:RUN apt-get install -y PowerShell\nUse PowerShell release tarballs with TARGETARCH mapping (amd64=x64, arm64=arm64).\n",
+      "calls": []
+    },
+    "fixture_chain_fail": {
+      "args": ["--contracts-only"],
+      "dockerfile": "FROM debian:12\nRUN apt-get update && apt-get install -y git && apt-get install -y powershell\n",
+      "network": null,
+      "exit": 1,
+      "stdout": "========================================\nDevcontainer Download URL Validation\nDockerfile: <DOCKERFILE>\n========================================\n\n",
+      "stderr": "\u001b[0;31mDetected apt-based PowerShell install in Dockerfile:\u001b[0m\n2:RUN apt-get update && apt-get install -y git && apt-get install -y powershell\nUse PowerShell release tarballs with TARGETARCH mapping (amd64=x64, arm64=arm64).\n",
+      "calls": []
+    },
+    "repository-list": {
+      "args": ["--list-tools"],
+      "dockerfile": "# Use the .NET devcontainer base image\nFROM mcr.microsoft.com/devcontainers/dotnet:2.3.2-9.0-bookworm\n\n# Architecture for downloading binaries (supports amd64 and arm64)\nARG TARGETARCH\n\n# Set non-interactive frontend for apt to avoid prompts\nENV DEBIAN_FRONTEND=noninteractive\n\n# The current devcontainer base trails the supported .NET 9 servicing release.\nRUN DOTNET_SDK_VERSION=\"9.0.320\" \\\n    && case \"${TARGETARCH}\" in \\\n        amd64) DOTNET_SDK_ARCH=\"x64\" ; DOTNET_SDK_SHA512=\"eb371100b5c40641a812b3683bfda1772f0b69e5232091293c715d49eb837f52174b9b9a93375d692bddbfd1d57005f1a9aa774b4b30276665b0c0b1a9b66427\" ;; \\\n        arm64) DOTNET_SDK_ARCH=\"arm64\" ; DOTNET_SDK_SHA512=\"88d78bf798432e9b92fe93cbffdad3ff3cc7b3e93b640c75ef46a2caa2d4d0b6dfdca002fcd007d4e95725f2e974ffbd99ae4e3a9d7999a57a667ab5d00ef0e8\" ;; \\\n        *) echo \"Unsupported TARGETARCH: ${TARGETARCH}\" >&2; exit 1 ;; \\\n    esac \\\n    && curl -fsSL \"https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-${DOTNET_SDK_ARCH}.tar.gz\" -o /tmp/dotnet-sdk.tar.gz \\\n    && echo \"${DOTNET_SDK_SHA512}  /tmp/dotnet-sdk.tar.gz\" | sha512sum -c - \\\n    && rm -rf /usr/share/dotnet \\\n    && mkdir -p /usr/share/dotnet \\\n    && tar -xzf /tmp/dotnet-sdk.tar.gz -C /usr/share/dotnet \\\n    && rm -f /tmp/dotnet-sdk.tar.gz \\\n    && test \"$(dotnet --version)\" = \"${DOTNET_SDK_VERSION}\"\n\n# CSharpier 1.4 requires .NET 10. Keep .NET 9 for the repository's net9.0 tools.\nRUN CSHARPIER_SDK_VERSION=\"10.0.403\" \\\n    && case \"${TARGETARCH}\" in \\\n        amd64) CSHARPIER_SDK_ARCH=\"x64\" ; CSHARPIER_SDK_SHA512=\"b7b3d8461cf98b07d2552ce9199702fa3ad010ac2671a5f8cd5136f7534e50f6855ba7bbb02b11494563f1d04156276a31cda1103b900e5eecd0d9473dc7b9c5\" ;; \\\n        arm64) CSHARPIER_SDK_ARCH=\"arm64\" ; CSHARPIER_SDK_SHA512=\"0966aa2b70f4677b8319be9df447a78a0dcd6164836425b55a68fd714f4023feb87b4cac21b9a996b79472ad54487cd0adcd2a9dfd570e2b2a1d26423a2baa9b\" ;; \\\n        *) echo \"Unsupported TARGETARCH: ${TARGETARCH}\" >&2; exit 1 ;; \\\n    esac \\\n    && curl -fsSL \"https://builds.dotnet.microsoft.com/dotnet/Sdk/${CSHARPIER_SDK_VERSION}/dotnet-sdk-${CSHARPIER_SDK_VERSION}-linux-${CSHARPIER_SDK_ARCH}.tar.gz\" -o /tmp/csharpier-sdk.tar.gz \\\n    && echo \"${CSHARPIER_SDK_SHA512}  /tmp/csharpier-sdk.tar.gz\" | sha512sum -c - \\\n    && tar -xzf /tmp/csharpier-sdk.tar.gz -C /usr/share/dotnet \\\n    && rm -f /tmp/csharpier-sdk.tar.gz \\\n    && test \"$(dotnet --version)\" = \"${CSHARPIER_SDK_VERSION}\"\n\nENV DOTNET_SDK_VERSION=10.0.403 DOTNET_VERSION=10.0.14 ASPNET_VERSION=10.0.14\n\n# Fix: Remove the Yarn repository with expired GPG key\n# The base image includes yarn repo, but the GPG key (23E7166788B63E1E) expired.\n# This causes apt-get update to fail with \"EXPKEYSIG\" error.\n# We don't need Yarn for this project, so simply remove the problematic source.\n# If Yarn is needed later, use corepack (bundled with Node.js) or npm instead.\nRUN rm -f /etc/apt/sources.list.d/yarn.list \\\n    && rm -f /etc/apt/keyrings/yarn.gpg \\\n    && rm -f /usr/share/keyrings/yarn-archive-keyring.gpg\n\n# Install additional tools from apt repositories\n# - ripgrep: Fast regex search (10x faster than grep)\n# - jq: JSON processor\n# - htop: Interactive process viewer (better than top)\n# - ncdu: Disk usage analyzer with ncurses interface\n# - tree: Directory listing in tree format\n# - tldr: Simplified man pages with practical examples\n# - silversearcher-ag: Fast code search (ag command)\n# - moreutils: Additional Unix utilities (sponge, parallel, etc.)\n# - unzip: Required for extracting some binaries\n# - wget: Alternative to curl for downloads\n# - ca-certificates: Ensure SSL certificates are available\n# - shellcheck: Shell script linter (used by actionlint for enhanced checks)\n#\n# Additional tools installed from GitHub releases:\n# - fd: Fast file finder (better find)\n# - bat: Cat with syntax highlighting\n# - fzf: Fuzzy finder\n# - delta: Better git diffs\n# - eza: Modern ls replacement\n# - zoxide: Smarter cd command\n# - yq: YAML processor\n# - duf: Better df\n# - sd: Intuitive find-and-replace (better sed)\n# - dust: Visual disk usage (better du)\n# - procs: Modern process viewer (better ps)\n# - tokei: Code statistics\n# - actionlint: GitHub Actions workflow linter\nRUN apt-get update && apt-get install -y --no-install-recommends \\\n    ripgrep \\\n    jq \\\n    htop \\\n    ncdu \\\n    tree \\\n    tldr \\\n    silversearcher-ag \\\n    moreutils \\\n    unzip \\\n    wget \\\n    ca-certificates \\\n    shellcheck \\\n    bubblewrap \\\n    socat \\\n    && apt-get clean \\\n    && rm -rf /var/lib/apt/lists/*\n\n# Install fd-find (faster alternative to find) from GitHub releases\n# fd respects .gitignore by default and has intuitive syntax\nRUN FD_VERSION=\"10.5.2\" \\\n    && case \"${TARGETARCH}\" in \\\n        amd64) FD_ARCH=\"x86_64-unknown-linux-gnu\" ;; \\\n        arm64) FD_ARCH=\"aarch64-unknown-linux-gnu\" ;; \\\n        *) echo \"Unsupported TARGETARCH: ${TARGETARCH}\" >&2; exit 1 ;; \\\n    esac \\\n    && curl -fsSL \"https://github.com/sharkdp/fd/releases/download/v${FD_VERSION}/fd-v${FD_VERSION}-${FD_ARCH}.tar.gz\" \\\n    | tar -xz --strip-components=1 -C /usr/local/bin \"fd-v${FD_VERSION}-${FD_ARCH}/fd\" \\\n    && chmod +x /usr/local/bin/fd\n\n# Install bat (better cat with syntax highlighting) from GitHub releases\nRUN BAT_VERSION=\"0.26.1\" \\\n    && case \"${TARGETARCH}\" in \\\n        amd64) BAT_ARCH=\"x86_64-unknown-linux-gnu\" ;; \\\n        arm64) BAT_ARCH=\"aarch64-unknown-linux-gnu\" ;; \\\n        *) echo \"Unsupported TARGETARCH: ${TARGETARCH}\" >&2; exit 1 ;; \\\n    esac \\\n    && curl -fsSL \"https://github.com/sharkdp/bat/releases/download/v${BAT_VERSION}/bat-v${BAT_VERSION}-${BAT_ARCH}.tar.gz\" \\\n    | tar -xz --strip-components=1 -C /usr/local/bin \"bat-v${BAT_VERSION}-${BAT_ARCH}/bat\" \\\n    && chmod +x /usr/local/bin/bat\n\n# Install fzf (fuzzy finder) from GitHub releases\nRUN FZF_VERSION=\"0.75.0\" \\\n    && case \"${TARGETARCH}\" in \\\n        amd64) FZF_ARCH=\"linux_amd64\" ;; \\\n        arm64) FZF_ARCH=\"linux_arm64\" ;; \\\n        *) echo \"Unsupported TARGETARCH: ${TARGETARCH}\" >&2; exit 1 ;; \\\n    esac \\\n    && curl -fsSL \"https://github.com/junegunn/fzf/releases/download/v${FZF_VERSION}/fzf-${FZF_VERSION}-${FZF_ARCH}.tar.gz\" \\\n    | tar -xz -C /usr/local/bin fzf \\\n    && chmod +x /usr/local/bin/fzf\n\n# Install delta (better git diff viewer) from GitHub releases\nRUN DELTA_VERSION=\"0.20.1\" \\\n    && case \"${TARGETARCH}\" in \\\n        amd64) DELTA_ARCH=\"x86_64-unknown-linux-gnu\" ;; \\\n        arm64) DELTA_ARCH=\"aarch64-unknown-linux-gnu\" ;; \\\n        *) echo \"Unsupported TARGETARCH: ${TARGETARCH}\" >&2; exit 1 ;; \\\n    esac \\\n    && curl -fsSL \"https://github.com/dandavison/delta/releases/download/${DELTA_VERSION}/delta-${DELTA_VERSION}-${DELTA_ARCH}.tar.gz\" \\\n    | tar -xz --strip-components=1 -C /usr/local/bin \"delta-${DELTA_VERSION}-${DELTA_ARCH}/delta\" \\\n    && chmod +x /usr/local/bin/delta\n\n# Install eza (modern replacement for ls, successor to exa) from GitHub releases\nRUN EZA_VERSION=\"0.23.5\" \\\n    && case \"${TARGETARCH}\" in \\\n        amd64) EZA_ARCH=\"x86_64-unknown-linux-gnu\" ;; \\\n        arm64) EZA_ARCH=\"aarch64-unknown-linux-gnu\" ;; \\\n        *) echo \"Unsupported TARGETARCH: ${TARGETARCH}\" >&2; exit 1 ;; \\\n    esac \\\n    && curl -fsSL \"https://github.com/eza-community/eza/releases/download/v${EZA_VERSION}/eza_${EZA_ARCH}.tar.gz\" \\\n    | tar -xz -C /usr/local/bin \\\n    && chmod +x /usr/local/bin/eza\n\n# Install zoxide (smarter cd command) from GitHub releases\nRUN ZOXIDE_VERSION=\"0.10.0\" \\\n    && case \"${TARGETARCH}\" in \\\n        amd64) ZOXIDE_ARCH=\"x86_64-unknown-linux-musl\" ;; \\\n        arm64) ZOXIDE_ARCH=\"aarch64-unknown-linux-musl\" ;; \\\n        *) echo \"Unsupported TARGETARCH: ${TARGETARCH}\" >&2; exit 1 ;; \\\n    esac \\\n    && curl -fsSL \"https://github.com/ajeetdsouza/zoxide/releases/download/v${ZOXIDE_VERSION}/zoxide-${ZOXIDE_VERSION}-${ZOXIDE_ARCH}.tar.gz\" \\\n    | tar -xz -C /usr/local/bin zoxide \\\n    && chmod +x /usr/local/bin/zoxide\n\n# Install yq (YAML processor, like jq for YAML) from GitHub releases\nRUN YQ_VERSION=\"4.54.3\" \\\n    && case \"${TARGETARCH}\" in \\\n        amd64) YQ_ARCH=\"linux_amd64\" ;; \\\n        arm64) YQ_ARCH=\"linux_arm64\" ;; \\\n        *) echo \"Unsupported TARGETARCH: ${TARGETARCH}\" >&2; exit 1 ;; \\\n    esac \\\n    && curl -fsSL \"https://github.com/mikefarah/yq/releases/download/v${YQ_VERSION}/yq_${YQ_ARCH}\" -o /usr/local/bin/yq \\\n    && chmod +x /usr/local/bin/yq\n\n# Install duf (better df) from GitHub releases\nRUN DUF_VERSION=\"0.9.1\" \\\n    && case \"${TARGETARCH}\" in \\\n        amd64) DUF_ARCH=\"linux_x86_64\" ;; \\\n        arm64) DUF_ARCH=\"linux_arm64\" ;; \\\n        *) echo \"Unsupported TARGETARCH: ${TARGETARCH}\" >&2; exit 1 ;; \\\n    esac \\\n    && curl -fsSL \"https://github.com/muesli/duf/releases/download/v${DUF_VERSION}/duf_${DUF_VERSION}_${DUF_ARCH}.tar.gz\" \\\n    | tar -xz -C /usr/local/bin duf \\\n    && chmod +x /usr/local/bin/duf\n\n# Install sd (intuitive find-and-replace, better sed) from GitHub releases\n# Note: arm64 uses musl (no gnu aarch64 builds published)\nRUN SD_VERSION=\"1.1.0\" \\\n    && case \"${TARGETARCH}\" in \\\n        amd64) SD_ARCH=\"x86_64-unknown-linux-gnu\" ;; \\\n        arm64) SD_ARCH=\"aarch64-unknown-linux-musl\" ;; \\\n        *) echo \"Unsupported TARGETARCH: ${TARGETARCH}\" >&2; exit 1 ;; \\\n    esac \\\n    && curl -fsSL \"https://github.com/chmln/sd/releases/download/v${SD_VERSION}/sd-v${SD_VERSION}-${SD_ARCH}.tar.gz\" \\\n    | tar -xz --strip-components=1 -C /usr/local/bin \"sd-v${SD_VERSION}-${SD_ARCH}/sd\" \\\n    && chmod +x /usr/local/bin/sd\n\n# Install dust (intuitive disk usage, better du) from GitHub releases\nRUN DUST_VERSION=\"1.2.7\" \\\n    && case \"${TARGETARCH}\" in \\\n        amd64) DUST_ARCH=\"x86_64-unknown-linux-gnu\" ;; \\\n        arm64) DUST_ARCH=\"aarch64-unknown-linux-gnu\" ;; \\\n        *) echo \"Unsupported TARGETARCH: ${TARGETARCH}\" >&2; exit 1 ;; \\\n    esac \\\n    && curl -fsSL \"https://github.com/bootandy/dust/releases/download/v${DUST_VERSION}/dust-v${DUST_VERSION}-${DUST_ARCH}.tar.gz\" \\\n    | tar -xz --strip-components=1 -C /usr/local/bin \"dust-v${DUST_VERSION}-${DUST_ARCH}/dust\" \\\n    && chmod +x /usr/local/bin/dust\n\n# Install procs (modern replacement for ps) from GitHub releases\nRUN PROCS_VERSION=\"0.14.12\" \\\n    && case \"${TARGETARCH}\" in \\\n        amd64) PROCS_ARCH=\"x86_64-linux\" ;; \\\n        arm64) PROCS_ARCH=\"aarch64-linux\" ;; \\\n        *) echo \"Unsupported TARGETARCH: ${TARGETARCH}\" >&2; exit 1 ;; \\\n    esac \\\n    && curl -fsSL \"https://github.com/dalance/procs/releases/download/v${PROCS_VERSION}/procs-v${PROCS_VERSION}-${PROCS_ARCH}.zip\" -o /tmp/procs.zip \\\n    && unzip -q /tmp/procs.zip -d /tmp/procs \\\n    && PROCS_BIN=\"$(find /tmp/procs -type f -name procs | head -n 1)\" \\\n    && test -n \"${PROCS_BIN}\" \\\n    && install -m 0755 \"${PROCS_BIN}\" /usr/local/bin/procs \\\n    && rm -rf /tmp/procs /tmp/procs.zip\n\n# Newer tokei releases publish no binaries; retain the last prebuilt release for both architectures.\n# Install tokei (code statistics) from GitHub releases\nRUN TOKEI_VERSION=\"12.1.2\" \\\n    && case \"${TARGETARCH}\" in \\\n        amd64) TOKEI_ARCH=\"x86_64-unknown-linux-gnu\" ;; \\\n        arm64) TOKEI_ARCH=\"aarch64-unknown-linux-gnu\" ;; \\\n        *) echo \"Unsupported TARGETARCH: ${TARGETARCH}\" >&2; exit 1 ;; \\\n    esac \\\n    && curl -fsSL \"https://github.com/XAMPPRocky/tokei/releases/download/v${TOKEI_VERSION}/tokei-${TOKEI_ARCH}.tar.gz\" \\\n    | tar -xz -C /usr/local/bin tokei \\\n    && chmod +x /usr/local/bin/tokei\n\n# Install lychee (fast link checker) from GitHub releases\n# Version should match lychee-action in .github/workflows/lint-doc-links.yml\nRUN LYCHEE_VERSION=\"0.24.2\" \\\n    && case \"${TARGETARCH}\" in \\\n        amd64) LYCHEE_ARCH=\"x86_64-unknown-linux-musl\" ;; \\\n        arm64) LYCHEE_ARCH=\"aarch64-unknown-linux-musl\" ;; \\\n        *) echo \"Unsupported TARGETARCH: ${TARGETARCH}\" >&2; exit 1 ;; \\\n    esac \\\n    && curl -fsSL \"https://github.com/lycheeverse/lychee/releases/download/lychee-v${LYCHEE_VERSION}/lychee-${LYCHEE_ARCH}.tar.gz\" \\\n    | tar -xz --strip-components=1 -C /usr/local/bin \"lychee-${LYCHEE_ARCH}/lychee\" \\\n    && chmod +x /usr/local/bin/lychee\n\n# Install actionlint (GitHub Actions workflow linter) from GitHub releases\n# https://github.com/rhysd/actionlint - validates workflow syntax and detects common errors\nRUN ACTIONLINT_VERSION=\"1.7.12\" \\\n    && case \"${TARGETARCH}\" in \\\n        amd64) ACTIONLINT_ARCH=\"linux_amd64\" ;; \\\n        arm64) ACTIONLINT_ARCH=\"linux_arm64\" ;; \\\n        *) echo \"Unsupported TARGETARCH: ${TARGETARCH}\" >&2; exit 1 ;; \\\n    esac \\\n    && curl -fsSL \"https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_${ACTIONLINT_ARCH}.tar.gz\" \\\n    | tar -xz -C /usr/local/bin actionlint \\\n    && chmod +x /usr/local/bin/actionlint\n\n# Verify GitHub-release tools are available and executable.\nRUN command -v fd >/dev/null \\\n    && command -v bat >/dev/null \\\n    && command -v fzf >/dev/null \\\n    && command -v delta >/dev/null \\\n    && command -v eza >/dev/null \\\n    && command -v zoxide >/dev/null \\\n    && command -v yq >/dev/null \\\n    && command -v duf >/dev/null \\\n    && command -v sd >/dev/null \\\n    && command -v dust >/dev/null \\\n    && command -v procs >/dev/null \\\n    && command -v tokei >/dev/null \\\n    && command -v lychee >/dev/null \\\n    && command -v actionlint >/dev/null\n\n# Install cross-tool Python requirements for container tooling.\nCOPY .devcontainer/requirements-tools.txt /tmp/requirements-tools.txt\n\n# Install PowerShell from GitHub releases to support both amd64 and arm64.\nRUN POWERSHELL_VERSION=\"7.6.9\" \\\n    && case \"${TARGETARCH}\" in \\\n        amd64) POWERSHELL_ARCH=\"x64\" ; POWERSHELL_SHA256=\"1da6d6d6035d651f20e70ddee7c4c15ac6ab8b9fb40ee92240d91263f28a884b\" ;; \\\n        arm64) POWERSHELL_ARCH=\"arm64\" ; POWERSHELL_SHA256=\"02eb9991af447c7e7fe881acde195961afd397c40b8eb1c2b3856b84ec2d85f2\" ;; \\\n        *) echo \"Unsupported TARGETARCH: ${TARGETARCH}\" >&2; exit 1 ;; \\\n    esac \\\n    && curl -fsSL \"https://github.com/PowerShell/PowerShell/releases/download/v${POWERSHELL_VERSION}/powershell-${POWERSHELL_VERSION}-linux-${POWERSHELL_ARCH}.tar.gz\" -o /tmp/powershell.tar.gz \\\n    && echo \"${POWERSHELL_SHA256}  /tmp/powershell.tar.gz\" | sha256sum -c - \\\n    && mkdir -p /opt/microsoft/powershell/7 \\\n    && tar -xzf /tmp/powershell.tar.gz -C /opt/microsoft/powershell/7 \\\n    && chmod +x /opt/microsoft/powershell/7/pwsh \\\n    && ln -sf /opt/microsoft/powershell/7/pwsh /usr/local/bin/pwsh \\\n    && ln -sf /opt/microsoft/powershell/7/pwsh /usr/local/bin/powershell \\\n    && rm -f /tmp/powershell.tar.gz \\\n    && pwsh -NoLogo -NoProfile -Command '$PSVersionTable.PSVersion.ToString()'\n\n# Install Git LFS, Python, yamllint and Node.js in a consolidated cycle.\n# uv lives inside the /opt/python-tools venv; its tool installs (the Python-based\n# git and fetch MCP servers) are system-wide under /usr/local/bin so MCP client\n# startup never depends on downloading them. UV_PYTHON_PREFERENCE=only-system\n# keeps uv on the apt-installed interpreter instead of downloading its own.\nRUN curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource_setup.sh \\\n    && bash /tmp/nodesource_setup.sh \\\n    && rm -f /tmp/nodesource_setup.sh \\\n    && apt-get update \\\n    && apt-get install -y --no-install-recommends \\\n    git-lfs \\\n    nodejs \\\n    python3 \\\n    python3-pip \\\n    python3-venv \\\n    && python3 -m venv /opt/python-tools \\\n    && /opt/python-tools/bin/pip install --no-cache-dir \"uv==0.13.8\" \\\n    && /opt/python-tools/bin/uv pip install --python /opt/python-tools/bin/python --no-cache --requirement /tmp/requirements-tools.txt \\\n    && UV_TOOL_DIR=/opt/mcp-uv-tools UV_TOOL_BIN_DIR=/usr/local/bin UV_PYTHON_PREFERENCE=only-system \\\n        /opt/python-tools/bin/uv tool install \"mcp-server-git==2026.10.19\" \\\n    && UV_TOOL_DIR=/opt/mcp-uv-tools UV_TOOL_BIN_DIR=/usr/local/bin UV_PYTHON_PREFERENCE=only-system \\\n        /opt/python-tools/bin/uv tool install \"mcp-server-fetch==2026.10.24\" \\\n    && test -x /opt/python-tools/bin/uv \\\n    && ln -sf /opt/python-tools/bin/uv /usr/local/bin/uv \\\n    && test -x /usr/local/bin/mcp-server-git \\\n    && test -x /usr/local/bin/mcp-server-fetch \\\n    && ln -sf /opt/python-tools/bin/yamllint /usr/local/bin/yamllint \\\n    && git lfs install \\\n    && npm install -g npm@12.2.1 \\\n    && rm -f /tmp/requirements-tools.txt \\\n    && apt-get clean \\\n    && rm -rf /var/lib/apt/lists/*\n\n# The fetch MCP server's ReadabiliPy dependency installs its JavaScript deps at runtime into\n# site-packages, which is root-owned. Warm that directory while the image is built so a normal\n# container user can fetch pages without a failed npm install.\nRUN FETCH_JS_DIR=\"$(find /opt/mcp-uv-tools/mcp-server-fetch -type d -path '*/readabilipy/javascript' -print -quit)\" \\\n    && test -n \"$FETCH_JS_DIR\" \\\n    && npm install --prefix \"$FETCH_JS_DIR\" --no-audit --no-fund --omit=dev \\\n    && test -d \"$FETCH_JS_DIR/node_modules\" \\\n    && rm -rf /root/.npm\n\n# Pre-create volume mount target directories with correct ownership.\n# Docker named volumes copy image-layer permissions into empty volumes on\n# first mount, so this ensures new volumes start with vscode ownership.\n# For existing volumes, post-create.sh runs sudo chown as a safety net.\n# See: https://github.com/microsoft/vscode-remote-release/issues/9931\n#\n# Note: /var/lib/docker is managed by the Docker-in-Docker feature and must\n# remain root-owned. It is NOT pre-created here (the DinD feature handles it).\nRUN mkdir -p /home/vscode/.codex \\\n    /home/vscode/.claude \\\n    /home/vscode/.claude-zai \\\n    /home/vscode/.claude-openrouter \\\n    /home/vscode/.config/opencode \\\n    /home/vscode/.local/share/opencode \\\n    /home/vscode/.local/state/opencode \\\n    /home/vscode/.config/nanocoder \\\n    /home/vscode/.local/share/nanocoder \\\n    /home/vscode/.copilot \\\n    /home/vscode/.config/gh \\\n    /home/vscode/.mcp-auth \\\n    && chown vscode:vscode /home/vscode/.local \\\n    && chown -R vscode:vscode /home/vscode/.codex /home/vscode/.claude /home/vscode/.claude-zai /home/vscode/.claude-openrouter /home/vscode/.config/opencode /home/vscode/.local/share/opencode /home/vscode/.local/state/opencode /home/vscode/.config/nanocoder /home/vscode/.local/share/nanocoder /home/vscode/.copilot /home/vscode/.config/gh /home/vscode/.mcp-auth \\\n    && chmod 0700 /home/vscode/.codex /home/vscode/.claude /home/vscode/.claude-zai /home/vscode/.claude-openrouter /home/vscode/.config/opencode /home/vscode/.local/share/opencode /home/vscode/.local/state/opencode /home/vscode/.config/nanocoder /home/vscode/.local/share/nanocoder /home/vscode/.copilot /home/vscode/.config/gh /home/vscode/.mcp-auth\n\nRUN mkdir -p /home/vscode/.npm \\\n    && mkdir -p /home/vscode/.nuget/packages \\\n    && mkdir -p /home/vscode/.cache/pip \\\n    && mkdir -p /home/vscode/.cache/unity-helpers-devcontainer \\\n    && mkdir -p /home/vscode/.unity-test-project \\\n    && chown -R vscode:vscode /home/vscode/.npm /home/vscode/.nuget /home/vscode/.cache /home/vscode/.unity-test-project\n\n# Install CSharpier as a global .NET tool for the vscode user\nUSER vscode\nRUN dotnet tool install -g csharpier --version 1.4.0\n\n# Point npm's global prefix at a user-owned directory so `npm install -g` works\n# without sudo for the vscode user (npm docs: \"resolving EACCES permissions\n# errors when installing packages globally\"). The system prefix (/usr, root-owned)\n# is what forced `sudo npm install` before. PATH entries for ~/.local/bin are\n# added below (ENV for processes, profile.d for login shells).\nRUN npm config set prefix \"${HOME}/.local\"\n\n# Pre-install the AI coding agent CLIs and local MCP runtime packages so a freshly\n# built/rebuilt image has them even before post-create runs. post-create.sh and\n# post-start.sh refresh these to the latest versions, so this layer is a fast\n# offline-safe baseline rather than the source of truth.\nRUN npm install -g --no-fund --no-audit --allow-scripts=opencode-ai \\\n    \"@openai/codex@latest\" \\\n    \"opencode-ai@latest\" \\\n    \"@nanocollective/nanocoder@latest\" \\\n    \"@z_ai/mcp-server@latest\" \\\n    \"mcp-remote@latest\" \\\n    && \"$(npm prefix -g)/bin/codex\" --version \\\n    && \"$(npm prefix -g)/bin/opencode\" --version \\\n    && \"$(npm prefix -g)/bin/nanocoder\" --version \\\n    && test -x \"$(npm prefix -g)/bin/zai-mcp-server\" \\\n    && \"$(npm prefix -g)/bin/mcp-remote\" --version\n\n# Switch back to root for remaining setup\nUSER root\n\n# Put user-installed npm binaries on PATH for login shells (ENV PATH below covers\n# non-login processes). $HOME expands per-user, so root keeps a working PATH too.\nRUN printf '%s\\n' \\\n    '# User-global npm/bin tools (npm prefix ~/.local, dotnet tools, pip --user)' \\\n    'export PATH=\"$HOME/.local/bin:$HOME/.dotnet/tools:$PATH\"' \\\n    > /etc/profile.d/90-user-binaries.sh \\\n    && chmod 0644 /etc/profile.d/90-user-binaries.sh\n\n# Configure delta as the default git pager for better diffs\nRUN git config --system core.pager delta \\\n    && git config --system interactive.diffFilter \"delta --color-only\" \\\n    && git config --system delta.navigate true \\\n    && git config --system delta.light false \\\n    && git config --system delta.line-numbers true \\\n    && git config --system delta.side-by-side false \\\n    && git config --system merge.conflictstyle diff3 \\\n    && git config --system diff.colorMoved default\n\n# Initialize zoxide for bash (add to bashrc for interactive shells)\nRUN echo 'eval \"$(zoxide init bash)\"' >> /etc/bash.bashrc\n\n# Add helpful aliases to bashrc\n# IMPORTANT: Do NOT alias standard POSIX tools (find, grep, sed, cat, etc.)\n# Modern replacements (fd, rg, sd, bat) have DIFFERENT syntax and break scripts.\n# They are installed and available by their real names: fd, rg, sd, bat, dust, procs, duf, etc.\n# Only alias commands that don't shadow standard tools.\nRUN { \\\n    echo ''; \\\n    echo '# Modern CLI tool aliases (list/tree only - never shadow POSIX tools)'; \\\n    echo '# Modern tools available by real name: fd, rg, sd, bat, dust, procs, duf, eza, z, zi'; \\\n    echo 'alias ls=\"eza --icons --group-directories-first\"'; \\\n    echo 'alias ll=\"eza -la --icons --group-directories-first\"'; \\\n    echo 'alias lt=\"eza --tree --icons --group-directories-first\"'; \\\n    } >> /etc/bash.bashrc\n\n# Enable VS Code shell integration\n# VS Code automatically injects shell integration when terminal.integrated.shellIntegration.enabled is true.\n# This manual fallback ensures shell integration works in edge cases (sub-shells, reconnections, etc.)\n# See: https://code.visualstudio.com/docs/terminal/shell-integration\nRUN { \\\n    echo ''; \\\n    echo '# VS Code shell integration (manual fallback)'; \\\n    echo '# Automatic injection is enabled via devcontainer.json settings.'; \\\n    echo '# This provides a fallback for sub-shells and edge cases.'; \\\n    echo 'if [[ \"$TERM_PROGRAM\" == \"vscode\" ]]; then'; \\\n    echo '    # Check if VS Code has injected the integration script path'; \\\n    echo '    if [[ -n \"$VSCODE_SHELL_INTEGRATION\" && -f \"$VSCODE_SHELL_INTEGRATION\" ]]; then'; \\\n    echo '        builtin source \"$VSCODE_SHELL_INTEGRATION\"'; \\\n    echo '    elif command -v code &> /dev/null; then'; \\\n    echo '        # Fallback: use code CLI to locate the script'; \\\n    echo '        _vscode_shell_integration=\"$(code --locate-shell-integration-path bash 2>/dev/null)\"'; \\\n    echo '        if [[ -n \"$_vscode_shell_integration\" && -f \"$_vscode_shell_integration\" ]]; then'; \\\n    echo '            builtin source \"$_vscode_shell_integration\"'; \\\n    echo '        fi'; \\\n    echo '        unset _vscode_shell_integration'; \\\n    echo '    fi'; \\\n    echo 'fi'; \\\n    } >> /etc/bash.bashrc \\\n    && { \\\n    echo ''; \\\n    echo '# VS Code shell integration (manual fallback)'; \\\n    echo ''; \\\n    echo 'if [[ \"$TERM_PROGRAM\" == \"vscode\" ]]; then'; \\\n    echo '    if [[ -n \"$VSCODE_SHELL_INTEGRATION\" && -f \"$VSCODE_SHELL_INTEGRATION\" ]]; then'; \\\n    echo '        builtin source \"$VSCODE_SHELL_INTEGRATION\"'; \\\n    echo '    elif command -v code &> /dev/null; then'; \\\n    echo '        _vscode_shell_integration=\"$(code --locate-shell-integration-path zsh 2>/dev/null)\"'; \\\n    echo '        if [[ -n \"$_vscode_shell_integration\" && -f \"$_vscode_shell_integration\" ]]; then'; \\\n    echo '            builtin source \"$_vscode_shell_integration\"'; \\\n    echo '        fi'; \\\n    echo '        unset _vscode_shell_integration'; \\\n    echo '    fi'; \\\n    echo 'fi'; \\\n    } >> /etc/zsh/zshrc\n\n# Enable VS Code shell integration for PowerShell\n# See: https://code.visualstudio.com/docs/terminal/shell-integration\nRUN mkdir -p /opt/microsoft/powershell/7 \\\n    && { \\\n    echo '# VS Code shell integration (manual fallback)'; \\\n    echo 'if ($env:TERM_PROGRAM -eq \"vscode\") {'; \\\n    echo '    if ($env:VSCODE_SHELL_INTEGRATION -and (Test-Path $env:VSCODE_SHELL_INTEGRATION)) {'; \\\n    echo '        . $env:VSCODE_SHELL_INTEGRATION'; \\\n    echo '    } elseif (Get-Command code -ErrorAction SilentlyContinue) {'; \\\n    echo '        $script = code --locate-shell-integration-path pwsh 2>$null'; \\\n    echo '        if ($script -and (Test-Path $script)) { . $script }'; \\\n    echo '    }'; \\\n    echo '}'; \\\n    } >> /opt/microsoft/powershell/7/profile.ps1\n\n# Ensure dotnet tools and user-global npm binaries are on the PATH\nENV PATH=\"${PATH}:/root/.dotnet/tools:/home/vscode/.dotnet/tools:/home/vscode/.local/bin\"\n\n# Reset to non-root user\nUSER vscode\n",
+      "network": null,
+      "exit": 0,
+      "stdout": "========================================\nDevcontainer Download URL Validation\nDockerfile: <DOCKERFILE>\n========================================\n\nFound 17 tools\ndotnet_sdk|9.0.320|x64|arm64|https://builds.dotnet.microsoft.com/dotnet/Sdk/{VERSION}/dotnet-sdk-{VERSION}-linux-{ARCH}.tar.gz\ncsharpier_sdk|10.0.403|x64|arm64|https://builds.dotnet.microsoft.com/dotnet/Sdk/{VERSION}/dotnet-sdk-{VERSION}-linux-{ARCH}.tar.gz\nfd|10.5.2|x86_64-unknown-linux-gnu|aarch64-unknown-linux-gnu|https://github.com/sharkdp/fd/releases/download/v{VERSION}/fd-v{VERSION}-{ARCH}.tar.gz\nbat|0.26.1|x86_64-unknown-linux-gnu|aarch64-unknown-linux-gnu|https://github.com/sharkdp/bat/releases/download/v{VERSION}/bat-v{VERSION}-{ARCH}.tar.gz\nfzf|0.75.0|linux_amd64|linux_arm64|https://github.com/junegunn/fzf/releases/download/v{VERSION}/fzf-{VERSION}-{ARCH}.tar.gz\ndelta|0.20.1|x86_64-unknown-linux-gnu|aarch64-unknown-linux-gnu|https://github.com/dandavison/delta/releases/download/{VERSION}/delta-{VERSION}-{ARCH}.tar.gz\neza|0.23.5|x86_64-unknown-linux-gnu|aarch64-unknown-linux-gnu|https://github.com/eza-community/eza/releases/download/v{VERSION}/eza_{ARCH}.tar.gz\nzoxide|0.10.0|x86_64-unknown-linux-musl|aarch64-unknown-linux-musl|https://github.com/ajeetdsouza/zoxide/releases/download/v{VERSION}/zoxide-{VERSION}-{ARCH}.tar.gz\nyq|4.54.3|linux_amd64|linux_arm64|https://github.com/mikefarah/yq/releases/download/v{VERSION}/yq_{ARCH}\nduf|0.9.1|linux_x86_64|linux_arm64|https://github.com/muesli/duf/releases/download/v{VERSION}/duf_{VERSION}_{ARCH}.tar.gz\nsd|1.1.0|x86_64-unknown-linux-gnu|aarch64-unknown-linux-musl|https://github.com/chmln/sd/releases/download/v{VERSION}/sd-v{VERSION}-{ARCH}.tar.gz\ndust|1.2.7|x86_64-unknown-linux-gnu|aarch64-unknown-linux-gnu|https://github.com/bootandy/dust/releases/download/v{VERSION}/dust-v{VERSION}-{ARCH}.tar.gz\nprocs|0.14.12|x86_64-linux|aarch64-linux|https://github.com/dalance/procs/releases/download/v{VERSION}/procs-v{VERSION}-{ARCH}.zip\ntokei|12.1.2|x86_64-unknown-linux-gnu|aarch64-unknown-linux-gnu|https://github.com/XAMPPRocky/tokei/releases/download/v{VERSION}/tokei-{ARCH}.tar.gz\nlychee|0.24.2|x86_64-unknown-linux-musl|aarch64-unknown-linux-musl|https://github.com/lycheeverse/lychee/releases/download/lychee-v{VERSION}/lychee-{ARCH}.tar.gz\nactionlint|1.7.12|linux_amd64|linux_arm64|https://github.com/rhysd/actionlint/releases/download/v{VERSION}/actionlint_{VERSION}_{ARCH}.tar.gz\npowershell|7.6.9|x64|arm64|https://github.com/PowerShell/PowerShell/releases/download/v{VERSION}/powershell-{VERSION}-linux-{ARCH}.tar.gz\n",
+      "stderr": "",
+      "calls": []
+    },
+    "contracts-before-list": {
+      "args": ["--list-tools", "--contracts-only"],
+      "dockerfile": "FROM debian:12\nARG TARGETARCH\nRUN POWERSHELL_VERSION=\"7.5.3\" \\\n    && case \"${TARGETARCH}\" in \\\n        amd64) POWERSHELL_ARCH=\"x64\" ;; \\\n        arm64) POWERSHELL_ARCH=\"arm64\" ;; \\\n        *) exit 1 ;; \\\n    esac \\\n    && curl -fsSL \"https://github.com/PowerShell/PowerShell/releases/download/v${POWERSHELL_VERSION}/powershell-${POWERSHELL_VERSION}-linux-${POWERSHELL_ARCH}.tar.gz\" \\\n    | tar -xz -C /opt/pwsh\n",
+      "network": null,
+      "exit": 0,
+      "stdout": "========================================\nDevcontainer Download URL Validation\nDockerfile: <DOCKERFILE>\n========================================\n\nContract checks passed (no URL probing requested).\n",
+      "stderr": "",
+      "calls": []
+    },
+    "empty-list": {
+      "args": ["--list-tools"],
+      "dockerfile": "FROM debian:12\n",
+      "network": null,
+      "exit": 1,
+      "stdout": "========================================\nDevcontainer Download URL Validation\nDockerfile: <DOCKERFILE>\n========================================\n\n",
+      "stderr": "Warning: No tool definitions found in Dockerfile\n",
+      "calls": []
+    },
+    "unknown-option": {
+      "args": ["--unknown"],
+      "dockerfile": null,
+      "network": null,
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Usage: <PROGRAM> [--dockerfile <path>] [--contracts-only] [--list-tools]\n",
+      "calls": []
+    },
+    "head-ok": {
+      "args": [],
+      "dockerfile": "FROM debian:12\nRUN ITEM_VERSION=\"1.2.3\" \\\n    && case \"${TARGETARCH}\" in \\\n        amd64) ITEM_ARCH=\"x64\" ;; \\\n        arm64) ITEM_ARCH=\"arm64\" ;; \\\n    esac \\\n    && curl -fsSL \"https://github.com/example/item/releases/download/${ITEM_VERSION}/item-${ITEM_ARCH}.tgz\"\n",
+      "network": "head-ok",
+      "exit": 0,
+      "stdout": "========================================\nDevcontainer Download URL Validation\nDockerfile: <DOCKERFILE>\n========================================\n\nFound 1 tools to validate\n\n\u001b[1;33mitem\u001b[0m v1.2.3\n  \u001b[0;32m✓\u001b[0m [amd64]  https://github.com/example/item/releases/download/1.2.3/item-x64.tgz\n  \u001b[0;32m✓\u001b[0m [arm64]  https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz\n\n========================================\nResults: 2 passed, 0 failed (2 total)\n========================================\n\u001b[0;32mAll download URLs are valid!\u001b[0m\n",
+      "stderr": "",
+      "calls": [
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz"
+      ]
+    },
+    "range-ok": {
+      "args": [],
+      "dockerfile": "FROM debian:12\nRUN ITEM_VERSION=\"1.2.3\" \\\n    && case \"${TARGETARCH}\" in \\\n        amd64) ITEM_ARCH=\"x64\" ;; \\\n        arm64) ITEM_ARCH=\"arm64\" ;; \\\n    esac \\\n    && curl -fsSL \"https://github.com/example/item/releases/download/${ITEM_VERSION}/item-${ITEM_ARCH}.tgz\"\n",
+      "network": "range-ok",
+      "exit": 0,
+      "stdout": "========================================\nDevcontainer Download URL Validation\nDockerfile: <DOCKERFILE>\n========================================\n\nFound 1 tools to validate\n\n\u001b[1;33mitem\u001b[0m v1.2.3\n  HEAD HTTP 504; bounded GET HTTP 206 (curl exit 0)\n  \u001b[0;32m✓\u001b[0m [amd64]  https://github.com/example/item/releases/download/1.2.3/item-x64.tgz\n  HEAD HTTP 504; bounded GET HTTP 206 (curl exit 0)\n  \u001b[0;32m✓\u001b[0m [arm64]  https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz\n\n========================================\nResults: 2 passed, 0 failed (2 total)\n========================================\n\u001b[0;32mAll download URLs are valid!\u001b[0m\n",
+      "stderr": "",
+      "calls": [
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "sleep 2",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "sleep 4",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "--version",
+        "-s -o /dev/null -w %{http_code} -L --range 0-0 --max-filesize 1 --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "sleep 2",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "sleep 4",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "--version",
+        "-s -o /dev/null -w %{http_code} -L --range 0-0 --max-filesize 1 --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz"
+      ]
+    },
+    "range-ignored": {
+      "args": [],
+      "dockerfile": "FROM debian:12\nRUN ITEM_VERSION=\"1.2.3\" \\\n    && case \"${TARGETARCH}\" in \\\n        amd64) ITEM_ARCH=\"x64\" ;; \\\n        arm64) ITEM_ARCH=\"arm64\" ;; \\\n    esac \\\n    && curl -fsSL \"https://github.com/example/item/releases/download/${ITEM_VERSION}/item-${ITEM_ARCH}.tgz\"\n",
+      "network": "range-ignored",
+      "exit": 0,
+      "stdout": "========================================\nDevcontainer Download URL Validation\nDockerfile: <DOCKERFILE>\n========================================\n\nFound 1 tools to validate\n\n\u001b[1;33mitem\u001b[0m v1.2.3\n  HEAD HTTP 504; bounded GET HTTP 200 (curl exit 0)\n  \u001b[0;32m✓\u001b[0m [amd64]  https://github.com/example/item/releases/download/1.2.3/item-x64.tgz\n  HEAD HTTP 504; bounded GET HTTP 200 (curl exit 0)\n  \u001b[0;32m✓\u001b[0m [arm64]  https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz\n\n========================================\nResults: 2 passed, 0 failed (2 total)\n========================================\n\u001b[0;32mAll download URLs are valid!\u001b[0m\n",
+      "stderr": "",
+      "calls": [
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "sleep 2",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "sleep 4",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "--version",
+        "-s -o /dev/null -w %{http_code} -L --range 0-0 --max-filesize 1 --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "sleep 2",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "sleep 4",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "--version",
+        "-s -o /dev/null -w %{http_code} -L --range 0-0 --max-filesize 1 --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz"
+      ]
+    },
+    "size-limited": {
+      "args": [],
+      "dockerfile": "FROM debian:12\nRUN ITEM_VERSION=\"1.2.3\" \\\n    && case \"${TARGETARCH}\" in \\\n        amd64) ITEM_ARCH=\"x64\" ;; \\\n        arm64) ITEM_ARCH=\"arm64\" ;; \\\n    esac \\\n    && curl -fsSL \"https://github.com/example/item/releases/download/${ITEM_VERSION}/item-${ITEM_ARCH}.tgz\"\n",
+      "network": "size-limited",
+      "exit": 0,
+      "stdout": "========================================\nDevcontainer Download URL Validation\nDockerfile: <DOCKERFILE>\n========================================\n\nFound 1 tools to validate\n\n\u001b[1;33mitem\u001b[0m v1.2.3\n  HEAD HTTP 504; bounded GET HTTP 200 (curl exit 63)\n  \u001b[0;32m✓\u001b[0m [amd64]  https://github.com/example/item/releases/download/1.2.3/item-x64.tgz\n  HEAD HTTP 504; bounded GET HTTP 200 (curl exit 63)\n  \u001b[0;32m✓\u001b[0m [arm64]  https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz\n\n========================================\nResults: 2 passed, 0 failed (2 total)\n========================================\n\u001b[0;32mAll download URLs are valid!\u001b[0m\n",
+      "stderr": "",
+      "calls": [
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "sleep 2",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "sleep 4",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "--version",
+        "-s -o /dev/null -w %{http_code} -L --range 0-0 --max-filesize 1 --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "sleep 2",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "sleep 4",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "--version",
+        "-s -o /dev/null -w %{http_code} -L --range 0-0 --max-filesize 1 --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz"
+      ]
+    },
+    "missing": {
+      "args": [],
+      "dockerfile": "FROM debian:12\nRUN ITEM_VERSION=\"1.2.3\" \\\n    && case \"${TARGETARCH}\" in \\\n        amd64) ITEM_ARCH=\"x64\" ;; \\\n        arm64) ITEM_ARCH=\"arm64\" ;; \\\n    esac \\\n    && curl -fsSL \"https://github.com/example/item/releases/download/${ITEM_VERSION}/item-${ITEM_ARCH}.tgz\"\n",
+      "network": "missing",
+      "exit": 1,
+      "stdout": "========================================\nDevcontainer Download URL Validation\nDockerfile: <DOCKERFILE>\n========================================\n\nFound 1 tools to validate\n\n\u001b[1;33mitem\u001b[0m v1.2.3\n  HEAD HTTP 404; bounded GET HTTP 404 (curl exit 0)\n  \u001b[0;31m✗\u001b[0m [amd64]  HTTP 404  https://github.com/example/item/releases/download/1.2.3/item-x64.tgz\n  HEAD HTTP 404; bounded GET HTTP 404 (curl exit 0)\n  \u001b[0;31m✗\u001b[0m [arm64]  HTTP 404  https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz\n\n========================================\nResults: 0 passed, 2 failed (2 total)\n========================================\n\u001b[0;31m2 URL(s) returned non-200 status!\u001b[0m\n\nCommon causes:\n  - Wrong libc suffix (gnu vs musl) — check release assets\n  - Version yanked or doesn't exist\n  - Archive naming convention changed in new release\n  - arm64 builds not published for this version\n",
+      "stderr": "",
+      "calls": [
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "sleep 2",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "sleep 4",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "--version",
+        "-s -o /dev/null -w %{http_code} -L --range 0-0 --max-filesize 1 --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "sleep 2",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "sleep 4",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "--version",
+        "-s -o /dev/null -w %{http_code} -L --range 0-0 --max-filesize 1 --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz"
+      ]
+    },
+    "gateway": {
+      "args": [],
+      "dockerfile": "FROM debian:12\nRUN ITEM_VERSION=\"1.2.3\" \\\n    && case \"${TARGETARCH}\" in \\\n        amd64) ITEM_ARCH=\"x64\" ;; \\\n        arm64) ITEM_ARCH=\"arm64\" ;; \\\n    esac \\\n    && curl -fsSL \"https://github.com/example/item/releases/download/${ITEM_VERSION}/item-${ITEM_ARCH}.tgz\"\n",
+      "network": "gateway",
+      "exit": 1,
+      "stdout": "========================================\nDevcontainer Download URL Validation\nDockerfile: <DOCKERFILE>\n========================================\n\nFound 1 tools to validate\n\n\u001b[1;33mitem\u001b[0m v1.2.3\n  HEAD HTTP 504; bounded GET HTTP 504 (curl exit 0)\n  \u001b[0;31m✗\u001b[0m [amd64]  HTTP 504  https://github.com/example/item/releases/download/1.2.3/item-x64.tgz\n  HEAD HTTP 504; bounded GET HTTP 504 (curl exit 0)\n  \u001b[0;31m✗\u001b[0m [arm64]  HTTP 504  https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz\n\n========================================\nResults: 0 passed, 2 failed (2 total)\n========================================\n\u001b[0;31m2 URL(s) returned non-200 status!\u001b[0m\n\nCommon causes:\n  - Wrong libc suffix (gnu vs musl) — check release assets\n  - Version yanked or doesn't exist\n  - Archive naming convention changed in new release\n  - arm64 builds not published for this version\n",
+      "stderr": "",
+      "calls": [
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "sleep 2",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "sleep 4",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "--version",
+        "-s -o /dev/null -w %{http_code} -L --range 0-0 --max-filesize 1 --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "sleep 2",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "sleep 4",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "--version",
+        "-s -o /dev/null -w %{http_code} -L --range 0-0 --max-filesize 1 --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz"
+      ]
+    },
+    "redirect": {
+      "args": [],
+      "dockerfile": "FROM debian:12\nRUN ITEM_VERSION=\"1.2.3\" \\\n    && case \"${TARGETARCH}\" in \\\n        amd64) ITEM_ARCH=\"x64\" ;; \\\n        arm64) ITEM_ARCH=\"arm64\" ;; \\\n    esac \\\n    && curl -fsSL \"https://github.com/example/item/releases/download/${ITEM_VERSION}/item-${ITEM_ARCH}.tgz\"\n",
+      "network": "redirect",
+      "exit": 1,
+      "stdout": "========================================\nDevcontainer Download URL Validation\nDockerfile: <DOCKERFILE>\n========================================\n\nFound 1 tools to validate\n\n\u001b[1;33mitem\u001b[0m v1.2.3\n  HEAD HTTP 504; bounded GET HTTP 302 (curl exit 0)\n  \u001b[0;31m✗\u001b[0m [amd64]  HTTP 504  https://github.com/example/item/releases/download/1.2.3/item-x64.tgz\n  HEAD HTTP 504; bounded GET HTTP 302 (curl exit 0)\n  \u001b[0;31m✗\u001b[0m [arm64]  HTTP 504  https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz\n\n========================================\nResults: 0 passed, 2 failed (2 total)\n========================================\n\u001b[0;31m2 URL(s) returned non-200 status!\u001b[0m\n\nCommon causes:\n  - Wrong libc suffix (gnu vs musl) — check release assets\n  - Version yanked or doesn't exist\n  - Archive naming convention changed in new release\n  - arm64 builds not published for this version\n",
+      "stderr": "",
+      "calls": [
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "sleep 2",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "sleep 4",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "--version",
+        "-s -o /dev/null -w %{http_code} -L --range 0-0 --max-filesize 1 --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "sleep 2",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "sleep 4",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "--version",
+        "-s -o /dev/null -w %{http_code} -L --range 0-0 --max-filesize 1 --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz"
+      ]
+    },
+    "transport": {
+      "args": [],
+      "dockerfile": "FROM debian:12\nRUN ITEM_VERSION=\"1.2.3\" \\\n    && case \"${TARGETARCH}\" in \\\n        amd64) ITEM_ARCH=\"x64\" ;; \\\n        arm64) ITEM_ARCH=\"arm64\" ;; \\\n    esac \\\n    && curl -fsSL \"https://github.com/example/item/releases/download/${ITEM_VERSION}/item-${ITEM_ARCH}.tgz\"\n",
+      "network": "transport",
+      "exit": 1,
+      "stdout": "========================================\nDevcontainer Download URL Validation\nDockerfile: <DOCKERFILE>\n========================================\n\nFound 1 tools to validate\n\n\u001b[1;33mitem\u001b[0m v1.2.3\n  HEAD HTTP 504; bounded GET HTTP 206 (curl exit 7)\n  \u001b[0;31m✗\u001b[0m [amd64]  HTTP 504  https://github.com/example/item/releases/download/1.2.3/item-x64.tgz\n  HEAD HTTP 504; bounded GET HTTP 206 (curl exit 7)\n  \u001b[0;31m✗\u001b[0m [arm64]  HTTP 504  https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz\n\n========================================\nResults: 0 passed, 2 failed (2 total)\n========================================\n\u001b[0;31m2 URL(s) returned non-200 status!\u001b[0m\n\nCommon causes:\n  - Wrong libc suffix (gnu vs musl) — check release assets\n  - Version yanked or doesn't exist\n  - Archive naming convention changed in new release\n  - arm64 builds not published for this version\n",
+      "stderr": "",
+      "calls": [
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "sleep 2",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "sleep 4",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "--version",
+        "-s -o /dev/null -w %{http_code} -L --range 0-0 --max-filesize 1 --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "sleep 2",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "sleep 4",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "--version",
+        "-s -o /dev/null -w %{http_code} -L --range 0-0 --max-filesize 1 --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz"
+      ]
+    },
+    "head-transport": {
+      "args": [],
+      "dockerfile": "FROM debian:12\nRUN ITEM_VERSION=\"1.2.3\" \\\n    && case \"${TARGETARCH}\" in \\\n        amd64) ITEM_ARCH=\"x64\" ;; \\\n        arm64) ITEM_ARCH=\"arm64\" ;; \\\n    esac \\\n    && curl -fsSL \"https://github.com/example/item/releases/download/${ITEM_VERSION}/item-${ITEM_ARCH}.tgz\"\n",
+      "network": "head-transport",
+      "exit": 1,
+      "stdout": "========================================\nDevcontainer Download URL Validation\nDockerfile: <DOCKERFILE>\n========================================\n\nFound 1 tools to validate\n\n\u001b[1;33mitem\u001b[0m v1.2.3\n  HEAD HTTP 000; bounded GET HTTP 206 (curl exit 7)\n  \u001b[0;31m✗\u001b[0m [amd64]  HTTP 000  https://github.com/example/item/releases/download/1.2.3/item-x64.tgz\n  HEAD HTTP 000; bounded GET HTTP 206 (curl exit 7)\n  \u001b[0;31m✗\u001b[0m [arm64]  HTTP 000  https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz\n\n========================================\nResults: 0 passed, 2 failed (2 total)\n========================================\n\u001b[0;31m2 URL(s) returned non-200 status!\u001b[0m\n\nCommon causes:\n  - Wrong libc suffix (gnu vs musl) — check release assets\n  - Version yanked or doesn't exist\n  - Archive naming convention changed in new release\n  - arm64 builds not published for this version\n",
+      "stderr": "",
+      "calls": [
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "sleep 2",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "sleep 4",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "--version",
+        "-s -o /dev/null -w %{http_code} -L --range 0-0 --max-filesize 1 --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "sleep 2",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "sleep 4",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "--version",
+        "-s -o /dev/null -w %{http_code} -L --range 0-0 --max-filesize 1 --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz"
+      ]
+    },
+    "size-limited-missing": {
+      "args": [],
+      "dockerfile": "FROM debian:12\nRUN ITEM_VERSION=\"1.2.3\" \\\n    && case \"${TARGETARCH}\" in \\\n        amd64) ITEM_ARCH=\"x64\" ;; \\\n        arm64) ITEM_ARCH=\"arm64\" ;; \\\n    esac \\\n    && curl -fsSL \"https://github.com/example/item/releases/download/${ITEM_VERSION}/item-${ITEM_ARCH}.tgz\"\n",
+      "network": "size-limited-missing",
+      "exit": 1,
+      "stdout": "========================================\nDevcontainer Download URL Validation\nDockerfile: <DOCKERFILE>\n========================================\n\nFound 1 tools to validate\n\n\u001b[1;33mitem\u001b[0m v1.2.3\n  HEAD HTTP 504; bounded GET HTTP 404 (curl exit 63)\n  \u001b[0;31m✗\u001b[0m [amd64]  HTTP 504  https://github.com/example/item/releases/download/1.2.3/item-x64.tgz\n  HEAD HTTP 504; bounded GET HTTP 404 (curl exit 63)\n  \u001b[0;31m✗\u001b[0m [arm64]  HTTP 504  https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz\n\n========================================\nResults: 0 passed, 2 failed (2 total)\n========================================\n\u001b[0;31m2 URL(s) returned non-200 status!\u001b[0m\n\nCommon causes:\n  - Wrong libc suffix (gnu vs musl) — check release assets\n  - Version yanked or doesn't exist\n  - Archive naming convention changed in new release\n  - arm64 builds not published for this version\n",
+      "stderr": "",
+      "calls": [
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "sleep 2",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "sleep 4",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "--version",
+        "-s -o /dev/null -w %{http_code} -L --range 0-0 --max-filesize 1 --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "sleep 2",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "sleep 4",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "--version",
+        "-s -o /dev/null -w %{http_code} -L --range 0-0 --max-filesize 1 --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz"
+      ]
+    },
+    "old-curl": {
+      "args": [],
+      "dockerfile": "FROM debian:12\nRUN ITEM_VERSION=\"1.2.3\" \\\n    && case \"${TARGETARCH}\" in \\\n        amd64) ITEM_ARCH=\"x64\" ;; \\\n        arm64) ITEM_ARCH=\"arm64\" ;; \\\n    esac \\\n    && curl -fsSL \"https://github.com/example/item/releases/download/${ITEM_VERSION}/item-${ITEM_ARCH}.tgz\"\n",
+      "network": "old-curl",
+      "exit": 1,
+      "stdout": "========================================\nDevcontainer Download URL Validation\nDockerfile: <DOCKERFILE>\n========================================\n\nFound 1 tools to validate\n\n\u001b[1;33mitem\u001b[0m v1.2.3\n  Bounded GET fallback requires curl 8.4.0 or newer; retaining the failed HEAD result.\n  \u001b[0;31m✗\u001b[0m [amd64]  HTTP 504  https://github.com/example/item/releases/download/1.2.3/item-x64.tgz\n  Bounded GET fallback requires curl 8.4.0 or newer; retaining the failed HEAD result.\n  \u001b[0;31m✗\u001b[0m [arm64]  HTTP 504  https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz\n\n========================================\nResults: 0 passed, 2 failed (2 total)\n========================================\n\u001b[0;31m2 URL(s) returned non-200 status!\u001b[0m\n\nCommon causes:\n  - Wrong libc suffix (gnu vs musl) — check release assets\n  - Version yanked or doesn't exist\n  - Archive naming convention changed in new release\n  - arm64 builds not published for this version\n",
+      "stderr": "",
+      "calls": [
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "sleep 2",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "sleep 4",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "--version",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "sleep 2",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "sleep 4",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "--version"
+      ]
+    },
+    "curl-8.3": {
+      "args": [],
+      "dockerfile": "FROM debian:12\nRUN ITEM_VERSION=\"1.2.3\" \\\n    && case \"${TARGETARCH}\" in \\\n        amd64) ITEM_ARCH=\"x64\" ;; \\\n        arm64) ITEM_ARCH=\"arm64\" ;; \\\n    esac \\\n    && curl -fsSL \"https://github.com/example/item/releases/download/${ITEM_VERSION}/item-${ITEM_ARCH}.tgz\"\n",
+      "network": "curl-8.3",
+      "exit": 1,
+      "stdout": "========================================\nDevcontainer Download URL Validation\nDockerfile: <DOCKERFILE>\n========================================\n\nFound 1 tools to validate\n\n\u001b[1;33mitem\u001b[0m v1.2.3\n  Bounded GET fallback requires curl 8.4.0 or newer; retaining the failed HEAD result.\n  \u001b[0;31m✗\u001b[0m [amd64]  HTTP 504  https://github.com/example/item/releases/download/1.2.3/item-x64.tgz\n  Bounded GET fallback requires curl 8.4.0 or newer; retaining the failed HEAD result.\n  \u001b[0;31m✗\u001b[0m [arm64]  HTTP 504  https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz\n\n========================================\nResults: 0 passed, 2 failed (2 total)\n========================================\n\u001b[0;31m2 URL(s) returned non-200 status!\u001b[0m\n\nCommon causes:\n  - Wrong libc suffix (gnu vs musl) — check release assets\n  - Version yanked or doesn't exist\n  - Archive naming convention changed in new release\n  - arm64 builds not published for this version\n",
+      "stderr": "",
+      "calls": [
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "sleep 2",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "sleep 4",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "--version",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "sleep 2",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "sleep 4",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "--version"
+      ]
+    },
+    "new-curl": {
+      "args": [],
+      "dockerfile": "FROM debian:12\nRUN ITEM_VERSION=\"1.2.3\" \\\n    && case \"${TARGETARCH}\" in \\\n        amd64) ITEM_ARCH=\"x64\" ;; \\\n        arm64) ITEM_ARCH=\"arm64\" ;; \\\n    esac \\\n    && curl -fsSL \"https://github.com/example/item/releases/download/${ITEM_VERSION}/item-${ITEM_ARCH}.tgz\"\n",
+      "network": "new-curl",
+      "exit": 0,
+      "stdout": "========================================\nDevcontainer Download URL Validation\nDockerfile: <DOCKERFILE>\n========================================\n\nFound 1 tools to validate\n\n\u001b[1;33mitem\u001b[0m v1.2.3\n  HEAD HTTP 504; bounded GET HTTP 206 (curl exit 0)\n  \u001b[0;32m✓\u001b[0m [amd64]  https://github.com/example/item/releases/download/1.2.3/item-x64.tgz\n  HEAD HTTP 504; bounded GET HTTP 206 (curl exit 0)\n  \u001b[0;32m✓\u001b[0m [arm64]  https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz\n\n========================================\nResults: 2 passed, 0 failed (2 total)\n========================================\n\u001b[0;32mAll download URLs are valid!\u001b[0m\n",
+      "stderr": "",
+      "calls": [
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "sleep 2",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "sleep 4",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "--version",
+        "-s -o /dev/null -w %{http_code} -L --range 0-0 --max-filesize 1 --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "sleep 2",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "sleep 4",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "--version",
+        "-s -o /dev/null -w %{http_code} -L --range 0-0 --max-filesize 1 --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz"
+      ]
+    },
+    "bad-version": {
+      "args": [],
+      "dockerfile": "FROM debian:12\nRUN ITEM_VERSION=\"1.2.3\" \\\n    && case \"${TARGETARCH}\" in \\\n        amd64) ITEM_ARCH=\"x64\" ;; \\\n        arm64) ITEM_ARCH=\"arm64\" ;; \\\n    esac \\\n    && curl -fsSL \"https://github.com/example/item/releases/download/${ITEM_VERSION}/item-${ITEM_ARCH}.tgz\"\n",
+      "network": "bad-version",
+      "exit": 1,
+      "stdout": "========================================\nDevcontainer Download URL Validation\nDockerfile: <DOCKERFILE>\n========================================\n\nFound 1 tools to validate\n\n\u001b[1;33mitem\u001b[0m v1.2.3\n  Bounded GET fallback requires curl 8.4.0 or newer; retaining the failed HEAD result.\n  \u001b[0;31m✗\u001b[0m [amd64]  HTTP 504  https://github.com/example/item/releases/download/1.2.3/item-x64.tgz\n  Bounded GET fallback requires curl 8.4.0 or newer; retaining the failed HEAD result.\n  \u001b[0;31m✗\u001b[0m [arm64]  HTTP 504  https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz\n\n========================================\nResults: 0 passed, 2 failed (2 total)\n========================================\n\u001b[0;31m2 URL(s) returned non-200 status!\u001b[0m\n\nCommon causes:\n  - Wrong libc suffix (gnu vs musl) — check release assets\n  - Version yanked or doesn't exist\n  - Archive naming convention changed in new release\n  - arm64 builds not published for this version\n",
+      "stderr": "",
+      "calls": [
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "sleep 2",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "sleep 4",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "--version",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "sleep 2",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "sleep 4",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "--version"
+      ]
+    },
+    "version-error": {
+      "args": [],
+      "dockerfile": "FROM debian:12\nRUN ITEM_VERSION=\"1.2.3\" \\\n    && case \"${TARGETARCH}\" in \\\n        amd64) ITEM_ARCH=\"x64\" ;; \\\n        arm64) ITEM_ARCH=\"arm64\" ;; \\\n    esac \\\n    && curl -fsSL \"https://github.com/example/item/releases/download/${ITEM_VERSION}/item-${ITEM_ARCH}.tgz\"\n",
+      "network": "version-error",
+      "exit": 1,
+      "stdout": "========================================\nDevcontainer Download URL Validation\nDockerfile: <DOCKERFILE>\n========================================\n\nFound 1 tools to validate\n\n\u001b[1;33mitem\u001b[0m v1.2.3\n  Bounded GET fallback requires curl 8.4.0 or newer; retaining the failed HEAD result.\n  \u001b[0;31m✗\u001b[0m [amd64]  HTTP 504  https://github.com/example/item/releases/download/1.2.3/item-x64.tgz\n  Bounded GET fallback requires curl 8.4.0 or newer; retaining the failed HEAD result.\n  \u001b[0;31m✗\u001b[0m [arm64]  HTTP 504  https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz\n\n========================================\nResults: 0 passed, 2 failed (2 total)\n========================================\n\u001b[0;31m2 URL(s) returned non-200 status!\u001b[0m\n\nCommon causes:\n  - Wrong libc suffix (gnu vs musl) — check release assets\n  - Version yanked or doesn't exist\n  - Archive naming convention changed in new release\n  - arm64 builds not published for this version\n",
+      "stderr": "",
+      "calls": [
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "sleep 2",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "sleep 4",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "--version",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "sleep 2",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "sleep 4",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz",
+        "--version"
+      ]
+    },
+    "head-old-ok": {
+      "args": [],
+      "dockerfile": "FROM debian:12\nRUN ITEM_VERSION=\"1.2.3\" \\\n    && case \"${TARGETARCH}\" in \\\n        amd64) ITEM_ARCH=\"x64\" ;; \\\n        arm64) ITEM_ARCH=\"arm64\" ;; \\\n    esac \\\n    && curl -fsSL \"https://github.com/example/item/releases/download/${ITEM_VERSION}/item-${ITEM_ARCH}.tgz\"\n",
+      "network": "head-old-ok",
+      "exit": 0,
+      "stdout": "========================================\nDevcontainer Download URL Validation\nDockerfile: <DOCKERFILE>\n========================================\n\nFound 1 tools to validate\n\n\u001b[1;33mitem\u001b[0m v1.2.3\n  \u001b[0;32m✓\u001b[0m [amd64]  https://github.com/example/item/releases/download/1.2.3/item-x64.tgz\n  \u001b[0;32m✓\u001b[0m [arm64]  https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz\n\n========================================\nResults: 2 passed, 0 failed (2 total)\n========================================\n\u001b[0;32mAll download URLs are valid!\u001b[0m\n",
+      "stderr": "",
+      "calls": [
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-x64.tgz",
+        "-sI -o /dev/null -w %{http_code} -L --max-time 30 https://github.com/example/item/releases/download/1.2.3/item-arm64.tgz"
+      ]
+    }
+  }
+}

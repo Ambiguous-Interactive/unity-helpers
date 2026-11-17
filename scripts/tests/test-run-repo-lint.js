@@ -485,6 +485,7 @@ runTest("no linter in scripts/ has been left unreachable", () => {
   // (#453). An allowlist whose entries are prose excuses whatever is put in it -- the quiet half of
   // #445, one level up: the thing named still exists, so nothing goes red.
   const runElsewhere = new Map([
+    ["scripts/validate-devcontainer-urls.sh", "devcontainer-url-controls"],
     ["scripts/validate-devcontainer-config.ps1", "devcontainer-controls"],
     ["scripts/validate-github-pages-css.sh", "pages-css-controls"],
     ["scripts/validate-npm-package.ps1", "npm-package-controls"],
@@ -544,6 +545,10 @@ runTest("no linter in scripts/ has been left unreachable", () => {
     [
       "policy-controls",
       (file) => registeredControlsInvoke(file, "scripts/tests/test_build_lock_inputs.py")
+    ],
+    [
+      "devcontainer-url-controls",
+      (file) => registeredControlsInvoke(file, "scripts/tests/test_devcontainer_urls.py")
     ],
     [
       "devcontainer-controls",

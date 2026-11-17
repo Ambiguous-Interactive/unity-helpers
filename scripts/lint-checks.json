@@ -416,13 +416,13 @@
   {
     "id": "devcontainer-urls",
     "name": "Devcontainer download URLs",
-    "run": "bash scripts/validate-devcontainer-urls.sh",
+    "run": "uv run --quiet --project scripts/python~ --locked --no-dev python scripts/validate_devcontainer_urls.py",
     "inputs": ["@tooling"]
   },
   {
     "id": "devcontainer-urls-test",
     "name": "Devcontainer URL contracts",
-    "run": "bash scripts/tests/test-validate-devcontainer-urls.sh",
+    "run": "npm run test:validate-devcontainer-urls",
     "inputs": ["@tooling"]
   },
   {

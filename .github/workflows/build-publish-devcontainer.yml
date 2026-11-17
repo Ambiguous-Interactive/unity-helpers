@@ -26,11 +26,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
-      - name: Validate Dockerfile download URLs
-        run: bash scripts/validate-devcontainer-urls.sh
-
       - name: Setup Python tooling
         uses: ./.github/actions/setup-python-tools
+
+      - name: Validate Dockerfile download URLs
+        run: uv run --quiet --project scripts/python~ --locked --no-dev python scripts/validate_devcontainer_urls.py
 
       - name: Validate devcontainer config
         shell: pwsh
