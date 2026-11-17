@@ -1,0 +1,1602 @@
+{
+  "date": "2026-11-17",
+  "baseCommit": "23be7598a5435efa7a0dfc05752b5e1016c6622d",
+  "environment": {
+    "platform": "Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.36",
+    "python": "3.11.2",
+    "uv": "uv 0.13.6 (x86_64-unknown-linux-gnu)",
+    "bash": "GNU bash, version 5.2.15(1)-release (x86_64-pc-linux-gnu)",
+    "filesystem": "Filesystem     Type  1K-blocks     Used Available Use% Mounted on\nnone           tmpfs  49438612 13866212  35572400  29% /tmp"
+  },
+  "protocol": "Two warmups per arm/input, seven alternating fresh-process pairs; full public commands including uv startup; serial execution with no owned competing validation; complete stdout/stderr and exit equality, unchanged input/source hashes.",
+  "sources": {
+    "progress/.artifacts/session-20261117/css-original.sh": "4073d2d512db3f3927380fae496acceb4c541f611a7aa9c6111ba5fd2d083781",
+    "scripts/validate_github_pages_css.py": "30ed0847936a532297df1a9264dfc262b50cbf583332c498378b1e575bba03ce",
+    "scripts/cli_encoding.py": "d946dc4bb98fc3eb66ffb1b4394625281421b346fbac364e7d9a50c99d90a9f9",
+    "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d"
+  },
+  "summaryMilliseconds": {
+    "theme": {
+      "original": 49.153581,
+      "python": 44.246234
+    },
+    "large": {
+      "original": 55.233201,
+      "python": 42.682483
+    }
+  },
+  "observations": [
+    {
+      "input": "theme",
+      "pair": 0,
+      "arm": "original",
+      "milliseconds": 55.849065,
+      "exit": 0,
+      "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+    },
+    {
+      "input": "theme",
+      "pair": 0,
+      "arm": "python",
+      "milliseconds": 44.246234,
+      "exit": 0,
+      "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+    },
+    {
+      "input": "theme",
+      "pair": 1,
+      "arm": "python",
+      "milliseconds": 56.036083,
+      "exit": 0,
+      "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+    },
+    {
+      "input": "theme",
+      "pair": 1,
+      "arm": "original",
+      "milliseconds": 49.153581,
+      "exit": 0,
+      "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+    },
+    {
+      "input": "theme",
+      "pair": 2,
+      "arm": "original",
+      "milliseconds": 63.365437,
+      "exit": 0,
+      "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+    },
+    {
+      "input": "theme",
+      "pair": 2,
+      "arm": "python",
+      "milliseconds": 39.527102,
+      "exit": 0,
+      "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+    },
+    {
+      "input": "theme",
+      "pair": 3,
+      "arm": "python",
+      "milliseconds": 43.534365,
+      "exit": 0,
+      "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+    },
+    {
+      "input": "theme",
+      "pair": 3,
+      "arm": "original",
+      "milliseconds": 52.155563,
+      "exit": 0,
+      "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+    },
+    {
+      "input": "theme",
+      "pair": 4,
+      "arm": "original",
+      "milliseconds": 48.225644,
+      "exit": 0,
+      "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+    },
+    {
+      "input": "theme",
+      "pair": 4,
+      "arm": "python",
+      "milliseconds": 38.93924,
+      "exit": 0,
+      "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+    },
+    {
+      "input": "theme",
+      "pair": 5,
+      "arm": "python",
+      "milliseconds": 55.556279,
+      "exit": 0,
+      "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+    },
+    {
+      "input": "theme",
+      "pair": 5,
+      "arm": "original",
+      "milliseconds": 48.304067,
+      "exit": 0,
+      "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+    },
+    {
+      "input": "theme",
+      "pair": 6,
+      "arm": "original",
+      "milliseconds": 44.001109,
+      "exit": 0,
+      "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+    },
+    {
+      "input": "theme",
+      "pair": 6,
+      "arm": "python",
+      "milliseconds": 44.310878,
+      "exit": 0,
+      "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+    },
+    {
+      "input": "large",
+      "pair": 0,
+      "arm": "original",
+      "milliseconds": 55.062713,
+      "exit": 0,
+      "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+    },
+    {
+      "input": "large",
+      "pair": 0,
+      "arm": "python",
+      "milliseconds": 45.591905,
+      "exit": 0,
+      "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+    },
+    {
+      "input": "large",
+      "pair": 1,
+      "arm": "python",
+      "milliseconds": 39.757815,
+      "exit": 0,
+      "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+    },
+    {
+      "input": "large",
+      "pair": 1,
+      "arm": "original",
+      "milliseconds": 55.83958,
+      "exit": 0,
+      "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+    },
+    {
+      "input": "large",
+      "pair": 2,
+      "arm": "original",
+      "milliseconds": 55.233201,
+      "exit": 0,
+      "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+    },
+    {
+      "input": "large",
+      "pair": 2,
+      "arm": "python",
+      "milliseconds": 39.151679,
+      "exit": 0,
+      "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+    },
+    {
+      "input": "large",
+      "pair": 3,
+      "arm": "python",
+      "milliseconds": 44.305802,
+      "exit": 0,
+      "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+    },
+    {
+      "input": "large",
+      "pair": 3,
+      "arm": "original",
+      "milliseconds": 50.052953,
+      "exit": 0,
+      "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+    },
+    {
+      "input": "large",
+      "pair": 4,
+      "arm": "original",
+      "milliseconds": 48.207464,
+      "exit": 0,
+      "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+    },
+    {
+      "input": "large",
+      "pair": 4,
+      "arm": "python",
+      "milliseconds": 42.682483,
+      "exit": 0,
+      "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+    },
+    {
+      "input": "large",
+      "pair": 5,
+      "arm": "python",
+      "milliseconds": 34.289029,
+      "exit": 0,
+      "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+    },
+    {
+      "input": "large",
+      "pair": 5,
+      "arm": "original",
+      "milliseconds": 58.77625,
+      "exit": 0,
+      "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+    },
+    {
+      "input": "large",
+      "pair": 6,
+      "arm": "original",
+      "milliseconds": 57.876366,
+      "exit": 0,
+      "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+    },
+    {
+      "input": "large",
+      "pair": 6,
+      "arm": "python",
+      "milliseconds": 47.248105,
+      "exit": 0,
+      "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+    }
+  ],
+  "limitations": [
+    "Local Linux/tmpfs observations only; no Windows, cold-host, CI or Unity throughput claim.",
+    "The original CSS policy remains heuristic, not a general CSS parser.",
+    "All historical startup observations elsewhere remain unchanged."
+  ],
+  "initialRejectedPort": {
+    "date": "2026-11-17",
+    "baseCommit": "23be7598a5435efa7a0dfc05752b5e1016c6622d",
+    "environment": {
+      "platform": "Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.36",
+      "python": "3.11.2",
+      "uv": "uv 0.13.6 (x86_64-unknown-linux-gnu)",
+      "bash": "GNU bash, version 5.2.15(1)-release (x86_64-pc-linux-gnu)",
+      "filesystem": "Filesystem     Type  1K-blocks     Used Available Use% Mounted on\nnone           tmpfs  49438612 13771000  35667612  28% /tmp"
+    },
+    "protocol": "Two warmups per arm/input, seven alternating fresh-process pairs; full public commands including uv startup; serial execution with no owned competing validation; complete stdout/stderr and exit equality, unchanged input/source hashes.",
+    "sources": {
+      "progress/.artifacts/session-20261117/css-original.sh": "4073d2d512db3f3927380fae496acceb4c541f611a7aa9c6111ba5fd2d083781",
+      "scripts/validate_github_pages_css.py": "aa950644dd732644467edad2c5bba3ad10efb7521fd02a63bb3954ee106b83a3",
+      "scripts/cli_encoding.py": "d946dc4bb98fc3eb66ffb1b4394625281421b346fbac364e7d9a50c99d90a9f9",
+      "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d"
+    },
+    "summaryMilliseconds": {
+      "theme": {
+        "original": 36.893705,
+        "python": 32.547416
+      },
+      "large": {
+        "original": 41.677385,
+        "python": 4587.621266
+      }
+    },
+    "observations": [
+      {
+        "input": "theme",
+        "pair": 0,
+        "arm": "original",
+        "milliseconds": 34.823591,
+        "exit": 0,
+        "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+      },
+      {
+        "input": "theme",
+        "pair": 0,
+        "arm": "python",
+        "milliseconds": 30.636137,
+        "exit": 0,
+        "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+      },
+      {
+        "input": "theme",
+        "pair": 1,
+        "arm": "python",
+        "milliseconds": 30.15867,
+        "exit": 0,
+        "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+      },
+      {
+        "input": "theme",
+        "pair": 1,
+        "arm": "original",
+        "milliseconds": 33.365436,
+        "exit": 0,
+        "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+      },
+      {
+        "input": "theme",
+        "pair": 2,
+        "arm": "original",
+        "milliseconds": 33.414035,
+        "exit": 0,
+        "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+      },
+      {
+        "input": "theme",
+        "pair": 2,
+        "arm": "python",
+        "milliseconds": 32.640785,
+        "exit": 0,
+        "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+      },
+      {
+        "input": "theme",
+        "pair": 3,
+        "arm": "python",
+        "milliseconds": 40.110668,
+        "exit": 0,
+        "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+      },
+      {
+        "input": "theme",
+        "pair": 3,
+        "arm": "original",
+        "milliseconds": 41.691651,
+        "exit": 0,
+        "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+      },
+      {
+        "input": "theme",
+        "pair": 4,
+        "arm": "original",
+        "milliseconds": 40.462876,
+        "exit": 0,
+        "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+      },
+      {
+        "input": "theme",
+        "pair": 4,
+        "arm": "python",
+        "milliseconds": 41.07981,
+        "exit": 0,
+        "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+      },
+      {
+        "input": "theme",
+        "pair": 5,
+        "arm": "python",
+        "milliseconds": 32.547416,
+        "exit": 0,
+        "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+      },
+      {
+        "input": "theme",
+        "pair": 5,
+        "arm": "original",
+        "milliseconds": 36.893705,
+        "exit": 0,
+        "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+      },
+      {
+        "input": "theme",
+        "pair": 6,
+        "arm": "original",
+        "milliseconds": 38.799309,
+        "exit": 0,
+        "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+      },
+      {
+        "input": "theme",
+        "pair": 6,
+        "arm": "python",
+        "milliseconds": 32.383425,
+        "exit": 0,
+        "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+      },
+      {
+        "input": "large",
+        "pair": 0,
+        "arm": "original",
+        "milliseconds": 41.677385,
+        "exit": 0,
+        "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+      },
+      {
+        "input": "large",
+        "pair": 0,
+        "arm": "python",
+        "milliseconds": 4583.820994,
+        "exit": 0,
+        "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+      },
+      {
+        "input": "large",
+        "pair": 1,
+        "arm": "python",
+        "milliseconds": 4587.621266,
+        "exit": 0,
+        "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+      },
+      {
+        "input": "large",
+        "pair": 1,
+        "arm": "original",
+        "milliseconds": 39.501497,
+        "exit": 0,
+        "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+      },
+      {
+        "input": "large",
+        "pair": 2,
+        "arm": "original",
+        "milliseconds": 39.970513,
+        "exit": 0,
+        "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+      },
+      {
+        "input": "large",
+        "pair": 2,
+        "arm": "python",
+        "milliseconds": 4604.871135,
+        "exit": 0,
+        "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+      },
+      {
+        "input": "large",
+        "pair": 3,
+        "arm": "python",
+        "milliseconds": 4557.101429,
+        "exit": 0,
+        "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+      },
+      {
+        "input": "large",
+        "pair": 3,
+        "arm": "original",
+        "milliseconds": 42.586274,
+        "exit": 0,
+        "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+      },
+      {
+        "input": "large",
+        "pair": 4,
+        "arm": "original",
+        "milliseconds": 42.876313,
+        "exit": 0,
+        "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+      },
+      {
+        "input": "large",
+        "pair": 4,
+        "arm": "python",
+        "milliseconds": 4489.780919,
+        "exit": 0,
+        "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+      },
+      {
+        "input": "large",
+        "pair": 5,
+        "arm": "python",
+        "milliseconds": 4779.13904,
+        "exit": 0,
+        "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+      },
+      {
+        "input": "large",
+        "pair": 5,
+        "arm": "original",
+        "milliseconds": 46.030074,
+        "exit": 0,
+        "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+      },
+      {
+        "input": "large",
+        "pair": 6,
+        "arm": "original",
+        "milliseconds": 40.677139,
+        "exit": 0,
+        "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+      },
+      {
+        "input": "large",
+        "pair": 6,
+        "arm": "python",
+        "milliseconds": 4687.786222,
+        "exit": 0,
+        "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+      }
+    ],
+    "limitations": [
+      "Local Linux/tmpfs observations only; no Windows, cold-host, CI or Unity throughput claim.",
+      "The original CSS policy remains heuristic, not a general CSS parser.",
+      "All historical startup observations elsewhere remain unchanged."
+    ]
+  },
+  "intermediateCaptures": [
+    {
+      "date": "2026-11-17",
+      "baseCommit": "23be7598a5435efa7a0dfc05752b5e1016c6622d",
+      "environment": {
+        "platform": "Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.36",
+        "python": "3.11.2",
+        "uv": "uv 0.13.6 (x86_64-unknown-linux-gnu)",
+        "bash": "GNU bash, version 5.2.15(1)-release (x86_64-pc-linux-gnu)",
+        "filesystem": "Filesystem     Type  1K-blocks     Used Available Use% Mounted on\nnone           tmpfs  49438612 13772896  35665716  28% /tmp"
+      },
+      "protocol": "Two warmups per arm/input, seven alternating fresh-process pairs; full public commands including uv startup; serial execution with no owned competing validation; complete stdout/stderr and exit equality, unchanged input/source hashes.",
+      "sources": {
+        "progress/.artifacts/session-20261117/css-original.sh": "4073d2d512db3f3927380fae496acceb4c541f611a7aa9c6111ba5fd2d083781",
+        "scripts/validate_github_pages_css.py": "7ef2544f1aaf80400aa972559b46b8027395c7ef7b4aca8528a48f26198c9f82",
+        "scripts/cli_encoding.py": "d946dc4bb98fc3eb66ffb1b4394625281421b346fbac364e7d9a50c99d90a9f9",
+        "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d"
+      },
+      "summaryMilliseconds": {
+        "theme": {
+          "original": 38.963572,
+          "python": 34.11535
+        },
+        "large": {
+          "original": 41.435246,
+          "python": 32.11094
+        }
+      },
+      "observations": [
+        {
+          "input": "theme",
+          "pair": 0,
+          "arm": "original",
+          "milliseconds": 42.034036,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "theme",
+          "pair": 0,
+          "arm": "python",
+          "milliseconds": 36.182297,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "theme",
+          "pair": 1,
+          "arm": "python",
+          "milliseconds": 34.11535,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "theme",
+          "pair": 1,
+          "arm": "original",
+          "milliseconds": 34.760262,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "theme",
+          "pair": 2,
+          "arm": "original",
+          "milliseconds": 33.548298,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "theme",
+          "pair": 2,
+          "arm": "python",
+          "milliseconds": 32.095392,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "theme",
+          "pair": 3,
+          "arm": "python",
+          "milliseconds": 31.976422,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "theme",
+          "pair": 3,
+          "arm": "original",
+          "milliseconds": 40.170755,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "theme",
+          "pair": 4,
+          "arm": "original",
+          "milliseconds": 38.963572,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "theme",
+          "pair": 4,
+          "arm": "python",
+          "milliseconds": 36.838947,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "theme",
+          "pair": 5,
+          "arm": "python",
+          "milliseconds": 32.533599,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "theme",
+          "pair": 5,
+          "arm": "original",
+          "milliseconds": 38.968063,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "theme",
+          "pair": 6,
+          "arm": "original",
+          "milliseconds": 35.784392,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "theme",
+          "pair": 6,
+          "arm": "python",
+          "milliseconds": 37.458633,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "large",
+          "pair": 0,
+          "arm": "original",
+          "milliseconds": 41.958924,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        },
+        {
+          "input": "large",
+          "pair": 0,
+          "arm": "python",
+          "milliseconds": 32.11094,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        },
+        {
+          "input": "large",
+          "pair": 1,
+          "arm": "python",
+          "milliseconds": 30.592663,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        },
+        {
+          "input": "large",
+          "pair": 1,
+          "arm": "original",
+          "milliseconds": 41.435246,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        },
+        {
+          "input": "large",
+          "pair": 2,
+          "arm": "original",
+          "milliseconds": 38.120672,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        },
+        {
+          "input": "large",
+          "pair": 2,
+          "arm": "python",
+          "milliseconds": 38.325078,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        },
+        {
+          "input": "large",
+          "pair": 3,
+          "arm": "python",
+          "milliseconds": 29.096099,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        },
+        {
+          "input": "large",
+          "pair": 3,
+          "arm": "original",
+          "milliseconds": 43.257503,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        },
+        {
+          "input": "large",
+          "pair": 4,
+          "arm": "original",
+          "milliseconds": 42.868741,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        },
+        {
+          "input": "large",
+          "pair": 4,
+          "arm": "python",
+          "milliseconds": 34.243064,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        },
+        {
+          "input": "large",
+          "pair": 5,
+          "arm": "python",
+          "milliseconds": 27.117608,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        },
+        {
+          "input": "large",
+          "pair": 5,
+          "arm": "original",
+          "milliseconds": 40.142327,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        },
+        {
+          "input": "large",
+          "pair": 6,
+          "arm": "original",
+          "milliseconds": 38.399283,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        },
+        {
+          "input": "large",
+          "pair": 6,
+          "arm": "python",
+          "milliseconds": 34.466371,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        }
+      ],
+      "limitations": [
+        "Local Linux/tmpfs observations only; no Windows, cold-host, CI or Unity throughput claim.",
+        "The original CSS policy remains heuristic, not a general CSS parser.",
+        "All historical startup observations elsewhere remain unchanged."
+      ],
+      "correction": "Remove redundant repetition before the colon in the Boolean missing-semicolon search. Every matched nonempty property name has the same final character immediately before its colon. A real 1 MiB comment child times out at five seconds before this change and passes afterward. Initial 100 KiB observations are retained, not replaced."
+    },
+    {
+      "date": "2026-11-17",
+      "baseCommit": "23be7598a5435efa7a0dfc05752b5e1016c6622d",
+      "environment": {
+        "platform": "Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.36",
+        "python": "3.11.2",
+        "uv": "uv 0.13.6 (x86_64-unknown-linux-gnu)",
+        "bash": "GNU bash, version 5.2.15(1)-release (x86_64-pc-linux-gnu)",
+        "filesystem": "Filesystem     Type  1K-blocks     Used Available Use% Mounted on\nnone           tmpfs  49438612 13773000  35665612  28% /tmp"
+      },
+      "protocol": "Two warmups per arm/input, seven alternating fresh-process pairs; full public commands including uv startup; serial execution with no owned competing validation; complete stdout/stderr and exit equality, unchanged input/source hashes.",
+      "sources": {
+        "progress/.artifacts/session-20261117/css-original.sh": "4073d2d512db3f3927380fae496acceb4c541f611a7aa9c6111ba5fd2d083781",
+        "scripts/validate_github_pages_css.py": "ff1b90b0e875011aabf884316cff96062808789ca3b8c355e27b345a4283ff52",
+        "scripts/cli_encoding.py": "d946dc4bb98fc3eb66ffb1b4394625281421b346fbac364e7d9a50c99d90a9f9",
+        "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d"
+      },
+      "summaryMilliseconds": {
+        "theme": {
+          "original": 50.909511,
+          "python": 45.624959
+        },
+        "large": {
+          "original": 41.572598,
+          "python": 33.442177
+        }
+      },
+      "observations": [
+        {
+          "input": "theme",
+          "pair": 0,
+          "arm": "original",
+          "milliseconds": 38.065824,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "theme",
+          "pair": 0,
+          "arm": "python",
+          "milliseconds": 40.766815,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "theme",
+          "pair": 1,
+          "arm": "python",
+          "milliseconds": 41.54095,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "theme",
+          "pair": 1,
+          "arm": "original",
+          "milliseconds": 56.841264,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "theme",
+          "pair": 2,
+          "arm": "original",
+          "milliseconds": 50.909511,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "theme",
+          "pair": 2,
+          "arm": "python",
+          "milliseconds": 45.624959,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "theme",
+          "pair": 3,
+          "arm": "python",
+          "milliseconds": 35.800562,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "theme",
+          "pair": 3,
+          "arm": "original",
+          "milliseconds": 52.151289,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "theme",
+          "pair": 4,
+          "arm": "original",
+          "milliseconds": 66.992648,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "theme",
+          "pair": 4,
+          "arm": "python",
+          "milliseconds": 50.584912,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "theme",
+          "pair": 5,
+          "arm": "python",
+          "milliseconds": 49.018102,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "theme",
+          "pair": 5,
+          "arm": "original",
+          "milliseconds": 39.528515,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "theme",
+          "pair": 6,
+          "arm": "original",
+          "milliseconds": 47.904533,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "theme",
+          "pair": 6,
+          "arm": "python",
+          "milliseconds": 46.460374,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "large",
+          "pair": 0,
+          "arm": "original",
+          "milliseconds": 41.572598,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        },
+        {
+          "input": "large",
+          "pair": 0,
+          "arm": "python",
+          "milliseconds": 42.994767,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        },
+        {
+          "input": "large",
+          "pair": 1,
+          "arm": "python",
+          "milliseconds": 35.886439,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        },
+        {
+          "input": "large",
+          "pair": 1,
+          "arm": "original",
+          "milliseconds": 43.513392,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        },
+        {
+          "input": "large",
+          "pair": 2,
+          "arm": "original",
+          "milliseconds": 41.356958,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        },
+        {
+          "input": "large",
+          "pair": 2,
+          "arm": "python",
+          "milliseconds": 28.083163,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        },
+        {
+          "input": "large",
+          "pair": 3,
+          "arm": "python",
+          "milliseconds": 33.442177,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        },
+        {
+          "input": "large",
+          "pair": 3,
+          "arm": "original",
+          "milliseconds": 40.084362,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        },
+        {
+          "input": "large",
+          "pair": 4,
+          "arm": "original",
+          "milliseconds": 40.392232,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        },
+        {
+          "input": "large",
+          "pair": 4,
+          "arm": "python",
+          "milliseconds": 33.631657,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        },
+        {
+          "input": "large",
+          "pair": 5,
+          "arm": "python",
+          "milliseconds": 30.348026,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        },
+        {
+          "input": "large",
+          "pair": 5,
+          "arm": "original",
+          "milliseconds": 47.077386,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        },
+        {
+          "input": "large",
+          "pair": 6,
+          "arm": "original",
+          "milliseconds": 42.627615,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        },
+        {
+          "input": "large",
+          "pair": 6,
+          "arm": "python",
+          "milliseconds": 28.555327,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        }
+      ],
+      "limitations": [
+        "Local Linux/tmpfs observations only; no Windows, cold-host, CI or Unity throughput claim.",
+        "The original CSS policy remains heuristic, not a general CSS parser.",
+        "All historical startup observations elsewhere remain unchanged."
+      ],
+      "corrections": [
+        "Remove redundant property-prefix repetition in Boolean semicolon search; a real 1 MiB child fails the five-second bound before correction and passes after it.",
+        "Preserve GNU grep literal backslash/s exclusions in the legacy hex-color heuristic. Twenty-seven new original-executable observations reproduce eighteen parity failures before correction."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "baseCommit": "23be7598a5435efa7a0dfc05752b5e1016c6622d",
+      "environment": {
+        "platform": "Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.36",
+        "python": "3.11.2",
+        "uv": "uv 0.13.6 (x86_64-unknown-linux-gnu)",
+        "bash": "GNU bash, version 5.2.15(1)-release (x86_64-pc-linux-gnu)",
+        "filesystem": "Filesystem     Type  1K-blocks     Used Available Use% Mounted on\nnone           tmpfs  49438612 13865956  35572656  29% /tmp"
+      },
+      "protocol": "Two warmups per arm/input, seven alternating fresh-process pairs; full public commands including uv startup; serial execution with no owned competing validation; complete stdout/stderr and exit equality, unchanged input/source hashes.",
+      "sources": {
+        "progress/.artifacts/session-20261117/css-original.sh": "4073d2d512db3f3927380fae496acceb4c541f611a7aa9c6111ba5fd2d083781",
+        "scripts/validate_github_pages_css.py": "6dcf0b2e85b46ffe31b4af761233c18a69b383679043311ba21a28b80b6a88f7",
+        "scripts/cli_encoding.py": "d946dc4bb98fc3eb66ffb1b4394625281421b346fbac364e7d9a50c99d90a9f9",
+        "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d"
+      },
+      "summaryMilliseconds": {
+        "theme": {
+          "original": 38.929043,
+          "python": 35.227459
+        },
+        "large": {
+          "original": 43.371072,
+          "python": 33.780799
+        }
+      },
+      "observations": [
+        {
+          "input": "theme",
+          "pair": 0,
+          "arm": "original",
+          "milliseconds": 38.929043,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "theme",
+          "pair": 0,
+          "arm": "python",
+          "milliseconds": 35.16167,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "theme",
+          "pair": 1,
+          "arm": "python",
+          "milliseconds": 35.227459,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "theme",
+          "pair": 1,
+          "arm": "original",
+          "milliseconds": 42.102245,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "theme",
+          "pair": 2,
+          "arm": "original",
+          "milliseconds": 40.5034,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "theme",
+          "pair": 2,
+          "arm": "python",
+          "milliseconds": 32.976359,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "theme",
+          "pair": 3,
+          "arm": "python",
+          "milliseconds": 38.198274,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "theme",
+          "pair": 3,
+          "arm": "original",
+          "milliseconds": 39.704173,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "theme",
+          "pair": 4,
+          "arm": "original",
+          "milliseconds": 37.612941,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "theme",
+          "pair": 4,
+          "arm": "python",
+          "milliseconds": 35.923063,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "theme",
+          "pair": 5,
+          "arm": "python",
+          "milliseconds": 34.598981,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "theme",
+          "pair": 5,
+          "arm": "original",
+          "milliseconds": 38.293119,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "theme",
+          "pair": 6,
+          "arm": "original",
+          "milliseconds": 36.403088,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "theme",
+          "pair": 6,
+          "arm": "python",
+          "milliseconds": 40.288024,
+          "exit": 0,
+          "stdoutSha256": "deb629829ef8fb393f5f21d9397927ac19cbbfa124535b3451be9a3233af140d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "802d0b677bed29b25a4fbc88562625e61b71ac33a0b05b706506f9bba4fdf369"
+        },
+        {
+          "input": "large",
+          "pair": 0,
+          "arm": "original",
+          "milliseconds": 43.371072,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        },
+        {
+          "input": "large",
+          "pair": 0,
+          "arm": "python",
+          "milliseconds": 38.965986,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        },
+        {
+          "input": "large",
+          "pair": 1,
+          "arm": "python",
+          "milliseconds": 35.850257,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        },
+        {
+          "input": "large",
+          "pair": 1,
+          "arm": "original",
+          "milliseconds": 42.011166,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        },
+        {
+          "input": "large",
+          "pair": 2,
+          "arm": "original",
+          "milliseconds": 43.850326,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        },
+        {
+          "input": "large",
+          "pair": 2,
+          "arm": "python",
+          "milliseconds": 32.031532,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        },
+        {
+          "input": "large",
+          "pair": 3,
+          "arm": "python",
+          "milliseconds": 33.392803,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        },
+        {
+          "input": "large",
+          "pair": 3,
+          "arm": "original",
+          "milliseconds": 44.377971,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        },
+        {
+          "input": "large",
+          "pair": 4,
+          "arm": "original",
+          "milliseconds": 40.715073,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        },
+        {
+          "input": "large",
+          "pair": 4,
+          "arm": "python",
+          "milliseconds": 35.383812,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        },
+        {
+          "input": "large",
+          "pair": 5,
+          "arm": "python",
+          "milliseconds": 32.936419,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        },
+        {
+          "input": "large",
+          "pair": 5,
+          "arm": "original",
+          "milliseconds": 43.065986,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        },
+        {
+          "input": "large",
+          "pair": 6,
+          "arm": "original",
+          "milliseconds": 44.294423,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        },
+        {
+          "input": "large",
+          "pair": 6,
+          "arm": "python",
+          "milliseconds": 33.780799,
+          "exit": 0,
+          "stdoutSha256": "a269efa792d2e85bef7d34c140a2cdcd2784ec228ca544f662584523cda00b55",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inputSha256": "5ef0f0721fc21133dcfe8a4521c4d1050490c7c5aa4eb15ae0b268ad2d66eba3"
+        }
+      ],
+      "limitations": [
+        "Local Linux/tmpfs observations only; no Windows, cold-host, CI or Unity throughput claim.",
+        "The original CSS policy remains heuristic, not a general CSS parser.",
+        "All historical startup observations elsewhere remain unchanged."
+      ],
+      "corrections": [
+        "Initial 1 MiB comment fails five-second child bound. Remove redundant property-prefix repetition. Later repeated declaration and media prefix controls also each fail five seconds; segment the semicolon and media heuristics before fixed-prefix matching. All three cases pass after linear scans.",
+        "Preserve GNU grep literal backslash/s exclusions in the legacy hex-color heuristic. Twenty-seven new original-executable observations reproduce eighteen parity failures before correction.",
+        "Preserve literal input display and refuse a trailing separator on a file. Both original-executable path observations fail before correction and pass afterward."
+      ],
+      "qualification": {
+        "frozenOriginalObservations": 56,
+        "focusedTests": 69,
+        "originalSuiteAssertions": 17
+      }
+    }
+  ],
+  "corrections": [
+    "Initial 1 MiB comment fails five-second child bound. Remove redundant property-prefix repetition. Later repeated declaration and media prefix controls also each fail five seconds; segment the semicolon and media heuristics before fixed-prefix matching. All three cases pass after linear scans.",
+    "Preserve GNU grep literal backslash/s exclusions in the legacy hex-color heuristic. Twenty-seven new original-executable observations reproduce eighteen parity failures before correction.",
+    "Preserve literal input display and refuse a trailing separator on a file. Both original-executable path observations fail before correction and pass afterward."
+  ],
+  "qualification": {
+    "frozenOriginalObservations": 56,
+    "focusedTests": 69,
+    "originalSuiteAssertions": 17
+  }
+}

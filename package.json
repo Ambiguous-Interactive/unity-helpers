@@ -216,7 +216,7 @@
     "test:validate-devcontainer-config": "pwsh -NoProfile -File scripts/tests/test-validate-devcontainer-config.ps1",
     "test:validate-hook-permissions": "uv run --project scripts/python~ --locked pytest scripts/tests/test_hook_permissions.py -q",
     "test:validate-hook-sync-calls": "uv run --project scripts/python~ --locked pytest scripts/tests/test_hook_validation.py -q",
-    "test:validate-github-pages-css": "bash scripts/tests/test-validate-github-pages-css.sh",
+    "test:validate-github-pages-css": "uv run --quiet --project scripts/python~ --locked pytest scripts/tests/test_github_pages_css.py -q",
     "test:check-code-fence-syntax": "uv run --quiet --project scripts/python~ --locked pytest scripts/tests/test_code_fence_syntax.py -q",
     "test:markdown-fence-repair": "uv run --quiet --project scripts/python~ --locked pytest scripts/tests/test_markdown_fence_languages.py -q",
     "test:lint-doc-identifiers": "uv run --project scripts/python~ --locked pytest scripts/tests/test_doc_identifiers.py -q",
