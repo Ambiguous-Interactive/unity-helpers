@@ -249,7 +249,7 @@
     "test:unity-acceptance-evidence": "node scripts/tests/test-unity-acceptance.js",
     "test:format-on-demand-workflow": "node scripts/tests/test-format-on-demand-workflow.js",
     "test:unity-acceptance-workflow": "npm run test:unity-acceptance-workflow:predicates && npm run test:nullable-consumer-matrix && npm run test:il2cpp-conversion-inputs",
-    "test:unity-acceptance-workflow:predicates": "node scripts/tests/test-unity-acceptance-workflow.js",
+    "test:unity-acceptance-workflow:predicates": "uv run --project scripts/python~ --locked pytest scripts/tests/test_native_build_selection.py -q && node scripts/tests/test-unity-acceptance-workflow.js",
     "test:nullable-consumer-matrix": "node scripts/tests/test-nullable-consumer-matrix.js",
     "test:il2cpp-conversion-inputs": "pwsh -NoProfile -File scripts/tests/test-il2cpp-conversion-inputs.ps1",
     "test:unity-grouped-modes": "node scripts/tests/test-unity-grouped-modes.js && node --test scripts/tests/test-unity-compatibility.js",

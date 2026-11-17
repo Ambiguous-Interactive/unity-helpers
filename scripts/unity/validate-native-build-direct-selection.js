@@ -3,24 +3,24 @@
 
 "use strict";
 
-function getDirectBuildSelectionError(environment) {
-  if (
-    environment == null ||
-    environment.UH_NATIVE_DIAGNOSTICS !== "true" ||
-    environment.UH_NATIVE_MODE !== "standalone" ||
-    environment.UH_NATIVE_ACCEPTANCE !== "none"
-  ) {
-    return "Direct Standalone build control requires native-diagnostics=true, test-mode=standalone and acceptance=none.";
-  }
-  return null;
-}
-
-module.exports = { getDirectBuildSelectionError };
-
+const path = require("node:path");
+const { spawnSync } = require("node:child_process");
 if (require.main === module) {
-  const error = getDirectBuildSelectionError(process.env);
-  if (error !== null) {
-    console.error(error);
-    process.exitCode = 1;
-  }
+  const result = spawnSync(
+    "uv",
+    [
+      "run",
+      "--quiet",
+      "--project",
+      path.join(__dirname, "../python~"),
+      "--locked",
+      "--no-dev",
+      "python",
+      path.join(__dirname, "native_build_selection.py"),
+      "direct"
+    ],
+    { stdio: "inherit" }
+  );
+  if (result.error) console.error(`Python tooling could not start: ${result.error.message}`);
+  process.exitCode = result.status ?? 1;
 }

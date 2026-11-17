@@ -388,6 +388,7 @@ jobs:
         run: >-
           uv run --project scripts/python~ --locked pytest
           scripts/tests/test_ci_modes.py scripts/tests/test_browser_consumer.py
+          scripts/tests/test_native_build_selection.py
           -vv --durations=20
 
   assembly-tools-windows:

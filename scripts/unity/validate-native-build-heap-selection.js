@@ -3,25 +3,24 @@
 
 "use strict";
 
-function getStandardHeapSelectionError(environment) {
-  if (
-    environment == null ||
-    environment.UH_NATIVE_DIAGNOSTICS !== "true" ||
-    environment.UH_NATIVE_MODE !== "standalone" ||
-    environment.UH_NATIVE_ACCEPTANCE !== "none" ||
-    environment.UH_NATIVE_DIRECT_CONTROL !== "false"
-  ) {
-    return "Standard heap control requires native diagnostics, Standalone, acceptance=none and the Debugger arm.";
-  }
-  return null;
-}
-
-module.exports = { getStandardHeapSelectionError };
-
+const path = require("node:path");
+const { spawnSync } = require("node:child_process");
 if (require.main === module) {
-  const error = getStandardHeapSelectionError(process.env);
-  if (error !== null) {
-    console.error(error);
-    process.exitCode = 1;
-  }
+  const result = spawnSync(
+    "uv",
+    [
+      "run",
+      "--quiet",
+      "--project",
+      path.join(__dirname, "../python~"),
+      "--locked",
+      "--no-dev",
+      "python",
+      path.join(__dirname, "native_build_selection.py"),
+      "heap"
+    ],
+    { stdio: "inherit" }
+  );
+  if (result.error) console.error(`Python tooling could not start: ${result.error.message}`);
+  process.exitCode = result.status ?? 1;
 }
