@@ -119,6 +119,13 @@ else
     fail ".devcontainer/Dockerfile exists" "Missing .devcontainer/Dockerfile"
 fi
 
+if grep -Eq '^[[:space:]]*ARG[[:space:]]+TARGETARCH[[:space:]]*$' "$DOCKERFILE" \
+    && ! grep -Eq '^[[:space:]]*ARG[[:space:]]+TARGETARCH=' "$DOCKERFILE"; then
+    pass "Dockerfile inherits the BuildKit target architecture"
+else
+    fail "Dockerfile inherits the BuildKit target architecture" "A TARGETARCH default can select x64 assets for arm64 images."
+fi
+
 assert_file_contains_literal "$DOCKERFILE" \
     'POWERSHELL_VERSION=' \
     "Dockerfile defines POWERSHELL_VERSION for release URL validation" \

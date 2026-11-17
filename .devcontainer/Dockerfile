@@ -2,7 +2,7 @@
 FROM mcr.microsoft.com/devcontainers/dotnet:2.3.2-9.0-bookworm
 
 # Architecture for downloading binaries (supports amd64 and arm64)
-ARG TARGETARCH=amd64
+ARG TARGETARCH
 
 # Set non-interactive frontend for apt to avoid prompts
 ENV DEBIAN_FRONTEND=noninteractive
