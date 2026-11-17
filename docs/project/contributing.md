@@ -184,6 +184,8 @@ Release admission retains the original handling of empty container fork flags, r
 branch names, and rejects non-JSON numbers and incompatible package encodings before publication.
 
 Local push-default configuration shares typed Python policy through locked uv.
+Write failures name the failed key; Bash keeps the Git failure status. Bootstrap or
+protocol failures preserve a prior native exit value or its absence.
 The Bash and PowerShell commands retain their caller-specific behavior. The dot-sourced
 PowerShell helper still returns a result table, preserves the caller's exit state and
 does not start another PowerShell host. A missing uv tool produces a failure result.
@@ -210,7 +212,7 @@ Dev Containers helper is registered; it reads configuration and declared host na
 and does not request a token. Git reads and the checker have 30-second process deadlines.
 
 The [qualification record](../performance/push-validation-qualification.json)
-retains 39 original CLI observations and 60 typed controls. The real container
+retains 39 original CLI observations and 56 typed controls. The real container
 integration uses disposable Git configuration. A PowerShell probe verifies the
 case-sensitive versus case-insensitive filename boundary. Historical measurements from
 seven alternating Linux pairs after two warmup pairs were 298.45 → 41.40 ms for a clean
@@ -218,6 +220,73 @@ fixture and 575.73 → 66.68 ms with 30 hook artifacts. The receipt seals that p
 implementation; the corrected credential-read error handling has no new timing claim.
 These fixture timings exclude the container checker and do not measure Windows,
 complete pushes or CI. Host configuration helpers remain separate migration scope.
+
+Unity failure patterns and environment warnings share the declarative catalogue in
+`scripts/unity/log-patterns.json`. Native consumers retain their existing regex engine
+and can load the catalogue when Python bootstrap is unavailable. Licensing warnings
+remain observations; independent cleanup receipts determine cleanup health.
+
+`npm run test:catastrophic-pattern-sync` runs the typed scanner controls and the
+original native consumer checks. Native-report summaries stream through locked Python,
+preserve BOM and line-ending behavior, count all observations and retain at most eight
+locations for each marker. Read failures retain delivered observations with an
+`unreadable-log` state. Child or malformed-protocol failures cannot claim observations.
+The adapter preserves prior or undefined native exit status and closes its native
+read handle on success and failure. The native handle retains
+[FileShare.Read semantics](https://learn.microsoft.com/en-us/dotnet/api/system.io.file.openread?view=net-10.0).
+
+The [log qualification record](../performance/log-patterns-qualification.json)
+retains the original implementation, all pattern values, host profiles and performance
+misses. Seven alternating pairs after two warmup pairs in an existing PowerShell parent
+measured catalogue loading at 0.11 → 0.59 ms, a tiny scan at 4.09 → 49.90 ms and a
+4 MiB scan at 88.44 → 101.04 ms. These all regressed. A 32 MiB scan improved from
+688.71 → 460.70 ms on the measured shared 9p fixture. Earlier captures remain retained;
+these observations do not establish Windows, full-job or statistically significant
+improvements. The owned Windows writer-sharing control requires Windows CI.
+
+Windows tool validation runs metadata and process-orchestration suites in two isolated
+phases, with at most two phases active. Each retains a ten-minute job limit. The
+`Assembly tools (Windows)` aggregate requires both phases to succeed; cancellation,
+skips and failures cannot pass it. All previously selected suites remain registered.
+
+Unity 6 projects that seed scripting defines also select the legacy Input Manager
+used by their generated package manifest. The generation fingerprint includes this
+bootstrap policy, so earlier generated settings and Libraries keep their old
+workspace identity. Existing caller-supplied settings remain authoritative.
+
+Unity project workspace selection and retention planning use locked typed Python behind
+`scripts/unity/lib/project-workspace.ps1`. Run `npm run test:project-workspace` for
+original-host comparisons, filesystem controls and compatibility launchers.
+Explicit paths retain precedence; generated fingerprints continue to isolate variant
+projects while sharing download caches. Native PowerShell comparison and timestamp
+ordering remain at the adapter boundary, including equal-time ordering. Native
+`Directory.Move` retains project directories without replacement; existing native
+volume measurement and deletion preserve host filesystem behavior. The adapter
+preserves the caller's prior or undefined native exit status on success and failure.
+
+Retention refuses linked ancestors, explicit projects with migration residue and
+unproven generated projects. A failed move reports source and destination without
+retrying, deleting residue or falling back to a fresh project. Release blocking
+handles after licensed work and cleanup are idle before retrying. Prune plans reject
+nonfinite space observations and consumed negative or nonfinite sizes. They stop at
+the floor without interpreting unused candidate sizes. A planning failure logs and
+skips best-effort pruning before any deletion; workspace resolution and retention
+errors remain fatal.
+
+The [workspace qualification record](../performance/project-workspace-qualification.json)
+retains original implementations, host comparisons and paired Linux measurements.
+Seven alternating pairs after two warmup pairs measured workspace resolution at
+0.63 → 33.68 ms and prune planning at 0.83 → 34.83 ms. Empty-project retention checks
+on the measured deep artifact path improved from 343.74 → 39.46 ms. These results
+include Python startup, retain both regressions and do not measure Windows, shallow
+paths, complete Unity jobs or statistical significance. No runner file lock is
+resolved by this migration.
+
+Read-only push validation honors the explicit repository even when inherited
+repository-location variables identify another Git directory. Child Git reads and
+the credential checker retain configuration variables, including `GIT_CONFIG_*`.
+The hook-text PowerShell wrapper resolves null, empty or whitespace-only roots to
+its own repository. An explicit nonblank root stays authoritative.
 
 Hook executable-mode validation runs through locked Python with
 `npm run validate:hook-perms`; the shell validation and test commands remain launchers.
@@ -236,7 +305,9 @@ The [qualification record](../performance/hook-permissions-qualification.json)
 retains original CLI decisions, the original shell driver and portable repair controls.
 The original bare chmod operation could stage working-file content; the coordinated
 repair preserves the staged blob even when working content differs. Diagnostics are
-plain text. Seven alternating Linux pairs after two warmup pairs measured
+plain text. The historical capture at `0d814246` used its recorded tooling configuration;
+later integration hashes do not rebind those measurements. Seven alternating Linux
+pairs after two warmup pairs measured
 3.59 → 36.12 ms for healthy validation, 3.74 → 36.37 ms for rejection and
 7.18 → 376.11 ms for repair. All startup regressions are retained, including the
 native coordinator launch cost. These results do not measure Windows, complete
@@ -251,22 +322,11 @@ unreadable, and malformed hook files fail. The previous validator incorrectly ac
 
 The [qualification record](../performance/hook-validation-qualification.json)
 retains 24 original CLI observations and the three intentional empty-file corrections.
-The 54 controls cover each required and forbidden token, both retained launchers,
+The 50 controls cover each required and forbidden token, both retained launchers,
 and the current hooks. Seven alternating Linux pairs measured median CLI times of
 204.70 ms for PowerShell and 37.11 ms for locked uv/Python after two warmup pairs.
 These observations concern this no-op validator on one host; they do not measure
 whole hooks, Windows or CI.
-
-Read-only push validation honors the explicit repository even when inherited
-repository-location variables identify another Git directory. Child Git reads and
-the credential checker retain configuration variables, including `GIT_CONFIG_*`.
-The hook-text PowerShell wrapper resolves null, empty or whitespace-only roots to
-its own repository. An explicit nonblank root stays authoritative.
-
-Unity 6 projects that seed scripting defines also select the legacy Input Manager
-used by their generated package manifest. The generation fingerprint includes this
-bootstrap policy, so earlier generated settings and Libraries keep their old
-workspace identity. Existing caller-supplied settings remain authoritative.
 
 Version reference synchronization uses `scripts/version_sync.py` through locked uv.
 The PowerShell entry points remain launchers. Content rules, sorting and validation run in

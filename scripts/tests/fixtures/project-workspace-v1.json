@@ -1,0 +1,1395 @@
+{
+  "original_source_sha256": "a6569064eb144db5bd696cd8a9c818fdb890d891d0f91c66438bc9414ca40511",
+  "original_source": "#!/usr/bin/env pwsh\r\n# project-workspace.ps1 - where the generated Unity test project and its Library live.\r\n#\r\n# Dot-sourceable library (NO param() block, just function definitions) so the\r\n# path/prune logic can be unit-tested with plain pwsh without triggering\r\n# run-ci-tests.ps1's main / mandatory param() prompts.\r\n#\r\n# WHY THIS EXISTS\r\n#   The generated project's `Library` is Unity's import database plus its\r\n#   compiled assemblies -- pure derived state, and the single biggest lever on\r\n#   how long a Unity leg takes. It used to live under the repo's gitignored\r\n#   `.artifacts/` tree, INSIDE $GITHUB_WORKSPACE. `actions/checkout` runs\r\n#   `git clean -ffdx` on every job, and `-x` means gitignored: every CI job\r\n#   deleted the Library the previous job had just built, on the same disk,\r\n#   minutes earlier. `actions/cache` then paid to download it back.\r\n#\r\n#   Pointing the project at a root OUTSIDE the workspace makes `git clean`\r\n#   structurally unable to reach it, so a self-hosted runner reuses its own\r\n#   local copy. Run artifacts (logs, results.xml) deliberately STAY inside the\r\n#   workspace -- those are per-run outputs the workflow uploads, not reusable\r\n#   state.\r\n#\r\n# Functions:\r\n#   Get-UnityProjectLeafName        - pure <version>-<mode>[-<scope>] leaf name.\r\n#   Resolve-UnityProjectWorkspace   - resolves project + cache roots from the\r\n#                                     explicit path / persistent root / repo default.\r\n#   Get-PersistentProjectPruneOrder - pure LRU prune plan for a free-space floor.\r\n#   Invoke-PersistentProjectPrune   - applies that plan on disk.\r\n\r\nfunction Get-UnityProjectLeafName {\r\n    param(\r\n        [Parameter(Mandatory = $true)][string]$Version,\r\n        [Parameter(Mandatory = $true)][string]$Mode,\r\n        [string]$Scope,\r\n        [switch]$ShareEditorProject\r\n    )\r\n\r\n    if ($ShareEditorProject -and $Mode -eq 'playmode') {\r\n        $Mode = 'editmode'\r\n    }\r\n\r\n    if ([string]::IsNullOrWhiteSpace($Scope)) {\r\n        return \"$Version-$Mode\"\r\n    }\r\n\r\n    return \"$Version-$Mode-$($Scope.Trim())\"\r\n}\r\n\r\nfunction Resolve-UnityProjectWorkspace {\r\n    <#\r\n    .SYNOPSIS\r\n        Resolve where the generated Unity project and the UPM caches live.\r\n\r\n    .DESCRIPTION\r\n        Precedence, highest first:\r\n          1. -ExplicitProjectPath  (an operator/caller override; used verbatim)\r\n          2. -PersistentRoot       (CI: a directory OUTSIDE $GITHUB_WORKSPACE)\r\n          3. $RepoRoot/.artifacts/unity/projects (the local-developer default)\r\n\r\n        Returns a hashtable with:\r\n          ProjectPath  - the generated project directory for this leg\r\n          CacheRoot    - the UPM/npm/git-lfs cache root for this Unity version\r\n          Persistent   - $true when the location survives `git clean -ffdx`\r\n          PruneRoot    - the parent holding sibling legs' projects, or '' when\r\n                         not persistent (never prune a developer's .artifacts)\r\n          LeafName     - the per-leg directory name\r\n          LegacyProjectPath - the original path before generation isolation\r\n\r\n        GenerationFingerprint isolates generated compiler inputs while retaining\r\n        package download caches. Explicit project paths remain authoritative.\r\n\r\n        Pure apart from path normalization: creates nothing, reads nothing.\r\n    #>\r\n    param(\r\n        [Parameter(Mandatory = $true)][string]$RepoRoot,\r\n        [Parameter(Mandatory = $true)][string]$Version,\r\n        [Parameter(Mandatory = $true)][string]$Mode,\r\n        [string]$Scope,\r\n        [switch]$ShareEditorProject,\r\n        [string]$ExplicitProjectPath,\r\n        [string]$PersistentRoot,\r\n        [string]$GenerationFingerprint\r\n    )\r\n\r\n    $leaf = Get-UnityProjectLeafName -Version $Version -Mode $Mode -Scope $Scope -ShareEditorProject:$ShareEditorProject\r\n    $repoProjects = Join-Path (Join-Path (Join-Path $RepoRoot '.artifacts') 'unity') 'projects'\r\n    $repoCaches = Join-Path (Join-Path (Join-Path $RepoRoot '.artifacts') 'unity') 'cache'\r\n\r\n    if (-not [string]::IsNullOrWhiteSpace($ExplicitProjectPath)) {\r\n        return @{\r\n            LegacyProjectPath = $ExplicitProjectPath\r\n            ProjectPath = $ExplicitProjectPath\r\n            CacheRoot = Join-Path $repoCaches $Version\r\n            Persistent = $false\r\n            PruneRoot = ''\r\n            LeafName = $leaf\r\n        }\r\n    }\r\n\r\n    $legacyLeaf = $leaf\r\n    if (-not [string]::IsNullOrWhiteSpace($GenerationFingerprint)) {\r\n        if ($GenerationFingerprint -cnotmatch '^[a-f0-9]{16}$') { throw 'Project generation fingerprint must contain sixteen lowercase hexadecimal characters.' }\r\n        $identity = [Text.Encoding]::UTF8.GetBytes($legacyLeaf + \"`n\" + $GenerationFingerprint)\r\n        $leaf = 'f-' + [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($identity)).ToLowerInvariant().Substring(0, 16)\r\n    }\r\n\r\n    if (-not [string]::IsNullOrWhiteSpace($PersistentRoot)) {\r\n        $root = $PersistentRoot.Trim()\r\n        $projectsRoot = Join-Path $root 'projects'\r\n        return @{\r\n            LegacyProjectPath = Join-Path $projectsRoot $legacyLeaf\r\n            ProjectPath = Join-Path $projectsRoot $leaf\r\n            CacheRoot = Join-Path (Join-Path $root 'cache') $Version\r\n            Persistent = $true\r\n            PruneRoot = $projectsRoot\r\n            LeafName = $leaf\r\n        }\r\n    }\r\n\r\n    return @{\r\n        LegacyProjectPath = Join-Path $repoProjects $legacyLeaf\r\n        ProjectPath = Join-Path $repoProjects $leaf\r\n        CacheRoot = Join-Path $repoCaches $Version\r\n        Persistent = $false\r\n        PruneRoot = ''\r\n        LeafName = $leaf\r\n    }\r\n}\r\n\r\nfunction Move-UnityProjectWithMigrationResidue {\r\n    [CmdletBinding()]\r\n    param(\r\n        [Parameter(Mandatory = $true)][string]$Project,\r\n        [switch]$ExplicitProject\r\n    )\r\n\r\n    $projectPath = [IO.Path]::GetFullPath($Project)\r\n    $retainedRoot = Join-Path (Split-Path -Parent (Split-Path -Parent $projectPath)) 'retained-projects'\r\n    foreach ($path in @($projectPath, (Join-Path $projectPath 'Assets/Editor'),\r\n            (Join-Path $projectPath 'Library/WallstopOdinMigrationApply'), $retainedRoot)) {\r\n        $ancestor = $path\r\n        while (-not [string]::IsNullOrWhiteSpace($ancestor)) {\r\n            if (Test-Path -LiteralPath $ancestor -ErrorAction Stop) {\r\n                $item = Get-Item -LiteralPath $ancestor -Force -ErrorAction Stop\r\n                if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {\r\n                    throw \"Generated project isolation refuses linked paths: $ancestor\"\r\n                }\r\n            }\r\n            $ancestor = Split-Path -Parent $ancestor\r\n        }\r\n    }\r\n    if (-not (Test-Path -LiteralPath $projectPath -PathType Container -ErrorAction Stop)) {\r\n        return\r\n    }\r\n\r\n    $reasons = New-Object System.Collections.Generic.List[string]\r\n    $pointerRelative = 'Library/WallstopOdinMigrationApply/active.txt'\r\n    if (Test-Path -LiteralPath (Join-Path $projectPath $pointerRelative) -ErrorAction Stop) {\r\n        $reasons.Add($pointerRelative)\r\n    }\r\n    $assets = Join-Path $projectPath 'Assets'\r\n    if (Test-Path -LiteralPath $assets -PathType Container -ErrorAction Stop) {\r\n        foreach ($entry in @(Get-ChildItem -LiteralPath $assets -Directory -Force -ErrorAction Stop)) {\r\n            if ($entry.Name -match '^Odin(ApplyIntegration|ImportVerification|BoundConversion|SceneScope|MigrationImport|MigrationReferences|PairedPreview|LiveAddress)-[0-9a-f]{32}$') {\r\n                $reasons.Add('Assets/' + $entry.Name)\r\n            }\r\n        }\r\n    }\r\n    if ($reasons.Count -eq 0) { return }\r\n    if ($ExplicitProject) {\r\n        throw \"Migration residue remains in explicit project '$projectPath'. Preserve and isolate that project before running tests.\"\r\n    }\r\n    $configurator = Get-Item -LiteralPath (Join-Path $projectPath 'Assets/Editor/UhCiTestConfigurator.cs') -Force -ErrorAction Stop\r\n    if ($configurator.PSIsContainer -or ($configurator.Attributes -band [IO.FileAttributes]::ReparsePoint) -or\r\n        $configurator.Length -gt 65536 -or\r\n        [IO.File]::ReadAllText($configurator.FullName) -notmatch 'public static class UhCiTestConfigurator\\b') {\r\n        throw 'Migration residue was found, but generated project provenance could not be established.'\r\n    }\r\n\r\n    $retainedPath = Join-Path $retainedRoot ((Split-Path -Leaf $projectPath) + '-' + [guid]::NewGuid().ToString('N'))\r\n    [void][IO.Directory]::CreateDirectory($retainedRoot)\r\n    [IO.Directory]::Move($projectPath, $retainedPath)\r\n    [pscustomobject]@{\r\n        OriginalPath = $projectPath\r\n        RetainedPath = $retainedPath\r\n        Reasons = $reasons.ToArray()\r\n        CapturedUtc = [datetime]::UtcNow.ToString('o')\r\n    }\r\n}\r\n\r\nfunction Get-PersistentProjectPruneOrder {\r\n    <#\r\n    .SYNOPSIS\r\n        Decide which sibling projects to delete to get back above a free-space floor.\r\n\r\n    .DESCRIPTION\r\n        Pure planner so the policy is testable without a real disk. Given the\r\n        candidate directories (name, last-use timestamp, size in bytes), the\r\n        current free bytes, and the floor, returns the names to delete in\r\n        least-recently-used-first order, stopping as soon as the projected free\r\n        space clears the floor.\r\n\r\n        -KeepName is never returned: the leg about to run must keep its own\r\n        project, because deleting it is exactly the cold import this whole\r\n        mechanism exists to avoid.\r\n\r\n        Returns @() when already above the floor or when nothing is prunable.\r\n    #>\r\n    param(\r\n        [Parameter(Mandatory = $true)][AllowEmptyCollection()][object[]]$Candidates,\r\n        [Parameter(Mandatory = $true)][double]$FreeBytes,\r\n        [Parameter(Mandatory = $true)][double]$MinimumFreeBytes,\r\n        [string]$KeepName\r\n    )\r\n\r\n    if ($FreeBytes -ge $MinimumFreeBytes) {\r\n        return @()\r\n    }\r\n\r\n    $prunable = @(\r\n        $Candidates |\r\n            Where-Object { $null -ne $_ } |\r\n            Where-Object { $_.Name -ne $KeepName } |\r\n            Sort-Object -Property @{ Expression = { [datetime]$_.LastUsed } }\r\n    )\r\n\r\n    $planned = New-Object System.Collections.Generic.List[string]\r\n    $projectedFree = $FreeBytes\r\n    foreach ($candidate in $prunable) {\r\n        if ($projectedFree -ge $MinimumFreeBytes) {\r\n            break\r\n        }\r\n        $planned.Add([string]$candidate.Name)\r\n        $projectedFree += [double]$candidate.SizeBytes\r\n    }\r\n\r\n    return $planned.ToArray()\r\n}\r\n\r\nfunction Invoke-PersistentProjectPrune {\r\n    <#\r\n    .SYNOPSIS\r\n        Keep the persistent project root from filling a self-hosted runner's disk.\r\n\r\n    .DESCRIPTION\r\n        Reads the sibling project directories under -ProjectsRoot, measures free\r\n        space on that volume, and deletes least-recently-used siblings until free\r\n        space clears -MinimumFreeGb. Best-effort by design: a measurement failure\r\n        or an undeletable directory logs and returns rather than failing the leg,\r\n        because a full disk is a slow run and a failed prune must not become a red\r\n        run. Returns the directory names it deleted.\r\n    #>\r\n    param(\r\n        [Parameter(Mandatory = $true)][string]$ProjectsRoot,\r\n        [Parameter(Mandatory = $true)][string]$KeepName,\r\n        [double]$MinimumFreeGb = 60\r\n    )\r\n\r\n    if (-not (Test-Path -LiteralPath $ProjectsRoot -PathType Container)) {\r\n        return @()\r\n    }\r\n\r\n    $freeBytes = $null\r\n    try {\r\n        $driveInfo = New-Object System.IO.DriveInfo(\r\n            [System.IO.Path]::GetPathRoot([System.IO.Path]::GetFullPath($ProjectsRoot))\r\n        )\r\n        $freeBytes = [double]$driveInfo.AvailableFreeSpace\r\n    } catch {\r\n        Write-Host \"::notice::Persistent Unity project prune skipped; free space unreadable for '$ProjectsRoot': $($_.Exception.Message)\"\r\n        return @()\r\n    }\r\n\r\n    $minimumFreeBytes = $MinimumFreeGb * 1GB\r\n    Write-Host (\"Persistent project root: {0} ({1:N1} GB free, floor {2:N0} GB)\" -f $ProjectsRoot, ($freeBytes / 1GB), $MinimumFreeGb)\r\n    if ($freeBytes -ge $minimumFreeBytes) {\r\n        return @()\r\n    }\r\n\r\n    $candidates = @(\r\n        Get-ChildItem -LiteralPath $ProjectsRoot -Directory -ErrorAction SilentlyContinue |\r\n            ForEach-Object {\r\n                $sizeBytes = 0\r\n                try {\r\n                    $sizeBytes = (\r\n                        Get-ChildItem -LiteralPath $_.FullName -Recurse -File -ErrorAction SilentlyContinue |\r\n                            Measure-Object -Property Length -Sum\r\n                    ).Sum\r\n                } catch {\r\n                    $sizeBytes = 0\r\n                }\r\n                if ($null -eq $sizeBytes) { $sizeBytes = 0 }\r\n                [pscustomobject]@{\r\n                    Name = $_.Name\r\n                    LastUsed = $_.LastWriteTimeUtc\r\n                    SizeBytes = [double]$sizeBytes\r\n                }\r\n            }\r\n    )\r\n\r\n    $plan = Get-PersistentProjectPruneOrder `\r\n        -Candidates $candidates `\r\n        -FreeBytes $freeBytes `\r\n        -MinimumFreeBytes $minimumFreeBytes `\r\n        -KeepName $KeepName\r\n\r\n    $deleted = New-Object System.Collections.Generic.List[string]\r\n    foreach ($name in $plan) {\r\n        $path = Join-Path $ProjectsRoot $name\r\n        try {\r\n            Remove-Item -LiteralPath $path -Recurse -Force -ErrorAction Stop\r\n            $deleted.Add($name)\r\n            Write-Host \"::notice::Pruned least-recently-used persistent Unity project '$name' to reclaim disk space.\"\r\n        } catch {\r\n            Write-Host \"::warning::Could not prune persistent Unity project '$name': $($_.Exception.Message)\"\r\n        }\r\n    }\r\n\r\n    return $deleted.ToArray()\r\n}\r\n",
+  "original_driver_sha256": "43debb36d5116cb435a57d66df7476d4a084fb0d34288efe2c07e207873f8bac",
+  "original_driver": "#!/usr/bin/env pwsh\r\n<#\r\n.SYNOPSIS\r\n    Test runner for scripts/unity/lib/project-workspace.ps1.\r\n\r\n.DESCRIPTION\r\n    Pins the two behaviours that decide whether a Unity leg reuses its Library or\r\n    imports cold:\r\n\r\n      1. Resolve-UnityProjectWorkspace precedence. An explicit path wins; a\r\n         persistent root puts BOTH the project and the UPM caches outside the\r\n         repository; neither set falls back to the repo-local .artifacts tree.\r\n         The persistent flag must be $false for the two non-persistent forms --\r\n         it gates disk pruning, and pruning a developer's .artifacts tree would\r\n         delete work they can see.\r\n\r\n      2. Get-PersistentProjectPruneOrder policy. Least-recently-used first, never\r\n         the leg that is about to run, and it stops as soon as the projected free\r\n         space clears the floor.\r\n\r\n    Uses temporary filesystem controls; no Unity or network access.\r\n\r\n.PARAMETER VerboseOutput\r\n    Show detailed output during test execution.\r\n\r\n.EXAMPLE\r\n    pwsh -NoProfile -File scripts/tests/test-project-workspace.ps1\r\n#>\r\nparam(\r\n    [switch]$VerboseOutput\r\n)\r\n\r\nSet-StrictMode -Version Latest\r\n$ErrorActionPreference = 'Stop'\r\n\r\n$script:TestsPassed = 0\r\n$script:TestsFailed = 0\r\n$script:FailedTests = @()\r\n\r\nfunction Write-Info($msg) {\r\n    if ($VerboseOutput) { Write-Host \"[test-project-workspace] $msg\" -ForegroundColor Cyan }\r\n}\r\n\r\nfunction Write-TestResult {\r\n    param(\r\n        [string]$TestName,\r\n        [bool]$Passed,\r\n        [string]$Message = ''\r\n    )\r\n    if ($Passed) {\r\n        Write-Host \"  [PASS] $TestName\" -ForegroundColor Green\r\n        $script:TestsPassed++\r\n    } else {\r\n        Write-Host \"  [FAIL] $TestName\" -ForegroundColor Red\r\n        if ($Message) {\r\n            Write-Host \"         $Message\" -ForegroundColor Yellow\r\n        }\r\n        $script:TestsFailed++\r\n        $script:FailedTests += $TestName\r\n    }\r\n}\r\n\r\nfunction Assert-Equal {\r\n    param(\r\n        [string]$TestName,\r\n        $Expected,\r\n        $Actual\r\n    )\r\n    $expectedText = if ($null -eq $Expected) { '<null>' } else { [string]$Expected }\r\n    $actualText = if ($null -eq $Actual) { '<null>' } else { [string]$Actual }\r\n    Write-TestResult -TestName $TestName -Passed ($expectedText -eq $actualText) -Message \"expected '$expectedText', got '$actualText'\"\r\n}\r\n\r\n$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\\..')).Path\r\n. (Join-Path $repoRoot 'scripts/unity/lib/project-workspace.ps1')\r\n\r\n# Compare paths through the platform separator so the same expectations hold on\r\n# the Linux devcontainer and the Windows self-hosted runners.\r\nfunction Join-Segments {\r\n    param([Parameter(Mandatory = $true)][string[]]$Segments)\r\n    $path = $Segments[0]\r\n    foreach ($segment in $Segments[1..($Segments.Length - 1)]) {\r\n        $path = Join-Path $path $segment\r\n    }\r\n    return $path\r\n}\r\n\r\nWrite-Host ''\r\nWrite-Host 'Get-UnityProjectLeafName' -ForegroundColor White\r\nAssert-Equal -TestName 'leaf without scope' -Expected '6000.3.16f1-editmode' -Actual (Get-UnityProjectLeafName -Version '6000.3.16f1' -Mode 'editmode')\r\nAssert-Equal -TestName 'leaf with scope' -Expected '6000.3.16f1-editmode-single-threaded' -Actual (Get-UnityProjectLeafName -Version '6000.3.16f1' -Mode 'editmode' -Scope 'single-threaded')\r\nAssert-Equal -TestName 'whitespace scope is no scope' -Expected '6000.3.16f1-playmode' -Actual (Get-UnityProjectLeafName -Version '6000.3.16f1' -Mode 'playmode' -Scope '   ')\r\nAssert-Equal -TestName 'shared EditMode leaf' -Expected '6000.3.16f1-editmode' -Actual (Get-UnityProjectLeafName -Version '6000.3.16f1' -Mode 'editmode' -ShareEditorProject)\r\nAssert-Equal -TestName 'shared PlayMode leaf' -Expected '6000.3.16f1-editmode' -Actual (Get-UnityProjectLeafName -Version '6000.3.16f1' -Mode 'playmode' -ShareEditorProject)\r\nAssert-Equal -TestName 'shared scoped editor leaf' -Expected '6000.3.16f1-editmode-single-threaded' -Actual (Get-UnityProjectLeafName -Version '6000.3.16f1' -Mode 'playmode' -Scope 'single-threaded' -ShareEditorProject)\r\nAssert-Equal -TestName 'Standalone remains separate' -Expected '6000.3.16f1-standalone' -Actual (Get-UnityProjectLeafName -Version '6000.3.16f1' -Mode 'standalone' -ShareEditorProject)\r\n\r\nWrite-Host ''\r\nWrite-Host 'Resolve-UnityProjectWorkspace' -ForegroundColor White\r\n\r\n$fakeRepo = Join-Segments @('/', 'repo')\r\n$fakePersistent = Join-Segments @('/', 'work', 'unity-workspace')\r\n\r\n$default = Resolve-UnityProjectWorkspace -RepoRoot $fakeRepo -Version '6000.3.16f1' -Mode 'editmode'\r\nAssert-Equal -TestName 'repo-local project path' `\r\n    -Expected (Join-Segments @($fakeRepo, '.artifacts', 'unity', 'projects', '6000.3.16f1-editmode')) `\r\n    -Actual $default.ProjectPath\r\nAssert-Equal -TestName 'repo-local cache root' `\r\n    -Expected (Join-Segments @($fakeRepo, '.artifacts', 'unity', 'cache', '6000.3.16f1')) `\r\n    -Actual $default.CacheRoot\r\nAssert-Equal -TestName 'repo-local is not persistent' -Expected $false -Actual $default.Persistent\r\nAssert-Equal -TestName 'repo-local has no prune root' -Expected '' -Actual $default.PruneRoot\r\n\r\n$persistent = Resolve-UnityProjectWorkspace -RepoRoot $fakeRepo -Version '6000.3.16f1' -Mode 'editmode' -Scope 'single-threaded' -PersistentRoot $fakePersistent\r\nAssert-Equal -TestName 'persistent project path leaves the repo' `\r\n    -Expected (Join-Segments @($fakePersistent, 'projects', '6000.3.16f1-editmode-single-threaded')) `\r\n    -Actual $persistent.ProjectPath\r\nAssert-Equal -TestName 'persistent cache root leaves the repo' `\r\n    -Expected (Join-Segments @($fakePersistent, 'cache', '6000.3.16f1')) `\r\n    -Actual $persistent.CacheRoot\r\nAssert-Equal -TestName 'persistent is flagged persistent' -Expected $true -Actual $persistent.Persistent\r\nAssert-Equal -TestName 'persistent prune root is the projects parent' `\r\n    -Expected (Join-Segments @($fakePersistent, 'projects')) `\r\n    -Actual $persistent.PruneRoot\r\n\r\n$sharedEditMode = Resolve-UnityProjectWorkspace -RepoRoot $fakeRepo -Version '6000.3.16f1' -Mode 'editmode' -Scope 'single-threaded' -PersistentRoot $fakePersistent -ShareEditorProject\r\n$sharedPlayMode = Resolve-UnityProjectWorkspace -RepoRoot $fakeRepo -Version '6000.3.16f1' -Mode 'playmode' -Scope 'single-threaded' -PersistentRoot $fakePersistent -ShareEditorProject\r\nAssert-Equal -TestName 'serial editor modes reuse the same persistent project' -Expected $sharedEditMode.ProjectPath -Actual $sharedPlayMode.ProjectPath\r\nAssert-Equal -TestName 'shared editor scope remains separate from default' `\r\n    -Expected (Join-Segments @($fakePersistent, 'projects', '6000.3.16f1-editmode-single-threaded')) `\r\n    -Actual $sharedPlayMode.ProjectPath\r\n\r\n# The UPM caches must move with the project. Leaving them under .artifacts/ would\r\n# put them back in `git clean -ffdx`'s path, re-downloading every UPM dependency\r\n# on every job -- the exact cost this whole mechanism exists to remove.\r\nWrite-TestResult -TestName 'persistent cache root is not under the repo' `\r\n    -Passed (-not $persistent.CacheRoot.StartsWith($fakeRepo)) `\r\n    -Message \"cache root '$($persistent.CacheRoot)' is still inside '$fakeRepo'\"\r\n\r\n$explicitPath = Join-Segments @('/', 'tmp', 'explicit-project')\r\n$explicit = Resolve-UnityProjectWorkspace -RepoRoot $fakeRepo -Version '6000.3.16f1' -Mode 'editmode' -ExplicitProjectPath $explicitPath -PersistentRoot $fakePersistent\r\nAssert-Equal -TestName 'explicit path outranks the persistent root' -Expected $explicitPath -Actual $explicit.ProjectPath\r\nAssert-Equal -TestName 'explicit path is not treated as persistent' -Expected $false -Actual $explicit.Persistent\r\n\r\n$blankRoot = Resolve-UnityProjectWorkspace -RepoRoot $fakeRepo -Version '6000.3.16f1' -Mode 'editmode' -PersistentRoot '   '\r\nAssert-Equal -TestName 'whitespace persistent root falls back to the repo' `\r\n    -Expected (Join-Segments @($fakeRepo, '.artifacts', 'unity', 'projects', '6000.3.16f1-editmode')) `\r\n    -Actual $blankRoot.ProjectPath\r\n\r\nWrite-Host ''\r\nWrite-Host 'Get-PersistentProjectPruneOrder' -ForegroundColor White\r\n\r\n$candidates = @(\r\n    [pscustomobject]@{ Name = 'oldest'; LastUsed = [datetime]'2020-01-01'; SizeBytes = 30 },\r\n    [pscustomobject]@{ Name = 'middle'; LastUsed = [datetime]'2021-01-01'; SizeBytes = 30 },\r\n    [pscustomobject]@{ Name = 'current'; LastUsed = [datetime]'2019-01-01'; SizeBytes = 5000 },\r\n    [pscustomobject]@{ Name = 'newest'; LastUsed = [datetime]'2022-01-01'; SizeBytes = 30 }\r\n)\r\n\r\nAssert-Equal -TestName 'above the floor prunes nothing' -Expected '' `\r\n    -Actual ((Get-PersistentProjectPruneOrder -Candidates $candidates -FreeBytes 100 -MinimumFreeBytes 100 -KeepName 'current') -join ',')\r\nAssert-Equal -TestName 'prunes least-recently-used first and stops at the floor' -Expected 'oldest' `\r\n    -Actual ((Get-PersistentProjectPruneOrder -Candidates $candidates -FreeBytes 10 -MinimumFreeBytes 40 -KeepName 'current') -join ',')\r\nAssert-Equal -TestName 'keeps pruning while still under the floor' -Expected 'oldest,middle,newest' `\r\n    -Actual ((Get-PersistentProjectPruneOrder -Candidates $candidates -FreeBytes 10 -MinimumFreeBytes 200 -KeepName 'current') -join ',')\r\n\r\n# The current leg's own project is the one thing pruning must never take: deleting\r\n# it is precisely the cold import the persistent root exists to avoid, and it is\r\n# also the largest entry here, so a size-greedy planner would grab it first.\r\n$unreachable = Get-PersistentProjectPruneOrder -Candidates $candidates -FreeBytes 0 -MinimumFreeBytes 999999 -KeepName 'current'\r\nWrite-TestResult -TestName 'never prunes the current leg' `\r\n    -Passed (@($unreachable) -notcontains 'current') `\r\n    -Message \"plan was [$(@($unreachable) -join ',')]\"\r\nAssert-Equal -TestName 'no candidates prunes nothing' -Expected '' `\r\n    -Actual ((Get-PersistentProjectPruneOrder -Candidates @() -FreeBytes 1 -MinimumFreeBytes 500 -KeepName 'current') -join ',')\r\n\r\nWrite-Host ''\r\nWrite-Host 'Invoke-PersistentProjectPrune' -ForegroundColor White\r\n\r\n$missingRoot = Join-Path ([System.IO.Path]::GetTempPath()) \"project-workspace-missing-$PID-$(Get-Random)\"\r\nAssert-Equal -TestName 'missing project root is a no-op' -Expected '' `\r\n    -Actual ((Invoke-PersistentProjectPrune -ProjectsRoot $missingRoot -KeepName 'current' -MinimumFreeGb 0) -join ',')\r\n\r\n$realRoot = Join-Path ([System.IO.Path]::GetTempPath()) \"project-workspace-$PID-$(Get-Random)\"\r\ntry {\r\n    New-Item -ItemType Directory -Force -Path (Join-Path $realRoot 'stale') | Out-Null\r\n    New-Item -ItemType Directory -Force -Path (Join-Path $realRoot 'current') | Out-Null\r\n    # A zero floor can never be under-water, so a healthy disk prunes nothing --\r\n    # the guard must not delete a warm Library just because it ran.\r\n    $pruned = Invoke-PersistentProjectPrune -ProjectsRoot $realRoot -KeepName 'current' -MinimumFreeGb 0\r\n    Assert-Equal -TestName 'healthy free space prunes nothing' -Expected '' -Actual (($pruned) -join ',')\r\n    Write-TestResult -TestName 'existing projects survive a no-op prune' `\r\n        -Passed ((Test-Path -LiteralPath (Join-Path $realRoot 'stale')) -and (Test-Path -LiteralPath (Join-Path $realRoot 'current'))) `\r\n        -Message 'a no-op prune deleted a project directory'\r\n} finally {\r\n    Remove-Item -LiteralPath $realRoot -Recurse -Force -ErrorAction SilentlyContinue\r\n}\r\n\r\nWrite-Host ''\r\nWrite-Host 'Interrupted migration project isolation' -ForegroundColor White\r\n$residueRoot = Join-Path ([IO.Path]::GetTempPath()) ('unity-migration-residue-' + [guid]::NewGuid().ToString('N'))\r\ntry {\r\n    $project = Join-Path $residueRoot 'projects/editor'\r\n    $sourceRelative = 'Assets/OdinApplyIntegration-0123456789abcdef0123456789abcdef/Consumer.cs'\r\n    $contents = @{\r\n        'Assets/Editor/UhCiTestConfigurator.cs' = 'public static class UhCiTestConfigurator {}'\r\n        'Packages/manifest.json' = '{\"dependencies\":{}}'\r\n        'Library/ScriptAssemblies/Consumer.dll' = 'derived assembly control'\r\n        'Library/WallstopOdinMigrationApply/active.txt' = 'retained-migration'\r\n        'Library/WallstopOdinMigrationBackups/retained-migration/state.json' = 'retained backup control'\r\n        $sourceRelative = 'interrupted consumer control'\r\n    }\r\n    foreach ($relative in $contents.Keys) {\r\n        $target = Join-Path $project $relative\r\n        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $target) | Out-Null\r\n        [IO.File]::WriteAllText($target, $contents[$relative])\r\n    }\r\n    $retained = Move-UnityProjectWithMigrationResidue -Project $project\r\n    Write-TestResult -TestName 'interrupted migration cannot contaminate the next generated project' `\r\n        -Passed (-not (Test-Path -LiteralPath $project) -and $null -ne $retained)\r\n    foreach ($relative in $contents.Keys) {\r\n        Assert-Equal -TestName \"retained project preserves $relative\" -Expected $contents[$relative] `\r\n            -Actual ([IO.File]::ReadAllText((Join-Path $retained.RetainedPath $relative)))\r\n    }\r\n    Write-TestResult -TestName 'retained project is outside ordinary sibling pruning' `\r\n        -Passed ((Split-Path -Parent $retained.RetainedPath) -eq (Join-Path $residueRoot 'retained-projects'))\r\n    Assert-Equal -TestName 'missing replacement is an idempotent no-op' -Expected $null `\r\n        -Actual (Move-UnityProjectWithMigrationResidue -Project $project)\r\n\r\n    foreach ($relative in @('Assets/Editor/UhCiTestConfigurator.cs', 'Library/cache.bin', 'Assets/OdinApplyIntegration-not-a-guid/Consumer.cs')) {\r\n        $target = Join-Path $project $relative\r\n        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $target) | Out-Null\r\n        [IO.File]::WriteAllText($target, 'healthy project control')\r\n    }\r\n    Assert-Equal -TestName 'healthy project keeps its warm Library' -Expected $null `\r\n        -Actual (Move-UnityProjectWithMigrationResidue -Project $project)\r\n    Assert-Equal -TestName 'healthy Library bytes remain unchanged' -Expected 'healthy project control' `\r\n        -Actual ([IO.File]::ReadAllText((Join-Path $project 'Library/cache.bin')))\r\n\r\n    foreach ($prefix in @('OdinApplyIntegration', 'OdinImportVerification', 'OdinBoundConversion', 'OdinSceneScope',\r\n            'OdinMigrationImport', 'OdinMigrationReferences', 'OdinPairedPreview', 'OdinLiveAddress')) {\r\n        $fixture = Join-Path $residueRoot ('projects/' + $prefix)\r\n        $asset = Join-Path $fixture ('Assets/' + $prefix + '-0123456789abcdef0123456789abcdef')\r\n        New-Item -ItemType Directory -Force -Path $asset | Out-Null\r\n        New-Item -ItemType Directory -Force -Path (Join-Path $fixture 'Assets/Editor') | Out-Null\r\n        [IO.File]::WriteAllText((Join-Path $fixture 'Assets/Editor/UhCiTestConfigurator.cs'), 'public static class UhCiTestConfigurator {}')\r\n        $moved = Move-UnityProjectWithMigrationResidue -Project $fixture\r\n        Write-TestResult -TestName \"$prefix residue is isolated without requiring a pointer\" `\r\n            -Passed ($null -ne $moved -and (Test-Path -LiteralPath (Join-Path $moved.RetainedPath ('Assets/' + (Split-Path -Leaf $asset)))))\r\n    }\r\n\r\n    $pointer = Join-Path $project 'Library/WallstopOdinMigrationApply/active.txt'\r\n    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $pointer) | Out-Null\r\n    [IO.File]::WriteAllText($pointer, 'active-only control')\r\n    $refused = $false\r\n    try { Move-UnityProjectWithMigrationResidue -Project $project -ExplicitProject | Out-Null }\r\n    catch { $refused = $_.Exception.Message -match 'explicit' }\r\n    Write-TestResult -TestName 'explicit caller project is refused without moving its migration' `\r\n        -Passed ($refused -and [IO.File]::ReadAllText($pointer) -eq 'active-only control')\r\n    [IO.File]::WriteAllText((Join-Path $project 'Assets/Editor/UhCiTestConfigurator.cs'), 'unrelated authoring source')\r\n    $refused = $false\r\n    try { Move-UnityProjectWithMigrationResidue -Project $project | Out-Null }\r\n    catch { $refused = $_.Exception.Message -match 'generated' }\r\n    Write-TestResult -TestName 'unproven project provenance is refused without moving its migration' `\r\n        -Passed ($refused -and [IO.File]::ReadAllText($pointer) -eq 'active-only control')\r\n    [IO.File]::WriteAllText((Join-Path $project 'Assets/Editor/UhCiTestConfigurator.cs'), 'public static class UhCiTestConfigurator {}')\r\n    $moved = Move-UnityProjectWithMigrationResidue -Project $project\r\n    Assert-Equal -TestName 'pointer alone preserves the interrupted project' -Expected 'active-only control' `\r\n        -Actual ([IO.File]::ReadAllText((Join-Path $moved.RetainedPath 'Library/WallstopOdinMigrationApply/active.txt')))\r\n\r\n    $failureProject = Join-Path $residueRoot 'failed-preservation/projects/editor'\r\n    $failurePointer = Join-Path $failureProject 'Library/WallstopOdinMigrationApply/active.txt'\r\n    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $failurePointer) | Out-Null\r\n    New-Item -ItemType Directory -Force -Path (Join-Path $failureProject 'Assets/Editor') | Out-Null\r\n    [IO.File]::WriteAllText((Join-Path $failureProject 'Assets/Editor/UhCiTestConfigurator.cs'), 'public static class UhCiTestConfigurator {}')\r\n    [IO.File]::WriteAllText($failurePointer, 'failed preservation control')\r\n    $blockedDestination = Join-Path $residueRoot 'failed-preservation/retained-projects'\r\n    [IO.File]::WriteAllText($blockedDestination, 'destination conflict control')\r\n    $refused = $false\r\n    try { Move-UnityProjectWithMigrationResidue -Project $failureProject | Out-Null }\r\n    catch { $refused = $true }\r\n    Write-TestResult -TestName 'failed preservation leaves the original pointer and conflicting destination unchanged' `\r\n        -Passed ($refused -and [IO.File]::ReadAllText($failurePointer) -ceq 'failed preservation control' -and\r\n            [IO.File]::ReadAllText($blockedDestination) -ceq 'destination conflict control')\r\n\r\n    $linkType = if ($env:OS -eq 'Windows_NT') { 'Junction' } else { 'SymbolicLink' }\r\n    foreach ($relative in @('', 'Assets', 'Library', 'Assets/Editor', 'Library/WallstopOdinMigrationApply')) {\r\n        $linkRoot = Join-Path $residueRoot ('linked-' + [guid]::NewGuid().ToString('N'))\r\n        $linkedProject = Join-Path $linkRoot 'projects/editor'\r\n        $linkTarget = Join-Path $linkRoot 'outside'\r\n        New-Item -ItemType Directory -Force -Path $linkTarget | Out-Null\r\n        [IO.File]::WriteAllText((Join-Path $linkTarget 'canary'), 'outside control')\r\n        $linkedPath = if ($relative) { Join-Path $linkedProject $relative } else { $linkedProject }\r\n        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $linkedPath) | Out-Null\r\n        New-Item -ItemType $linkType -Path $linkedPath -Target $linkTarget | Out-Null\r\n        $refused = $false\r\n        try { Move-UnityProjectWithMigrationResidue -Project $linkedProject | Out-Null }\r\n        catch { $refused = $_.Exception.Message -match 'linked' }\r\n        Write-TestResult -TestName \"linked project path '$relative' is refused without changing its target\" `\r\n            -Passed ($refused -and [IO.File]::ReadAllText((Join-Path $linkTarget 'canary')) -ceq 'outside control')\r\n        Remove-Item -LiteralPath $linkedPath -Force\r\n    }\r\n    Remove-Item -LiteralPath $blockedDestination\r\n    $outside = Join-Path $residueRoot 'retention-link-target'\r\n    New-Item -ItemType Directory -Path $outside | Out-Null\r\n    New-Item -ItemType $linkType -Path $blockedDestination -Target $outside | Out-Null\r\n    $refused = $false\r\n    try { Move-UnityProjectWithMigrationResidue -Project $failureProject | Out-Null }\r\n    catch { $refused = $_.Exception.Message -match 'linked' }\r\n    Write-TestResult -TestName 'linked retention root is refused without moving the source' `\r\n        -Passed ($refused -and [IO.File]::ReadAllText($failurePointer) -ceq 'failed preservation control' -and\r\n            @(Get-ChildItem -LiteralPath $outside -Force).Count -eq 0)\r\n    Remove-Item -LiteralPath $blockedDestination -Force\r\n\r\n    $runnerSource = Get-Content -LiteralPath (Join-Path $repoRoot 'scripts/unity/run-ci-tests.ps1') -Raw\r\n    $guardOffset = $runnerSource.IndexOf('$retainedProject = Move-UnityProjectWithMigrationResidue')\r\n    $initializeOffset = $runnerSource.IndexOf('$ProjectPath = Initialize-EphemeralProject')\r\n    $warmthOffset = $runnerSource.IndexOf('$LibraryWarmth =')\r\n    Write-TestResult -TestName 'runner isolates residue before measuring cache warmth or generating compiler inputs' `\r\n        -Passed ($guardOffset -ge 0 -and $guardOffset -lt $warmthOffset -and $guardOffset -lt $initializeOffset)\r\n    Write-TestResult -TestName 'runner retains explicit-path provenance before resolving workspace' `\r\n        -Passed ($runnerSource.IndexOf('$ExplicitProjectRequested =') -ge 0 -and\r\n            $runnerSource.IndexOf('$ExplicitProjectRequested =') -lt $runnerSource.IndexOf('$ProjectWorkspace = Resolve-UnityProjectWorkspace'))\r\n    $tokens = $null\r\n    $parseErrors = $null\r\n    $runnerAst = [Management.Automation.Language.Parser]::ParseInput($runnerSource, [ref]$tokens, [ref]$parseErrors)\r\n    if ($parseErrors.Count -ne 0) { throw 'Unity runner must parse before exercising its retention guard.' }\r\n    $guard = @($runnerAst.EndBlock.Statements | Where-Object {\r\n        $_ -is [Management.Automation.Language.IfStatementAst] -and\r\n        $_.Extent.Text.Contains('$retainedProject = Move-UnityProjectWithMigrationResidue')\r\n    })\r\n    if ($guard.Count -ne 1) { throw 'Expected exactly one top-level project retention guard.' }\r\n    $ProjectPath = $failureProject\r\n    $ArtifactsPath = Join-Path $residueRoot 'public-artifacts'\r\n    $ExplicitProjectRequested = $false\r\n    function Write-CiWarning { param([string]$Message) }\r\n    $TestMode = 'export'\r\n    Invoke-Expression $guard[0].Extent.Text\r\n    Write-TestResult -TestName 'export never moves its staged project or writes a retention receipt' `\r\n        -Passed ((Test-Path -LiteralPath $failurePointer) -and -not (Test-Path -LiteralPath $ArtifactsPath))\r\n    $TestMode = 'editmode'\r\n    Invoke-Expression $guard[0].Extent.Text\r\n    $receipt = Get-Content -LiteralPath (Join-Path $ArtifactsPath 'retained-project.json') -Raw | ConvertFrom-Json\r\n    Write-TestResult -TestName 'shipping guard preserves residue and writes the actual destination receipt' `\r\n        -Passed ($receipt.OriginalPath -ceq $failureProject -and -not (Test-Path -LiteralPath $failureProject) -and\r\n            [IO.File]::ReadAllText((Join-Path $receipt.RetainedPath 'Library/WallstopOdinMigrationApply/active.txt')) -ceq 'failed preservation control')\r\n    $lifecycle = @($runnerAst.EndBlock.Statements | Where-Object {\r\n        $_ -is [Management.Automation.Language.TryStatementAst] -and\r\n        $_.Body.Extent.Text.Contains('Invoke-UnityNativeStartupProbe')\r\n    })\r\n    Write-TestResult -TestName 'shipping guard runs before the native editor and license lifecycle' `\r\n        -Passed ($lifecycle.Count -eq 1 -and $guard[0].Extent.EndOffset -lt $lifecycle[0].Extent.StartOffset)\r\n} finally {\r\n    if (Test-Path -LiteralPath $residueRoot) { Remove-Item -LiteralPath $residueRoot -Recurse -Force }\r\n}\r\n\r\nWrite-Host \"Passed: $script:TestsPassed\" -ForegroundColor Green\r\nif ($script:TestsFailed -gt 0) {\r\n    Write-Host \"Failed: $script:TestsFailed\" -ForegroundColor Red\r\n    foreach ($failed in $script:FailedTests) {\r\n        Write-Host \"  - $failed\" -ForegroundColor Red\r\n    }\r\n    exit 1\r\n}\r\nWrite-Host 'All project-workspace tests passed.' -ForegroundColor Green\r\nexit 0\r\n",
+  "capture_driver": "param([string]$Helper)\nSet-StrictMode -Version Latest\n$ErrorActionPreference = 'Stop'\n. $Helper\n$caseList = [Console]::In.ReadToEnd() | ConvertFrom-Json -AsHashtable\n$observed = [Collections.Generic.List[object]]::new()\nforeach ($case in $caseList) {\n    try {\n        $callParameters = $case.parameters\n        switch ($case.action) {\n            'leaf' { $value = Get-UnityProjectLeafName @callParameters }\n            'workspace' { $value = Resolve-UnityProjectWorkspace @callParameters }\n            'plan' { $value = @(Get-PersistentProjectPruneOrder @callParameters) }\n        }\n        $observed.Add(@{ name=$case.name; value=$value; error='' })\n    } catch {\n        $observed.Add(@{ name=$case.name; value=$null; error=$_.Exception.Message })\n    }\n}\nConvertTo-Json -InputObject $observed.ToArray() -Depth 20 -Compress\n",
+  "cases": [
+    {
+      "name": "leaf-editmode-False-''",
+      "action": "leaf",
+      "parameters": {
+        "Version": "6000.6.0f1",
+        "Mode": "editmode",
+        "Scope": "",
+        "ShareEditorProject": false
+      }
+    },
+    {
+      "name": "leaf-editmode-False-'   '",
+      "action": "leaf",
+      "parameters": {
+        "Version": "6000.6.0f1",
+        "Mode": "editmode",
+        "Scope": "   ",
+        "ShareEditorProject": false
+      }
+    },
+    {
+      "name": "leaf-editmode-False-' single-threaded '",
+      "action": "leaf",
+      "parameters": {
+        "Version": "6000.6.0f1",
+        "Mode": "editmode",
+        "Scope": " single-threaded ",
+        "ShareEditorProject": false
+      }
+    },
+    {
+      "name": "leaf-editmode-True-''",
+      "action": "leaf",
+      "parameters": {
+        "Version": "6000.6.0f1",
+        "Mode": "editmode",
+        "Scope": "",
+        "ShareEditorProject": true
+      }
+    },
+    {
+      "name": "leaf-editmode-True-'   '",
+      "action": "leaf",
+      "parameters": {
+        "Version": "6000.6.0f1",
+        "Mode": "editmode",
+        "Scope": "   ",
+        "ShareEditorProject": true
+      }
+    },
+    {
+      "name": "leaf-editmode-True-' single-threaded '",
+      "action": "leaf",
+      "parameters": {
+        "Version": "6000.6.0f1",
+        "Mode": "editmode",
+        "Scope": " single-threaded ",
+        "ShareEditorProject": true
+      }
+    },
+    {
+      "name": "leaf-playmode-False-''",
+      "action": "leaf",
+      "parameters": {
+        "Version": "6000.6.0f1",
+        "Mode": "playmode",
+        "Scope": "",
+        "ShareEditorProject": false
+      }
+    },
+    {
+      "name": "leaf-playmode-False-'   '",
+      "action": "leaf",
+      "parameters": {
+        "Version": "6000.6.0f1",
+        "Mode": "playmode",
+        "Scope": "   ",
+        "ShareEditorProject": false
+      }
+    },
+    {
+      "name": "leaf-playmode-False-' single-threaded '",
+      "action": "leaf",
+      "parameters": {
+        "Version": "6000.6.0f1",
+        "Mode": "playmode",
+        "Scope": " single-threaded ",
+        "ShareEditorProject": false
+      }
+    },
+    {
+      "name": "leaf-playmode-True-''",
+      "action": "leaf",
+      "parameters": {
+        "Version": "6000.6.0f1",
+        "Mode": "playmode",
+        "Scope": "",
+        "ShareEditorProject": true
+      }
+    },
+    {
+      "name": "leaf-playmode-True-'   '",
+      "action": "leaf",
+      "parameters": {
+        "Version": "6000.6.0f1",
+        "Mode": "playmode",
+        "Scope": "   ",
+        "ShareEditorProject": true
+      }
+    },
+    {
+      "name": "leaf-playmode-True-' single-threaded '",
+      "action": "leaf",
+      "parameters": {
+        "Version": "6000.6.0f1",
+        "Mode": "playmode",
+        "Scope": " single-threaded ",
+        "ShareEditorProject": true
+      }
+    },
+    {
+      "name": "leaf-standalone-False-''",
+      "action": "leaf",
+      "parameters": {
+        "Version": "6000.6.0f1",
+        "Mode": "standalone",
+        "Scope": "",
+        "ShareEditorProject": false
+      }
+    },
+    {
+      "name": "leaf-standalone-False-'   '",
+      "action": "leaf",
+      "parameters": {
+        "Version": "6000.6.0f1",
+        "Mode": "standalone",
+        "Scope": "   ",
+        "ShareEditorProject": false
+      }
+    },
+    {
+      "name": "leaf-standalone-False-' single-threaded '",
+      "action": "leaf",
+      "parameters": {
+        "Version": "6000.6.0f1",
+        "Mode": "standalone",
+        "Scope": " single-threaded ",
+        "ShareEditorProject": false
+      }
+    },
+    {
+      "name": "leaf-standalone-True-''",
+      "action": "leaf",
+      "parameters": {
+        "Version": "6000.6.0f1",
+        "Mode": "standalone",
+        "Scope": "",
+        "ShareEditorProject": true
+      }
+    },
+    {
+      "name": "leaf-standalone-True-'   '",
+      "action": "leaf",
+      "parameters": {
+        "Version": "6000.6.0f1",
+        "Mode": "standalone",
+        "Scope": "   ",
+        "ShareEditorProject": true
+      }
+    },
+    {
+      "name": "leaf-standalone-True-' single-threaded '",
+      "action": "leaf",
+      "parameters": {
+        "Version": "6000.6.0f1",
+        "Mode": "standalone",
+        "Scope": " single-threaded ",
+        "ShareEditorProject": true
+      }
+    },
+    {
+      "name": "leaf-PLAYMODE-False-''",
+      "action": "leaf",
+      "parameters": {
+        "Version": "6000.6.0f1",
+        "Mode": "PLAYMODE",
+        "Scope": "",
+        "ShareEditorProject": false
+      }
+    },
+    {
+      "name": "leaf-PLAYMODE-False-'   '",
+      "action": "leaf",
+      "parameters": {
+        "Version": "6000.6.0f1",
+        "Mode": "PLAYMODE",
+        "Scope": "   ",
+        "ShareEditorProject": false
+      }
+    },
+    {
+      "name": "leaf-PLAYMODE-False-' single-threaded '",
+      "action": "leaf",
+      "parameters": {
+        "Version": "6000.6.0f1",
+        "Mode": "PLAYMODE",
+        "Scope": " single-threaded ",
+        "ShareEditorProject": false
+      }
+    },
+    {
+      "name": "leaf-PLAYMODE-True-''",
+      "action": "leaf",
+      "parameters": {
+        "Version": "6000.6.0f1",
+        "Mode": "PLAYMODE",
+        "Scope": "",
+        "ShareEditorProject": true
+      }
+    },
+    {
+      "name": "leaf-PLAYMODE-True-'   '",
+      "action": "leaf",
+      "parameters": {
+        "Version": "6000.6.0f1",
+        "Mode": "PLAYMODE",
+        "Scope": "   ",
+        "ShareEditorProject": true
+      }
+    },
+    {
+      "name": "leaf-PLAYMODE-True-' single-threaded '",
+      "action": "leaf",
+      "parameters": {
+        "Version": "6000.6.0f1",
+        "Mode": "PLAYMODE",
+        "Scope": " single-threaded ",
+        "ShareEditorProject": true
+      }
+    },
+    {
+      "name": "workspace-editmode-False-False-False",
+      "action": "workspace",
+      "parameters": {
+        "RepoRoot": "@ROOT@/repo",
+        "Version": "6000.6.0f1",
+        "Mode": "editmode",
+        "Scope": "single-threaded",
+        "ShareEditorProject": false,
+        "PersistentRoot": "",
+        "GenerationFingerprint": ""
+      }
+    },
+    {
+      "name": "workspace-editmode-False-False-True",
+      "action": "workspace",
+      "parameters": {
+        "RepoRoot": "@ROOT@/repo",
+        "Version": "6000.6.0f1",
+        "Mode": "editmode",
+        "Scope": "single-threaded",
+        "ShareEditorProject": false,
+        "PersistentRoot": "",
+        "GenerationFingerprint": "0123456789abcdef"
+      }
+    },
+    {
+      "name": "workspace-editmode-False-True-False",
+      "action": "workspace",
+      "parameters": {
+        "RepoRoot": "@ROOT@/repo",
+        "Version": "6000.6.0f1",
+        "Mode": "editmode",
+        "Scope": "single-threaded",
+        "ShareEditorProject": false,
+        "PersistentRoot": "@ROOT@/persistent",
+        "GenerationFingerprint": ""
+      }
+    },
+    {
+      "name": "workspace-editmode-False-True-True",
+      "action": "workspace",
+      "parameters": {
+        "RepoRoot": "@ROOT@/repo",
+        "Version": "6000.6.0f1",
+        "Mode": "editmode",
+        "Scope": "single-threaded",
+        "ShareEditorProject": false,
+        "PersistentRoot": "@ROOT@/persistent",
+        "GenerationFingerprint": "0123456789abcdef"
+      }
+    },
+    {
+      "name": "workspace-editmode-True-False-False",
+      "action": "workspace",
+      "parameters": {
+        "RepoRoot": "@ROOT@/repo",
+        "Version": "6000.6.0f1",
+        "Mode": "editmode",
+        "Scope": "single-threaded",
+        "ShareEditorProject": true,
+        "PersistentRoot": "",
+        "GenerationFingerprint": ""
+      }
+    },
+    {
+      "name": "workspace-editmode-True-False-True",
+      "action": "workspace",
+      "parameters": {
+        "RepoRoot": "@ROOT@/repo",
+        "Version": "6000.6.0f1",
+        "Mode": "editmode",
+        "Scope": "single-threaded",
+        "ShareEditorProject": true,
+        "PersistentRoot": "",
+        "GenerationFingerprint": "0123456789abcdef"
+      }
+    },
+    {
+      "name": "workspace-editmode-True-True-False",
+      "action": "workspace",
+      "parameters": {
+        "RepoRoot": "@ROOT@/repo",
+        "Version": "6000.6.0f1",
+        "Mode": "editmode",
+        "Scope": "single-threaded",
+        "ShareEditorProject": true,
+        "PersistentRoot": "@ROOT@/persistent",
+        "GenerationFingerprint": ""
+      }
+    },
+    {
+      "name": "workspace-editmode-True-True-True",
+      "action": "workspace",
+      "parameters": {
+        "RepoRoot": "@ROOT@/repo",
+        "Version": "6000.6.0f1",
+        "Mode": "editmode",
+        "Scope": "single-threaded",
+        "ShareEditorProject": true,
+        "PersistentRoot": "@ROOT@/persistent",
+        "GenerationFingerprint": "0123456789abcdef"
+      }
+    },
+    {
+      "name": "workspace-playmode-False-False-False",
+      "action": "workspace",
+      "parameters": {
+        "RepoRoot": "@ROOT@/repo",
+        "Version": "6000.6.0f1",
+        "Mode": "playmode",
+        "Scope": "single-threaded",
+        "ShareEditorProject": false,
+        "PersistentRoot": "",
+        "GenerationFingerprint": ""
+      }
+    },
+    {
+      "name": "workspace-playmode-False-False-True",
+      "action": "workspace",
+      "parameters": {
+        "RepoRoot": "@ROOT@/repo",
+        "Version": "6000.6.0f1",
+        "Mode": "playmode",
+        "Scope": "single-threaded",
+        "ShareEditorProject": false,
+        "PersistentRoot": "",
+        "GenerationFingerprint": "0123456789abcdef"
+      }
+    },
+    {
+      "name": "workspace-playmode-False-True-False",
+      "action": "workspace",
+      "parameters": {
+        "RepoRoot": "@ROOT@/repo",
+        "Version": "6000.6.0f1",
+        "Mode": "playmode",
+        "Scope": "single-threaded",
+        "ShareEditorProject": false,
+        "PersistentRoot": "@ROOT@/persistent",
+        "GenerationFingerprint": ""
+      }
+    },
+    {
+      "name": "workspace-playmode-False-True-True",
+      "action": "workspace",
+      "parameters": {
+        "RepoRoot": "@ROOT@/repo",
+        "Version": "6000.6.0f1",
+        "Mode": "playmode",
+        "Scope": "single-threaded",
+        "ShareEditorProject": false,
+        "PersistentRoot": "@ROOT@/persistent",
+        "GenerationFingerprint": "0123456789abcdef"
+      }
+    },
+    {
+      "name": "workspace-playmode-True-False-False",
+      "action": "workspace",
+      "parameters": {
+        "RepoRoot": "@ROOT@/repo",
+        "Version": "6000.6.0f1",
+        "Mode": "playmode",
+        "Scope": "single-threaded",
+        "ShareEditorProject": true,
+        "PersistentRoot": "",
+        "GenerationFingerprint": ""
+      }
+    },
+    {
+      "name": "workspace-playmode-True-False-True",
+      "action": "workspace",
+      "parameters": {
+        "RepoRoot": "@ROOT@/repo",
+        "Version": "6000.6.0f1",
+        "Mode": "playmode",
+        "Scope": "single-threaded",
+        "ShareEditorProject": true,
+        "PersistentRoot": "",
+        "GenerationFingerprint": "0123456789abcdef"
+      }
+    },
+    {
+      "name": "workspace-playmode-True-True-False",
+      "action": "workspace",
+      "parameters": {
+        "RepoRoot": "@ROOT@/repo",
+        "Version": "6000.6.0f1",
+        "Mode": "playmode",
+        "Scope": "single-threaded",
+        "ShareEditorProject": true,
+        "PersistentRoot": "@ROOT@/persistent",
+        "GenerationFingerprint": ""
+      }
+    },
+    {
+      "name": "workspace-playmode-True-True-True",
+      "action": "workspace",
+      "parameters": {
+        "RepoRoot": "@ROOT@/repo",
+        "Version": "6000.6.0f1",
+        "Mode": "playmode",
+        "Scope": "single-threaded",
+        "ShareEditorProject": true,
+        "PersistentRoot": "@ROOT@/persistent",
+        "GenerationFingerprint": "0123456789abcdef"
+      }
+    },
+    {
+      "name": "workspace-standalone-False-False-False",
+      "action": "workspace",
+      "parameters": {
+        "RepoRoot": "@ROOT@/repo",
+        "Version": "6000.6.0f1",
+        "Mode": "standalone",
+        "Scope": "single-threaded",
+        "ShareEditorProject": false,
+        "PersistentRoot": "",
+        "GenerationFingerprint": ""
+      }
+    },
+    {
+      "name": "workspace-standalone-False-False-True",
+      "action": "workspace",
+      "parameters": {
+        "RepoRoot": "@ROOT@/repo",
+        "Version": "6000.6.0f1",
+        "Mode": "standalone",
+        "Scope": "single-threaded",
+        "ShareEditorProject": false,
+        "PersistentRoot": "",
+        "GenerationFingerprint": "0123456789abcdef"
+      }
+    },
+    {
+      "name": "workspace-standalone-False-True-False",
+      "action": "workspace",
+      "parameters": {
+        "RepoRoot": "@ROOT@/repo",
+        "Version": "6000.6.0f1",
+        "Mode": "standalone",
+        "Scope": "single-threaded",
+        "ShareEditorProject": false,
+        "PersistentRoot": "@ROOT@/persistent",
+        "GenerationFingerprint": ""
+      }
+    },
+    {
+      "name": "workspace-standalone-False-True-True",
+      "action": "workspace",
+      "parameters": {
+        "RepoRoot": "@ROOT@/repo",
+        "Version": "6000.6.0f1",
+        "Mode": "standalone",
+        "Scope": "single-threaded",
+        "ShareEditorProject": false,
+        "PersistentRoot": "@ROOT@/persistent",
+        "GenerationFingerprint": "0123456789abcdef"
+      }
+    },
+    {
+      "name": "workspace-standalone-True-False-False",
+      "action": "workspace",
+      "parameters": {
+        "RepoRoot": "@ROOT@/repo",
+        "Version": "6000.6.0f1",
+        "Mode": "standalone",
+        "Scope": "single-threaded",
+        "ShareEditorProject": true,
+        "PersistentRoot": "",
+        "GenerationFingerprint": ""
+      }
+    },
+    {
+      "name": "workspace-standalone-True-False-True",
+      "action": "workspace",
+      "parameters": {
+        "RepoRoot": "@ROOT@/repo",
+        "Version": "6000.6.0f1",
+        "Mode": "standalone",
+        "Scope": "single-threaded",
+        "ShareEditorProject": true,
+        "PersistentRoot": "",
+        "GenerationFingerprint": "0123456789abcdef"
+      }
+    },
+    {
+      "name": "workspace-standalone-True-True-False",
+      "action": "workspace",
+      "parameters": {
+        "RepoRoot": "@ROOT@/repo",
+        "Version": "6000.6.0f1",
+        "Mode": "standalone",
+        "Scope": "single-threaded",
+        "ShareEditorProject": true,
+        "PersistentRoot": "@ROOT@/persistent",
+        "GenerationFingerprint": ""
+      }
+    },
+    {
+      "name": "workspace-standalone-True-True-True",
+      "action": "workspace",
+      "parameters": {
+        "RepoRoot": "@ROOT@/repo",
+        "Version": "6000.6.0f1",
+        "Mode": "standalone",
+        "Scope": "single-threaded",
+        "ShareEditorProject": true,
+        "PersistentRoot": "@ROOT@/persistent",
+        "GenerationFingerprint": "0123456789abcdef"
+      }
+    },
+    {
+      "name": "invalid-../escape",
+      "action": "workspace",
+      "parameters": {
+        "RepoRoot": "@ROOT@/repo",
+        "Version": "6000.6.0f1",
+        "Mode": "editmode",
+        "GenerationFingerprint": "../escape"
+      }
+    },
+    {
+      "name": "invalid-ABCDEF0123456789",
+      "action": "workspace",
+      "parameters": {
+        "RepoRoot": "@ROOT@/repo",
+        "Version": "6000.6.0f1",
+        "Mode": "editmode",
+        "GenerationFingerprint": "ABCDEF0123456789"
+      }
+    },
+    {
+      "name": "invalid-short",
+      "action": "workspace",
+      "parameters": {
+        "RepoRoot": "@ROOT@/repo",
+        "Version": "6000.6.0f1",
+        "Mode": "editmode",
+        "GenerationFingerprint": "short"
+      }
+    },
+    {
+      "name": "explicit-outranks-invalid-fingerprint",
+      "action": "workspace",
+      "parameters": {
+        "RepoRoot": "@ROOT@/repo",
+        "Version": "6000.6.0f1",
+        "Mode": "playmode",
+        "PersistentRoot": "@ROOT@/persistent",
+        "ExplicitProjectPath": "@ROOT@/explicit",
+        "GenerationFingerprint": "../escape"
+      }
+    },
+    {
+      "name": "plan-100-100",
+      "action": "plan",
+      "parameters": {
+        "Candidates": [
+          {
+            "Name": "oldest",
+            "LastUsed": "2020-01-01",
+            "SizeBytes": 30
+          },
+          {
+            "Name": "middle",
+            "LastUsed": "2021-01-01",
+            "SizeBytes": 30
+          },
+          {
+            "Name": "current",
+            "LastUsed": "2019-01-01",
+            "SizeBytes": 5000
+          },
+          {
+            "Name": "newest",
+            "LastUsed": "2022-01-01",
+            "SizeBytes": 30
+          }
+        ],
+        "FreeBytes": 100,
+        "MinimumFreeBytes": 100,
+        "KeepName": "current"
+      }
+    },
+    {
+      "name": "plan-10-40",
+      "action": "plan",
+      "parameters": {
+        "Candidates": [
+          {
+            "Name": "oldest",
+            "LastUsed": "2020-01-01",
+            "SizeBytes": 30
+          },
+          {
+            "Name": "middle",
+            "LastUsed": "2021-01-01",
+            "SizeBytes": 30
+          },
+          {
+            "Name": "current",
+            "LastUsed": "2019-01-01",
+            "SizeBytes": 5000
+          },
+          {
+            "Name": "newest",
+            "LastUsed": "2022-01-01",
+            "SizeBytes": 30
+          }
+        ],
+        "FreeBytes": 10,
+        "MinimumFreeBytes": 40,
+        "KeepName": "current"
+      }
+    },
+    {
+      "name": "plan-10-200",
+      "action": "plan",
+      "parameters": {
+        "Candidates": [
+          {
+            "Name": "oldest",
+            "LastUsed": "2020-01-01",
+            "SizeBytes": 30
+          },
+          {
+            "Name": "middle",
+            "LastUsed": "2021-01-01",
+            "SizeBytes": 30
+          },
+          {
+            "Name": "current",
+            "LastUsed": "2019-01-01",
+            "SizeBytes": 5000
+          },
+          {
+            "Name": "newest",
+            "LastUsed": "2022-01-01",
+            "SizeBytes": 30
+          }
+        ],
+        "FreeBytes": 10,
+        "MinimumFreeBytes": 200,
+        "KeepName": "current"
+      }
+    },
+    {
+      "name": "plan-0-999999",
+      "action": "plan",
+      "parameters": {
+        "Candidates": [
+          {
+            "Name": "oldest",
+            "LastUsed": "2020-01-01",
+            "SizeBytes": 30
+          },
+          {
+            "Name": "middle",
+            "LastUsed": "2021-01-01",
+            "SizeBytes": 30
+          },
+          {
+            "Name": "current",
+            "LastUsed": "2019-01-01",
+            "SizeBytes": 5000
+          },
+          {
+            "Name": "newest",
+            "LastUsed": "2022-01-01",
+            "SizeBytes": 30
+          }
+        ],
+        "FreeBytes": 0,
+        "MinimumFreeBytes": 999999,
+        "KeepName": "current"
+      }
+    },
+    {
+      "name": "native-name-CURRENT",
+      "action": "plan",
+      "parameters": {
+        "Candidates": [
+          {
+            "Name": "CURRENT",
+            "LastUsed": "2020-01-01",
+            "SizeBytes": 1
+          }
+        ],
+        "FreeBytes": 0,
+        "MinimumFreeBytes": 1,
+        "KeepName": "current"
+      }
+    },
+    {
+      "name": "native-name-stra\u00dfe",
+      "action": "plan",
+      "parameters": {
+        "Candidates": [
+          {
+            "Name": "stra\u00dfe",
+            "LastUsed": "2020-01-01",
+            "SizeBytes": 1
+          }
+        ],
+        "FreeBytes": 0,
+        "MinimumFreeBytes": 1,
+        "KeepName": "STRASSE"
+      }
+    },
+    {
+      "name": "native-name-a\u00adb",
+      "action": "plan",
+      "parameters": {
+        "Candidates": [
+          {
+            "Name": "a\u00adb",
+            "LastUsed": "2020-01-01",
+            "SizeBytes": 1
+          }
+        ],
+        "FreeBytes": 0,
+        "MinimumFreeBytes": 1,
+        "KeepName": "ab"
+      }
+    },
+    {
+      "name": "native-name-\u03c3",
+      "action": "plan",
+      "parameters": {
+        "Candidates": [
+          {
+            "Name": "\u03c3",
+            "LastUsed": "2020-01-01",
+            "SizeBytes": 1
+          }
+        ],
+        "FreeBytes": 0,
+        "MinimumFreeBytes": 1,
+        "KeepName": "\u03c2"
+      }
+    },
+    {
+      "name": "equal-time-twenty",
+      "action": "plan",
+      "parameters": {
+        "Candidates": [
+          {
+            "Name": "entry-00",
+            "LastUsed": "2020-01-01",
+            "SizeBytes": 1
+          },
+          {
+            "Name": "entry-01",
+            "LastUsed": "2020-01-01",
+            "SizeBytes": 1
+          },
+          {
+            "Name": "entry-02",
+            "LastUsed": "2020-01-01",
+            "SizeBytes": 1
+          },
+          {
+            "Name": "entry-03",
+            "LastUsed": "2020-01-01",
+            "SizeBytes": 1
+          },
+          {
+            "Name": "entry-04",
+            "LastUsed": "2020-01-01",
+            "SizeBytes": 1
+          },
+          {
+            "Name": "entry-05",
+            "LastUsed": "2020-01-01",
+            "SizeBytes": 1
+          },
+          {
+            "Name": "entry-06",
+            "LastUsed": "2020-01-01",
+            "SizeBytes": 1
+          },
+          {
+            "Name": "entry-07",
+            "LastUsed": "2020-01-01",
+            "SizeBytes": 1
+          },
+          {
+            "Name": "entry-08",
+            "LastUsed": "2020-01-01",
+            "SizeBytes": 1
+          },
+          {
+            "Name": "entry-09",
+            "LastUsed": "2020-01-01",
+            "SizeBytes": 1
+          },
+          {
+            "Name": "entry-10",
+            "LastUsed": "2020-01-01",
+            "SizeBytes": 1
+          },
+          {
+            "Name": "entry-11",
+            "LastUsed": "2020-01-01",
+            "SizeBytes": 1
+          },
+          {
+            "Name": "entry-12",
+            "LastUsed": "2020-01-01",
+            "SizeBytes": 1
+          },
+          {
+            "Name": "entry-13",
+            "LastUsed": "2020-01-01",
+            "SizeBytes": 1
+          },
+          {
+            "Name": "entry-14",
+            "LastUsed": "2020-01-01",
+            "SizeBytes": 1
+          },
+          {
+            "Name": "entry-15",
+            "LastUsed": "2020-01-01",
+            "SizeBytes": 1
+          },
+          {
+            "Name": "entry-16",
+            "LastUsed": "2020-01-01",
+            "SizeBytes": 1
+          },
+          {
+            "Name": "entry-17",
+            "LastUsed": "2020-01-01",
+            "SizeBytes": 1
+          },
+          {
+            "Name": "entry-18",
+            "LastUsed": "2020-01-01",
+            "SizeBytes": 1
+          },
+          {
+            "Name": "entry-19",
+            "LastUsed": "2020-01-01",
+            "SizeBytes": 1
+          }
+        ],
+        "FreeBytes": 0,
+        "MinimumFreeBytes": 10,
+        "KeepName": "none"
+      }
+    }
+  ],
+  "linux_observations": [
+    {
+      "name": "leaf-editmode-False-''",
+      "value": "6000.6.0f1-editmode",
+      "error": ""
+    },
+    {
+      "name": "leaf-editmode-False-'   '",
+      "value": "6000.6.0f1-editmode",
+      "error": ""
+    },
+    {
+      "name": "leaf-editmode-False-' single-threaded '",
+      "value": "6000.6.0f1-editmode-single-threaded",
+      "error": ""
+    },
+    {
+      "name": "leaf-editmode-True-''",
+      "value": "6000.6.0f1-editmode",
+      "error": ""
+    },
+    {
+      "name": "leaf-editmode-True-'   '",
+      "value": "6000.6.0f1-editmode",
+      "error": ""
+    },
+    {
+      "name": "leaf-editmode-True-' single-threaded '",
+      "value": "6000.6.0f1-editmode-single-threaded",
+      "error": ""
+    },
+    {
+      "name": "leaf-playmode-False-''",
+      "value": "6000.6.0f1-playmode",
+      "error": ""
+    },
+    {
+      "name": "leaf-playmode-False-'   '",
+      "value": "6000.6.0f1-playmode",
+      "error": ""
+    },
+    {
+      "name": "leaf-playmode-False-' single-threaded '",
+      "value": "6000.6.0f1-playmode-single-threaded",
+      "error": ""
+    },
+    {
+      "name": "leaf-playmode-True-''",
+      "value": "6000.6.0f1-editmode",
+      "error": ""
+    },
+    {
+      "name": "leaf-playmode-True-'   '",
+      "value": "6000.6.0f1-editmode",
+      "error": ""
+    },
+    {
+      "name": "leaf-playmode-True-' single-threaded '",
+      "value": "6000.6.0f1-editmode-single-threaded",
+      "error": ""
+    },
+    {
+      "name": "leaf-standalone-False-''",
+      "value": "6000.6.0f1-standalone",
+      "error": ""
+    },
+    {
+      "name": "leaf-standalone-False-'   '",
+      "value": "6000.6.0f1-standalone",
+      "error": ""
+    },
+    {
+      "name": "leaf-standalone-False-' single-threaded '",
+      "value": "6000.6.0f1-standalone-single-threaded",
+      "error": ""
+    },
+    {
+      "name": "leaf-standalone-True-''",
+      "value": "6000.6.0f1-standalone",
+      "error": ""
+    },
+    {
+      "name": "leaf-standalone-True-'   '",
+      "value": "6000.6.0f1-standalone",
+      "error": ""
+    },
+    {
+      "name": "leaf-standalone-True-' single-threaded '",
+      "value": "6000.6.0f1-standalone-single-threaded",
+      "error": ""
+    },
+    {
+      "name": "leaf-PLAYMODE-False-''",
+      "value": "6000.6.0f1-PLAYMODE",
+      "error": ""
+    },
+    {
+      "name": "leaf-PLAYMODE-False-'   '",
+      "value": "6000.6.0f1-PLAYMODE",
+      "error": ""
+    },
+    {
+      "name": "leaf-PLAYMODE-False-' single-threaded '",
+      "value": "6000.6.0f1-PLAYMODE-single-threaded",
+      "error": ""
+    },
+    {
+      "name": "leaf-PLAYMODE-True-''",
+      "value": "6000.6.0f1-editmode",
+      "error": ""
+    },
+    {
+      "name": "leaf-PLAYMODE-True-'   '",
+      "value": "6000.6.0f1-editmode",
+      "error": ""
+    },
+    {
+      "name": "leaf-PLAYMODE-True-' single-threaded '",
+      "value": "6000.6.0f1-editmode-single-threaded",
+      "error": ""
+    },
+    {
+      "name": "workspace-editmode-False-False-False",
+      "value": {
+        "LeafName": "6000.6.0f1-editmode-single-threaded",
+        "ProjectPath": "@ROOT@/repo/.artifacts/unity/projects/6000.6.0f1-editmode-single-threaded",
+        "PruneRoot": "",
+        "LegacyProjectPath": "@ROOT@/repo/.artifacts/unity/projects/6000.6.0f1-editmode-single-threaded",
+        "CacheRoot": "@ROOT@/repo/.artifacts/unity/cache/6000.6.0f1",
+        "Persistent": false
+      },
+      "error": ""
+    },
+    {
+      "name": "workspace-editmode-False-False-True",
+      "value": {
+        "LeafName": "f-09d2bebc44c97016",
+        "ProjectPath": "@ROOT@/repo/.artifacts/unity/projects/f-09d2bebc44c97016",
+        "PruneRoot": "",
+        "LegacyProjectPath": "@ROOT@/repo/.artifacts/unity/projects/6000.6.0f1-editmode-single-threaded",
+        "CacheRoot": "@ROOT@/repo/.artifacts/unity/cache/6000.6.0f1",
+        "Persistent": false
+      },
+      "error": ""
+    },
+    {
+      "name": "workspace-editmode-False-True-False",
+      "value": {
+        "LeafName": "6000.6.0f1-editmode-single-threaded",
+        "ProjectPath": "@ROOT@/persistent/projects/6000.6.0f1-editmode-single-threaded",
+        "PruneRoot": "@ROOT@/persistent/projects",
+        "LegacyProjectPath": "@ROOT@/persistent/projects/6000.6.0f1-editmode-single-threaded",
+        "CacheRoot": "@ROOT@/persistent/cache/6000.6.0f1",
+        "Persistent": true
+      },
+      "error": ""
+    },
+    {
+      "name": "workspace-editmode-False-True-True",
+      "value": {
+        "LeafName": "f-09d2bebc44c97016",
+        "ProjectPath": "@ROOT@/persistent/projects/f-09d2bebc44c97016",
+        "PruneRoot": "@ROOT@/persistent/projects",
+        "LegacyProjectPath": "@ROOT@/persistent/projects/6000.6.0f1-editmode-single-threaded",
+        "CacheRoot": "@ROOT@/persistent/cache/6000.6.0f1",
+        "Persistent": true
+      },
+      "error": ""
+    },
+    {
+      "name": "workspace-editmode-True-False-False",
+      "value": {
+        "LeafName": "6000.6.0f1-editmode-single-threaded",
+        "ProjectPath": "@ROOT@/repo/.artifacts/unity/projects/6000.6.0f1-editmode-single-threaded",
+        "PruneRoot": "",
+        "LegacyProjectPath": "@ROOT@/repo/.artifacts/unity/projects/6000.6.0f1-editmode-single-threaded",
+        "CacheRoot": "@ROOT@/repo/.artifacts/unity/cache/6000.6.0f1",
+        "Persistent": false
+      },
+      "error": ""
+    },
+    {
+      "name": "workspace-editmode-True-False-True",
+      "value": {
+        "LeafName": "f-09d2bebc44c97016",
+        "ProjectPath": "@ROOT@/repo/.artifacts/unity/projects/f-09d2bebc44c97016",
+        "PruneRoot": "",
+        "LegacyProjectPath": "@ROOT@/repo/.artifacts/unity/projects/6000.6.0f1-editmode-single-threaded",
+        "CacheRoot": "@ROOT@/repo/.artifacts/unity/cache/6000.6.0f1",
+        "Persistent": false
+      },
+      "error": ""
+    },
+    {
+      "name": "workspace-editmode-True-True-False",
+      "value": {
+        "LeafName": "6000.6.0f1-editmode-single-threaded",
+        "ProjectPath": "@ROOT@/persistent/projects/6000.6.0f1-editmode-single-threaded",
+        "PruneRoot": "@ROOT@/persistent/projects",
+        "LegacyProjectPath": "@ROOT@/persistent/projects/6000.6.0f1-editmode-single-threaded",
+        "CacheRoot": "@ROOT@/persistent/cache/6000.6.0f1",
+        "Persistent": true
+      },
+      "error": ""
+    },
+    {
+      "name": "workspace-editmode-True-True-True",
+      "value": {
+        "LeafName": "f-09d2bebc44c97016",
+        "ProjectPath": "@ROOT@/persistent/projects/f-09d2bebc44c97016",
+        "PruneRoot": "@ROOT@/persistent/projects",
+        "LegacyProjectPath": "@ROOT@/persistent/projects/6000.6.0f1-editmode-single-threaded",
+        "CacheRoot": "@ROOT@/persistent/cache/6000.6.0f1",
+        "Persistent": true
+      },
+      "error": ""
+    },
+    {
+      "name": "workspace-playmode-False-False-False",
+      "value": {
+        "LeafName": "6000.6.0f1-playmode-single-threaded",
+        "ProjectPath": "@ROOT@/repo/.artifacts/unity/projects/6000.6.0f1-playmode-single-threaded",
+        "PruneRoot": "",
+        "LegacyProjectPath": "@ROOT@/repo/.artifacts/unity/projects/6000.6.0f1-playmode-single-threaded",
+        "CacheRoot": "@ROOT@/repo/.artifacts/unity/cache/6000.6.0f1",
+        "Persistent": false
+      },
+      "error": ""
+    },
+    {
+      "name": "workspace-playmode-False-False-True",
+      "value": {
+        "LeafName": "f-ef315cc658571117",
+        "ProjectPath": "@ROOT@/repo/.artifacts/unity/projects/f-ef315cc658571117",
+        "PruneRoot": "",
+        "LegacyProjectPath": "@ROOT@/repo/.artifacts/unity/projects/6000.6.0f1-playmode-single-threaded",
+        "CacheRoot": "@ROOT@/repo/.artifacts/unity/cache/6000.6.0f1",
+        "Persistent": false
+      },
+      "error": ""
+    },
+    {
+      "name": "workspace-playmode-False-True-False",
+      "value": {
+        "LeafName": "6000.6.0f1-playmode-single-threaded",
+        "ProjectPath": "@ROOT@/persistent/projects/6000.6.0f1-playmode-single-threaded",
+        "PruneRoot": "@ROOT@/persistent/projects",
+        "LegacyProjectPath": "@ROOT@/persistent/projects/6000.6.0f1-playmode-single-threaded",
+        "CacheRoot": "@ROOT@/persistent/cache/6000.6.0f1",
+        "Persistent": true
+      },
+      "error": ""
+    },
+    {
+      "name": "workspace-playmode-False-True-True",
+      "value": {
+        "LeafName": "f-ef315cc658571117",
+        "ProjectPath": "@ROOT@/persistent/projects/f-ef315cc658571117",
+        "PruneRoot": "@ROOT@/persistent/projects",
+        "LegacyProjectPath": "@ROOT@/persistent/projects/6000.6.0f1-playmode-single-threaded",
+        "CacheRoot": "@ROOT@/persistent/cache/6000.6.0f1",
+        "Persistent": true
+      },
+      "error": ""
+    },
+    {
+      "name": "workspace-playmode-True-False-False",
+      "value": {
+        "LeafName": "6000.6.0f1-editmode-single-threaded",
+        "ProjectPath": "@ROOT@/repo/.artifacts/unity/projects/6000.6.0f1-editmode-single-threaded",
+        "PruneRoot": "",
+        "LegacyProjectPath": "@ROOT@/repo/.artifacts/unity/projects/6000.6.0f1-editmode-single-threaded",
+        "CacheRoot": "@ROOT@/repo/.artifacts/unity/cache/6000.6.0f1",
+        "Persistent": false
+      },
+      "error": ""
+    },
+    {
+      "name": "workspace-playmode-True-False-True",
+      "value": {
+        "LeafName": "f-09d2bebc44c97016",
+        "ProjectPath": "@ROOT@/repo/.artifacts/unity/projects/f-09d2bebc44c97016",
+        "PruneRoot": "",
+        "LegacyProjectPath": "@ROOT@/repo/.artifacts/unity/projects/6000.6.0f1-editmode-single-threaded",
+        "CacheRoot": "@ROOT@/repo/.artifacts/unity/cache/6000.6.0f1",
+        "Persistent": false
+      },
+      "error": ""
+    },
+    {
+      "name": "workspace-playmode-True-True-False",
+      "value": {
+        "LeafName": "6000.6.0f1-editmode-single-threaded",
+        "ProjectPath": "@ROOT@/persistent/projects/6000.6.0f1-editmode-single-threaded",
+        "PruneRoot": "@ROOT@/persistent/projects",
+        "LegacyProjectPath": "@ROOT@/persistent/projects/6000.6.0f1-editmode-single-threaded",
+        "CacheRoot": "@ROOT@/persistent/cache/6000.6.0f1",
+        "Persistent": true
+      },
+      "error": ""
+    },
+    {
+      "name": "workspace-playmode-True-True-True",
+      "value": {
+        "LeafName": "f-09d2bebc44c97016",
+        "ProjectPath": "@ROOT@/persistent/projects/f-09d2bebc44c97016",
+        "PruneRoot": "@ROOT@/persistent/projects",
+        "LegacyProjectPath": "@ROOT@/persistent/projects/6000.6.0f1-editmode-single-threaded",
+        "CacheRoot": "@ROOT@/persistent/cache/6000.6.0f1",
+        "Persistent": true
+      },
+      "error": ""
+    },
+    {
+      "name": "workspace-standalone-False-False-False",
+      "value": {
+        "LeafName": "6000.6.0f1-standalone-single-threaded",
+        "ProjectPath": "@ROOT@/repo/.artifacts/unity/projects/6000.6.0f1-standalone-single-threaded",
+        "PruneRoot": "",
+        "LegacyProjectPath": "@ROOT@/repo/.artifacts/unity/projects/6000.6.0f1-standalone-single-threaded",
+        "CacheRoot": "@ROOT@/repo/.artifacts/unity/cache/6000.6.0f1",
+        "Persistent": false
+      },
+      "error": ""
+    },
+    {
+      "name": "workspace-standalone-False-False-True",
+      "value": {
+        "LeafName": "f-847ba4d3a36aec78",
+        "ProjectPath": "@ROOT@/repo/.artifacts/unity/projects/f-847ba4d3a36aec78",
+        "PruneRoot": "",
+        "LegacyProjectPath": "@ROOT@/repo/.artifacts/unity/projects/6000.6.0f1-standalone-single-threaded",
+        "CacheRoot": "@ROOT@/repo/.artifacts/unity/cache/6000.6.0f1",
+        "Persistent": false
+      },
+      "error": ""
+    },
+    {
+      "name": "workspace-standalone-False-True-False",
+      "value": {
+        "LeafName": "6000.6.0f1-standalone-single-threaded",
+        "ProjectPath": "@ROOT@/persistent/projects/6000.6.0f1-standalone-single-threaded",
+        "PruneRoot": "@ROOT@/persistent/projects",
+        "LegacyProjectPath": "@ROOT@/persistent/projects/6000.6.0f1-standalone-single-threaded",
+        "CacheRoot": "@ROOT@/persistent/cache/6000.6.0f1",
+        "Persistent": true
+      },
+      "error": ""
+    },
+    {
+      "name": "workspace-standalone-False-True-True",
+      "value": {
+        "LeafName": "f-847ba4d3a36aec78",
+        "ProjectPath": "@ROOT@/persistent/projects/f-847ba4d3a36aec78",
+        "PruneRoot": "@ROOT@/persistent/projects",
+        "LegacyProjectPath": "@ROOT@/persistent/projects/6000.6.0f1-standalone-single-threaded",
+        "CacheRoot": "@ROOT@/persistent/cache/6000.6.0f1",
+        "Persistent": true
+      },
+      "error": ""
+    },
+    {
+      "name": "workspace-standalone-True-False-False",
+      "value": {
+        "LeafName": "6000.6.0f1-standalone-single-threaded",
+        "ProjectPath": "@ROOT@/repo/.artifacts/unity/projects/6000.6.0f1-standalone-single-threaded",
+        "PruneRoot": "",
+        "LegacyProjectPath": "@ROOT@/repo/.artifacts/unity/projects/6000.6.0f1-standalone-single-threaded",
+        "CacheRoot": "@ROOT@/repo/.artifacts/unity/cache/6000.6.0f1",
+        "Persistent": false
+      },
+      "error": ""
+    },
+    {
+      "name": "workspace-standalone-True-False-True",
+      "value": {
+        "LeafName": "f-847ba4d3a36aec78",
+        "ProjectPath": "@ROOT@/repo/.artifacts/unity/projects/f-847ba4d3a36aec78",
+        "PruneRoot": "",
+        "LegacyProjectPath": "@ROOT@/repo/.artifacts/unity/projects/6000.6.0f1-standalone-single-threaded",
+        "CacheRoot": "@ROOT@/repo/.artifacts/unity/cache/6000.6.0f1",
+        "Persistent": false
+      },
+      "error": ""
+    },
+    {
+      "name": "workspace-standalone-True-True-False",
+      "value": {
+        "LeafName": "6000.6.0f1-standalone-single-threaded",
+        "ProjectPath": "@ROOT@/persistent/projects/6000.6.0f1-standalone-single-threaded",
+        "PruneRoot": "@ROOT@/persistent/projects",
+        "LegacyProjectPath": "@ROOT@/persistent/projects/6000.6.0f1-standalone-single-threaded",
+        "CacheRoot": "@ROOT@/persistent/cache/6000.6.0f1",
+        "Persistent": true
+      },
+      "error": ""
+    },
+    {
+      "name": "workspace-standalone-True-True-True",
+      "value": {
+        "LeafName": "f-847ba4d3a36aec78",
+        "ProjectPath": "@ROOT@/persistent/projects/f-847ba4d3a36aec78",
+        "PruneRoot": "@ROOT@/persistent/projects",
+        "LegacyProjectPath": "@ROOT@/persistent/projects/6000.6.0f1-standalone-single-threaded",
+        "CacheRoot": "@ROOT@/persistent/cache/6000.6.0f1",
+        "Persistent": true
+      },
+      "error": ""
+    },
+    {
+      "name": "invalid-../escape",
+      "value": null,
+      "error": "Project generation fingerprint must contain sixteen lowercase hexadecimal characters."
+    },
+    {
+      "name": "invalid-ABCDEF0123456789",
+      "value": null,
+      "error": "Project generation fingerprint must contain sixteen lowercase hexadecimal characters."
+    },
+    {
+      "name": "invalid-short",
+      "value": null,
+      "error": "Project generation fingerprint must contain sixteen lowercase hexadecimal characters."
+    },
+    {
+      "name": "explicit-outranks-invalid-fingerprint",
+      "value": {
+        "LeafName": "6000.6.0f1-playmode",
+        "ProjectPath": "@ROOT@/explicit",
+        "PruneRoot": "",
+        "LegacyProjectPath": "@ROOT@/explicit",
+        "CacheRoot": "@ROOT@/repo/.artifacts/unity/cache/6000.6.0f1",
+        "Persistent": false
+      },
+      "error": ""
+    },
+    {
+      "name": "plan-100-100",
+      "value": [],
+      "error": ""
+    },
+    {
+      "name": "plan-10-40",
+      "value": ["oldest"],
+      "error": ""
+    },
+    {
+      "name": "plan-10-200",
+      "value": ["oldest", "middle", "newest"],
+      "error": ""
+    },
+    {
+      "name": "plan-0-999999",
+      "value": ["oldest", "middle", "newest"],
+      "error": ""
+    },
+    {
+      "name": "native-name-CURRENT",
+      "value": [],
+      "error": ""
+    },
+    {
+      "name": "native-name-stra\u00dfe",
+      "value": ["stra\u00dfe"],
+      "error": ""
+    },
+    {
+      "name": "native-name-a\u00adb",
+      "value": [],
+      "error": ""
+    },
+    {
+      "name": "native-name-\u03c3",
+      "value": [],
+      "error": ""
+    },
+    {
+      "name": "equal-time-twenty",
+      "value": [
+        "entry-00",
+        "entry-17",
+        "entry-16",
+        "entry-15",
+        "entry-14",
+        "entry-13",
+        "entry-12",
+        "entry-11",
+        "entry-10",
+        "entry-09"
+      ],
+      "error": ""
+    }
+  ]
+}
