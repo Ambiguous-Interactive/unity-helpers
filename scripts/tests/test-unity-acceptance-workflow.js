@@ -420,15 +420,16 @@ for (const file of fs.readdirSync(workflowDirectory).filter((name) => /\.ya?ml$/
         for (const status of ["success", "failure", "cancelled"]) {
           const context = {
             github: { event_name: "workflow_dispatch" },
-            inputs: { acceptance: "all" },
+            inputs: { acceptance: "all", "latest-mode-scheduling": "combined" },
             needs: {
               "matrix-config": {
                 outputs: {
-                  "test-modes": '["editmode","playmode","standalone"]'
+                  "test-modes": '["editmode","playmode","standalone"]',
+                  "combine-variants": "true"
                 }
               }
             },
-            matrix: {},
+            matrix: { "unity-version": "6000.6.0f1" },
             success: status === "success",
             failure: status === "failure",
             cancelled: status === "cancelled",
@@ -436,7 +437,8 @@ for (const file of fs.readdirSync(workflowDirectory).filter((name) => /\.ya?ml$/
               {},
               {
                 get: (_, id) => ({
-                  outcome: id === "checkout" ? checkoutOutcome : status
+                  outcome: id === "checkout" ? checkoutOutcome : status,
+                  outputs: { st_editmode: status, st_playmode: status, st_standalone: status }
                 })
               }
             )
@@ -563,7 +565,7 @@ const readbackOriginalJobPredicates = {
   "unity-tests":
     "!cancelled() &&\n        (github.event_name != 'pull_request' ||\n          github.event.pull_request.head.repo.full_name == github.repository) &&\n        (github.event_name != 'push' || github.ref_protected) &&\n        needs.matrix-config.result == 'success' &&\n        needs.runner-preflight.result == 'success' &&\n        needs.matrix-config.outputs.test-modes != '[]' &&\n        needs.matrix-config.outputs.superseded != 'true'",
   "unity-tests-single-threaded":
-    "!cancelled() &&\n        (github.event_name != 'pull_request' ||\n          github.event.pull_request.head.repo.full_name == github.repository) &&\n        (github.event_name != 'push' || github.ref_protected) &&\n        needs.matrix-config.result == 'success' &&\n        needs.runner-preflight.result == 'success' &&\n        needs.matrix-config.outputs.superseded != 'true'",
+    "!cancelled() &&\n        (github.event_name != 'pull_request' ||\n          github.event.pull_request.head.repo.full_name == github.repository) &&\n        (github.event_name != 'push' || github.ref_protected) &&\n        needs.matrix-config.outputs.combine-variants != 'true' &&\n        needs.matrix-config.result == 'success' &&\n        needs.runner-preflight.result == 'success' &&\n        needs.matrix-config.outputs.superseded != 'true'",
   "unitypackage-smoke":
     "!cancelled() &&\n        (github.event_name != 'pull_request' ||\n          github.event.pull_request.head.repo.full_name == github.repository) &&\n        (github.event_name != 'push' || github.ref_protected) &&\n        needs.matrix-config.result == 'success' &&\n        needs.runner-preflight.result == 'success' &&\n        needs.matrix-config.outputs.superseded != 'true'",
   "unity-tests-aggregate": "always()",
@@ -992,6 +994,35 @@ console.log(
 
 const matrixConfig = workflow.match(/^  matrix-config:\n([\s\S]*?)(?=^  [\w-]+:\n)/m)?.[1];
 assert.ok(matrixConfig);
+const combination = matrixConfig.match(/^      combine-variants: >-\n((?:        [^\n]+\n)+)/m);
+assert.ok(combination, "matrix-config must publish the shared scheduling decision");
+const combineSelectedVariants = expression(combination[1].trim());
+for (const event of ["pull_request", "push", "workflow_dispatch"]) {
+  for (const lane of ["split", "combined"]) {
+    for (const versions of [undefined, "[]", '["2021.3.45f1"]', '["6000.6.0f1"]']) {
+      for (const modes of [
+        "",
+        "[]",
+        '["editmode","playmode"]',
+        '["editmode","playmode","standalone"]'
+      ]) {
+        assert.equal(
+          Boolean(
+            combineSelectedVariants({
+              github: { event_name: event },
+              inputs: { "latest-mode-scheduling": lane },
+              steps: { resolve: { outputs: { "unity-versions": versions, "test-modes": modes } } }
+            })
+          ),
+          versions === '["6000.6.0f1"]' &&
+            modes !== "" &&
+            modes !== "[]" &&
+            (event !== "workflow_dispatch" || lane === "combined")
+        );
+      }
+    }
+  }
+}
 const directSelection = matrixConfig
   .split(/(?=^      - name:)/m)
   .find((step) => step.startsWith("      - name: Validate Standalone Direct control selection\n"));
@@ -1225,7 +1256,8 @@ for (const name of [
             FORK_PR: String(fork),
             DEPENDABOT_PR: String(dependabot),
             RUNNER_PREFLIGHT_RESULT: preflight,
-            UNITY_TESTS_RESULT: licensed
+            UNITY_TESTS_RESULT: licensed,
+            UH_COMBINED: "false"
           }
         });
         assert.ifError(result.error);
@@ -1235,6 +1267,33 @@ for (const name of [
           `${name}: ${JSON.stringify({ fork, dependabot, preflight, licensed })}: ${result.stderr}`
         );
         historicalAggregateControls++;
+      }
+    }
+  }
+  if (name === "unity-tests-single-threaded-aggregate") {
+    for (const preflight of outcomes) {
+      for (const split of outcomes) {
+        for (const combined of outcomes) {
+          const result = spawnSync("bash", ["-c", program], {
+            encoding: "utf8",
+            env: {
+              ...process.env,
+              FORK_PR: "false",
+              DEPENDABOT_PR: "false",
+              RUNNER_PREFLIGHT_RESULT: preflight,
+              UNITY_TESTS_RESULT: split,
+              UH_COMBINED: "true",
+              UH_COMBINED_RESULT: combined
+            }
+          });
+          assert.ifError(result.error);
+          assert.equal(
+            result.status === 0,
+            preflight === "success" && split === "skipped" && combined === "success",
+            `${name}: ${JSON.stringify({ preflight, split, combined })}: ${result.stderr}`
+          );
+          historicalAggregateControls++;
+        }
       }
     }
   }
