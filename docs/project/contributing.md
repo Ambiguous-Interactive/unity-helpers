@@ -183,6 +183,24 @@ Claims still prevent retries after uncertain mutations. CLI stdout and summaries
 Release admission retains the original handling of empty container fork flags, requires string
 branch names, and rejects non-JSON numbers and incompatible package encodings before publication.
 
+Local push-default configuration shares typed Python policy through locked uv.
+The Bash and PowerShell commands retain their caller-specific behavior. The dot-sourced
+PowerShell helper still returns a result table, preserves the caller's exit state and
+does not start another PowerShell host. A missing uv tool produces a failure result.
+The Windows PowerShell 5.1 contract has a dedicated Windows control.
+
+The [qualification record](../performance/push-defaults-qualification.json)
+retains 34 original profile observations and 67 registered controls. Configuration writes
+only the two local push-default keys; it preserves other local settings and global/system
+configuration. Another writer's configuration lock remains untouched. A later write failure
+can leave the first key updated, so inspect local configuration before retrying.
+
+Seven alternating Linux pairs after two warmup pairs measured Bash CLI times of
+10.34 → 48.46 ms and PowerShell CLI times of 294.73 → 304.65 ms. Both regressions are
+retained. Inside an existing PowerShell parent, the medians were 53.43 → 49.43 ms,
+excluding parent startup and module loading. These results do not measure the healthy
+read-only push gate, Windows, complete hooks or CI, and do not establish statistical significance.
+
 The read-only Git push gate runs through locked Python with
 `npm run validate:git-push-config`. Its retained PowerShell commands delegate to
 the same validator and controls. The gate checks local push defaults, classifies

@@ -11,7 +11,7 @@
     "scripts/sync-banner-version.ps1": "40a87a1c4ef824a69219eef2848d9ef1cf08af9b6d8cf3b04d4e34c39d9a806f",
     "scripts/sync-issue-template-versions.ps1": "5662dc9feba6a2172931cc9f156dc4a551a320f7f620108f3e46667cd1d76725",
     "scripts/git-staging-helpers.ps1": "6106ab0d95cf64cc30b0e6314d6a8cc5555ab56c7610e3fb3986f1153592f957",
-    "scripts/python~/pyproject.toml": "718eb07ef10f453a492c4d20c43da0636575ee7388ec1473c03f38237cdc5ba2",
+    "scripts/python~/pyproject.toml": "785165834cdd0f419085847b5beaeb2b008e1127e94e4863430f08e57492a979",
     "scripts/python~/uv.lock": "5bc379d9b7d4af707b6d6f557766aef9ddd367af11fa4367487020275d53f70d",
     "scripts/tests/test_version_sync.py": "139773aac78de51beb513fedff4638f36665ab241732a6a428c332109ec1fefb"
   },

@@ -201,7 +201,7 @@
     "github:token:store": "bash scripts/github-token.sh --store-stdin",
     "check:container-git-credentials": "bash scripts/check-container-git-credentials.sh",
     "test:add-cspell-word": "uv run --project scripts/python~ --locked pytest scripts/tests/test_cspell_tools.py -q",
-    "test:configure-git-defaults": "bash scripts/tests/test-configure-git-defaults.sh",
+    "test:configure-git-defaults": "uv run --project scripts/python~ --locked pytest scripts/tests/test_push_defaults.py -q",
     "test:github-token": "bash scripts/tests/test-github-token.sh",
     "test:agent-skill-migration": "uv run --quiet --project scripts/python~ --locked pytest scripts/tests/test_skills_tooling.py -q",
     "test:skill-stubs": "uv run --project scripts/python~ --locked pytest scripts/tests/test_skill_stubs.py -q",

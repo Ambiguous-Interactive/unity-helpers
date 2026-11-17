@@ -1,0 +1,728 @@
+{
+  "source_sha256": {
+    "scripts/configure-git-defaults.sh": "111ee0b46067ea7147906345c99af9f6233b4d47debb495ea5d661157247ffd6",
+    "scripts/configure-git-defaults.ps1": "baaec0cff0871ad8c4f8f6ecf64974ce93ef51d124c5c5bdeaad007b04d1a205",
+    "scripts/git-push-defaults-helpers.ps1": "76250286cafa4f9a436b53b5c43b4b24b66a0db2f9194c076b0e85f6e4684dd2",
+    "scripts/tests/test-configure-git-defaults.sh": "043a11aba40573baaa4198fcd0a5bbee92d344abbd15c24a2ed4fe7272806356"
+  },
+  "git_stub_script": "#!/usr/bin/env bash\nset -uo pipefail\nprintf '%s\\0' \"$@\" >> \"$UH_GIT_LOG\"\nprintf '\\n' >> \"$UH_GIT_LOG\"\nif [ \"${1:-}\" = \"--version\" ]; then\n case \"$UH_GIT_SCENARIO\" in\n  old-git) echo 'git version 2.36.0';;\n  garbage-version) echo 'nonsense';;\n  failed-version) exit 1;;\n  *) echo 'git version 2.44.0';;\n esac\n exit 0\nfi\nif [ \"${1:-}\" = \"-C\" ]; then shift 2; fi\nif [ \"${1:-}\" = \"rev-parse\" ]; then\n [ \"$UH_GIT_SCENARIO\" != not-repo ] || exit 1\n echo .git;exit 0\nfi\nif [ \"${1:-}\" = config ] && [ \"${2:-}\" = --local ]; then\n if [ \"${3:-}\" = --get ]; then\n  if [ \"${4:-}\" = push.autoSetupRemote ]; then value=true; which=first; else value=simple;which=second;fi\n  [ \"$UH_GIT_SCENARIO\" != \"missing-$which\" ] || exit 1\n  case \"$UH_GIT_SCENARIO\" in\n   uppercase) printf '%s\\n' \"${value^^}\";;\n   crlf) printf '%s\\r\\n' \"$value\";;\n   spaced) printf '  %s \\r\\n' \"$value\";;\n   *) printf '%s\\n' \"$value\";;\n  esac\n else\n  if [ \"${3:-}\" = push.autoSetupRemote ]; then which=first; else which=second;fi\n  [ \"$UH_GIT_SCENARIO\" != \"fail-$which\" ] || exit 2\n fi\n exit 0\nfi\necho \"unexpected fixture Git call\" >&2\nexit 9\n",
+  "cases": [
+    {
+      "profile": "bash",
+      "shape": "fresh",
+      "scenario": null,
+      "name": "bash-fresh",
+      "status": 0,
+      "stdout": "\u2139 Configuring git push defaults (local only) in <ROOT>\n\u2713 push.autoSetupRemote = true\n\u2713 push.default = simple\npush.autoSetupRemote=true\npush.default=simple",
+      "stderr": "",
+      "result": null,
+      "last_git_exit_code": null,
+      "git_calls": [],
+      "after": {
+        "fixture.keep": "authored",
+        "push.autoSetupRemote": "true",
+        "push.default": "simple"
+      }
+    },
+    {
+      "profile": "bash",
+      "shape": "existing",
+      "scenario": null,
+      "name": "bash-existing",
+      "status": 0,
+      "stdout": "\u2139 Configuring git push defaults (local only) in <ROOT>\n\u2713 push.autoSetupRemote = true\n\u2713 push.default = simple\npush.autoSetupRemote=true\npush.default=simple",
+      "stderr": "",
+      "result": null,
+      "last_git_exit_code": null,
+      "git_calls": [],
+      "after": {
+        "fixture.keep": "authored",
+        "push.autoSetupRemote": "true",
+        "push.default": "simple"
+      }
+    },
+    {
+      "profile": "bash",
+      "shape": "not-repository",
+      "scenario": null,
+      "name": "bash-not-repository",
+      "status": 1,
+      "stdout": "\u2717 Not a git repository: <ROOT>",
+      "stderr": "",
+      "result": null,
+      "last_git_exit_code": null,
+      "git_calls": [],
+      "after": {}
+    },
+    {
+      "profile": "bash",
+      "shape": "missing",
+      "scenario": null,
+      "name": "bash-missing",
+      "status": 1,
+      "stdout": "\u2717 Not a git repository: <ROOT>",
+      "stderr": "",
+      "result": null,
+      "last_git_exit_code": null,
+      "git_calls": [],
+      "after": {}
+    },
+    {
+      "profile": "bash",
+      "shape": "file",
+      "scenario": null,
+      "name": "bash-file",
+      "status": 1,
+      "stdout": "\u2717 Not a git repository: <ROOT>",
+      "stderr": "",
+      "result": null,
+      "last_git_exit_code": null,
+      "git_calls": [],
+      "after": {}
+    },
+    {
+      "profile": "bash",
+      "shape": "stub",
+      "scenario": "healthy",
+      "name": "bash-healthy",
+      "status": 0,
+      "stdout": "\u2139 Configuring git push defaults (local only) in <ROOT>\n\u2713 push.autoSetupRemote = true\n\u2713 push.default = simple\npush.autoSetupRemote=true\npush.default=simple",
+      "stderr": "",
+      "result": null,
+      "last_git_exit_code": null,
+      "git_calls": [
+        "-C\u0000<ROOT>\u0000rev-parse\u0000--git-dir\u0000",
+        "--version\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000push.autoSetupRemote\u0000true\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000push.default\u0000simple\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000--get\u0000push.autoSetupRemote\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000--get\u0000push.default\u0000"
+      ],
+      "after": {}
+    },
+    {
+      "profile": "bash",
+      "shape": "stub",
+      "scenario": "crlf",
+      "name": "bash-crlf",
+      "status": 0,
+      "stdout": "\u2139 Configuring git push defaults (local only) in <ROOT>\n\u2713 push.autoSetupRemote = true\n\u2713 push.default = simple\npush.autoSetupRemote=true\npush.default=simple",
+      "stderr": "",
+      "result": null,
+      "last_git_exit_code": null,
+      "git_calls": [
+        "-C\u0000<ROOT>\u0000rev-parse\u0000--git-dir\u0000",
+        "--version\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000push.autoSetupRemote\u0000true\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000push.default\u0000simple\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000--get\u0000push.autoSetupRemote\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000--get\u0000push.default\u0000"
+      ],
+      "after": {}
+    },
+    {
+      "profile": "bash",
+      "shape": "stub",
+      "scenario": "spaced",
+      "name": "bash-spaced",
+      "status": 0,
+      "stdout": "\u2139 Configuring git push defaults (local only) in <ROOT>\n\u2713 push.autoSetupRemote = true\n\u2713 push.default = simple\npush.autoSetupRemote=true\npush.default=simple",
+      "stderr": "",
+      "result": null,
+      "last_git_exit_code": null,
+      "git_calls": [
+        "-C\u0000<ROOT>\u0000rev-parse\u0000--git-dir\u0000",
+        "--version\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000push.autoSetupRemote\u0000true\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000push.default\u0000simple\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000--get\u0000push.autoSetupRemote\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000--get\u0000push.default\u0000"
+      ],
+      "after": {}
+    },
+    {
+      "profile": "bash",
+      "shape": "stub",
+      "scenario": "uppercase",
+      "name": "bash-uppercase",
+      "status": 1,
+      "stdout": "\u2139 Configuring git push defaults (local only) in <ROOT>\n\u2713 push.autoSetupRemote = true\n\u2713 push.default = simple\npush.autoSetupRemote=TRUE\npush.default=SIMPLE\n\u2717 Post-configure verification failed (push.autoSetupRemote=TRUE push.default=SIMPLE)",
+      "stderr": "",
+      "result": null,
+      "last_git_exit_code": null,
+      "git_calls": [
+        "-C\u0000<ROOT>\u0000rev-parse\u0000--git-dir\u0000",
+        "--version\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000push.autoSetupRemote\u0000true\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000push.default\u0000simple\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000--get\u0000push.autoSetupRemote\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000--get\u0000push.default\u0000"
+      ],
+      "after": {}
+    },
+    {
+      "profile": "bash",
+      "shape": "stub",
+      "scenario": "old-git",
+      "name": "bash-old-git",
+      "status": 0,
+      "stdout": "\u26a0 git 2.36.0 detected. push.autoSetupRemote requires git >= 2.37; older clients will silently ignore it.\n\u2139 Configuring git push defaults (local only) in <ROOT>\n\u2713 push.autoSetupRemote = true\n\u2713 push.default = simple\npush.autoSetupRemote=true\npush.default=simple",
+      "stderr": "",
+      "result": null,
+      "last_git_exit_code": null,
+      "git_calls": [
+        "-C\u0000<ROOT>\u0000rev-parse\u0000--git-dir\u0000",
+        "--version\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000push.autoSetupRemote\u0000true\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000push.default\u0000simple\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000--get\u0000push.autoSetupRemote\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000--get\u0000push.default\u0000"
+      ],
+      "after": {}
+    },
+    {
+      "profile": "bash",
+      "shape": "stub",
+      "scenario": "garbage-version",
+      "name": "bash-garbage-version",
+      "status": 0,
+      "stdout": "\u26a0 git  detected. push.autoSetupRemote requires git >= 2.37; older clients will silently ignore it.\n\u2139 Configuring git push defaults (local only) in <ROOT>\n\u2713 push.autoSetupRemote = true\n\u2713 push.default = simple\npush.autoSetupRemote=true\npush.default=simple",
+      "stderr": "",
+      "result": null,
+      "last_git_exit_code": null,
+      "git_calls": [
+        "-C\u0000<ROOT>\u0000rev-parse\u0000--git-dir\u0000",
+        "--version\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000push.autoSetupRemote\u0000true\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000push.default\u0000simple\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000--get\u0000push.autoSetupRemote\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000--get\u0000push.default\u0000"
+      ],
+      "after": {}
+    },
+    {
+      "profile": "bash",
+      "shape": "stub",
+      "scenario": "failed-version",
+      "name": "bash-failed-version",
+      "status": 1,
+      "stdout": "",
+      "stderr": "",
+      "result": null,
+      "last_git_exit_code": null,
+      "git_calls": ["-C\u0000<ROOT>\u0000rev-parse\u0000--git-dir\u0000", "--version\u0000"],
+      "after": {}
+    },
+    {
+      "profile": "bash",
+      "shape": "stub",
+      "scenario": "fail-first",
+      "name": "bash-fail-first",
+      "status": 2,
+      "stdout": "\u2139 Configuring git push defaults (local only) in <ROOT>",
+      "stderr": "",
+      "result": null,
+      "last_git_exit_code": null,
+      "git_calls": [
+        "-C\u0000<ROOT>\u0000rev-parse\u0000--git-dir\u0000",
+        "--version\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000push.autoSetupRemote\u0000true\u0000"
+      ],
+      "after": {}
+    },
+    {
+      "profile": "bash",
+      "shape": "stub",
+      "scenario": "fail-second",
+      "name": "bash-fail-second",
+      "status": 2,
+      "stdout": "\u2139 Configuring git push defaults (local only) in <ROOT>\n\u2713 push.autoSetupRemote = true",
+      "stderr": "",
+      "result": null,
+      "last_git_exit_code": null,
+      "git_calls": [
+        "-C\u0000<ROOT>\u0000rev-parse\u0000--git-dir\u0000",
+        "--version\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000push.autoSetupRemote\u0000true\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000push.default\u0000simple\u0000"
+      ],
+      "after": {}
+    },
+    {
+      "profile": "bash",
+      "shape": "stub",
+      "scenario": "missing-first",
+      "name": "bash-missing-first",
+      "status": 1,
+      "stdout": "\u2139 Configuring git push defaults (local only) in <ROOT>\n\u2713 push.autoSetupRemote = true\n\u2713 push.default = simple\npush.autoSetupRemote=\npush.default=simple\n\u2717 Post-configure verification failed (push.autoSetupRemote= push.default=simple)",
+      "stderr": "",
+      "result": null,
+      "last_git_exit_code": null,
+      "git_calls": [
+        "-C\u0000<ROOT>\u0000rev-parse\u0000--git-dir\u0000",
+        "--version\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000push.autoSetupRemote\u0000true\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000push.default\u0000simple\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000--get\u0000push.autoSetupRemote\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000--get\u0000push.default\u0000"
+      ],
+      "after": {}
+    },
+    {
+      "profile": "bash",
+      "shape": "stub",
+      "scenario": "missing-second",
+      "name": "bash-missing-second",
+      "status": 1,
+      "stdout": "\u2139 Configuring git push defaults (local only) in <ROOT>\n\u2713 push.autoSetupRemote = true\n\u2713 push.default = simple\npush.autoSetupRemote=true\npush.default=\n\u2717 Post-configure verification failed (push.autoSetupRemote=true push.default=)",
+      "stderr": "",
+      "result": null,
+      "last_git_exit_code": null,
+      "git_calls": [
+        "-C\u0000<ROOT>\u0000rev-parse\u0000--git-dir\u0000",
+        "--version\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000push.autoSetupRemote\u0000true\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000push.default\u0000simple\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000--get\u0000push.autoSetupRemote\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000--get\u0000push.default\u0000"
+      ],
+      "after": {}
+    },
+    {
+      "profile": "bash",
+      "shape": "stub",
+      "scenario": "not-repo",
+      "name": "bash-not-repo",
+      "status": 1,
+      "stdout": "\u2717 Not a git repository: <ROOT>",
+      "stderr": "",
+      "result": null,
+      "last_git_exit_code": null,
+      "git_calls": ["-C\u0000<ROOT>\u0000rev-parse\u0000--git-dir\u0000"],
+      "after": {}
+    },
+    {
+      "profile": "powershell",
+      "shape": "fresh",
+      "scenario": null,
+      "name": "powershell-fresh",
+      "status": 0,
+      "stdout": "[git-push-defaults] Configuring git push defaults (local only) in <ROOT>\n[git-push-defaults] push.autoSetupRemote = true\n[git-push-defaults] push.default = simple\npush.autoSetupRemote=true\npush.default=simple",
+      "stderr": "",
+      "result": {
+        "Values": {
+          "push.autoSetupRemote": "true",
+          "push.default": "simple"
+        },
+        "Errors": [],
+        "Success": true
+      },
+      "last_git_exit_code": 0,
+      "git_calls": [],
+      "after": {
+        "fixture.keep": "authored",
+        "push.autoSetupRemote": "true",
+        "push.default": "simple"
+      }
+    },
+    {
+      "profile": "powershell",
+      "shape": "existing",
+      "scenario": null,
+      "name": "powershell-existing",
+      "status": 0,
+      "stdout": "[git-push-defaults] Configuring git push defaults (local only) in <ROOT>\n[git-push-defaults] push.autoSetupRemote = true\n[git-push-defaults] push.default = simple\npush.autoSetupRemote=true\npush.default=simple",
+      "stderr": "",
+      "result": {
+        "Errors": [],
+        "Success": true,
+        "Values": {
+          "push.default": "simple",
+          "push.autoSetupRemote": "true"
+        }
+      },
+      "last_git_exit_code": 0,
+      "git_calls": [],
+      "after": {
+        "fixture.keep": "authored",
+        "push.autoSetupRemote": "true",
+        "push.default": "simple"
+      }
+    },
+    {
+      "profile": "powershell",
+      "shape": "not-repository",
+      "scenario": null,
+      "name": "powershell-not-repository",
+      "status": 1,
+      "stdout": "[git-push-defaults] ERROR: Not a git repository: <ROOT>",
+      "stderr": "",
+      "result": {
+        "Errors": ["Not a git repository: <ROOT>"],
+        "Values": {
+          "push.default": "",
+          "push.autoSetupRemote": ""
+        },
+        "Success": false
+      },
+      "last_git_exit_code": 128,
+      "git_calls": [],
+      "after": {}
+    },
+    {
+      "profile": "powershell",
+      "shape": "missing",
+      "scenario": null,
+      "name": "powershell-missing",
+      "status": 1,
+      "stdout": "[git-push-defaults] ERROR: RepoRoot does not exist or is not a directory: <ROOT>",
+      "stderr": "",
+      "result": {
+        "Success": false,
+        "Values": {
+          "push.autoSetupRemote": "",
+          "push.default": ""
+        },
+        "Errors": ["RepoRoot does not exist or is not a directory: <ROOT>"]
+      },
+      "last_git_exit_code": 79,
+      "git_calls": [],
+      "after": {}
+    },
+    {
+      "profile": "powershell",
+      "shape": "file",
+      "scenario": null,
+      "name": "powershell-file",
+      "status": 1,
+      "stdout": "[git-push-defaults] ERROR: RepoRoot does not exist or is not a directory: <ROOT>",
+      "stderr": "",
+      "result": {
+        "Success": false,
+        "Values": {
+          "push.default": "",
+          "push.autoSetupRemote": ""
+        },
+        "Errors": ["RepoRoot does not exist or is not a directory: <ROOT>"]
+      },
+      "last_git_exit_code": 79,
+      "git_calls": [],
+      "after": {}
+    },
+    {
+      "profile": "powershell",
+      "shape": "stub",
+      "scenario": "healthy",
+      "name": "powershell-healthy",
+      "status": 0,
+      "stdout": "[git-push-defaults] Configuring git push defaults (local only) in <ROOT>\n[git-push-defaults] push.autoSetupRemote = true\n[git-push-defaults] push.default = simple\npush.autoSetupRemote=true\npush.default=simple",
+      "stderr": "",
+      "result": {
+        "Success": true,
+        "Errors": [],
+        "Values": {
+          "push.autoSetupRemote": "true",
+          "push.default": "simple"
+        }
+      },
+      "last_git_exit_code": 0,
+      "git_calls": [
+        "-C\u0000<ROOT>\u0000rev-parse\u0000--git-dir\u0000",
+        "--version\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000push.autoSetupRemote\u0000true\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000push.default\u0000simple\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000--get\u0000push.autoSetupRemote\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000--get\u0000push.default\u0000"
+      ],
+      "after": {}
+    },
+    {
+      "profile": "powershell",
+      "shape": "stub",
+      "scenario": "crlf",
+      "name": "powershell-crlf",
+      "status": 0,
+      "stdout": "[git-push-defaults] Configuring git push defaults (local only) in <ROOT>\n[git-push-defaults] push.autoSetupRemote = true\n[git-push-defaults] push.default = simple\npush.autoSetupRemote=true\npush.default=simple",
+      "stderr": "",
+      "result": {
+        "Success": true,
+        "Errors": [],
+        "Values": {
+          "push.default": "simple",
+          "push.autoSetupRemote": "true"
+        }
+      },
+      "last_git_exit_code": 0,
+      "git_calls": [
+        "-C\u0000<ROOT>\u0000rev-parse\u0000--git-dir\u0000",
+        "--version\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000push.autoSetupRemote\u0000true\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000push.default\u0000simple\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000--get\u0000push.autoSetupRemote\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000--get\u0000push.default\u0000"
+      ],
+      "after": {}
+    },
+    {
+      "profile": "powershell",
+      "shape": "stub",
+      "scenario": "spaced",
+      "name": "powershell-spaced",
+      "status": 0,
+      "stdout": "[git-push-defaults] Configuring git push defaults (local only) in <ROOT>\n[git-push-defaults] push.autoSetupRemote = true\n[git-push-defaults] push.default = simple\npush.autoSetupRemote=true\npush.default=simple",
+      "stderr": "",
+      "result": {
+        "Success": true,
+        "Errors": [],
+        "Values": {
+          "push.autoSetupRemote": "true",
+          "push.default": "simple"
+        }
+      },
+      "last_git_exit_code": 0,
+      "git_calls": [
+        "-C\u0000<ROOT>\u0000rev-parse\u0000--git-dir\u0000",
+        "--version\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000push.autoSetupRemote\u0000true\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000push.default\u0000simple\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000--get\u0000push.autoSetupRemote\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000--get\u0000push.default\u0000"
+      ],
+      "after": {}
+    },
+    {
+      "profile": "powershell",
+      "shape": "stub",
+      "scenario": "uppercase",
+      "name": "powershell-uppercase",
+      "status": 0,
+      "stdout": "[git-push-defaults] Configuring git push defaults (local only) in <ROOT>\n[git-push-defaults] push.autoSetupRemote = true\n[git-push-defaults] push.default = simple\npush.autoSetupRemote=TRUE\npush.default=SIMPLE",
+      "stderr": "",
+      "result": {
+        "Errors": [],
+        "Success": true,
+        "Values": {
+          "push.autoSetupRemote": "TRUE",
+          "push.default": "SIMPLE"
+        }
+      },
+      "last_git_exit_code": 0,
+      "git_calls": [
+        "-C\u0000<ROOT>\u0000rev-parse\u0000--git-dir\u0000",
+        "--version\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000push.autoSetupRemote\u0000true\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000push.default\u0000simple\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000--get\u0000push.autoSetupRemote\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000--get\u0000push.default\u0000"
+      ],
+      "after": {}
+    },
+    {
+      "profile": "powershell",
+      "shape": "stub",
+      "scenario": "old-git",
+      "name": "powershell-old-git",
+      "status": 0,
+      "stdout": "[git-push-defaults] WARNING: git 2.36.0 detected. push.autoSetupRemote requires git >= 2.37; older clients will silently ignore it.\n[git-push-defaults] Configuring git push defaults (local only) in <ROOT>\n[git-push-defaults] push.autoSetupRemote = true\n[git-push-defaults] push.default = simple\npush.autoSetupRemote=true\npush.default=simple",
+      "stderr": "",
+      "result": {
+        "Success": true,
+        "Errors": [],
+        "Values": {
+          "push.autoSetupRemote": "true",
+          "push.default": "simple"
+        }
+      },
+      "last_git_exit_code": 0,
+      "git_calls": [
+        "-C\u0000<ROOT>\u0000rev-parse\u0000--git-dir\u0000",
+        "--version\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000push.autoSetupRemote\u0000true\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000push.default\u0000simple\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000--get\u0000push.autoSetupRemote\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000--get\u0000push.default\u0000"
+      ],
+      "after": {}
+    },
+    {
+      "profile": "powershell",
+      "shape": "stub",
+      "scenario": "garbage-version",
+      "name": "powershell-garbage-version",
+      "status": 0,
+      "stdout": "[git-push-defaults] Configuring git push defaults (local only) in <ROOT>\n[git-push-defaults] push.autoSetupRemote = true\n[git-push-defaults] push.default = simple\npush.autoSetupRemote=true\npush.default=simple",
+      "stderr": "",
+      "result": {
+        "Values": {
+          "push.autoSetupRemote": "true",
+          "push.default": "simple"
+        },
+        "Errors": [],
+        "Success": true
+      },
+      "last_git_exit_code": 0,
+      "git_calls": [
+        "-C\u0000<ROOT>\u0000rev-parse\u0000--git-dir\u0000",
+        "--version\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000push.autoSetupRemote\u0000true\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000push.default\u0000simple\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000--get\u0000push.autoSetupRemote\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000--get\u0000push.default\u0000"
+      ],
+      "after": {}
+    },
+    {
+      "profile": "powershell",
+      "shape": "stub",
+      "scenario": "failed-version",
+      "name": "powershell-failed-version",
+      "status": 0,
+      "stdout": "[git-push-defaults] Configuring git push defaults (local only) in <ROOT>\n[git-push-defaults] push.autoSetupRemote = true\n[git-push-defaults] push.default = simple\npush.autoSetupRemote=true\npush.default=simple",
+      "stderr": "",
+      "result": {
+        "Values": {
+          "push.autoSetupRemote": "true",
+          "push.default": "simple"
+        },
+        "Success": true,
+        "Errors": []
+      },
+      "last_git_exit_code": 0,
+      "git_calls": [
+        "-C\u0000<ROOT>\u0000rev-parse\u0000--git-dir\u0000",
+        "--version\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000push.autoSetupRemote\u0000true\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000push.default\u0000simple\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000--get\u0000push.autoSetupRemote\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000--get\u0000push.default\u0000"
+      ],
+      "after": {}
+    },
+    {
+      "profile": "powershell",
+      "shape": "stub",
+      "scenario": "fail-first",
+      "name": "powershell-fail-first",
+      "status": 1,
+      "stdout": "[git-push-defaults] Configuring git push defaults (local only) in <ROOT>\n[git-push-defaults] ERROR: Failed to set push.autoSetupRemote",
+      "stderr": "",
+      "result": {
+        "Values": {
+          "push.autoSetupRemote": "",
+          "push.default": ""
+        },
+        "Errors": ["Failed to set push.autoSetupRemote"],
+        "Success": false
+      },
+      "last_git_exit_code": 2,
+      "git_calls": [
+        "-C\u0000<ROOT>\u0000rev-parse\u0000--git-dir\u0000",
+        "--version\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000push.autoSetupRemote\u0000true\u0000"
+      ],
+      "after": {}
+    },
+    {
+      "profile": "powershell",
+      "shape": "stub",
+      "scenario": "fail-second",
+      "name": "powershell-fail-second",
+      "status": 1,
+      "stdout": "[git-push-defaults] Configuring git push defaults (local only) in <ROOT>\n[git-push-defaults] push.autoSetupRemote = true\n[git-push-defaults] ERROR: Failed to set push.default",
+      "stderr": "",
+      "result": {
+        "Success": false,
+        "Values": {
+          "push.autoSetupRemote": "",
+          "push.default": ""
+        },
+        "Errors": ["Failed to set push.default"]
+      },
+      "last_git_exit_code": 2,
+      "git_calls": [
+        "-C\u0000<ROOT>\u0000rev-parse\u0000--git-dir\u0000",
+        "--version\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000push.autoSetupRemote\u0000true\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000push.default\u0000simple\u0000"
+      ],
+      "after": {}
+    },
+    {
+      "profile": "powershell",
+      "shape": "stub",
+      "scenario": "missing-first",
+      "name": "powershell-missing-first",
+      "status": 1,
+      "stdout": "[git-push-defaults] Configuring git push defaults (local only) in <ROOT>\n[git-push-defaults] push.autoSetupRemote = true\n[git-push-defaults] push.default = simple\npush.autoSetupRemote=\npush.default=simple\n[git-push-defaults] ERROR: Post-configure verification failed (push.autoSetupRemote= push.default=simple)",
+      "stderr": "",
+      "result": {
+        "Errors": [
+          "Post-configure verification failed (push.autoSetupRemote= push.default=simple)"
+        ],
+        "Values": {
+          "push.default": "simple",
+          "push.autoSetupRemote": ""
+        },
+        "Success": false
+      },
+      "last_git_exit_code": 0,
+      "git_calls": [
+        "-C\u0000<ROOT>\u0000rev-parse\u0000--git-dir\u0000",
+        "--version\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000push.autoSetupRemote\u0000true\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000push.default\u0000simple\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000--get\u0000push.autoSetupRemote\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000--get\u0000push.default\u0000"
+      ],
+      "after": {}
+    },
+    {
+      "profile": "powershell",
+      "shape": "stub",
+      "scenario": "missing-second",
+      "name": "powershell-missing-second",
+      "status": 1,
+      "stdout": "[git-push-defaults] Configuring git push defaults (local only) in <ROOT>\n[git-push-defaults] push.autoSetupRemote = true\n[git-push-defaults] push.default = simple\npush.autoSetupRemote=true\npush.default=\n[git-push-defaults] ERROR: Post-configure verification failed (push.autoSetupRemote=true push.default=)",
+      "stderr": "",
+      "result": {
+        "Success": false,
+        "Errors": ["Post-configure verification failed (push.autoSetupRemote=true push.default=)"],
+        "Values": {
+          "push.default": "",
+          "push.autoSetupRemote": "true"
+        }
+      },
+      "last_git_exit_code": 1,
+      "git_calls": [
+        "-C\u0000<ROOT>\u0000rev-parse\u0000--git-dir\u0000",
+        "--version\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000push.autoSetupRemote\u0000true\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000push.default\u0000simple\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000--get\u0000push.autoSetupRemote\u0000",
+        "-C\u0000<ROOT>\u0000config\u0000--local\u0000--get\u0000push.default\u0000"
+      ],
+      "after": {}
+    },
+    {
+      "profile": "powershell",
+      "shape": "stub",
+      "scenario": "not-repo",
+      "name": "powershell-not-repo",
+      "status": 1,
+      "stdout": "[git-push-defaults] ERROR: Not a git repository: <ROOT>",
+      "stderr": "",
+      "result": {
+        "Values": {
+          "push.default": "",
+          "push.autoSetupRemote": ""
+        },
+        "Errors": ["Not a git repository: <ROOT>"],
+        "Success": false
+      },
+      "last_git_exit_code": 1,
+      "git_calls": ["-C\u0000<ROOT>\u0000rev-parse\u0000--git-dir\u0000"],
+      "after": {}
+    }
+  ],
+  "install_hooks_git_stub_script": "#!/usr/bin/env bash\nset -euo pipefail\n\nif [[ \"${1:-}\" == \"--version\" ]]; then\n    echo \"git version 2.44.0\"\n    exit 0\nfi\n\nif [[ \"${1:-}\" == \"-C\" ]]; then\n    shift 2\nfi\n\nif [[ \"${1:-}\" == \"config\" && \"${2:-}\" == \"--get\" && \"${3:-}\" == \"core.hooksPath\" ]]; then\n    printf '.\\\\.githooks\\\\\\r\\n'\n    exit 0\nfi\n\nif [[ \"${1:-}\" == \"config\" && \"${2:-}\" == \"--local\" && \"${3:-}\" == \"--get\" && \"${4:-}\" == \"push.autoSetupRemote\" ]]; then\n    printf 'true\\r\\n'\n    exit 0\nfi\n\nif [[ \"${1:-}\" == \"config\" && \"${2:-}\" == \"--local\" && \"${3:-}\" == \"--get\" && \"${4:-}\" == \"push.default\" ]]; then\n    printf ' simple \\r\\n'\n    exit 0\nfi\n\necho \"unexpected git invocation: $*\" >&2\nexit 1\n"
+}
