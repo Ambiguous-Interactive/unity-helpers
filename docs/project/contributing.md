@@ -122,7 +122,7 @@ before publication validation. PowerShell's error framing remains host presentat
 status and actionable message text are preserved. All 184 Python files join strict checks.
 
 Seven alternating Linux tmpfs process pairs after two warmups per arm measured repository
-validation at 285.05 → 42.43 ms and a 500-workflow fixture at 333.99 → 46.12 ms, including uv startup.
+validation at 284.74 → 40.83 ms and a 500-workflow fixture at 334.68 → 43.43 ms, including uv startup.
 Every pair matches successful stdout/stderr and exit status and retains input/source hashes.
 The [qualification record](../performance/devcontainer-config-qualification.json) preserves those
 observations, original decisions and setup limitations. Windows, cold-host and whole-CI speed
