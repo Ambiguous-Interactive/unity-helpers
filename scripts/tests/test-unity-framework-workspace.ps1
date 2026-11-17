@@ -36,6 +36,11 @@ function New-Legacy {
 try {
     $fingerprint = Get-UnityTestFrameworkProjectFingerprint -Root $root
     Require ($fingerprint -cmatch '^[0-9a-f]{16}$') 'bounded generation fingerprint'
+    $previousHashes = foreach ($relative in @('.github/unity-test-framework.json', 'scripts/unity/test-framework-evidence.cs.txt', 'scripts/unity/test-framework-evidence.asmdef.txt')) {
+        Get-UnityFrameworkTextHash -Path (Join-Path $root $relative)
+    }
+    $previousFingerprint = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes(($previousHashes -join "`n")))).ToLowerInvariant().Substring(0, 16)
+    Require ($fingerprint -cne $previousFingerprint) 'input bootstrap policy isolates old generated settings'
     $workflow = [IO.File]::ReadAllText((Join-Path $root '.github/workflows/unity-tests.yml'))
     $step = [regex]::Match($workflow, '(?ms)^      - name: Capture native exit diagnostics\r?\n.*?(?=^      - name:)').Value
     $run = [regex]::Match($step, '(?ms)^        run: \|\r?\n(?<script>.*)$').Groups['script'].Value

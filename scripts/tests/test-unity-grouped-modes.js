@@ -146,6 +146,49 @@ try {
 const workflow = fs
   .readFileSync(path.join(repoRoot, ".github/workflows/unity-tests.yml"), "utf8")
   .replace(/\r\n/g, "\n");
+const matrixCheckoutDepth = Number(
+  workflow.match(/  matrix-config:[\s\S]*?fetch-depth: (\d+)/)?.[1]
+);
+assert.ok(Number.isInteger(matrixCheckoutDepth), "matrix checkout depth must be explicit");
+const history = fs.mkdtempSync(path.join(os.tmpdir(), "unity-stack-history-"));
+try {
+  const origin = path.join(history, "origin");
+  fs.mkdirSync(origin);
+  function git(cwd, args) {
+    const result = spawnSync("git", args, {
+      cwd,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: "Stack control",
+        GIT_AUTHOR_EMAIL: "stack@example.invalid",
+        GIT_COMMITTER_NAME: "Stack control",
+        GIT_COMMITTER_EMAIL: "stack@example.invalid"
+      }
+    });
+    assert.ifError(result.error);
+    assert.equal(result.status, 0, result.stderr);
+    return result.stdout.trim();
+  }
+  git(origin, ["init", "--initial-branch=main"]);
+  for (let layer = 0; layer < 5; layer++) {
+    fs.writeFileSync(path.join(origin, "layer.txt"), String(layer));
+    git(origin, ["add", "layer.txt"]);
+    git(origin, ["commit", "-m", `layer ${layer}`]);
+  }
+  const immutableBase = git(origin, ["rev-parse", "HEAD~3"]);
+  const clone = path.join(history, "checkout");
+  const depth = matrixCheckoutDepth === 0 ? [] : [`--depth=${matrixCheckoutDepth}`];
+  git(history, ["clone", ...depth, require("node:url").pathToFileURL(origin).href, clone]);
+  assert.equal(
+    git(clone, ["diff", "--name-only", immutableBase, "HEAD"]),
+    "layer.txt",
+    "native stack planning must resolve an immutable base beyond the synthetic merge's parents"
+  );
+  cases++;
+} finally {
+  fs.rmSync(history, { recursive: true, force: true });
+}
 assert.match(workflow, /unity-exclusions: \$\{\{ steps\.resolve\.outputs\.unity-exclusions \}\}/);
 assert.match(
   workflow,

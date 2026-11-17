@@ -17,10 +17,10 @@ releases, tags, branches, repository metadata, and settings.
 5. **Never use the local `gh` CLI for agent work.** Its presence in the image is not permission or
    a fallback. Tracked workflow code may invoke `gh` on a GitHub-hosted or self-hosted runner.
 
-Plain `git` does not replace GitHub MCP. A normal shipping flow pushes commits with `git`, then uses
-GitHub MCP to create or inspect the pull request, read reviews and checks, monitor workflow runs,
-and merge. Do not prefer an editor extension, editor connector, app connector, shell command, or ad
-hoc HTTP request over an available GitHub MCP capability.
+Plain `git` does not replace GitHub MCP. Use GitHub's native stacked pull requests for dependent
+changes; follow [native stack delivery](../references/github-stacked-pull-requests.md).
+Use MCP for supported operations and the documented REST fallback for missing stack operations.
+Preserve reviews and trunk checks, and use the asynchronous API for atomic stack merges.
 
 ## What "Available" Means
 

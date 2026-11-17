@@ -117,6 +117,7 @@ function Get-UnityTestFrameworkProjectFingerprint {
     $hashes = foreach ($relative in @('.github/unity-test-framework.json', 'scripts/unity/test-framework-evidence.cs.txt', 'scripts/unity/test-framework-evidence.asmdef.txt')) {
         Get-UnityFrameworkTextHash -Path (Join-Path $Root $relative)
     }
+    $hashes += 'player-input-manager-v1'
     return [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes(($hashes -join "`n")))).ToLowerInvariant().Substring(0, 16)
 }
 

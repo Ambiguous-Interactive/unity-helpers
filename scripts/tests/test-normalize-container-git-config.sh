@@ -484,11 +484,12 @@ fi
 
 # The check has to be reachable without an attach, or it only helps the session that did not need
 # it. validate:prepush is the last gate before the push that would otherwise hang.
-if grep -q 'check-container-git-credentials.sh' "$REPO_ROOT/scripts/validate-git-push-config.ps1"; then
+if uv run --quiet --project "$REPO_ROOT/scripts/python~" --locked \
+    pytest "$REPO_ROOT/scripts/tests/test_push_validation.py" -q -k test_npm_pre_push_route_reaches_postcondition; then
     pass "the pre-push validator runs the postcondition check"
 else
     fail "the pre-push validator runs the postcondition check" \
-        "scripts/validate-git-push-config.ps1 does not name the check, so nothing runs it before a push"
+        "the real npm route did not preserve broken and healthy postcondition decisions"
 fi
 
 if node -e "process.exit(require('$REPO_ROOT/package.json').scripts['check:container-git-credentials'] ? 0 : 1)"; then
