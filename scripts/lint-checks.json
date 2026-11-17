@@ -410,7 +410,7 @@
   {
     "id": "devcontainer-config",
     "name": "Devcontainer config",
-    "run": "pwsh -NoProfile -File scripts/validate-devcontainer-config.ps1 -VerboseOutput",
+    "run": "uv run --quiet --project scripts/python~ --locked --no-dev python scripts/validate_devcontainer_config.py --verbose",
     "inputs": ["@tooling"]
   },
   {

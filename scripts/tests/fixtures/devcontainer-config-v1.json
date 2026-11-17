@@ -1,0 +1,441 @@
+{
+  "provenance": {
+    "sourceCommit": "b352c241d7bcea94676cb7734588987c19ba2a43",
+    "sourcePath": "scripts/validate-devcontainer-config.ps1",
+    "sha256": "669de6a7bc730bbf2dd5d2a335fe8bc596d918ef4eb74b8936218fdc10b60a9a",
+    "presentationNormalization": "Failure stderr keeps gutter-extracted error text, unwraps host display lines and normalizes the fixture root; success streams are literal. Complete raw streams and hashes are retained in ignored session evidence."
+  },
+  "base": {
+    ".devcontainer/devcontainer.json": "{\n  \"build\": {\n    \"cacheFrom\": [\n      \"ghcr.io/ambiguous-interactive/unity-helpers/devcontainer:buildcache\",\n      \"ghcr.io/ambiguous-interactive/unity-helpers/devcontainer:latest\"\n    ]\n  },\n  \"customizations\": {\n    \"vscode\": {\n      \"settings\": {\n        \"[csharp]\": {},\n        \"[json]\": {},\n        \"[jsonc]\": {},\n        \"[yaml]\": {},\n        \"[markdown]\": {},\n        \"[javascript]\": {},\n        \"[xml]\": {},\n        \"[shellscript]\": {},\n        \"[powershell]\": {},\n        \"[hlsl]\": {},\n        \"[shaderlab]\": {}\n      }\n    }\n  }\n}\n",
+    ".githooks/pre-commit": "#!/bin/sh\nexit 0\n",
+    ".github/workflows/build-publish-devcontainer.yml": "name: Publish\non:\n  workflow_dispatch:\npermissions:\n  packages: write\nenv:\n  IMAGE_NAME: ambiguous-interactive/unity-helpers/devcontainer\njobs:\n  publish:\n    runs-on: ubuntu-latest\n    steps:\n      - run: ./scripts/validate-devcontainer-config.ps1 -VerboseOutput\n      - run: echo 'org.opencontainers.image.source=https://github.com/${{ github.repository }}'\n",
+    ".github/workflows/validate.yml": "name: Validate\non:\n  push:\njobs:\n  validate:\n    runs-on: ubuntu-latest\n    steps:\n      - run: pwsh -File scripts/validate-devcontainer-config.ps1\n"
+  },
+  "cases": [
+    {
+      "name": "valid",
+      "edits": {},
+      "expected": "",
+      "verbose": false,
+      "exit": 0,
+      "stdout": "",
+      "stderr": "",
+      "rawStdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawStderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "verbose",
+      "edits": {},
+      "expected": "",
+      "verbose": true,
+      "exit": 0,
+      "stdout": "Devcontainer image namespace and GHCR publish metadata are valid.\nFound devcontainer formatter entries for: csharp, json, jsonc, yaml, markdown, javascript, xml, shellscript, powershell, hlsl, shaderlab\nAll expected formatter assignments are present in devcontainer.json.\n",
+      "stderr": "",
+      "rawStdoutSha256": "bb87e1f8d615d48e5d9bb93372f313b70215f606661a0f67834106523bd05da5",
+      "rawStderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "missing-devcontainer.json",
+      "edits": {
+        ".devcontainer/devcontainer.json": null
+      },
+      "expected": "devcontainer.json not found at",
+      "verbose": false,
+      "exit": 1,
+      "stdout": "",
+      "stderr": "devcontainer.json not found at: <ROOT>/.devcontainer/devcontainer.json\n",
+      "rawStdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawStderrSha256": "c67e7d6c922ac20b84642b16ce3d53df4c68bf6c6385f3ab05a4cada9ff2c46e"
+    },
+    {
+      "name": "missing-pre-commit",
+      "edits": {
+        ".githooks/pre-commit": null
+      },
+      "expected": "pre-commit hook not found at",
+      "verbose": false,
+      "exit": 1,
+      "stdout": "",
+      "stderr": "pre-commit hook not found at: <ROOT>/.githooks/pre-commit\n",
+      "rawStdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawStderrSha256": "75570ae51a1adea212387b45e046d54d38201f0b1a80d7b564eec1420b57ab37"
+    },
+    {
+      "name": "missing-build-publish-devcontainer.yml",
+      "edits": {
+        ".github/workflows/build-publish-devcontainer.yml": null
+      },
+      "expected": "Devcontainer publish workflow not found at",
+      "verbose": false,
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Devcontainer publish workflow not found at: <ROOT>/.github/workflows/build-publish-devcontainer.yml\n",
+      "rawStdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawStderrSha256": "5c4baafa3b672512c7edf9420ef71fc763771a025ada668de5e9b69ebb2dd156"
+    },
+    {
+      "name": "legacy",
+      "edits": {
+        ".devcontainer/devcontainer.json": "{\n  \"build\": {\n    \"cacheFrom\": [\n      \"ghcr.io/wallstop/unity-helpers/devcontainer:buildcache\",\n      \"ghcr.io/wallstop/unity-helpers/devcontainer:latest\"\n    ]\n  },\n  \"customizations\": {\n    \"vscode\": {\n      \"settings\": {\n        \"[csharp]\": {},\n        \"[json]\": {},\n        \"[jsonc]\": {},\n        \"[yaml]\": {},\n        \"[markdown]\": {},\n        \"[javascript]\": {},\n        \"[xml]\": {},\n        \"[shellscript]\": {},\n        \"[powershell]\": {},\n        \"[hlsl]\": {},\n        \"[shaderlab]\": {}\n      }\n    }\n  }\n}\n"
+      },
+      "expected": "Devcontainer image references must use",
+      "verbose": false,
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Devcontainer image references must use ghcr.io/ambiguous-interactive/unity-helpers/devcontainer, not ghcr.io/wallstop/unity-helpers/devcontainer.\n",
+      "rawStdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawStderrSha256": "ee0f2ef3daa22b1248c8b37bb00d0ca3fd55c94e4f38220c15b3685879139c42"
+    },
+    {
+      "name": "cache",
+      "edits": {
+        ".devcontainer/devcontainer.json": "{\n  \"build\": {\n    \"cacheFrom\": [\n      \"wrong:buildcache\",\n      \"ghcr.io/ambiguous-interactive/unity-helpers/devcontainer:latest\"\n    ]\n  },\n  \"customizations\": {\n    \"vscode\": {\n      \"settings\": {\n        \"[csharp]\": {},\n        \"[json]\": {},\n        \"[jsonc]\": {},\n        \"[yaml]\": {},\n        \"[markdown]\": {},\n        \"[javascript]\": {},\n        \"[xml]\": {},\n        \"[shellscript]\": {},\n        \"[powershell]\": {},\n        \"[hlsl]\": {},\n        \"[shaderlab]\": {}\n      }\n    }\n  }\n}\n"
+      },
+      "expected": "must cache from",
+      "verbose": false,
+      "exit": 1,
+      "stdout": "",
+      "stderr": "devcontainer.json must cache from ghcr.io/ambiguous-interactive/unity-helpers/devcontainer buildcache and latest tags.\n",
+      "rawStdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawStderrSha256": "c0f3c3fb3c0b0ac30fc7888171744a36577ecf7cec4dcf6134f25079e706682f"
+    },
+    {
+      "name": "image",
+      "edits": {
+        ".github/workflows/build-publish-devcontainer.yml": "name: Publish\non:\n  workflow_dispatch:\npermissions:\n  packages: write\nenv:\n  IMAGE_NAME: wrong\njobs:\n  publish:\n    runs-on: ubuntu-latest\n    steps:\n      - run: ./scripts/validate-devcontainer-config.ps1 -VerboseOutput\n      - run: echo 'org.opencontainers.image.source=https://github.com/${{ github.repository }}'\n"
+      },
+      "expected": "must publish IMAGE_NAME:",
+      "verbose": false,
+      "exit": 1,
+      "stdout": "",
+      "stderr": "build-publish-devcontainer.yml must publish IMAGE_NAME: ambiguous-interactive/unity-helpers/devcontainer.\n",
+      "rawStdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawStderrSha256": "47828a59eb3c298522555784454bf5a4aa32e7e80af7b39ce095c945d1cd7882"
+    },
+    {
+      "name": "permission",
+      "edits": {
+        ".github/workflows/build-publish-devcontainer.yml": "name: Publish\non:\n  workflow_dispatch:\npermissions:\n  packages: read\nenv:\n  IMAGE_NAME: ambiguous-interactive/unity-helpers/devcontainer\njobs:\n  publish:\n    runs-on: ubuntu-latest\n    steps:\n      - run: ./scripts/validate-devcontainer-config.ps1 -VerboseOutput\n      - run: echo 'org.opencontainers.image.source=https://github.com/${{ github.repository }}'\n"
+      },
+      "expected": "must grant packages: write",
+      "verbose": false,
+      "exit": 1,
+      "stdout": "",
+      "stderr": "build-publish-devcontainer.yml must grant packages: write for GHCR publishing.\n",
+      "rawStdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawStderrSha256": "65e7e4fb320db0f0e22a6d625b006ac9018d2d14844ac7e6e1b30ca4ae0ed7b3"
+    },
+    {
+      "name": "label",
+      "edits": {
+        ".github/workflows/build-publish-devcontainer.yml": "name: Publish\non:\n  workflow_dispatch:\npermissions:\n  packages: write\nenv:\n  IMAGE_NAME: ambiguous-interactive/unity-helpers/devcontainer\njobs:\n  publish:\n    runs-on: ubuntu-latest\n    steps:\n      - run: ./scripts/validate-devcontainer-config.ps1 -VerboseOutput\n      - run: echo 'org.opencontainers.image.url=https://github.com/${{ github.repository }}'\n"
+      },
+      "expected": "must publish an org.opencontainers.image.source label",
+      "verbose": false,
+      "exit": 1,
+      "stdout": "",
+      "stderr": "build-publish-devcontainer.yml must publish an org.opencontainers.image.source label so GHCR links the image to this repository.\n",
+      "rawStdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawStderrSha256": "da8bb11e5f83ed5d10ea06a8ce045b29a491fb607a2c8de7dae99aaeb6467998"
+    },
+    {
+      "name": "self",
+      "edits": {
+        ".github/workflows/build-publish-devcontainer.yml": "name: Publish\non:\n  workflow_dispatch:\npermissions:\n  packages: write\nenv:\n  IMAGE_NAME: ambiguous-interactive/unity-helpers/devcontainer\njobs:\n  publish:\n    runs-on: ubuntu-latest\n    steps:\n      - run: ./scripts/validate-devcontainer-config.ps1\n      - run: echo 'org.opencontainers.image.source=https://github.com/${{ github.repository }}'\n"
+      },
+      "expected": "must run validate-devcontainer-config.ps1 before publishing",
+      "verbose": false,
+      "exit": 1,
+      "stdout": "",
+      "stderr": "build-publish-devcontainer.yml must run validate-devcontainer-config.ps1 before publishing to GHCR.\n",
+      "rawStdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawStderrSha256": "fd5917eb856959c9ced2e3fa15134092ff07498d7166da34cb36f89d708f4793"
+    },
+    {
+      "name": "missing-language-csharp",
+      "edits": {
+        ".devcontainer/devcontainer.json": "{\n  \"build\": {\n    \"cacheFrom\": [\n      \"ghcr.io/ambiguous-interactive/unity-helpers/devcontainer:buildcache\",\n      \"ghcr.io/ambiguous-interactive/unity-helpers/devcontainer:latest\"\n    ]\n  },\n  \"customizations\": {\n    \"vscode\": {\n      \"settings\": {\n        \"[csharp-absent]\": {},\n        \"[json]\": {},\n        \"[jsonc]\": {},\n        \"[yaml]\": {},\n        \"[markdown]\": {},\n        \"[javascript]\": {},\n        \"[xml]\": {},\n        \"[shellscript]\": {},\n        \"[powershell]\": {},\n        \"[hlsl]\": {},\n        \"[shaderlab]\": {}\n      }\n    }\n  }\n}\n"
+      },
+      "expected": "is missing 1 explicit formatter assignment",
+      "verbose": false,
+      "exit": 1,
+      "stdout": "\nWARNING: The following languages are handled by pre-commit but have no explicit devcontainer.json formatter entry:\nWARNING:   [csharp] (*.cs) - expected formatter: csharpier.csharpier-vscode\n\n",
+      "stderr": "devcontainer.json is missing 1 explicit formatter assignment(s). See warnings above.\n",
+      "rawStdoutSha256": "70711dd98f1987ed87b035bc514ac0e0a6e4565f84b7d72f54f2b71882c64177",
+      "rawStderrSha256": "2cac62017eeac6399459454a56cd3965e612d7bd73a1e9797050170234c66381"
+    },
+    {
+      "name": "missing-language-json",
+      "edits": {
+        ".devcontainer/devcontainer.json": "{\n  \"build\": {\n    \"cacheFrom\": [\n      \"ghcr.io/ambiguous-interactive/unity-helpers/devcontainer:buildcache\",\n      \"ghcr.io/ambiguous-interactive/unity-helpers/devcontainer:latest\"\n    ]\n  },\n  \"customizations\": {\n    \"vscode\": {\n      \"settings\": {\n        \"[csharp]\": {},\n        \"[json-absent]\": {},\n        \"[jsonc]\": {},\n        \"[yaml]\": {},\n        \"[markdown]\": {},\n        \"[javascript]\": {},\n        \"[xml]\": {},\n        \"[shellscript]\": {},\n        \"[powershell]\": {},\n        \"[hlsl]\": {},\n        \"[shaderlab]\": {}\n      }\n    }\n  }\n}\n"
+      },
+      "expected": "is missing 1 explicit formatter assignment",
+      "verbose": false,
+      "exit": 1,
+      "stdout": "\nWARNING: The following languages are handled by pre-commit but have no explicit devcontainer.json formatter entry:\nWARNING:   [json] (*.json) - expected formatter: esbenp.prettier-vscode\n\n",
+      "stderr": "devcontainer.json is missing 1 explicit formatter assignment(s). See warnings above.\n",
+      "rawStdoutSha256": "b5f5fc2a6fa691075cc3ce06f522be512e67504efaeffb8b27776acf18ef5286",
+      "rawStderrSha256": "2cac62017eeac6399459454a56cd3965e612d7bd73a1e9797050170234c66381"
+    },
+    {
+      "name": "missing-language-jsonc",
+      "edits": {
+        ".devcontainer/devcontainer.json": "{\n  \"build\": {\n    \"cacheFrom\": [\n      \"ghcr.io/ambiguous-interactive/unity-helpers/devcontainer:buildcache\",\n      \"ghcr.io/ambiguous-interactive/unity-helpers/devcontainer:latest\"\n    ]\n  },\n  \"customizations\": {\n    \"vscode\": {\n      \"settings\": {\n        \"[csharp]\": {},\n        \"[json]\": {},\n        \"[jsonc-absent]\": {},\n        \"[yaml]\": {},\n        \"[markdown]\": {},\n        \"[javascript]\": {},\n        \"[xml]\": {},\n        \"[shellscript]\": {},\n        \"[powershell]\": {},\n        \"[hlsl]\": {},\n        \"[shaderlab]\": {}\n      }\n    }\n  }\n}\n"
+      },
+      "expected": "is missing 1 explicit formatter assignment",
+      "verbose": false,
+      "exit": 1,
+      "stdout": "\nWARNING: The following languages are handled by pre-commit but have no explicit devcontainer.json formatter entry:\nWARNING:   [jsonc] (*.jsonc) - expected formatter: esbenp.prettier-vscode\n\n",
+      "stderr": "devcontainer.json is missing 1 explicit formatter assignment(s). See warnings above.\n",
+      "rawStdoutSha256": "773edd49631245d43a0aa546726d13b1180ed6c0541dd8fb522921cc44c4d57a",
+      "rawStderrSha256": "2cac62017eeac6399459454a56cd3965e612d7bd73a1e9797050170234c66381"
+    },
+    {
+      "name": "missing-language-yaml",
+      "edits": {
+        ".devcontainer/devcontainer.json": "{\n  \"build\": {\n    \"cacheFrom\": [\n      \"ghcr.io/ambiguous-interactive/unity-helpers/devcontainer:buildcache\",\n      \"ghcr.io/ambiguous-interactive/unity-helpers/devcontainer:latest\"\n    ]\n  },\n  \"customizations\": {\n    \"vscode\": {\n      \"settings\": {\n        \"[csharp]\": {},\n        \"[json]\": {},\n        \"[jsonc]\": {},\n        \"[yaml-absent]\": {},\n        \"[markdown]\": {},\n        \"[javascript]\": {},\n        \"[xml]\": {},\n        \"[shellscript]\": {},\n        \"[powershell]\": {},\n        \"[hlsl]\": {},\n        \"[shaderlab]\": {}\n      }\n    }\n  }\n}\n"
+      },
+      "expected": "is missing 1 explicit formatter assignment",
+      "verbose": false,
+      "exit": 1,
+      "stdout": "\nWARNING: The following languages are handled by pre-commit but have no explicit devcontainer.json formatter entry:\nWARNING:   [yaml] (*.yml/*.yaml) - expected formatter: esbenp.prettier-vscode\n\n",
+      "stderr": "devcontainer.json is missing 1 explicit formatter assignment(s). See warnings above.\n",
+      "rawStdoutSha256": "d40b735c385e5a6ca418cca3c5ef237b0de18ce2b6a72ede1a6841da99b3a863",
+      "rawStderrSha256": "2cac62017eeac6399459454a56cd3965e612d7bd73a1e9797050170234c66381"
+    },
+    {
+      "name": "missing-language-markdown",
+      "edits": {
+        ".devcontainer/devcontainer.json": "{\n  \"build\": {\n    \"cacheFrom\": [\n      \"ghcr.io/ambiguous-interactive/unity-helpers/devcontainer:buildcache\",\n      \"ghcr.io/ambiguous-interactive/unity-helpers/devcontainer:latest\"\n    ]\n  },\n  \"customizations\": {\n    \"vscode\": {\n      \"settings\": {\n        \"[csharp]\": {},\n        \"[json]\": {},\n        \"[jsonc]\": {},\n        \"[yaml]\": {},\n        \"[markdown-absent]\": {},\n        \"[javascript]\": {},\n        \"[xml]\": {},\n        \"[shellscript]\": {},\n        \"[powershell]\": {},\n        \"[hlsl]\": {},\n        \"[shaderlab]\": {}\n      }\n    }\n  }\n}\n"
+      },
+      "expected": "is missing 1 explicit formatter assignment",
+      "verbose": false,
+      "exit": 1,
+      "stdout": "\nWARNING: The following languages are handled by pre-commit but have no explicit devcontainer.json formatter entry:\nWARNING:   [markdown] (*.md) - expected formatter: esbenp.prettier-vscode\n\n",
+      "stderr": "devcontainer.json is missing 1 explicit formatter assignment(s). See warnings above.\n",
+      "rawStdoutSha256": "e93cb6bfbce3329aeb6848c15a8b54d50bbd7f69e9a6d3e60a69dae7b8b7caa1",
+      "rawStderrSha256": "2cac62017eeac6399459454a56cd3965e612d7bd73a1e9797050170234c66381"
+    },
+    {
+      "name": "missing-language-javascript",
+      "edits": {
+        ".devcontainer/devcontainer.json": "{\n  \"build\": {\n    \"cacheFrom\": [\n      \"ghcr.io/ambiguous-interactive/unity-helpers/devcontainer:buildcache\",\n      \"ghcr.io/ambiguous-interactive/unity-helpers/devcontainer:latest\"\n    ]\n  },\n  \"customizations\": {\n    \"vscode\": {\n      \"settings\": {\n        \"[csharp]\": {},\n        \"[json]\": {},\n        \"[jsonc]\": {},\n        \"[yaml]\": {},\n        \"[markdown]\": {},\n        \"[javascript-absent]\": {},\n        \"[xml]\": {},\n        \"[shellscript]\": {},\n        \"[powershell]\": {},\n        \"[hlsl]\": {},\n        \"[shaderlab]\": {}\n      }\n    }\n  }\n}\n"
+      },
+      "expected": "is missing 1 explicit formatter assignment",
+      "verbose": false,
+      "exit": 1,
+      "stdout": "\nWARNING: The following languages are handled by pre-commit but have no explicit devcontainer.json formatter entry:\nWARNING:   [javascript] (*.js) - expected formatter: esbenp.prettier-vscode\n\n",
+      "stderr": "devcontainer.json is missing 1 explicit formatter assignment(s). See warnings above.\n",
+      "rawStdoutSha256": "c7ebecf5633b361682a5aef7ccfc9d6ad753e402c4f6430a5014c053e226da4a",
+      "rawStderrSha256": "2cac62017eeac6399459454a56cd3965e612d7bd73a1e9797050170234c66381"
+    },
+    {
+      "name": "missing-language-xml",
+      "edits": {
+        ".devcontainer/devcontainer.json": "{\n  \"build\": {\n    \"cacheFrom\": [\n      \"ghcr.io/ambiguous-interactive/unity-helpers/devcontainer:buildcache\",\n      \"ghcr.io/ambiguous-interactive/unity-helpers/devcontainer:latest\"\n    ]\n  },\n  \"customizations\": {\n    \"vscode\": {\n      \"settings\": {\n        \"[csharp]\": {},\n        \"[json]\": {},\n        \"[jsonc]\": {},\n        \"[yaml]\": {},\n        \"[markdown]\": {},\n        \"[javascript]\": {},\n        \"[xml-absent]\": {},\n        \"[shellscript]\": {},\n        \"[powershell]\": {},\n        \"[hlsl]\": {},\n        \"[shaderlab]\": {}\n      }\n    }\n  }\n}\n"
+      },
+      "expected": "is missing 1 explicit formatter assignment",
+      "verbose": false,
+      "exit": 1,
+      "stdout": "\nWARNING: The following languages are handled by pre-commit but have no explicit devcontainer.json formatter entry:\nWARNING:   [xml] (*.xml) - expected formatter: (formatOnSave: false)\n\n",
+      "stderr": "devcontainer.json is missing 1 explicit formatter assignment(s). See warnings above.\n",
+      "rawStdoutSha256": "b0c409ea68927f29fb3e4f27e0a21b3216815a4bb474a41439f04f63df230bcb",
+      "rawStderrSha256": "2cac62017eeac6399459454a56cd3965e612d7bd73a1e9797050170234c66381"
+    },
+    {
+      "name": "missing-language-shellscript",
+      "edits": {
+        ".devcontainer/devcontainer.json": "{\n  \"build\": {\n    \"cacheFrom\": [\n      \"ghcr.io/ambiguous-interactive/unity-helpers/devcontainer:buildcache\",\n      \"ghcr.io/ambiguous-interactive/unity-helpers/devcontainer:latest\"\n    ]\n  },\n  \"customizations\": {\n    \"vscode\": {\n      \"settings\": {\n        \"[csharp]\": {},\n        \"[json]\": {},\n        \"[jsonc]\": {},\n        \"[yaml]\": {},\n        \"[markdown]\": {},\n        \"[javascript]\": {},\n        \"[xml]\": {},\n        \"[shellscript-absent]\": {},\n        \"[powershell]\": {},\n        \"[hlsl]\": {},\n        \"[shaderlab]\": {}\n      }\n    }\n  }\n}\n"
+      },
+      "expected": "is missing 1 explicit formatter assignment",
+      "verbose": false,
+      "exit": 1,
+      "stdout": "\nWARNING: The following languages are handled by pre-commit but have no explicit devcontainer.json formatter entry:\nWARNING:   [shellscript] (*.sh) - expected formatter: (formatOnSave: false)\n\n",
+      "stderr": "devcontainer.json is missing 1 explicit formatter assignment(s). See warnings above.\n",
+      "rawStdoutSha256": "0b818d10d403aa4441bea765d9ef959316a823c5e4cf6d39d0b523232970549c",
+      "rawStderrSha256": "2cac62017eeac6399459454a56cd3965e612d7bd73a1e9797050170234c66381"
+    },
+    {
+      "name": "missing-language-powershell",
+      "edits": {
+        ".devcontainer/devcontainer.json": "{\n  \"build\": {\n    \"cacheFrom\": [\n      \"ghcr.io/ambiguous-interactive/unity-helpers/devcontainer:buildcache\",\n      \"ghcr.io/ambiguous-interactive/unity-helpers/devcontainer:latest\"\n    ]\n  },\n  \"customizations\": {\n    \"vscode\": {\n      \"settings\": {\n        \"[csharp]\": {},\n        \"[json]\": {},\n        \"[jsonc]\": {},\n        \"[yaml]\": {},\n        \"[markdown]\": {},\n        \"[javascript]\": {},\n        \"[xml]\": {},\n        \"[shellscript]\": {},\n        \"[powershell-absent]\": {},\n        \"[hlsl]\": {},\n        \"[shaderlab]\": {}\n      }\n    }\n  }\n}\n"
+      },
+      "expected": "is missing 1 explicit formatter assignment",
+      "verbose": false,
+      "exit": 1,
+      "stdout": "\nWARNING: The following languages are handled by pre-commit but have no explicit devcontainer.json formatter entry:\nWARNING:   [powershell] (*.ps1) - expected formatter: (formatOnSave: false)\n\n",
+      "stderr": "devcontainer.json is missing 1 explicit formatter assignment(s). See warnings above.\n",
+      "rawStdoutSha256": "aaa695860c75597235f9aa085f47ba67f22aea8fa0b2fa5d0548ce369f340689",
+      "rawStderrSha256": "2cac62017eeac6399459454a56cd3965e612d7bd73a1e9797050170234c66381"
+    },
+    {
+      "name": "missing-language-hlsl",
+      "edits": {
+        ".devcontainer/devcontainer.json": "{\n  \"build\": {\n    \"cacheFrom\": [\n      \"ghcr.io/ambiguous-interactive/unity-helpers/devcontainer:buildcache\",\n      \"ghcr.io/ambiguous-interactive/unity-helpers/devcontainer:latest\"\n    ]\n  },\n  \"customizations\": {\n    \"vscode\": {\n      \"settings\": {\n        \"[csharp]\": {},\n        \"[json]\": {},\n        \"[jsonc]\": {},\n        \"[yaml]\": {},\n        \"[markdown]\": {},\n        \"[javascript]\": {},\n        \"[xml]\": {},\n        \"[shellscript]\": {},\n        \"[powershell]\": {},\n        \"[hlsl-absent]\": {},\n        \"[shaderlab]\": {}\n      }\n    }\n  }\n}\n"
+      },
+      "expected": "is missing 1 explicit formatter assignment",
+      "verbose": false,
+      "exit": 1,
+      "stdout": "\nWARNING: The following languages are handled by pre-commit but have no explicit devcontainer.json formatter entry:\nWARNING:   [hlsl] (*.hlsl) - expected formatter: (formatOnSave: false)\n\n",
+      "stderr": "devcontainer.json is missing 1 explicit formatter assignment(s). See warnings above.\n",
+      "rawStdoutSha256": "110a3c4d4a3120428e36f8da419f151b5a0023236b15aad02f773625fdd5e568",
+      "rawStderrSha256": "2cac62017eeac6399459454a56cd3965e612d7bd73a1e9797050170234c66381"
+    },
+    {
+      "name": "missing-language-shaderlab",
+      "edits": {
+        ".devcontainer/devcontainer.json": "{\n  \"build\": {\n    \"cacheFrom\": [\n      \"ghcr.io/ambiguous-interactive/unity-helpers/devcontainer:buildcache\",\n      \"ghcr.io/ambiguous-interactive/unity-helpers/devcontainer:latest\"\n    ]\n  },\n  \"customizations\": {\n    \"vscode\": {\n      \"settings\": {\n        \"[csharp]\": {},\n        \"[json]\": {},\n        \"[jsonc]\": {},\n        \"[yaml]\": {},\n        \"[markdown]\": {},\n        \"[javascript]\": {},\n        \"[xml]\": {},\n        \"[shellscript]\": {},\n        \"[powershell]\": {},\n        \"[hlsl]\": {},\n        \"[shaderlab-absent]\": {}\n      }\n    }\n  }\n}\n"
+      },
+      "expected": "is missing 1 explicit formatter assignment",
+      "verbose": false,
+      "exit": 1,
+      "stdout": "\nWARNING: The following languages are handled by pre-commit but have no explicit devcontainer.json formatter entry:\nWARNING:   [shaderlab] (*.shader) - expected formatter: (formatOnSave: false)\n\n",
+      "stderr": "devcontainer.json is missing 1 explicit formatter assignment(s). See warnings above.\n",
+      "rawStdoutSha256": "d1b4fc018186490cb0edc7cb7aa3a5eada24f792bd29f1499f2207559158c773",
+      "rawStderrSha256": "2cac62017eeac6399459454a56cd3965e612d7bd73a1e9797050170234c66381"
+    },
+    {
+      "name": "all-languages-missing",
+      "edits": {
+        ".devcontainer/devcontainer.json": "{\n  \"build\": {\n    \"cacheFrom\": [\n      \"ghcr.io/ambiguous-interactive/unity-helpers/devcontainer:buildcache\",\n      \"ghcr.io/ambiguous-interactive/unity-helpers/devcontainer:latest\"\n    ]\n  },\n  \"customizations\": {\n    \"vscode\": {\n      \"settings\": {\n        \"[absent-csharp]\": {},\n        \"[absent-json]\": {},\n        \"[absent-jsonc]\": {},\n        \"[absent-yaml]\": {},\n        \"[absent-markdown]\": {},\n        \"[absent-javascript]\": {},\n        \"[absent-xml]\": {},\n        \"[absent-shellscript]\": {},\n        \"[absent-powershell]\": {},\n        \"[absent-hlsl]\": {},\n        \"[absent-shaderlab]\": {}\n      }\n    }\n  }\n}\n"
+      },
+      "expected": "is missing 11 explicit formatter assignment",
+      "verbose": false,
+      "exit": 1,
+      "stdout": "\nWARNING: The following languages are handled by pre-commit but have no explicit devcontainer.json formatter entry:\nWARNING:   [csharp] (*.cs) - expected formatter: csharpier.csharpier-vscode\nWARNING:   [json] (*.json) - expected formatter: esbenp.prettier-vscode\nWARNING:   [jsonc] (*.jsonc) - expected formatter: esbenp.prettier-vscode\nWARNING:   [yaml] (*.yml/*.yaml) - expected formatter: esbenp.prettier-vscode\nWARNING:   [markdown] (*.md) - expected formatter: esbenp.prettier-vscode\nWARNING:   [javascript] (*.js) - expected formatter: esbenp.prettier-vscode\nWARNING:   [xml] (*.xml) - expected formatter: (formatOnSave: false)\nWARNING:   [shellscript] (*.sh) - expected formatter: (formatOnSave: false)\nWARNING:   [powershell] (*.ps1) - expected formatter: (formatOnSave: false)\nWARNING:   [hlsl] (*.hlsl) - expected formatter: (formatOnSave: false)\nWARNING:   [shaderlab] (*.shader) - expected formatter: (formatOnSave: false)\n\n",
+      "stderr": "devcontainer.json is missing 11 explicit formatter assignment(s). See warnings above.\n",
+      "rawStdoutSha256": "e5cfd34657e0fff3be6d32231df5d0fed9cf848ca12beb863f9f767656a948e1",
+      "rawStderrSha256": "06ee50ed3f22a5db23fb5a0f2161e006f896667f9cd6452df919098ba894fccd"
+    },
+    {
+      "name": "mixed-case",
+      "edits": {
+        ".devcontainer/devcontainer.json": "{\n  \"build\": {\n    \"cacheFrom\": [\n      \"ghcr.io/ambiguous-interactive/unity-helpers/devcontainer:buildcache\",\n      \"ghcr.io/ambiguous-interactive/unity-helpers/devcontainer:latest\"\n    ]\n  },\n  \"customizations\": {\n    \"vscode\": {\n      \"settings\": {\n        \"[CsHaRp]\": {},\n        \"[json]\": {},\n        \"[jsonc]\": {},\n        \"[yaml]\": {},\n        \"[markdown]\": {},\n        \"[javascript]\": {},\n        \"[xml]\": {},\n        \"[shellscript]\": {},\n        \"[powershell]\": {},\n        \"[hlsl]\": {},\n        \"[shaderlab]\": {}\n      }\n    }\n  }\n}\n"
+      },
+      "expected": "",
+      "verbose": false,
+      "exit": 0,
+      "stdout": "",
+      "stderr": "",
+      "rawStdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawStderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "no-owner",
+      "edits": {
+        ".github/workflows/validate.yml": null
+      },
+      "expected": "A workflow must run",
+      "verbose": false,
+      "exit": 1,
+      "stdout": "",
+      "stderr": "A workflow must run validate-devcontainer-config.ps1 (directly or via the lint registry) on changes to build-publish-devcontainer.yml.\n",
+      "rawStdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawStderrSha256": "abc065d99c4980dbd0d393203e32747a5465fcfb38a1a78af397573f3e0a0038"
+    },
+    {
+      "name": "schedule",
+      "edits": {
+        ".github/workflows/validate.yml": "name: Validate\non:\n  schedule:\njobs:\n  validate:\n    runs-on: ubuntu-latest\n    steps:\n      - run: pwsh -File scripts/validate-devcontainer-config.ps1\n"
+      },
+      "expected": "A workflow must run",
+      "verbose": false,
+      "exit": 1,
+      "stdout": "",
+      "stderr": "A workflow must run validate-devcontainer-config.ps1 (directly or via the lint registry) on changes to build-publish-devcontainer.yml.\n",
+      "rawStdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawStderrSha256": "abc065d99c4980dbd0d393203e32747a5465fcfb38a1a78af397573f3e0a0038"
+    },
+    {
+      "name": "commented",
+      "edits": {
+        ".github/workflows/validate.yml": "name: Validate\non:\n  push:\njobs:\n  validate:\n    runs-on: ubuntu-latest\n    steps:\n      # - run: pwsh -File scripts/validate-devcontainer-config.ps1\n"
+      },
+      "expected": "A workflow must run",
+      "verbose": false,
+      "exit": 1,
+      "stdout": "",
+      "stderr": "A workflow must run validate-devcontainer-config.ps1 (directly or via the lint registry) on changes to build-publish-devcontainer.yml.\n",
+      "rawStdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawStderrSha256": "abc065d99c4980dbd0d393203e32747a5465fcfb38a1a78af397573f3e0a0038"
+    },
+    {
+      "name": "filtered",
+      "edits": {
+        ".github/workflows/validate.yml": "name: Validate\non:\n  push:\n    paths:\n      - \"docs/**\"\njobs:\n  validate:\n    runs-on: ubuntu-latest\n    steps:\n      - run: pwsh -File scripts/validate-devcontainer-config.ps1\n"
+      },
+      "expected": "A workflow must run",
+      "verbose": false,
+      "exit": 1,
+      "stdout": "",
+      "stderr": "A workflow must run validate-devcontainer-config.ps1 (directly or via the lint registry) on changes to build-publish-devcontainer.yml.\n",
+      "rawStdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawStderrSha256": "abc065d99c4980dbd0d393203e32747a5465fcfb38a1a78af397573f3e0a0038"
+    },
+    {
+      "name": "covered",
+      "edits": {
+        ".github/workflows/validate.yml": "name: Validate\non:\n  push:\n    paths:\n      - \".github/workflows/build-publish-devcontainer.yml\"\njobs:\n  validate:\n    runs-on: ubuntu-latest\n    steps:\n      - run: pwsh -File scripts/validate-devcontainer-config.ps1\n"
+      },
+      "expected": "",
+      "verbose": false,
+      "exit": 0,
+      "stdout": "",
+      "stderr": "",
+      "rawStdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawStderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "legacy-node",
+      "edits": {
+        ".github/workflows/validate.yml": "name: Validate\non:\n  push:\njobs:\n  validate:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node scripts/run-repo-lint.js\n"
+      },
+      "expected": "",
+      "verbose": false,
+      "exit": 0,
+      "stdout": "",
+      "stderr": "",
+      "rawStdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawStderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "registry",
+      "edits": {
+        ".github/workflows/validate.yml": "name: Validate\non:\n  push:\njobs:\n  validate:\n    runs-on: ubuntu-latest\n    steps:\n      - run: |\n          uv run --project scripts/python~ --locked --no-dev python scripts/check_registries.py lint --direct --ci\n"
+      },
+      "expected": "",
+      "verbose": false,
+      "exit": 0,
+      "stdout": "",
+      "stderr": "",
+      "rawStdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawStderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "filtered-registry",
+      "edits": {
+        ".github/workflows/validate.yml": "name: Validate\non:\n  push:\njobs:\n  validate:\n    runs-on: ubuntu-latest\n    steps:\n      - run: |\n          uv run --project scripts/python~ --locked --no-dev python scripts/check_registries.py lint --direct --only doc-links\n"
+      },
+      "expected": "A workflow must run",
+      "verbose": false,
+      "exit": 1,
+      "stdout": "",
+      "stderr": "A workflow must run validate-devcontainer-config.ps1 (directly or via the lint registry) on changes to build-publish-devcontainer.yml.\n",
+      "rawStdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawStderrSha256": "abc065d99c4980dbd0d393203e32747a5465fcfb38a1a78af397573f3e0a0038"
+    },
+    {
+      "name": "contracts",
+      "edits": {
+        ".github/workflows/validate.yml": "name: Validate\non:\n  push:\njobs:\n  validate:\n    runs-on: ubuntu-latest\n    steps:\n      - run: |\n          uv run --project scripts/python~ --locked --no-dev python scripts/check_registries.py contracts --direct\n"
+      },
+      "expected": "A workflow must run",
+      "verbose": false,
+      "exit": 1,
+      "stdout": "",
+      "stderr": "A workflow must run validate-devcontainer-config.ps1 (directly or via the lint registry) on changes to build-publish-devcontainer.yml.\n",
+      "rawStdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawStderrSha256": "abc065d99c4980dbd0d393203e32747a5465fcfb38a1a78af397573f3e0a0038"
+    }
+  ]
+}

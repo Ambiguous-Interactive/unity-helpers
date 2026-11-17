@@ -108,6 +108,26 @@ results, process receipts, source hashes and the complete case inventory.
 
 ### Typed Python scripts
 
+Devcontainer configuration validation uses `scripts/validate_devcontainer_config.py` through
+locked uv. npm and Repo Lint invoke Python directly. The publish workflow provisions the shared
+Python/uv tools before its retained PowerShell command. Both PowerShell paths remain tested
+compatibility launchers. The gate preserves the image namespace, cache tags, publication metadata,
+workflow coverage and eleven required language-entry checks. Its retained text patterns check
+entry presence; they do not validate arbitrary JSON/YAML schemas or formatter values.
+
+`npm run test:validate-devcontainer-config` replays 33 original executable decisions. All 22 original
+suite assertions pass before and through the port. Additional controls cover five original BOM
+encodings, Unicode/foreign-directory launchers, failures without input mutation, and Python setup
+before publication validation. PowerShell's error framing remains host presentation; failure
+status and actionable message text are preserved. All 184 Python files join strict checks.
+
+Seven alternating Linux tmpfs process pairs after two warmups per arm measured repository
+validation at 285.05 → 42.43 ms and a 500-workflow fixture at 333.99 → 46.12 ms, including uv startup.
+Every pair matches successful stdout/stderr and exit status and retains input/source hashes.
+The [qualification record](../performance/devcontainer-config-qualification.json) preserves those
+observations, original decisions and setup limitations. Windows, cold-host and whole-CI speed
+remain unmeasured.
+
 GitHub Pages CSS validation uses `scripts/validate_github_pages_css.py` through locked uv.
 The Bash commands remain tested compatibility launchers; npm and the lint registry call Python.
 The gate retains its fixed layout, breakpoint and accessibility checks, fail-fast errors, and
