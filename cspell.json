@@ -992,7 +992,8 @@
         "ufeff",
         "notin",
         "tmpfs",
-        "moz"
+        "moz",
+        "mcr"
       ]
     }
   ],
