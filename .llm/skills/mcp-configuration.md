@@ -101,7 +101,7 @@ Most often the server is reachable but the agent session is stale. Order of chec
 
 ## Enforced forever
 
-`scripts/validate-mcp-config.ps1` (CI: `.github/workflows/validate-mcp-config.yml`)
+`npm run validate:mcp-config` runs the locked Python validator in Repo Lint and
 fails the build on:
 
 - `UNH-MCP-TRACKED` — a machine-local config path is not gitignored.
@@ -115,8 +115,8 @@ fails the build on:
   project's editor.
 
 When you add a new MCP client config path, update `clientConfigPaths` in
-`scripts/mcp/unity-mcp.mjs`, `.gitignore`, and the `$localConfigs` list in
-`scripts/validate-mcp-config.ps1` together.
+`scripts/mcp/unity-mcp.mjs`, `.gitignore`, and the `LOCAL_CONFIGS` tuple in
+`scripts/validate_mcp_config.py` together.
 
 ## Related Skills
 
