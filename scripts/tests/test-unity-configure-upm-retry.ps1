@@ -572,6 +572,7 @@ try {
             Set-Content -LiteralPath $LogPath -Value $(if ($fault) { 'failed-first-process' } else { 'next-editor-process' })
             Set-Content -LiteralPath ([IO.Path]::ChangeExtension($LogPath, 'execution-diagnostics.json')) -Value $script:buildAttempts
             if ($fault) {
+                if ($script:buildCase.HasResults) { Set-Content -LiteralPath $script:buildResultPath -Value '<test-run />' }
                 $ProcessObservation['ExitOrigin'] = 'asset-database-startup'
                 $ProcessObservation['RawExitCode'] = if ($script:buildCase.Reaped) { 1 } else { $null }
                 $ProcessObservation['KillSucceeded'] = $true
@@ -584,6 +585,7 @@ try {
         foreach ($case in @(
                 @{ Name = 'standalone-healthy'; Allow = $true; Fault = $false; Reaped = $true; Owned = $true; HasResults = $false; FinalExit = 0; Attempts = 1; Throws = $false; Retains = $false },
                 @{ Name = 'standalone-recovered'; Allow = $true; Fault = $true; Reaped = $true; Owned = $true; HasResults = $false; FinalExit = 0; Attempts = 2; Throws = $false; Retains = $true },
+                @{ Name = 'standalone-clears-stale-results'; Allow = $true; Fault = $true; Reaped = $true; Owned = $true; HasResults = $false; Stale = $true; FinalExit = 0; Attempts = 2; Throws = $false; Retains = $true },
                 @{ Name = 'standalone-second-fault'; Allow = $true; Fault = $true; Reaped = $true; Owned = $true; HasResults = $false; FinalExit = 1; Attempts = 2; Throws = $false; Retains = $true },
                 @{ Name = 'standalone-unreaped'; Allow = $true; Fault = $true; Reaped = $false; Owned = $true; HasResults = $false; FinalExit = 0; Attempts = 1; Throws = $true; Retains = $false },
                 @{ Name = 'standalone-existing-results'; Allow = $true; Fault = $true; Reaped = $true; Owned = $true; HasResults = $true; FinalExit = 0; Attempts = 1; Throws = $true; Retains = $false },
@@ -599,7 +601,8 @@ try {
             Set-Content -LiteralPath (Join-Path $library 'ArtifactDB') -Value 'old-cache'
             if ($case.Owned) { Set-Content -LiteralPath (Join-Path $library '.unity-helpers-repo-root.txt') -Value 'owned-fixture' }
             $resultPath = Join-Path $project 'results.xml'
-            if ($case.HasResults) { Set-Content -LiteralPath $resultPath -Value '<test-run />' }
+            $script:buildResultPath = $resultPath
+            if ($case['Stale']) { Set-Content -LiteralPath $resultPath -Value '<stale />' }
             $threw = $false
             try {
                 $watch = Invoke-StandaloneBuildWithAssetDatabaseRecovery -EditorPath 'owned-editor' -Arguments @('-runTests') -TimeoutSeconds 30 `

@@ -2979,6 +2979,14 @@ function Invoke-ProcessWithTreeKillTimeout {
     $stalled = $false
     $assetDatabaseStartupFailure = $false
     $startupLockError = '[Error] Failed to initialise lock:'
+    $startupLockMarkers = @(
+        $startupLockError
+        'ucommand_buffer_connect'
+        '[Error] Tried to create a new semaphore handle'
+        'uds_sharedmutex_init'
+        'InitializeAssetDatabaseV2'
+    )
+    $startupLockPattern = ($startupLockMarkers | ForEach-Object { [regex]::Escape($_) }) -join '|'
     $stallEnabled = $StallSeconds -gt 0
     $completionArmed = $false
     $completionExitCode = $null
@@ -3043,7 +3051,7 @@ function Invoke-ProcessWithTreeKillTimeout {
                     if (-not $completionArmed) {
                         $deadline = Set-CompletionGraceDeadline -Line $line -Pattern $CompletionPattern -GraceSeconds $CompletionGraceSeconds -CurrentDeadline $deadline -Armed ([ref]$completionArmed) -ExitCode ([ref]$completionExitCode) -Label $Label
                     }
-                    if ($StopOnAssetDatabaseStartupFailure -and $line.StartsWith($startupLockError, [StringComparison]::Ordinal)) {
+                    if ($StopOnAssetDatabaseStartupFailure -and $line -cmatch $startupLockPattern) {
                         $checkStartupLock = $true
                     }
                     $oTask = $outReader.ReadLineAsync()
@@ -3062,7 +3070,7 @@ function Invoke-ProcessWithTreeKillTimeout {
                     if (-not $completionArmed) {
                         $deadline = Set-CompletionGraceDeadline -Line $line -Pattern $CompletionPattern -GraceSeconds $CompletionGraceSeconds -CurrentDeadline $deadline -Armed ([ref]$completionArmed) -ExitCode ([ref]$completionExitCode) -Label $Label
                     }
-                    if ($StopOnAssetDatabaseStartupFailure -and $line.StartsWith($startupLockError, [StringComparison]::Ordinal)) {
+                    if ($StopOnAssetDatabaseStartupFailure -and $line -cmatch $startupLockPattern) {
                         $checkStartupLock = $true
                     }
                     $eTask = $errReader.ReadLineAsync()
@@ -3100,10 +3108,9 @@ function Invoke-ProcessWithTreeKillTimeout {
 
             if ($checkStartupLock -and -not $completionArmed -and -not $proc.HasExited) {
                 $startupLog = $buffer -join "`n"
-                if ($startupLog.Contains('ucommand_buffer_connect') -and
-                    $startupLog.Contains('[Error] Tried to create a new semaphore handle') -and
-                    $startupLog.Contains('uds_sharedmutex_init') -and
-                    $startupLog.Contains('InitializeAssetDatabaseV2') -and
+                # The streams can deliver the lock message before the preceding stack.
+                $missingMarker = $startupLockMarkers.Where({ -not $startupLog.Contains($_) }, 'First')
+                if ($missingMarker.Count -eq 0 -and
                     -not $startupLog.Contains('Application.AssetDatabase Initial Refresh End') -and
                     -not $startupLog.Contains('[uh-test-stream] RUN-STARTED') -and
                     -not $startupLog.Contains('error CS')) {
@@ -4182,6 +4189,9 @@ function Invoke-StandaloneBuildWithAssetDatabaseRecovery {
         [switch]$AllowCacheRecovery
     )
 
+    if ($AllowCacheRecovery -and (Test-Path -LiteralPath $ResultsPath -PathType Leaf)) {
+        Remove-Item -LiteralPath $ResultsPath -Force -ErrorAction Stop
+    }
     $clock = [Diagnostics.Stopwatch]::StartNew()
     try {
         $watch = Invoke-UnityObservedEditor -EditorPath $EditorPath -Arguments $Arguments `

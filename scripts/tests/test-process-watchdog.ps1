@@ -144,6 +144,14 @@ $startupChild = "Write-Output '$startupLock'; Start-Sleep -Seconds 30"
 $r = Invoke-Watchdog -ChildCommand $startupChild -TimeoutSeconds 15 -GraceSeconds 1 -Label 'asset-startup-lock' -ProcessObservation $observation -StopOnAssetDatabaseStartupFailure
 Assert-That 'the captured Asset Database startup lock fails before the wall timeout' ($r.ExitCode -ne 0 -and -not $r.TimedOut -and $observation.ExitOrigin -eq 'asset-database-startup' -and $observation.KillSucceeded -and $null -ne $observation.RawExitCode)
 
+$lockLineStart = $startupLock.IndexOf('[Error] Failed to initialise lock:')
+$lockLine = $startupLock.Substring($lockLineStart)
+$lockStack = $startupLock.Substring(0, $lockLineStart).TrimEnd()
+$observation = @{}
+$interleavedChild = "Write-Output '$lockLine'; Start-Sleep -Seconds 1; [Console]::Error.WriteLine('$lockStack'); Start-Sleep -Seconds 20"
+$r = Invoke-Watchdog -ChildCommand $interleavedChild -TimeoutSeconds 8 -GraceSeconds 1 -Label 'interleaved-startup-lock' -ProcessObservation $observation -StopOnAssetDatabaseStartupFailure
+Assert-That 'the startup check sees evidence that arrives later on stderr' ($r.ExitCode -ne 0 -and -not $r.TimedOut -and $observation.ExitOrigin -eq 'asset-database-startup')
+
 foreach ($unrelated in @(
         $startupLock.Replace('InitializeAssetDatabaseV2', 'UnrelatedSystem'),
         "Application.AssetDatabase Initial Refresh End`n$startupLock",
@@ -151,11 +159,11 @@ foreach ($unrelated in @(
         '[Error] Failed to initialise lock: unrelated error'
     )) {
     $observation = @{}
-    $r = Invoke-Watchdog -ChildCommand "Write-Output '$unrelated'; exit 0" -TimeoutSeconds 15 -GraceSeconds 1 -Label 'unmatched-startup-lock' -ProcessObservation $observation -StopOnAssetDatabaseStartupFailure
+    $r = Invoke-Watchdog -ChildCommand "Write-Output '$unrelated'; Start-Sleep -Seconds 2; exit 0" -TimeoutSeconds 15 -GraceSeconds 1 -Label 'unmatched-startup-lock' -ProcessObservation $observation -StopOnAssetDatabaseStartupFailure
     Assert-That 'partial or post-startup errors leave the process outcome unchanged' ($r.ExitCode -eq 0 -and $observation.ExitOrigin -eq 'process-exit')
 }
 $observation = @{}
-$r = Invoke-Watchdog -ChildCommand "Write-Output '$startupLock'; exit 0" -TimeoutSeconds 15 -GraceSeconds 1 -Label 'unarmed-startup-lock' -ProcessObservation $observation
+$r = Invoke-Watchdog -ChildCommand "Write-Output '$startupLock'; Start-Sleep -Seconds 2; exit 0" -TimeoutSeconds 15 -GraceSeconds 1 -Label 'unarmed-startup-lock' -ProcessObservation $observation
 Assert-That 'other process callers keep their existing behavior' ($r.ExitCode -eq 0 -and $observation.ExitOrigin -eq 'process-exit')
 
 # 1. sentinel (code 0) then hang -> grace-killed fast, exit 0, not timed out.
