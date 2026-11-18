@@ -2611,6 +2611,7 @@ jobs:
             test "${UNITY_TESTS_RESULT}" = success
           elif [ "${LANE_SELECTED}" = "false" ]; then
             test "${RUNNER_PREFLIGHT_RESULT}" = success
+            test "${UNITY_TESTS_RESULT}" = skipped
           else
             echo "LANE_SELECTED must be true or false." >&2
             false

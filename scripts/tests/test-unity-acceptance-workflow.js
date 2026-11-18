@@ -1295,7 +1295,9 @@ for (const name of [
           assert.ifError(result.error);
           assert.equal(
             result.status === 0,
-            fork ? preflight === "skipped" && licensed === "skipped" : preflight === "success",
+            fork
+              ? preflight === "skipped" && licensed === "skipped"
+              : preflight === "success" && licensed === "skipped",
             `${name}: ${JSON.stringify({ fork, preflight, licensed })}: ${result.stderr}`
           );
           historicalAggregateControls++;
