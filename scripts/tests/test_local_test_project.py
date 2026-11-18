@@ -135,6 +135,11 @@ def test_scaffold_preserves_project_files_and_recreates_on_force(
             '{"modules":{"com.unity.modules.ui":42}}',
             "nonblank version",
         ),
+        (
+            ".github/unity-test-project-modules.json",
+            '{"modules":{"com.unity.test-framework":"1.2.3"}}',
+            "version belongs in .github/unity-test-framework.json",
+        ),
         ("scripts/unity/test-framework-evidence.cs.txt", None, "test-framework-evidence.cs.txt"),
     ],
 )

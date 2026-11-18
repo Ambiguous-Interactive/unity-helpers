@@ -15,6 +15,7 @@ from cli_encoding import configure_output
 UNITY_SCRIPTS = Path(__file__).resolve().parent
 REPOSITORY = UNITY_SCRIPTS.parents[1]
 PACKAGE_REFERENCE = "file:/workspace"
+FRAMEWORK_PACKAGE = "com.unity.test-framework"
 PROJECT_SETTINGS = """%YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!129 &1
@@ -41,8 +42,12 @@ def manifest_text() -> str:
     modules = read_object(modules_source).get("modules")
     if not isinstance(modules, dict) or not modules:
         raise ValueError(f"{modules_source} must declare a nonempty modules object.")
+    if FRAMEWORK_PACKAGE in modules:
+        raise ValueError(
+            f"The {FRAMEWORK_PACKAGE} version belongs in .github/unity-test-framework.json."
+        )
     framework = test_framework_version(REPOSITORY)
-    dependencies = {"com.unity.test-framework": framework}
+    dependencies = {FRAMEWORK_PACKAGE: framework}
     for name, version in cast("dict[str, object]", modules).items():
         if not isinstance(version, str) or not version.strip():
             raise ValueError(f"{modules_source} requires a nonblank version for {name}.")
