@@ -674,6 +674,7 @@ def test_windows_phases_preserve_every_suite_and_bounded_concurrency() -> None:
         "scripts/tests/test_lint_error_codes.py",
         "scripts/tests/test_log_patterns.py",
         "scripts/tests/test_markdown_checks.py",
+        "scripts/tests/test_mcp_config.py",
         "scripts/tests/test_meta_lint.py",
         "scripts/tests/test_native_build_selection.py",
         "scripts/tests/test_no_regions.py",
