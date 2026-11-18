@@ -119,7 +119,7 @@ def test_batch_validates_boolean_facts_before_classifying(invalid: bool | str) -
     result = parse_input(
         [
             {
-                "path": "scripts/fixture.ps1",
+                "path": path,
                 "error": None,
                 "commands": empty,
                 "comment_lines": empty,
@@ -130,10 +130,14 @@ def test_batch_validates_boolean_facts_before_classifying(invalid: bool | str) -
                     "positional_disabled": True,
                     "parameters": [
                         {"name": "Paths", "array_type": True, "catches_remaining": False},
-                        {"name": "Trailing", "array_type": False, "catches_remaining": invalid},
+                        {"name": "Trailing", "array_type": False, "catches_remaining": remaining},
                     ],
                 },
             }
+            for path, remaining in (
+                ("scripts/first.ps1", False),
+                ("scripts/second.ps1", invalid),
+            )
         ]
     )
     if isinstance(invalid, str):
@@ -142,7 +146,9 @@ def test_batch_validates_boolean_facts_before_classifying(invalid: bool | str) -
         assert b"Expected AST field catches_remaining to be bool" in result.stderr
     else:
         assert result.returncode == 0
-        assert b'"code":"PWS005"' in result.stdout
+        assert result.stdout.count(b'"code":"PWS005"') == 2
+        assert b'"path":"scripts/first.ps1"' in result.stdout
+        assert b'"path":"scripts/second.ps1"' in result.stdout
         assert result.stderr == b""
 
 

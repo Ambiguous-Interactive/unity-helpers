@@ -57,7 +57,7 @@ function Write-TestResult {
     }
 }
 
-$lintScriptPath = (Resolve-Path (Join-Path $PSScriptRoot '..' 'lint-pwsh-invocations.ps1')).Path
+$lintScriptPath = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..' 'lint-pwsh-invocations.ps1')).Path
 
 $tempBase = if ($env:TEMP) { $env:TEMP } elseif ($env:TMPDIR) { $env:TMPDIR } else { '/tmp' }
 $tempRoot = Join-Path $tempBase "test-lint-pwsh-invocations-$(Get-Random)"
