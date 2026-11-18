@@ -24,7 +24,9 @@ try {
     foreach ($name in @('create-test-project.sh', 'create_test_project.py', 'stage_unitypackage.py', 'test-framework-evidence.cs.txt', 'test-framework-evidence.asmdef.txt')) {
         Copy-Item -LiteralPath (Join-Path $root "scripts/unity/$name") -Destination (Join-Path $fixture "scripts/unity/$name")
     }
-    Copy-Item -LiteralPath (Join-Path $root 'scripts/cli_encoding.py') -Destination (Join-Path $fixture 'scripts')
+    foreach ($name in @('check_runner.py', 'cli_encoding.py', 'lint_unity_test_modules.py')) {
+        Copy-Item -LiteralPath (Join-Path $root "scripts/$name") -Destination (Join-Path $fixture 'scripts')
+    }
     $pythonProject = Join-Path $fixture 'scripts/python~'
     New-Item -ItemType Directory -Path $pythonProject -Force | Out-Null
     foreach ($name in @('pyproject.toml', 'uv.lock')) {

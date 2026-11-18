@@ -34,7 +34,7 @@ def repository(tmp_path: Path) -> Path:
     checkout = tmp_path / "checkout Ω"
     for directory, names in (
         ("scripts/unity", UNITY_FILES),
-        ("scripts", ("cli_encoding.py",)),
+        ("scripts", ("check_runner.py", "cli_encoding.py", "lint_unity_test_modules.py")),
         ("scripts/python~", ("pyproject.toml", "uv.lock")),
         (".github", ("unity-test-framework.json", "unity-test-project-modules.json")),
     ):
@@ -133,12 +133,27 @@ def test_scaffold_preserves_project_files_and_recreates_on_force(
         (
             ".github/unity-test-project-modules.json",
             '{"modules":{"com.unity.modules.ui":42}}',
-            "nonblank version",
+            "needs a string version",
         ),
         (
             ".github/unity-test-project-modules.json",
             '{"modules":{"com.unity.test-framework":"1.2.3"}}',
             "version belongs in .github/unity-test-framework.json",
+        ),
+        (
+            ".github/unity-test-project-modules.json",
+            '{"modules":{"":"1.0"}}',
+            "is not allowed here",
+        ),
+        (
+            ".github/unity-test-project-modules.json",
+            '{"modules":{"com.unity.modules.missing":"1.0.0"}}',
+            "is not a known Unity built-in module",
+        ),
+        (
+            ".github/unity-test-project-modules.json",
+            '{"modules":{"com.unity.modules.ui":"1.0.0","com.unity.modules.ui":"2.0.0"}}',
+            "Duplicate JSON key",
         ),
         ("scripts/unity/test-framework-evidence.cs.txt", None, "test-framework-evidence.cs.txt"),
     ],

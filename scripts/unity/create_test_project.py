@@ -36,22 +36,24 @@ EditorSettings:
 
 
 def manifest_text() -> str:
-    from stage_unitypackage import read_object, test_framework_version
+    from lint_unity_test_modules import read_module_policy
+    from lint_unity_test_modules import validate as validate_module_policy
+    from stage_unitypackage import test_framework_version
 
     modules_source = REPOSITORY / ".github/unity-test-project-modules.json"
-    modules = read_object(modules_source).get("modules")
+    policy = read_module_policy(modules_source)
+    modules = policy.get("modules")
     if not isinstance(modules, dict) or not modules:
         raise ValueError(f"{modules_source} must declare a nonempty modules object.")
     if FRAMEWORK_PACKAGE in modules:
         raise ValueError(
             f"The {FRAMEWORK_PACKAGE} version belongs in .github/unity-test-framework.json."
         )
+    errors = validate_module_policy(policy)
+    if errors:
+        raise ValueError(f"{modules_source}: {' '.join(errors)}")
     framework = test_framework_version(REPOSITORY)
-    dependencies = {FRAMEWORK_PACKAGE: framework}
-    for name, version in cast("dict[str, object]", modules).items():
-        if not isinstance(version, str) or not version.strip():
-            raise ValueError(f"{modules_source} requires a nonblank version for {name}.")
-        dependencies[name] = version
+    dependencies = {FRAMEWORK_PACKAGE: framework, **cast("dict[str, str]", modules)}
     dependencies["com.wallstop-studios.unity-helpers"] = PACKAGE_REFERENCE
     return json.dumps({"dependencies": dependencies}, ensure_ascii=False, indent=2) + "\n"
 
