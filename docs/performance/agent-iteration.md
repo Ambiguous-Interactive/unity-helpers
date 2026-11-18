@@ -142,10 +142,11 @@ source run to recover a transient failure. Background work uses DAD-MACHINE only
 is eligible for fast validation but is shared with other repositories. Older-version failures remain visible and release
 publication requires all older versions for the same source.
 Default manual Unity Tests qualification retains the full matrix. An explicit manual version selects
-that named editor. Regenerate the compatibility workflow with
-`node scripts/unity/generate-compatibility-workflow.js` after changing canonical Unity jobs; the
-grouped-mode contract tests reject drift. Licensed setup, lock, result and cleanup steps have one
-maintained source in `unity-tests.yml`.
+that named editor. After changing canonical Unity jobs, regenerate the compatibility workflow with
+`uv run --project scripts/python~ --locked --no-dev python scripts/unity/generate_compatibility_workflow.py`.
+The renderer uses the repository-pinned Prettier YAML formatter, and the contract tests reject
+drift. Licensed setup, lock, result and cleanup steps have one maintained source in
+`unity-tests.yml`.
 Documentation retains latest editor validation pending a qualified conditional gate. Job summaries
 report selected versions and modes; a reduced run does not qualify omitted coverage.
 
