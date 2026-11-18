@@ -675,6 +675,7 @@ def test_windows_phases_preserve_every_suite_and_bounded_concurrency() -> None:
         "scripts/tests/test_log_patterns.py",
         "scripts/tests/test_markdown_checks.py",
         "scripts/tests/test_meta_lint.py",
+        "scripts/tests/test_native_build_selection.py",
         "scripts/tests/test_no_regions.py",
         "scripts/tests/test_normalize_eol.py",
         "scripts/tests/test_npm_package.py",
@@ -704,3 +705,4 @@ def test_windows_phases_preserve_every_suite_and_bounded_concurrency() -> None:
     )
     assert "scripts/tests/test_ci_modes.py" in str(orchestration["run"])
     assert "scripts/tests/test_browser_consumer.py" in str(orchestration["run"])
+    assert "scripts/tests/test_native_build_selection.py" in str(orchestration["run"])

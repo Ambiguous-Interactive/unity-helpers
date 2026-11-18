@@ -2934,7 +2934,8 @@ function Invoke-ProcessWithTreeKillTimeout {
         # completion sentinel is seen, because the editor legitimately goes quiet while
         # flushing results during the grace window (that case is the completion guard's).
         [int]$StallSeconds = 0,
-        [hashtable]$ProcessObservation
+        [hashtable]$ProcessObservation,
+        [switch]$StopOnAssetDatabaseStartupFailure
     )
 
     $logDir = Split-Path -Parent $LogPath
@@ -2976,6 +2977,17 @@ function Invoke-ProcessWithTreeKillTimeout {
     $timedOut = $false
     $reaped = $false
     $stalled = $false
+    $assetDatabaseStartupFailure = $false
+    $startupLockError = '[Error] Failed to initialise lock:'
+    $startupLockMarkers = @(
+        $startupLockError
+        'ucommand_buffer_connect'
+        '[Error] Tried to create a new semaphore handle'
+        'uds_sharedmutex_init'
+        'InitializeAssetDatabaseV2'
+    )
+    $startupLockPattern = ($startupLockMarkers | ForEach-Object { [regex]::Escape($_) }) -join '|'
+    $startupLockQuietSeconds = 2
     $stallEnabled = $StallSeconds -gt 0
     $completionArmed = $false
     $completionExitCode = $null
@@ -3026,6 +3038,7 @@ function Invoke-ProcessWithTreeKillTimeout {
             $deadline = [DateTime]::MaxValue
         }
 
+        $checkStartupLock = $false
         while (-not ($oDone -and $eDone)) {
             $progressed = $false
 
@@ -3038,6 +3051,9 @@ function Invoke-ProcessWithTreeKillTimeout {
                     $buffer.Add([string]$line)
                     if (-not $completionArmed) {
                         $deadline = Set-CompletionGraceDeadline -Line $line -Pattern $CompletionPattern -GraceSeconds $CompletionGraceSeconds -CurrentDeadline $deadline -Armed ([ref]$completionArmed) -ExitCode ([ref]$completionExitCode) -Label $Label
+                    }
+                    if ($StopOnAssetDatabaseStartupFailure -and $line -cmatch $startupLockPattern) {
+                        $checkStartupLock = $true
                     }
                     $oTask = $outReader.ReadLineAsync()
                     $lastOutputAt = [DateTime]::UtcNow
@@ -3054,6 +3070,9 @@ function Invoke-ProcessWithTreeKillTimeout {
                     $buffer.Add([string]$line)
                     if (-not $completionArmed) {
                         $deadline = Set-CompletionGraceDeadline -Line $line -Pattern $CompletionPattern -GraceSeconds $CompletionGraceSeconds -CurrentDeadline $deadline -Armed ([ref]$completionArmed) -ExitCode ([ref]$completionExitCode) -Label $Label
+                    }
+                    if ($StopOnAssetDatabaseStartupFailure -and $line -cmatch $startupLockPattern) {
+                        $checkStartupLock = $true
                     }
                     $eTask = $errReader.ReadLineAsync()
                     $lastOutputAt = [DateTime]::UtcNow
@@ -3085,6 +3104,26 @@ function Invoke-ProcessWithTreeKillTimeout {
                     }
                     if (-not $progressed) { Start-Sleep -Milliseconds 50 }
                     continue
+                }
+            }
+
+            # Drain both streams and give delayed refresh markers time to arrive.
+            if ($checkStartupLock -and -not $progressed -and -not $completionArmed -and -not $proc.HasExited -and
+                ([DateTime]::UtcNow - $lastOutputAt).TotalSeconds -ge $startupLockQuietSeconds) {
+                $checkStartupLock = $false
+                $startupLog = $buffer -join "`n"
+                # The streams can deliver the lock message before the preceding stack.
+                $missingMarker = $startupLockMarkers.Where({ -not $startupLog.Contains($_) }, 'First')
+                if ($missingMarker.Count -eq 0 -and
+                    -not $startupLog.Contains('Application.AssetDatabase Initial Refresh End') -and
+                    -not $startupLog.Contains('[uh-test-stream] RUN-STARTED') -and
+                    -not $startupLog.Contains('error CS')) {
+                    $assetDatabaseStartupFailure = $true
+                    $killReason = 'asset-database-startup'
+                    Write-Host "::warning::$Label failed to initialize the Asset Database shared lock. Stopping its process tree."
+                    $proc.Kill($true)
+                    $killSucceeded = $true
+                    break
                 }
             }
 
@@ -3183,7 +3222,10 @@ function Invoke-ProcessWithTreeKillTimeout {
                 }
             }
         } catch { }
-        if ($killedAfterCompletion) {
+        if ($assetDatabaseStartupFailure) {
+            $exitOrigin = 'asset-database-startup'
+            $exit = 1
+        } elseif ($killedAfterCompletion) {
             $exitOrigin = 'completion-grace'
             # The test run finished and wrote results.xml; the editor then hung on
             # shutdown and we tree-killed it after the grace window. This is NOT a
@@ -4078,7 +4120,8 @@ function Invoke-UnityObservedEditor {
         [int]$CompletionGraceSeconds = 120,
         [int]$TimeoutSeconds = 0,
         [int]$StallSeconds = 0,
-        [hashtable]$ProcessObservation
+        [hashtable]$ProcessObservation,
+        [switch]$StopOnAssetDatabaseStartupFailure
     )
 
     $Arguments = @(New-UnityImportArguments -Arguments $Arguments -UnityVersion $UnityVersion)
@@ -4113,7 +4156,8 @@ function Invoke-UnityObservedEditor {
         -CompletionPattern $CompletionPattern `
         -CompletionGraceSeconds $CompletionGraceSeconds `
         -StallSeconds $StallSeconds `
-        -ProcessObservation $ProcessObservation
+        -ProcessObservation $ProcessObservation `
+        -StopOnAssetDatabaseStartupFailure:$StopOnAssetDatabaseStartupFailure
     try { $ProcessObservation['NativeEvidence'] = Get-UnityNativeEvidence -Capture $nativeCapture -LogPath $LogPath }
     catch { $ProcessObservation['NativeEvidence'] = @{ State = 'capture-unavailable'; Files = @() } }
     Write-UnityExecutionObservation -LogPath $LogPath -ProcessObservation $ProcessObservation -Label $Label
@@ -4134,6 +4178,61 @@ function Invoke-UnityObservedEditor {
         Assert-UnityTestFrameworkEvidence -Directory $frameworkEvidence -ProcessId $ProcessObservation.ProcessId -Project $frameworkProject
     }
     return $watch
+}
+
+function Invoke-StandaloneBuildWithAssetDatabaseRecovery {
+    param(
+        [string]$EditorPath,
+        [string[]]$Arguments,
+        [int]$TimeoutSeconds,
+        [string]$LogPath,
+        [string]$Label,
+        [hashtable]$ProcessObservation,
+        [string]$Project,
+        [string]$ResultsPath,
+        [switch]$AllowCacheRecovery
+    )
+
+    if ($AllowCacheRecovery -and (Test-Path -LiteralPath $ResultsPath -PathType Leaf)) {
+        Remove-Item -LiteralPath $ResultsPath -Force -ErrorAction Stop
+    }
+    $clock = [Diagnostics.Stopwatch]::StartNew()
+    try {
+        $watch = Invoke-UnityObservedEditor -EditorPath $EditorPath -Arguments $Arguments `
+            -TimeoutSeconds $TimeoutSeconds -LogPath $LogPath -Label $Label `
+            -ProcessObservation $ProcessObservation -StopOnAssetDatabaseStartupFailure:$AllowCacheRecovery
+    } catch {
+        # The startup failure prevents Test Framework evidence collection.
+        if (-not $AllowCacheRecovery -or $ProcessObservation['ExitOrigin'] -cne 'asset-database-startup') { throw }
+    }
+    if (-not $AllowCacheRecovery -or $ProcessObservation['ExitOrigin'] -cne 'asset-database-startup') {
+        return $watch
+    }
+    if ($null -eq $ProcessObservation['RawExitCode'] -or -not $ProcessObservation['KillSucceeded'] -or
+        $ProcessObservation['LogPersistence'] -cne 'written' -or (Test-Path -LiteralPath $ResultsPath -PathType Leaf)) {
+        throw 'Asset Database recovery requires a stopped process tree, a retained log and no test results.'
+    }
+    $libraryItem = Get-Item -LiteralPath (Join-Path $Project 'Library') -Force -ErrorAction Stop
+    if ($libraryItem.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+        throw 'Asset Database recovery cannot move a linked Library.'
+    }
+
+    $firstLog = Join-Path (Split-Path -Parent $LogPath) ("{0}.first-attempt.log" -f [IO.Path]::GetFileNameWithoutExtension($LogPath))
+    Copy-Item -LiteralPath $LogPath -Destination $firstLog -Force -ErrorAction Stop
+    Copy-Item -LiteralPath ([IO.Path]::ChangeExtension($LogPath, 'execution-diagnostics.json')) `
+        -Destination ([IO.Path]::ChangeExtension($firstLog, 'execution-diagnostics.json')) -Force -ErrorAction Stop
+    Reset-UnityArtifactDatabaseLibrary -Project $Project
+
+    $remaining = $TimeoutSeconds
+    if ($TimeoutSeconds -gt 0) {
+        $remaining -= [int][Math]::Ceiling($clock.Elapsed.TotalSeconds)
+        if ($remaining -le 0) { throw 'The Standalone build deadline expired during Asset Database recovery.' }
+    }
+    Remove-Item -LiteralPath $LogPath -Force -ErrorAction Stop
+    Write-CiNotice 'Rebuilding Standalone from the retained startup failure with a fresh Library.'
+    return Invoke-UnityObservedEditor -EditorPath $EditorPath -Arguments $Arguments `
+        -TimeoutSeconds $remaining -LogPath $LogPath -Label "$Label (Asset Database recovery)" `
+        -ProcessObservation $ProcessObservation -StopOnAssetDatabaseStartupFailure
 }
 
 function Invoke-UnityEditor {
@@ -5655,13 +5754,15 @@ try {
             throw 'Evidence-only Standalone build capture stops before player launch and cannot satisfy acceptance.'
         }
         $buildObservation = @{}
-        $buildResult = Invoke-UnityObservedEditor `
+        $buildResult = Invoke-StandaloneBuildWithAssetDatabaseRecovery `
             -EditorPath $UnityEditorPath `
             -Arguments $buildArgs `
             -TimeoutSeconds (Get-StandaloneBuildTimeoutSeconds) `
             -LogPath $logPath `
             -Label "Build standalone IL2CPP test player (Unity $UnityVersion)" `
-            -ProcessObservation $buildObservation
+            -ProcessObservation $buildObservation `
+            -Project $ProjectPath -ResultsPath $resultsPath `
+            -AllowCacheRecovery:(-not $ExplicitProjectRequested -and $null -eq $frozenPlayerProvenance -and $UnityVersion -match '^6000\.6\.')
 
         if ($null -ne $frozenPlayerProvenance) {
             $frozenPlayerProvenance.BuildOutcome = $buildResult

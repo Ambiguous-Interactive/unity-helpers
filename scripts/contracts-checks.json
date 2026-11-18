@@ -624,7 +624,10 @@
       "@tooling",
       "scripts/unity/resolve-test-matrix.js",
       ".github/workflows/unity-tests.yml",
-      "scripts/tests/test-unity-acceptance-workflow.js"
+      "scripts/tests/test-unity-acceptance-workflow.js",
+      "scripts/unity/native_build_selection.py",
+      "scripts/tests/test_native_build_selection.py",
+      "scripts/unity/validate-native-build-*-selection.js"
     ]
   },
   {

@@ -639,6 +639,17 @@ acceptance self-test requires its final completion line after cleanup as well as
 Missing completion evidence fails the aggregate and preserves the captured output; it cannot count
 as a passing suite. This requirement does not imply that other checks have completion receipts.
 
+Before licensed jobs start, the hosted matrix validates Standalone Direct, debugger heap and
+attachment selections with one typed Python entry point through locked uv. The three earlier
+Node commands forward CLI calls to the same policy. Run `npm run test:unity-acceptance-workflow:predicates`
+to check the workflow wiring, original decision and diagnostic digests, and actual command exit
+codes and streams. Invalid inputs still fail before any runner acquires a Unity license.
+
+Seven alternating local Linux launches per mode after two warmups measured 20–24 ms for the
+original Node selectors and 33–39 ms through locked uv. The Node forwarding commands took
+50–61 ms. These isolated timings cover selector startup. The hosted matrix already provisions
+uv for module validation and moves that setup before the selectors.
+
 The WProto player and host source censuses use `scripts/unity/frozen_files.py` through locked uv. The PowerShell
 library entry points retain their names and result properties. Census walks include untracked and
 hidden inputs, prune only generated compiler output, and bind the Python project and lock alongside

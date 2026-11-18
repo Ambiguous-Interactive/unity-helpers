@@ -990,10 +990,6 @@ console.log(
   `${nativeBuildControls} build-only native diagnostic predicate and wiring controls passed.`
 );
 
-const { getDirectBuildSelectionError } = require("../unity/validate-native-build-direct-selection");
-const vm = require("node:vm");
-const directHelperPath = path.join(__dirname, "../unity/validate-native-build-direct-selection.js");
-const directHelperSource = fs.readFileSync(directHelperPath, "utf8");
 const matrixConfig = workflow.match(/^  matrix-config:\n([\s\S]*?)(?=^  [\w-]+:\n)/m)?.[1];
 assert.ok(matrixConfig);
 const directSelection = matrixConfig
@@ -1002,10 +998,13 @@ const directSelection = matrixConfig
 assert.ok(directSelection, "Hosted Direct selection must precede licensed jobs");
 assert.match(
   directSelection,
-  /run: node scripts\/unity\/validate-native-build-direct-selection\.js/
+  /run: uv run --project scripts\/python~ --locked --no-dev python scripts\/unity\/native_build_selection\.py direct/
 );
+const setupPythonIndex = matrixConfig.indexOf("uses: ./.github/actions/setup-python-tools");
+assert.ok(setupPythonIndex >= 0, "Python tooling setup must exist in matrix-config");
 assert.ok(
-  matrixConfig.indexOf("uses: actions/setup-node@") < matrixConfig.indexOf(directSelection)
+  setupPythonIndex < matrixConfig.indexOf(directSelection),
+  "Python tooling setup must precede Direct selection"
 );
 assert.match(directSelection, /UH_NATIVE_DIAGNOSTICS: \$\{\{ inputs.native-diagnostics \}\}/);
 assert.match(directSelection, /UH_NATIVE_MODE: \$\{\{ inputs.test-mode \}\}/);
@@ -1034,75 +1033,14 @@ for (const direct of [undefined, false, true]) {
     direct === true ? "Direct" : "Debugger"
   );
 }
-for (const absent of [null, undefined]) {
-  assert.notEqual(getDirectBuildSelectionError(absent), null);
-}
-const directSelections = [];
-for (const diagnostics of ["", "false", "true", "invalid"]) {
-  for (const mode of ["", "editmode", "standalone", "all"]) {
-    for (const acceptance of ["", "none", "wproto", "all"]) {
-      const environment = {
-        UH_NATIVE_DIAGNOSTICS: diagnostics,
-        UH_NATIVE_MODE: mode,
-        UH_NATIVE_ACCEPTANCE: acceptance
-      };
-      const permitted = diagnostics === "true" && mode === "standalone" && acceptance === "none";
-      assert.equal(getDirectBuildSelectionError(environment) === null, permitted);
-      directSelections.push({ environment, permitted });
-    }
-  }
-}
-for (const field of ["UH_NATIVE_DIAGNOSTICS", "UH_NATIVE_MODE", "UH_NATIVE_ACCEPTANCE"]) {
-  const patterns = {
-    UH_NATIVE_DIAGNOSTICS: /environment\.UH_NATIVE_DIAGNOSTICS !== "true"\s*\|\|\s*/,
-    UH_NATIVE_MODE: /environment\.UH_NATIVE_MODE !== "standalone"\s*\|\|\s*/,
-    UH_NATIVE_ACCEPTANCE: /\|\|\s*environment\.UH_NATIVE_ACCEPTANCE !== "none"/
-  };
-  const pattern = patterns[field];
-  const removed = directHelperSource.replace(pattern, "");
-  assert.notEqual(
-    removed,
-    directHelperSource,
-    `The ${field} control must change the actual helper`
-  );
-  const sandbox = { module: { exports: {} }, require, console, process };
-  vm.runInNewContext(removed, sandbox, { filename: directHelperPath });
-  const mismatches = directSelections.filter(
-    ({ environment, permitted }) =>
-      (sandbox.module.exports.getDirectBuildSelectionError(environment) === null) !== permitted
-  );
-  assert.equal(
-    mismatches.length,
-    3,
-    `Removing ${field} must fail its three exact selection controls`
-  );
-}
-for (const [diagnostics, mode, acceptance, exitCode] of [
-  ["true", "standalone", "none", 0],
-  ["false", "standalone", "none", 1],
-  ["true", "editmode", "none", 1],
-  ["true", "standalone", "wproto", 1]
-]) {
-  const environment = {
-    UH_NATIVE_DIAGNOSTICS: diagnostics,
-    UH_NATIVE_MODE: mode,
-    UH_NATIVE_ACCEPTANCE: acceptance
-  };
-  const result = spawnSync(process.execPath, [directHelperPath], {
-    env: { ...process.env, ...environment },
-    encoding: "utf8"
-  });
-  assert.equal(result.status, exitCode, result.stderr);
-}
-console.log(
-  `${directSelections.length} Direct build selection controls, three removed-guard controls, CLI and workflow wiring passed.`
-);
-
 const heapSelection = matrixConfig.match(
   /- name: Validate Standalone debugger heap selection\n[\s\S]*?(?=\n      - name:)/
 )?.[0];
 assert.ok(heapSelection);
-assert.match(heapSelection, /run: node scripts\/unity\/validate-native-build-heap-selection\.js/);
+assert.match(
+  heapSelection,
+  /run: uv run --project scripts\/python~ --locked --no-dev python scripts\/unity\/native_build_selection\.py heap/
+);
 for (const [field, input] of [
   ["UH_NATIVE_DIAGNOSTICS", "native-diagnostics"],
   ["UH_NATIVE_MODE", "test-mode"],
@@ -1125,73 +1063,6 @@ for (const event of ["workflow_dispatch", "pull_request", "push", "schedule"]) {
     }
   }
 }
-const heapHelperPath = path.join(__dirname, "../unity/validate-native-build-heap-selection.js");
-const heapHelperSource = fs.readFileSync(heapHelperPath, "utf8");
-const { getStandardHeapSelectionError } = require(heapHelperPath);
-const heapSelections = [];
-for (const diagnostics of ["", "false", "true", "invalid"]) {
-  for (const mode of ["", "editmode", "standalone", "all"]) {
-    for (const acceptance of ["", "none", "wproto", "all"]) {
-      for (const direct of ["", "false", "true", "invalid"]) {
-        const environment = {
-          UH_NATIVE_DIAGNOSTICS: diagnostics,
-          UH_NATIVE_MODE: mode,
-          UH_NATIVE_ACCEPTANCE: acceptance,
-          UH_NATIVE_DIRECT_CONTROL: direct
-        };
-        const permitted =
-          diagnostics === "true" &&
-          mode === "standalone" &&
-          acceptance === "none" &&
-          direct === "false";
-        assert.equal(getStandardHeapSelectionError(environment) === null, permitted);
-        heapSelections.push({ environment, permitted });
-      }
-    }
-  }
-}
-for (const missing of [null, undefined, {}]) {
-  assert.notEqual(getStandardHeapSelectionError(missing), null);
-}
-for (const [field, value] of [
-  ["UH_NATIVE_DIAGNOSTICS", "true"],
-  ["UH_NATIVE_MODE", "standalone"],
-  ["UH_NATIVE_ACCEPTANCE", "none"],
-  ["UH_NATIVE_DIRECT_CONTROL", "false"]
-]) {
-  const withoutGuard = heapHelperSource.replace(`environment.${field} !== "${value}"`, "false");
-  assert.notEqual(withoutGuard, heapHelperSource);
-  const sandbox = { module: { exports: {} }, require, console, process };
-  vm.runInNewContext(withoutGuard, sandbox, { filename: heapHelperPath });
-  assert.equal(
-    heapSelections.filter(
-      ({ environment, permitted }) =>
-        (sandbox.module.exports.getStandardHeapSelectionError(environment) === null) !== permitted
-    ).length,
-    3
-  );
-}
-for (const [direct, expected] of [
-  ["false", 0],
-  ["true", 1],
-  ["", 1]
-]) {
-  const result = spawnSync(process.execPath, [heapHelperPath], {
-    env: {
-      ...process.env,
-      UH_NATIVE_DIAGNOSTICS: "true",
-      UH_NATIVE_MODE: "standalone",
-      UH_NATIVE_ACCEPTANCE: "none",
-      UH_NATIVE_DIRECT_CONTROL: direct
-    },
-    encoding: "utf8"
-  });
-  assert.equal(result.status, expected, result.stderr);
-}
-console.log(
-  `${heapSelections.length} standard heap admission controls and four removed-guard controls passed.`
-);
-
 const attachOption = workflow.match(
   /^      native-build-attach-control:\n((?:        [^\n]*\n|\n)+)/m
 )[1];
@@ -1212,7 +1083,7 @@ for (const [field, input] of attachFields) {
 }
 assert.match(
   attachSelection,
-  /run: node scripts\/unity\/validate-native-build-attach-selection\.js/
+  /run: uv run --project scripts\/python~ --locked --no-dev python scripts\/unity\/native_build_selection\.py attach/
 );
 assert.match(
   nativeBuild,
@@ -1242,52 +1113,6 @@ for (const event of ["workflow_dispatch", "pull_request", "push", "schedule"]) {
     }
   }
 }
-const attachHelperPath = path.join(__dirname, "../unity/validate-native-build-attach-selection.js");
-const attachHelperSource = fs.readFileSync(attachHelperPath, "utf8");
-const { getAttachSelectionError } = require(attachHelperPath);
-const attachSelections = [];
-for (let mask = 0; mask < 1024; ++mask) {
-  const environment = {};
-  let cursor = mask;
-  for (const [field, , valid] of attachFields) {
-    environment[field] = [valid, "", "invalid", valid === "true" ? "false" : "true"][cursor % 4];
-    cursor = Math.floor(cursor / 4);
-  }
-  const permitted = mask === 0;
-  assert.equal(getAttachSelectionError(environment) === null, permitted);
-  attachSelections.push({ environment, permitted });
-}
-for (const missing of [null, undefined, {}]) {
-  assert.notEqual(getAttachSelectionError(missing), null);
-}
-for (const [field, , value] of attachFields) {
-  const withoutGuard = attachHelperSource.replace(`environment.${field} !== "${value}"`, "false");
-  assert.notEqual(withoutGuard, attachHelperSource);
-  const sandbox = { module: { exports: {} }, require, console, process };
-  vm.runInNewContext(withoutGuard, sandbox, { filename: attachHelperPath });
-  assert.equal(
-    attachSelections.filter(
-      ({ environment, permitted }) =>
-        (sandbox.module.exports.getAttachSelectionError(environment) === null) !== permitted
-    ).length,
-    3
-  );
-}
-for (const [selection, code] of [
-  [attachSelections[0], 0],
-  [attachSelections[1], 1],
-  [attachSelections[256], 1]
-]) {
-  const result = spawnSync(process.execPath, [attachHelperPath], {
-    env: { ...process.env, ...selection.environment },
-    encoding: "utf8"
-  });
-  assert.equal(result.status, code, result.stderr);
-}
-console.log(
-  `${attachSelections.length} attachment admission controls and five removed-guard controls passed.`
-);
-
 const startupOption = workflow.match(
   /^      native-build-attach-after-startup:\n((?:        [^\n]*\n|\n)+)/m
 )[1];
@@ -1307,74 +1132,6 @@ assert.match(
   nativeBuild,
   /-StandaloneBuildAttachAfterStartup:\(\$env:UH_NATIVE_ATTACH_AFTER_STARTUP -eq 'true'\)/
 );
-const { getStartupAttachSelectionError } = require(attachHelperPath);
-const startupSelections = [];
-for (const selection of attachSelections) {
-  for (const attach of ["true", "false", "", "invalid"]) {
-    for (const startup of ["true", "false", "", "invalid"]) {
-      const environment = {
-        ...selection.environment,
-        UH_NATIVE_ATTACH_CONTROL: attach,
-        UH_NATIVE_ATTACH_AFTER_STARTUP: startup
-      };
-      const permitted = selection.permitted && attach === "true" && startup === "true";
-      assert.equal(getStartupAttachSelectionError(environment) === null, permitted);
-      startupSelections.push({ environment, permitted });
-    }
-  }
-}
-for (const [field, value] of [
-  ["UH_NATIVE_ATTACH_CONTROL", "true"],
-  ["UH_NATIVE_ATTACH_AFTER_STARTUP", "true"]
-]) {
-  const mutant = attachHelperSource.replace(`environment.${field} !== "${value}"`, "false");
-  assert.notEqual(mutant, attachHelperSource);
-  const sandbox = { module: { exports: {} }, require, console, process };
-  vm.runInNewContext(mutant, sandbox, { filename: attachHelperPath });
-  assert.equal(
-    startupSelections.filter(
-      ({ environment, permitted }) =>
-        (sandbox.module.exports.getStartupAttachSelectionError(environment) === null) !== permitted
-    ).length,
-    3
-  );
-}
-const delegateMutant = attachHelperSource.replace(
-  "getAttachSelectionError(environment) !== null",
-  "false"
-);
-assert.notEqual(delegateMutant, attachHelperSource);
-const delegateSandbox = { module: { exports: {} }, require, console, process };
-vm.runInNewContext(delegateMutant, delegateSandbox, { filename: attachHelperPath });
-assert.equal(
-  startupSelections.filter(
-    ({ environment, permitted }) =>
-      (delegateSandbox.module.exports.getStartupAttachSelectionError(environment) === null) !==
-      permitted
-  ).length,
-  1023
-);
-for (const [attach, startup, expected] of [
-  ["true", "true", 0],
-  ["false", "true", 1],
-  ["true", "false", 0],
-  ["true", "invalid", 1]
-]) {
-  const result = spawnSync(process.execPath, [attachHelperPath], {
-    env: {
-      ...process.env,
-      ...attachSelections[0].environment,
-      UH_NATIVE_ATTACH_CONTROL: attach,
-      UH_NATIVE_ATTACH_AFTER_STARTUP: startup
-    },
-    encoding: "utf8"
-  });
-  assert.equal(result.status, expected, result.stderr);
-}
-console.log(
-  `${startupSelections.length} startup attachment admissions and three removed-guard controls passed.`
-);
-
 const shutdownOption = workflow.match(
   /^      native-build-attach-after-shutdown:\n((?:        [^\n]*\n|\n)+)/m
 )[1];
@@ -1395,46 +1152,6 @@ assert.ok(
     "-StandaloneBuildAttachAfterShutdown:($env:UH_NATIVE_ATTACH_AFTER_SHUTDOWN -eq 'true')"
   )
 );
-const { getShutdownAttachSelectionError } = require(attachHelperPath);
-const shutdownSelections = [];
-for (const selection of startupSelections) {
-  for (const shutdown of ["true", "false", "", "invalid"]) {
-    const environment = { ...selection.environment, UH_NATIVE_ATTACH_AFTER_SHUTDOWN: shutdown };
-    const permitted =
-      getAttachSelectionError(environment) === null &&
-      environment.UH_NATIVE_ATTACH_CONTROL === "true" &&
-      environment.UH_NATIVE_ATTACH_AFTER_STARTUP === "false" &&
-      shutdown === "true";
-    assert.equal(getShutdownAttachSelectionError(environment) === null, permitted);
-    assert.equal(
-      getStartupAttachSelectionError(environment) === null,
-      selection.permitted && shutdown === "false"
-    );
-    shutdownSelections.push({ environment, permitted });
-  }
-}
-const shutdownFunctionStart = attachHelperSource.indexOf(
-  "function getShutdownAttachSelectionError"
-);
-for (const condition of [
-  "getAttachSelectionError(environment) !== null",
-  'environment.UH_NATIVE_ATTACH_CONTROL !== "true"',
-  'environment.UH_NATIVE_ATTACH_AFTER_STARTUP !== "false"',
-  'environment.UH_NATIVE_ATTACH_AFTER_SHUTDOWN !== "true"'
-]) {
-  const before = attachHelperSource.slice(0, shutdownFunctionStart);
-  const after = attachHelperSource.slice(shutdownFunctionStart);
-  const removed = after.replace(condition, "false");
-  assert.notEqual(after, removed);
-  const sandbox = { module: { exports: {} }, require, console, process };
-  vm.runInNewContext(before + removed, sandbox, { filename: attachHelperPath });
-  assert.ok(
-    shutdownSelections.some(
-      ({ environment, permitted }) =>
-        (sandbox.module.exports.getShutdownAttachSelectionError(environment) === null) !== permitted
-    )
-  );
-}
 for (const event of ["workflow_dispatch", "push", "pull_request"]) {
   for (const cancelled of [true, false]) {
     for (const attach of [true, false]) {
@@ -1457,28 +1174,6 @@ for (const event of ["workflow_dispatch", "push", "pull_request"]) {
     }
   }
 }
-for (const [startup, shutdown, expected] of [
-  ["false", "true", 0],
-  ["true", "true", 1],
-  ["false", "invalid", 1],
-  ["true", "false", 0]
-]) {
-  const result = spawnSync(process.execPath, [attachHelperPath], {
-    env: {
-      ...process.env,
-      ...attachSelections[0].environment,
-      UH_NATIVE_ATTACH_CONTROL: "true",
-      UH_NATIVE_ATTACH_AFTER_STARTUP: startup,
-      UH_NATIVE_ATTACH_AFTER_SHUTDOWN: shutdown
-    },
-    encoding: "utf8"
-  });
-  assert.equal(result.status, expected, result.stderr);
-}
-console.log(
-  `${shutdownSelections.length} final telemetry attachment admissions and four removed guards passed.`
-);
-
 let historicalAggregateControls = 0;
 for (const name of [
   "unity-tests-aggregate",

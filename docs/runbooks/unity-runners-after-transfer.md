@@ -363,6 +363,14 @@ previous current log before launch, so an earlier stack cannot authorize a new r
 investigating the cache corruption. Unity tracks the artifact-pruning crash as UUM-153198.
 [Unity issue tracker](https://issuetracker.unity.com/issues/25007/crash-on-isartifactstillrelevant-when-opening-a-project-with-corrupted-library)
 
+An ordinary Unity 6000.6 Standalone build in a generated project also watches for the
+shared-lock startup failure before the initial Asset Database refresh finishes. The watcher
+drains ready output from both streams and waits for two seconds of silence to catch delayed
+refresh markers. On that signature it stops the editor tree, keeps the first log and receipt, and moves the owned
+Library aside before rebuilding once within the original deadline. Recovery requires a
+reaped editor, a saved current log, and no test results. A repeated failure fails the build.
+This path excludes explicit projects, frozen measurements, and evidence-only diagnostics.
+
 On Windows, these invocations also receive an isolated `-crash-report-folder` and a unique
 `-upmLogFile`. Both write outside uploaded artifacts. The receipt's `Process.NativeEvidence`
 links the raw Package Manager log, its redacted text snapshot, and the private

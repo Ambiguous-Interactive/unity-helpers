@@ -48,6 +48,7 @@ foreach ($name in @(
         'New-UnityNativeEvidenceCapture',
         'New-UnityImportArguments',
         'Invoke-UnityObservedEditor',
+        'Invoke-StandaloneBuildWithAssetDatabaseRecovery',
         'Invoke-UnityEditor',
         'Get-EditorTestCompletionGraceSeconds',
         'Get-EditorTestRunTimeoutSeconds',
@@ -554,10 +555,75 @@ try {
     $buildObservation = @($buildAssignment | ForEach-Object {
             $_.Right.FindAll({ param($node)
                     $node -is [System.Management.Automation.Language.CommandAst] -and
-                    $node.GetCommandName() -eq 'Invoke-UnityObservedEditor'
+                    $node.GetCommandName() -eq 'Invoke-StandaloneBuildWithAssetDatabaseRecovery'
                 }, $true)
         })
-    Assert-That 'the shipping Standalone build uses the observed Editor path' ($buildAssignment.Count -eq 1 -and $buildObservation.Count -eq 1)
+    Assert-That 'the shipping Standalone build uses the scoped recovery path' ($buildAssignment.Count -eq 1 -and $buildObservation.Count -eq 1)
+    Assert-That 'the shipping call excludes explicit projects and frozen captures' ($buildObservation[0].Extent.Text.Contains('-AllowCacheRecovery:(-not $ExplicitProjectRequested -and $null -eq $frozenPlayerProvenance'))
+
+    $savedObservedEditor = ${function:Invoke-UnityObservedEditor}
+    try {
+        function Invoke-UnityObservedEditor {
+            param($EditorPath, $Arguments, $TimeoutSeconds, $LogPath, $Label, $ProcessObservation, [switch]$StopOnAssetDatabaseStartupFailure)
+            ++$script:buildAttempts
+            $script:buildTimeouts.Add($TimeoutSeconds)
+            $ProcessObservation.Clear()
+            $fault = $script:buildAttempts -eq 1 -and $StopOnAssetDatabaseStartupFailure -and $script:buildCase.Fault
+            Set-Content -LiteralPath $LogPath -Value $(if ($fault) { 'failed-first-process' } else { 'next-editor-process' })
+            Set-Content -LiteralPath ([IO.Path]::ChangeExtension($LogPath, 'execution-diagnostics.json')) -Value $script:buildAttempts
+            if ($fault) {
+                if ($script:buildCase.HasResults) { Set-Content -LiteralPath $script:buildResultPath -Value '<test-run />' }
+                $ProcessObservation['ExitOrigin'] = 'asset-database-startup'
+                $ProcessObservation['RawExitCode'] = if ($script:buildCase.Reaped) { 1 } else { $null }
+                $ProcessObservation['KillSucceeded'] = $true
+                $ProcessObservation['LogPersistence'] = 'written'
+                throw 'No loaded Test Framework snapshot was captured.'
+            }
+            return @{ ExitCode = $script:buildCase.FinalExit; TimedOut = $false }
+        }
+
+        foreach ($case in @(
+                @{ Name = 'standalone-healthy'; Allow = $true; Fault = $false; Reaped = $true; Owned = $true; HasResults = $false; FinalExit = 0; Attempts = 1; Throws = $false; Retains = $false },
+                @{ Name = 'standalone-recovered'; Allow = $true; Fault = $true; Reaped = $true; Owned = $true; HasResults = $false; FinalExit = 0; Attempts = 2; Throws = $false; Retains = $true },
+                @{ Name = 'standalone-clears-stale-results'; Allow = $true; Fault = $true; Reaped = $true; Owned = $true; HasResults = $false; Stale = $true; FinalExit = 0; Attempts = 2; Throws = $false; Retains = $true },
+                @{ Name = 'standalone-second-fault'; Allow = $true; Fault = $true; Reaped = $true; Owned = $true; HasResults = $false; FinalExit = 1; Attempts = 2; Throws = $false; Retains = $true },
+                @{ Name = 'standalone-unreaped'; Allow = $true; Fault = $true; Reaped = $false; Owned = $true; HasResults = $false; FinalExit = 0; Attempts = 1; Throws = $true; Retains = $false },
+                @{ Name = 'standalone-existing-results'; Allow = $true; Fault = $true; Reaped = $true; Owned = $true; HasResults = $true; FinalExit = 0; Attempts = 1; Throws = $true; Retains = $false },
+                @{ Name = 'standalone-unowned'; Allow = $true; Fault = $true; Reaped = $true; Owned = $false; HasResults = $false; FinalExit = 0; Attempts = 1; Throws = $true; Retains = $false },
+                @{ Name = 'standalone-recovery-disabled'; Allow = $false; Fault = $true; Reaped = $true; Owned = $true; HasResults = $false; FinalExit = 1; Attempts = 1; Throws = $false; Retains = $false }
+            )) {
+            $script:buildCase = $case
+            $script:buildAttempts = 0
+            $script:buildTimeouts = [Collections.Generic.List[int]]::new()
+            $project = Join-Path $temporaryRoot $case.Name
+            $library = Join-Path $project 'Library'
+            $null = New-Item -ItemType Directory -Path $library -Force
+            Set-Content -LiteralPath (Join-Path $library 'ArtifactDB') -Value 'old-cache'
+            if ($case.Owned) { Set-Content -LiteralPath (Join-Path $library '.unity-helpers-repo-root.txt') -Value 'owned-fixture' }
+            $resultPath = Join-Path $project 'results.xml'
+            $script:buildResultPath = $resultPath
+            if ($case['Stale']) { Set-Content -LiteralPath $resultPath -Value '<stale />' }
+            $threw = $false
+            try {
+                $watch = Invoke-StandaloneBuildWithAssetDatabaseRecovery -EditorPath 'owned-editor' -Arguments @('-runTests') -TimeoutSeconds 30 `
+                    -LogPath (Join-Path $project 'build.log') -Label $case.Name -ProcessObservation @{} -Project $project -ResultsPath $resultPath -AllowCacheRecovery:$case.Allow
+            } catch {
+                $threw = $true
+                if (-not $case.Throws) { Write-Host $_.Exception.Message }
+            }
+            Assert-That "$($case.Name) bounds attempts and preserves the outcome" ($script:buildAttempts -eq $case.Attempts -and $threw -eq $case.Throws -and ($threw -or $watch.ExitCode -eq $case.FinalExit))
+            $retained = @(Get-ChildItem -LiteralPath $project -Directory -Filter 'Library.artifact-database-failure-*')
+            Assert-That "$($case.Name) moves only an eligible cache" ($retained.Count -eq [int]$case.Retains -and (Test-Path -LiteralPath (Join-Path $library 'ArtifactDB')) -ne $case.Retains)
+            if ($case.Retains -and $retained.Count -eq 1) {
+                Assert-That "$($case.Name) retains first-attempt evidence and spends the original deadline" (
+                    (Get-Content -LiteralPath (Join-Path $project 'build.first-attempt.log') -Raw).Trim() -eq 'failed-first-process' -and
+                    (Get-Content -LiteralPath (Join-Path $project 'build.first-attempt.execution-diagnostics.json') -Raw).Trim() -eq '1' -and
+                    (Test-Path -LiteralPath (Join-Path $retained[0].FullName 'ArtifactDB')) -and
+                    $script:buildTimeouts.Count -eq 2 -and $script:buildTimeouts[1] -lt $script:buildTimeouts[0])
+            }
+        }
+    } finally { ${function:Invoke-UnityObservedEditor} = $savedObservedEditor }
+
     $before = $receipt.Process.ProcessId
     $script:executionExit = 0
     $providedObservation = @{ Stale = $true }

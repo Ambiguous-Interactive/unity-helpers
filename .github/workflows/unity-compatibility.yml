@@ -50,6 +50,9 @@ jobs:
         with:
           node-version: "22.23.4"
 
+      - name: Setup Python tooling for matrix validation
+        uses: ./.github/actions/setup-python-tools
+
       - name: Validate Build readback source selection
         if: ${{ github.event_name == 'workflow_dispatch' && '' != '' }}
         shell: pwsh
@@ -86,7 +89,7 @@ jobs:
           UH_NATIVE_DIAGNOSTICS: ${{ false }}
           UH_NATIVE_MODE: ${{ 'all' }}
           UH_NATIVE_ACCEPTANCE: ${{ 'none' }}
-        run: node scripts/unity/validate-native-build-direct-selection.js
+        run: uv run --project scripts/python~ --locked --no-dev python scripts/unity/native_build_selection.py direct
 
       - name: Validate Standalone debugger heap selection
         if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && false }}
@@ -95,7 +98,7 @@ jobs:
           UH_NATIVE_MODE: ${{ 'all' }}
           UH_NATIVE_ACCEPTANCE: ${{ 'none' }}
           UH_NATIVE_DIRECT_CONTROL: ${{ false }}
-        run: node scripts/unity/validate-native-build-heap-selection.js
+        run: uv run --project scripts/python~ --locked --no-dev python scripts/unity/native_build_selection.py heap
 
       - name: Validate Standalone debugger attachment selection
         if: >-
@@ -110,7 +113,7 @@ jobs:
           UH_NATIVE_ATTACH_CONTROL: ${{ false }}
           UH_NATIVE_ATTACH_AFTER_STARTUP: ${{ false }}
           UH_NATIVE_ATTACH_AFTER_SHUTDOWN: ${{ false }}
-        run: node scripts/unity/validate-native-build-attach-selection.js
+        run: uv run --project scripts/python~ --locked --no-dev python scripts/unity/native_build_selection.py attach
 
       # Assembly compatibility depends on target mode and integration opt-in,
       # never on Unity version. Compute each distinct list once on this hosted
@@ -222,9 +225,6 @@ jobs:
       # hosted-runner check turns that whole class into an instant, self-
       # describing red on the PR. run-ci-tests.ps1's catastrophic-pattern scan is
       # the in-Unity backstop for the same failure.
-      - name: Setup Python tooling for module validation
-        uses: ./.github/actions/setup-python-tools
-
       - name: Validate Unity test-project module manifest
         shell: pwsh
         run: uv run --project scripts/python~ --locked --no-dev python scripts/lint_unity_test_modules.py --verbose
