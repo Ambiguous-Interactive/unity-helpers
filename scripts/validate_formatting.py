@@ -64,6 +64,14 @@ FORMAT_SUFFIXES = (
     ".xml",
 )
 EXCLUDED_ROOTS = {".git", "node_modules", "site"}
+GIT_REPOSITORY_SELECTORS = {
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_COMMON_DIR",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_IMPLICIT_WORK_TREE",
+}
 FORMAT_CHECKS = (
     ("Markdown (*.md, *.markdown)", "**/*.{md,markdown}"),
     ("JSON (*.json, *.jsonc, *.asmdef, *.asmref)", "**/*.{json,jsonc,asmdef,asmref}"),
@@ -91,8 +99,12 @@ def git_result(
     git = shutil.which("git")
     if git is None:
         raise ValidationError("Git is not available.")
+    # Anchor discovery to this checkout while keeping an explicit alternate index.
+    env = {
+        name: value for name, value in os.environ.items() if name not in GIT_REPOSITORY_SELECTORS
+    }
     return subprocess.run(  # noqa: S603 - resolved Git and fixed read-only commands.
-        [git, *args], cwd=root, input=payload, capture_output=True, check=False, timeout=30
+        [git, *args], cwd=root, env=env, input=payload, capture_output=True, check=False, timeout=30
     )
 
 
@@ -131,9 +143,7 @@ def report_paths(root: Path) -> tuple[list[str], bool]:
         if probe.returncode == 0 and probe.stdout.strip() == b"true":
             return tracked_paths(root), True
     markers = (directory / ".git" for directory in (root, *root.parents))
-    if os.environ.get("GIT_DIR") or any(
-        marker.is_symlink() or marker.exists() for marker in markers
-    ):
+    if any(marker.is_symlink() or marker.exists() for marker in markers):
         message = "Git could not identify the checkout." if git_available else "Git is unavailable."
         raise ValidationError(message)
     paths: list[str] = []
@@ -300,7 +310,9 @@ def show_report(root: Path, *, verbose: bool) -> int:
     ]
     groups.extend((title, grouped_paths(names, suffixes), "") for title, suffixes in GROUPS)
     observed = scan(
-        root, (name for _, paths, _ in groups for name in paths), staged_attributes=from_checkout
+        root,
+        (name.removeprefix("./") for _, paths, _ in groups for name in paths),
+        staged_attributes=from_checkout,
     )
     rejected: list[str] = []
     seen: set[str] = set()
@@ -308,10 +320,11 @@ def show_report(root: Path, *, verbose: bool) -> int:
     for title, paths, config_source in groups:
         print(f"{BLUE}Checking {title}...{RESET}")
         for name in paths:
-            if name in seen or name not in observed:
+            key = name.removeprefix("./")
+            if key in seen or key not in observed:
                 continue
-            seen.add(name)
-            entry = observed[name]
+            seen.add(key)
+            entry = observed[key]
             label = display(name)
             if entry is None:
                 passed += 1

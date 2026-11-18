@@ -370,7 +370,7 @@
     "test:deprecated-external-links": "pwsh -NoProfile -File scripts/tests/test-deprecated-external-links.ps1 -VerboseOutput",
     "test:validate-devcontainer-urls": "uv run --quiet --project scripts/python~ --locked pytest scripts/tests/test_devcontainer_urls.py -q",
     "test:final-newline": "uv run --quiet --project scripts/python~ --locked --no-dev python scripts/validate_formatting.py newline",
-    "test:validate-formatting": "uv run --quiet --project scripts/python~ --locked pytest scripts/tests/test_validate_formatting.py -q",
+    "test:validate-formatting": "uv run --quiet --project scripts/python~ --locked pytest scripts/tests/test_validate_formatting.py -q && bash scripts/tests/test-final-newline.sh && bash scripts/validate-formatting.sh --help",
     "test:post-create": "bash scripts/tests/test-post-create.sh",
     "test:ai-backends": "bash scripts/tests/test-ai-backends.sh",
     "test:wiki-generation": "bash scripts/tests/test-wiki-generation.sh",

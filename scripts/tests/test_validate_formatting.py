@@ -220,6 +220,47 @@ def test_report_outside_git_lists_lf_and_crlf_findings(tmp_path: Path, with_git:
     assert b"validate-formatting.sh --fix" not in result.stdout
 
 
+def test_report_outside_git_counts_named_yaml_configuration_once(tmp_path: Path) -> None:
+    (tmp_path / "scripts").mkdir()
+    shutil.copyfile(ROOT / POLICY, tmp_path / POLICY)
+    write(tmp_path, "mkdocs.yml", b"site_name: missing newline")
+    result = run_policy(tmp_path, "newline")
+    assert result.returncode == 1
+    assert result.stderr == b""
+    assert b"Files checked: 1" in result.stdout
+    assert result.stdout.count(b"mkdocs.yml (LF)") == 1
+    assert b"Sources: config-list" in result.stdout
+
+
+@pytest.mark.parametrize("foreign_worktree", [False, True])
+def test_checkout_inventory_ignores_other_repository_selectors(
+    tmp_path: Path, foreign_worktree: bool
+) -> None:
+    target = tmp_path / "target"
+    foreign = tmp_path / "foreign"
+    for root in (target, foreign):
+        root.mkdir()
+        setup(root)
+    write(target, "unreported.txt", b"missing final newline")
+    write(foreign, "other.txt", b"correct\n")
+    git(target, "add", "--", "unreported.txt")
+    git(foreign, "add", "--", "other.txt")
+    before = [(root / ".git/index").read_bytes() for root in (target, foreign)]
+    result = run_policy(
+        target,
+        "newline",
+        GIT_DIR=str(foreign / ".git"),
+        GIT_WORK_TREE=str(foreign if foreign_worktree else target),
+        GIT_COMMON_DIR=str(foreign / ".git"),
+        GIT_OBJECT_DIRECTORY=str(foreign / ".git/objects"),
+    )
+    assert result.returncode == 1
+    assert result.stderr == b""
+    assert b"unreported.txt (LF)" in result.stdout
+    assert b"other.txt" not in result.stdout
+    assert [(root / ".git/index").read_bytes() for root in (target, foreign)] == before
+
+
 def test_missing_git_fails_for_a_checkout_or_worktree(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
