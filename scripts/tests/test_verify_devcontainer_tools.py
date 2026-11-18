@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+import shutil
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -11,6 +13,48 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import verify_devcontainer_tools as verifier
+
+
+def test_main_restores_the_native_path_before_checking_tools(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("PATH", "locked-uv-environment")
+    monkeypatch.setenv("UH_VERIFY_NATIVE_PATH", "native-command-path")
+    monkeypatch.setenv("REMOTE_CONTAINERS", "1")
+    monkeypatch.setattr(verifier, "configure_output", lambda: None)
+
+    def verify(*, inside_container: bool) -> int:
+        assert inside_container
+        assert os.environ["PATH"] == "native-command-path"
+        assert "UH_VERIFY_NATIVE_PATH" not in os.environ
+        return 0
+
+    monkeypatch.setattr(verifier, "verify", verify)
+    assert verifier.main() == 0
+
+
+@pytest.mark.skipif(os.name != "posix", reason="The legacy entry point is a POSIX launcher")
+def test_bash_launcher_passes_the_native_path_to_locked_uv(tmp_path: Path) -> None:
+    bash = shutil.which("bash")
+    assert bash is not None
+    uv = tmp_path / "uv"
+    uv.write_text(
+        '#!/usr/bin/env bash\nprintf "%s\\n" "$UH_VERIFY_NATIVE_PATH" "$@"\n', encoding="utf-8"
+    )
+    uv.chmod(0o755)
+    native_path = os.pathsep.join((str(tmp_path), os.environ.get("PATH", os.defpath)))
+    launcher = Path(__file__).resolve().parents[1] / "verify-devcontainer-tools.sh"
+    result = subprocess.run(
+        [bash, str(launcher)],
+        env={**os.environ, "PATH": native_path},
+        capture_output=True,
+        check=False,
+        timeout=15,
+    )
+    assert result.returncode == 0
+    assert result.stderr == b""
+    assert result.stdout.splitlines()[0] == os.fsencode(native_path)
+    assert b"--locked" in result.stdout.splitlines()
 
 
 def test_probe_keeps_first_line_and_exit_status() -> None:
