@@ -1,10 +1,37 @@
 "use strict";
 
-const fs = require("node:fs");
 const path = require("node:path");
-const { changedFiles, select } = require("../agent-check.js");
+const { spawnSync } = require("node:child_process");
 
+const root = path.resolve(__dirname, "../..");
 const TEST_MODES = Object.freeze(["editmode", "playmode", "standalone"]);
+
+function invoke(args, input) {
+  return spawnSync(
+    "uv",
+    [
+      "run",
+      "--quiet",
+      "--project",
+      path.join(root, "scripts/python~"),
+      "--locked",
+      "--no-dev",
+      "python",
+      path.join(__dirname, "resolve_test_matrix.py"),
+      ...args
+    ],
+    { cwd: root, input, encoding: "utf8", windowsHide: true }
+  );
+}
+
+function bridge(method, ...args) {
+  const result = invoke(["--bridge"], JSON.stringify([method, ...args]));
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(result.stderr.trim() || "Unity matrix resolution failed.");
+  }
+  return JSON.parse(result.stdout);
+}
 
 function resolveTestMatrix(
   versions,
@@ -12,138 +39,27 @@ function resolveTestMatrix(
   requestedMode = "all",
   requestedAcceptance = "none"
 ) {
-  if (
-    !Array.isArray(versions) ||
-    versions.length === 0 ||
-    versions.some(
-      (version) => typeof version !== "string" || version.trim() !== version || !version
-    ) ||
-    new Set(versions).size !== versions.length
-  ) {
-    throw new Error("Unity versions must be a nonempty list of distinct version strings.");
-  }
-  const version = requestedVersion.trim();
-  const mode = requestedMode.trim();
-  if (version && !versions.includes(version)) {
-    throw new Error(`Unsupported Unity version: ${version}`);
-  }
-  if (mode && mode !== "all" && !TEST_MODES.includes(mode)) {
-    throw new Error(`Unsupported Unity test mode: ${mode}`);
-  }
-  const acceptance = requestedAcceptance.trim();
-  if (
-    ["nullableconsumer", "wproto"].includes(acceptance) &&
-    version &&
-    version !== "2021.3.45f1" &&
-    version !== "6000.6.0f1"
-  ) {
-    throw new Error(
-      `${acceptance === "wproto" ? "WProto corpus" : "Nullable consumer"} acceptance requires its pinned floor or latest Unity version: ${version}`
-    );
-  }
-  const acceptanceRequested = acceptance !== "" && acceptance !== "none";
-  const selectedVersions = version ? [version] : [...versions];
-  const selectedModes = !mode || mode === "all" ? [...TEST_MODES] : [mode];
-  if (acceptanceRequested && !selectedModes.includes("standalone")) {
-    // Native acceptance builds IL2CPP standalone players (intmap, serialization),
-    // so standalone coverage must be selected whenever acceptance runs.
-    selectedModes.push("standalone");
-  }
-  return {
-    "unity-versions": selectedVersions,
-    "unity-exclusions": versions
-      .filter((candidate) => !selectedVersions.includes(candidate))
-      .map((candidate) => ({ "unity-version": candidate })),
-    "test-modes": selectedModes
-  };
+  return bridge("resolve", versions, requestedVersion, requestedMode, requestedAcceptance);
 }
 
 function latestVersion(versions) {
-  resolveTestMatrix(versions);
-  const latest = versions[versions.length - 1];
-  if (!/^6000\.\d+\.\d+f\d+$/.test(latest))
-    throw new Error("The blocking Unity version must be the final supported 6.x release.");
-  return latest;
+  return bridge("latest", versions);
 }
 
 function resolveCompatibilityMatrix(versions) {
-  const latest = latestVersion(versions);
-  const older = versions.filter((version) => version !== latest);
-  if (!older.length) throw new Error("Compatibility coverage requires at least one older editor.");
-  return {
-    ...resolveTestMatrix(older),
-    "unity-exclusions": [{ "unity-version": latest }]
-  };
+  return bridge("compatibility", versions);
 }
 
 function resolvePullRequestMatrix(versions, files) {
-  const latest = latestVersion(versions);
-  const full = resolveTestMatrix(versions, latest);
-  const proposal = files.length ? select(files, "pr").unity : "full";
-  if (proposal === "full")
-    return {
-      ...full,
-      coverage: "latest-full-modes",
-      reason: "compatibility-sensitive or unknown input; older editors run asynchronously"
-    };
-  return {
-    ...resolveTestMatrix(versions, latest),
-    "test-modes": ["editmode", "playmode"],
-    coverage: "latest-editors",
-    reason:
-      proposal === "none"
-        ? "documentation retains latest editor validation pending conditional enrollment"
-        : "ordinary C#; latest editors, older editors run asynchronously"
-  };
-}
-
-function main() {
-  const repoRoot = path.resolve(__dirname, "..", "..");
-  const versions = JSON.parse(
-    fs.readFileSync(path.join(repoRoot, ".github", "unity-versions.json"), "utf8")
-  ).all;
-  let matrix = resolveTestMatrix(
-    versions,
-    process.env.INPUT_UNITY_VERSION || "",
-    process.env.INPUT_TEST_MODE || "all",
-    process.env.INPUT_ACCEPTANCE || "none"
-  );
-  if (process.env.INPUT_UNITY_COVERAGE === "compatibility") {
-    matrix = resolveCompatibilityMatrix(versions);
-  } else if (process.env.GITHUB_EVENT_NAME === "push") {
-    matrix = resolveTestMatrix(versions, latestVersion(versions));
-  } else if (process.env.GITHUB_EVENT_NAME === "pull_request") {
-    if (!/^[0-9a-f]{40}$/.test(process.env.AGENT_CHECK_BASE || ""))
-      throw new Error("PR matrix selection requires the immutable PR base SHA");
-    matrix = resolvePullRequestMatrix(
-      versions,
-      changedFiles(process.env.AGENT_CHECK_BASE, repoRoot)
-    );
-  }
-  if (!process.env.GITHUB_OUTPUT) {
-    throw new Error("GITHUB_OUTPUT is required to publish the Unity test matrix.");
-  }
-  const outputs = Object.entries(matrix).map(
-    ([key, value]) => `${key}=${typeof value === "string" ? value : JSON.stringify(value)}`
-  );
-  fs.appendFileSync(process.env.GITHUB_OUTPUT, `${outputs.join("\n")}\n`, "utf8");
-  if (process.env.GITHUB_STEP_SUMMARY)
-    fs.appendFileSync(
-      process.env.GITHUB_STEP_SUMMARY,
-      `### Selected Unity coverage\n\n${JSON.stringify(matrix)}\n\n` +
-        "SINGLE_THREADED follows the selected modes. Package export smoke also runs. " +
-        "Unselected versions and modes are not validated by this run. Older editors run in Unity Compatibility; default manual dispatch retains full qualification.\n",
-      "utf8"
-    );
+  return bridge("pull-request", versions, files);
 }
 
 if (require.main === module) {
-  try {
-    main();
-  } catch (error) {
-    console.error(`[resolve-test-matrix] ${error.message}`);
-    process.exitCode = 1;
-  }
+  const result = invoke([]);
+  if (result.stdout) process.stdout.write(result.stdout);
+  if (result.stderr) process.stderr.write(result.stderr);
+  if (result.error) console.error(result.error.message);
+  process.exitCode = result.status ?? 1;
 }
 
 module.exports = {

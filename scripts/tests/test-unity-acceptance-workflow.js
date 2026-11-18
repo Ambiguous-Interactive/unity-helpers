@@ -261,7 +261,7 @@ controls++;
 assert.match(
   workflow,
   /INPUT_ACCEPTANCE: \$\{\{ inputs\.acceptance \}\}/,
-  "Dispatch acceptance must feed resolve-test-matrix.js"
+  "Dispatch acceptance must feed the Unity matrix resolver"
 );
 const { resolveTestMatrix } = require("../unity/resolve-test-matrix.js");
 assert.deepEqual(resolveTestMatrix(["2022.3.45f1"], "", "all", "none")["test-modes"], [

@@ -231,6 +231,7 @@ def test_native_cli_shallow_clone(tmp_path: Path) -> None:
         "scripts/check_runner.py",
         "scripts/cli_encoding.py",
         "scripts/unity/resolve-test-matrix.js",
+        "scripts/unity/resolve_test_matrix.py",
         "scripts/python~/pyproject.toml",
         "scripts/python~/uv.lock",
         ".github/unity-versions.json",
