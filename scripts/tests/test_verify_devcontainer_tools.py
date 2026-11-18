@@ -9,6 +9,7 @@ import socket
 import subprocess
 import sys
 import tracemalloc
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -144,17 +145,26 @@ def test_timed_out_probe_terminates_its_child(
     monkeypatch: pytest.MonkeyPatch, leader_exits: bool
 ) -> None:
     monkeypatch.setattr(verifier, "TIMEOUT_SECONDS", 3)
-    with socket.create_server(("127.0.0.1", 0)) as listener:
+    with (
+        socket.create_server(("127.0.0.1", 0)) as listener,
+        ThreadPoolExecutor(max_workers=1) as executor,
+    ):
         listener.settimeout(5)
-        result = verifier.probe(
-            sys.executable, *_descendant_arguments(listener, leader_exits=leader_exits)
+        probe = executor.submit(
+            verifier.probe,
+            sys.executable,
+            *_descendant_arguments(listener, leader_exits=leader_exits),
         )
         connection, _ = listener.accept()
         with connection:
             connection.settimeout(5)
             assert connection.recv(1) == b"R"
-            assert result == verifier.Version(124, "", timed_out=True)
-            assert connection.recv(1) == b""
+            assert probe.result(timeout=5) == verifier.Version(124, "", timed_out=True)
+            try:
+                assert connection.recv(1) == b""
+            except ConnectionResetError as error:
+                if sys.platform != "win32" or error.winerror != 10054:
+                    raise
 
 
 @pytest.mark.skipif(os.name != "posix", reason="POSIX process groups are verified on Unix")
