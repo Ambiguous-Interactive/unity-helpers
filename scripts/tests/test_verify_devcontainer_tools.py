@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import os
 import shutil
+import signal
+import socket
 import subprocess
 import sys
-import time
 from pathlib import Path
 
 import pytest
@@ -43,18 +44,29 @@ def test_bash_launcher_passes_the_native_path_to_locked_uv(tmp_path: Path) -> No
     )
     uv.chmod(0o755)
     native_path = os.pathsep.join((str(tmp_path), os.environ.get("PATH", os.defpath)))
-    launcher = Path(__file__).resolve().parents[1] / "verify-devcontainer-tools.sh"
+    repository = Path(__file__).resolve().parents[2]
+    scripts = repository / "scripts"
     result = subprocess.run(
-        [bash, str(launcher)],
-        env={**os.environ, "PATH": native_path},
+        [bash, "scripts/verify-devcontainer-tools.sh"],
+        cwd=repository,
+        env={**os.environ, "PATH": native_path, "CDPATH": "."},
         capture_output=True,
         check=False,
         timeout=15,
     )
     assert result.returncode == 0
     assert result.stderr == b""
-    assert result.stdout.splitlines()[0] == os.fsencode(native_path)
-    assert b"--locked" in result.stdout.splitlines()
+    assert result.stdout.splitlines() == [
+        os.fsencode(native_path),
+        b"run",
+        b"--quiet",
+        b"--project",
+        os.fsencode(scripts / "python~"),
+        b"--locked",
+        b"--no-dev",
+        b"python",
+        os.fsencode(scripts / "verify_devcontainer_tools.py"),
+    ]
 
 
 def test_probe_keeps_first_line_and_exit_status() -> None:
@@ -66,29 +78,81 @@ def test_probe_keeps_first_line_and_exit_status() -> None:
     assert result == verifier.Version(7, "first")
 
 
+@pytest.mark.parametrize(
+    ("output", "expected"),
+    [(b"first\r\nsecond", "first"), (b"first\r", "first\r"), (b"", "")],
+)
+def test_probe_normalizes_only_line_terminators(output: bytes, expected: str) -> None:
+    result = verifier.probe(
+        sys.executable, "-c", "import os,sys; os.write(1,bytes.fromhex(sys.argv[1]))", output.hex()
+    )
+    assert result == verifier.Version(0, expected)
+
+
 def test_probe_bounds_a_silent_command(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(verifier, "TIMEOUT_SECONDS", 0.05)
     result = verifier.probe(sys.executable, "-c", "from time import sleep; sleep(60)")
     assert result == verifier.Version(124, "", timed_out=True)
 
 
-@pytest.mark.skipif(os.name != "posix", reason="POSIX process groups are verified on Unix")
-def test_timed_out_probe_terminates_its_child(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr(verifier, "TIMEOUT_SECONDS", 0.5)
-    started = tmp_path / "started"
-    late_write = tmp_path / "late-write"
-    child = "from pathlib import Path; from time import sleep; import sys; sleep(0.8); Path(sys.argv[1]).touch()"
-    parent = (
-        "from pathlib import Path; from subprocess import Popen; from time import sleep; import sys; "
-        "Popen([sys.executable, '-c', sys.argv[1], sys.argv[2]]); Path(sys.argv[3]).touch(); sleep(60)"
+def _descendant_arguments(listener: socket.socket) -> tuple[str, ...]:
+    parent = "import subprocess, sys; sys.exit(subprocess.call([sys.executable, *sys.argv[1:]]))"
+    child = (
+        "import socket, sys\n"
+        "with socket.create_connection(('127.0.0.1', int(sys.argv[1])), timeout=10) as connection:\n"
+        "    connection.sendall(b'R')\n"
+        "    connection.settimeout(None)\n"
+        "    connection.recv(1)\n"
     )
-    result = verifier.probe(sys.executable, "-c", parent, child, str(late_write), str(started))
-    assert result == verifier.Version(124, "", timed_out=True)
-    assert started.is_file()
-    time.sleep(1)
-    assert not late_write.exists()
+    return ("-c", parent, "-c", child, str(listener.getsockname()[1]))
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX process groups are verified on Unix")
+def test_timed_out_probe_terminates_its_child(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(verifier, "TIMEOUT_SECONDS", 2)
+    with socket.create_server(("127.0.0.1", 0)) as listener:
+        listener.settimeout(5)
+        result = verifier.probe(sys.executable, *_descendant_arguments(listener))
+        connection, _ = listener.accept()
+        with connection:
+            connection.settimeout(5)
+            assert connection.recv(1) == b"R"
+            assert result == verifier.Version(124, "", timed_out=True)
+            assert connection.recv(1) == b""
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX process groups are verified on Unix")
+def test_interrupted_probe_terminates_its_child() -> None:
+    harness = (
+        "import sys\nsys.path.insert(0, sys.argv[1])\n"
+        "from verify_devcontainer_tools import probe\n"
+        "try:\n    probe(sys.executable, *sys.argv[2:])\n"
+        "except KeyboardInterrupt:\n    sys.exit(7)\n"
+    )
+    with (
+        socket.create_server(("127.0.0.1", 0)) as listener,
+        subprocess.Popen(
+            [
+                sys.executable,
+                "-c",
+                harness,
+                str(Path(verifier.__file__).parent),
+                *_descendant_arguments(listener),
+            ]
+        ) as process,
+    ):
+        try:
+            listener.settimeout(5)
+            connection, _ = listener.accept()
+            with connection:
+                connection.settimeout(5)
+                assert connection.recv(1) == b"R"
+                process.send_signal(signal.SIGINT)
+                assert connection.recv(1) == b""
+                assert process.wait(timeout=5) == 7
+        finally:
+            if process.poll() is None:
+                process.kill()
 
 
 def test_missing_system_tools_only_warn_outside_the_container(

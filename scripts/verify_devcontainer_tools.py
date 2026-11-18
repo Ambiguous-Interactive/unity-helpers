@@ -87,6 +87,15 @@ def _probe_output() -> AbstractContextManager[IO[bytes] | None]:
     return tempfile.TemporaryFile() if sys.platform == "win32" else nullcontext(None)
 
 
+def _stop_probe(process: subprocess.Popen[bytes]) -> None:
+    with suppress(ProcessLookupError):
+        if sys.platform == "win32":
+            process.kill()
+        else:
+            os.killpg(process.pid, signal.SIGKILL)
+    process.wait()
+
+
 def probe(command: str, *args: str) -> Version | None:
     executable = shutil.which(command)
     if executable is None:
@@ -103,19 +112,17 @@ def probe(command: str, *args: str) -> Version | None:
         ):
             try:
                 captured, _ = process.communicate(timeout=TIMEOUT_SECONDS)
-            except subprocess.TimeoutExpired:
-                with suppress(ProcessLookupError):
-                    if sys.platform == "win32":
-                        process.kill()
-                    else:
-                        os.killpg(process.pid, signal.SIGKILL)
-                process.wait()
+            except (KeyboardInterrupt, subprocess.TimeoutExpired) as error:
+                _stop_probe(process)
+                if isinstance(error, KeyboardInterrupt):
+                    raise
                 return Version(124, "", timed_out=True)
-            if output is None:
-                first_line = (captured or b"").partition(b"\n")[0]
-            else:
+            if output is not None:
                 output.seek(0)
-                first_line = output.readline().removesuffix(b"\n")
+                captured = output.readline()
+            first_line, newline, _ = (captured or b"").partition(b"\n")
+            if newline:
+                first_line = first_line.removesuffix(b"\r")
             return Version(process.returncode, first_line.decode("utf-8", "replace"))
     except OSError:
         return None
