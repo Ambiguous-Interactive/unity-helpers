@@ -28,6 +28,16 @@ function renderCompatibilityWorkflow(source) {
       (_, name) =>
         `    name: ${id === "unity-tests-aggregate" ? "Unity Compatibility Success" : `Compatibility ${name}`}`
     );
+    block = block
+      .split(/(?=^      - name: )/m)
+      .filter((section) => {
+        const condition = section.match(/^        if:[^\n]*(?:\n {10,}[^\n]*)*/m)?.[0];
+        return (
+          !condition?.includes("inputs.latest-mode-scheduling") &&
+          !condition?.includes("needs.matrix-config.outputs.combine-variants")
+        );
+      })
+      .join("");
     block = block.replace(/inputs\.([a-z][a-z0-9-]*)/g, (_, input) => {
       if (
         [
@@ -38,6 +48,7 @@ function renderCompatibilityWorkflow(source) {
       )
         return "''";
       if (input === "acceptance") return "'none'";
+      if (input === "latest-mode-scheduling") return "'split'";
       if (input === "test-mode") return "'all'";
       const flags = [
         "fresh-conversion",
@@ -54,6 +65,10 @@ function renderCompatibilityWorkflow(source) {
       throw new Error(`Unclassified Unity dispatch input: ${input}`);
     });
     if (id === "matrix-config") {
+      block = block.replace(
+        /^      combine-variants: >-\n(?: {8,}[^\n]*\n)+/m,
+        '      combine-variants: "false"\n'
+      );
       block = block.replace(
         "          INPUT_UNITY_VERSION:",
         "          INPUT_UNITY_COVERAGE: compatibility\n          INPUT_UNITY_VERSION:"

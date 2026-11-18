@@ -121,9 +121,13 @@ by the existing hook regressions.
 
 Native PR mode selection uses the same merge-base inventory and risk selector. Ordinary C# and
 documentation changes run EditMode and PlayMode; compatibility-sensitive and unknown changes
-retain Standalone and protobuf-only players. SINGLE_THREADED follows PR mode selection. Main runs all modes on latest 6.x;
-default manual qualification retains the full supported matrix. Every selected mode still requires passing native XML,
-redaction, artifact upload, and confirmed cleanup.
+retain Standalone and protobuf-only players. SINGLE_THREADED follows PR mode selection. The latest
+PR and main jobs run both variants with one activation and a shared cap of five workers. Separate
+source worktrees, Libraries, artifact paths and result gates preserve each variant. Main runs all
+modes on latest 6.x. Default manual qualification retains the full supported matrix and split
+jobs. To repeat the comparison, dispatch all modes for the latest editor with diagnostics and
+additional acceptance disabled, then choose `split` or `combined` in `latest-mode-scheduling`.
+Each selected mode requires passing native XML, redaction, artifact upload and confirmed cleanup.
 
 The approved organization policy requires a static version axis to prove matching editor setup
 and license return. The workflow retains that literal universe and uses
@@ -231,6 +235,23 @@ Workflow inventory controls own both YAML suffixes. Adding a workflow therefore 
 registration locally, including protection of licensed work from generic watchdog cancellation.
 The full source-free organization audit remains necessary; source review alone missed an exact
 aggregate-condition contract during this rollout.
+
+### Latest-editor variant scheduling comparison
+
+Both runs used `d6c4fab0` and all modes on Unity 6000.6.0f1. Package export remained a separate
+job and is outside the test timing totals. The seven archives for each arm retained matching
+assemblies, test identities and outcomes across 19 NUnit reports. All 11 source and Library
+paths remained distinct. The combined controller peaked at five workers and passed both
+variant gates and its central license return and cleanup.
+
+| Test jobs                                                                                   | Runner placement                      | Occupied runner time | Dispatch to last test job | Lock lifecycles |
+| ------------------------------------------------------------------------------------------- | ------------------------------------- | -------------------: | ------------------------: | --------------: |
+| [Split](https://github.com/Ambiguous-Interactive/unity-helpers/actions/runs/44192964317)    | Normal on ELI, SINGLE_THREADED on DAD |              1,413 s |                   1,887 s |               2 |
+| [Combined](https://github.com/Ambiguous-Interactive/unity-helpers/actions/runs/44197974376) | Both variants on ELI                  |                596 s |                   1,236 s |               1 |
+
+The combined job occupied 58% fewer runner-seconds in this pair. Different hosts, cache and
+queue conditions limit the timing comparison. The trial supports reducing licensed job churn.
+It leaves fleet-wide latency and performance on DAD unmeasured.
 
 ### Native task pilots
 

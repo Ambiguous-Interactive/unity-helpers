@@ -19,6 +19,7 @@ import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "unity"))
 import desktop_worker
 from desktop_worker import validate_payload
+from project_workspace import workspace
 from run_ci_modes import (
     ROOT,
     Mode,
@@ -287,7 +288,10 @@ def make_control(
                 [IO.File]::WriteAllText((Join-Path $folder 'control.txt'), $part)
             }
         }
-        [IO.File]::WriteAllText((Join-Path $ArtifactsPath 'fixture-options.json'), (@{ RepoRoot = $RepoRoot; AssemblyNames = $AssemblyNames } | ConvertTo-Json))
+        [IO.File]::WriteAllText((Join-Path $ArtifactsPath 'fixture-options.json'), (@{
+            RepoRoot = $RepoRoot; AssemblyNames = $AssemblyNames; Mode = $TestMode;
+            Scope = $ProjectScope; ShareEditor = [bool]$ShareEditorProject; Defines = $AdditionalScriptingDefines
+        } | ConvertTo-Json))
         [IO.File]::WriteAllText((Join-Path $env:CONTROL_EVENTS ($workerName + '.completed')), 'done')
         """.replace("HELPER", helper),
         encoding="utf-8",
@@ -767,8 +771,9 @@ def test_unknown_source_paths_are_preserved(tmp_path: Path, damage: str) -> None
     assert canary.read_text(encoding="utf-8") == "preserve me\n"
 
 
-def test_complete_cli_uses_isolated_sources_and_publishes_all_four_modes(
-    tmp_path: Path,
+@pytest.mark.parametrize(("combined", "failed"), [(False, False), (True, False), (True, True)])
+def test_complete_cli_preserves_equivalent_isolated_mode_groups(
+    tmp_path: Path, combined: bool, failed: bool
 ) -> None:
     _modes, _preparation, environment, _shell = make_control(tmp_path)
     repository = tmp_path / "repository"
@@ -779,6 +784,30 @@ def test_complete_cli_uses_isolated_sources_and_publishes_all_four_modes(
         Path(environment["UH_MODE_RUNNER"]).read_text(encoding="utf-8"),
         encoding="utf-8",
     )
+    if combined:
+        source = runner.read_text(encoding="utf-8")
+        marker = "        $expectedWorkers = [int]$env:CONTROL_MODE_COUNT"
+        assert marker in source
+        source = source.replace(
+            marker,
+            "        if ($ProjectScope -like '*shard-1') { $workerName = 'editmode_shard' }\n"
+            "        if ($ProjectScope -like 'single-threaded*') { $workerName = 'st_' + $workerName }\n"
+            + marker,
+        )
+        source = source.replace(
+            "$env:CONTROL_FAIL -eq $TestMode", "$env:CONTROL_FAIL -eq $workerName"
+        )
+        marker = "        [IO.File]::WriteAllText((Join-Path $ArtifactsPath 'fixture-options.json')"
+        assert marker in source
+        xml = '<test-run result="Passed" total="1" passed="1" failed="0" skipped="0" inconclusive="0" duration="1"><test-suite type="Assembly" name="ASSEMBLY.dll" result="Passed"><test-case fullname="ASSEMBLY.Case" result="Passed" /></test-suite></test-run>'
+        source = source.replace(
+            marker,
+            f"        if ($EditorPhaseGroup -eq 'Main') {{\n"
+            f"            $xml = '{xml}'.Replace('ASSEMBLY', $AssemblyNames)\n"
+            "            [IO.File]::WriteAllText((Join-Path $ArtifactsPath 'results.xml'), $xml)\n"
+            "        }\n" + marker,
+        )
+        runner.write_text(source, encoding="utf-8")
     helper = str(ROOT / "scripts/git-staging-helpers.ps1").replace("'", "''")
     shell = shutil.which("pwsh")
     assert shell is not None
@@ -804,8 +833,22 @@ def test_complete_cli_uses_isolated_sources_and_publishes_all_four_modes(
         GITHUB_OUTPUT=str(output),
         UH_PARALLEL_SELECTED_MODES=json.dumps(list(PROFILES)),
         UH_PARALLEL_ASSEMBLY_PROFILES=json.dumps(PROFILES),
-        CONTROL_MODE_COUNT="5",
+        CONTROL_MODE_COUNT="11" if combined else "5",
     )
+    if combined:
+        environment["UH_PARALLEL_ASSEMBLY_PROFILES"] = json.dumps(
+            {**PROFILES, "editmode": "Normal.First;Normal.Second"}
+        )
+        environment["UH_PARALLEL_SINGLE_THREADED_SELECTED_MODES"] = json.dumps(list(PROFILES))
+        environment["UH_PARALLEL_SINGLE_THREADED_ASSEMBLY_PROFILES"] = json.dumps(
+            {
+                "editmode": "SingleThreaded.First;SingleThreaded.Second",
+                "playmode": "SingleThreaded.playmode",
+                "standalone": "SingleThreaded.standalone",
+            }
+        )
+        if failed:
+            environment["CONTROL_FAIL"] = "st_playmode"
     wrapper = tmp_path / "cli-wrapper.py"
     wrapper.write_text(
         "import sys\nfrom pathlib import Path\n"
@@ -818,8 +861,11 @@ def test_complete_cli_uses_isolated_sources_and_publishes_all_four_modes(
         + "raise SystemExit(run_ci_modes.main())\n",
         encoding="utf-8",
     )
+    command = [sys.executable, str(wrapper), "--version", "6000.6.0f1"]
+    if combined:
+        command.extend(["--with-single-threaded", "--editmode-shards", "2", "--max-workers", "5"])
     result = subprocess.run(
-        [sys.executable, str(wrapper), "--version", "6000.6.0f1"],
+        command,
         env=environment,
         capture_output=True,
         text=True,
@@ -827,14 +873,47 @@ def test_complete_cli_uses_isolated_sources_and_publishes_all_four_modes(
         timeout=40,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    assert (
-        output.read_text(encoding="utf-8")
-        == "editmode=success\nplaymode=success\nstandalone=success\nproto_only=success\n"
-    )
+    expected = "editmode=success\nplaymode=success\nstandalone=success\nproto_only=success\n"
+    if combined:
+        playmode_outcome = "failure" if failed else "success"
+        expected += f"st_editmode=success\nst_playmode={playmode_outcome}\nst_standalone=success\n"
+    assert output.read_text(encoding="utf-8") == expected
     artifact_paths = list((repository / ".artifacts/unity").rglob("fixture-options.json"))
-    assert len(artifact_paths) == 5
+    worker_count = 11 if combined else 5
+    assert len(artifact_paths) == worker_count - int(failed)
     inputs = [json.loads(path.read_text(encoding="utf-8")) for path in artifact_paths]
-    assert len({item["RepoRoot"] for item in inputs}) == 5
+    assert len({item["RepoRoot"] for item in inputs}) == worker_count - int(failed)
+    if combined:
+        sources = {item["RepoRoot"] for item in inputs}
+        libraries = {
+            workspace(
+                item["RepoRoot"],
+                "6000.6.0f1",
+                item["Mode"],
+                item["Scope"],
+                share_editor=item["ShareEditor"],
+                persistent=str(tmp_path / "workspace/unity-workspace"),
+                fingerprint="0123456789abcdef",
+            )["ProjectPath"]
+            for item in inputs
+        }
+        assert len(libraries) == len(sources)
+        single_threaded_inputs = [
+            item for item in inputs if "-st" in Path(item["RepoRoot"]).parent.name
+        ]
+        assert len(single_threaded_inputs) == 5 - int(failed)
+        assert all(
+            item["Defines"] == ["SINGLE_THREADED", "WALLSTOP_CONCAVE_HULL_STATS"]
+            for item in single_threaded_inputs
+        )
+        assert all(
+            item["AssemblyNames"].startswith("SingleThreaded.") for item in single_threaded_inputs
+        )
+        for variant, prefix in (("", "Normal"), ("-single-threaded", "SingleThreaded")):
+            result_path = repository / f".artifacts/unity/6000.6.0f1-editmode{variant}/results.xml"
+            xml_text = result_path.read_text(encoding="utf-8")
+            assert f"{prefix}.First.dll" in xml_text
+            assert f"{prefix}.Second.dll" in xml_text
     assert str(repository) not in {item["RepoRoot"] for item in inputs}
     receipt = json.loads(
         (repository / ".artifacts/unity/6000.6.0f1-editmode/mode-timings.json").read_text(
@@ -842,7 +921,17 @@ def test_complete_cli_uses_isolated_sources_and_publishes_all_four_modes(
         )
     )
     assert receipt["ControllerCompleted"] is True
-    assert len(receipt["Workers"]) == 5
+    assert len({worker["Mode"] for worker in receipt["Workers"]}) == worker_count
+    if combined:
+        intervals = sorted(
+            [(worker["StartedAfterSeconds"], 1) for worker in receipt["Workers"]]
+            + [(worker["EndedAfterSeconds"], -1) for worker in receipt["Workers"]]
+        )
+        active = peak = 0
+        for _, change in intervals:
+            active += change
+            peak = max(peak, active)
+        assert peak == 5
     assert receipt["ElapsedSeconds"] >= max(item["ElapsedSeconds"] for item in receipt["Workers"])
 
 
