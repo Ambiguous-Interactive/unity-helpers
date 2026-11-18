@@ -394,6 +394,7 @@ runTest("no contract test in scripts/tests/ has been left unreachable", () => {
     ["scripts/tests/test-validate-lint-error-codes.ps1", "lint-code-controls"],
     ["scripts/tests/test-fixture-runspace.ps1", "lint-code-controls"],
     ["scripts/tests/test-check-eol.ps1", "eol-controls"],
+    ["scripts/tests/test-final-newline.sh", "formatting-controls"],
     ["scripts/tests/test-extract-code-samples.ps1", "sample-controls"],
     ["scripts/tests/test-extract-doc-samples.js", "doc-sample-controls"],
     ["scripts/tests/test-lint-comment-block-form.js", "comment-controls"],
@@ -527,6 +528,10 @@ runTest("no contract test in scripts/tests/ has been left unreachable", () => {
       (file) => registeredControlsInvoke(file, "scripts/tests/test_lint_error_codes.py")
     ],
     ["eol-controls", (file) => registeredControlsInvoke(file, "scripts/tests/test_check_eol.py")],
+    [
+      "formatting-controls",
+      (file) => registeredControlsInvoke(file, "scripts/tests/test-precommit-integration.sh")
+    ],
     [
       "doc-sample-controls",
       (file) => registeredControlsInvoke(file, "scripts/tests/test_doc_samples.py")
