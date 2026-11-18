@@ -385,6 +385,7 @@
     "test:release-tools": "uv run --quiet --project scripts/python~ --locked pytest scripts/tests/test_release_tools.py -q",
     "test:verify-release-tag": "uv run --quiet --project scripts/python~ --locked pytest scripts/tests/test_release_tag.py -q",
     "verify:tools": "bash scripts/verify-devcontainer-tools.sh",
+    "test:verify-devcontainer-tools": "uv run --quiet --project scripts/python~ --locked pytest scripts/tests/test_verify_devcontainer_tools.py -q",
     "test:devcontainer-persistence": "uv run --project scripts/python~ --locked pytest scripts/tests/test-devcontainer-persistence.py -q",
     "agents:update": "bash .devcontainer/install-agent-clis.sh --force-latest-check",
     "agents:state:backup": "python3 .devcontainer/agent-state.py backup",

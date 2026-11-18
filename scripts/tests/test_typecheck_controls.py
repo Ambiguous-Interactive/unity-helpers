@@ -697,6 +697,7 @@ def test_windows_phases_preserve_every_suite_and_bounded_concurrency() -> None:
         "scripts/tests/test_unity_matrix_resolver.py",
         "scripts/tests/test_unity_test_modules.py",
         "scripts/tests/test_validate_formatting.py",
+        "scripts/tests/test_verify_devcontainer_tools.py",
         "scripts/tests/test_verify_shipped_analyzers.py",
         "scripts/tests/test_version_sync.py",
         "scripts/tests/test_workflow_expression_length.py",
