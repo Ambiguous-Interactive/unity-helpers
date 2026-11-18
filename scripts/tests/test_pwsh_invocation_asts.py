@@ -1,4 +1,4 @@
-"""Check typed AST policy and the real PowerShell launcher boundary."""
+"""Check typed invocation policy and the real PowerShell launcher boundary."""
 
 from __future__ import annotations
 
@@ -14,14 +14,17 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import pwsh_invocation_asts as policy
+from pwsh_invocation_text import CulturePatterns, remove_inline_comment, scan_source
 
 ROOT = Path(__file__).resolve().parents[2]
 LINTER = "scripts/lint-pwsh-invocations.ps1"
+WORD_RANGES = [[48, 57], [65, 90], [95, 95], [97, 122], [0x301, 0x301]]
+TEXT_PATTERNS = CulturePatterns("invariant", policy.word_range_expression(WORD_RANGES))
 
 
-def parse_input(payload: object) -> subprocess.CompletedProcess[bytes]:
+def parse_input(payload: object, *options: str) -> subprocess.CompletedProcess[bytes]:
     return subprocess.run(
-        [sys.executable, str(ROOT / "scripts/pwsh_invocation_asts.py")],
+        [sys.executable, str(ROOT / "scripts/pwsh_invocation_asts.py"), *options],
         input=json.dumps(payload).encode("utf-8"),
         capture_output=True,
         check=False,
@@ -164,6 +167,7 @@ def copy_native_linter(root: Path) -> None:
     for relative in (
         LINTER,
         "scripts/pwsh_invocation_asts.py",
+        "scripts/pwsh_invocation_text.py",
         "scripts/python~/pyproject.toml",
         "scripts/python~/uv.lock",
     ):
@@ -239,7 +243,7 @@ def test_native_cli_reads_type_facts_and_preserves_diagnostic_order(tmp_path: Pa
     assert input_path.read_bytes() == contents
 
 
-def test_native_cli_preserves_findings_and_uv_error_on_early_child_exit(tmp_path: Path) -> None:
+def test_native_cli_reports_uv_error_on_early_child_exit(tmp_path: Path) -> None:
     pwsh = shutil.which("pwsh")
     assert pwsh is not None
     root = tmp_path / "PowerShell failing bridge"
@@ -262,7 +266,220 @@ def test_native_cli_preserves_findings_and_uv_error_on_early_child_exit(tmp_path
         timeout=60,
     )
     assert result.returncode == 1
-    assert b".githooks/pre-commit:1: PWS001" in result.stdout
+    assert b".githooks/pre-commit:1: PWS001" not in result.stdout
     assert b"OK: No pwsh" not in result.stdout
-    assert b"AST checks failed: PowerShell AST policy failed (exit" in result.stderr
+    assert b"Checks failed: PowerShell invocation policy failed (exit" in result.stderr
     assert b"uv.lock" in result.stderr
+
+
+@pytest.mark.parametrize("ast", [None, "invalid", [{"path": "scripts/incomplete.ps1"}]])
+def test_failed_ast_validation_still_reports_completed_text_checks(ast: object) -> None:
+    result = parse_input(
+        {
+            "sources": [{"path": "tool.sh", "lines": ["pwsh -File tool.ps1 -- one"]}],
+            "ast": ast,
+            "word_ranges": WORD_RANGES,
+            "culture": "",
+        },
+        "--include-text",
+    )
+    assert result.returncode == 0
+    assert not result.stderr
+    report = cast("policy.InvocationReport", json.loads(result.stdout))
+    assert [(entry["line"], entry["code"]) for entry in report["findings"]] == [(1, "PWS001")]
+    assert report["ast_error"] is not None
+    assert report["ast_error"].startswith("Invalid AST input:")
+
+
+@pytest.mark.parametrize(
+    ("path", "lines", "expected"),
+    [
+        (
+            ".github/workflows/native.yaml",
+            ["run: >-", "  powershell -f", "  scripts/build.ps1", "  -- payload"],
+            [(1, "PWS001", "powershell -f scripts/build.ps1 -- payload")],
+        ),
+        (
+            "scripts/tests/check.ps1",
+            ["& $target -- payload", "Write-Host 'pwsh -File tool.ps1 -- payload'"],
+            [(1, "PWS002", "& $target -- payload")],
+        ),
+        (
+            "scripts/top.ps1",
+            ["# lint-pwsh-invocations: allow-subprocess-pwsh\x1creason", "pwsh -f $child"],
+            [(2, "PWS003", "pwsh -f $child")],
+        ),
+        (
+            "scripts/top.ps1",
+            ["# lint-pwsh-invocations: allow-subprocess-pwsh\u2003reason", "pwsh -f $child"],
+            [],
+        ),
+        (
+            "scripts/nested/run.ps1",
+            [
+                "$Hook = Join-Path '.githooks' 'pre-push'",
+                "pwsh -f $HOOK",
+                "pwsh -f $OTHER",
+                "$Other = '.githooks/pre-commit'",
+                "pwsh -f $other",
+            ],
+            [(2, "PWS004", "pwsh -f $HOOK"), (5, "PWS004", "pwsh -f $other")],
+        ),
+        (
+            "scripts/run.sh",
+            ["pwsh\x1c-f tool.ps1 -- arg", "pwsh\u2003-f tool.ps1 -- arg"],
+            [(2, "PWS001", "pwsh\u2003-f tool.ps1 -- arg")],
+        ),
+        (
+            "scripts/run.sh",
+            [
+                'echo\u0301 "pwsh -File tool.ps1 -- arg"',
+                'echo\u200d "pwsh -File tool.ps1 -- arg"',
+                'echo\u00b2 "pwsh -File tool.ps1 -- arg"',
+                'pwsh -Command "Write-Host\u0301 -File tool.ps1 -- arg"',
+                'pwsh -Command "Write-Host\u00b2 -File tool.ps1 -- arg"',
+            ],
+            [
+                (1, "PWS001", 'echo\u0301 "pwsh -File tool.ps1 -- arg"'),
+                (2, "PWS001", 'echo\u200d "pwsh -File tool.ps1 -- arg"'),
+                (4, "PWS001", 'pwsh -Command "Write-Host\u0301 -File tool.ps1 -- arg"'),
+            ],
+        ),
+        (
+            "scripts/nested/assign.ps1",
+            [
+                "$first = Join-Path\u0301 '.githooks' 'pre-push'",
+                "pwsh -File $first",
+                "$second = Join-Path\u00b2 '.githooks' 'pre-push'",
+                "pwsh -File $second",
+            ],
+            [(4, "PWS004", "pwsh -File $second")],
+        ),
+    ],
+)
+def test_text_rules_keep_physical_positions_and_content(
+    path: str, lines: list[str], expected: list[tuple[int, str, str]]
+) -> None:
+    findings = scan_source(path, lines, TEXT_PATTERNS)
+    assert [(item["line"], item["code"], item["content"]) for item in findings] == expected
+
+
+@pytest.mark.parametrize(
+    ("culture", "shell_lines"),
+    [
+        ("", [4, 5, 7]),
+        ("en-US", [2, 4, 5, 7, 9]),
+        ("tr-TR", [2, 4, 5, 7, 10]),
+    ],
+)
+def test_native_cli_preserves_legacy_culture_and_word_matching(
+    tmp_path: Path, culture: str, shell_lines: list[int]
+) -> None:
+    pwsh = shutil.which("pwsh")
+    assert pwsh is not None
+    copy_native_linter(tmp_path)
+    (tmp_path / "script.sh").write_text(
+        "power\u017fhell -f tool.ps1 -- arg\n"
+        "pwsh -F\u0130LE tool.ps1 -- arg\n"
+        "pwsh -f\u0131le tool.ps1 -- arg\n"
+        "pwsh -FiLe tool.ps1 -- arg\n"
+        "pwsh -File .githoo\u212as/pre-push\n"
+        "pwsh -File .githook\u017f/pre-push\n"
+        "pwsh -File .githooks/pre-puSh\n"
+        '"${POWERSHELL_\u017f[@]}" tool.ps1 -- arg\n'
+        '"${POWERSHELL_\u0130[@]}" tool.ps1 -- arg\n'
+        '"${POWERSHELL_\u0131[@]}" tool.ps1 -- arg\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "scripts/fixture.ps1").write_text(
+        "pwsh -File $\u00b2\npwsh -File $\u0301\npwsh -File $zero\n",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [
+            pwsh,
+            "-NoProfile",
+            "-Command",
+            (
+                "[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false); "
+                "[Threading.Thread]::CurrentThread.CurrentCulture = "
+                "[Globalization.CultureInfo]::GetCultureInfo([string]$env:PWS_SAMPLE_CULTURE); "
+                "& ./scripts/lint-pwsh-invocations.ps1; exit $LASTEXITCODE"
+            ),
+        ],
+        cwd=tmp_path,
+        env={
+            **os.environ,
+            "NO_COLOR": "1",
+            "PWS_SAMPLE_CULTURE": culture,
+            "UV_PROJECT_ENVIRONMENT": str(tmp_path / "environment"),
+        },
+        check=False,
+        capture_output=True,
+        timeout=40,
+    )
+    assert result.returncode == 1
+    assert result.stderr == b""
+    output = result.stdout.decode("utf-8")
+    assert [line.split(": ", 1)[0] for line in output.splitlines() if ": PWS00" in line] == [
+        *(f"script.sh:{line}" for line in shell_lines),
+        "scripts/fixture.ps1:2",
+        "scripts/fixture.ps1:3",
+    ]
+
+
+@pytest.mark.parametrize(
+    "spans",
+    [[], [[False, 1]], [[11, 10]], [[22, 0x10000]], [[5, 7], [7, 9]], [[9, 14], [1, 5]]],
+)
+def test_invalid_host_word_ranges_fail_the_policy(spans: object) -> None:
+    result = parse_input(
+        {"sources": [], "ast": [], "culture": "", "word_ranges": spans},
+        "--include-text",
+    )
+    assert result.returncode == 1
+    assert result.stdout == b""
+    assert b"Invalid invocation policy input" in result.stderr
+
+
+def test_inline_comments_skip_hashes_inside_long_and_unterminated_literals() -> None:
+    hashes = "#" * 100_000
+    quoted = f"Write-Output \"{hashes}\" 'and #literal' "
+    assert remove_inline_comment(quoted + "# actual comment") == quoted
+    assert remove_inline_comment(f'Write-Output "{hashes}') == f'Write-Output "{hashes}'
+    assert remove_inline_comment('Write-Output # outside "#"') == "Write-Output "
+
+
+def test_native_cli_uses_the_hosts_word_classification(tmp_path: Path) -> None:
+    pwsh = shutil.which("pwsh")
+    assert pwsh is not None
+    copy_native_linter(tmp_path)
+    (tmp_path / "shell.sh").write_text(
+        'echo\u0ece "pwsh -File tool.ps1 -- payload"\n', encoding="utf-8"
+    )
+    command = (
+        "[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false); "
+        "$expected = [regex]::IsMatch([string][char]0x0ece, '^\\w$'); "
+        'Write-Output "Host word: $expected"; '
+        "& ./scripts/lint-pwsh-invocations.ps1; exit $LASTEXITCODE"
+    )
+    result = subprocess.run(
+        [pwsh, "-NoProfile", "-Command", command],
+        cwd=tmp_path,
+        env={
+            **os.environ,
+            "NO_COLOR": "1",
+            "UV_PYTHON": sys.executable,
+            "UV_PROJECT_ENVIRONMENT": str(tmp_path / "environment"),
+        },
+        check=False,
+        capture_output=True,
+        timeout=40,
+    )
+    assert result.stderr == b""
+    lines = result.stdout.decode("utf-8").splitlines()
+    assert lines
+    assert lines[0] in {"Host word: True", "Host word: False"}
+    expected_finding = lines[0] == "Host word: True"
+    assert result.returncode == int(expected_finding)
+    assert any(line.startswith("shell.sh:1: PWS001") for line in lines) is expected_finding

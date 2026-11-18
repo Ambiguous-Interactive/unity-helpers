@@ -35,7 +35,7 @@
     },
     {
       "name": "bash-pwsh-invocation",
-      "sha256": "1c55904a57825f02e902f3c9e00ba9e177295231175cb41ebeec3fafcdbf4705",
+      "sha256": "55393b8f0801e7ec1b93d634970a85835b90777d3b20739989ea4ae9f8b75182",
       "parts": ["bash-pwsh-invocation-part-1.md", "bash-pwsh-invocation-part-2.md"],
       "routerSha256": "f0cca73c9fab5ed1dbde785e8d10dc8f8942b589578f56dc76fef65d72e6b21f"
     },
