@@ -491,7 +491,7 @@
   {
     "id": "unity-nunit-results",
     "name": "Unity NUnit results gate",
-    "run": "bash scripts/tests/test-unity-nunit-results.sh",
+    "run": "uv run --project scripts/python~ --locked pytest scripts/tests/test_nunit_results.py -q",
     "inputs": ["@tooling"]
   },
   {

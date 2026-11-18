@@ -76,6 +76,11 @@ case "${MODE}" in
         ;;
 esac
 
+if [[ -z "$(command -v uv)" ]]; then
+    echo "ERROR: Install uv before running local Unity tests. The NUnit results gate requires it." >&2
+    exit 1
+fi
+
 echo "==> [run-tests] Test mode: ${MODE}"
 if [[ -n "${FILTER}" ]]; then
     echo "==> [run-tests] Test filter: ${FILTER}"
@@ -134,10 +139,13 @@ run_test_mode() {
     local platform="$1"
     local platform_lower
     platform_lower="$(echo "${platform}" | tr '[:upper:]' '[:lower:]')"
-    # Results are written to /project/test-results/ inside Docker (writable mount)
-    # and read from UNITY_TEST_PROJECT_DIR/test-results/ on the host.
-    local results_file="/project/test-results/${platform_lower}-results.xml"
-    local local_results_file="${UNITY_TEST_PROJECT_DIR}/test-results/${platform_lower}-results.xml"
+    # Use a fresh directory so a previous report cannot qualify this invocation.
+    local result_directory
+    result_directory="$(mktemp -d "${RESULTS_DIR}/.${platform_lower}-XXXXXX")" || return 1
+    local result_name="${platform_lower}-results.xml"
+    local results_file="/project/test-results/${result_directory##*/}/${result_name}"
+    local local_results_file="${result_directory}/${result_name}"
+    local published_result="${RESULTS_DIR}/${result_name}"
 
     echo "==> [run-tests] Running ${platform} tests..."
     local start_time
@@ -177,14 +185,17 @@ run_test_mode() {
     # A zero exit from Unity is not by itself evidence that tests ran, so the results file
     # gets a vote.
     local results_exit=0
-    parse_nunit_results "${local_results_file}" "${platform}" || results_exit=$?
-
     if [[ -f "${local_results_file}" ]]; then
-        # Surface the slowest fixtures/cases so local runs see what to optimize.
-        if command -v pwsh > /dev/null 2>&1; then
+        parse_nunit_results "${local_results_file}" "${platform}" "${published_result}" || results_exit=$?
+        if [[ ! -e "${local_results_file}" ]] && command -v pwsh > /dev/null 2>&1; then
             pwsh -NoProfile -File "${SCRIPT_DIR}/report-slow-tests.ps1" \
-                -ResultsPath "${local_results_file}" -Top 20 || true
+                -ResultsPath "${published_result}" -Top 20 || true
         fi
+    else
+        parse_nunit_results "${local_results_file}" "${platform}" || results_exit=$?
+    fi
+    if [[ ! -e "${local_results_file}" ]]; then
+        rmdir -- "${result_directory}" || true
     fi
 
     if [[ "${exit_code}" -eq 0 ]]; then
