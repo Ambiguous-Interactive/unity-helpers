@@ -518,6 +518,7 @@ runTest("no linter in scripts/ has been left unreachable", () => {
     ["scripts/lint-unity-test-modules.ps1", "module-controls"],
     ["scripts/lint_unity_test_modules.py", "workflow"],
     ["scripts/validate-formatting.sh", "formatting-controls"],
+    ["scripts/tests/test-final-newline.sh", "formatting-controls"],
     ["scripts/lint-csharp-format.ps1", "preflight"],
     ["scripts/lint_csharp_format.py", "formatter-launcher"],
     ["scripts/lint_meta_files.py", "preflight"],

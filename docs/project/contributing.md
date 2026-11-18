@@ -565,6 +565,11 @@ and failed Git reads fail explicitly. A full scan requires nonempty tracked text
 `npm run test:check-eol` runs the Git-blob, worktree, path-scope and compatibility-launcher controls.
 The two PowerShell entry points remain available for existing hooks and callers.
 
+`npm run test:final-newline` checks tracked text and named configuration files. The standalone
+`bash scripts/validate-formatting.sh --fix` uses Prettier for formatting and cached Git
+attributes for newline repairs. A repair updates the worktree and leaves the index intact.
+The command refuses repairs through linked files.
+
 `npm run validate:lint-error-codes` harvests error-code prefixes from lint scripts, their controls,
 and Git hooks, including typed Python names. It sends one batch through the repository's actual
 cspell configuration and prints source locations plus a root-word patch for rejected families.

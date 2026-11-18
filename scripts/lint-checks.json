@@ -374,7 +374,7 @@
   {
     "id": "final-newline",
     "name": "Final newline contract",
-    "run": "bash scripts/tests/test-final-newline.sh",
+    "run": "uv run --quiet --project scripts/python~ --locked --no-dev python scripts/validate_formatting.py newline",
     "inputs": ["*"]
   },
   {

@@ -430,6 +430,12 @@
     "inputs": ["@tooling"]
   },
   {
+    "id": "validate-formatting",
+    "name": "Formatting validation and staged newline policy",
+    "run": "npm run test:validate-formatting",
+    "inputs": ["@tooling"]
+  },
+  {
     "id": "lint-pwsh-invocations",
     "name": "PowerShell invocation linter self-test",
     "run": "npm run test:lint-pwsh-invocations",
