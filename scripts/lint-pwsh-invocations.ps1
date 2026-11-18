@@ -1037,7 +1037,7 @@ function Invoke-InvocationAstPolicy {
     param([object[]]$Facts)
 
     $start = [System.Diagnostics.ProcessStartInfo]::new()
-    $start.FileName = (Get-Command uv -CommandType Application -ErrorAction Stop).Source
+    $start.FileName = @(Get-Command uv -CommandType Application -ErrorAction Stop)[0].Source
     $start.WorkingDirectory = $repoRoot
     $start.UseShellExecute = $false
     $start.RedirectStandardInput = $true
@@ -1077,8 +1077,9 @@ function Invoke-InvocationAstPolicy {
     }
 }
 
-# PowerShell owns AST extraction so the classifier receives actual parameter and command node
-# types rather than guesses based on source text.
+# PowerShell supplies native node types and recognizes directive tokens with its own matching
+# rules. Python decides which commands and parameter blocks those facts permit.
+$pws006AllowMarker = '#\s*lint-pwsh-invocations:\s*allow-start-process-argument-list\s+\S+'
 $astFacts = [System.Collections.Generic.List[object]]::new()
 foreach ($scriptPath in (Get-OwnedPowerShellScript)) {
     $rel = [System.IO.Path]::GetRelativePath($repoRoot, $scriptPath.FullName).Replace('\', '/')
@@ -1096,7 +1097,8 @@ foreach ($scriptPath in (Get-OwnedPowerShellScript)) {
                 text = $firstError.Extent.Text
             }
             commands = @()
-            lines = @()
+            comment_lines = @()
+            marker_lines = @()
             block = $null
         })
         continue
@@ -1133,19 +1135,35 @@ foreach ($scriptPath in (Get-OwnedPowerShellScript)) {
         @{
             line = $paramBlock.Extent.StartLineNumber
             text = $paramBlock.Extent.Text.Split("`n")[0].Trim()
-            attributes = @(foreach ($attribute in $paramBlock.Attributes) { $attribute.Extent.Text })
+            positional_disabled = [bool](@(foreach ($attribute in $paramBlock.Attributes) { $attribute.Extent.Text }) -match 'PositionalBinding\s*=\s*\$false')
             parameters = @(foreach ($parameter in $paramBlock.Parameters) {
+                $remaining = [bool](@(foreach ($attribute in $parameter.Attributes) { $attribute.Extent.Text }) -match 'ValueFromRemainingArguments')
                 @{
                     name = $parameter.Name.VariablePath.UserPath
-                    array_type = $null -ne $parameter.StaticType -and $parameter.StaticType.IsArray
-                    attributes = @(foreach ($attribute in $parameter.Attributes) { $attribute.Extent.Text })
+                    array_type = -not $remaining -and $null -ne $parameter.StaticType -and $parameter.StaticType.IsArray
+                    catches_remaining = $remaining
                 }
             })
         }
     }
     if ($commands.Count -eq 0 -and $null -eq $block) { continue }
-    $lines = @(if ($commands.Count -gt 0) { [System.IO.File]::ReadAllLines($scriptPath.FullName) })
-    $astFacts.Add(@{ path = $rel; error = $null; commands = $commands; lines = $lines; block = $block })
+    $commentLines = [System.Collections.Generic.List[int]]::new()
+    $markerLines = [System.Collections.Generic.List[int]]::new()
+    if ($commands.Count -gt 0) {
+        $lines = [System.IO.File]::ReadAllLines($scriptPath.FullName)
+        for ($index = 0; $index -lt $lines.Length; $index++) {
+            if ($lines[$index] -match '^\s*#') { $commentLines.Add($index + 1) }
+            if ($lines[$index] -match $pws006AllowMarker) { $markerLines.Add($index + 1) }
+        }
+    }
+    $astFacts.Add(@{
+        path = $rel
+        error = $null
+        commands = $commands
+        comment_lines = $commentLines.ToArray()
+        marker_lines = $markerLines.ToArray()
+        block = $block
+    })
 }
 
 if ($astFacts.Count -gt 0) {

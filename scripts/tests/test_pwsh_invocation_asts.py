@@ -48,7 +48,7 @@ def test_only_joined_argument_shapes_are_reported(kind: str, reported: bool) -> 
             {"name": "ArgumentList", "kind": kind},
         ],
     }
-    finding = policy.start_process_violation("scripts/launch.ps1", command, [command["text"]])
+    finding = policy.start_process_violation("scripts/launch.ps1", command, set(), set())
     if reported:
         assert finding is not None
         assert finding["code"] == "PWS006"
@@ -58,26 +58,18 @@ def test_only_joined_argument_shapes_are_reported(kind: str, reported: bool) -> 
 
 
 @pytest.mark.parametrize(
-    ("lines", "allowed"),
+    ("line", "comments", "markers", "allowed"),
     [
-        (
-            [
-                "# lint-pwsh-invocations: allow-start-process-argument-list fixed flags",
-                "# intro",
-                "run",
-            ],
-            True,
-        ),
-        (
-            ["# lint-pwsh-invocations: allow-start-process-argument-list fixed flags", "", "run"],
-            False,
-        ),
-        (["# lint-pwsh-invocations: allow-start-process-argument-list", "run"], False),
-        (["run # LINT-PWSH-INVOCATIONS: ALLOW-START-PROCESS-ARGUMENT-LIST fixed flags"], True),
+        (3, {1, 2}, {1}, True),
+        (3, {1}, {1}, False),
+        (2, {1}, set[int](), False),
+        (1, set[int](), {1}, True),
     ],
 )
-def test_opt_out_requires_attached_rationale(lines: list[str], allowed: bool) -> None:
-    assert policy.allow_start_process(len(lines), lines) is allowed
+def test_opt_out_requires_attached_rationale(
+    line: int, comments: set[int], markers: set[int], allowed: bool
+) -> None:
+    assert policy.allow_start_process(line, comments, markers) is allowed
 
 
 @pytest.mark.parametrize(
@@ -85,21 +77,21 @@ def test_opt_out_requires_attached_rationale(lines: list[str], allowed: bool) ->
 )
 def test_array_rules_require_both_guards(sibling: bool, positional: bool) -> None:
     parameters: list[policy.ParameterFact] = [
-        {"name": "Paths", "array_type": True, "attributes": []},
-        {"name": "Output", "array_type": False, "attributes": []},
+        {"name": "Paths", "array_type": True, "catches_remaining": False},
+        {"name": "Output", "array_type": False, "catches_remaining": False},
     ]
     if sibling:
         parameters.append(
             {
                 "name": "Remaining",
                 "array_type": True,
-                "attributes": ["[Parameter(ValueFromRemainingArguments = $true)]"],
+                "catches_remaining": True,
             }
         )
     block: policy.ParameterBlockFact = {
         "line": 2,
         "text": "param(...",
-        "attributes": ["[CmdletBinding(PositionalBinding = $false)]"] if positional else [],
+        "positional_disabled": positional,
         "parameters": parameters,
     }
     finding = policy.array_parameter_violation("scripts/tool.ps1", block)
@@ -128,7 +120,12 @@ def test_empty_ast_list_returns_one_json_array() -> None:
 
 def test_native_cli_reads_type_facts_and_preserves_diagnostic_order(tmp_path: Path) -> None:
     pwsh = shutil.which("pwsh")
+    uv = shutil.which("uv")
     assert pwsh is not None
+    assert uv is not None
+    shadow = tmp_path / "second uv application"
+    shadow.mkdir()
+    shutil.copy2(uv, shadow / Path(uv).name)
     root = tmp_path / "PowerShell fixture [space]"
     for relative in (
         LINTER,
@@ -140,7 +137,13 @@ def test_native_cli_reads_type_facts_and_preserves_diagnostic_order(tmp_path: Pa
         fixture.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(ROOT / relative, fixture)
     input_path = root / "scripts/unicode-\u03bb config.ps1"
-    contents = b"param([int[]]$Paths)\n\nsaps -FilePath 'synthetic' -Arg:$arguments\n"
+    contents = (
+        "param([int[]]$Paths)\n\nsaps -FilePath 'synthetic' -Arg:$arguments\n"
+        "# lint-pwsh-invocations: allow-start-process-argument-list\x1cfixed flags\n"
+        "saps -FilePath 'synthetic' -Arg:$arguments\n"
+        "# lint-pwsh-invocations: allow-start-process-argument-list\u2003fixed flags\n"
+        "saps -FilePath 'synthetic' -Arg:$arguments\n"
+    ).encode("utf-8")
     input_path.write_bytes(contents)
     for relative, invocation in (
         (".githooks/pre-commit", b"pwsh -File scripts/tool.ps1 -- payload\n"),
@@ -158,6 +161,7 @@ def test_native_cli_reads_type_facts_and_preserves_diagnostic_order(tmp_path: Pa
         env={
             **os.environ,
             "NO_COLOR": "1",
+            "PATH": os.environ["PATH"] + os.pathsep + str(shadow),
             "UV_PROJECT_ENVIRONMENT": str(tmp_path / "locked AST test environment"),
         },
         check=False,
@@ -171,8 +175,10 @@ def test_native_cli_reads_type_facts_and_preserves_diagnostic_order(tmp_path: Pa
     stop = output.index(
         "scripts/unicode-\u03bb config.ps1:1: PWS005 declares array parameter(s) Paths"
     )
-    assert start < stop
+    second = output.index("scripts/unicode-\u03bb config.ps1:5: PWS006 Start-Process -Arg ")
+    assert start < second < stop
+    assert "scripts/unicode-\u03bb config.ps1:7: PWS006" not in output
     for finding in (".githooks/pre-commit:1", ".github/workflows/native.yml:2"):
         assert output.index(f"{finding}: PWS001") < start
-    assert "4 violation(s) found" in output
+    assert "5 violation(s) found" in output
     assert input_path.read_bytes() == contents

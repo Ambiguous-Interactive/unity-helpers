@@ -3,16 +3,10 @@
 from __future__ import annotations
 
 import json
-import re
 import sys
 from typing import TypedDict, cast
 
 JOINED_ARGUMENT_TYPES = {"ArrayLiteralAst", "ArrayExpressionAst", "VariableExpressionAst"}
-ALLOW_START_PROCESS = re.compile(
-    r"#\s*lint-pwsh-invocations:\s*allow-start-process-argument-list\s+\S+", re.IGNORECASE
-)
-POSITIONAL_FALSE = re.compile(r"PositionalBinding\s*=\s*\$false", re.IGNORECASE)
-COMMENT = re.compile(r"^\s*#")
 
 
 class SyntaxErrorFact(TypedDict):
@@ -35,13 +29,13 @@ class CommandFact(TypedDict):
 class ParameterFact(TypedDict):
     name: str
     array_type: bool
-    attributes: list[str]
+    catches_remaining: bool
 
 
 class ParameterBlockFact(TypedDict):
     line: int
     text: str
-    attributes: list[str]
+    positional_disabled: bool
     parameters: list[ParameterFact]
 
 
@@ -49,7 +43,8 @@ class ScriptFact(TypedDict):
     path: str
     error: SyntaxErrorFact | None
     commands: list[CommandFact]
-    lines: list[str]
+    comment_lines: list[int]
+    marker_lines: list[int]
     block: ParameterBlockFact | None
 
 
@@ -61,24 +56,25 @@ class Violation(TypedDict):
     content: str
 
 
-def allow_start_process(line_number: int, lines: list[str]) -> bool:
-    if line_number <= len(lines) and ALLOW_START_PROCESS.search(lines[line_number - 1]):
+def allow_start_process(line: int, comment_lines: set[int], marker_lines: set[int]) -> bool:
+    if line in marker_lines:
         return True
-    for index in range(line_number - 2, -1, -1):
-        line = lines[index]
-        if not COMMENT.match(line):
+    for above in range(line - 1, 0, -1):
+        if above not in comment_lines:
             break
-        if ALLOW_START_PROCESS.search(line):
+        if above in marker_lines:
             return True
     return False
 
 
-def start_process_violation(path: str, command: CommandFact, lines: list[str]) -> Violation | None:
+def start_process_violation(
+    path: str, command: CommandFact, comment_lines: set[int], marker_lines: set[int]
+) -> Violation | None:
     for argument in command["arguments"]:
         name = argument["name"]
         if not name.lower().startswith("arg") or argument["kind"] not in JOINED_ARGUMENT_TYPES:
             continue
-        if allow_start_process(command["line"], lines):
+        if allow_start_process(command["line"], comment_lines, marker_lines):
             return None
         return {
             "path": path,
@@ -104,16 +100,11 @@ def array_parameter_violation(path: str, block: ParameterBlockFact) -> Violation
     arrays: list[str] = []
     catches_remaining = False
     for parameter in block["parameters"]:
-        if any(
-            "valuefromremainingarguments" in attribute.lower()
-            for attribute in parameter["attributes"]
-        ):
+        if parameter["catches_remaining"]:
             catches_remaining = True
         elif parameter["array_type"]:
             arrays.append(parameter["name"])
-    positional_disabled = any(
-        POSITIONAL_FALSE.search(attribute) for attribute in block["attributes"]
-    )
+    positional_disabled = block["positional_disabled"]
     if not arrays or (catches_remaining and positional_disabled):
         return None
     missing: list[str] = []
@@ -154,8 +145,10 @@ def violations(scripts: list[ScriptFact]) -> list[Violation]:
                 }
             )
             continue
+        comment_lines = set(script["comment_lines"])
+        marker_lines = set(script["marker_lines"])
         for command in script["commands"]:
-            finding = start_process_violation(path, command, script["lines"])
+            finding = start_process_violation(path, command, comment_lines, marker_lines)
             if finding is not None:
                 report.append(finding)
         block = script["block"]

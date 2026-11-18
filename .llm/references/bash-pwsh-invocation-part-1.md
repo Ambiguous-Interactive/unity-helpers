@@ -140,8 +140,9 @@ very script. The failure is silent -- `-Paths a b c` lints `a`, skips `b` and `c
 - `PWS006`: `Start-Process -ArgumentList|-Args <array|@()|variable>`.
 
 `PWS005` and `PWS006` are AST rules rather than line scans, and they read `scripts/**/*.ps1` plus
-`.githooks/*.ps1`. PowerShell parses the sources and sends the facts for both rules in one
-JSON batch to `scripts/pwsh_invocation_asts.py` through the locked uv project. Both skip files `git` reports as ignored: CI checks out tracked content only, so
+`.githooks/*.ps1`. PowerShell parses the sources and matches directive text with its native
+comparison rules. It sends the facts for both checks in one JSON batch to
+`scripts/pwsh_invocation_asts.py` through the locked uv project. Both skip files `git` reports as ignored: CI checks out tracked content only, so
 a violation in a developer's scratch script is one the repository cannot fix and CI can never see.
 An untracked file that is NOT ignored is still scanned -- a new script you forgot to stage is
 exactly the one a rule should catch -- and where `git` cannot answer, nothing is excluded.
