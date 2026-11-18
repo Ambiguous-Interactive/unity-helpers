@@ -1245,60 +1245,54 @@ for (const name of [
   const program = block.match(/^        run: \|\n([\s\S]+)$/m)?.[1]?.replace(/^ {10}/gm, "");
   assert.ok(program, `${name} needs an executable result gate`);
   const outcomes = ["success", "failure", "cancelled", "skipped"];
-  for (const [fork, dependabot] of [
-    [false, false],
-    [true, false],
-    [false, true]
-  ]) {
-    for (const preflight of outcomes) {
-      for (const licensed of outcomes) {
-        const accepted =
-          fork || dependabot
-            ? preflight === "skipped" && licensed === "skipped"
-            : preflight === "success" && licensed === "success";
-        const result = spawnSync("bash", ["-c", program], {
-          encoding: "utf8",
-          env: {
-            ...process.env,
-            FORK_PR: String(fork),
-            DEPENDABOT_PR: String(dependabot),
-            RUNNER_PREFLIGHT_RESULT: preflight,
-            UNITY_TESTS_RESULT: licensed,
-            LANE_SELECTED: "true"
-          }
-        });
-        assert.ifError(result.error);
-        assert.equal(
-          result.status === 0,
-          accepted,
-          `${name}: ${JSON.stringify({ fork, dependabot, preflight, licensed })}: ${result.stderr}`
-        );
-        historicalAggregateControls++;
-      }
-    }
-  }
-  if (name === "unity-tests-single-threaded-aggregate") {
-    for (const fork of [false, true]) {
+  const splitAggregate = name === "unity-tests-single-threaded-aggregate";
+  const laneCases = splitAggregate
+    ? [
+        ["workflow_dispatch", "", "false", true],
+        ["workflow_dispatch", "", "true", false],
+        ["workflow_dispatch", "123", "false", false],
+        ["push", "", "false", false],
+        ["pull_request", "", "false", false]
+      ]
+    : [["", "", "", true]];
+  const laneSource = block.match(/^          LANE_SELECTED: >-\n((?: {12}[^\n]+\n)+)/m)?.[1];
+  if (splitAggregate) assert.ok(laneSource, "Split aggregate must select its lane");
+  const evaluateLane = laneSource ? expression(laneSource) : undefined;
+  for (const [event, request, combined, expectedSelection] of laneCases) {
+    const laneSelected =
+      evaluateLane?.({
+        github: { event_name: event },
+        inputs: { "native-readback-run-id": request },
+        needs: { "matrix-config": { outputs: { "combine-variants": combined } } }
+      }) ?? true;
+    assert.equal(laneSelected, expectedSelection, `${name} lane selection for ${event}`);
+    for (const [fork, dependabot] of [
+      [false, false],
+      [true, false],
+      [false, true]
+    ]) {
       for (const preflight of outcomes) {
         for (const licensed of outcomes) {
+          const accepted =
+            fork || dependabot
+              ? preflight === "skipped" && licensed === "skipped"
+              : preflight === "success" && licensed === (expectedSelection ? "success" : "skipped");
           const result = spawnSync("bash", ["-c", program], {
             encoding: "utf8",
             env: {
               ...process.env,
               FORK_PR: String(fork),
-              DEPENDABOT_PR: "false",
+              DEPENDABOT_PR: String(dependabot),
               RUNNER_PREFLIGHT_RESULT: preflight,
               UNITY_TESTS_RESULT: licensed,
-              LANE_SELECTED: "false"
+              LANE_SELECTED: String(laneSelected)
             }
           });
           assert.ifError(result.error);
           assert.equal(
             result.status === 0,
-            fork
-              ? preflight === "skipped" && licensed === "skipped"
-              : preflight === "success" && licensed === "skipped",
-            `${name}: ${JSON.stringify({ fork, preflight, licensed })}: ${result.stderr}`
+            accepted,
+            `${name}: ${JSON.stringify({ event, request, combined, fork, dependabot, preflight, licensed })}: ${result.stderr}`
           );
           historicalAggregateControls++;
         }
