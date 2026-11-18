@@ -693,6 +693,7 @@ def test_windows_phases_preserve_every_suite_and_bounded_concurrency() -> None:
         "scripts/tests/test_skill_sizes.py",
         "scripts/tests/test_slow_tests.py",
         "scripts/tests/test_unity_cli_maintenance.py",
+        "scripts/tests/test_unity_matrix_resolver.py",
         "scripts/tests/test_unity_test_modules.py",
         "scripts/tests/test_verify_shipped_analyzers.py",
         "scripts/tests/test_version_sync.py",
@@ -709,3 +710,4 @@ def test_windows_phases_preserve_every_suite_and_bounded_concurrency() -> None:
     assert "scripts/tests/test_browser_consumer.py" in str(orchestration["run"])
     assert "scripts/tests/test_native_build_selection.py" in str(orchestration["run"])
     assert "scripts/tests/test_compatibility_renderer.py" in str(orchestration["run"])
+    assert "scripts/tests/test_unity_matrix_resolver.py" in str(orchestration["run"])

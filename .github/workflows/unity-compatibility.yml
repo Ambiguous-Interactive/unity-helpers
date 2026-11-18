@@ -259,7 +259,7 @@ jobs:
           INPUT_UNITY_VERSION: ${{ '' }}
           INPUT_TEST_MODE: ${{ 'all' }}
           INPUT_ACCEPTANCE: ${{ 'none' }}
-        run: node scripts/unity/resolve-test-matrix.js
+        run: uv run --quiet --project scripts/python~ --locked --no-dev python scripts/unity/resolve_test_matrix.py
 
       # NOTE: this job deliberately holds NO `secrets.*` reference. It used to read
       # UNITY_SERIAL/UNITY_EMAIL/UNITY_PASSWORD/BUILD_LOCK_APP_ID/BUILD_LOCK_APP_PRIVATE_KEY
