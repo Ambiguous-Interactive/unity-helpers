@@ -657,20 +657,12 @@
       "scripts/tests/test-unity-grouped-modes.js",
       "scripts/tests/test-unity-compatibility.js",
       "scripts/unity/generate-compatibility-workflow.js",
+      "scripts/unity/generate_compatibility_workflow.py",
+      "scripts/tests/test_compatibility_renderer.py",
       ".github/workflows/unity-compatibility.yml",
       "scripts/release-tools/require-native-unity-export.js",
       "scripts/release_automation.py",
       "scripts/tests/test_release_automation.py"
-    ]
-  },
-  {
-    "id": "unity-compatibility-renderer",
-    "name": "Unity compatibility renderer",
-    "run": "npm run test:unity-compatibility-renderer",
-    "inputs": [
-      "@tooling",
-      ".github/workflows/unity-tests.yml",
-      ".github/workflows/unity-compatibility.yml"
     ]
   },
   {
