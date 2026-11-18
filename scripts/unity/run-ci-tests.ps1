@@ -2987,6 +2987,7 @@ function Invoke-ProcessWithTreeKillTimeout {
         'InitializeAssetDatabaseV2'
     )
     $startupLockPattern = ($startupLockMarkers | ForEach-Object { [regex]::Escape($_) }) -join '|'
+    $startupLockQuietSeconds = 2
     $stallEnabled = $StallSeconds -gt 0
     $completionArmed = $false
     $completionExitCode = $null
@@ -3037,9 +3038,9 @@ function Invoke-ProcessWithTreeKillTimeout {
             $deadline = [DateTime]::MaxValue
         }
 
+        $checkStartupLock = $false
         while (-not ($oDone -and $eDone)) {
             $progressed = $false
-            $checkStartupLock = $false
 
             if (-not $oDone -and $oTask.Wait(0)) {
                 $line = $oTask.Result
@@ -3106,7 +3107,10 @@ function Invoke-ProcessWithTreeKillTimeout {
                 }
             }
 
-            if ($checkStartupLock -and -not $completionArmed -and -not $proc.HasExited) {
+            # Drain both streams and give delayed refresh markers time to arrive.
+            if ($checkStartupLock -and -not $progressed -and -not $completionArmed -and -not $proc.HasExited -and
+                ([DateTime]::UtcNow - $lastOutputAt).TotalSeconds -ge $startupLockQuietSeconds) {
+                $checkStartupLock = $false
                 $startupLog = $buffer -join "`n"
                 # The streams can deliver the lock message before the preceding stack.
                 $missingMarker = $startupLockMarkers.Where({ -not $startupLog.Contains($_) }, 'First')
