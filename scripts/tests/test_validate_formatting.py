@@ -8,12 +8,16 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import validate_formatting as validator
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from contextlib import AbstractContextManager
 
 ROOT = Path(__file__).resolve().parents[2]
 POLICY = "scripts/validate_formatting.py"
@@ -192,6 +196,53 @@ def test_report_outside_git_checks_only_visible_regular_files(tmp_path: Path) ->
     assert b"Files checked: 3" in result.stdout
     assert b"ignored" not in result.stdout
     assert result.stderr == b""
+
+
+def test_missing_git_fails_for_a_checkout_or_worktree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    setup(tmp_path, checkout=False)
+    monkeypatch.setenv("PATH", "")
+    monkeypatch.delenv("GIT_DIR", raising=False)
+    for marker_is_dir in (True, False):
+        checkout = tmp_path / str(marker_is_dir)
+        checkout.mkdir()
+        marker = checkout / ".git"
+        if marker_is_dir:
+            marker.mkdir()
+        else:
+            marker.write_text("gitdir: /example/linked-worktree\n", encoding="utf-8")
+        with pytest.raises(validator.ValidationError, match="Git is unavailable"):
+            validator.report_paths(checkout)
+
+
+def test_missing_git_allows_an_exported_source_tree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("PATH", "")
+    monkeypatch.delenv("GIT_DIR", raising=False)
+    write(tmp_path, "sample.txt", b"present\n")
+    assert validator.report_paths(tmp_path) == ["./sample.txt"]
+
+
+def test_report_fails_when_the_fallback_cannot_read_a_subdirectory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    unreadable = tmp_path / "unreadable"
+    unreadable.mkdir()
+    write(tmp_path, "visible.txt", b"present\n")
+    monkeypatch.setenv("PATH", "")
+    monkeypatch.delenv("GIT_DIR", raising=False)
+    default_scandir = os.scandir
+
+    def scandir(path: str | Path) -> AbstractContextManager[Iterator[os.DirEntry[str]]]:
+        if Path(path) == unreadable:
+            raise PermissionError(f"controlled unreadable directory: {unreadable}")
+        return default_scandir(path)
+
+    monkeypatch.setattr(os, "scandir", scandir)
+    with pytest.raises(validator.ValidationError, match="controlled unreadable directory"):
+        validator.report_paths(tmp_path)
 
 
 def test_repair_refuses_a_hardlinked_missing_newline(tmp_path: Path) -> None:

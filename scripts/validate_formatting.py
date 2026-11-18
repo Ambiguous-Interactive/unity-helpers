@@ -11,7 +11,7 @@ import tempfile
 from dataclasses import dataclass
 from io import TextIOWrapper
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NoReturn
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -120,15 +120,24 @@ def tracked_paths(root: Path) -> list[str]:
     )
 
 
+def fail_walk(error: OSError) -> NoReturn:
+    raise ValidationError(f"Cannot read the source tree. {error}") from error
+
+
 def report_paths(root: Path) -> list[str]:
-    if shutil.which("git") is not None:
+    git_available = shutil.which("git") is not None
+    if git_available:
         probe = git_result(root, ["rev-parse", "--is-inside-work-tree"])
         if probe.returncode == 0 and probe.stdout.strip() == b"true":
             return tracked_paths(root)
-        if (root / ".git").exists():
-            raise ValidationError("Git could not identify the checkout.")
+    markers = (directory / ".git" for directory in (root, *root.parents))
+    if os.environ.get("GIT_DIR") or any(
+        marker.is_symlink() or marker.exists() for marker in markers
+    ):
+        message = "Git could not identify the checkout." if git_available else "Git is unavailable."
+        raise ValidationError(message)
     paths: list[str] = []
-    for current, folders, files in os.walk(root):
+    for current, folders, files in os.walk(root, onerror=fail_walk):
         parent = Path(current)
         if parent == root:
             folders[:] = [name for name in folders if name not in EXCLUDED_ROOTS]
