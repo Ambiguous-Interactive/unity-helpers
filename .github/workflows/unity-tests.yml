@@ -554,7 +554,7 @@ jobs:
         needs.matrix-config.outputs.test-modes != '[]' &&
         needs.matrix-config.outputs.superseded != 'true'
       }}
-    runs-on: [self-hosted, Windows, RAM-64GB]
+    runs-on: [self-hosted, Windows, RAM-64GB, DAD-MACHINE]
     timeout-minutes: 1200
     strategy:
       # A sibling may hold a Unity license, so matrix failures must never cancel
