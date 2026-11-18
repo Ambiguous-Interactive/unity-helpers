@@ -1269,12 +1269,13 @@ function New-UnityEditorTestPhases {
 }
 
 function New-UnityImportArguments {
-    param([string[]]$Arguments, [string]$UnityVersion)
+    param([string[]]$Arguments, [string]$UnityVersion, [switch]$Standalone)
 
-    # CI observed 6000.5 worker crashes during assembly reload; UUM-135237 also
-    # affects worker teardown during Editor shutdown.
-    # Keep importing the same assets, without starting the failing worker process.
-    if ($UnityVersion -match '^6000\.5\.' -and [Array]::IndexOf($Arguments, '-refreshImportMode') -lt 0) {
+    # UUM-135237 affects 6000.5 worker teardown. A 6000.6 Standalone configure
+    # also force-killed an import worker just before the next editor stalled in UDS.
+    $useInProcess = $UnityVersion -match '^6000\.5\.' -or
+        ($Standalone -and $UnityVersion -match '^6000\.6\.')
+    if ($useInProcess -and [Array]::IndexOf($Arguments, '-refreshImportMode') -lt 0) {
         return @($Arguments) + @('-refreshImportMode', 'InProcess')
     }
     return $Arguments
@@ -5564,6 +5565,11 @@ try {
     }
 
     if ($TestMode -eq 'standalone') {
+        $standaloneEditorArgs = @(if ($StandaloneBuildCapture -eq 'None') {
+                New-UnityImportArguments -Arguments $acceleratorArgs -UnityVersion $UnityVersion -Standalone
+            } else {
+                $acceleratorArgs
+            })
         # CONFIGURE the standalone IL2CPP project (scripting backend/api/stripping,
         # Release code optimization, and any injected scripting defines). Marker-gated
         # via the shared Invoke-UnityConfigurePass.
@@ -5574,7 +5580,7 @@ try {
             -LogPath $configureLogPath `
             -Label 'Configure standalone IL2CPP project' `
             -FrozenContext $frozenPlayerProvenance `
-            -ExtraArguments $acceleratorArgs
+            -ExtraArguments $standaloneEditorArgs
     } elseif ($AdditionalScriptingDefinesList.Count -gt 0) {
         # EDITMODE/PLAYMODE with extra global scripting defines (e.g. SINGLE_THREADED):
         # run the SAME configure pass FIRST so UhCiTestConfigurator.Apply persists the
@@ -5639,7 +5645,7 @@ try {
             '-releaseCodeOptimization',
             '-buildTarget', 'StandaloneWindows64',
             '-logFile', '-'
-        ) + $categoryArgs + $filterArgs + $acceleratorArgs
+        ) + $categoryArgs + $filterArgs + $standaloneEditorArgs
 
         # No -StallSeconds here (only the wall-clock backstop): IL2CPP native C++
         # compilation and linking are legitimately silent for minutes under `-logFile -`,

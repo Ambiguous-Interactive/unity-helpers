@@ -113,6 +113,30 @@ $selectionEnd = $source.IndexOf('$resultsPath =', $selectionStart)
 if ($selectionStart -lt 0 -or $selectionEnd -le $selectionStart) { throw 'Missing test selection construction.' }
 $selection = $source.Substring($selectionStart, $selectionEnd - $selectionStart)
 $expectedFilter = 'Package.Fixture.Method("literal value");Package.Other'
+$standaloneImportAssignment = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.AssignmentStatementAst] -and
+        $node.Left -is [System.Management.Automation.Language.VariableExpressionAst] -and
+        $node.Left.VariablePath.UserPath -ceq 'standaloneEditorArgs'
+    }, $true)
+if ($null -eq $standaloneImportAssignment) { throw 'Missing Standalone import argument construction.' }
+$standaloneConfigure = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.CommandAst] -and
+        $node.GetCommandName() -ceq 'Invoke-UnityConfigurePass' -and
+        $node.Extent.Text.Contains("'Configure standalone IL2CPP project'")
+    }, $true)
+if ($null -eq $standaloneConfigure -or -not $standaloneConfigure.Extent.Text.Contains('-ExtraArguments $standaloneEditorArgs')) {
+    throw 'Standalone configure must use the same import arguments as the build.'
+}
+$UnityVersion = '6000.6.0f1'
+$acceleratorArgs = @()
+foreach ($StandaloneBuildCapture in @('Direct', 'Debugger', 'None')) {
+    Invoke-Expression $standaloneImportAssignment.Extent.Text
+    if (($standaloneEditorArgs.Count -eq 0) -ne ($StandaloneBuildCapture -ne 'None')) {
+        throw "Wrong Standalone import arguments for capture mode $StandaloneBuildCapture."
+    }
+}
 foreach ($TestFilter in @('', $expectedFilter)) {
     $TestCategory = 'FocusedAcceptance'
     Invoke-Expression $selection
@@ -146,6 +170,9 @@ foreach ($TestFilter in @('', $expectedFilter)) {
             }
         }
         if ([Array]::IndexOf($arguments, '-testCategory') -lt 0) { throw "$TestMode lost its category filter." }
+        if (($arguments -contains '-refreshImportMode') -ne ($TestMode -ceq 'standalone')) {
+            throw "$TestMode did not preserve the scoped Standalone import policy."
+        }
     }
 }
 
@@ -159,6 +186,21 @@ foreach ($version in @('2021.3.45f1', '6000.5.2f1', '6000.6.0f1')) {
         if ($expectedOverride -and $arguments[$position + 1] -cne 'InProcess') { throw 'Affected phase lost in-process importing.' }
         if ($arguments[2] -cne 'owned project' -or $arguments[-1] -cne 'Owned.Fixture') { throw 'Import override changed existing arguments.' }
     }
+}
+
+foreach ($version in @('2021.3.45f1', '2022.3.45f1', '6000.5.2f1', '6000.6.0f1')) {
+    $original = @('-projectPath', 'owned project')
+    $standaloneArguments = @(New-UnityImportArguments -Arguments $original -UnityVersion $version -Standalone)
+    $override = [Array]::IndexOf($standaloneArguments, '-refreshImportMode')
+    $affected = $version -in @('6000.5.2f1', '6000.6.0f1')
+    if (($override -ge 0) -ne $affected -or $standaloneArguments.Count -ne $(if ($affected) { 4 } else { 2 })) {
+        throw "Standalone launch has the wrong import policy on Unity $version."
+    }
+    if ($affected -and $standaloneArguments[$override + 1] -cne 'InProcess') { throw 'Standalone must import in-process.' }
+    if (($standaloneArguments[0..1] -join '|') -cne ($original -join '|')) { throw 'Standalone import policy changed existing arguments.' }
+    $explicit = $original + @('-refreshImportMode', 'OutOfProcess')
+    $result = @(New-UnityImportArguments -Arguments $explicit -UnityVersion $version -Standalone)
+    if (($result -join '|') -cne ($explicit -join '|')) { throw 'Standalone import policy replaced explicit selection.' }
 }
 
 $observedEditor = $ast.Find({
