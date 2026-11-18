@@ -57,7 +57,7 @@ function Write-TestResult {
     }
 }
 
-$lintScriptPath = (Resolve-Path (Join-Path $PSScriptRoot '..' 'lint-pwsh-invocations.ps1')).Path
+$lintScriptPath = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..' 'lint-pwsh-invocations.ps1')).Path
 
 $tempBase = if ($env:TEMP) { $env:TEMP } elseif ($env:TMPDIR) { $env:TMPDIR } else { '/tmp' }
 $tempRoot = Join-Path $tempBase "test-lint-pwsh-invocations-$(Get-Random)"
@@ -71,6 +71,13 @@ function New-FixtureRoot {
     New-Item -ItemType Directory -Path (Join-Path $root '.githooks') -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $root '.github/workflows') -Force | Out-Null
     Copy-Item -LiteralPath $lintScriptPath -Destination (Join-Path $root 'scripts/lint-pwsh-invocations.ps1')
+    $sourceScripts = [System.IO.Path]::GetDirectoryName($lintScriptPath)
+    $fixtureProject = Join-Path $root 'scripts/python~'
+    New-Item -ItemType Directory -Path $fixtureProject | Out-Null
+    Copy-Item -LiteralPath (Join-Path $sourceScripts 'pwsh_invocation_asts.py') -Destination (Join-Path $root 'scripts')
+    foreach ($projectFile in @('pyproject.toml', 'uv.lock')) {
+        Copy-Item -LiteralPath (Join-Path $sourceScripts 'python~' $projectFile) -Destination $fixtureProject
+    }
     return $root
 }
 
@@ -101,8 +108,10 @@ function Invoke-LintInFixture {
     }
 }
 
+$previousPythonEnvironment = $env:UV_PROJECT_ENVIRONMENT
 try {
     New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
+    $env:UV_PROJECT_ENVIRONMENT = Join-Path $tempRoot 'ast-environment'
 
     $root = New-FixtureRoot
     $harnessScript = Join-Path $root 'scripts/lint-pwsh-invocations.ps1'
@@ -145,8 +154,8 @@ pwsh -NoProfile -File scripts/lint-dependabot.ps1 -Paths "${ARRAY[@]}"
         $outsideDirectory = Join-Path $tempRoot 'outside'
         New-Item -ItemType Directory -Path $outsideDirectory -Force | Out-Null
         Set-Content -LiteralPath (Join-Path $outsideDirectory 'linked.sh') -Value 'pwsh -File bad.ps1 -- arg'
-        New-Item -ItemType SymbolicLink -Path (Join-Path $root 'linked-root') -Target $outsideDirectory | Out-Null
-        New-Item -ItemType SymbolicLink -Path (Join-Path $root 'scripts/linked-nested') -Target $outsideDirectory | Out-Null
+        [void][System.IO.Directory]::CreateSymbolicLink((Join-Path $root 'linked-root'), $outsideDirectory)
+        [void][System.IO.Directory]::CreateSymbolicLink((Join-Path $root 'scripts/linked-nested'), $outsideDirectory)
     }
     $result = Invoke-LintInFixture $root
     Write-TestResult "Pass_CleanRepo" ($result.ExitCode -eq 0) "Expected exit 0 on clean fixture. Exit: $($result.ExitCode). Output: $($result.Output)"
@@ -177,7 +186,7 @@ pwsh -NoProfile -File scripts/lint-dependabot.ps1 -- "${FILES[@]}"
         Set-Content -LiteralPath (Join-Path $nestedDirectory 'included.sh') -Value 'pwsh -File bad.ps1 -- arg'
     }
     if ($env:OS -ne 'Windows_NT') {
-        New-Item -ItemType SymbolicLink -Path (Join-Path $root 'linked-file.sh') -Target (Join-Path $root 'scripts/bad.sh') | Out-Null
+        [void][System.IO.File]::CreateSymbolicLink((Join-Path $root 'linked-file.sh'), (Join-Path $root 'scripts/bad.sh'))
     }
     $result = Invoke-LintInFixture $root
     $hasPws001 = $result.Output -match 'PWS001' -and $result.Output -match 'scripts/bad\.sh'
@@ -1484,7 +1493,8 @@ Start-Process -FilePath 'installer.exe' -ArgumentList @('/q') -Wait
     Write-TestResult "Pass_GitignoredScriptIsNotScanned" ($result.ExitCode -eq 0) "Expected exit 0 — a gitignored script is not the repository's to fix. Exit: $($result.ExitCode). Output: $($result.Output)"
 
 } finally {
-    Remove-Item -Recurse -Force $tempRoot -ErrorAction SilentlyContinue
+    $env:UV_PROJECT_ENVIRONMENT = $previousPythonEnvironment
+    Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 # ── Summary ──────────────────────────────────────────────────────────────────

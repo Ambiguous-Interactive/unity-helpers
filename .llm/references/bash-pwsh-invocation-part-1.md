@@ -28,7 +28,7 @@ pwsh -NoProfile -File scripts/lint-foo.ps1 -Paths "${FILES[@]}"
 These rules are enforced by:
 
 1. `scripts/lint-pwsh-invocations.ps1` — scans `*.sh`, `.githooks/*`, `.github/workflows/*.yml`, `scripts/**/*.ps1`, and `package.json` for `-File`/`-f <script> --` (code `PWS001`) and extensionless hook `-File`/`-f` targets (code `PWS004`), and reads `scripts/**/*.ps1` plus `.githooks/*.ps1` as an AST for `PWS005` and `PWS006`.
-2. `.github/workflows/pwsh-invocations-lint.yml` — runs the lint on every PR that touches hook/workflow/script files.
+2. `.github/workflows/repo-lint.yml` — runs the lint through the repository check registry.
 3. `scripts/tests/test-precommit-integration.sh` — smoke-tests that each pwsh-invoked hook branch works.
 4. `scripts/validate-lint-error-codes.ps1` — enforces that the `PWS` prefix (and any other lint-error-code prefix introduced by a new lint script) is registered in `cspell.json`, so the skill/doc tokens `PWS001`/`PWS002` do not trip the spell checker.
 
@@ -140,7 +140,10 @@ very script. The failure is silent -- `-Paths a b c` lints `a`, skips `b` and `c
 - `PWS006`: `Start-Process -ArgumentList|-Args <array|@()|variable>`.
 
 `PWS005` and `PWS006` are AST rules rather than line scans, and they read `scripts/**/*.ps1` plus
-`.githooks/*.ps1`. Both skip files `git` reports as ignored: CI checks out tracked content only, so
+`.githooks/*.ps1`. PowerShell parses the sources and matches directive text with its native
+comparison rules. It sends the facts for both checks in one JSON batch to
+`scripts/pwsh_invocation_asts.py` through the locked uv project. If that phase fails,
+the linter reports any findings already collected and returns an AST-phase error. Both skip files `git` reports as ignored: CI checks out tracked content only, so
 a violation in a developer's scratch script is one the repository cannot fix and CI can never see.
 An untracked file that is NOT ignored is still scanned -- a new script you forgot to stage is
 exactly the one a rule should catch -- and where `git` cannot answer, nothing is excluded.
