@@ -6,12 +6,13 @@ import os
 import shutil
 import signal
 import subprocess
+import sys
 import tempfile
-from contextlib import nullcontext, suppress
+from contextlib import AbstractContextManager, nullcontext, suppress
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Literal
+from typing import IO, Literal
 
 from cli_encoding import configure_output
 
@@ -81,29 +82,33 @@ class Outcome(Enum):
     OPTIONAL_MISSING = "optional_missing"
 
 
+def _probe_output() -> AbstractContextManager[IO[bytes] | None]:
+    # A file avoids waiting on inherited stdout handles after stopping a Windows tool.
+    return tempfile.TemporaryFile() if sys.platform == "win32" else nullcontext(None)
+
+
 def probe(command: str, *args: str) -> Version | None:
     executable = shutil.which(command)
     if executable is None:
         return None
     try:
-        # A file avoids waiting on inherited stdout handles after stopping a Windows tool.
         with (
-            nullcontext(None) if os.name == "posix" else tempfile.TemporaryFile() as output,
+            _probe_output() as output,
             subprocess.Popen(  # noqa: S603 - resolved executable with explicit version arguments.
                 [executable, *args],
                 stdout=subprocess.PIPE if output is None else output,
                 stderr=subprocess.STDOUT,
-                start_new_session=os.name == "posix",
+                start_new_session=sys.platform != "win32",
             ) as process,
         ):
             try:
                 captured, _ = process.communicate(timeout=TIMEOUT_SECONDS)
             except subprocess.TimeoutExpired:
                 with suppress(ProcessLookupError):
-                    if os.name == "posix":
-                        os.killpg(process.pid, signal.SIGKILL)
-                    else:
+                    if sys.platform == "win32":
                         process.kill()
+                    else:
+                        os.killpg(process.pid, signal.SIGKILL)
                 process.wait()
                 return Version(124, "", timed_out=True)
             if output is None:
