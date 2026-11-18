@@ -141,6 +141,7 @@ very script. The failure is silent -- `-Paths a b c` lints `a`, skips `b` and `c
 
 `PWS001`–`PWS004` scan physical lines, continuations and folded workflow commands in typed Python.
 PowerShell discovers the files, decodes their lines and parses the native AST for `PWS005` and `PWS006`.
+It supplies its own word character ranges so Python versions use the same matching rules.
 A single locked uv call evaluates both rule families. A failure before the shared process starts
 fails the whole lint. An AST validation failure inside the process retains completed text findings
 and reports the AST error. The AST rules skip scripts that Git reports as ignored. Untracked,

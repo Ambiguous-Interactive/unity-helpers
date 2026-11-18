@@ -202,11 +202,31 @@ class InvocationReport(TypedDict):
     ast_error: str | None
 
 
-def combined_report(payload: object) -> InvocationReport:
-    from pwsh_invocation_text import scan_source
+def word_range_expression(value: object) -> str:
+    spans = require_array(value)
+    ranges: list[str] = []
+    previous = -2
+    for span in spans:
+        pair = require_array(span)
+        if len(pair) != 2 or not all(type(item) is int for item in pair):
+            raise ValueError("Expected two integer bounds in each native word range.")
+        start, end = cast("list[int]", pair)
+        if not (previous + 1 < start <= end < 0x10000):
+            raise ValueError("Expected sorted, disjoint native UTF-16 word ranges.")
+        first = rf"\u{start:04x}"
+        ranges.append(first if start == end else rf"{first}-\u{end:04x}")
+        previous = end
+    if not ranges:
+        raise ValueError("Expected nonempty native word ranges.")
+    return "".join(ranges)
 
-    batch = require_fields(payload, sources=list, ast=list, culture=str)
-    culture = cast("str", batch["culture"])
+
+def combined_report(payload: object) -> InvocationReport:
+    from pwsh_invocation_text import CulturePatterns, case_mode, scan_source
+
+    batch = require_fields(payload, sources=list, culture=str)
+    culture = case_mode(cast("str", batch["culture"]))
+    patterns = CulturePatterns(culture, word_range_expression(batch["word_ranges"]))
     findings: list[Violation] = []
     for target in require_array(batch["sources"]):
         source = require_fields(target, path=str, lines=list)
@@ -214,7 +234,7 @@ def combined_report(payload: object) -> InvocationReport:
         lines = require_array(source["lines"])
         if not all(isinstance(line, str) for line in lines):
             raise ValueError("Expected physical lines of text.")
-        findings.extend(scan_source(cast("str", path), cast("list[str]", lines), culture))
+        findings.extend(scan_source(cast("str", path), cast("list[str]", lines), patterns))
 
     ast_error = None
     try:

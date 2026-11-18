@@ -14,10 +14,12 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import pwsh_invocation_asts as policy
-from pwsh_invocation_text import scan_source
+from pwsh_invocation_text import CulturePatterns, remove_inline_comment, scan_source
 
 ROOT = Path(__file__).resolve().parents[2]
 LINTER = "scripts/lint-pwsh-invocations.ps1"
+WORD_RANGES = [[48, 57], [65, 90], [95, 95], [97, 122], [0x301, 0x301]]
+TEXT_PATTERNS = CulturePatterns("invariant", policy.word_range_expression(WORD_RANGES))
 
 
 def parse_input(payload: object, *options: str) -> subprocess.CompletedProcess[bytes]:
@@ -270,11 +272,13 @@ def test_native_cli_reports_uv_error_on_early_child_exit(tmp_path: Path) -> None
     assert b"uv.lock" in result.stderr
 
 
-def test_failed_ast_validation_still_reports_completed_text_checks() -> None:
+@pytest.mark.parametrize("ast", [None, "invalid", [{"path": "scripts/incomplete.ps1"}]])
+def test_failed_ast_validation_still_reports_completed_text_checks(ast: object) -> None:
     result = parse_input(
         {
             "sources": [{"path": "tool.sh", "lines": ["pwsh -File tool.ps1 -- one"]}],
-            "ast": [{"path": "scripts/incomplete.ps1"}],
+            "ast": ast,
+            "word_ranges": WORD_RANGES,
             "culture": "",
         },
         "--include-text",
@@ -283,7 +287,8 @@ def test_failed_ast_validation_still_reports_completed_text_checks() -> None:
     assert not result.stderr
     report = cast("policy.InvocationReport", json.loads(result.stdout))
     assert [(entry["line"], entry["code"]) for entry in report["findings"]] == [(1, "PWS001")]
-    assert report["ast_error"] == "Invalid AST input: 'error'"
+    assert report["ast_error"] is not None
+    assert report["ast_error"].startswith("Invalid AST input:")
 
 
 @pytest.mark.parametrize(
@@ -355,7 +360,7 @@ def test_failed_ast_validation_still_reports_completed_text_checks() -> None:
 def test_text_rules_keep_physical_positions_and_content(
     path: str, lines: list[str], expected: list[tuple[int, str, str]]
 ) -> None:
-    findings = scan_source(path, lines)
+    findings = scan_source(path, lines, TEXT_PATTERNS)
     assert [(item["line"], item["code"], item["content"]) for item in findings] == expected
 
 
@@ -421,3 +426,60 @@ def test_native_cli_preserves_legacy_culture_and_word_matching(
         "scripts/fixture.ps1:2",
         "scripts/fixture.ps1:3",
     ]
+
+
+@pytest.mark.parametrize(
+    "spans",
+    [[], [[False, 1]], [[11, 10]], [[22, 0x10000]], [[5, 7], [7, 9]], [[9, 14], [1, 5]]],
+)
+def test_invalid_host_word_ranges_fail_the_policy(spans: object) -> None:
+    result = parse_input(
+        {"sources": [], "ast": [], "culture": "", "word_ranges": spans},
+        "--include-text",
+    )
+    assert result.returncode == 1
+    assert result.stdout == b""
+    assert b"Invalid invocation policy input" in result.stderr
+
+
+def test_inline_comments_skip_hashes_inside_long_and_unterminated_literals() -> None:
+    hashes = "#" * 100_000
+    quoted = f"Write-Output \"{hashes}\" 'and #literal' "
+    assert remove_inline_comment(quoted + "# actual comment") == quoted
+    assert remove_inline_comment(f'Write-Output "{hashes}') == f'Write-Output "{hashes}'
+    assert remove_inline_comment('Write-Output # outside "#"') == "Write-Output "
+
+
+def test_native_cli_uses_the_hosts_word_classification(tmp_path: Path) -> None:
+    pwsh = shutil.which("pwsh")
+    assert pwsh is not None
+    copy_native_linter(tmp_path)
+    (tmp_path / "shell.sh").write_text(
+        'echo\u0ece "pwsh -File tool.ps1 -- payload"\n', encoding="utf-8"
+    )
+    command = (
+        "[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false); "
+        "$expected = [regex]::IsMatch([string][char]0x0ece, '^\\w$'); "
+        'Write-Output "Host word: $expected"; '
+        "& ./scripts/lint-pwsh-invocations.ps1; exit $LASTEXITCODE"
+    )
+    result = subprocess.run(
+        [pwsh, "-NoProfile", "-Command", command],
+        cwd=tmp_path,
+        env={
+            **os.environ,
+            "NO_COLOR": "1",
+            "UV_PYTHON": sys.executable,
+            "UV_PROJECT_ENVIRONMENT": str(tmp_path / "environment"),
+        },
+        check=False,
+        capture_output=True,
+        timeout=40,
+    )
+    assert result.stderr == b""
+    lines = result.stdout.decode("utf-8").splitlines()
+    assert lines
+    assert lines[0] in {"Host word: True", "Host word: False"}
+    expected_finding = lines[0] == "Host word: True"
+    assert result.returncode == int(expected_finding)
+    assert any(line.startswith("shell.sh:1: PWS001") for line in lines) is expected_finding

@@ -371,11 +371,20 @@ foreach ($scriptPath in (Get-OwnedPowerShellScript)) {
     })
 }
 
+function Get-InvocationWordRanges {
+    # Positions in this string are UTF-16 code units, the same units Regex classifies.
+    $codeUnits = [string]::new([char[]](0..0xFFFF))
+    foreach ($range in [regex]::Matches($codeUnits, '\w+')) {
+        , @($range.Index, ($range.Index + $range.Length - 1))
+    }
+}
+
 try {
     $report = Invoke-InvocationPolicy -InputBatch @{
         sources = $sources
         ast = $astFacts.ToArray()
         culture = [System.Globalization.CultureInfo]::CurrentCulture.Name
+        word_ranges = @(Get-InvocationWordRanges)
     }
 }
 catch {

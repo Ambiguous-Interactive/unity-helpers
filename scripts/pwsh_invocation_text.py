@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import re
-import unicodedata
-from functools import cache, lru_cache
+from functools import lru_cache, partial
 from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
@@ -19,7 +18,6 @@ WHITESPACE = (
 )
 REGEX_WHITESPACE = re.escape(WHITESPACE)
 ASCII_LOWER = str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")
-WORD_CATEGORIES = {"Lu", "Ll", "Lt", "Lm", "Lo", "Mn", "Nd", "Pc"}
 CaseMode = Literal["invariant", "unicode", "turkic"]
 EXECUTABLE = r"pwsh(?:\.exe)?|powershell(?:\.exe)?"
 FILE_SWITCH = r"-(?:File|f)\b"
@@ -55,23 +53,6 @@ def case_mode(culture: str) -> CaseMode:
     return "unicode"
 
 
-@cache
-def dotnet_word_ranges() -> str:
-    # .NET Regex classifies UTF-16 code units. Supplementary-plane letters
-    # are surrogate pairs and neither unit is a Regex word character.
-    ranges: list[str] = []
-    start: int | None = None
-    for point in range(0x10000):
-        if unicodedata.category(chr(point)) in WORD_CATEGORIES:
-            if start is None:
-                start = point
-        elif start is not None:
-            first = rf"\u{start:04x}"
-            ranges.append(first if start == point - 1 else rf"{first}-\u{point - 1:04x}")
-            start = None
-    return "".join(ranges)
-
-
 REGEX_PART = re.compile(r"\\.|\[(?:\\.|[^\]\\])*\]|\(\?P<[^>]+>|[iI\u0130\u0131sS]")
 ASCII_RANGES = {
     "[A-Z0-9_]": "A-Za-z0-9_",
@@ -83,7 +64,7 @@ ASCII_RANGES = {
 
 
 @lru_cache(maxsize=128)
-def pattern(source: str, mode: CaseMode = "invariant") -> re.Pattern[str]:
+def pattern(source: str, mode: CaseMode = "invariant", word_ranges: str = "") -> re.Pattern[str]:
     def adapt(match: re.Match[str]) -> str:
         part = match[0]
         if part in ASCII_RANGES:
@@ -100,9 +81,9 @@ def pattern(source: str, mode: CaseMode = "invariant") -> re.Pattern[str]:
         if part == r"\S":
             return f"[^{REGEX_WHITESPACE}]"
         if part == r"\w":
-            return f"(?-i:[{dotnet_word_ranges()}])"
+            return f"(?-i:[{word_ranges}])"
         if part == r"\b":
-            word = rf"(?-i:[{dotnet_word_ranges()}\u200c\u200d])"
+            word = rf"(?-i:[{word_ranges}\u200c\u200d])"
             return f"(?:(?<!{word})(?={word})|(?<={word})(?!{word}))"
         if part in {"s", "S"}:
             return "(?-i:[sS])"
@@ -118,51 +99,42 @@ def pattern(source: str, mode: CaseMode = "invariant") -> re.Pattern[str]:
 
 
 class CulturePatterns:
-    def __init__(self, mode: CaseMode) -> None:
-        self.mode = mode
-        self.direct_separator = pattern(
-            DIRECT + r"""(?:"[^"]+"|'[^']+'|\S+)(?:\s+\S+)*?\s+""" + DASH, mode
+    def __init__(self, mode: CaseMode, word_ranges: str) -> None:
+        self.compile = partial(pattern, mode=mode, word_ranges=word_ranges)
+        self.direct_separator = self.compile(
+            DIRECT + r"""(?:"[^"]+"|'[^']+'|\S+)(?:\s+\S+)*?\s+""" + DASH
         )
-        self.array_separator = pattern(ARRAY + r"(?:\S+\s+)*?\S+\.ps1(?:\s+\S+)*?\s+" + DASH, mode)
-        self.array_hook = pattern(ARRAY + r"(?:\S+\s+)*?" + HOOK_TARGET, mode)
-        self.direct_hook = pattern(DIRECT + HOOK_TARGET, mode)
-        self.in_process = pattern(
+        self.array_separator = self.compile(ARRAY + r"(?:\S+\s+)*?\S+\.ps1(?:\s+\S+)*?\s+" + DASH)
+        self.array_hook = self.compile(ARRAY + r"(?:\S+\s+)*?" + HOOK_TARGET)
+        self.direct_hook = self.compile(DIRECT + HOOK_TARGET)
+        self.in_process = self.compile(
             r"""(&)\s+(?:\([^)]*\.ps1[^)]*\)|\$[A-Za-z_][A-Za-z0-9_]*(?:Path|Script|Ps1|Cmd|Tool)?|"""
             r"""["'][^"']*\.ps1["']|[^\s"']+\.ps1)(?:\s+\S+)*?\s+""" + DASH,
-            mode,
         )
-        self.subprocess = pattern(
+        self.subprocess = self.compile(
             r"(?:^|[\s;&|\x60(])("
             + EXECUTABLE
             + rf")\b(?:\s+-[A-Za-z][A-Za-z0-9]*(?:\s+\S+)?)*?\s+{FILE_SWITCH}\s+"
             + rf"""(?:"(?:[^"]*?[/\\])?{SIBLING_PATH}[^"]+\.ps1"|"""
             + rf"""'(?:[^']*?[/\\])?{SIBLING_PATH}[^']+\.ps1'|"""
             + rf"(?:\S*[/\\])?{SIBLING_PATH}\S+\.ps1|\$\w+)",
-            mode,
         )
-        self.hook_assignment = pattern(VARIABLE_ASSIGNMENT + HOOK_TARGET, mode)
-        self.hook_join_path = pattern(
+        self.hook_assignment = self.compile(VARIABLE_ASSIGNMENT + HOOK_TARGET)
+        self.hook_join_path = self.compile(
             VARIABLE_ASSIGNMENT
             + r"""\bJoin-Path\b.*(?:["']\.githooks["']|["'][^"']*[/\\]\.githooks["']).*"""
             + rf"""["'](?:{HOOK_NAMES})["'](?=$|[\s;&,)])""",
-            mode,
         )
-        self.file_option = pattern(r"\s-(?:File|f)\b", mode)
-        self.command_option = pattern(r"\s-(?:Command|c)(?=\s|$)", mode)
-        self.command_help = pattern(
+        self.file_option = self.compile(r"\s-(?:File|f)\b")
+        self.command_option = self.compile(r"\s-(?:Command|c)(?=\s|$)")
+        self.command_help = self.compile(
             r"""\s-(?:Command|c)\s+\\?["']?\s*(?:Write-(?:Host|Output|Warning|Error|Verbose|Information)|echo|printf)\b""",
-            mode,
         )
-        self.shell_help = pattern(r"^\s*(?:-\s+)?(?:run\s*:\s*)?(?:echo|printf)\b", mode)
-        self.allow_subprocess = pattern(
-            r"^\s*#\s*lint-pwsh-invocations:\s*allow-subprocess-pwsh\s+\S+", mode
+        self.shell_help = self.compile(r"^\s*(?:-\s+)?(?:run\s*:\s*)?(?:echo|printf)\b")
+        self.allow_subprocess = self.compile(
+            r"^\s*#\s*lint-pwsh-invocations:\s*allow-subprocess-pwsh\s+\S+"
         )
-        self.top_level_script = pattern(r"scripts/[^/]+\.ps1", mode)
-
-
-@cache
-def culture_patterns(mode: CaseMode) -> CulturePatterns:
-    return CulturePatterns(mode)
+        self.top_level_script = self.compile(r"scripts/[^/]+\.ps1")
 
 
 COMMENT = pattern(r"^\s*#")
@@ -195,10 +167,17 @@ def in_quote(line: str, index: int) -> bool:
 
 
 def remove_inline_comment(line: str) -> str:
-    for match in re.finditer("#", line):
-        if not in_quote(line, match.start()):
-            return line[: match.start()]
-    return line
+    index = line.find("#")
+    if index == -1:
+        return line
+    for start, stop in quote_spans(line):
+        if index < start:
+            break
+        if index < stop:
+            index = line.find("#", stop)
+            if index == -1:
+                return line
+    return line[:index]
 
 
 def mask_literals(line: str) -> str:
@@ -417,8 +396,7 @@ def scan_command(
     return None
 
 
-def scan_source(path: str, lines: list[str], culture: str = "") -> list[Violation]:
-    patterns = culture_patterns(case_mode(culture))
+def scan_source(path: str, lines: list[str], patterns: CulturePatterns) -> list[Violation]:
     suffix_path = path.lower()
     powershell = suffix_path.endswith(".ps1")
     yaml = suffix_path.endswith((".yml", ".yaml"))
@@ -448,9 +426,7 @@ def scan_source(path: str, lines: list[str], culture: str = "") -> list[Violatio
                         names.setdefault(name.translate(ASCII_LOWER), name)
             if len(names) != previous:
                 names_pattern = "|".join(re.escape(name) for name in names.values())
-                variable_hook = pattern(
-                    DIRECT + rf"\$(?:{names_pattern})" + TARGET_END, patterns.mode
-                )
+                variable_hook = patterns.compile(DIRECT + rf"\$(?:{names_pattern})" + TARGET_END)
         finding = scan_command(
             candidate,
             patterns,
