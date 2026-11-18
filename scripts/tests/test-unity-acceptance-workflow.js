@@ -565,7 +565,7 @@ const readbackOriginalJobPredicates = {
   "unity-tests":
     "!cancelled() &&\n        (github.event_name != 'pull_request' ||\n          github.event.pull_request.head.repo.full_name == github.repository) &&\n        (github.event_name != 'push' || github.ref_protected) &&\n        needs.matrix-config.result == 'success' &&\n        needs.runner-preflight.result == 'success' &&\n        needs.matrix-config.outputs.test-modes != '[]' &&\n        needs.matrix-config.outputs.superseded != 'true'",
   "unity-tests-single-threaded":
-    "!cancelled() &&\n        (github.event_name != 'pull_request' ||\n          github.event.pull_request.head.repo.full_name == github.repository) &&\n        (github.event_name != 'push' || github.ref_protected) &&\n        needs.matrix-config.outputs.combine-variants != 'true' &&\n        needs.matrix-config.result == 'success' &&\n        needs.runner-preflight.result == 'success' &&\n        needs.matrix-config.outputs.superseded != 'true'",
+    "!cancelled() &&\n        github.event_name == 'workflow_dispatch' &&\n        (github.event_name != 'pull_request' ||\n          github.event.pull_request.head.repo.full_name == github.repository) &&\n        (github.event_name != 'push' || github.ref_protected) &&\n        needs.matrix-config.outputs.combine-variants != 'true' &&\n        needs.matrix-config.result == 'success' &&\n        needs.runner-preflight.result == 'success' &&\n        needs.matrix-config.outputs.superseded != 'true'",
   "unitypackage-smoke":
     "!cancelled() &&\n        (github.event_name != 'pull_request' ||\n          github.event.pull_request.head.repo.full_name == github.repository) &&\n        (github.event_name != 'push' || github.ref_protected) &&\n        needs.matrix-config.result == 'success' &&\n        needs.runner-preflight.result == 'success' &&\n        needs.matrix-config.outputs.superseded != 'true'",
   "unity-tests-aggregate": "always()",
@@ -647,7 +647,9 @@ for (const event of ["push", "pull_request", "workflow_dispatch"]) {
               assert.ok(block, name);
               const expected =
                 Boolean(expression(previous)(context)) &&
-                (name === "runner-preflight" || !requested);
+                (name === "runner-preflight" ||
+                  name === "unity-tests-single-threaded-aggregate" ||
+                  !requested);
               assert.equal(
                 Boolean(jobGate(block)(context)),
                 expected,
@@ -1226,10 +1228,15 @@ for (const name of [
               always: () => true,
               github: { event_name: event },
               inputs: { "native-readback-run-id": request },
-              needs: { "unity-tests": { result: outcome } }
+              needs: {
+                "unity-tests": { result: outcome },
+                "matrix-config": { outputs: { "combine-variants": "false" } }
+              }
             })
           ),
-          event !== "workflow_dispatch" || request === ""
+          name === "unity-tests-single-threaded-aggregate" ||
+            event !== "workflow_dispatch" ||
+            request === ""
         );
         historicalAggregateControls++;
       }
@@ -1257,7 +1264,7 @@ for (const name of [
             DEPENDABOT_PR: String(dependabot),
             RUNNER_PREFLIGHT_RESULT: preflight,
             UNITY_TESTS_RESULT: licensed,
-            UH_COMBINED: "false"
+            LANE_SELECTED: "true"
           }
         });
         assert.ifError(result.error);
@@ -1271,26 +1278,25 @@ for (const name of [
     }
   }
   if (name === "unity-tests-single-threaded-aggregate") {
-    for (const preflight of outcomes) {
-      for (const split of outcomes) {
-        for (const combined of outcomes) {
+    for (const fork of [false, true]) {
+      for (const preflight of outcomes) {
+        for (const licensed of outcomes) {
           const result = spawnSync("bash", ["-c", program], {
             encoding: "utf8",
             env: {
               ...process.env,
-              FORK_PR: "false",
+              FORK_PR: String(fork),
               DEPENDABOT_PR: "false",
               RUNNER_PREFLIGHT_RESULT: preflight,
-              UNITY_TESTS_RESULT: split,
-              UH_COMBINED: "true",
-              UH_COMBINED_RESULT: combined
+              UNITY_TESTS_RESULT: licensed,
+              LANE_SELECTED: "false"
             }
           });
           assert.ifError(result.error);
           assert.equal(
             result.status === 0,
-            preflight === "success" && split === "skipped" && combined === "success",
-            `${name}: ${JSON.stringify({ preflight, split, combined })}: ${result.stderr}`
+            fork ? preflight === "skipped" && licensed === "skipped" : preflight === "success",
+            `${name}: ${JSON.stringify({ fork, preflight, licensed })}: ${result.stderr}`
           );
           historicalAggregateControls++;
         }
