@@ -1271,12 +1271,15 @@ function New-UnityEditorTestPhases {
 function New-UnityImportArguments {
     param([string[]]$Arguments, [string]$UnityVersion, [switch]$Standalone)
 
-    # UUM-135237 affects 6000.5 worker teardown. A 6000.6 Standalone configure
-    # also force-killed an import worker just before the next editor stalled in UDS.
-    $useInProcess = $UnityVersion -match '^6000\.5\.' -or
-        ($Standalone -and $UnityVersion -match '^6000\.6\.')
-    if ($useInProcess -and [Array]::IndexOf($Arguments, '-refreshImportMode') -lt 0) {
-        return @($Arguments) + @('-refreshImportMode', 'InProcess')
+    # UUM-135237 affects 6000.5 worker teardown. Unity 6000.6 still starts a
+    # standby worker with InProcess alone, and forced its exit between Standalone phases.
+    $latestStandalone = $Standalone -and $UnityVersion -match '^6000\.6\.'
+    if (($latestStandalone -or $UnityVersion -match '^6000\.5\.') -and
+        [Array]::IndexOf($Arguments, '-refreshImportMode') -lt 0) {
+        $Arguments = @($Arguments) + @('-refreshImportMode', 'InProcess')
+    }
+    if ($latestStandalone -and [Array]::IndexOf($Arguments, '-standbyWorkerCount') -lt 0) {
+        $Arguments = @($Arguments) + @('-standbyWorkerCount', '0')
     }
     return $Arguments
 }

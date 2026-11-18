@@ -170,7 +170,9 @@ foreach ($TestFilter in @('', $expectedFilter)) {
             }
         }
         if ([Array]::IndexOf($arguments, '-testCategory') -lt 0) { throw "$TestMode lost its category filter." }
-        if (($arguments -contains '-refreshImportMode') -ne ($TestMode -ceq 'standalone')) {
+        $isStandalone = $TestMode -ceq 'standalone'
+        if (($arguments -contains '-refreshImportMode') -ne $isStandalone -or
+            ($arguments -contains '-standbyWorkerCount') -ne $isStandalone) {
             throw "$TestMode did not preserve the scoped Standalone import policy."
         }
     }
@@ -193,12 +195,18 @@ foreach ($version in @('2021.3.45f1', '2022.3.45f1', '6000.5.2f1', '6000.6.0f1')
     $standaloneArguments = @(New-UnityImportArguments -Arguments $original -UnityVersion $version -Standalone)
     $override = [Array]::IndexOf($standaloneArguments, '-refreshImportMode')
     $affected = $version -in @('6000.5.2f1', '6000.6.0f1')
-    if (($override -ge 0) -ne $affected -or $standaloneArguments.Count -ne $(if ($affected) { 4 } else { 2 })) {
+    $standbyOverride = [Array]::IndexOf($standaloneArguments, '-standbyWorkerCount')
+    $latest = $version -ceq '6000.6.0f1'
+    if (($standbyOverride -ge 0) -ne $latest -or ($latest -and $standaloneArguments[$standbyOverride + 1] -cne '0')) {
+        throw "Standalone launch has the wrong standby worker count on Unity $version."
+    }
+    $expectedCount = $original.Count + 2 * [int]$affected + 2 * [int]$latest
+    if (($override -ge 0) -ne $affected -or $standaloneArguments.Count -ne $expectedCount) {
         throw "Standalone launch has the wrong import policy on Unity $version."
     }
     if ($affected -and $standaloneArguments[$override + 1] -cne 'InProcess') { throw 'Standalone must import in-process.' }
     if (($standaloneArguments[0..1] -join '|') -cne ($original -join '|')) { throw 'Standalone import policy changed existing arguments.' }
-    $explicit = $original + @('-refreshImportMode', 'OutOfProcess')
+    $explicit = $original + @('-refreshImportMode', 'OutOfProcess', '-standbyWorkerCount', '2')
     $result = @(New-UnityImportArguments -Arguments $explicit -UnityVersion $version -Standalone)
     if (($result -join '|') -cne ($explicit -join '|')) { throw 'Standalone import policy replaced explicit selection.' }
 }
