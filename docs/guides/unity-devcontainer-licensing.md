@@ -10,6 +10,12 @@ new machine to Unity's licensing service.** This guide gets `scripts/unity/compi
 `scripts/unity/run-tests.sh` running in a Codespace or a local dev container, and tells you which
 error message means what.
 
+The local test runner uses locked uv to check NUnit results. If you run it outside the
+development container, install uv before starting Unity. The gate requires an NUnit report
+with a positive test count and no failures. An all-skipped report still has a positive count.
+Each invocation checks a fresh report. When Unity produces no new XML, the runner keeps the
+previous report and returns a failure.
+
 Start by asking the repo what is missing -- this runs no Docker and takes a second:
 
 ```bash
