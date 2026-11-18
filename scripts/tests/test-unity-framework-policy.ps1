@@ -21,8 +21,14 @@ $checks = 0
 try {
     $fixture = Join-Path $temporary 'repository with spaces'
     New-Item -ItemType Directory -Path (Join-Path $fixture 'scripts/unity'), (Join-Path $fixture '.github') -Force | Out-Null
-    foreach ($name in @('create-test-project.sh', 'test-framework-evidence.cs.txt', 'test-framework-evidence.asmdef.txt')) {
+    foreach ($name in @('create-test-project.sh', 'create_test_project.py', 'stage_unitypackage.py', 'test-framework-evidence.cs.txt', 'test-framework-evidence.asmdef.txt')) {
         Copy-Item -LiteralPath (Join-Path $root "scripts/unity/$name") -Destination (Join-Path $fixture "scripts/unity/$name")
+    }
+    Copy-Item -LiteralPath (Join-Path $root 'scripts/cli_encoding.py') -Destination (Join-Path $fixture 'scripts')
+    $pythonProject = Join-Path $fixture 'scripts/python~'
+    New-Item -ItemType Directory -Path $pythonProject -Force | Out-Null
+    foreach ($name in @('pyproject.toml', 'uv.lock')) {
+        Copy-Item -LiteralPath (Join-Path $root "scripts/python~/$name") -Destination $pythonProject
     }
     Copy-Item -LiteralPath (Join-Path $root '.github/unity-test-project-modules.json') -Destination (Join-Path $fixture '.github/unity-test-project-modules.json')
     $policyPath = Join-Path $fixture '.github/unity-test-framework.json'
