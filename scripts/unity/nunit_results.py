@@ -55,7 +55,12 @@ def summarize(results: str, platform: str) -> int:
         total = _count(root, "total")
         passed = _count(root, "passed", "0")
         failed = _count(root, "failed")
-        skipped = _count(root, "skipped", root.get("inconclusive", "0"))
+        skipped = _count(root, "skipped", "0")
+        inconclusive = _count(root, "inconclusive", "0")
+        total_count = int(total)
+        failed_count = int(failed)
+        if total_count < int(passed) + failed_count + int(skipped) + int(inconclusive):
+            raise ValueError("NUnit outcome counts exceed the total")
     except (ET.ParseError, OSError, ValueError) as error:
         print(f"{prefix}: invalid NUnit results at {results}: {error}")
         return 1
@@ -65,18 +70,19 @@ def summarize(results: str, platform: str) -> int:
     print(f"    Total:   {total}")
     print(f"    Passed:  {passed}")
     print(f"    Failed:  {failed}")
-    print(f"    Skipped: {skipped}")
+    shown_skipped = skipped if "skipped" in root.attrib else inconclusive
+    print(f"    Skipped: {shown_skipped}")
     found_failure = _print_failed_tests(root)
     print("    ----------------------------------------\n")
 
     status = 0
-    if not total.lstrip("0"):
+    if total_count == 0:
         print(
             f"{prefix}: 0 tests ran -- check assembly selection, the --filter "
             "expression, and the host project's testables."
         )
         status = 1
-    if failed.lstrip("0"):
+    if failed_count != 0:
         print(f"{prefix}: {failed} test(s) failed.")
         status = 1
     elif found_failure or root.get("result", "").lower() in ("failed", "error"):

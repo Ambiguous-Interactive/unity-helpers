@@ -24,6 +24,17 @@ ROOT = Path(__file__).resolve().parents[2]
         (b'<test-run total="0" failed="0"/>', 1, "0 tests ran"),
         (b'<test-run total="3" failed="0" skipped="3"/>', 0, "Skipped: 3"),
         (b'<test-run total="3" failed="0" inconclusive="3"/>', 0, "Skipped: 3"),
+        (
+            b'<test-run total="3" passed="1" failed="0" skipped="1" inconclusive="1"/>',
+            0,
+            "Skipped: 1",
+        ),
+        (b'<test-run total="1" passed="2" failed="0"/>', 1, "outcome counts exceed"),
+        (
+            b'<test-run total="2" passed="1" failed="0" skipped="1" inconclusive="1"/>',
+            1,
+            "outcome counts exceed",
+        ),
         (b'<test-run total="8" failed="008"/>', 1, "008 test(s) failed"),
         (b'<test-run total="1" passed="1"/>', 1, "'failed' count"),
         (b'<test-run total="1" failed="bad"/>', 1, "'failed' count"),
