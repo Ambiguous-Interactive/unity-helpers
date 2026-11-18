@@ -124,12 +124,12 @@ def fail_walk(error: OSError) -> NoReturn:
     raise ValidationError(f"Cannot read the source tree. {error}") from error
 
 
-def report_paths(root: Path) -> list[str]:
+def report_paths(root: Path) -> tuple[list[str], bool]:
     git_available = shutil.which("git") is not None
     if git_available:
         probe = git_result(root, ["rev-parse", "--is-inside-work-tree"])
         if probe.returncode == 0 and probe.stdout.strip() == b"true":
-            return tracked_paths(root)
+            return tracked_paths(root), True
     markers = (directory / ".git" for directory in (root, *root.parents))
     if os.environ.get("GIT_DIR") or any(
         marker.is_symlink() or marker.exists() for marker in markers
@@ -145,7 +145,7 @@ def report_paths(root: Path) -> list[str]:
             child = parent / name
             if stat.S_ISREG(child.lstat().st_mode):
                 paths.append(f"./{child.relative_to(root).as_posix()}")
-    return sorted(paths, key=os.fsencode)
+    return sorted(paths, key=os.fsencode), False
 
 
 def path_suffix(name: str) -> str:
@@ -208,30 +208,37 @@ def inspect_missing(root: Path, name: str, info: os.stat_result) -> MissingNewli
     return MissingNewline(name, info, crlf, tail)
 
 
-def scan(root: Path, names: Iterable[str]) -> dict[str, MissingNewline | None]:
+def local_file_info(root: Path, name: str, safe_parents: set[Path]) -> os.stat_result | None:
+    relative = Path(name)
+    if relative.anchor or ".." in relative.parts:
+        raise ValidationError(f"Refusing a path outside the checkout: {display(name)}")
+    path = root / relative
+    try:
+        info = path.lstat()
+    except FileNotFoundError:
+        return None
+    parent = path.parent
+    if parent not in safe_parents:
+        resolved = parent.resolve(strict=True)
+        if resolved != parent or not resolved.is_relative_to(root):
+            raise ValidationError(f"Refusing a redirected path: {display(name)}")
+        safe_parents.add(parent)
+    if not stat.S_ISREG(info.st_mode):
+        raise ValidationError(f"Refusing a nonregular file: {display(name)}")
+    return info
+
+
+def scan(
+    root: Path, names: Iterable[str], *, staged_attributes: bool
+) -> dict[str, MissingNewline | None]:
     observed: dict[str, MissingNewline | None] = {}
     incomplete: dict[str, os.stat_result] = {}
     safe_parents: set[Path] = {root}
     for name in dict.fromkeys(names):
-        relative = Path(name)
-        if relative.anchor or ".." in relative.parts:
-            raise ValidationError(f"Refusing a path outside the checkout: {display(name)}")
-        path = root / relative
-        try:
-            info = path.lstat()
-        except FileNotFoundError:
+        info = local_file_info(root, name, safe_parents)
+        if info is None or not info.st_size:
             continue
-        parent = path.parent
-        if parent not in safe_parents:
-            resolved = parent.resolve(strict=True)
-            if resolved != parent or not resolved.is_relative_to(root):
-                raise ValidationError(f"Refusing a redirected path: {display(name)}")
-            safe_parents.add(parent)
-        if not stat.S_ISREG(info.st_mode):
-            raise ValidationError(f"Refusing a nonregular file: {display(name)}")
-        if not info.st_size:
-            continue
-        with path.open("rb") as stream:
+        with (root / name).open("rb") as stream:
             if not stable_file(info, os.fstat(stream.fileno())):
                 raise ValidationError(f"File changed during scan: {display(name)}")
             stream.seek(-1, os.SEEK_END)
@@ -239,12 +246,14 @@ def scan(root: Path, names: Iterable[str]) -> dict[str, MissingNewline | None]:
                 incomplete[name] = info
         observed[name] = None
 
-    try:
-        attributes = cached_text_attributes(root, list(incomplete))
-    except (ValueError, ValidationError) as error:
-        raise ValidationError(f"Cannot inspect staged text attribute. {error}") from error
+    attributes: dict[str, bytes] = {}
+    if staged_attributes:
+        try:
+            attributes = cached_text_attributes(root, list(incomplete))
+        except (ValueError, ValidationError) as error:
+            raise ValidationError(f"Cannot inspect staged text attribute. {error}") from error
     for name, info in incomplete.items():
-        if attributes[name] == b"unset":
+        if attributes.get(name) == b"unset":
             del observed[name]
         else:
             observed[name] = inspect_missing(root, name, info)
@@ -272,6 +281,7 @@ def repair(root: Path, finding: MissingNewline) -> None:
             or path.parent.resolve(strict=True) != path.parent
         ):
             raise ValidationError(f"File changed before publication: {display(finding.name)}")
+        # Repair assumes no concurrent writers between the identity check and replacement.
         temporary.replace(path)
     finally:
         if temporary is not None:
@@ -284,12 +294,14 @@ def display(name: str) -> str:
 
 def show_report(root: Path, *, verbose: bool) -> int:
     print(f"{BLUE}── Final Newline Check ──{RESET}\n")
-    names = report_paths(root)
+    names, from_checkout = report_paths(root)
     groups: list[tuple[str, list[str], str]] = [
         ("configuration files", list(CONFIG_FILES), "config-list")
     ]
     groups.extend((title, grouped_paths(names, suffixes), "") for title, suffixes in GROUPS)
-    observed = scan(root, (name for _, paths, _ in groups for name in paths))
+    observed = scan(
+        root, (name for _, paths, _ in groups for name in paths), staged_attributes=from_checkout
+    )
     rejected: list[str] = []
     seen: set[str] = set()
     passed = 0
@@ -325,9 +337,10 @@ def show_report(root: Path, *, verbose: bool) -> int:
     print("\nFix with (CRLF-aware):")
     print(rf"  {YELLOW}For CRLF files: printf '\r\n' >> <file>{RESET}")
     print(rf"  {YELLOW}For LF files:   printf '\n' >> <file>{RESET}")
-    print(
-        f"Or run:   {YELLOW}./scripts/validate-formatting.sh --fix{RESET} (auto-detects line endings)"
-    )
+    if from_checkout:
+        print(
+            f"Or run:   {YELLOW}./scripts/validate-formatting.sh --fix{RESET} (auto-detects line endings)"
+        )
     return 1
 
 
@@ -383,6 +396,13 @@ def show_formatting(root: Path, caller: str, option: str) -> int:
         return 1
 
     fix = option == "--fix"
+    names = grouped_paths(tracked_paths(root), FORMAT_SUFFIXES)
+    if fix:
+        safe_parents = {root}
+        for name in names:
+            info = local_file_info(root, name, safe_parents)
+            if info is not None and info.st_nlink != 1:
+                raise ValidationError(f"Refusing to replace a linked file: {display(name)}")
     title = (
         "Auto-fixing formatting issues" if fix else "Checking formatting (use --fix to auto-fix)"
     )
@@ -407,7 +427,7 @@ def show_formatting(root: Path, caller: str, option: str) -> int:
             )
             for line in result.stdout.decode("utf-8", "replace").split("\n")[:-1]:
                 print(f"           {RED}-{RESET} {line}")
-            if result.returncode:
+            if result.returncode and (result.returncode != 1 or not result.stdout.strip()):
                 return result.returncode if result.returncode > 0 else 128 - result.returncode
             print(
                 f'         Fix with: {YELLOW}node scripts/run-prettier.js --write -- "{pattern}"{RESET}'
@@ -416,8 +436,9 @@ def show_formatting(root: Path, caller: str, option: str) -> int:
         print(f"{GREEN}  PASS{RESET} {label}")
         passed += 1
 
-    names = grouped_paths(tracked_paths(root), FORMAT_SUFFIXES)
-    missing = [entry for entry in scan(root, names).values() if entry is not None]
+    missing = [
+        entry for entry in scan(root, names, staged_attributes=True).values() if entry is not None
+    ]
     if fix and missing:
         for finding in missing:
             if finding.info.st_nlink != 1:

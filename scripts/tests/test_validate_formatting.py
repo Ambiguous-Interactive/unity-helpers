@@ -31,11 +31,16 @@ if (process.env.NEWLINE_FORMATTER_FAULT && args[0] === "--check" && args[2] === 
   process.exitCode = 1;
 }
 if (args[0] === "--list-different") {
-  console.log("sample.md");
-  process.exitCode = process.env.NEWLINE_FORMATTER_FAULT === "listing-error" ? 1 : 0;
+  if (process.env.NEWLINE_FORMATTER_FAULT !== "listing-bootstrap-error") {
+    console.log("sample.md");
+  }
+  process.exitCode = process.env.NEWLINE_FORMATTER_FAULT === "listing-error" ? 2 : 1;
 }
 if (args[0] === "--write") {
   console.log("wrote " + args[2]);
+  if (process.env.NEWLINE_FORMATTER_FAULT === "rewrite-linked" && args[2] === "**/*.{md,markdown}") {
+    fs.writeFileSync("linked.md", "# Reformatted\\n");
+  }
   if (process.env.NEWLINE_FORMATTER_FAULT === "write-error" && args[2] === "**/*.{md,markdown}") {
     process.exitCode = 1;
   }
@@ -45,7 +50,7 @@ if (args[0] === "--write") {
 
 def environment(**updates: str) -> dict[str, str]:
     return {
-        **os.environ,
+        **{key: value for key, value in os.environ.items() if not key.startswith("GIT_")},
         "GIT_CONFIG_GLOBAL": os.devnull,
         "GIT_CONFIG_NOSYSTEM": "1",
         **updates,
@@ -198,6 +203,23 @@ def test_report_outside_git_checks_only_visible_regular_files(tmp_path: Path) ->
     assert result.stderr == b""
 
 
+@pytest.mark.parametrize("with_git", [False, True])
+def test_report_outside_git_lists_lf_and_crlf_findings(tmp_path: Path, with_git: bool) -> None:
+    (tmp_path / "scripts").mkdir()
+    shutil.copyfile(ROOT / POLICY, tmp_path / POLICY)
+    write(tmp_path, "plain.txt", b"no newline")
+    write(tmp_path, "crlf.txt", b"first\r\nlast")
+    overrides = {} if with_git else {"PATH": ""}
+    result = run_policy(tmp_path, "newline", **overrides)
+    assert result.returncode == 1
+    assert result.stderr == b""
+    assert b"./plain.txt (LF)" in result.stdout
+    assert b"./crlf.txt (CRLF)" in result.stdout
+    assert b"Files checked: 2" in result.stdout
+    assert b"Tail hex: 66 69 72 73 74 0d 0a 6c 61 73 74" in result.stdout
+    assert b"validate-formatting.sh --fix" not in result.stdout
+
+
 def test_missing_git_fails_for_a_checkout_or_worktree(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -222,7 +244,7 @@ def test_missing_git_allows_an_exported_source_tree(
     monkeypatch.setenv("PATH", "")
     monkeypatch.delenv("GIT_DIR", raising=False)
     write(tmp_path, "sample.txt", b"present\n")
-    assert validator.report_paths(tmp_path) == ["./sample.txt"]
+    assert validator.report_paths(tmp_path) == (["./sample.txt"], False)
 
 
 def test_report_fails_when_the_fallback_cannot_read_a_subdirectory(
@@ -262,6 +284,55 @@ def test_repair_refuses_a_hardlinked_missing_newline(tmp_path: Path) -> None:
     assert other.read_bytes() == b"{}"
 
 
+def test_formatter_refuses_a_link_before_any_writes(tmp_path: Path) -> None:
+    setup(tmp_path)
+    contents = b"#  Keep original\n"
+    original = write(tmp_path, "linked.md", contents)
+    alias = tmp_path / "linked-alias"
+    try:
+        os.link(original, alias)
+    except OSError as error:
+        pytest.skip(f"Hard links are unavailable in this fixture: {error}")
+    git(tmp_path, "add", "--", original.name)
+    result = run_policy(
+        tmp_path, "format", "caller", "--fix", NEWLINE_FORMATTER_FAULT="rewrite-linked"
+    )
+    assert original.read_bytes() == alias.read_bytes() == contents
+    assert result.returncode == 1
+    assert b"Refusing to replace a linked file" in result.stderr
+    assert read_calls(tmp_path) == [["--version"]]
+
+
+def test_fixture_git_isolated_from_callers_checkout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    caller = tmp_path / "caller"
+    caller.mkdir()
+    setup(caller)
+    write(caller, "protected.txt", b"separate checkout\n")
+    git(caller, "add", "--", "protected.txt")
+    index = caller / ".git/index"
+    config = caller / ".git/config"
+    before_index = index.read_bytes()
+    before_config = config.read_bytes()
+    monkeypatch.setenv("GIT_DIR", str(caller / ".git"))
+    monkeypatch.setenv("GIT_COMMON_DIR", str(caller / ".git"))
+    monkeypatch.setenv("GIT_WORK_TREE", str(caller))
+    monkeypatch.setenv("GIT_INDEX_FILE", str(index))
+    monkeypatch.setenv("GIT_OBJECT_DIRECTORY", str(caller / ".git/objects"))
+    fixture = tmp_path / "fixture"
+    fixture.mkdir()
+    setup(fixture)
+    write(fixture, "fixture.txt", b"test subject")
+    git(fixture, "add", "--", "fixture.txt")
+    assert git(fixture, "ls-files", "-z") == b"fixture.txt\0"
+    result = run_policy(fixture, "newline")
+    assert result.returncode == 1
+    assert b"fixture.txt (LF)" in result.stdout
+    assert index.read_bytes() == before_index
+    assert config.read_bytes() == before_config
+
+
 def test_report_refuses_a_redirected_tracked_file(tmp_path: Path) -> None:
     setup(tmp_path)
     original = write(tmp_path, "sample.txt", b"expected\n")
@@ -290,17 +361,35 @@ def test_formatter_help_precedes_prettier_bootstrap(tmp_path: Path, option: str)
     assert result.stderr == b""
 
 
-def test_formatter_preserves_listing_failure_exit_and_output(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("fault", "status", "has_listing"),
+    [("listing-error", 2, True), ("listing-bootstrap-error", 1, False)],
+)
+def test_formatter_preserves_listing_failure_exit_and_output(
+    tmp_path: Path, fault: str, status: int, has_listing: bool
+) -> None:
     setup(tmp_path)
-    result = run_policy(tmp_path, "format", "caller", NEWLINE_FORMATTER_FAULT="listing-error")
-    assert result.returncode == 1
-    assert b"sample.md" in result.stdout
+    result = run_policy(tmp_path, "format", "caller", NEWLINE_FORMATTER_FAULT=fault)
+    assert result.returncode == status
+    assert (b"sample.md" in result.stdout) == has_listing
     assert b"Summary" not in result.stdout
     assert read_calls(tmp_path) == [
         ["--version"],
         ["--check", "--", "**/*.{md,markdown}"],
         ["--list-different", "--", "**/*.{md,markdown}"],
     ]
+
+
+def test_formatter_continues_after_ordinary_differences(tmp_path: Path) -> None:
+    setup(tmp_path)
+    write(tmp_path, "missing.txt", b"test subject")
+    git(tmp_path, "add", "--", "missing.txt")
+    result = run_policy(tmp_path, "format", "caller", NEWLINE_FORMATTER_FAULT="different")
+    assert result.returncode == 1
+    assert b"sample.md" in result.stdout
+    assert b"missing.txt" in result.stdout
+    assert b"Checks: 3/5 passed" in result.stdout
+    assert len(read_calls(tmp_path)) == 6
 
 
 def test_fix_preserves_child_output_order_and_reports_failure(tmp_path: Path) -> None:
@@ -392,4 +481,4 @@ def test_staged_binary_is_excluded_before_its_body_is_read(
         pytest.fail(f"Unexpected read of {root / name} with {info.st_size} bytes.")
 
     monkeypatch.setattr(validator, "inspect_missing", fail_on_body)
-    assert validator.scan(tmp_path, [file.name]) == {}
+    assert validator.scan(tmp_path, [file.name], staged_attributes=True) == {}
