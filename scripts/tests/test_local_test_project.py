@@ -166,9 +166,39 @@ def test_failed_input_validation_leaves_existing_and_missing_projects_untouched(
 def test_force_does_not_recreate_the_checkout_or_a_parent(repository: Path) -> None:
     result = run_launcher(repository, repository.parent, "--force")
     assert result.returncode == 1
-    assert "Refusing to recreate the repository or a parent" in result.stderr
+    assert "outside the package checkout" in result.stderr
     assert (repository / "scripts/unity/create_test_project.py").is_file()
     assert not (repository.parent / "Assets").exists()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="The local Docker project launcher uses POSIX Bash")
+@pytest.mark.parametrize("via_symlink", [False, True])
+def test_force_keeps_checkout_descendants(
+    repository: Path, tmp_path: Path, via_symlink: bool
+) -> None:
+    package_content = repository / "Runtime"
+    package_content.mkdir()
+    marker = package_content / "source.txt"
+    marker.write_text("existing package source", encoding="utf-8")
+    project = package_content
+    if via_symlink:
+        project = tmp_path / "linked project"
+        project.symlink_to(package_content, target_is_directory=True)
+
+    result = run_launcher(repository, project, "--force")
+    assert marker.read_text(encoding="utf-8") == "existing package source"
+    assert project.is_symlink() == via_symlink
+    assert result.returncode == 1
+    assert "outside the package checkout" in result.stderr
+
+
+@pytest.mark.skipif(os.name != "posix", reason="The local Docker project launcher uses POSIX Bash")
+def test_scaffold_refuses_to_create_projects_within_the_checkout(repository: Path) -> None:
+    project = repository / "generated"
+    result = run_launcher(repository, project)
+    assert not project.exists()
+    assert result.returncode == 1
+    assert "outside the package checkout" in result.stderr
 
 
 @pytest.mark.skipif(os.name != "posix", reason="The local Docker project launcher uses POSIX Bash")

@@ -53,6 +53,11 @@ def manifest_text() -> str:
 
 def create_project(project_name: str, unity_version: str, *, force: bool) -> None:
     project = Path(project_name)
+    resolved = project.resolve()
+    if resolved.is_relative_to(REPOSITORY) or REPOSITORY.is_relative_to(resolved):
+        raise ValueError(
+            f"Set UNITY_TEST_PROJECT_DIR outside the package checkout and its parents: {project_name}"
+        )
     assets = project / "Assets"
     settings = project / "ProjectSettings"
     packages = project / "Packages"
@@ -71,8 +76,6 @@ def create_project(project_name: str, unity_version: str, *, force: bool) -> Non
         for extension in ("cs", "asmdef")
     }
     if force and project.is_dir():
-        if REPOSITORY.is_relative_to(project.resolve()):
-            raise ValueError(f"Refusing to recreate the repository or a parent: {project_name}")
         print("==> [create-test-project] Removing existing test project (--force)...")
         if project.is_symlink():
             project.unlink()
@@ -120,7 +123,7 @@ def main() -> int:
             os.environ.get("UNITY_VERSION") or "2021.3.45f1",
             force="--force" in arguments,
         )
-    except (OSError, ValueError) as error:
+    except (OSError, RuntimeError, ValueError) as error:
         print(f"ERROR: {error}", file=sys.stderr)
         return 1
     return 0
