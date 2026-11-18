@@ -1058,14 +1058,19 @@ function Invoke-InvocationAstPolicy {
         [void]$process.Start()
         $stdout = $process.StandardOutput.ReadToEndAsync()
         $stderr = $process.StandardError.ReadToEndAsync()
-        $process.StandardInput.WriteLine($payload)
-        $process.StandardInput.Close()
+        $inputFailure = $null
+        try {
+            try { $process.StandardInput.WriteLine($payload) }
+            finally { $process.StandardInput.Close() }
+        }
+        catch { $inputFailure = $_ }
         $process.WaitForExit()
         $output = $stdout.GetAwaiter().GetResult()
         $errorOutput = $stderr.GetAwaiter().GetResult()
         if ($process.ExitCode -ne 0) {
             throw "PowerShell AST policy failed (exit $($process.ExitCode)): $errorOutput"
         }
+        if ($null -ne $inputFailure) { throw $inputFailure }
         $decoded = ConvertFrom-Json -InputObject $output -NoEnumerate
         if ($decoded -isnot [array]) {
             throw 'PowerShell AST policy did not return a diagnostic array.'
@@ -1150,11 +1155,16 @@ foreach ($scriptPath in (Get-OwnedPowerShellScript)) {
     $commentLines = [System.Collections.Generic.List[int]]::new()
     $markerLines = [System.Collections.Generic.List[int]]::new()
     if ($commands.Count -gt 0) {
-        $lines = [System.IO.File]::ReadAllLines($scriptPath.FullName)
-        for ($index = 0; $index -lt $lines.Length; $index++) {
-            if ($lines[$index] -match '^\s*#') { $commentLines.Add($index + 1) }
-            if ($lines[$index] -match $pws006AllowMarker) { $markerLines.Add($index + 1) }
+        $reader = [System.IO.StringReader]::new($ast.Extent.Text)
+        try {
+            $lineNumber = 0
+            while ($null -ne ($line = $reader.ReadLine())) {
+                ++$lineNumber
+                if ($line -match '^\s*#') { $commentLines.Add($lineNumber) }
+                if ($line -match $pws006AllowMarker) { $markerLines.Add($lineNumber) }
+            }
         }
+        finally { $reader.Dispose() }
     }
     $astFacts.Add(@{
         path = $rel
@@ -1166,10 +1176,14 @@ foreach ($scriptPath in (Get-OwnedPowerShellScript)) {
     })
 }
 
+$astFailure = $null
 if ($astFacts.Count -gt 0) {
-    foreach ($finding in @(Invoke-InvocationAstPolicy -Facts $astFacts.ToArray())) {
-        $violations.Add($finding)
+    try {
+        foreach ($finding in @(Invoke-InvocationAstPolicy -Facts $astFacts.ToArray())) {
+            $violations.Add($finding)
+        }
     }
+    catch { $astFailure = $_ }
 }
 
 if ($violations.Count -gt 0) {
@@ -1181,8 +1195,12 @@ if ($violations.Count -gt 0) {
     }
     Write-Host ""
     Write-Host ("[lint-pwsh-invocations] {0} violation(s) found." -f $violations.Count) -ForegroundColor Red
+}
+if ($null -ne $astFailure) {
+    [Console]::Error.WriteLine("[lint-pwsh-invocations] AST checks failed: " + $astFailure.Exception.Message)
     exit 1
 }
+if ($violations.Count -gt 0) { exit 1 }
 
 if ($VerboseOutput) {
     Write-Host "[lint-pwsh-invocations] OK: No pwsh/powershell invocation anti-patterns detected." -ForegroundColor Green

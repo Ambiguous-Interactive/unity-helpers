@@ -159,12 +159,48 @@ def violations(scripts: list[ScriptFact]) -> list[Violation]:
     return report
 
 
+def require_array(value: object) -> list[object]:
+    if not isinstance(value, list):
+        raise ValueError("Expected an array of AST facts.")
+    return cast("list[object]", value)
+
+
+def require_fields(value: object, **fields: type[object]) -> dict[str, object]:
+    if not isinstance(value, dict):
+        raise ValueError("Expected an AST fact object.")
+    record = cast("dict[str, object]", value)
+    for name, expected in fields.items():
+        if type(record[name]) is not expected:
+            raise ValueError(f"Expected AST field {name} to be {expected.__name__}.")
+    return record
+
+
+def read_facts(payload: object) -> list[ScriptFact]:
+    scripts = require_array(payload)
+    for value in scripts:
+        script = require_fields(value, path=str)
+        error = script["error"]
+        if error is not None:
+            require_fields(error, line=int, message=str, text=str)
+        for line_kind in ("comment_lines", "marker_lines"):
+            if any(type(line) is not int for line in require_array(script[line_kind])):
+                raise ValueError(f"Expected integer line numbers in {line_kind}.")
+        for command_value in require_array(script["commands"]):
+            command = require_fields(command_value, line=int, text=str)
+            for argument in require_array(command["arguments"]):
+                require_fields(argument, name=str, kind=str)
+        block_value = script["block"]
+        if block_value is not None:
+            block = require_fields(block_value, line=int, text=str, positional_disabled=bool)
+            for parameter in require_array(block["parameters"]):
+                require_fields(parameter, name=str, array_type=bool, catches_remaining=bool)
+    return cast("list[ScriptFact]", scripts)
+
+
 def main() -> int:
     try:
         payload: object = json.load(sys.stdin.buffer)
-        if not isinstance(payload, list):
-            raise ValueError("Expected a list of PowerShell script facts.")
-        report = violations(cast("list[ScriptFact]", payload))
+        report = violations(read_facts(payload))
         output = json.dumps(report, ensure_ascii=False, separators=(",", ":")) + "\n"
         sys.stdout.buffer.write(output.encode("utf-8", errors="backslashreplace"))
     except (ValueError, KeyError, TypeError, IndexError) as error:
