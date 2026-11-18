@@ -139,14 +139,12 @@ very script. The failure is silent -- `-Paths a b c` lints `a`, skips `b` and `c
 - `PWS005`: a script-level array parameter without BOTH a `ValueFromRemainingArguments` sibling and `[CmdletBinding(PositionalBinding = $false)]`.
 - `PWS006`: `Start-Process -ArgumentList|-Args <array|@()|variable>`.
 
-`PWS005` and `PWS006` are AST rules rather than line scans, and they read `scripts/**/*.ps1` plus
-`.githooks/*.ps1`. PowerShell parses the sources and matches directive text with its native
-comparison rules. It sends the facts for both checks in one JSON batch to
-`scripts/pwsh_invocation_asts.py` through the locked uv project. If that phase fails,
-the linter reports any findings already collected and returns an AST-phase error. Both skip files `git` reports as ignored: CI checks out tracked content only, so
-a violation in a developer's scratch script is one the repository cannot fix and CI can never see.
-An untracked file that is NOT ignored is still scanned -- a new script you forgot to stage is
-exactly the one a rule should catch -- and where `git` cannot answer, nothing is excluded.
+`PWS001`–`PWS004` scan physical lines, continuations and folded workflow commands in typed Python.
+PowerShell discovers the files, decodes their lines and parses the native AST for `PWS005` and `PWS006`.
+A single locked uv call evaluates both rule families. A failure before the shared process starts
+fails the whole lint. An AST validation failure inside the process retains completed text findings
+and reports the AST error. The AST rules skip scripts that Git reports as ignored. Untracked,
+unignored scripts are checked. If Git cannot answer, the AST rules check every owned script.
 
 Detection beyond a single physical line:
 

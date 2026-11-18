@@ -197,14 +197,43 @@ def read_facts(payload: object) -> list[ScriptFact]:
     return cast("list[ScriptFact]", scripts)
 
 
+class InvocationReport(TypedDict):
+    findings: list[Violation]
+    ast_error: str | None
+
+
+def combined_report(payload: object) -> InvocationReport:
+    from pwsh_invocation_text import scan_source
+
+    batch = require_fields(payload, sources=list, ast=list, culture=str)
+    culture = cast("str", batch["culture"])
+    findings: list[Violation] = []
+    for target in require_array(batch["sources"]):
+        source = require_fields(target, path=str, lines=list)
+        path = source["path"]
+        lines = require_array(source["lines"])
+        if not all(isinstance(line, str) for line in lines):
+            raise ValueError("Expected physical lines of text.")
+        findings.extend(scan_source(cast("str", path), cast("list[str]", lines), culture))
+
+    ast_error = None
+    try:
+        findings.extend(violations(read_facts(batch["ast"])))
+    except (ValueError, KeyError, TypeError, IndexError) as error:
+        ast_error = f"Invalid AST input: {error}"
+    return {"findings": findings, "ast_error": ast_error}
+
+
 def main() -> int:
+    include_text = sys.argv[1:] == ["--include-text"]
     try:
         payload: object = json.load(sys.stdin.buffer)
-        report = violations(read_facts(payload))
+        report = combined_report(payload) if include_text else violations(read_facts(payload))
         output = json.dumps(report, ensure_ascii=False, separators=(",", ":")) + "\n"
         sys.stdout.buffer.write(output.encode("utf-8", errors="backslashreplace"))
     except (ValueError, KeyError, TypeError, IndexError) as error:
-        print(f"[pwsh-invocation-asts] Invalid AST input: {error}", file=sys.stderr)
+        policy_input = "invocation policy" if include_text else "AST"
+        print(f"[pwsh-invocation-asts] Invalid {policy_input} input: {error}", file=sys.stderr)
         return 1
     return 0
 
