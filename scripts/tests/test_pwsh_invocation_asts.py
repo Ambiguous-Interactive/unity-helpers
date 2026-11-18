@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -146,9 +147,11 @@ def test_batch_validates_boolean_facts_before_classifying(invalid: bool | str) -
         assert b"Expected AST field catches_remaining to be bool" in result.stderr
     else:
         assert result.returncode == 0
-        assert result.stdout.count(b'"code":"PWS005"') == 2
-        assert b'"path":"scripts/first.ps1"' in result.stdout
-        assert b'"path":"scripts/second.ps1"' in result.stdout
+        findings = cast("list[policy.Violation]", json.loads(result.stdout))
+        assert [(finding["path"], finding["code"]) for finding in findings] == [
+            ("scripts/first.ps1", "PWS005"),
+            ("scripts/second.ps1", "PWS005"),
+        ]
         assert result.stderr == b""
 
 

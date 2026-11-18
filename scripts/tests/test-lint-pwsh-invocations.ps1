@@ -154,8 +154,8 @@ pwsh -NoProfile -File scripts/lint-dependabot.ps1 -Paths "${ARRAY[@]}"
         $outsideDirectory = Join-Path $tempRoot 'outside'
         New-Item -ItemType Directory -Path $outsideDirectory -Force | Out-Null
         Set-Content -LiteralPath (Join-Path $outsideDirectory 'linked.sh') -Value 'pwsh -File bad.ps1 -- arg'
-        New-Item -ItemType SymbolicLink -Path (Join-Path $root 'linked-root') -Target $outsideDirectory | Out-Null
-        New-Item -ItemType SymbolicLink -Path (Join-Path $root 'scripts/linked-nested') -Target $outsideDirectory | Out-Null
+        [void][System.IO.Directory]::CreateSymbolicLink((Join-Path $root 'linked-root'), $outsideDirectory)
+        [void][System.IO.Directory]::CreateSymbolicLink((Join-Path $root 'scripts/linked-nested'), $outsideDirectory)
     }
     $result = Invoke-LintInFixture $root
     Write-TestResult "Pass_CleanRepo" ($result.ExitCode -eq 0) "Expected exit 0 on clean fixture. Exit: $($result.ExitCode). Output: $($result.Output)"
@@ -186,7 +186,7 @@ pwsh -NoProfile -File scripts/lint-dependabot.ps1 -- "${FILES[@]}"
         Set-Content -LiteralPath (Join-Path $nestedDirectory 'included.sh') -Value 'pwsh -File bad.ps1 -- arg'
     }
     if ($env:OS -ne 'Windows_NT') {
-        New-Item -ItemType SymbolicLink -Path (Join-Path $root 'linked-file.sh') -Target (Join-Path $root 'scripts/bad.sh') | Out-Null
+        [void][System.IO.File]::CreateSymbolicLink((Join-Path $root 'linked-file.sh'), (Join-Path $root 'scripts/bad.sh'))
     }
     $result = Invoke-LintInFixture $root
     $hasPws001 = $result.Output -match 'PWS001' -and $result.Output -match 'scripts/bad\.sh'
@@ -1494,7 +1494,7 @@ Start-Process -FilePath 'installer.exe' -ArgumentList @('/q') -Wait
 
 } finally {
     $env:UV_PROJECT_ENVIRONMENT = $previousPythonEnvironment
-    Remove-Item -Recurse -Force $tempRoot -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 # ── Summary ──────────────────────────────────────────────────────────────────
