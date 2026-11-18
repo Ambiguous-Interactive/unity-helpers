@@ -23,6 +23,11 @@ The easiest way to contribute is using the included dev container, which has all
 2. Click "Reopen in Container" when prompted
 3. Run `npm run verify:tools` to confirm all tools are available
 
+The verifier runs through locked uv and uses the native version commands for each tool. It limits
+each probe to 30 seconds and keeps up to 64 KiB of its first output line. On a host machine, tools
+marked as container-only are optional. Run
+`npm run test:verify-devcontainer-tools` to exercise the inventory and version probes.
+
 Run `bash scripts/validate-devcontainer-urls.sh` to check the Dockerfile's download URLs.
 If HEAD probes fail, the validator confirms reachability with a GET limited to one byte.
 This fallback requires [curl 8.4.0 or newer](https://curl.se/docs/manpage.html#--max-filesize);
