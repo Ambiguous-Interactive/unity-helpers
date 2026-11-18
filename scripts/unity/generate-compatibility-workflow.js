@@ -1,133 +1,58 @@
 "use strict";
 
-const fs = require("node:fs");
 const path = require("node:path");
+const { spawnSync } = require("node:child_process");
 
+const root = path.resolve(__dirname, "../..");
 const target = ".github/workflows/unity-compatibility.yml";
-const selectedJobs = ["matrix-config", "runner-preflight", "unity-tests", "unity-tests-aggregate"];
-const readbackGuard =
-  "!(github.event_name == 'workflow_dispatch' && inputs.native-readback-run-id != '') && ";
+
+function callRenderer(args, input) {
+  return spawnSync(
+    "uv",
+    [
+      "run",
+      "--quiet",
+      "--project",
+      path.join(root, "scripts/python~"),
+      "--locked",
+      "--no-dev",
+      "python",
+      path.join(__dirname, "generate_compatibility_workflow.py"),
+      ...args
+    ],
+    {
+      cwd: root,
+      encoding: "utf8",
+      input,
+      windowsHide: true,
+      env: { ...process.env, UH_NODE_EXECUTABLE: process.execPath }
+    }
+  );
+}
+
+function capturedOutput(args, input) {
+  const result = callRenderer(args, input);
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(result.stderr.trim() || "Unity compatibility workflow generation failed.");
+  }
+  return result.stdout;
+}
 
 function renderCompatibilityWorkflow(source) {
-  const jobs = source.slice(source.indexOf("\njobs:\n") + 7);
-  const starts = [...jobs.matchAll(/^  ([a-z][a-z0-9-]*):$/gm)];
-  const blocks = new Map(
-    starts.map((match, index) => [
-      match[1],
-      jobs.slice(match.index, starts[index + 1]?.index ?? jobs.length).trimEnd()
-    ])
-  );
-  const rendered = selectedJobs.map((id) => {
-    let block = blocks.get(id);
-    if (!block) throw new Error(`Canonical Unity workflow is missing ${id}.`);
-    block = block.replaceAll(readbackGuard, "");
-    if (id === "unity-tests-aggregate")
-      block = block.replace("if: ${{ (always()) }}", "if: ${{ always() }}");
-    block = block.replace(
-      /^    name: (.+)$/m,
-      (_, name) =>
-        `    name: ${id === "unity-tests-aggregate" ? "Unity Compatibility Success" : `Compatibility ${name}`}`
-    );
-    block = block
-      .split(/(?=^      - name: )/m)
-      .filter((section) => {
-        const condition = section.match(/^        if:[^\n]*(?:\n {10,}[^\n]*)*/m)?.[0];
-        return (
-          !condition?.includes("inputs.latest-mode-scheduling") &&
-          !condition?.includes("needs.matrix-config.outputs.combine-variants")
-        );
-      })
-      .join("");
-    block = block.replace(/inputs\.([a-z][a-z0-9-]*)/g, (_, input) => {
-      if (
-        [
-          "unity-version",
-          "native-readback-run-id",
-          "native-readback-build-receipt-sha256"
-        ].includes(input)
-      )
-        return "''";
-      if (input === "acceptance") return "'none'";
-      if (input === "latest-mode-scheduling") return "'split'";
-      if (input === "test-mode") return "'all'";
-      const flags = [
-        "fresh-conversion",
-        "intmap-diagnostics",
-        "native-diagnostics",
-        "native-build-direct-control",
-        "native-debugger-standard-heap",
-        "native-build-attach-control",
-        "native-build-attach-after-startup",
-        "native-build-attach-after-shutdown",
-        "native-loader-snaps-comparison"
-      ];
-      if (flags.includes(input)) return "false";
-      throw new Error(`Unclassified Unity dispatch input: ${input}`);
-    });
-    if (id === "matrix-config") {
-      block = block.replace(
-        /^      combine-variants: >-\n(?: {8,}[^\n]*\n)+/m,
-        '      combine-variants: "false"\n'
-      );
-      block = block.replace(
-        "          INPUT_UNITY_VERSION:",
-        "          INPUT_UNITY_COVERAGE: compatibility\n          INPUT_UNITY_VERSION:"
-      );
-    }
-    if (["matrix-config", "unity-tests"].includes(id)) {
-      block = block.replace(
-        /(    if: >-\n      \$\{\{ |    if: \$\{\{ )/,
-        "$1github.ref == 'refs/heads/main' && github.ref_protected && "
-      );
-    }
-    if (id === "runner-preflight") {
-      block = block.replace(
-        /      group: >-\n(?:        .*\n)+/,
-        "      group: ${{ github.workflow }}-runner-preflight-${{ github.sha }}\n"
-      );
-      block = block.replace(
-        /          required-label-sets: >-\n(?:            .*\n?)+/,
-        `          required-label-sets: '[["self-hosted","Windows","RAM-64GB","DAD-MACHINE"]]'\n`
-      );
-    }
-    if (id === "unity-tests") {
-      block = block.replace(
-        "    runs-on: [self-hosted, Windows, RAM-64GB]",
-        "    runs-on: [self-hosted, Windows, RAM-64GB, DAD-MACHINE]"
-      );
-      block = block.replace(
-        /      # No max-parallel[\s\S]*?(?=      # The enrollment audit)/,
-        "      # Keep one runner available for new fast validation.\n"
-      );
-      block = block.replace("    strategy:\n", "    strategy:\n      max-parallel: 1\n");
-    }
-    return block;
-  });
-  return `# Generated by scripts/unity/generate-compatibility-workflow.js. Do not edit.\nname: Unity Compatibility\n\non:\n  push:\n    branches: [main]\n  workflow_dispatch:\n\npermissions:\n  contents: read\n  checks: write\n  pull-requests: read\n\nconcurrency:\n  group: unity-compatibility-\${{ github.sha }}\n  cancel-in-progress: true\n\njobs:\n${rendered.join("\n\n")}\n`;
+  return capturedOutput(["--raw"], source);
 }
 
-async function generatedWorkflow(root) {
-  const prettier = require("prettier");
-  const source = fs.readFileSync(path.join(root, ".github/workflows/unity-tests.yml"), "utf8");
-  return prettier.format(renderCompatibilityWorkflow(source), { parser: "yaml" });
+async function generatedWorkflow(repository) {
+  return capturedOutput(["--repo-root", path.resolve(repository), "--stdout"]);
 }
 
-async function main() {
-  const root = path.resolve(__dirname, "../..");
-  const generated = await generatedWorkflow(root);
-  const file = path.join(root, target);
-  if (process.argv.includes("--check")) {
-    if (!fs.existsSync(file) || fs.readFileSync(file, "utf8") !== generated)
-      throw new Error(
-        `Run node scripts/unity/generate-compatibility-workflow.js to update ${target}.`
-      );
-  } else fs.writeFileSync(file, generated);
+if (require.main === module) {
+  const result = callRenderer(process.argv.includes("--check") ? ["--check"] : []);
+  if (result.stdout) process.stdout.write(result.stdout);
+  if (result.stderr) process.stderr.write(result.stderr);
+  if (result.error) console.error(result.error.message);
+  process.exitCode = result.status ?? 1;
 }
-
-if (require.main === module)
-  main().catch((error) => {
-    console.error(error.message);
-    process.exitCode = 1;
-  });
 
 module.exports = { target, renderCompatibilityWorkflow, generatedWorkflow };

@@ -664,6 +664,16 @@
     ]
   },
   {
+    "id": "unity-compatibility-renderer",
+    "name": "Unity compatibility renderer",
+    "run": "npm run test:unity-compatibility-renderer",
+    "inputs": [
+      "@tooling",
+      ".github/workflows/unity-tests.yml",
+      ".github/workflows/unity-compatibility.yml"
+    ]
+  },
+  {
     "id": "standalone-scene-provision",
     "name": "Standalone packed-scene build provision controls",
     "run": "npm run test:standalone-scene-provision",
