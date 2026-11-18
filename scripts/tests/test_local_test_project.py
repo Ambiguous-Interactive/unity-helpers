@@ -45,7 +45,9 @@ def repository(tmp_path: Path) -> Path:
     return checkout
 
 
-def run_launcher(repository: Path, project: Path, *args: str) -> subprocess.CompletedProcess[str]:
+def run_launcher(
+    repository: Path, project: Path | str, *args: str
+) -> subprocess.CompletedProcess[str]:
     bash = shutil.which("bash")
     assert bash is not None
     return subprocess.run(
@@ -199,6 +201,23 @@ def test_scaffold_refuses_to_create_projects_within_the_checkout(repository: Pat
     assert not project.exists()
     assert result.returncode == 1
     assert "outside the package checkout" in result.stderr
+
+
+@pytest.mark.skipif(os.name != "posix", reason="The local Docker project launcher uses POSIX Bash")
+@pytest.mark.parametrize("suffix", ["/.", "/child/..", "/child/../"])
+def test_force_rejects_dot_operands_before_normalizing_them(
+    repository: Path, tmp_path: Path, suffix: str
+) -> None:
+    victim = tmp_path / "disposable source"
+    (victim / "child").mkdir(parents=True)
+    marker = victim / "source.txt"
+    marker.write_text("retain this file", encoding="utf-8")
+
+    result = run_launcher(repository, f"{victim}{suffix}", "--force")
+    assert marker.read_text(encoding="utf-8") == "retain this file"
+    assert (victim / "child").is_dir()
+    assert result.returncode == 1
+    assert "named project directory" in result.stderr
 
 
 @pytest.mark.skipif(os.name != "posix", reason="The local Docker project launcher uses POSIX Bash")

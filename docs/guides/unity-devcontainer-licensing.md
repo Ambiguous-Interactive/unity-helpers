@@ -53,8 +53,9 @@ Fix whatever it reports, then run `npm run unity:compile`.
 
 The local project scaffold uses locked uv to validate the shared test framework, module list,
 and evidence sources before creating or recreating a project. Set `UNITY_TEST_PROJECT_DIR` to a
-separate directory outside the package checkout and its parent directories. Install uv on the host
-if you invoke the local compile or test scripts outside the devcontainer.
+separate directory outside the package checkout, such as a sibling directory. The scaffold rejects
+the checkout and any directory that contains it. Install uv on the host if you invoke the local
+compile or test scripts outside the devcontainer.
 
 ---
 

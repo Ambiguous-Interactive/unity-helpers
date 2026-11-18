@@ -52,11 +52,18 @@ def manifest_text() -> str:
 
 
 def create_project(project_name: str, unity_version: str, *, force: bool) -> None:
+    if force:
+        operand = project_name.rstrip(os.sep + (os.altsep or ""))
+        leaf = os.path.basename(operand)  # noqa: PTH119 - Path removes a trailing dot.
+        if leaf in (".", ".."):
+            raise ValueError("Use a named project directory with --force.")
+
     project = Path(project_name)
     resolved = project.resolve()
     if resolved.is_relative_to(REPOSITORY) or REPOSITORY.is_relative_to(resolved):
         raise ValueError(
-            f"Set UNITY_TEST_PROJECT_DIR outside the package checkout and its parents: {project_name}"
+            f"Set UNITY_TEST_PROJECT_DIR outside the package checkout, "
+            f"such as a sibling directory: {project_name}"
         )
     assets = project / "Assets"
     settings = project / "ProjectSettings"
