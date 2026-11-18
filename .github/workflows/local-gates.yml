@@ -365,6 +365,7 @@ jobs:
           scripts/tests/test_duplicate_usings.py scripts/tests/test_unity_test_modules.py
           scripts/tests/test_concurrent_cache_fill.py
           scripts/tests/test_workflow_expression_length.py
+          scripts/tests/test_validate_formatting.py
           scripts/tests/test_gitignore_docs.py scripts/tests/test_drawer_multiobject.py
           scripts/tests/test_check_eol.py scripts/tests/test_normalize_eol.py scripts/tests/test_lint_error_codes.py
           scripts/tests/test_code_samples.py

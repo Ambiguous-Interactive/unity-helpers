@@ -651,6 +651,17 @@ test_precommit_preserves_staged_byte_attributes() {
     done
 }
 
+copy_newline_policy() {
+    local consumer="$1" root="$2"
+    case "$consumer" in
+        scripts/tests/test-final-newline.sh|scripts/validate-formatting.sh)
+            mkdir -p "$root/scripts/python~"
+            cp "$REPO_ROOT/scripts/validate_formatting.py" "$root/scripts/"
+            cp "$REPO_ROOT/scripts/python~/pyproject.toml" "$REPO_ROOT/scripts/python~/uv.lock" "$root/scripts/python~/"
+            ;;
+    esac
+}
+
 test_bash_newline_staged_byte_attributes() {
     local consumer policy mode
     for consumer in scripts/tests/test-final-newline.sh scripts/validate-formatting.sh; do
@@ -664,6 +675,7 @@ test_bash_newline_staged_byte_attributes() {
                 sandbox="$TEMPDIR/bash-newline-$(basename "$consumer")-$policy-$mode"
                 mkdir -p "$sandbox/scripts/tests" "$sandbox/node_modules"
                 cp "$REPO_ROOT/$consumer" "$sandbox/$consumer"
+                copy_newline_policy "$consumer" "$sandbox"
                 # Isolate newline behavior from Prettier; its four calls are outside this contract.
                 printf 'process.exit(0);\n' > "$sandbox/scripts/run-prettier.js"
                 git -C "$sandbox" init -q
@@ -725,6 +737,7 @@ test_newline_attribute_lookup_failure() {
         sandbox="$TEMPDIR/newline-attribute-failure-$(basename "$consumer")"
         mkdir -p "$sandbox/.githooks" "$sandbox/scripts/tests" "$sandbox/node_modules" "$sandbox/bin"
         cp "$REPO_ROOT/$consumer" "$sandbox/$consumer"
+        copy_newline_policy "$consumer" "$sandbox"
         cp "$REPO_ROOT/scripts/git-staging-helpers.ps1" "$sandbox/scripts/git-staging-helpers.ps1"
         printf 'process.exit(0);\n' > "$sandbox/scripts/run-prettier.js"
         git -C "$sandbox" init -q
