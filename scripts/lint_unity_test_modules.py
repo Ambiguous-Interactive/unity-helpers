@@ -58,6 +58,13 @@ def unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
     return result
 
 
+def read_module_policy(path: Path) -> dict[str, object]:
+    """Read the shared module policy without silently accepting duplicate JSON keys."""
+    return mapping(
+        json.loads(path.read_text(encoding="utf-8-sig"), object_pairs_hook=unique_object)
+    )
+
+
 def validate(value: object) -> list[str]:
     """Require real package IDs, string versions and a matching optional evidence map."""
     document = mapping(value)
@@ -107,10 +114,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     path: Path = args.path
     try:
-        value: object = json.loads(
-            path.read_text(encoding="utf-8-sig"), object_pairs_hook=unique_object
-        )
-        errors = validate(value)
+        errors = validate(read_module_policy(path))
     except FileNotFoundError:
         errors = [f"Unity test-project modules manifest not found: {path}"]
     except json.JSONDecodeError as error:
