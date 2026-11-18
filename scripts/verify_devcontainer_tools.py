@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import os
+import selectors
 import shutil
 import signal
 import subprocess
 import sys
 import tempfile
+import time
 from contextlib import AbstractContextManager, nullcontext, suppress
 from dataclasses import dataclass
 from enum import Enum
@@ -23,6 +25,7 @@ RESET = "\x1b[0m"
 DIVIDER = "========================================"
 VERSION = "--version"
 TIMEOUT_SECONDS = 30
+MAXIMUM_VERSION_BYTES = 64 * 1024
 
 
 @dataclass(frozen=True)
@@ -96,6 +99,29 @@ def _stop_probe(process: subprocess.Popen[bytes]) -> None:
     process.wait()
 
 
+def _read_probe_pipe(process: subprocess.Popen[bytes], deadline: float) -> bytes:
+    pipe = process.stdout
+    if pipe is None:
+        return b""
+    descriptor = pipe.fileno()
+    first_line = bytearray()
+    line_finished = False
+    with selectors.DefaultSelector() as selector:
+        selector.register(descriptor, selectors.EVENT_READ)
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0 or not selector.select(remaining):
+                raise subprocess.TimeoutExpired(process.args, TIMEOUT_SECONDS)
+            chunk = os.read(descriptor, MAXIMUM_VERSION_BYTES)
+            if not chunk:
+                return bytes(first_line)
+            space = MAXIMUM_VERSION_BYTES + 2 - len(first_line)
+            if not line_finished and space > 0:
+                newline = chunk.find(b"\n")
+                line_finished = newline >= 0
+                first_line.extend(chunk[: min(space, newline + 1) if line_finished else space])
+
+
 def probe(command: str, *args: str) -> Version | None:
     executable = shutil.which(command)
     if executable is None:
@@ -110,20 +136,23 @@ def probe(command: str, *args: str) -> Version | None:
                 start_new_session=sys.platform != "win32",
             ) as process,
         ):
+            deadline = time.monotonic() + TIMEOUT_SECONDS
             try:
-                captured, _ = process.communicate(timeout=TIMEOUT_SECONDS)
-            except (KeyboardInterrupt, subprocess.TimeoutExpired) as error:
+                captured = _read_probe_pipe(process, deadline)
+                process.wait(timeout=max(0.0, deadline - time.monotonic()))
+            except (KeyboardInterrupt, OSError, subprocess.TimeoutExpired) as error:
                 _stop_probe(process)
-                if isinstance(error, KeyboardInterrupt):
-                    raise
-                return Version(124, "", timed_out=True)
+                if isinstance(error, subprocess.TimeoutExpired):
+                    return Version(124, "", timed_out=True)
+                raise
             if output is not None:
                 output.seek(0)
-                captured = output.readline()
-            first_line, newline, _ = (captured or b"").partition(b"\n")
+                captured = output.readline(MAXIMUM_VERSION_BYTES + 2)
+            first_line, newline, _ = captured.partition(b"\n")
             if newline:
                 first_line = first_line.removesuffix(b"\r")
-            return Version(process.returncode, first_line.decode("utf-8", "replace"))
+            version = first_line[:MAXIMUM_VERSION_BYTES].decode("utf-8", "replace")
+            return Version(process.returncode, version)
     except OSError:
         return None
 

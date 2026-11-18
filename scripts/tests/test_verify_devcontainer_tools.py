@@ -8,6 +8,7 @@ import signal
 import socket
 import subprocess
 import sys
+import tracemalloc
 from pathlib import Path
 
 import pytest
@@ -87,6 +88,26 @@ def test_probe_normalizes_only_line_terminators(output: bytes, expected: str) ->
         sys.executable, "-c", "import os,sys; os.write(1,bytes.fromhex(sys.argv[1]))", output.hex()
     )
     assert result == verifier.Version(0, expected)
+
+
+def test_probe_retains_a_bounded_first_line_and_drains_the_rest() -> None:
+    command = (
+        "import sys\n"
+        "output = sys.stdout.buffer\n"
+        "for _ in range(256):\n    output.write(b'A' * 65536)\n"
+        "output.write(b'\\n')\n"
+        "for _ in range(256):\n    output.write(b'B' * 65536)\n"
+        "sys.exit(7)\n"
+    )
+    tracemalloc.start()
+    try:
+        result = verifier.probe(sys.executable, "-c", command)
+        _, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+
+    assert peak < 4 * 1024 * 1024
+    assert result == verifier.Version(7, "A" * 65536)
 
 
 def test_probe_bounds_a_silent_command(monkeypatch: pytest.MonkeyPatch) -> None:
