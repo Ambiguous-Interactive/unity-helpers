@@ -1312,11 +1312,6 @@ verifier requires the separate fixture's passing results. Ruleset imports can
 leave compilation pending until the current Test Runner invocation completes,
 so waiting inside a later test cannot make that process idle.
 
-On Unity 6000.6, ordinary Standalone configure and build runs import assets in the editor process
-and set the standby import worker count to zero. Both launch settings are needed because Unity can
-start standby workers even when it imports assets in process. The usual selection and result checks
-apply to both Standalone variants. Evidence-only native build captures keep their original settings.
-
 Use `SanitizePath()` or `PathHelper.Sanitize` for separator normalization in Runtime, Editor, Tests and Generator~, and reuse the result when checking multiple paths. `npm run lint:path-normalization` enforces the rule and `npm run test:lint-path-normalization` checks reporting and empty-scope rejection. The shared helper implementation is the only exception within those trees; standalone Generator tools link the same Unity-free helper source.
 
 ### Wiki publication
