@@ -59,8 +59,11 @@ def summarize(results: str, platform: str) -> int:
         inconclusive = _count(root, "inconclusive", "0")
         total_count = int(total)
         failed_count = int(failed)
-        if total_count < int(passed) + failed_count + int(skipped) + int(inconclusive):
+        outcome_count = int(passed) + failed_count + int(skipped) + int(inconclusive)
+        if total_count < outcome_count:
             raise ValueError("NUnit outcome counts exceed the total")
+        if total_count > outcome_count:
+            raise ValueError("NUnit outcome counts fall short of the total")
     except (ET.ParseError, OSError, ValueError) as error:
         print(f"{prefix}: invalid NUnit results at {results}: {error}")
         return 1
@@ -93,10 +96,26 @@ def summarize(results: str, platform: str) -> int:
 
 def main() -> int:
     configure_output()
-    if len(sys.argv) != 3:
-        print("Usage: nunit_results.py <results.xml> <platform>", file=sys.stderr)
+    if len(sys.argv) not in (3, 4):
+        print(
+            "Usage: nunit_results.py <results.xml> <platform> [published.xml]",
+            file=sys.stderr,
+        )
         return 2
-    return summarize(sys.argv[1], sys.argv[2])
+    results, platform = sys.argv[1:3]
+    status = summarize(results, platform)
+    if len(sys.argv) == 4:
+        published = sys.argv[3]
+        source = Path(results)
+        try:
+            source.replace(published)
+        except OSError as error:
+            print(
+                f"ERROR: Could not publish {published}. The new report is at {results}. {error}",
+                file=sys.stderr,
+            )
+            return 1
+    return status
 
 
 if __name__ == "__main__":

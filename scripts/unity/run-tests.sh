@@ -185,16 +185,14 @@ run_test_mode() {
     # A zero exit from Unity is not by itself evidence that tests ran, so the results file
     # gets a vote.
     local results_exit=0
-    parse_nunit_results "${local_results_file}" "${platform}" || results_exit=$?
-
     if [[ -f "${local_results_file}" ]]; then
-        if ! mv -fT -- "${local_results_file}" "${published_result}"; then
-            echo "ERROR: Could not publish ${published_result}. The new report is at ${local_results_file}." >&2
-            results_exit=1
-        elif command -v pwsh > /dev/null 2>&1; then
+        parse_nunit_results "${local_results_file}" "${platform}" "${published_result}" || results_exit=$?
+        if [[ ! -e "${local_results_file}" ]] && command -v pwsh > /dev/null 2>&1; then
             pwsh -NoProfile -File "${SCRIPT_DIR}/report-slow-tests.ps1" \
                 -ResultsPath "${published_result}" -Top 20 || true
         fi
+    else
+        parse_nunit_results "${local_results_file}" "${platform}" || results_exit=$?
     fi
     if [[ ! -e "${local_results_file}" ]]; then
         rmdir -- "${result_directory}" || true

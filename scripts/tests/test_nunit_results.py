@@ -35,15 +35,29 @@ ROOT = Path(__file__).resolve().parents[2]
             1,
             "outcome counts exceed",
         ),
+        (
+            b'<test-run total="3" passed="0" failed="0"/>',
+            1,
+            "outcome counts fall short",
+        ),
+        (
+            b'<test-run total="3" passed="2" failed="0"/>',
+            1,
+            "outcome counts fall short",
+        ),
         (b'<test-run total="8" failed="008"/>', 1, "008 test(s) failed"),
         (b'<test-run total="1" passed="1"/>', 1, "'failed' count"),
         (b'<test-run total="1" failed="bad"/>', 1, "'failed' count"),
         (b'<test-run total="-1" failed="0"/>', 1, "'total' count"),
         ('<test-run total="\uff19" failed="0"/>'.encode(), 1, "'total' count"),
         (b'<root total="1" failed="0"/>', 1, "NUnit test-run root"),
-        (b'<test-run total="1" failed="0" result="Failed"/>', 1, "zero failed count"),
         (
-            b'<test-run total="1" failed="0"><test-case result="error"/></test-run>',
+            b'<test-run total="1" passed="1" failed="0" result="Failed"/>',
+            1,
+            "zero failed count",
+        ),
+        (
+            b'<test-run total="1" passed="1" failed="0"><test-case result="error"/></test-run>',
             1,
             "FAILED: unknown",
         ),
@@ -52,12 +66,20 @@ ROOT = Path(__file__).resolve().parents[2]
             1,
             "document type",
         ),
-        ('<test-run total="1" failed="0"/>'.encode("utf-16"), 0, "Total:   1"),
+        (
+            '<test-run total="1" passed="1" failed="0"/>'.encode("utf-16"),
+            0,
+            "Total:   1",
+        ),
         (b'<test-run total="1"', 1, "invalid NUnit results"),
     ],
 )
 def test_nunit_result_status(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str], data: bytes, status: int, message: str
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    data: bytes,
+    status: int,
+    message: str,
 ) -> None:
     document = tmp_path / "a result Ω.xml"
     document.write_bytes(data)
@@ -100,11 +122,13 @@ def test_missing_result_preserves_the_caller_path(
 
 
 @pytest.mark.skipif(os.name != "posix", reason="The Docker test launcher uses POSIX Bash")
-def test_sourced_launcher_preserves_caller_directory_and_arguments(tmp_path: Path) -> None:
+def test_sourced_launcher_preserves_caller_directory_and_arguments(
+    tmp_path: Path,
+) -> None:
     bash = shutil.which("bash")
     assert bash is not None
     path = tmp_path / "- result Ω.xml"
-    path.write_text('<test-run total="1" failed="0"/>', encoding="utf-8")
+    path.write_text('<test-run total="1" passed="1" failed="0"/>', encoding="utf-8")
     script = ROOT / "scripts/unity/lib/nunit-results.sh"
     result = subprocess.run(
         [
@@ -132,7 +156,12 @@ def test_legacy_suite_launcher_collects_registered_cases() -> None:
     bash = shutil.which("bash")
     assert bash is not None
     result = subprocess.run(
-        [bash, str(ROOT / "scripts/tests/test-unity-nunit-results.sh"), "--collect-only", "-q"],
+        [
+            bash,
+            str(ROOT / "scripts/tests/test-unity-nunit-results.sh"),
+            "--collect-only",
+            "-q",
+        ],
         cwd=ROOT,
         capture_output=True,
         timeout=30,
@@ -143,7 +172,9 @@ def test_legacy_suite_launcher_collects_registered_cases() -> None:
 
 
 @pytest.mark.skipif(os.name != "posix", reason="The Docker test launcher uses POSIX Bash")
-def test_runner_checks_uv_before_creating_or_entering_a_unity_project(tmp_path: Path) -> None:
+def test_runner_checks_uv_before_creating_or_entering_a_unity_project(
+    tmp_path: Path,
+) -> None:
     bash = shutil.which("bash")
     dirname = shutil.which("dirname")
     assert bash is not None
@@ -154,7 +185,11 @@ def test_runner_checks_uv_before_creating_or_entering_a_unity_project(tmp_path: 
     project = tmp_path / "project"
     result = subprocess.run(
         [bash, str(ROOT / "scripts/unity/run-tests.sh")],
-        env={**os.environ, "PATH": str(bin_dir), "UNITY_TEST_PROJECT_DIR": str(project)},
+        env={
+            **os.environ,
+            "PATH": str(bin_dir),
+            "UNITY_TEST_PROJECT_DIR": str(project),
+        },
         capture_output=True,
         timeout=15,
         check=False,
@@ -167,20 +202,35 @@ def test_runner_checks_uv_before_creating_or_entering_a_unity_project(tmp_path: 
 
 @pytest.mark.skipif(os.name != "posix", reason="The Docker test launcher uses POSIX Bash")
 @pytest.mark.parametrize(
-    ("report", "native_status", "status"),
+    ("report", "native_status", "blocked_destination", "status"),
     [
-        ("", 0, 1),
-        ("", 42, 42),
-        ('<test-run total="1" failed="0"/>', 0, 0),
-        ('<test-run total="1" failed="0"/>', 17, 17),
-        ('<test-run total="0" failed="0"/>', 0, 1),
+        ("", 0, False, 1),
+        ("", 42, False, 42),
+        ('<test-run total="1" passed="1" failed="0"/>', 0, False, 0),
+        ('<test-run total="1" passed="1" failed="0"/>', 17, False, 17),
+        ('<test-run total="0" failed="0"/>', 0, False, 1),
+        ('<test-run total="1" passed="1" failed="0"/>', 0, True, 1),
     ],
 )
 def test_runner_only_qualifies_the_current_result(
-    tmp_path: Path, report: str, native_status: int, status: int
+    tmp_path: Path,
+    report: str,
+    native_status: int,
+    blocked_destination: bool,
+    status: int,
 ) -> None:
     bash = shutil.which("bash")
+    mv = shutil.which("mv")
     assert bash is not None
+    assert mv is not None
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    portable_mv = bin_dir / "mv"
+    portable_mv.write_text(
+        '#!/usr/bin/env bash\n[[ "$1" != "-fT" ]] || exit 64\nexec "$NUNIT_MV" "$@"\n',
+        encoding="utf-8",
+    )
+    portable_mv.chmod(0o755)
     unity = tmp_path / "package/scripts/unity"
     library = unity / "lib"
     library.mkdir(parents=True)
@@ -204,12 +254,17 @@ def test_runner_only_qualifies_the_current_result(
     results = project / "test-results"
     results.mkdir(parents=True)
     stable_report = results / "editmode-results.xml"
-    old_report = '<test-run total="4" failed="0"/>'
-    stable_report.write_text(old_report, encoding="utf-8")
+    old_report = '<test-run total="4" passed="4" failed="0"/>'
+    if blocked_destination:
+        stable_report.mkdir()
+    else:
+        stable_report.write_text(old_report, encoding="utf-8")
     command = subprocess.run(
         [bash, str(unity / "run-tests.sh")],
         env={
             **os.environ,
+            "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
+            "NUNIT_MV": mv,
             "UNITY_TEST_PROJECT_DIR": str(project),
             "NUNIT_LIBRARY": str(ROOT / "scripts/unity/lib/nunit-results.sh"),
             "NUNIT_REPORT": report,
@@ -221,5 +276,12 @@ def test_runner_only_qualifies_the_current_result(
         check=False,
     )
     assert command.returncode == status, command.stdout.decode("utf-8")
-    assert stable_report.read_text(encoding="utf-8") == (report or old_report)
-    assert list(results.iterdir()) == [stable_report]
+    if blocked_destination:
+        assert not list(stable_report.iterdir())
+        retained = list(results.glob(".editmode-*/editmode-results.xml"))
+        assert len(retained) == 1
+        assert retained[0].read_text(encoding="utf-8") == report
+        assert b"Could not publish" in command.stderr
+    else:
+        assert stable_report.read_text(encoding="utf-8") == (report or old_report)
+        assert list(results.iterdir()) == [stable_report]
