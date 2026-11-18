@@ -92,7 +92,7 @@ public static class UnityHelpersPackageExporter
 
 
 def read_object(path: Path) -> dict[str, object]:
-    value = cast("object", json.loads(path.read_text(encoding="utf-8")))
+    value = cast("object", json.loads(path.read_text(encoding="utf-8-sig")))
     if not isinstance(value, dict):
         raise ValueError(f"Expected a JSON object: {path}")
     return cast("dict[str, object]", value)
