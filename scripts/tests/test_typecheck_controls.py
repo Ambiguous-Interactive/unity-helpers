@@ -686,6 +686,7 @@ def test_windows_phases_preserve_every_suite_and_bounded_concurrency() -> None:
         "scripts/tests/test_project_workspace.py",
         "scripts/tests/test_push_defaults.py",
         "scripts/tests/test_push_validation.py",
+        "scripts/tests/test_pwsh_invocation_asts.py",
         "scripts/tests/test_release_automation.py",
         "scripts/tests/test_release_tag.py",
         "scripts/tests/test_release_tools.py",
@@ -711,3 +712,4 @@ def test_windows_phases_preserve_every_suite_and_bounded_concurrency() -> None:
     assert "scripts/tests/test_native_build_selection.py" in str(orchestration["run"])
     assert "scripts/tests/test_compatibility_renderer.py" in str(orchestration["run"])
     assert "scripts/tests/test_unity_matrix_resolver.py" in str(orchestration["run"])
+    assert "scripts/tests/test_pwsh_invocation_asts.py" in str(orchestration["run"])

@@ -233,7 +233,7 @@
     "test:lint-editor-assembly-monobehaviours": "node scripts/tests/test-lint-editor-assembly-monobehaviours.js",
     "test:evaluate-testu01": "node scripts/tests/test-evaluate-testu01.mjs",
     "test:lint-concurrent-cache-fill": "uv run --project scripts/python~ --locked pytest scripts/tests/test_concurrent_cache_fill.py -q",
-    "test:lint-pwsh-invocations": "pwsh -NoProfile -File scripts/tests/test-lint-pwsh-invocations.ps1 -VerboseOutput",
+    "test:lint-pwsh-invocations": "pwsh -NoProfile -File scripts/tests/test-lint-pwsh-invocations.ps1 -VerboseOutput && uv run --quiet --project scripts/python~ --locked pytest scripts/tests/test_pwsh_invocation_asts.py -q",
     "test:lint-workflow-run-expression-length": "uv run --quiet --project scripts/python~ --locked pytest scripts/tests/test_workflow_expression_length.py -q",
     "test:pr-workflow-concurrency": "pwsh -NoProfile -File scripts/tests/test-pr-workflow-concurrency.ps1 -VerboseOutput",
     "test:workflow-repository-guard": "pwsh -NoProfile -File scripts/tests/test-workflow-repository-guard.ps1 -VerboseOutput",

@@ -30,9 +30,8 @@ jobs:
     name: Contract Suites
     runs-on: ubuntu-latest
     steps:
-      # Checked out into a subdirectory, like pwsh-invocations-lint.yml, because one suite in the
-      # chain compares this repository's cleanup classifier against the central policy repository
-      # and needs both trees side by side.
+      # The cleanup classifier contract compares this repository against the central policy
+      # repository and needs both trees side by side.
       # fetch-depth 0 because one suite -- the license-year copy-detection gate -- dates files
       # from the repository's own history. actions/checkout defaults to depth 1, where `git log`
       # sees a single commit, every file resolves to the year of that commit, and the gate skips
@@ -389,6 +388,7 @@ jobs:
           uv run --project scripts/python~ --locked pytest
           scripts/tests/test_ci_modes.py scripts/tests/test_browser_consumer.py
           scripts/tests/test_native_build_selection.py scripts/tests/test_compatibility_renderer.py scripts/tests/test_unity_matrix_resolver.py
+          scripts/tests/test_pwsh_invocation_asts.py
           -vv --durations=20
 
   assembly-tools-windows:

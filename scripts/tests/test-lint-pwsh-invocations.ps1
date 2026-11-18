@@ -71,6 +71,13 @@ function New-FixtureRoot {
     New-Item -ItemType Directory -Path (Join-Path $root '.githooks') -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $root '.github/workflows') -Force | Out-Null
     Copy-Item -LiteralPath $lintScriptPath -Destination (Join-Path $root 'scripts/lint-pwsh-invocations.ps1')
+    $sourceScripts = [System.IO.Path]::GetDirectoryName($lintScriptPath)
+    $fixtureProject = Join-Path $root 'scripts/python~'
+    New-Item -ItemType Directory -Path $fixtureProject | Out-Null
+    Copy-Item -LiteralPath (Join-Path $sourceScripts 'pwsh_invocation_asts.py') -Destination (Join-Path $root 'scripts')
+    foreach ($projectFile in @('pyproject.toml', 'uv.lock')) {
+        Copy-Item -LiteralPath (Join-Path $sourceScripts 'python~' $projectFile) -Destination $fixtureProject
+    }
     return $root
 }
 
@@ -101,8 +108,10 @@ function Invoke-LintInFixture {
     }
 }
 
+$previousPythonEnvironment = $env:UV_PROJECT_ENVIRONMENT
 try {
     New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
+    $env:UV_PROJECT_ENVIRONMENT = Join-Path $tempRoot 'ast-environment'
 
     $root = New-FixtureRoot
     $harnessScript = Join-Path $root 'scripts/lint-pwsh-invocations.ps1'
@@ -1484,6 +1493,7 @@ Start-Process -FilePath 'installer.exe' -ArgumentList @('/q') -Wait
     Write-TestResult "Pass_GitignoredScriptIsNotScanned" ($result.ExitCode -eq 0) "Expected exit 0 — a gitignored script is not the repository's to fix. Exit: $($result.ExitCode). Output: $($result.Output)"
 
 } finally {
+    $env:UV_PROJECT_ENVIRONMENT = $previousPythonEnvironment
     Remove-Item -Recurse -Force $tempRoot -ErrorAction SilentlyContinue
 }
 

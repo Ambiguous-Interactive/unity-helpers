@@ -93,7 +93,7 @@ function Write-Info($msg) {
     if ($VerboseOutput) { Write-Host "[lint-pwsh-invocations] $msg" -ForegroundColor Cyan }
 }
 
-$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $selfRel = 'scripts/lint-pwsh-invocations.ps1'
 $selfTestRel = 'scripts/tests/test-lint-pwsh-invocations.ps1'
 
@@ -181,13 +181,6 @@ $pws004JoinPathVariableAssignmentPattern = '(?:^|[;\s])(?:\[[^\]]+\]\s*)?\$(?<na
 # should explain WHY subprocess isolation is needed — e.g. the called script
 # uses `exit` heavily, or it must run in a fresh PS session).
 $pws003AllowMarker = '^\s*#\s*lint-pwsh-invocations:\s*allow-subprocess-pwsh\s+\S+'
-
-# PWS006 opt-out marker. Per SITE rather than per file: a script may legitimately
-# launch one fixed-switch installer and still be wrong to hand a path to another.
-# Not anchored to the start of a line, so it may be a trailing comment on the
-# invocation itself or a line of the comment block directly above it. A rationale
-# is required, as it is for PWS003.
-$pws006AllowMarker = '#\s*lint-pwsh-invocations:\s*allow-start-process-argument-list\s+\S+'
 
 # Strips PowerShell string literals (double-quoted and single-quoted) from a
 # line, replacing each literal with a same-length sequence of spaces so that
@@ -409,31 +402,31 @@ function Get-TargetFiles {
 
     # .githooks/* (non-recursive files)
     $hooksDir = Join-Path $repoRoot '.githooks'
-    if (Test-Path $hooksDir) {
-        Get-ChildItem -Path $hooksDir -File -ErrorAction SilentlyContinue |
+    if (Test-Path -LiteralPath $hooksDir) {
+        Get-ChildItem -LiteralPath $hooksDir -File -ErrorAction SilentlyContinue |
             ForEach-Object { $results.Add($_.FullName) | Out-Null }
     }
 
     # .github/workflows/*.yml
     $wfDir = Join-Path (Join-Path $repoRoot '.github') 'workflows'
-    if (Test-Path $wfDir) {
-        Get-ChildItem -Path $wfDir -File -Filter '*.yml' -ErrorAction SilentlyContinue |
+    if (Test-Path -LiteralPath $wfDir) {
+        Get-ChildItem -LiteralPath $wfDir -File -Filter '*.yml' -ErrorAction SilentlyContinue |
             ForEach-Object { $results.Add($_.FullName) | Out-Null }
-        Get-ChildItem -Path $wfDir -File -Filter '*.yaml' -ErrorAction SilentlyContinue |
+        Get-ChildItem -LiteralPath $wfDir -File -Filter '*.yaml' -ErrorAction SilentlyContinue |
             ForEach-Object { $results.Add($_.FullName) | Out-Null }
     }
 
     # scripts/**/*.ps1. PWS003 remains scoped below to top-level scripts/*.ps1,
     # but the other pwsh invocation checks should cover nested automation too.
     $scriptsDir = Join-Path $repoRoot 'scripts'
-    if (Test-Path $scriptsDir) {
-        Get-ChildItem -Path $scriptsDir -Recurse -File -Filter '*.ps1' -ErrorAction SilentlyContinue |
+    if (Test-Path -LiteralPath $scriptsDir) {
+        Get-ChildItem -LiteralPath $scriptsDir -Recurse -File -Filter '*.ps1' -ErrorAction SilentlyContinue |
             ForEach-Object { $results.Add($_.FullName) | Out-Null }
     }
 
     # package.json
     $pkgJson = Join-Path $repoRoot 'package.json'
-    if (Test-Path $pkgJson) { $results.Add($pkgJson) | Out-Null }
+    if (Test-Path -LiteralPath $pkgJson) { $results.Add($pkgJson) | Out-Null }
 
     return $results | Sort-Object -Unique
 }
@@ -1040,151 +1033,124 @@ function Get-OwnedPowerShellScript {
     return $owned
 }
 
+function Invoke-InvocationAstPolicy {
+    param([object[]]$Facts)
+
+    $start = [System.Diagnostics.ProcessStartInfo]::new()
+    $start.FileName = (Get-Command uv -CommandType Application -ErrorAction Stop).Source
+    $start.WorkingDirectory = $repoRoot
+    $start.UseShellExecute = $false
+    $start.RedirectStandardInput = $true
+    $start.RedirectStandardOutput = $true
+    $start.RedirectStandardError = $true
+    $utf8 = [System.Text.UTF8Encoding]::new($false)
+    $start.StandardInputEncoding = $utf8
+    $start.StandardOutputEncoding = $utf8
+    $start.StandardErrorEncoding = $utf8
+    foreach ($argument in @('run', '--quiet', '--project', (Join-Path $PSScriptRoot 'python~'), '--locked', '--no-dev', 'python', (Join-Path $PSScriptRoot 'pwsh_invocation_asts.py'))) {
+        $start.ArgumentList.Add($argument)
+    }
+
+    $payload = ConvertTo-Json -InputObject $Facts -Depth 9 -Compress -EscapeHandling EscapeNonAscii
+    $process = [System.Diagnostics.Process]::new()
+    $process.StartInfo = $start
+    try {
+        [void]$process.Start()
+        $stdout = $process.StandardOutput.ReadToEndAsync()
+        $stderr = $process.StandardError.ReadToEndAsync()
+        $process.StandardInput.WriteLine($payload)
+        $process.StandardInput.Close()
+        $process.WaitForExit()
+        $output = $stdout.GetAwaiter().GetResult()
+        $errorOutput = $stderr.GetAwaiter().GetResult()
+        if ($process.ExitCode -ne 0) {
+            throw "PowerShell AST policy failed (exit $($process.ExitCode)): $errorOutput"
+        }
+        $decoded = ConvertFrom-Json -InputObject $output -NoEnumerate
+        if ($decoded -isnot [array]) {
+            throw 'PowerShell AST policy did not return a diagnostic array.'
+        }
+        return $decoded
+    }
+    finally {
+        $process.Dispose()
+    }
+}
+
+# PowerShell owns AST extraction so the classifier receives actual parameter and command node
+# types rather than guesses based on source text.
+$astFacts = [System.Collections.Generic.List[object]]::new()
 foreach ($scriptPath in (Get-OwnedPowerShellScript)) {
-    # '\' not '\\': in a PowerShell single-quoted string the latter is TWO backslashes, so a
-    # Windows separator from GetRelativePath would pass through unchanged and the self-exclusion
-    # against $selfRel would never match (Bugbot, PR #555).
     $rel = [System.IO.Path]::GetRelativePath($repoRoot, $scriptPath.FullName).Replace('\', '/')
     if ($rel -eq $selfRel -or $rel -eq $selfTestRel) { continue }
 
     $parseErrors = $null
     $ast = [System.Management.Automation.Language.Parser]::ParseFile($scriptPath.FullName, [ref]$null, [ref]$parseErrors)
-    # A script the parser cannot read is not a script this rule has cleared. Skipping it silently
-    # is the same failure mode the rule exists to prevent, so report it instead.
     if ($parseErrors -and $parseErrors.Count -gt 0) {
-        $violations.Add(@{
-            Path = $rel
-            Line = $parseErrors[0].Extent.StartLineNumber
-            Code = 'PWS005'
-            Message = "could not be parsed, so its parameter block was never checked: $($parseErrors[0].Message)"
-            Content = $parseErrors[0].Extent.Text
-        }) | Out-Null
+        $firstError = $parseErrors[0]
+        $astFacts.Add(@{
+            path = $rel
+            error = @{
+                line = $firstError.Extent.StartLineNumber
+                message = $firstError.Message
+                text = $firstError.Extent.Text
+            }
+            commands = @()
+            lines = @()
+            block = $null
+        })
         continue
     }
-    # PWS006: `Start-Process -ArgumentList <array>` joins the array with spaces and adds no
-    # quoting, so an argument containing a space is split into separate arguments. What makes it
-    # worth a rule rather than three fixes is the failure SHAPE: pwsh answers its usage banner and
-    # exits 64, so a caller asserting "the child failed" is satisfied by a child that never ran.
-    # Measured on #571's harness -- reverting one converted site under a spaced fixture root
-    # reddened six of nine scenarios and left three green (#572).
-    #
-    # Checked from the AST, not a regex: the parameter and its value have to be matched as ONE
-    # thing, and matching them independently over the file is the mistake #556's CSS gate made.
-    #
-    # Deliberately narrow. Only the three shapes that can hold more than one argument are
-    # reported -- an array literal, an @() expression, and a variable, whose contents this script
-    # cannot know. A string literal is quoted by its author and is left alone.
-    $startProcessAsts = $ast.FindAll(
-        {
-            param($node)
-            $node -is [System.Management.Automation.Language.CommandAst]
-        },
-        $true
-    )
-    $scriptLines = $null
-    foreach ($startProcessAst in $startProcessAsts) {
-        $commandName = $startProcessAst.GetCommandName()
-        if ([string]::IsNullOrEmpty($commandName)) { continue }
-        # `saps` is the shipped alias. `start` is one too, but it is also an ordinary word, and a
-        # rule that reports `start` reports things that are not Start-Process.
-        if ($commandName -notmatch '^(?:Start-Process|saps)$') { continue }
 
-        $elements = $startProcessAst.CommandElements
-        for ($elementIndex = 1; $elementIndex -lt $elements.Count; $elementIndex++) {
-            $element = $elements[$elementIndex]
+    $commands = @(foreach ($command in $ast.FindAll(
+            { param($node) $node -is [System.Management.Automation.Language.CommandAst] },
+            $true
+        )) {
+        if ($command.GetCommandName() -notmatch '^(?:Start-Process|saps)$') { continue }
+        $elements = $command.CommandElements
+        $arguments = @(for ($index = 1; $index -lt $elements.Count; $index++) {
+            $element = $elements[$index]
             if ($element -isnot [System.Management.Automation.Language.CommandParameterAst]) { continue }
-            # PowerShell binds any unambiguous prefix, so -Arg, -Args, -ArgumentL and
-            # -ArgumentList are all the same parameter. Start-Process has no other -Arg* one.
-            if ($element.ParameterName -notmatch '^(?i:arg)') { continue }
-
-            # `-ArgumentList:$values` puts the value on the parameter; `-ArgumentList $values`
-            # puts it in the next element.
-            $argumentValue = $element.Argument
-            if ($null -eq $argumentValue -and ($elementIndex + 1) -lt $elements.Count) {
-                $argumentValue = $elements[$elementIndex + 1]
+            $value = $element.Argument
+            if ($null -eq $value -and ($index + 1) -lt $elements.Count) {
+                $value = $elements[$index + 1]
             }
-            if ($null -eq $argumentValue) { continue }
-
-            $isJoinedShape = (
-                $argumentValue -is [System.Management.Automation.Language.ArrayLiteralAst] -or
-                $argumentValue -is [System.Management.Automation.Language.ArrayExpressionAst] -or
-                $argumentValue -is [System.Management.Automation.Language.VariableExpressionAst]
-            )
-            if (-not $isJoinedShape) { continue }
-
-            $siteLine = $startProcessAst.Extent.StartLineNumber
-            if ($null -eq $scriptLines) {
-                $scriptLines = [System.IO.File]::ReadAllLines($scriptPath.FullName)
+            if ($null -ne $value) {
+                @{ name = $element.ParameterName; kind = $value.GetType().Name }
             }
-
-            # The marker may be a trailing comment on the invocation itself, or a line of the
-            # comment block directly above it. A blank line ends the block: a rationale three
-            # paragraphs up is not attached to this call.
-            $isAllowed = $false
-            if ($siteLine -le $scriptLines.Length -and $scriptLines[$siteLine - 1] -match $pws006AllowMarker) {
-                $isAllowed = $true
+        })
+        if ($arguments.Count -gt 0) {
+            @{
+                line = $command.Extent.StartLineNumber
+                text = $command.Extent.Text.Split("`n")[0].Trim()
+                arguments = $arguments
             }
-            for ($above = $siteLine - 2; 0 -le $above -and -not $isAllowed; $above--) {
-                $aboveLine = $scriptLines[$above]
-                if ($aboveLine -notmatch '^\s*#') { break }
-                if ($aboveLine -match $pws006AllowMarker) { $isAllowed = $true }
-            }
-            if ($isAllowed) { continue }
-
-            $violations.Add(@{
-                Path = $rel
-                Line = $siteLine
-                Code = 'PWS006'
-                Message = "Start-Process -$($element.ParameterName) is handed an array or a variable, which it joins with spaces and does NOT quote, so any element containing a space is split into separate arguments -- and the failure is a non-zero exit with a usage banner, which reads exactly like the child running and failing. Use System.Diagnostics.ProcessStartInfo.ArgumentList, which quotes each element. The conversion is not always mechanical: Start-Process -Wait also waits on the child's descendants, which Process.WaitForExit() does not. If the arguments are genuinely fixed switches, opt out on this site with a comment '# lint-pwsh-invocations: allow-start-process-argument-list <rationale>'. See .llm/skills/bash-pwsh-invocation.md."
-                Content = $startProcessAst.Extent.Text.Split("`n")[0].Trim()
-            }) | Out-Null
-            break
         }
-    }
+    })
 
-    # The SCRIPT's own param block, not a nested function's: a function parameter is bound in
-    # process and never goes through -File argument binding.
     $paramBlock = $ast.ParamBlock
-    if ($null -eq $paramBlock) { continue }
-
-    $arrayParameters = [System.Collections.Generic.List[string]]::new()
-    $catchesRemaining = $false
-    foreach ($parameter in $paramBlock.Parameters) {
-        $isRemaining = $false
-        foreach ($attribute in $parameter.Attributes) {
-            if ($attribute.Extent.Text -match 'ValueFromRemainingArguments') {
-                $catchesRemaining = $true
-                $isRemaining = $true
-            }
-        }
-        # Any array type, not just [string[]]: an [int[]] or [object[]] parameter drops arguments
-        # exactly the same way.
-        if (-not $isRemaining -and $null -ne $parameter.StaticType -and $parameter.StaticType.IsArray) {
-            $arrayParameters.Add($parameter.Name.VariablePath.UserPath) | Out-Null
+    $block = if ($null -ne $paramBlock) {
+        @{
+            line = $paramBlock.Extent.StartLineNumber
+            text = $paramBlock.Extent.Text.Split("`n")[0].Trim()
+            attributes = @(foreach ($attribute in $paramBlock.Attributes) { $attribute.Extent.Text })
+            parameters = @(foreach ($parameter in $paramBlock.Parameters) {
+                @{
+                    name = $parameter.Name.VariablePath.UserPath
+                    array_type = $null -ne $parameter.StaticType -and $parameter.StaticType.IsArray
+                    attributes = @(foreach ($attribute in $parameter.Attributes) { $attribute.Extent.Text })
+                }
+            })
         }
     }
+    if ($commands.Count -eq 0 -and $null -eq $block) { continue }
+    $lines = @(if ($commands.Count -gt 0) { [System.IO.File]::ReadAllLines($scriptPath.FullName) })
+    $astFacts.Add(@{ path = $rel; error = $null; commands = $commands; lines = $lines; block = $block })
+}
 
-    # PositionalBinding = $false is the half that actually routes stray values to the catch-all.
-    # It lives on a [CmdletBinding()] attribute attached to the param block, not inside it.
-    $disablesPositional = $false
-    foreach ($attribute in $paramBlock.Attributes) {
-        if ($attribute.Extent.Text -match 'PositionalBinding\s*=\s*\$false') {
-            $disablesPositional = $true
-        }
-    }
-
-    if ($arrayParameters.Count -gt 0 -and (-not $catchesRemaining -or -not $disablesPositional)) {
-        $first = $arrayParameters[0]
-        $missing = @()
-        if (-not $catchesRemaining) { $missing += 'a [Parameter(ValueFromRemainingArguments = $true)] sibling' }
-        if (-not $disablesPositional) { $missing += '[CmdletBinding(PositionalBinding = $false)]' }
-        $violations.Add(@{
-            Path = $rel
-            Line = $paramBlock.Extent.StartLineNumber
-            Code = 'PWS005'
-            Message = "declares array parameter(s) $($arrayParameters -join ', ') but is missing $($missing -join ' and '), so ``pwsh -File $rel -$first a b`` binds only 'a' and puts 'b' on whichever parameter is positionally next -- silently. BOTH are required: the sibling catches the remainder, PositionalBinding = `$false is what sends it there. See .llm/skills/bash-pwsh-invocation.md."
-            Content = $paramBlock.Extent.Text.Split("`n")[0].Trim()
-        }) | Out-Null
+if ($astFacts.Count -gt 0) {
+    foreach ($finding in @(Invoke-InvocationAstPolicy -Facts $astFacts.ToArray())) {
+        $violations.Add($finding)
     }
 }
 
