@@ -116,8 +116,19 @@ def test_probe_bounds_a_silent_command(monkeypatch: pytest.MonkeyPatch) -> None:
     assert result == verifier.Version(124, "", timed_out=True)
 
 
-def _descendant_arguments(listener: socket.socket) -> tuple[str, ...]:
-    parent = "import subprocess, sys; sys.exit(subprocess.call([sys.executable, *sys.argv[1:]]))"
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows batch version commands")
+def test_windows_worker_runs_batch_commands(tmp_path: Path) -> None:
+    command = tmp_path / "version command.cmd"
+    command.write_bytes(b"@echo off\r\necho native %1\r\nexit /b 7\r\n")
+    assert verifier.probe(str(command), "--version") == verifier.Version(7, "native --version")
+
+
+def _descendant_arguments(
+    listener: socket.socket, *, leader_exits: bool = False
+) -> tuple[str, ...]:
+    parent = "import subprocess, sys; child = subprocess.Popen([sys.executable, *sys.argv[1:]])"
+    if not leader_exits:
+        parent += "; sys.exit(child.wait())"
     child = (
         "import socket, sys\n"
         "with socket.create_connection(('127.0.0.1', int(sys.argv[1])), timeout=10) as connection:\n"
@@ -128,12 +139,16 @@ def _descendant_arguments(listener: socket.socket) -> tuple[str, ...]:
     return ("-c", parent, "-c", child, str(listener.getsockname()[1]))
 
 
-@pytest.mark.skipif(os.name != "posix", reason="POSIX process groups are verified on Unix")
-def test_timed_out_probe_terminates_its_child(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(verifier, "TIMEOUT_SECONDS", 2)
+@pytest.mark.parametrize("leader_exits", [False, True])
+def test_timed_out_probe_terminates_its_child(
+    monkeypatch: pytest.MonkeyPatch, leader_exits: bool
+) -> None:
+    monkeypatch.setattr(verifier, "TIMEOUT_SECONDS", 3)
     with socket.create_server(("127.0.0.1", 0)) as listener:
         listener.settimeout(5)
-        result = verifier.probe(sys.executable, *_descendant_arguments(listener))
+        result = verifier.probe(
+            sys.executable, *_descendant_arguments(listener, leader_exits=leader_exits)
+        )
         connection, _ = listener.accept()
         with connection:
             connection.settimeout(5)

@@ -8,15 +8,15 @@ import shutil
 import signal
 import subprocess
 import sys
-import tempfile
 import time
-from contextlib import AbstractContextManager, nullcontext, suppress
+from contextlib import suppress
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import IO, Literal
+from typing import Literal
 
 from cli_encoding import configure_output
+from windows_version_probe import MAXIMUM_VERSION_BYTES, STATUS_BYTES
 
 RED = "\x1b[0;31m"
 GREEN = "\x1b[0;32m"
@@ -25,7 +25,6 @@ RESET = "\x1b[0m"
 DIVIDER = "========================================"
 VERSION = "--version"
 TIMEOUT_SECONDS = 30
-MAXIMUM_VERSION_BYTES = 64 * 1024
 
 
 @dataclass(frozen=True)
@@ -85,11 +84,6 @@ class Outcome(Enum):
     OPTIONAL_MISSING = "optional_missing"
 
 
-def _probe_output() -> AbstractContextManager[IO[bytes] | None]:
-    # A file avoids waiting on inherited stdout handles after stopping a Windows tool.
-    return tempfile.TemporaryFile() if sys.platform == "win32" else nullcontext(None)
-
-
 def _stop_probe(process: subprocess.Popen[bytes]) -> None:
     with suppress(ProcessLookupError):
         if sys.platform == "win32":
@@ -97,6 +91,40 @@ def _stop_probe(process: subprocess.Popen[bytes]) -> None:
         else:
             os.killpg(process.pid, signal.SIGKILL)
     process.wait()
+
+
+def _version_from_output(status: int, captured: bytes) -> Version:
+    first_line, newline, _ = captured.partition(b"\n")
+    if newline:
+        first_line = first_line.removesuffix(b"\r")
+    return Version(status, first_line[:MAXIMUM_VERSION_BYTES].decode("utf-8", "replace"))
+
+
+if sys.platform == "win32":
+
+    def _probe_windows(executable: str, args: tuple[str, ...]) -> Version | None:
+        worker = Path(__file__).with_name("windows_version_probe.py")
+        # Skip the venv redirector so the process handle belongs to the job owner.
+        python = Path(sys.base_prefix) / "python.exe"
+        with subprocess.Popen(  # noqa: S603 - start the sibling worker with a resolved executable.
+            [str(python), "-I", str(worker), executable, *args],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+        ) as process:
+            try:
+                captured, diagnostic = process.communicate(timeout=TIMEOUT_SECONDS)
+            except (KeyboardInterrupt, OSError, subprocess.TimeoutExpired) as error:
+                _stop_probe(process)
+                if isinstance(error, subprocess.TimeoutExpired):
+                    return Version(124, "", timed_out=True)
+                raise
+            if process.returncode or len(captured) < STATUS_BYTES:
+                if diagnostic:
+                    print(diagnostic.decode("utf-8", "replace").rstrip(), file=sys.stderr)
+                return None
+            status = int.from_bytes(captured[:STATUS_BYTES], "little")
+            return _version_from_output(status, captured[STATUS_BYTES:])
 
 
 def _read_probe_pipe(process: subprocess.Popen[bytes], deadline: float) -> bytes:
@@ -122,37 +150,37 @@ def _read_probe_pipe(process: subprocess.Popen[bytes], deadline: float) -> bytes
                 first_line.extend(chunk[: min(space, newline + 1) if line_finished else space])
 
 
+def _probe_posix(executable: str, args: tuple[str, ...]) -> Version:
+    with subprocess.Popen(  # noqa: S603 - resolved executable with explicit version arguments.
+        [executable, *args],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        start_new_session=True,
+    ) as process:
+        deadline = time.monotonic() + TIMEOUT_SECONDS
+        try:
+            captured = _read_probe_pipe(process, deadline)
+            process.wait(timeout=max(0.0, deadline - time.monotonic()))
+        except (KeyboardInterrupt, OSError, subprocess.TimeoutExpired) as error:
+            _stop_probe(process)
+            if isinstance(error, subprocess.TimeoutExpired):
+                return Version(124, "", timed_out=True)
+            raise
+        return _version_from_output(process.returncode, captured)
+
+
+if sys.platform == "win32":
+    _native_probe = _probe_windows
+else:
+    _native_probe = _probe_posix
+
+
 def probe(command: str, *args: str) -> Version | None:
     executable = shutil.which(command)
     if executable is None:
         return None
     try:
-        with (
-            _probe_output() as output,
-            subprocess.Popen(  # noqa: S603 - resolved executable with explicit version arguments.
-                [executable, *args],
-                stdout=subprocess.PIPE if output is None else output,
-                stderr=subprocess.STDOUT,
-                start_new_session=sys.platform != "win32",
-            ) as process,
-        ):
-            deadline = time.monotonic() + TIMEOUT_SECONDS
-            try:
-                captured = _read_probe_pipe(process, deadline)
-                process.wait(timeout=max(0.0, deadline - time.monotonic()))
-            except (KeyboardInterrupt, OSError, subprocess.TimeoutExpired) as error:
-                _stop_probe(process)
-                if isinstance(error, subprocess.TimeoutExpired):
-                    return Version(124, "", timed_out=True)
-                raise
-            if output is not None:
-                output.seek(0)
-                captured = output.readline(MAXIMUM_VERSION_BYTES + 2)
-            first_line, newline, _ = captured.partition(b"\n")
-            if newline:
-                first_line = first_line.removesuffix(b"\r")
-            version = first_line[:MAXIMUM_VERSION_BYTES].decode("utf-8", "replace")
-            return Version(process.returncode, version)
+        return _native_probe(executable, args)
     except OSError:
         return None
 
