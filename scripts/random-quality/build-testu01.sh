@@ -96,20 +96,7 @@ if grep -q 'input stream exhausted' "${control_reports}/driver.stderr.log"; then
     exit 1
 fi
 
-node --input-type=module - "${SCRIPT_DIR}/evaluate-testu01.mjs" "${control_reports}/report.txt" <<'JS'
-import { readFileSync } from "node:fs";
-import { pathToFileURL } from "node:url";
-const { verdict } = await import(pathToFileURL(process.argv[2]).href);
-const result = verdict(readFileSync(process.argv[3], "utf8"));
-if (!result.ranBattery || !result.failed) {
-    console.error(result.ranBattery
-        ? "[testu01] SELF-TEST FAILED: the control has no decisive failure."
-        : "[testu01] SELF-TEST INCONCLUSIVE: the control has no battery summary.");
-    process.exitCode = 1;
-} else {
-    console.log("[testu01] Self-test passed; the harness detects decisive failures:");
-    for (const row of result.decisive) console.log(`  ${row.test}: ${row.raw}`);
-}
-JS
+uv run --quiet --project "${REPO_ROOT}/scripts/python~" --locked --no-dev python \
+    "${SCRIPT_DIR}/testu01_report.py" --check-control "${control_reports}/report.txt"
 
 echo "[testu01] driver: ${DRIVER}"
