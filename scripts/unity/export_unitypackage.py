@@ -58,7 +58,8 @@ def run_export(repository: Path, project: Path, output_argument: str, unity_vers
     internal_directory = project / OUTPUT_DIRECTORY
     internal_package = internal_directory / output_path.name
     log = internal_directory / UNITY_LOG_NAME
-    internal_directory.mkdir(parents=True, exist_ok=True)
+    # Staging creates a fresh project. Only launch tee into a directory we just created.
+    internal_directory.mkdir()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     command = [
         str(repository / "scripts/unity/run-unity-docker.sh"),

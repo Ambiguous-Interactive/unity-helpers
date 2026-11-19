@@ -7,10 +7,14 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tarfile
 from pathlib import Path
 
 import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "unity"))
+from export_unitypackage import run_export
 
 ROOT = Path(__file__).resolve().parents[2]
 PACKAGE = b"Unity export fixture\x00\xff\n"
@@ -297,6 +301,33 @@ def test_publication_alias_cannot_overwrite_export_evidence(repository: Path, al
     assert log.read_bytes() == LOG
     assert (internal_directory / output.name).read_bytes() == PACKAGE
     assert not output.exists() or output.is_symlink()
+
+
+@pytest.mark.parametrize("alias", ["log", "directory"])
+def test_export_rejects_preexisting_log_location(
+    repository: Path, monkeypatch: pytest.MonkeyPatch, alias: str
+) -> None:
+    project = repository.parent / "staged"
+    project.mkdir()
+    internal_directory = project / "unitypackage-output"
+    protected_directory = repository.parent / "keep"
+    protected_directory.mkdir()
+    protected_log = protected_directory / "unity.log"
+    protected_log.write_bytes(b"keep these bytes")
+    if alias == "directory":
+        internal_directory.symlink_to(protected_directory, target_is_directory=True)
+    else:
+        internal_directory.mkdir()
+        (internal_directory / "unity.log").symlink_to(protected_log)
+
+    monkeypatch.setenv("UH_EXPORT_FIXTURE", str(repository))
+    monkeypatch.setenv("UH_EXPORT_MODE", "success")
+    output = repository.parent / "release.unitypackage"
+    with pytest.raises(FileExistsError):
+        run_export(repository, project, str(output), "6000.6.0f1")
+    assert protected_log.read_bytes() == b"keep these bytes"
+    assert not (repository / "runner-arguments").exists()
+    assert not output.exists()
 
 
 @pytest.mark.parametrize(
