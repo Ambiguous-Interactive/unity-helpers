@@ -9,7 +9,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from tempfile import TemporaryDirectory
+from tempfile import TemporaryDirectory, TemporaryFile
 from typing import TypedDict, cast
 from xml.sax.saxutils import escape, quoteattr
 
@@ -18,6 +18,7 @@ ANALYZER_DIRECTORY = Path("Runtime/Analyzers")
 PROJECT_DIRECTORY = Path("Generator~")
 PRODUCTION_PROJECTS = ("TypeCheck", "EditorCheck", "IntegrationCheck")
 PRODUCTION_IDS = ("WUH019", "WUH021", "WUH023")
+MAX_MSBUILD_OUTPUT_BYTES = 1024 * 1024
 CONSUMER_OPT_INS = {
     "WUH024": "enum cache advice stays an explicit per-project opt-in",
     "WUH029": "member order stays an explicit consumer opt-in while repository source gates retain ownership",
@@ -189,28 +190,35 @@ def path_identity(path: str | Path, root: Path) -> str:
 
 
 def evaluated_items(dotnet: str, root: Path, project: Path, oracle: str) -> list[AnalyzerItem]:
-    result = subprocess.run(  # noqa: S603 - evaluate the fixed MSBuild query on owned projects.
-        [
-            dotnet,
-            "msbuild",
-            str(project),
-            "--nologo",
-            "-getItem:Analyzer",
-            f"-p:ProtobufNetOracle={oracle}",
-        ],
-        cwd=root,
-        capture_output=True,
-        check=False,
-        encoding="utf-8",
-        timeout=30,
-    )
-    if result.returncode:
-        raise ValueError(
-            f"MSBuild failed for {project} ({oracle}): {result.stderr or result.stdout}"
+    with TemporaryFile() as output, TemporaryFile() as errors:
+        result = subprocess.run(  # noqa: S603 - evaluate the fixed MSBuild query on owned projects.
+            [
+                dotnet,
+                "msbuild",
+                str(project),
+                "--nologo",
+                "-getItem:Analyzer",
+                f"-p:ProtobufNetOracle={oracle}",
+            ],
+            cwd=root,
+            stdout=output,
+            stderr=errors,
+            check=False,
+            timeout=30,
         )
-    if len(result.stdout.encode("utf-8")) > 1024 * 1024:
-        raise ValueError(f"MSBuild analyzer output exceeded 1 MiB for {project}")
-    data = cast("dict[str, object]", json.loads(result.stdout))
+        if any(
+            os.fstat(stream.fileno()).st_size > MAX_MSBUILD_OUTPUT_BYTES
+            for stream in (output, errors)
+        ):
+            raise ValueError(f"MSBuild analyzer output exceeded 1 MiB for {project}")
+        output.seek(0)
+        if result.returncode:
+            errors.seek(0)
+            diagnostic = (errors.read() or output.read()).decode("utf-8", errors="replace")
+            raise ValueError(f"MSBuild failed for {project} ({oracle}): {diagnostic}")
+        data = cast(
+            "dict[str, object]", json.loads(output.read().decode("utf-8", errors="replace"))
+        )
     group = cast("dict[str, object]", data.get("Items", {}))
     items = group.get("Analyzer")
     if not isinstance(items, list):
