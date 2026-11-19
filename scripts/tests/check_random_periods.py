@@ -6,11 +6,43 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from csharp_sources import literal_end, mask_noise
+
 MINIMUM_GENERATORS = 20
-GENERATOR_ATTRIBUTE = "[RandomGeneratorMetadata("
-PERIOD = re.compile(r'\[RandomGeneratorMetadata\(.*?period:\s*"([^"]*)"', re.S)
+GENERATOR_ATTRIBUTE = re.compile(r"\[\s*RandomGeneratorMetadata\s*\(")
+PERIOD_ARGUMENT = re.compile(r"\s*(period\s*:)\s*")
 DOC_PATH = Path("docs/features/utilities/random-generators.md")
 SOURCE_DIR = Path("Runtime/Core/Random")
+
+
+def attribute_period(source: str, code: str, start: int) -> str | None:
+    depth = 0
+    for end in range(start, len(code)):
+        character = code[end]
+        if character in "([{":
+            depth += 1
+            continue
+        if depth and character in ")]}":
+            depth -= 1
+            continue
+        if depth or character not in ",)]}":
+            continue
+
+        argument = PERIOD_ARGUMENT.fullmatch(code, start, end)
+        if argument is not None:
+            value = mask_noise(source[argument.end(1) : end], preserve_strings=True).strip()
+            if (
+                value.startswith('"')
+                and value.endswith('"')
+                and literal_end(value, 0) == len(value)
+            ):
+                return value[1:-1]
+            return None
+        if character != ",":
+            return None
+        start = end + 1
+    return None
 
 
 def declared_periods(directory: Path) -> tuple[dict[str, str], list[str]]:
@@ -20,13 +52,17 @@ def declared_periods(directory: Path) -> tuple[dict[str, str], list[str]]:
         if path.suffix != ".cs" or path.stem == "RandomGeneratorMetadata":
             continue
         source = path.read_text(encoding="utf-8")
-        if GENERATOR_ATTRIBUTE not in source:
+        if "RandomGeneratorMetadata" not in source:
             continue
-        match = PERIOD.search(source)
-        if match is None or not match[1].strip():
+        code = mask_noise(source)
+        attribute = GENERATOR_ATTRIBUTE.search(code)
+        if attribute is None:
+            continue
+        period = attribute_period(source, code, attribute.end())
+        if period is None or not period.strip():
             unannotated.append(path.stem)
         else:
-            declared[path.stem] = match[1]
+            declared[path.stem] = period
     return declared, unannotated
 
 

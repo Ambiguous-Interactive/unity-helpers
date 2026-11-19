@@ -144,6 +144,71 @@ def test_comment_attributes_do_not_create_subjects() -> None:
     assert not errors
 
 
+def run_period_check(
+    repository: Path, source: str, documented_period: str | None
+) -> subprocess.CompletedProcess[str]:
+    sources = repository / "Runtime/Core/Random"
+    sources.mkdir(parents=True)
+    (sources / "Generator.cs").write_text(source, encoding="utf-8")
+    table = ["| Generator | Period |", "| --- | --- |"]
+    for index in range(20):
+        name = f"Control{index}"
+        (sources / f"{name}.cs").write_text(
+            '[RandomGeneratorMetadata(Quality, "notes", period: "2^64")]',
+            encoding="utf-8",
+        )
+        table.append(f"| `{name}` | 2^64 |")
+    if documented_period is not None:
+        table.append(f"| `Generator` | {documented_period} |")
+    docs = repository / "docs/features/utilities/random-generators.md"
+    docs.parent.mkdir(parents=True)
+    docs.write_text("\n".join(table), encoding="utf-8")
+
+    check = repository / "scripts/tests/check_random_periods.py"
+    check.parent.mkdir(parents=True)
+    shutil.copyfile(ROOT / "scripts/csharp_sources.py", check.parent.parent / "csharp_sources.py")
+    shutil.copyfile(ROOT / "scripts/tests/check_random_periods.py", check)
+    return subprocess.run(
+        [sys.executable, str(check)], capture_output=True, text=True, timeout=15, check=False
+    )
+
+
+@pytest.mark.parametrize(
+    ("arguments", "following_source", "expected"),
+    [
+        ('Quality, "notes"', '// period: "2^64"', None),
+        ('Quality, "notes"', '[OtherMetadata(period: "2^64")]', None),
+        ('Quality, "notes" /* period: "2^64" */', "", None),
+        ('Quality, nameof(Generator), period: "2^64 (published)"', "", "2^64 (published)"),
+        ('Quality, "a )] in notes", period: /* provenance */ "2^64"', "", "2^64"),
+    ],
+)
+def test_generator_period_reads_only_its_own_attribute_arguments(
+    tmp_path: Path, arguments: str, following_source: str, expected: str | None
+) -> None:
+    result = run_period_check(
+        tmp_path,
+        f"[RandomGeneratorMetadata({arguments})]\n{following_source}\nclass Generator {{}}\n",
+        expected or "2^64",
+    )
+    if expected is None:
+        assert result.returncode == 1
+        assert "with no period: Generator" in result.stderr
+    else:
+        assert result.returncode == 0, result.stderr
+        assert "6 passed, 0 failed." in result.stdout
+
+
+def test_generator_period_ignores_commented_metadata(tmp_path: Path) -> None:
+    result = run_period_check(
+        tmp_path,
+        '// [RandomGeneratorMetadata(Quality, "notes", period: "2^64")]\nclass Generator {}',
+        None,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "6 passed, 0 failed." in result.stdout
+
+
 def test_corpus_requires_all_roots_and_nonzero_files(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="root not found"):
         csharp_sources.source_files(tmp_path, licenses.SOURCE_ROOTS)
