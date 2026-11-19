@@ -187,7 +187,7 @@
     "lint:bundled-assemblies": "uv run --project scripts/python~ --locked --no-dev python scripts/lint_bundled_assemblies.py --verbose",
     "lint:conditional-call-chains": "uv run --project scripts/python~ --locked --no-dev python scripts/lint_conditional_call_chains.py --verbose",
     "lint:concurrent-cache-fill": "uv run --project scripts/python~ --locked --no-dev python scripts/lint_concurrent_cache_fill.py --verbose",
-    "lint:pwsh-invocations": "pwsh -NoProfile -File scripts/lint-pwsh-invocations.ps1 -VerboseOutput",
+    "lint:pwsh-invocations": "uv run --quiet --project scripts/python~ --locked --no-dev python scripts/lint_pwsh_invocations.py --verbose",
     "lint:workflow-run-expression-length": "uv run --quiet --project scripts/python~ --locked --no-dev --group metadata python scripts/lint_workflow_expression_length.py --verbose",
     "validate:lint-error-codes": "uv run --project scripts/python~ --locked --no-dev python scripts/validate_lint_error_codes.py --verbose",
     "validate:mcp-config": "uv run --quiet --project scripts/python~ --locked --no-dev --group documentation python scripts/validate_mcp_config.py --verbose",

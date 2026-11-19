@@ -27,7 +27,7 @@ pwsh -NoProfile -File scripts/lint-foo.ps1 -Paths "${FILES[@]}"
 
 These rules are enforced by:
 
-1. `scripts/lint-pwsh-invocations.ps1` — scans `*.sh`, `.githooks/*`, `.github/workflows/*.yml`, `scripts/**/*.ps1`, and `package.json` for `-File`/`-f <script> --` (code `PWS001`) and extensionless hook `-File`/`-f` targets (code `PWS004`), and reads `scripts/**/*.ps1` plus `.githooks/*.ps1` as an AST for `PWS005` and `PWS006`.
+1. `npm run lint:pwsh-invocations` runs the locked Python scanner. It scans `*.sh`, `.githooks/*`, `.github/workflows/*.yml`, `scripts/**/*.ps1`, and `package.json` for `-File`/`-f <script> --` (code `PWS001`) and extensionless hook `-File`/`-f` targets (code `PWS004`), and reads `scripts/**/*.ps1` plus `.githooks/*.ps1` as an AST for `PWS005` and `PWS006`. PowerShell supplies native syntax and culture facts in one batch. The original PowerShell command forwards to the same scanner.
 2. `.github/workflows/repo-lint.yml` — runs the lint through the repository check registry.
 3. `scripts/tests/test-precommit-integration.sh` — smoke-tests that each pwsh-invoked hook branch works.
 4. `scripts/validate-lint-error-codes.ps1` — enforces that the `PWS` prefix (and any other lint-error-code prefix introduced by a new lint script) is registered in `cspell.json`, so the skill/doc tokens `PWS001`/`PWS002` do not trip the spell checker.
@@ -140,8 +140,10 @@ very script. The failure is silent -- `-Paths a b c` lints `a`, skips `b` and `c
 - `PWS006`: `Start-Process -ArgumentList|-Args <array|@()|variable>`.
 
 `PWS001`–`PWS004` scan physical lines, continuations and folded workflow commands in typed Python.
-PowerShell discovers the files, decodes their lines and parses the native AST for `PWS005` and `PWS006`.
-It supplies its own word character ranges so Python versions use the same matching rules.
+Python discovers files and decodes their physical lines. The native PowerShell 7 reader parses
+requested scripts for `PWS005` and `PWS006` and supplies culture and word character ranges.
+The legacy command uses its own PowerShell 7 installation when run in that host. A Windows
+PowerShell caller needs PowerShell 7 on PATH.
 A single locked uv call evaluates both rule families. A failure before the shared process starts
 fails the whole lint. An AST validation failure inside the process retains completed text findings
 and reports the AST error. The AST rules skip scripts that Git reports as ignored. Untracked,
