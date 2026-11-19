@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -12,7 +13,13 @@ SCRIPT_DIRECTORY = Path(__file__).resolve().parents[1] / "unity"
 sys.path.insert(0, str(SCRIPT_DIRECTORY))
 
 from credential_patterns import PATTERNS, redact_credentials  # noqa: E402
-from redact_unity_artifacts import MAXIMUM_FILE_BYTES, USAGE, redact_directory  # noqa: E402
+from redact_unity_artifacts import (  # noqa: E402
+    COMMAND,
+    LEGACY_COMMAND,
+    MAXIMUM_FILE_BYTES,
+    USAGE,
+    redact_directory,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts/unity/redact_unity_artifacts.py"
@@ -210,3 +217,30 @@ def test_failed_rewrite_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyP
     monkeypatch.setattr(Path, "write_bytes", deny_write)
     with pytest.raises(ValueError, match=r"locked\.log contains credential material"):
         redact_directory(tmp_path, "artifacts")
+
+
+def test_legacy_node_cli_preserves_usage_and_working_directory(tmp_path: Path) -> None:
+    node = shutil.which("node")
+    assert node is not None, "The compatibility control must exercise the actual Node launcher"
+    launcher = ROOT / "scripts/unity/redact-unity-artifacts.js"
+    help_result = subprocess.run(
+        [node, str(launcher), "--help"], capture_output=True, cwd=tmp_path, check=False
+    )
+    assert help_result.returncode == 0
+    assert help_result.stdout == USAGE.replace(COMMAND, LEGACY_COMMAND, 1).encode()
+    assert not help_result.stderr
+
+    artifacts = tmp_path / "artifacts with spaces"
+    artifacts.mkdir()
+    log = artifacts / "unity.log"
+    log.write_bytes(f"serial {SERIAL}\r\n".encode())
+    result = subprocess.run(
+        [node, str(launcher), artifacts.name], capture_output=True, cwd=tmp_path, check=False
+    )
+    assert result.returncode == 0
+    assert result.stdout == (
+        b"Redacted 1 file(s) under artifacts with spaces: unity-serial x1.\n"
+        b"  unity.log: unity-serial\n"
+    )
+    assert not result.stderr
+    assert log.read_bytes() == b"serial <redacted:unity-serial>\r\n"

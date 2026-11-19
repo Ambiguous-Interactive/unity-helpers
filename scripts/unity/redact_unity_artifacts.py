@@ -16,7 +16,9 @@ if TYPE_CHECKING:
     from collections.abc import Iterator, Sequence
 
 MAXIMUM_FILE_BYTES = 256 * 1024 * 1024
-USAGE = """Usage: uv run --quiet --project scripts/python~ --locked --no-dev python scripts/unity/redact_unity_artifacts.py <directory> [<directory>...]
+COMMAND = "uv run --quiet --project scripts/python~ --locked --no-dev python scripts/unity/redact_unity_artifacts.py"
+LEGACY_COMMAND = "node scripts/unity/redact-unity-artifacts.js"
+USAGE = f"""Usage: {COMMAND} <directory> [<directory>...]
 
 Rewrites credential values in every text file under each directory before the tree is uploaded as a
 CI artifact. Missing directories are skipped so one call can cover every test mode of a run.
@@ -85,17 +87,22 @@ def redact_directory(root: Path, label: str) -> str:
 
 
 def main(arguments: Sequence[str]) -> int:
+    usage = (
+        USAGE.replace(COMMAND, LEGACY_COMMAND, 1)
+        if os.environ.get("UH_REDACTION_LEGACY_USAGE") == "1"
+        else USAGE
+    )
     roots: list[str] = []
     try:
         for argument in arguments:
             if argument in {"--help", "-h"}:
-                print(USAGE, end="")
+                print(usage, end="")
                 return 0
             if argument.startswith("-"):
                 raise ValueError(f"Unknown option {argument}.")
             roots.append(argument)
         if not roots:
-            print(USAGE, end="")
+            print(usage, end="")
             return 1
         for root in roots:
             path = Path(os.path.abspath(root))  # noqa: PTH100 - preserve lexical Node path resolution.
