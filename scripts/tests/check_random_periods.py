@@ -34,7 +34,7 @@ def cells(line: str) -> list[str]:
     return [cell.strip() for cell in line.strip().removeprefix("|").removesuffix("|").split("|")]
 
 
-def documented_periods(markdown: str) -> dict[str, str] | None:
+def documented_periods(markdown: str) -> dict[str, str | None] | None:
     lines = markdown.split("\n")
     header_index = next(
         (
@@ -48,16 +48,14 @@ def documented_periods(markdown: str) -> dict[str, str] | None:
         return None
 
     headings = cells(lines[header_index])
-    if "Period" not in headings:
-        return None
-    period_column = headings.index("Period")
-    documented: dict[str, str] = {}
+    period_column = headings.index("Period") if "Period" in headings else None
+    documented: dict[str, str | None] = {}
     for line in lines[header_index + 2 :]:
         if not line.startswith("| `"):
             break
         row = cells(line)
         documented[row[0].replace("`", "")] = (
-            row[period_column] if period_column < len(row) else "undefined"
+            row[period_column] if period_column is not None and period_column < len(row) else None
         )
     return documented
 
@@ -105,11 +103,12 @@ def run(repository: Path) -> None:
         not unknown,
         f"documented but not found in Runtime/Core/Random: {', '.join(unknown)}",
     )
-    drifted = [
-        f'{name}: source "{declared[name]}" vs docs "{documented[name]}"'
-        for name in sorted(declared)
-        if declared[name] != documented[name]
-    ]
+    drifted: list[str] = []
+    for name in sorted(declared):
+        actual = documented[name]
+        if declared[name] != actual:
+            observed = "undefined" if actual is None else actual
+            drifted.append(f'{name}: source "{declared[name]}" vs docs "{observed}"')
     check(
         "every documented period matches the one declared on the type",
         not drifted,
