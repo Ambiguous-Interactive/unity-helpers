@@ -58,5 +58,5 @@ fails at 8GB, so a 1GB run reports it as inconclusive rather than as a fault. `D
 null `failsBy` because it reflects into the host `System.Random` and has never been caught inside
 16GB, so it is never asserted at all.
 
-`scripts/tests/test-random-quality-outcomes.mjs` (`npm run test:random-quality-outcomes`) is the
-contract test for the manifest and the report parser.
+The [contract test](../../scripts/tests/test_random_quality_outcomes.py) covers the manifest and
+report parser. Run it with `npm run test:random-quality-outcomes`.
