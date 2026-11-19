@@ -26,9 +26,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         private LatestWriteFilePathOrder() { }
 
-        internal static (LatestWriteFilePathOrder Order, long Submission) Reserve(
+        internal static PendingWrite Reserve(
             string path,
-            bool replacesPending
+            bool replacesPending,
+            WritePayload contents
         )
         {
             lock (RegistryGate)
@@ -44,7 +45,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 {
                     ++order._outstanding;
                 }
-                return (order, ++order._lastSubmission);
+                return new PendingWrite(order, ++order._lastSubmission, contents);
             }
         }
 
@@ -55,31 +56,43 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return isWindows || isMac ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
         }
 
-        private static Exception Write(string path, WritePayload contents)
+        private static bool TryWrite(string path, WritePayload contents, out Exception error)
         {
             try
             {
                 bool success;
-                Exception error;
+                Exception failure;
                 if (contents.TryGetT0(out string text))
                 {
-                    success = DurableFile.TryWriteAllText(path, text, out error);
+                    success = DurableFile.TryWriteAllText(path, text, out failure);
                 }
                 else
                 {
                     byte[] bytes = contents.AsT1;
-                    success = DurableFile.TryWriteAllBytes(path, bytes, out error);
+                    success = DurableFile.TryWriteAllBytes(path, bytes, out failure);
                 }
 
-                return success ? null : error ?? new IOException("The durable write failed.");
+                if (success)
+                {
+                    error = null;
+                    return true;
+                }
+                error = failure ?? new IOException("The durable write failed.");
+                return false;
             }
             catch (Exception exception)
             {
-                return exception;
+                error = exception;
+                return false;
             }
         }
 
-        internal Exception Publish(string path, long submission, WritePayload contents)
+        private bool TryPublish(
+            string path,
+            long submission,
+            WritePayload contents,
+            out Exception error
+        )
         {
             try
             {
@@ -87,11 +100,13 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 {
                     if (submission < _lastAttempt)
                     {
-                        return _lastFailure;
+                        error = _lastFailure;
+                        return error == null;
                     }
                     _lastAttempt = submission;
-                    _lastFailure = Write(path, contents);
-                    return _lastFailure;
+                    bool success = TryWrite(path, contents, out _lastFailure);
+                    error = _lastFailure;
+                    return success;
                 }
             }
             finally
@@ -103,6 +118,29 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         Registry.Remove(path);
                     }
                 }
+            }
+        }
+
+        internal readonly struct PendingWrite
+        {
+            private readonly LatestWriteFilePathOrder _order;
+            private readonly long _submission;
+            private readonly WritePayload _contents;
+
+            internal PendingWrite(
+                LatestWriteFilePathOrder order,
+                long submission,
+                WritePayload contents
+            )
+            {
+                _order = order;
+                _submission = submission;
+                _contents = contents;
+            }
+
+            internal bool TryPublish(string path, out Exception error)
+            {
+                return _order.TryPublish(path, _submission, _contents, out error);
             }
         }
     }

@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     using System.Collections.Generic;
     using System.IO;
     using System.Threading;
+    using PendingWrite = WallstopStudios.UnityHelpers.Core.Helper.LatestWriteFilePathOrder.PendingWrite;
     using WritePayload = WallstopStudios.UnityHelpers.Core.OneOf.FastOneOf<string, byte[]>;
 #if !SINGLE_THREADED
     using System.Diagnostics;
@@ -261,8 +262,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     }
                     foreach (KeyValuePair<string, PendingWrite> entry in batch)
                     {
-                        Exception failure = WriteOwned(entry.Key, entry.Value);
-                        if (failure != null)
+                        if (!TryPublishOwned(entry.Key, entry.Value, out Exception failure))
                         {
                             notifications ??= new List<KeyValuePair<string, Exception>>();
                             KeyValuePair<string, Exception> notification = new KeyValuePair<
@@ -304,9 +304,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     return false;
                 }
                 bool replacesPending = _pending.ContainsKey(path);
-                (LatestWriteFilePathOrder order, long submission) =
-                    LatestWriteFilePathOrder.Reserve(path, replacesPending);
-                PendingWrite write = new(order, submission, contents);
+                PendingWrite write = LatestWriteFilePathOrder.Reserve(
+                    path,
+                    replacesPending,
+                    contents
+                );
                 _pending[path] = write;
                 if (_writeInBackground && !_workerScheduled)
                 {
@@ -346,6 +348,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 string path = null;
                 PendingWrite write = default;
                 Exception failure;
+                bool success;
                 lock (_writeGate)
                 {
                     lock (_stateGate)
@@ -363,9 +366,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         }
                         _pending.Remove(path);
                     }
-                    failure = WriteOwned(path, write);
+                    success = TryPublishOwned(path, write, out failure);
                 }
-                if (failure != null)
+                if (!success)
                 {
                     NotifyFailure(path, failure);
                 }
@@ -390,21 +393,22 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 #endif
 
-        private Exception WriteOwned(string path, PendingWrite write)
+        private bool TryPublishOwned(string path, PendingWrite write, out Exception error)
         {
-            Exception error = write.Order.Publish(path, write.Submission, write.Contents);
+            bool success = write.TryPublish(path, out Exception failure);
             lock (_stateGate)
             {
-                if (error == null)
+                if (success)
                 {
                     _failures.Remove(path);
                 }
                 else
                 {
-                    _failures[path] = error;
+                    _failures[path] = failure;
                 }
             }
-            return error;
+            error = failure;
+            return success;
         }
 
         private void NotifyFailure(string path, Exception error)
@@ -435,24 +439,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return failure.Value;
             }
             return null;
-        }
-
-        private readonly struct PendingWrite
-        {
-            internal readonly LatestWriteFilePathOrder Order;
-            internal readonly long Submission;
-            internal readonly WritePayload Contents;
-
-            internal PendingWrite(
-                LatestWriteFilePathOrder order,
-                long submission,
-                WritePayload contents
-            )
-            {
-                Order = order;
-                Submission = submission;
-                Contents = contents;
-            }
         }
     }
 }
