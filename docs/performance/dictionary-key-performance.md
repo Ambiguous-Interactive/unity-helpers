@@ -188,6 +188,43 @@ The hit, miss and insertion limits remain open for
 These measurements use the standalone consumer harness and host tests. Player
 or backend-specific claims require their own measurements.
 
+### Independent source and binary replays
+
+Two further batches used the frozen consumer harness on .NET SDK 10.0.403
+(runtime 10.0.14 with PGO) and Mono 6.14.1. The IntMap source at main
+`990dd276` is byte-identical to the source in the preceding table.
+Each batch used three processes per runtime. The ranges below cover the
+preceding main batch and the two replays. An exact-source rebuild and a
+separate run of the sealed binaries reproduced the passing iteration result.
+Lookup and insertion still exceed the 1.10× target in some cells.
+
+| Runtime |  Hit / 3.7.1 | Miss / 3.7.1 | Insert / 3.7.1 | Iterate / Dictionary |
+| ------- | -----------: | -----------: | -------------: | -------------------: |
+| .NET 10 | 0.887–1.074× | 0.821–1.994× |   0.556–1.287× |         0.823–1.089× |
+| Mono    | 0.979–1.290× | 1.004–1.177× |   0.925–1.224× |         1.060–1.108× |
+
+The ranges cover dense, seeded sparse, and shared-low-bit keys. The lookup
+and insertion ranges include 8, 64, and 1,024 keys. The iteration range covers
+the required 64 and 1,024 keys. All replays kept 64 slots through one million
+churn operations.
+
+A candidate that encoded the keys and grouped the reverse index in four-slot
+groups passed all 66 required cells in its first three batches. Its fresh
+source rebuild exceeded the Mono sparse 1,024-key insertion limit at 1.108×.
+The archived binaries exceeded the .NET sparse 1,024-key miss limit at 1.391×.
+Iteration remained within budget in every batch.
+
+| Runtime |  Hit / 3.7.1 | Miss / 3.7.1 | Insert / 3.7.1 | Iterate / Dictionary |
+| ------- | -----------: | -----------: | -------------: | -------------------: |
+| .NET 10 | 0.861–1.038× | 0.695–1.391× |   0.268–1.049× |         0.938–1.210× |
+| Mono    | 0.917–0.974× | 0.561–0.916× |   0.681–1.108× |         1.077–1.117× |
+
+A separate first-removal comparison used the same candidate and current-main
+source. Across three batches, Mono first removal took 1.114–1.190× main at 64
+keys, 1.116–1.289× at 1,024, and 1.188–1.253× at 16,384. The source passed enumeration
+invalidation and bounded churn on both runtimes. The removal regression and
+the two original-budget misses ruled out the candidate.
+
 ## Rejected first-probe split
 
 A separate candidate keeps the first `TryGet` probe inline and moves collision continuation to
