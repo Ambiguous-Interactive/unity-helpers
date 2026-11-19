@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from types import FrameType
 
 ROOT = Path(__file__).resolve().parents[2]
+TIMEOUT_PROBE_REF = "task/unity-smoke-probe-timeout-20261119"
 MODES = ("editmode", "playmode", "standalone")
 MAX_CONCURRENT_WORKERS = 4
 WORKER_PRIORITY = (
@@ -668,11 +669,12 @@ def main(argv: list[str] | None = None) -> int:
     controller_started = time.monotonic()
     probe_output: Path | None = None
     stage_probe: Callable[[], None] | None = None
+    probe_ref = os.environ.get("GITHUB_REF_NAME")
     try:
         if (
             args.with_single_threaded
             and os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch"
-            and os.environ.get("GITHUB_REF_NAME") == "task/unity-smoke-probe-20261119"
+            and probe_ref in {"task/unity-smoke-probe-20261119", TIMEOUT_PROBE_REF}
         ):
             project = ROOT / ".artifacts/unity/unitypackage-combined-probe-project"
             project.mkdir(parents=True, exist_ok=True)
@@ -689,7 +691,7 @@ def main(argv: list[str] | None = None) -> int:
             os.environ["UH_PARALLEL_SELECTED_MODES"],
             os.environ["UH_PARALLEL_ASSEMBLY_PROFILES"],
         )
-        if stage_probe is not None and selected == ["editmode"]:
+        if stage_probe is not None and probe_ref == TIMEOUT_PROBE_REF:
             args.timeout_seconds = 120
             print("Combined package smoke timeout control is limited to 120 seconds", flush=True)
         selections = [(args.single_threaded, selected, profiles)]
