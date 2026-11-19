@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict, cast
 
 import pytest
+import yaml
 
 if TYPE_CHECKING:
     from _pytest.capture import CaptureFixture
@@ -592,6 +593,45 @@ def test_workflow_installs_python_and_uv_before_the_pin_resolver() -> None:
     assert content.index("- name: Setup Python\n") < content.index("- name: Install uv\n")
     assert content.index("- name: Install uv\n") < content.index(
         "- name: Resolve pinned central cleanup policy commit\n"
+    )
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Local Gates resolves the pin on a POSIX Bash host.")
+def test_workflow_resolves_policy_pin_without_node(tmp_path: Path) -> None:
+    workflow_path = inputs.ROOT / ".github/workflows/local-gates.yml"
+    workflow = cast("dict[str, object]", yaml.safe_load(workflow_path.read_text(encoding="utf-8")))
+    jobs = cast("dict[str, dict[str, object]]", workflow["jobs"])
+    steps = cast("list[dict[str, object]]", jobs["contract-suites"]["steps"])
+    resolver = next(step for step in steps if step.get("id") == "policy_pin")
+    bash = shutil.which("bash")
+    assert bash is not None
+    rejected = tmp_path / "node-invoked"
+    node = tmp_path / "node"
+    node.write_text(
+        '#!/bin/sh\nprintf "unexpected Node launch\n" > "$NODE_CALLED"\nexit 86\n', encoding="utf-8"
+    )
+    node.chmod(0o755)
+    output = tmp_path / "output file"
+    result = subprocess.run(
+        [bash, "-e", "-o", "pipefail", "-c", cast("str", resolver["run"])],
+        cwd=inputs.ROOT,
+        env={
+            **os.environ,
+            "PATH": str(tmp_path) + os.pathsep + os.environ["PATH"],
+            "GITHUB_OUTPUT": str(output),
+            "NODE_CALLED": str(rejected),
+            "UV_PYTHON": sys.executable,
+        },
+        capture_output=True,
+        encoding="utf-8",
+        timeout=30,
+        check=False,
+    )
+    assert not rejected.exists()
+    assert result.returncode == 0, result.stderr
+    assert (
+        output.read_text(encoding="utf-8")
+        == "sha=" + inputs.resolve_build_lock_pin("require-confirmed-unity-cleanup") + "\n"
     )
 
 

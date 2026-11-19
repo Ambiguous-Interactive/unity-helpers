@@ -4924,12 +4924,12 @@ foreach ($policyCheckoutWorkflow in $policyCheckoutWorkflows) {
     $relativePolicyPath = ".github/workflows/$($policyCheckoutWorkflow.Name)"
     $policyCheckoutWorkflowContent = Get-Content -LiteralPath $policyCheckoutWorkflow.FullName -Raw
     $policyPinIsDerived = (
-        $policyCheckoutWorkflowContent -match '(?m)^\s+run:\s*\|\s*$[\s\S]*?node scripts/resolve-build-lock-pin\.js require-confirmed-unity-cleanup' -and
+        $policyCheckoutWorkflowContent -match '(?m)^\s+run:\s*\|\s*$[\s\S]*?uv run --quiet --project scripts/python~ --locked --no-dev --group metadata python scripts/build_lock_inputs\.py --resolve require-confirmed-unity-cleanup' -and
         $policyCheckoutWorkflowContent -match '(?m)^\s+ref:\s+\$\{\{ steps\.policy_pin\.outputs\.sha \}\}\s*$' -and
         $policyCheckoutWorkflowContent -notmatch '(?m)^\s+ref:\s+[0-9a-f]{40}\s*$'
     )
     if (-not $policyPinIsDerived) {
-        Write-Host "::error file=$relativePolicyPath::The central cleanup policy checkout must take its ref from scripts/resolve-build-lock-pin.js via steps.policy_pin.outputs.sha, never a literal commit SHA."
+        Write-Host "::error file=$relativePolicyPath::The central cleanup policy checkout must take its ref from scripts/build_lock_inputs.py via steps.policy_pin.outputs.sha, never a literal commit SHA."
         $failed = $true
     } elseif ($VerboseOutput) {
         Write-Info "Checked $relativePolicyPath derives its central cleanup policy commit from the workflow pins."
