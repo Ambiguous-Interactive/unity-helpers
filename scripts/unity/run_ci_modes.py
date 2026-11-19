@@ -18,11 +18,12 @@ import sys
 import tempfile
 import time
 from dataclasses import dataclass, replace
+from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, BinaryIO, cast
 
 from editmode_shards import merge_results, partition_assemblies
-from stage_unitypackage import stage_unity_package
+from stage_unitypackage import package_metadata, stage_unity_package
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator
@@ -210,6 +211,19 @@ def package_smoke_mode(
             "ProjectRootMinimumFreeGb": "0",
         },
     )
+
+
+def stage_combined_probe(project: Path, version: str) -> None:
+    original_path = os.environ["PATH"]
+    if sys.platform == "win32":
+        runtime = Path(os.environ["RUNNER_TOOL_CACHE"]) / "node" / "22.23.4" / "x64"
+        if not (runtime / "node.exe").is_file():
+            raise ValueError("The reviewed Node runtime is missing from the runner tool cache")
+        os.environ["PATH"] = str(runtime) + os.pathsep + original_path
+    try:
+        stage_unity_package(ROOT, project, version)
+    finally:
+        os.environ["PATH"] = original_path
 
 
 def git(repository: Path, *arguments: str) -> str:
@@ -413,6 +427,7 @@ def run(
     started_at: float | None = None,
     max_workers: int = MAX_CONCURRENT_WORKERS,
     independent_outcomes: bool = False,
+    after_activation: Callable[[], None] | None = None,
 ) -> bool:
     """Activate once, run independent projects and retain every outcome.
 
@@ -447,6 +462,8 @@ def run(
             )
             if session.get("State") != "activated" or session.get("OwnerProcessId") != os.getpid():
                 raise RuntimeError("Unity license preparation did not publish its owned session")
+            if after_activation is not None:
+                after_activation()
             for mode in modes:
                 if mode.name == "package_smoke":
                     continue
@@ -650,28 +667,24 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("Select both the package smoke project and output")
     controller_started = time.monotonic()
     probe_output: Path | None = None
-    if (
-        args.with_single_threaded
-        and os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch"
-        and os.environ.get("GITHUB_REF_NAME") == "task/unity-smoke-probe-20261119"
-    ):
-        project = ROOT / ".artifacts/unity/unitypackage-combined-probe-project"
-        try:
-            manifest = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
-            stage_unity_package(ROOT, project, args.version)
-        except (OSError, ValueError, subprocess.CalledProcessError) as error:
-            print(f"Cannot stage combined package smoke: {error}", file=sys.stderr)
-            return 1
-        probe_output = (
-            ROOT
-            / ".artifacts/unitypackage-combined-probe"
-            / (f"{manifest['name']}-{manifest['version']}.unitypackage")
-        )
-        probe_output.unlink(missing_ok=True)
-        Path(f"{probe_output}.sha256").unlink(missing_ok=True)
-        args.package_smoke_project = project
-        args.package_smoke_output = probe_output
+    stage_probe: Callable[[], None] | None = None
     try:
+        if (
+            args.with_single_threaded
+            and os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch"
+            and os.environ.get("GITHUB_REF_NAME") == "task/unity-smoke-probe-20261119"
+        ):
+            project = ROOT / ".artifacts/unity/unitypackage-combined-probe-project"
+            project.mkdir(parents=True, exist_ok=True)
+            name, version = package_metadata(ROOT)
+            probe_output = (
+                ROOT / ".artifacts/unitypackage-combined-probe" / f"{name}-{version}.unitypackage"
+            )
+            probe_output.unlink(missing_ok=True)
+            Path(f"{probe_output}.sha256").unlink(missing_ok=True)
+            args.package_smoke_project = project
+            args.package_smoke_output = probe_output
+            stage_probe = partial(stage_combined_probe, project, args.version)
         selected, profiles = read_selection(
             os.environ["UH_PARALLEL_SELECTED_MODES"],
             os.environ["UH_PARALLEL_ASSEMBLY_PROFILES"],
@@ -765,6 +778,7 @@ def main(argv: list[str] | None = None) -> int:
                 started_at=controller_started,
                 max_workers=args.max_workers,
                 independent_outcomes=args.with_single_threaded,
+                after_activation=stage_probe,
             )
     except KeyboardInterrupt:
         print(

@@ -1254,6 +1254,12 @@ def test_package_smoke_shares_worker_budget_and_has_own_verdict(
         environment["CONTROL_FAIL"] = "export"
     if scenario in {"timeout", "cancellation"}:
         environment["CONTROL_HANG"] = "export"
+
+    def check_activation_before_staging() -> None:
+        identity = json.loads(session.read_text(encoding="utf-8"))
+        assert identity["State"] == "activated"
+        assert not list(Path(environment["CONTROL_EVENTS"]).glob("*.started"))
+
     events = Path(environment["CONTROL_EVENTS"])
     receipt_path = tmp_path / "receipt.json"
 
@@ -1287,6 +1293,7 @@ def test_package_smoke_shares_worker_budget_and_has_own_verdict(
                     output=tmp_path / "github-output",
                     max_workers=3,
                     independent_outcomes=True,
+                    after_activation=check_activation_before_staging,
                 )
         finally:
             if cancellation is not None:
