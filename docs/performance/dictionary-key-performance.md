@@ -174,9 +174,10 @@ a 64-key shared-low-bit hit, sparse misses at 64 and 1,024 keys, and all three
 The million-operation churn workload retains 64 slots in every process.
 
 A candidate that deferred reverse-index construction until removal passed all 66
-required cells in three independent batches. It also passed the 170-case host suite,
-including allocation-failure recovery. The first removal from a 16,384-entry map
-increased from 0.433 to 119.749 µs on .NET and from 0.388 to 40.196 µs on Mono,
+required cells in three independent batches. Hit, miss and insertion used IntMap 3.7.1
+as the baseline. Iteration used Dictionary. The candidate also passed the 170-case host
+suite, including allocation-failure recovery. Compared with main, the first removal
+from a 16,384-entry map increased from 0.433 to 119.749 µs on .NET and from 0.388 to 40.196 µs on Mono,
 so the candidate was rejected. A later candidate coallocated the occupied-slot
 index with the keys and limited reverse search to slot groups. It passed two batches,
 then exceeded the insertion limit at 64 entries on both runtimes in the third batch.
