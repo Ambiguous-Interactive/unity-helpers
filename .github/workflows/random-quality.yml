@@ -278,6 +278,14 @@ jobs:
           printf 'Selected .NET SDK: %s\n' "$selected_sdk"
           test "$selected_sdk" = "${EXPECTED_DOTNET_SDK:?Missing installed SDK version}"
 
+      - name: Setup Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        run: python -m pip install --disable-pip-version-check uv==0.13.8
+
       - name: Download generator host
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
@@ -335,7 +343,9 @@ jobs:
           exit "${harness_failed}"
 
       - name: Report
-        run: node scripts/random-quality/report-testu01.mjs .artifacts/random-quality/testu01-reports
+        run: >-
+          uv run --quiet --project scripts/python~ --locked --no-dev python
+          scripts/random-quality/testu01_report.py .artifacts/random-quality/testu01-reports
 
       - name: Upload TestU01 reports
         if: ${{ always() }}
