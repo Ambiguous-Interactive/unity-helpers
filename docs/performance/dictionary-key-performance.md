@@ -137,6 +137,57 @@ environment records, analysis and controllers. It preserves the rejected hint an
 unchanged-main replay. Earlier overlapping exploratory captures are excluded from the retention
 decision and remain retained locally.
 
+## November 19 original consumer replay
+
+The archived consumer harness ran against main at `6ce056ca`, with its original 3.7.1
+and Dictionary controls. Three .NET 10.0.14 processes and three Mono 6.14.1 processes
+each completed 111 cells. Source and executable hashes stayed fixed. Values are medians
+of three process medians. Hit, miss and insertion compare with 3.7.1. Iteration compares
+with `Dictionary<int,int>`.
+
+| Runtime | Keys      | Count | Hit ns (3.7.1 ratio) | Miss ns (3.7.1 ratio) | Insert ns (3.7.1 ratio) | Iterate ns/entry (Dictionary ratio) |
+| ------- | --------- | ----: | -------------------: | --------------------: | ----------------------: | ----------------------------------: |
+| .NET 10 | dense     |     8 |       0.628 (1.013×) |        0.936 (1.983×) |         11.559 (0.556×) |                      0.452 (0.976×) |
+| .NET 10 | dense     |    64 |       0.723 (1.048×) |        0.665 (1.149×) |          8.088 (1.079×) |                      0.487 (1.089×) |
+| .NET 10 | dense     | 1,024 |       0.675 (1.071×) |        0.486 (1.070×) |          7.101 (1.083×) |                      0.423 (0.972×) |
+| .NET 10 | sparse    |     8 |       0.840 (1.029×) |        0.593 (0.997×) |          6.972 (1.014×) |                      0.497 (1.069×) |
+| .NET 10 | sparse    |    64 |       0.819 (0.987×) |        0.846 (1.082×) |          6.620 (0.965×) |                      0.448 (1.014×) |
+| .NET 10 | sparse    | 1,024 |       0.803 (0.979×) |        0.732 (0.821×) |          6.886 (1.017×) |                      0.360 (0.824×) |
+| .NET 10 | shift1024 |     8 |       0.728 (0.887×) |        0.593 (0.997×) |          6.610 (1.048×) |                      0.440 (1.021×) |
+| .NET 10 | shift1024 |    64 |       0.888 (0.975×) |        0.661 (1.000×) |          7.390 (1.010×) |                      0.447 (0.941×) |
+| .NET 10 | shift1024 | 1,024 |       0.796 (1.000×) |        0.727 (0.993×) |          7.291 (1.036×) |                      0.360 (0.829×) |
+| Mono    | dense     |     8 |       1.969 (0.987×) |        2.531 (1.038×) |         10.297 (0.925×) |                      4.033 (1.154×) |
+| Mono    | dense     |    64 |       1.925 (1.040×) |        1.462 (1.014×) |         10.994 (1.017×) |                      2.710 (1.092×) |
+| Mono    | dense     | 1,024 |       1.839 (1.024×) |        1.338 (1.021×) |         42.112 (1.188×) |                      2.442 (1.062×) |
+| Mono    | sparse    |     8 |       1.996 (1.024×) |        2.484 (1.038×) |         10.421 (0.953×) |                      4.168 (1.198×) |
+| Mono    | sparse    |    64 |       2.066 (1.012×) |        1.968 (1.114×) |         11.222 (1.046×) |                      2.718 (1.097×) |
+| Mono    | sparse    | 1,024 |       2.033 (1.025×) |        2.094 (1.139×) |         43.973 (1.202×) |                      2.468 (1.060×) |
+| Mono    | shift1024 |     8 |       1.949 (0.986×) |        2.536 (1.055×) |         10.495 (0.946×) |                      4.115 (1.164×) |
+| Mono    | shift1024 |    64 |       3.025 (1.249×) |        1.488 (1.021×) |         12.439 (1.069×) |                      2.757 (1.104×) |
+| Mono    | shift1024 | 1,024 |       1.899 (1.016×) |        1.461 (1.016×) |         42.383 (1.195×) |                      2.480 (1.069×) |
+
+All 12 required iteration cells at 64 and 1,024 entries meet the 1.5× Dictionary
+limit. Eight of 54 hit, miss and insertion cells exceed the 1.10× limit.
+Both .NET failures were dense misses at 8 and 64 keys. The six Mono failures were
+a 64-key shared-low-bit hit, sparse misses at 64 and 1,024 keys, and all three
+1,024-key insertion cells.
+The million-operation churn workload retains 64 slots in every process.
+
+A candidate that deferred reverse-index construction until removal passed all 66
+required cells in three independent batches. Hit, miss and insertion used IntMap 3.7.1
+as the baseline. Iteration used Dictionary. The candidate also passed the 170-case host
+suite, including allocation-failure recovery. Compared with main, the first removal
+from a 16,384-entry map increased from 0.433 to 119.749 µs on .NET and from 0.388 to 40.196 µs on Mono,
+so the candidate was rejected. A later candidate coallocated the occupied-slot
+index with the keys and limited reverse search to slot groups. It passed two batches,
+then exceeded the insertion limit at 64 entries on both runtimes in the third batch.
+Its first removal at 16,384 entries took 1.832× main on .NET and 2.473× on Mono.
+
+The hit, miss and insertion limits remain open for
+[#1131](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1131).
+These measurements use the standalone consumer harness and host tests. Player
+or backend-specific claims require their own measurements.
+
 ## Rejected first-probe split
 
 A separate candidate keeps the first `TryGet` probe inline and moves collision continuation to
@@ -239,6 +290,6 @@ The [qualification record](./intmap-guard-layout-20261117.json) retains all pair
 process receipts, seals, the rejected diff and environment limitations. Raw sources and all rounds
 remain in ignored session storage. A fresh SDK image's failed net48 setup remains recorded;
 this triage explicitly builds net10.0 and does not qualify Mono or native players.
-The original consumer iteration and lookup tables above remain applicable: 13 of 54 lookup/insert
-cells still miss the original budget. Production `IntMap` is unchanged, and
+The earlier recovered consumer replay measured 13 of 54 lookup/insert cells above the original
+budget. Production `IntMap` is unchanged, and
 [#1131](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1131) remains open.
