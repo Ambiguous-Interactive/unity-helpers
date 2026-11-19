@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Reject local Unity package export paths that would overwrite the Unity log or package data ([#859](https://github.com/Ambiguous-Interactive/unity-helpers/issues/859)).
+
 ## [3.7.2] - 2026-11-19
 
 ### Added

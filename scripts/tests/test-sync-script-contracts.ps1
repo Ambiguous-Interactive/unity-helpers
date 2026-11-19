@@ -2264,7 +2264,7 @@ function Run-ReleasePublishWorkflowBudgetContractTests {
   $workflowContent = Get-Content -Path $workflowPath -Raw
   $unityTestsWorkflowPath = Join-Path $repoRoot '.github/workflows/unity-tests.yml'
   $unityTestsWorkflowContent = Get-Content -Path $unityTestsWorkflowPath -Raw
-  $exporterPath = Join-Path $repoRoot 'scripts/unity/export-unitypackage.sh'
+  $exporterPath = Join-Path $repoRoot 'scripts/unity/export_unitypackage.py'
   $exporterContent = Get-Content -Path $exporterPath -Raw
   $dockerRunnerPath = Join-Path $repoRoot 'scripts/unity/run-unity-docker.sh'
   $dockerRunnerContent = Get-Content -Path $dockerRunnerPath -Raw
@@ -2273,7 +2273,7 @@ function Run-ReleasePublishWorkflowBudgetContractTests {
   $smokeJob = [regex]::Match($unityTestsWorkflowContent, '(?ms)^  unitypackage-smoke:\s*$.*?(?=^  [A-Za-z0-9_-]+:\s*$|\z)').Value
   $unityTimeoutMatch = [regex]::Match(
     $exporterContent,
-    'UNITY_TIMEOUT="\$\{UNITY_TIMEOUT:-(?<seconds>\d+)\}"'
+    '(?m)^DEFAULT_UNITY_TIMEOUT = "(?<seconds>\d+)"$'
   )
   $activationTimeoutMatch = [regex]::Match($dockerRunnerContent, 'UNITY_LICENSE_ACTIVATION_TIMEOUT="\$\{UNITY_LICENSE_ACTIVATION_TIMEOUT:-(?<seconds>\d+)\}"')
   $returnTimeoutMatch = [regex]::Match($dockerRunnerContent, 'UNITY_LICENSE_RETURN_TIMEOUT="\$\{UNITY_LICENSE_RETURN_TIMEOUT:-(?<seconds>\d+)\}"')
@@ -2330,20 +2330,8 @@ function Run-ReleasePublishWorkflowBudgetContractTests {
     }
   }
   $timeoutBudgetIsCoherent = $unityTimeoutMatch.Success -and $activationTimeoutMatch.Success -and $returnTimeoutMatch.Success -and $terminationGraceMatch.Success -and $containerWrapperMatch.Success -and $dockerClientTimeoutMatch.Success -and $dockerClientGraceMatch.Success -and $timeoutBudgetFailures.Count -eq 0
-  $teeFailureMessageIndex = $exporterContent.IndexOf('Failed to persist Unity package export log with tee exit code')
-  $unityFailureMessageIndex = $exporterContent.IndexOf('Unity package export failed with exit code')
-  $exporterPersistsUnityLog = (
-    $exporterContent.Contains('UNITY_LOG="${INTERNAL_OUTPUT_DIR}/unity.log"') -and
-    $exporterContent.Contains('-logFile - 2>&1 | tee "${UNITY_LOG}"') -and
-    $exporterContent.Contains('UNITY_EXPORT_PIPE_STATUS=("${PIPESTATUS[@]}")') -and
-    $exporterContent.Contains('UNITY_EXIT_CODE="${UNITY_EXPORT_PIPE_STATUS[0]}"') -and
-    $exporterContent.Contains('TEE_EXIT_CODE="${UNITY_EXPORT_PIPE_STATUS[1]}"') -and
-    $exporterContent.Contains('Unity package export failed with exit code') -and
-    $exporterContent.Contains('Failed to persist Unity package export log with tee exit code') -and
-    $teeFailureMessageIndex -ge 0 -and
-    $unityFailureMessageIndex -ge 0 -and
-    $teeFailureMessageIndex -lt $unityFailureMessageIndex
-  )
+  $packageScripts = (Get-Content -LiteralPath (Join-Path $repoRoot 'package.json') -Raw | ConvertFrom-Json).scripts
+  $exporterLoggingControlIsRegistered = $packageScripts.'test:create-unitypackage' -match '\bpytest\b.*\bscripts/tests/test_unitypackage_export\.py\b'
   $releaseCreatesPortableUnityPackage = (
     $releaseJob.Contains('runs-on: ubuntu-latest') -and
     $releaseJob.Contains('run: uv run --project scripts/python~ --locked --no-dev python scripts/unity/create_unitypackage.py') -and
@@ -2413,8 +2401,8 @@ function Run-ReleasePublishWorkflowBudgetContractTests {
 
   Write-TestResult `
     -TestName 'unitypackage exporter persists Unity log and preserves exit code' `
-    -Passed $exporterPersistsUnityLog `
-    -Message 'Expected export-unitypackage.sh to tee Unity stdout to unitypackage-output/unity.log, preserve the original Unity command exit code, and fail when tee cannot persist the log.'
+    -Passed $exporterLoggingControlIsRegistered `
+    -Message 'Expected the package contract to run the local exporter log and exit-status integration tests.'
 
   Write-TestResult `
     -TestName 'release unitypackage creation is portable and license-free' `

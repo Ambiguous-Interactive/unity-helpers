@@ -162,14 +162,12 @@ function uploadedDirectories() {
 function unityProjectDirectories() {
   const found = new Map();
   const exportScript = fs.readFileSync(
-    path.join(repoRoot, "scripts", "unity", "export-unitypackage.sh"),
+    path.join(repoRoot, "scripts", "unity", "export_unitypackage.py"),
     "utf8"
   );
-  const exportDefault =
-    /PROJECT_DIR="\$\{UNITY_PACKAGE_PROJECT_DIR:-\$\{REPO_ROOT\}\/([^"}]+)\}"/.exec(exportScript);
-  if (exportDefault) {
-    found.set(exportDefault[1], "scripts/unity/export-unitypackage.sh default");
-  }
+  const exportDefault = /^DEFAULT_PROJECT_DIRECTORY = "([^"]+)"$/m.exec(exportScript);
+  assert.ok(exportDefault, "The local package export must declare its default project directory");
+  found.set(exportDefault[1], "scripts/unity/export_unitypackage.py default");
   for (const { name, lines } of readWorkflows()) {
     for (const line of lines) {
       const flag = /--project-dir\s+"?([^"\s\\]+)"?/.exec(line);
