@@ -126,6 +126,19 @@ def paths_alias(first: Path, second: Path) -> bool:
     )
 
 
+def open_package_destination(output_path: Path, mode: int) -> IO[bytes]:
+    flags = os.O_CREAT | os.O_WRONLY
+    try:
+        descriptor = os.open(output_path, flags | os.O_TRUNC, mode)
+    except PermissionError:
+        if not output_path.is_file():
+            raise
+        # Match cp -f when a read-only destination sits in a writable directory.
+        output_path.unlink()
+        descriptor = os.open(output_path, flags | os.O_EXCL, mode)
+    return os.fdopen(descriptor, "wb")
+
+
 def publish_package(package: Path, log: Path, output_path: Path) -> None:
     checksum_path = output_path.with_name(f"{output_path.name}.sha256")
     for first, second in combinations((package, log, output_path, checksum_path), 2):
@@ -137,9 +150,7 @@ def publish_package(package: Path, log: Path, output_path: Path) -> None:
     mode = package.stat().st_mode & 0o777
     with (
         package.open("rb") as source,
-        os.fdopen(
-            os.open(output_path, os.O_CREAT | os.O_WRONLY | os.O_TRUNC, mode), "wb"
-        ) as output,
+        open_package_destination(output_path, mode) as output,
     ):
         shutil.copyfileobj(source, output)
     with output_path.open("rb") as package_file:

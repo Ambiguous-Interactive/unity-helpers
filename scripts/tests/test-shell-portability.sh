@@ -954,30 +954,26 @@ case "${1:-}" in
             wait "${container_pid}"
         }
         if [[ "${FAKE_SIGNAL_PHASE:-main}" == "registration" ]]; then
-            printf 'docker registration pending\n' >> "${FAKE_EVENT_LOG}"
             trap '' TERM
-            while [[ ! -f "${FAKE_REGISTRATION_RELEASE_FILE}" ]]; do
-                sleep 0.1
-            done
+            # Start the independent daemon before announcing that the client
+            # can be signaled. The timeout can then kill the entire client group.
+            set -m
             (
-                # Model a daemon independent of the canceled CLI. Without this
-                # reset, the fake container inherits the client's ignored TERM.
                 trap - TERM
-                # Register only after cleanup's first inspect has finished. This
-                # phase exists to prove cleanup RETRIES across a late
-                # registration, so a registration that lands first proves
-                # nothing -- and a fixed sleep made which landed first a
-                # property of runner load, which is how it flaked (#526). The
-                # deadline only stops a hang; missing the barrier still fails
-                # the ordering assertion, which is the regression to report.
                 registration_deadline=$((SECONDS + 20))
-                while ! grep -qE '^fake inspect end ' "${FAKE_EVENT_LOG}"; do
-                    [[ "${SECONDS}" -lt "${registration_deadline}" ]] || break
+                while [[ ! -f "${FAKE_REGISTRATION_RELEASE_FILE}" ]] ||
+                    ! grep -qE '^fake inspect end ' "${FAKE_EVENT_LOG}"; do
+                    [[ "${SECONDS}" -lt "${registration_deadline}" ]] || exit 1
                     sleep 0.05
                 done
                 launch_fake_container
             ) &
             printf '%s\n' "$!" > "${FAKE_DOCKER_DAEMON_PID_FILE}"
+            set +m
+            printf 'docker registration pending\n' >> "${FAKE_EVENT_LOG}"
+            while [[ ! -f "${FAKE_REGISTRATION_RELEASE_FILE}" ]]; do
+                sleep 0.1
+            done
             exit 143
         fi
         launch_fake_container
@@ -1212,7 +1208,9 @@ if [[ -z "$h1_failure" ]]; then
         if [[ "$h1_ready" -ne 1 ]]; then
             h1_failure="${h1_signal_phase} signal fixture did not reach its licensed phase"
             kill -KILL "$h1_wrapper_pid" 2>/dev/null || true
-            wait "$h1_wrapper_pid" 2>/dev/null || true
+            h1_output="$h1_signal_output"
+            h1_exit=0
+            wait "$h1_wrapper_pid" 2>/dev/null || h1_exit=$?
             break
         fi
 
@@ -1262,6 +1260,8 @@ if [[ -z "$h1_failure" ]]; then
             h1_failure="docker run client TERM did not preserve the configured 12-second container cleanup grace"
         fi
         if [[ -n "$h1_failure" ]]; then
+            h1_output="$h1_signal_output"
+            h1_exit="$h1_wrapper_exit"
             break
         fi
     done

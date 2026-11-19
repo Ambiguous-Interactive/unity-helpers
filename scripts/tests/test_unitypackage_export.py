@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import shutil
+import stat
 import subprocess
 import sys
 import tarfile
@@ -301,6 +302,34 @@ def test_publication_alias_cannot_overwrite_export_evidence(repository: Path, al
     assert log.read_bytes() == LOG
     assert (internal_directory / output.name).read_bytes() == PACKAGE
     assert not output.exists() or output.is_symlink()
+
+
+@pytest.mark.parametrize("symlink", [False, True])
+def test_publish_replaces_read_only_output(repository: Path, symlink: bool) -> None:
+    project = repository.parent / "staged"
+    output = repository.parent / "release.unitypackage"
+    existing = repository.parent / "retained.unitypackage" if symlink else output
+    existing.write_bytes(b"old archive")
+    existing.chmod(0o444)
+    if symlink:
+        output.symlink_to(existing)
+    can_overwrite = os.access(existing, os.W_OK)
+
+    result = run_launcher(repository, "--output", str(output), "--project-dir", str(project))
+
+    assert result.returncode == 0, result.stderr
+    assert output.read_bytes() == PACKAGE
+    checksum = output.with_suffix(".unitypackage.sha256")
+    assert (
+        checksum.read_text(encoding="ascii")
+        == f"{hashlib.sha256(PACKAGE).hexdigest()}  {output.name}\n"
+    )
+    if not can_overwrite:
+        staged_package = project / "unitypackage-output" / output.name
+        assert stat.S_IMODE(output.stat().st_mode) == stat.S_IMODE(staged_package.stat().st_mode)
+        if symlink:
+            assert not output.is_symlink()
+            assert existing.read_bytes() == b"old archive"
 
 
 @pytest.mark.parametrize("alias", ["log", "directory"])
