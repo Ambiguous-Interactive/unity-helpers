@@ -7,14 +7,19 @@ import os
 import shutil
 import subprocess
 import sys
-from pathlib import Path
-from typing import cast
+from contextlib import contextmanager
+from pathlib import Path, PureWindowsPath
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import lint_pwsh_invocations as scanner
 import pwsh_invocation_asts as policy
 from pwsh_invocation_text import CulturePatterns, remove_inline_comment, scan_source
+
+if TYPE_CHECKING:
+    from collections.abc import Generator, Iterator
 
 ROOT = Path(__file__).resolve().parents[2]
 LINTER = "scripts/lint-pwsh-invocations.ps1"
@@ -598,11 +603,186 @@ def test_direct_cli_rejects_an_incomplete_native_response(tmp_path: Path) -> Non
     root = tmp_path / "fixtures"
     copy_native_linter(root)
     (root / "scripts/subject.ps1").write_text("param([int[]]$Paths)\n", encoding="utf-8")
+    native_payload = json.dumps({"ast": [], "culture": "", "word_ranges": WORD_RANGES})
     (root / "scripts/read-pwsh-invocation-facts.ps1").write_text(
-        """[Console]::Out.WriteLine('{"ast":[],"culture":"","word_ranges":[[65,90]]}')\n""",
-        encoding="utf-8",
+        f"[Console]::Out.WriteLine('{native_payload}')\n", encoding="utf-8"
     )
+    (root / "tool.sh").write_text("pwsh -File tool.ps1 -- payload\n", encoding="utf-8")
     result = direct_lint(root, root)
     assert result.returncode == 1
+    assert b"tool.sh:1: PWS001" in result.stdout
+    assert b"PWS005" not in result.stdout
     assert b"did not report every requested script" in result.stderr
     assert b"OK: No pwsh" not in result.stdout
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Windows reserves backslashes as separators")
+def test_native_parser_keeps_literal_backslashes_in_filenames(tmp_path: Path) -> None:
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    clean = scripts / "clean\\name.ps1"
+    clean.write_text("Write-Output clean\n", encoding="utf-8")
+    result = direct_lint(tmp_path)
+    assert result.returncode == 0
+    assert result.stderr == b""
+
+    unsafe = scripts / "unsafe\\name.ps1"
+    unsafe.write_text("Start-Process -FilePath tool -ArgumentList $arguments\n", encoding="utf-8")
+    result = direct_lint(tmp_path)
+    assert result.returncode == 1
+    assert result.stderr == b""
+    assert b"scripts/unsafe\\name.ps1:1: PWS006" in result.stdout
+    assert b"PWS005" not in result.stdout
+
+
+def test_disappearing_directory_entry_keeps_other_targets(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    survivor = scripts / "survivor.ps1"
+    survivor.write_text("param([int[]]$Paths)\n", encoding="utf-8")
+    scandir = os.scandir
+
+    class MissingEntry:
+        def stat(self, *, follow_symlinks: bool = True) -> os.stat_result:
+            assert not follow_symlinks
+            raise FileNotFoundError("The entry disappeared")
+
+    @contextmanager
+    def scan(directory: Path) -> Generator[Iterator[os.DirEntry[str]], None, None]:
+        with scandir(directory) as entries:
+            if directory == scripts:
+                yield iter((cast("os.DirEntry[str]", MissingEntry()), *entries))
+            else:
+                yield entries
+
+    monkeypatch.setattr(os, "scandir", scan)
+    assert list(scanner.walk_files(scripts)) == [survivor]
+
+
+def test_git_timeout_falls_back_to_all_owned_scripts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    (scripts / "owned.ps1").write_text("param([int[]]$Paths)\n", encoding="utf-8")
+    assert shutil.which("git")
+
+    def timeout(*_args: object, **_kwargs: object) -> subprocess.CompletedProcess[bytes]:
+        raise subprocess.TimeoutExpired("git", 30)
+
+    monkeypatch.setattr(subprocess, "run", timeout)
+    assert scanner.targets(tmp_path)[1] == ["scripts/owned.ps1"]
+
+
+def test_target_identity_uses_spelling_even_with_windows_paths(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = cast("Path", PureWindowsPath("C:/fixture"))
+
+    def walk(directory: Path, **_options: object) -> Iterator[Path]:
+        if directory == root:
+            yield root / "Case.sh"
+            yield root / "case.sh"
+            yield root / "case.sh"
+
+    def absent(_path: PureWindowsPath) -> bool:
+        return False
+
+    def ignore_nothing(_path: Path) -> set[str]:
+        return set()
+
+    monkeypatch.setattr(scanner, "walk_files", walk)
+    monkeypatch.setattr(PureWindowsPath, "exists", absent, raising=False)
+    monkeypatch.setattr(scanner, "ignored_ast_paths", ignore_nothing)
+    assert scanner.targets(root)[0] == ["Case.sh", "case.sh"]
+
+
+def test_other_case_of_launcher_name_is_still_checked(tmp_path: Path) -> None:
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    policy_fixture = scripts / "Lint-pwsh-invocations.ps1"
+    policy_fixture.write_text("param([string[]]$Paths)\n", encoding="utf-8")
+    result = direct_lint(tmp_path)
+    assert result.returncode == 1
+    assert result.stderr == b""
+    assert b"scripts/Lint-pwsh-invocations.ps1:1: PWS005" in result.stdout
+
+
+@pytest.mark.parametrize(
+    ("positional", "parameter", "wanted"),
+    [
+        ("PositionalBinding = $false", "ValueFromRemainingArguments = $false", "Paths, Extra"),
+        (
+            "PositionalBinding = $false",
+            "HelpMessage = 'ValueFromRemainingArguments'",
+            "Paths, Extra",
+        ),
+        ("HelpUri = 'PositionalBinding = $false'", "ValueFromRemainingArguments = $true", "Paths"),
+        ("PositionalBinding = $false", "ValueFromRemainingArguments", ""),
+        ("PositionalBinding = $false", "ValueFromRemainingArguments = $true", ""),
+    ],
+)
+def test_native_array_policy_uses_named_boolean_arguments(
+    tmp_path: Path, positional: str, parameter: str, wanted: str
+) -> None:
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    (scripts / "subject.ps1").write_text(
+        f"[CmdletBinding({positional})]\nparam([string[]]$Paths, "
+        f"[Parameter({parameter})][object[]]$Extra)\n",
+        encoding="utf-8",
+    )
+    result = direct_lint(tmp_path)
+    assert result.stderr == b""
+    assert result.returncode == int(bool(wanted))
+    if wanted:
+        assert f"PWS005 declares array parameter(s) {wanted} but".encode() in result.stdout
+
+
+@pytest.mark.parametrize(
+    "host_name",
+    [
+        "pwsh",
+        pytest.param(
+            "powershell.exe",
+            marks=pytest.mark.skipif(
+                os.name != "nt", reason="Windows PowerShell is a Windows host"
+            ),
+        ),
+    ],
+)
+def test_legacy_launcher_decodes_unicode_and_restores_console_encoding(
+    tmp_path: Path, host_name: str
+) -> None:
+    host = shutil.which(host_name)
+    assert host is not None
+    copy_native_linter(tmp_path)
+    (tmp_path / "scripts/caf\u00e9.ps1").write_text("param([int[]]$Paths)\n", encoding="utf-8")
+    command = (
+        "[Console]::OutputEncoding = [Text.Encoding]::GetEncoding(28591); "
+        "$diagnostics = @(& $env:PWS_AST_FIXTURE_LINTER); $status = $LASTEXITCODE; "
+        "$restored = [Console]::OutputEncoding.CodePage; "
+        "[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false); "
+        "[Console]::WriteLine(($diagnostics -join [Environment]::NewLine)); "
+        '[Console]::WriteLine("Restored: $restored"); exit $status'
+    )
+    result = subprocess.run(
+        [host, "-NoProfile", "-NonInteractive", "-Command", command],
+        cwd=tmp_path,
+        env={
+            **os.environ,
+            "NO_COLOR": "1",
+            "PWS_AST_FIXTURE_LINTER": str(tmp_path / LINTER),
+            "UV_PROJECT_ENVIRONMENT": str(tmp_path / "environment"),
+        },
+        check=False,
+        capture_output=True,
+        timeout=60,
+    )
+    assert result.returncode == 1
+    assert result.stderr == b""
+    output = result.stdout.decode("utf-8")
+    assert "scripts/caf\u00e9.ps1:1: PWS005" in output
+    assert "Restored: 28591" in output

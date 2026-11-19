@@ -7,12 +7,33 @@ if ($null -ne $request.culture) {
     [System.Globalization.CultureInfo]::CurrentCulture =
         [System.Globalization.CultureInfo]::GetCultureInfo($request.culture)
 }
+function Test-AttributeSwitch($attributes, [string]$typePattern, [string]$name, [bool]$value) {
+    foreach ($attribute in $attributes) {
+        if ($attribute -isnot [System.Management.Automation.Language.AttributeAst] -or
+            $attribute.TypeName.FullName -notmatch $typePattern) { continue }
+
+        foreach ($argument in $attribute.NamedArguments) {
+            if ($argument.ArgumentName -ine $name) { continue }
+            if ($argument.ExpressionOmitted) {
+                if ($value) { return $true }
+                continue
+            }
+            $expression = $argument.Argument
+            if ($expression -is [System.Management.Automation.Language.VariableExpressionAst] -and
+                $expression.VariablePath.UserPath -ieq [string]$value) { return $true }
+        }
+    }
+    return $false
+}
+
+$cmdletBinding = '^(?:System\.Management\.Automation\.)?CmdletBinding(?:Attribute)?$'
+$parameterAttribute = '^(?:System\.Management\.Automation\.)?Parameter(?:Attribute)?$'
 $pws006AllowMarker = '#\s*lint-pwsh-invocations:\s*allow-start-process-argument-list\s+\S+'
 $astFacts = [System.Collections.Generic.List[object]]::new()
 foreach ($rel in $request.paths) {
-
     $parseErrors = $null
-    $ast = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $request.root $rel), [ref]$null, [ref]$parseErrors)
+    $path = [System.IO.Path]::Combine($request.root, $rel)
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$null, [ref]$parseErrors)
     if ($parseErrors -and $parseErrors.Count -gt 0) {
         $firstError = $parseErrors[0]
         $astFacts.Add(@{
@@ -61,9 +82,9 @@ foreach ($rel in $request.paths) {
         @{
             line = $paramBlock.Extent.StartLineNumber
             text = $paramBlock.Extent.Text.Split("`n")[0].Trim()
-            positional_disabled = [bool](@(foreach ($attribute in $paramBlock.Attributes) { $attribute.Extent.Text }) -match 'PositionalBinding\s*=\s*\$false')
+            positional_disabled = Test-AttributeSwitch $paramBlock.Attributes $cmdletBinding 'PositionalBinding' $false
             parameters = @(foreach ($parameter in $paramBlock.Parameters) {
-                $remaining = [bool](@(foreach ($attribute in $parameter.Attributes) { $attribute.Extent.Text }) -match 'ValueFromRemainingArguments')
+                $remaining = Test-AttributeSwitch $parameter.Attributes $parameterAttribute 'ValueFromRemainingArguments' $true
                 @{
                     name = $parameter.Name.VariablePath.UserPath
                     array_type = -not $remaining -and $null -ne $parameter.StaticType -and $parameter.StaticType.IsArray

@@ -60,7 +60,10 @@ def walk_files(
                 continue
             with os.scandir(directory) as entries:
                 for entry in entries:
-                    info = entry.stat(follow_symlinks=False)
+                    try:
+                        info = entry.stat(follow_symlinks=False)
+                    except (FileNotFoundError, NotADirectoryError):
+                        continue
                     attributes = cast("int", getattr(info, "st_file_attributes", 0))
                     hidden = (
                         bool(attributes & stat.FILE_ATTRIBUTE_HIDDEN)
@@ -82,32 +85,35 @@ def walk_files(
             continue
 
 
-def file_order(path: Path) -> tuple[str, str]:
-    return path.as_posix().casefold(), path.as_posix()
+def file_order(path: str) -> tuple[str, str]:
+    return path.casefold(), path
 
 
 def ignored_ast_paths(root: Path) -> set[str]:
     git = shutil.which("git")
     if git is None:
         return set()
-    result = subprocess.run(  # noqa: S603 - resolved Git with fixed, read-only arguments.
-        [
-            git,
-            "-C",
-            str(root),
-            "ls-files",
-            "-z",
-            "--others",
-            "--ignored",
-            "--exclude-standard",
-            "--",
-            "scripts",
-            ".githooks",
-        ],
-        capture_output=True,
-        check=False,
-        timeout=30,
-    )
+    try:
+        result = subprocess.run(  # noqa: S603 - resolved Git with fixed, read-only arguments.
+            [
+                git,
+                "-C",
+                str(root),
+                "ls-files",
+                "-z",
+                "--others",
+                "--ignored",
+                "--exclude-standard",
+                "--",
+                "scripts",
+                ".githooks",
+            ],
+            capture_output=True,
+            check=False,
+            timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return set()
     if result.returncode != 0:
         return set()
     return {os.fsdecode(path) for path in result.stdout.split(b"\0") if path}
@@ -115,41 +121,38 @@ def ignored_ast_paths(root: Path) -> set[str]:
 
 def targets(root: Path) -> tuple[list[str], list[str]]:
     scripts = [
-        path.relative_to(root)
+        path.relative_to(root).as_posix()
         for path in walk_files(root / "scripts", recursive=True)
         if path.suffix.casefold() == ".ps1"
     ]
-    hooks = list(walk_files(root / ".githooks"))
-    workflow_paths = walk_files(root / ".github" / "workflows")
-    package = root / "package.json"
     text_paths = set(scripts)
-    text_paths.update(path.relative_to(root) for path in hooks)
+    text_paths.update(path.relative_to(root).as_posix() for path in walk_files(root / ".githooks"))
     text_paths.update(
-        path.relative_to(root)
-        for path in workflow_paths
+        path.relative_to(root).as_posix()
+        for path in walk_files(root / ".github" / "workflows")
         if path.suffix.casefold() in {".yaml", ".yml"}
     )
     text_paths.update(
-        path.relative_to(root)
+        path.relative_to(root).as_posix()
         for path in walk_files(root, recursive=True, excluded_roots=IGNORED_ROOTS)
         if path.suffix.casefold() == ".sh"
     )
-    if package.exists():
-        text_paths.add(package.relative_to(root))
+    if (root / "package.json").exists():
+        text_paths.add("package.json")
 
     owned_hooks = [
-        path.relative_to(root)
+        path.relative_to(root).as_posix()
         for path in walk_files(root / ".githooks", recursive=True)
         if path.suffix.casefold() == ".ps1"
     ]
     ignored = ignored_ast_paths(root)
     ast_paths = [
-        path.as_posix()
+        path
         for group in (scripts, owned_hooks)
         for path in sorted(group, key=file_order)
-        if path.as_posix().casefold() not in SELF and path.as_posix() not in ignored
+        if path not in SELF and path not in ignored
     ]
-    return [path.as_posix() for path in sorted(text_paths, key=file_order)], ast_paths
+    return sorted(text_paths, key=file_order), ast_paths
 
 
 def read_lines(path: Path) -> list[str]:
@@ -188,10 +191,12 @@ def native_facts(
     if result.returncode != 0 or result.stderr:
         detail = result.stderr.decode("utf-8", errors="replace").strip()
         raise ValueError(f"PowerShell syntax reader failed (exit {result.returncode}): {detail}")
-    return require_fields(json.loads(result.stdout), ast=list, culture=str)
+    return require_fields(json.loads(result.stdout), culture=str)
 
 
-def lint(root: Path, culture: str | None, pshome: Path | None, *, verbose: bool) -> list[Violation]:
+def lint(
+    root: Path, culture: str | None, pshome: Path | None, *, verbose: bool
+) -> tuple[list[Violation], str | None]:
     text_paths, ast_paths = targets(root)
     if verbose:
         print(f"{LABEL} Scanning {len(text_paths)} file(s)")
@@ -202,7 +207,7 @@ def lint(root: Path, culture: str | None, pshome: Path | None, *, verbose: bool)
     )
     findings: list[Violation] = []
     for relative in text_paths:
-        if relative.casefold() in SELF:
+        if relative in SELF:
             continue
         try:
             lines = read_lines(root / relative)
@@ -211,11 +216,16 @@ def lint(root: Path, culture: str | None, pshome: Path | None, *, verbose: bool)
                 print(f"{LABEL} Skipping unreadable file: {relative}")
             continue
         findings.extend(scan_source(relative, lines, patterns))
-    scripts = read_facts(batch["ast"])
-    if [fact["path"] for fact in scripts] != ast_paths:
-        raise ValueError("PowerShell syntax reader did not report every requested script in order.")
-    findings.extend(violations(scripts))
-    return findings
+    try:
+        scripts = read_facts(batch["ast"])
+        if [fact["path"] for fact in scripts] != ast_paths:
+            raise ValueError(
+                "PowerShell syntax reader did not report every requested script in order."
+            )
+        findings.extend(violations(scripts))
+    except (ValueError, KeyError, TypeError, IndexError) as error:
+        return findings, str(error)
+    return findings, None
 
 
 def main() -> int:
@@ -230,7 +240,7 @@ def main() -> int:
         root = cast("Path", args.repo_root).resolve(strict=True)
         if not root.is_dir():
             raise ValueError(f"Repository root is not a directory: {root}")
-        findings = lint(root, args.culture, args.pshome, verbose=args.verbose)
+        findings, ast_error = lint(root, args.culture, args.pshome, verbose=args.verbose)
     except (
         OSError,
         subprocess.SubprocessError,
@@ -246,6 +256,10 @@ def main() -> int:
             print(f"    > {finding['content']}")
     if findings:
         print(f"\n{LABEL} {len(findings)} violation(s) found.")
+    if ast_error is not None:
+        print(f"{LABEL} AST checks failed: {ast_error}", file=sys.stderr)
+        return 1
+    if findings:
         return 1
     if args.verbose:
         print(f"{LABEL} OK: No pwsh/powershell invocation anti-patterns detected.")

@@ -490,6 +490,7 @@ runTest("no linter in scripts/ has been left unreachable", () => {
     ["scripts/validate-github-pages-css.sh", "pages-css-controls"],
     ["scripts/validate-npm-package.ps1", "npm-package-controls"],
     ["scripts/validate-mcp-config.ps1", "mcp-config-controls"],
+    ["scripts/lint-pwsh-invocations.ps1", "pwsh-invocation-controls"],
 
     ["scripts/lint-comparison-direction.js", "comparison-controls"],
     ["scripts/validate-build-lock-action-inputs.js", "policy-controls"],
@@ -529,6 +530,10 @@ runTest("no linter in scripts/ has been left unreachable", () => {
     [
       "mcp-config-controls",
       (file) => registeredControlsInvoke(file, "scripts/tests/test_mcp_config.py")
+    ],
+    [
+      "pwsh-invocation-controls",
+      (file) => registeredControlsInvoke(file, "scripts/tests/test_pwsh_invocation_asts.py")
     ],
     [
       "push-config-controls",
