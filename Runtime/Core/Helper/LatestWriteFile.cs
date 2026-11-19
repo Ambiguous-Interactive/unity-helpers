@@ -6,22 +6,27 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     using System;
     using System.Collections.Generic;
     using System.IO;
-    using System.Runtime.InteropServices;
+    using System.Threading;
+    using PendingWrite = WallstopStudios.UnityHelpers.Core.Helper.LatestWriteFilePathOrder.PendingWrite;
     using WritePayload = WallstopStudios.UnityHelpers.Core.OneOf.FastOneOf<string, byte[]>;
 #if !SINGLE_THREADED
-    using System.Threading;
+    using System.Diagnostics;
+    using System.Threading.Tasks;
 #endif
 
     /// <summary>Coalesces queued file writes and flushes the latest pending payload for each path.</summary>
     /// <remarks>
-    /// Accepted submissions retain immutable text or a byte copy but do not prove persistence. Flush before a durable
-    /// boundary; disposal stops submissions and flushes accepted work. A write already in progress
-    /// finishes before a newer payload for the same path. Failures remain observable until a later
-    /// successful write to that path. DurableFile's replacement and crash-durability limits apply.
+    /// Flush before a durable boundary. Disposal stops submissions and flushes accepted work.
+    /// Writers share publication order for each normalized path in the process. An older submission
+    /// flushed after a newer attempt takes that attempt's result without writing. A newer submission
+    /// waiting in a manual batch does not delay an older writer's flush.
+    /// DurableFile's replacement and crash-durability limits apply.
     /// </remarks>
     public sealed class LatestWriteFile : IDisposable
     {
-        private static readonly StringComparer PathComparer = CreatePathComparer();
+#if !SINGLE_THREADED
+        private static readonly TimeSpan MaximumWait = TimeSpan.FromMilliseconds(int.MaxValue);
+#endif
 
         /// <summary>Gets the number of distinct queued paths, excluding writes already in progress.</summary>
         public int PendingPathCount
@@ -54,12 +59,14 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         private readonly Dictionary<string, Exception> _failures = new Dictionary<
             string,
             Exception
-        >(PathComparer);
+        >(LatestWriteFilePathOrder.PathComparer);
 #if !SINGLE_THREADED
         private readonly WaitCallback _drainCallback;
+        private readonly Func<Exception> _flushCallback;
+        private Task<Exception> _queuedFlush;
 #endif
-        private Dictionary<string, WritePayload> _pending = new Dictionary<string, WritePayload>(
-            PathComparer
+        private Dictionary<string, PendingWrite> _pending = new(
+            LatestWriteFilePathOrder.PathComparer
         );
         private bool _accepting = true;
         private bool _workerScheduled;
@@ -76,14 +83,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             _onFailure = onFailure;
 #if !SINGLE_THREADED
             _drainCallback = DrainPendingWrites;
+            _flushCallback = FlushInBackground;
 #endif
-        }
-
-        private static StringComparer CreatePathComparer()
-        {
-            bool isWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
-            bool isMac = RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
-            return isWindows || isMac ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
         }
 
         private static string NormalizePath(string path)
@@ -133,6 +134,26 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 
+        /// <summary>Queues the supplied byte array without copying it.</summary>
+        /// <remarks>
+        /// On acceptance, the caller transfers ownership and must stop modifying or recycling the array.
+        /// Null bytes are an empty file. Flush reports persistence or a later submission's result.
+        /// </remarks>
+        public bool TryEnqueueOwnedBytes(string path, byte[] contents, out Exception error)
+        {
+            try
+            {
+                string normalized = NormalizePath(path);
+                WritePayload payload = contents ?? Array.Empty<byte>();
+                return TryEnqueueOwned(normalized, payload, out error);
+            }
+            catch (Exception exception)
+            {
+                error = exception;
+                return false;
+            }
+        }
+
         /// <summary>Synchronously flushes the current batch and reports unresolved write failures.</summary>
         public bool Flush()
         {
@@ -143,30 +164,105 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <remarks>Concurrent submissions after the batch is captured may remain pending. Failure callbacks may reenter the writer.</remarks>
         public bool Flush(out Exception error)
         {
+            return FlushBatch(queued: false, out error);
+        }
+
+        /// <summary>Starts a flush and waits up to the specified limit for its result.</summary>
+        /// <remarks>
+        /// A timeout returns false with a <see cref="TimeoutException"/>. The flush continues in the background.
+        /// Failure callbacks may run on a worker thread even for a manual writer.
+        /// <see cref="Timeout.InfiniteTimeSpan"/> performs a synchronous flush.
+        /// Finite limits require a threaded build.
+        /// </remarks>
+        public bool Flush(TimeSpan limit, out Exception error)
+        {
+            if (limit == Timeout.InfiniteTimeSpan)
+            {
+                return Flush(out error);
+            }
+            if (limit < TimeSpan.Zero)
+            {
+                error = new ArgumentOutOfRangeException(nameof(limit));
+                return false;
+            }
+#if SINGLE_THREADED
+            error = new PlatformNotSupportedException(
+                "A timed flush requires a background thread."
+            );
+            return false;
+#else
+            try
+            {
+                long started = Stopwatch.GetTimestamp();
+                Task<Exception> completion;
+                lock (_stateGate)
+                {
+                    _queuedFlush ??= Task.Run(_flushCallback);
+                    completion = _queuedFlush;
+                }
+                TimeSpan remaining = limit - StopwatchTimestamp.Since(started);
+                while (MaximumWait < remaining && !completion.Wait(MaximumWait))
+                {
+                    remaining = limit - StopwatchTimestamp.Since(started);
+                }
+                TimeSpan wait = remaining < TimeSpan.Zero ? TimeSpan.Zero : remaining;
+                if (!completion.IsCompleted && !completion.Wait(wait))
+                {
+                    error = new TimeoutException("The file flush is still running.");
+                    return false;
+                }
+                error = completion.GetAwaiter().GetResult();
+                return error == null;
+            }
+            catch (Exception exception)
+            {
+                error = exception;
+                return false;
+            }
+#endif
+        }
+
+        /// <summary>Stops accepting writes and synchronously flushes accepted work.</summary>
+        /// <remarks>Inspect Failure or call Flush to observe a failed final write; disposal does not throw.</remarks>
+        public void Dispose()
+        {
+            lock (_stateGate)
+            {
+                _accepting = false;
+            }
+            Flush(out _);
+        }
+
+        private bool FlushBatch(bool queued, out Exception error)
+        {
             List<KeyValuePair<string, Exception>> notifications = null;
             try
             {
                 lock (_writeGate)
                 {
-                    Dictionary<string, WritePayload> batch;
+                    Dictionary<string, PendingWrite> batch;
                     lock (_stateGate)
                     {
+#if !SINGLE_THREADED
+                        if (queued)
+                        {
+                            _queuedFlush = null;
+                        }
+#endif
                         if (_pending.Count == 0)
                         {
                             error = FirstFailureCore();
                             return error == null;
                         }
-                        Dictionary<string, WritePayload> next = new Dictionary<
-                            string,
-                            WritePayload
-                        >(PathComparer);
+                        Dictionary<string, PendingWrite> next = new(
+                            LatestWriteFilePathOrder.PathComparer
+                        );
                         batch = _pending;
                         _pending = next;
                     }
-                    foreach (KeyValuePair<string, WritePayload> entry in batch)
+                    foreach (KeyValuePair<string, PendingWrite> entry in batch)
                     {
-                        Exception failure = WriteOwned(entry.Key, entry.Value);
-                        if (failure != null)
+                        if (!TryPublishOwned(entry.Key, entry.Value, out Exception failure))
                         {
                             notifications ??= new List<KeyValuePair<string, Exception>>();
                             KeyValuePair<string, Exception> notification = new KeyValuePair<
@@ -197,17 +293,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 
-        /// <summary>Stops accepting writes and synchronously flushes accepted work.</summary>
-        /// <remarks>Inspect Failure or call Flush to observe a failed final write; disposal does not throw.</remarks>
-        public void Dispose()
-        {
-            lock (_stateGate)
-            {
-                _accepting = false;
-            }
-            Flush(out _);
-        }
-
         private bool TryEnqueueOwned(string path, WritePayload contents, out Exception error)
         {
             bool schedule = false;
@@ -218,7 +303,13 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     error = new ObjectDisposedException(nameof(LatestWriteFile));
                     return false;
                 }
-                _pending[path] = contents;
+                bool replacesPending = _pending.ContainsKey(path);
+                PendingWrite write = LatestWriteFilePathOrder.Reserve(
+                    path,
+                    replacesPending,
+                    contents
+                );
+                _pending[path] = write;
                 if (_writeInBackground && !_workerScheduled)
                 {
                     _workerScheduled = true;
@@ -255,16 +346,17 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             while (true)
             {
                 string path = null;
-                WritePayload contents = default;
+                PendingWrite write = default;
                 Exception failure;
+                bool success;
                 lock (_writeGate)
                 {
                     lock (_stateGate)
                     {
-                        foreach (KeyValuePair<string, WritePayload> entry in _pending)
+                        foreach (KeyValuePair<string, PendingWrite> entry in _pending)
                         {
                             path = entry.Key;
-                            contents = entry.Value;
+                            write = entry.Value;
                             break;
                         }
                         if (path == null)
@@ -274,9 +366,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         }
                         _pending.Remove(path);
                     }
-                    failure = WriteOwned(path, contents);
+                    success = TryPublishOwned(path, write, out failure);
                 }
-                if (failure != null)
+                if (!success)
                 {
                     NotifyFailure(path, failure);
                 }
@@ -284,6 +376,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
 #if !SINGLE_THREADED
+        private Exception FlushInBackground()
+        {
+            FlushBatch(queued: true, out Exception error);
+            return error;
+        }
+
         private void SchedulingFailed(string path, Exception error)
         {
             lock (_stateGate)
@@ -295,46 +393,22 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 #endif
 
-        private Exception WriteOwned(string path, WritePayload contents)
+        private bool TryPublishOwned(string path, PendingWrite write, out Exception error)
         {
-            Exception error;
-            try
-            {
-                bool success;
-                if (contents.TryGetT0(out string text))
-                {
-                    success = DurableFile.TryWriteAllText(path, text, out error);
-                }
-                else
-                {
-                    byte[] bytes = contents.AsT1;
-                    success = DurableFile.TryWriteAllBytes(path, bytes, out error);
-                }
-                if (success)
-                {
-                    error = null;
-                }
-                else if (error == null)
-                {
-                    error = new IOException("The durable write failed.");
-                }
-            }
-            catch (Exception exception)
-            {
-                error = exception;
-            }
+            bool success = write.TryPublish(path, out Exception failure);
             lock (_stateGate)
             {
-                if (error == null)
+                if (success)
                 {
                     _failures.Remove(path);
                 }
                 else
                 {
-                    _failures[path] = error;
+                    _failures[path] = failure;
                 }
             }
-            return error;
+            error = failure;
+            return success;
         }
 
         private void NotifyFailure(string path, Exception error)

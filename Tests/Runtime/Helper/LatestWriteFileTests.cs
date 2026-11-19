@@ -58,6 +58,49 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsTrue(writer.Failure == null);
         }
 
+        [TestCase(false)]
+        [TestCase(true)]
+        public void NewerSubmissionWinsAcrossWritersRegardlessOfFlushOrder(bool newestFirst)
+        {
+            string path = Path.Combine(_directory, "ordered.txt");
+            string alias = Path.Combine(_directory, "unused", "..", "ordered.txt");
+            using LatestWriteFile older = new(writeInBackground: false);
+            using LatestWriteFile newer = new(writeInBackground: false);
+            Assert.IsTrue(older.TryEnqueueText(path, "older", out _));
+            Assert.IsTrue(newer.TryEnqueueText(alias, "newer", out _));
+
+            LatestWriteFile first = newestFirst ? newer : older;
+            LatestWriteFile second = newestFirst ? older : newer;
+            Assert.IsTrue(first.Flush(out Exception error), error?.ToString());
+            Assert.That(File.ReadAllText(path), Is.EqualTo(newestFirst ? "newer" : "older"));
+            Assert.IsTrue(second.Flush(out error), error?.ToString());
+            Assert.That(File.ReadAllText(path), Is.EqualTo("newer"));
+            Assert.That(older.PendingPathCount, Is.Zero);
+            Assert.That(newer.PendingPathCount, Is.Zero);
+        }
+
+        [Test]
+        public void FailedNewerWriteDoesNotAllowAnOlderPayloadToBePublished()
+        {
+            string path = Path.Combine(_directory, "blocked");
+            Directory.CreateDirectory(path);
+            using LatestWriteFile older = new(writeInBackground: false);
+            using LatestWriteFile newer = new(writeInBackground: false);
+            Assert.IsTrue(older.TryEnqueueText(path, "older", out _));
+            Assert.IsTrue(newer.TryEnqueueText(path, "newer", out _));
+            Assert.IsFalse(newer.Flush(out Exception newerError));
+            Assert.That(newerError, Is.Not.Null);
+
+            Directory.Delete(path);
+            Assert.IsFalse(older.Flush(out Exception olderError));
+            Assert.That(olderError, Is.SameAs(newerError));
+            Assert.IsFalse(File.Exists(path));
+
+            Assert.IsTrue(older.TryEnqueueText(path, "recovered", out _));
+            Assert.IsTrue(older.Flush(out Exception retryError), retryError?.ToString());
+            Assert.That(File.ReadAllText(path), Is.EqualTo("recovered"));
+        }
+
         [Test]
         public void CaseAliasesFollowTheHostPathComparison()
         {
@@ -149,6 +192,56 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsTrue(error == null);
             Assert.That(File.ReadAllBytes(path), Is.Empty);
         }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void OwnedBytesReplacePendingTextAndPersistExactly(bool empty)
+        {
+            string path = Path.Combine(_directory, "owned.bin");
+            byte[] payload = empty ? null : new byte[] { 0, 255, 3, 0 };
+            byte[] expected = empty ? Array.Empty<byte>() : new byte[] { 0, 255, 3, 0 };
+            using LatestWriteFile writer = new(writeInBackground: false);
+            Assert.IsTrue(writer.TryEnqueueText(path, "discarded", out _));
+            Assert.IsTrue(writer.TryEnqueueOwnedBytes(path, payload, out Exception enqueueError));
+            Assert.That(enqueueError, Is.Null);
+            Assert.That(writer.PendingPathCount, Is.EqualTo(1));
+            Assert.IsTrue(writer.Flush(out Exception error), error?.ToString());
+            CollectionAssert.AreEqual(expected, File.ReadAllBytes(path));
+            writer.Dispose();
+            Assert.IsFalse(writer.TryEnqueueOwnedBytes(path, new byte[] { 1 }, out error));
+            Assert.That(error, Is.InstanceOf<ObjectDisposedException>());
+        }
+
+        [Test]
+        public void InvalidTimedFlushLeavesTheBatchForAnExplicitFlush()
+        {
+            string path = Path.Combine(_directory, "timed.txt");
+            using LatestWriteFile writer = new(writeInBackground: false);
+            Assert.IsTrue(writer.TryEnqueueText(path, "queued", out _));
+            TimeSpan invalidLimit = TimeSpan.FromTicks(-1);
+            Assert.IsFalse(writer.Flush(invalidLimit, out Exception error));
+            Assert.That(error, Is.InstanceOf<ArgumentOutOfRangeException>());
+            Assert.IsFalse(File.Exists(path));
+            Assert.IsTrue(writer.Flush(System.Threading.Timeout.InfiniteTimeSpan, out error));
+            Assert.That(error, Is.Null);
+            Assert.That(File.ReadAllText(path), Is.EqualTo("queued"));
+        }
+
+#if SINGLE_THREADED
+        [Test]
+        public void FiniteFlushPreservesPendingWorkWhenBackgroundThreadsAreUnavailable()
+        {
+            string path = Path.Combine(_directory, "timed.txt");
+            using LatestWriteFile writer = new(writeInBackground: false);
+            Assert.IsTrue(writer.TryEnqueueText(path, "queued", out _));
+            Assert.IsFalse(writer.Flush(TimeSpan.Zero, out Exception error));
+            Assert.That(error, Is.InstanceOf<PlatformNotSupportedException>());
+            Assert.That(writer.PendingPathCount, Is.EqualTo(1));
+            Assert.IsFalse(File.Exists(path));
+            Assert.IsTrue(writer.Flush(out error), error?.ToString());
+            Assert.That(File.ReadAllText(path), Is.EqualTo("queued"));
+        }
+#endif
 
         [TestCase(false)]
         [TestCase(true)]
@@ -293,6 +386,61 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 
 #if !SINGLE_THREADED
+        [Test]
+        public void TimedFlushReturnsWhileItsWorkerContinuesTheManualBatch()
+        {
+            string blocked = Path.Combine(_directory, "blocked");
+            string writable = Path.Combine(_directory, "writable.txt");
+            Directory.CreateDirectory(blocked);
+            TimeSpan watchdog = TimeSpan.FromSeconds(10);
+            using ManualResetEventSlim callbackStarted = new();
+            using ManualResetEventSlim releaseCallback = new();
+            using ManualResetEventSlim callbackFinished = new();
+            using LatestWriteFile writer = new(writeInBackground: false, onFailure: (_, _) =>
+            {
+                callbackStarted.Set();
+                releaseCallback.Wait(watchdog);
+                callbackFinished.Set();
+            });
+            try
+            {
+                Assert.IsTrue(writer.TryEnqueueText(blocked, "unwritable", out _));
+                Assert.IsTrue(writer.TryEnqueueText(writable, "saved", out _));
+                Assert.IsFalse(writer.Flush(TimeSpan.Zero, out Exception error));
+                Assert.That(error, Is.InstanceOf<TimeoutException>());
+                Assert.IsTrue(callbackStarted.Wait(watchdog));
+                Assert.IsFalse(callbackFinished.IsSet);
+                Assert.That(File.ReadAllText(writable), Is.EqualTo("saved"));
+                Assert.That(writer.Failure, Is.Not.Null);
+            }
+            finally
+            {
+                releaseCallback.Set();
+                if (callbackStarted.IsSet)
+                {
+                    Assert.IsTrue(callbackFinished.Wait(watchdog));
+                }
+            }
+        }
+
+        [Test]
+        public void TimedFlushReportsSuccessOrTheUnderlyingWriteError()
+        {
+            string path = Path.Combine(_directory, "timed.txt");
+            TimeSpan limit = TimeSpan.FromSeconds(10);
+            using LatestWriteFile writer = new(writeInBackground: false);
+            Assert.IsTrue(writer.TryEnqueueText(path, "readable", out _));
+            Assert.IsTrue(writer.Flush(limit, out Exception error), error?.ToString());
+            Assert.That(File.ReadAllText(path), Is.EqualTo("readable"));
+
+            File.Delete(path);
+            Directory.CreateDirectory(path);
+            Assert.IsTrue(writer.TryEnqueueText(path, "blocked", out _));
+            Assert.IsFalse(writer.Flush(limit, out error));
+            Assert.That(error, Is.Not.Null.And.Not.InstanceOf<TimeoutException>());
+            Assert.That(writer.Failure, Is.SameAs(error));
+        }
+
         [Test]
         public void BackgroundFailureCallbackDoesNotHoldTheWriteLockOrResurrectAnOlderPayload()
         {
