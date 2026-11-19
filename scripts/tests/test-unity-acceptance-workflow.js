@@ -312,7 +312,7 @@ assert.ok(job.indexOf(reverify) < job.indexOf(upload));
 assert.ok(reverify.includes("./scripts/unity/verify-acceptance.ps1"));
 assert.ok(reverify.includes("-Acceptance 'wproto'"));
 assert.match(reverify, /timeout-minutes: 5/);
-const nodeSetup = named("Setup Node.js for credential redaction");
+const nodeSetup = named("Setup Node.js for native acceptance verification");
 assert.ok(
   job.indexOf(nodeSetup) < job.indexOf(verify),
   "Node must be installed before the raw evidence verifier"

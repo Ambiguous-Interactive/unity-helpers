@@ -326,7 +326,7 @@
     "test:browser-storage": "node --test scripts/tests/test-browser-storage.js",
     "test:browser-consumer": "uv run --project scripts/python~ --locked pytest scripts/tests/test_browser_consumer.py -q",
     "test:run-contract-tests": "node scripts/tests/test-run-contract-tests.js",
-    "test:redact-unity-artifacts": "node scripts/tests/test-redact-unity-artifacts.js",
+    "test:redact-unity-artifacts": "uv run --quiet --project scripts/python~ --locked pytest scripts/tests/test_redact_unity_artifacts.py -q && node scripts/tests/test-redact-unity-artifacts.js",
     "test:unity-artifact-redaction": "node scripts/tests/test-unity-artifact-redaction.js",
     "test:unity-license-cache-location": "node scripts/tests/test-unity-license-cache-location.js",
     "test:precommit-integration": "bash scripts/tests/test-precommit-integration.sh",
