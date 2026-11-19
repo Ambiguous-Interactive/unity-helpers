@@ -150,3 +150,31 @@ def test_inventory_failure_fails_before_lint(
     captured = capfd.readouterr()
     assert captured.out == ""
     assert "Markdown inventory failed" in captured.err
+
+
+def test_legacy_lint_launcher_reports_actual_failure(repository: Path) -> None:
+    launcher = "scripts/lint-markdown.mjs"
+    for file in (
+        launcher,
+        "scripts/lint_markdown.py",
+        "scripts/run_node_bin.py",
+        "scripts/cli_encoding.py",
+        "scripts/python~/pyproject.toml",
+        "scripts/python~/uv.lock",
+    ):
+        destination = repository / file
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / file, destination)
+    write(repository, "new document.markdown", f"# Invalid\n\n{FENCE}\nmissing language\n{FENCE}\n")
+    node = shutil.which("node")
+    assert node is not None
+    result = subprocess.run(
+        [node, str(repository / launcher)],
+        cwd=repository,
+        check=False,
+        capture_output=True,
+        timeout=TIMEOUT_SECONDS,
+    )
+    assert result.returncode == 1
+    assert b"Linting " in result.stdout
+    assert b"new document.markdown:3 error MD040" in result.stderr
