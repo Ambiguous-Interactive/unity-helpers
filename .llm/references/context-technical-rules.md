@@ -53,7 +53,7 @@
 - **`(?:.|\n)*?` is not a safe "any character" in V8; use `[\s\S]*?`.** Measured: the same lazy
   pattern matched a 300-character slice of `PcgRandom.cs` and returned `null` for the whole 8 KB
   file, while Python's engine matched both.
-- **`RandomGeneratorMetadata.Period` carries its provenance**: a published spec is quoted, otherwise the MEASURED live state width, because a 2^128 period cannot be observed. `test-random-periods.js` enforces it against the docs table both ways.
+- **`RandomGeneratorMetadata.Period` carries its provenance**: a published spec is quoted, otherwise the MEASURED live state width, because a 2^128 period cannot be observed. `npm run test:random-periods` enforces it against the docs table both ways.
 - **Reach for the math helpers rather than open-coding the arithmetic.** `WallMath.WrappedAdd`, `WrappedIncrement` and `PositiveMod` exist; `(i + 1) % capacity` re-implements them and gets the negative case wrong.
 - **Never compare against a magic sentinel; test for the valid range.** `index != -1` becomes
   `0 <= index`, so the comparison says what it means and refuses values the sentinel does not
