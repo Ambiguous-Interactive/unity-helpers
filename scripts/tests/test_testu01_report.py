@@ -15,7 +15,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS = ROOT / "scripts" / "random-quality"
 sys.path.insert(0, str(SCRIPTS))
-from testu01_report import DECISIVE, extremity, verdict  # noqa: E402
+from testu01_report import DECISIVE, extremity, read_expectations, verdict  # noqa: E402
 
 CONTROL = """========= Summary results of SmallCrush =========
 
@@ -281,6 +281,36 @@ def test_report_cli(tmp_path: Path, files: dict[str, str], expected: int, messag
     )
     assert result.returncode == expected
     assert message in result.stdout + result.stderr
+
+
+@pytest.mark.parametrize("invalid", ["NaN", "Infinity", "-Infinity"])
+def test_manifest_rejects_non_json_constants(tmp_path: Path, invalid: str) -> None:
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text('{"generators": [], "extra": ' + invalid + "}", encoding="utf-8")
+    with pytest.raises(ValueError, match="Invalid JSON constant"):
+        read_expectations(manifest)
+
+
+def test_redirected_report_uses_utf8_with_lf(tmp_path: Path) -> None:
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    name = "測定"
+    (reports / f"{name}.txt").write_text(MARGINAL, encoding="utf-8")
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(
+        json.dumps({"generators": [{"name": name, "widths": {"32": {"expected": "pass"}}}]}),
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [sys.executable, str(SCRIPTS / "testu01_report.py"), str(reports), str(manifest)],
+        env={**os.environ, "PYTHONIOENCODING": "cp1252"},
+        capture_output=True,
+        timeout=30,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert name.encode() in result.stdout
+    assert b"\r\n" not in result.stdout
 
 
 def write_command(path: Path, body: str) -> None:

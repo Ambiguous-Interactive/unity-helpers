@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from tempfile import gettempdir
 
-from testu01_report import check_control
+from testu01_report import check_control, configure_cli_output
 
 SOURCE = Path(__file__).resolve().parent
 ROOT = SOURCE.parents[1]
@@ -224,4 +224,5 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    configure_cli_output()
     sys.exit(main())
