@@ -266,7 +266,7 @@
     "test:node-bin": "uv run --quiet --project scripts/python~ --locked pytest scripts/tests/test_node_bin.py -q",
     "test:build-lock-action-input-parser": "uv run --project scripts/python~ --locked pytest scripts/tests/test_build_lock_inputs.py -q",
     "test:read-stdin-sync": "node scripts/tests/test-read-stdin-sync.js",
-    "test:analyzer-placement": "uv run --quiet --project scripts/python~ --locked --no-dev python scripts/tests/check_analyzer_placement.py",
+    "test:analyzer-placement": "node scripts/tests/test-analyzer-placement.js",
     "test:random-periods": "node scripts/tests/test-random-periods.js",
     "test:reference-upstream-drift": "uv run --quiet --project scripts/python~ --locked pytest scripts/tests/test_reference_upstream_drift.py -q",
     "test:verify-shipped-analyzers": "node scripts/tests/test-verify-shipped-analyzers.js",
