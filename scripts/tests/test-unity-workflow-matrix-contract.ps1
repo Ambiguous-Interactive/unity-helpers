@@ -387,7 +387,7 @@ $windowsActionsRunnerInstallPath = Join-Path $repoRoot 'scripts/unity/install-wi
 $ensureEditorPath = Join-Path $repoRoot 'scripts/unity/ensure-editor.ps1'
 $runCiTestsPath = Join-Path $repoRoot 'scripts/unity/run-ci-tests.ps1'
 $runUnityDockerPath = Join-Path $repoRoot 'scripts/unity/run-unity-docker.sh'
-$exportUnityPackagePath = Join-Path $repoRoot 'scripts/unity/export-unitypackage.sh'
+$exportUnityPackagePath = Join-Path $repoRoot 'scripts/unity/export_unitypackage.py'
 
 if (-not (Test-Path -LiteralPath $workflowPath)) {
     Write-Host "::error::Unity workflow not found: $workflowPath"
@@ -970,8 +970,8 @@ if (-not $benchmarkBaselineRequiresCompleteFreshMatrix) {
     Write-Info 'Checked partial benchmark runs cannot mix stale XML into reports or automatically promote baselines.'
 }
 
-if ($exportUnityPackageContent -notmatch '(?m)^\s+-releaseCodeOptimization\s+\\\s*$') {
-    Write-Host '::error file=scripts/unity/export-unitypackage.sh::The release payload compile must pass -releaseCodeOptimization so the unitypackage smoke covers the same optimized assembly contract as Unity CI.'
+if ($exportUnityPackageContent -notmatch '(?m)^\s*"-releaseCodeOptimization",\s*$') {
+    Write-Host '::error file=scripts/unity/export_unitypackage.py::The release payload compile must pass -releaseCodeOptimization so the unitypackage smoke covers the same optimized assembly contract as Unity CI.'
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info 'Checked unitypackage export compiles optimized release assemblies.'

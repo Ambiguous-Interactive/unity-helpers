@@ -244,7 +244,7 @@
     "test:unity-frozen-player-provenance": "pwsh -NoProfile -File scripts/tests/test-unity-frozen-player-provenance.ps1",
     "test:release-export-only": "node scripts/tests/test-release-export-only.js && uv run --project scripts/python~ --locked pytest scripts/tests/test_release_automation.py -q",
     "test:unity-package-export": "pwsh -NoProfile -File scripts/tests/test-unity-package-export.ps1",
-    "test:create-unitypackage": "uv run --project scripts/python~ --locked pytest scripts/tests/test_unitypackage.py -q",
+    "test:create-unitypackage": "uv run --project scripts/python~ --locked pytest scripts/tests/test_unitypackage.py scripts/tests/test_unitypackage_export.py -q",
     "test:unity-acceptance-runner": "pwsh -NoProfile -File scripts/tests/test-unity-acceptance.ps1",
     "test:unity-acceptance-evidence": "node scripts/tests/test-unity-acceptance.js",
     "test:format-on-demand-workflow": "node scripts/tests/test-format-on-demand-workflow.js",

@@ -599,7 +599,7 @@ Complete struct and interface examples remain at type scope when compilation uni
 Generation is a heuristic convenience; the standalone documentation compiler checks remain the
 separate compilation gate.
 
-Release payload staging, archive creation, and Unity metadata generation run through uv. Install uv 0.13.8, then use:
+Release payload staging, archive creation, local Docker export, and Unity metadata generation use the locked uv environment. Install uv 0.13.8 and run these commands as needed.
 
 ```bash
 python -m pip install --disable-pip-version-check uv==0.13.8
@@ -615,7 +615,10 @@ npm run test:frozen-files
 npm run meta:generate -- Runtime/Example.cs
 uv run --project scripts/python~ --locked --no-dev python scripts/unity/create_unitypackage.py --output .artifacts/release/local.unitypackage
 uv run --project scripts/python~ --locked --no-dev python scripts/unity/stage_unitypackage.py --project-dir .artifacts/unity/local-export
+bash scripts/unity/export-unitypackage.sh --output .artifacts/release/local.unitypackage
 ```
+
+The local export command requires the POSIX Docker runner and `tee`. It saves the combined Unity output in `unitypackage-output/unity.log` inside the staged project. A successful export writes the selected output file and its `.sha256` file. Choose an output filename other than `unity.log`. Pass `--stage-only` to stage the project without starting Docker.
 
 `lint:repo`, `validate:local`, `validate:tests:fast`, `validate:tests:hook-regressions`, and
 `test:agent-preflight` require uv, including the metadata parity check. Outside the devcontainer,
