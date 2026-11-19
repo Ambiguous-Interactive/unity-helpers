@@ -947,7 +947,8 @@ $benchmarkBaselineRequiresCompleteFreshMatrix = (
     $benchmarksWorkflowContent.Contains('BENCHMARKS_RESULT: ${{ needs.benchmarks.result }}') -and
     $benchmarksWorkflowContent.Contains('ALLOW_BASELINE_REFRESH: ${{ needs.matrix-config.outputs.allow-baseline-refresh }}') -and
     $benchmarksWorkflowContent.Contains('EXPECTED_RESULT_FILES: ${{ needs.matrix-config.outputs.expected-result-files }}') -and
-    $benchmarksWorkflowContent.Contains('scripts/unity/lib/evaluate-perf-refresh.js') -and
+    $benchmarksWorkflowContent.Contains('uses: ./.github/actions/setup-python-tools') -and
+    $benchmarksWorkflowContent.Contains('uv run --quiet --project scripts/python~ --locked --no-dev python scripts/unity/evaluate_perf_refresh.py') -and
     $benchmarksWorkflowContent.Contains('--benchmark-result "${BENCHMARKS_RESULT}"') -and
     $benchmarksWorkflowContent.Contains('--allow-baseline-refresh "${ALLOW_BASELINE_REFRESH}"') -and
     $benchmarksWorkflowContent.Contains('--expected-files "${EXPECTED_RESULT_FILES}"') -and
