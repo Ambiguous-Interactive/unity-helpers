@@ -1325,11 +1325,16 @@ safe to ignore or delete.
 
 ### Coalesce Repeated Saves
 
-Keep one `LatestWriteFile` for a store whose newest pending snapshot replaces earlier ones.
-It retains one queued payload per normalized path. A write already in progress finishes first;
-its newer replacement follows it. Text stays immutable and is encoded as UTF-8 only when written.
-Byte submissions make an owned copy so callers can immediately reuse their array.
-Path identity ignores case on Windows and macOS and uses ordinal comparison on other hosts.
+A `LatestWriteFile` retains one queued payload per normalized path. Text stays immutable and is
+encoded as UTF-8 only when written. `TryEnqueueBytes` copies the input so the caller can reuse
+it immediately. Use `TryEnqueueOwnedBytes` to transfer the array without copying it. Once accepted,
+the caller must stop modifying the array or returning it to a pool.
+
+All `LatestWriteFile` instances in the process share publication order per normalized path. A
+write already in progress finishes before another write starts for that path. If a newer
+submission has already been attempted, an older submission takes its result and skips the write.
+A newer submission waiting in a manual batch does not hold back earlier flushes. Path identity
+uses full paths, ignores case on Windows and macOS, and uses ordinal comparison on other hosts.
 
 <!-- doc-sample: compiles -->
 
@@ -1368,12 +1373,20 @@ submissions can remain for a later flush. Stop producers before a final boundary
 which stops accepting submissions before flushing accepted work. Later submissions are rejected
 with an `ObjectDisposedException` in their error output. Repeated disposal is safe.
 
+On threaded builds, `Flush(TimeSpan limit, out Exception error)` starts a flush on a worker,
+even for a manual writer. If the wait expires, it returns `false` with a `TimeoutException`.
+The worker continues and records any write failure through the usual callback and `Failure`
+property. `TimeSpan.Zero` starts the work without waiting. Calling `Dispose` immediately after
+a timeout can wait for the same write. `Timeout.InfiniteTimeSpan` uses ordinary synchronous flush.
+A finite limit in a `SINGLE_THREADED` build returns a `PlatformNotSupportedException` and
+leaves manual batches queued. Use synchronous flush on those builds.
+
 Write failures invoke the callback outside the writer's locks, on the thread attempting the write.
 `Failure` and `Flush(out error)` also expose unresolved failures. A later successful write to the
 same path clears its failure; success on another path does not. A throwing failure callback retains
 both errors without stopping other paths. Failed writes are not automatically requeued.
-The underlying [DurableFile guarantees and limits](#durable-writes-for-player-data) still apply;
-coalescing is per path within one writer, not a multi-file transaction.
+The underlying [DurableFile guarantees and limits](#durable-writes-for-player-data) still apply.
+Each path is published independently.
 
 ---
 
