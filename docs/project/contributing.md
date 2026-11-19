@@ -72,7 +72,8 @@ require the formatter to run.
 The analyzer placement check evaluates MSBuild compiler inputs for each owned .NET project with
 both protobuf oracle settings. Each shipped analyzer must appear exactly once at its package
 path. Normal assembly references, including the compiler compatibility test reference, do not
-count as compiler inputs. Run it with `node scripts/tests/test-analyzer-placement.js`.
+count as compiler inputs. Run it with `npm run test:analyzer-placement`. The historical Node
+command forwards to the same locked Python check.
 
 The WProto compatibility inventory checks referenced enum values independently of source file
 order. Its regression compiles both declaration orders and requires the same inventory, including

@@ -127,7 +127,7 @@ jobs:
         # Unity scopes an analyzer by its nearest enclosing asmdef. Under an editor-only one it
         # reaches no consumer runtime code at all, and the failure reads as a missing generated
         # type rather than as anything naming the analyzer.
-        run: node scripts/tests/test-analyzer-placement.js
+        run: npm run test:analyzer-placement
 
       - name: Test the generator against protobuf-net 3.2.56
         # The formatters under test are the shipped analyzer's own output, produced the way Unity
