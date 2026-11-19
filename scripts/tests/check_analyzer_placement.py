@@ -8,8 +8,10 @@ import re
 import shutil
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from tempfile import TemporaryDirectory, TemporaryFile
+from tempfile import TemporaryDirectory
+from time import monotonic
 from typing import TypedDict, cast
 from xml.sax.saxutils import escape, quoteattr
 
@@ -19,6 +21,7 @@ PROJECT_DIRECTORY = Path("Generator~")
 PRODUCTION_PROJECTS = ("TypeCheck", "EditorCheck", "IntegrationCheck")
 PRODUCTION_IDS = ("WUH019", "WUH021", "WUH023")
 MAX_MSBUILD_OUTPUT_BYTES = 1024 * 1024
+MSBUILD_TIMEOUT_SECONDS = 30
 CONSUMER_OPT_INS = {
     "WUH024": "enum cache advice stays an explicit per-project opt-in",
     "WUH029": "member order stays an explicit consumer opt-in while repository source gates retain ownership",
@@ -190,35 +193,40 @@ def path_identity(path: str | Path, root: Path) -> str:
 
 
 def evaluated_items(dotnet: str, root: Path, project: Path, oracle: str) -> list[AnalyzerItem]:
-    with TemporaryFile() as output, TemporaryFile() as errors:
-        result = subprocess.run(  # noqa: S603 - evaluate the fixed MSBuild query on owned projects.
-            [
-                dotnet,
-                "msbuild",
-                str(project),
-                "--nologo",
-                "-getItem:Analyzer",
-                f"-p:ProtobufNetOracle={oracle}",
-            ],
-            cwd=root,
-            stdout=output,
-            stderr=errors,
-            check=False,
-            timeout=30,
-        )
-        if any(
-            os.fstat(stream.fileno()).st_size > MAX_MSBUILD_OUTPUT_BYTES
-            for stream in (output, errors)
-        ):
-            raise ValueError(f"MSBuild analyzer output exceeded 1 MiB for {project}")
-        output.seek(0)
-        if result.returncode:
-            errors.seek(0)
-            diagnostic = (errors.read() or output.read()).decode("utf-8", errors="replace")
-            raise ValueError(f"MSBuild failed for {project} ({oracle}): {diagnostic}")
-        data = cast(
-            "dict[str, object]", json.loads(output.read().decode("utf-8", errors="replace"))
-        )
+    command = [
+        dotnet,
+        "msbuild",
+        str(project),
+        "--nologo",
+        "-getItem:Analyzer",
+        f"-p:ProtobufNetOracle={oracle}",
+    ]
+    deadline = monotonic() + MSBUILD_TIMEOUT_SECONDS
+    with (
+        subprocess.Popen(  # noqa: S603 - evaluate the fixed MSBuild query on owned projects.
+            command, cwd=root, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        ) as process,
+        ThreadPoolExecutor(max_workers=2) as readers,
+    ):
+        try:
+            if process.stdout is None or process.stderr is None:
+                raise ValueError(f"MSBuild output pipes are unavailable for {project}")
+            output = readers.submit(process.stdout.read, MAX_MSBUILD_OUTPUT_BYTES + 1)
+            errors = readers.submit(process.stderr.read, MAX_MSBUILD_OUTPUT_BYTES + 1)
+            for captured in as_completed((output, errors), timeout=max(0, deadline - monotonic())):
+                if len(captured.result()) > MAX_MSBUILD_OUTPUT_BYTES:
+                    raise ValueError(f"MSBuild analyzer output exceeded 1 MiB for {project}")
+            status = process.wait(timeout=max(0, deadline - monotonic()))
+        except TimeoutError as error:
+            raise subprocess.TimeoutExpired(command, MSBUILD_TIMEOUT_SECONDS) from error
+        finally:
+            if process.poll() is None:
+                process.kill()
+                process.wait()
+    if status:
+        diagnostic = (errors.result() or output.result()).decode("utf-8", errors="replace")
+        raise ValueError(f"MSBuild failed for {project} ({oracle}): {diagnostic}")
+    data = cast("dict[str, object]", json.loads(output.result().decode("utf-8", errors="replace")))
     group = cast("dict[str, object]", data.get("Items", {}))
     items = group.get("Analyzer")
     if not isinstance(items, list):

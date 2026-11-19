@@ -80,6 +80,50 @@ def test_clean_runs_npm_without_shared_compilation(
         assert not (baseline / "Generator~/Project/bin").exists()
 
 
+@pytest.mark.parametrize("stream", ["stdout", "stderr"])
+@pytest.mark.parametrize("overflow", [False, True])
+def test_analyzer_placement_bounds_live_msbuild_streams(
+    tmp_path: Path, stream: str, overflow: bool
+) -> None:
+    (tmp_path / "msbuild").write_text(
+        "import sys, time\n"
+        "from pathlib import Path\n"
+        'result = b\'{"Items":{"Analyzer":[]}}\'\n'
+        f"size = 1024 * 1024 + {int(overflow)}\n"
+        + (
+            "sys.stdout.buffer.write(result.ljust(size, b' '))\nsys.stdout.buffer.flush()\n"
+            if stream == "stdout"
+            else "sys.stdout.buffer.write(result)\n"
+            "sys.stderr.buffer.write(b'!' * size)\n"
+            "sys.stderr.buffer.flush()\n"
+        )
+        + ("time.sleep(1.5)\nPath('continued').touch()\n" if overflow else ""),
+        encoding="utf-8",
+    )
+    runner = (
+        "import sys\nfrom pathlib import Path\n"
+        "from check_analyzer_placement import evaluated_items\n"
+        "root = Path(sys.argv[1])\n"
+        "try:\n"
+        "    assert evaluated_items(sys.executable, root, root / 'Fixture.proj', 'v3') == []\n"
+        "except ValueError as error:\n"
+        "    print(error, file=sys.stderr)\n"
+        "    sys.exit(1)\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", runner, str(tmp_path)],
+        cwd=ROOT / "scripts/tests",
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+    assert result.returncode == int(overflow), result.stderr
+    if overflow:
+        assert "MSBuild analyzer output exceeded 1 MiB" in result.stderr
+        assert not (tmp_path / "continued").exists()
+
+
 def test_missing_generator_fails_without_launch(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
