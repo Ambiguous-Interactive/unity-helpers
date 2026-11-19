@@ -403,6 +403,18 @@ def test_aggregate_gate_runs_and_rejects_every_non_success_state(state: str, gat
     assert (result.returncode == 0) is (state == "success")
 
 
+@pytest.mark.parametrize("event", ["push", "pull_request"])
+def test_generator_workflow_runs_for_analyzer_placement_inputs(event: str) -> None:
+    definition = cast("dict[object, object]", workflow("wproto-generator.yml"))
+    triggers = as_mapping(definition.get("on", definition.get(True)))
+    paths = as_list(as_mapping(triggers[event])["paths"])
+    assert {
+        "package.json",
+        "scripts/tests/check_analyzer_placement.py",
+        "scripts/tests/test-analyzer-placement.js",
+    } <= set(paths)
+
+
 def sdk_guards() -> list[tuple[str, str, dict[str, object], dict[str, object]]]:
     guards: list[tuple[str, str, dict[str, object], dict[str, object]]] = []
     for file in ("wproto-generator.yml", "repo-lint.yml", "local-gates.yml", "random-quality.yml"):
