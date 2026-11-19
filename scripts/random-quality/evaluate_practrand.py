@@ -10,8 +10,9 @@ import math
 import re
 import sys
 from dataclasses import dataclass
+from io import TextIOWrapper
 from pathlib import Path
-from typing import Literal, NotRequired, TypedDict, cast
+from typing import Literal, NoReturn, NotRequired, TypedDict, cast
 
 UNITS = {"KB": 2**10, "MB": 2**20, "GB": 2**30, "TB": 2**40}
 DISPLAY_UNITS = {"kilobyte": "KB", "megabyte": "MB", "gigabyte": "GB", "terabyte": "TB"}
@@ -26,8 +27,8 @@ DISPLAY_LENGTH = re.compile(
 )
 ROW = re.compile(
     r"""(\S.*?)\s*R[=<>]\s*([-+]?[0-9]+(?:\.[0-9]+)?(?:e[-+]?[0-9]+)?)\s+"""
-    r"""(?:(?:p(?:~=|\s*=)\s*((?:1-)?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:e[-+]?[0-9]+)?)|"(?:pass|fail)")\s+)?"""
-    r"""(normal(?:ish)?|unusual|(?:mildly |very )?suspicious|FAIL[ !]*)""",
+    r"""(?:(?:p(?:~=|\s*=)\s*((?:1-)?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:e[-+]?[0-9]+)?)|"(?a:pass|fail)")\s+)?"""
+    r"""((?a:normal(?:ish)?|unusual|(?:mildly |very )?suspicious|FAIL[ !]*))""",
     re.I,
 )
 
@@ -129,7 +130,7 @@ def read_rows(body: list[str], length: str, failures: list[Failure]) -> str:
         ):
             return "A result row contains a non-finite raw value or an out-of-range probability."
         evaluated += 1
-        if re.fullmatch(r"FAIL[ !]*", result[4], re.I):
+        if re.fullmatch(r"FAIL[ !]*", result[4], re.I | re.A):
             failures.append({"test": result[1], "length": length, "line": line})
     return "" if evaluated else "The result table contains no evaluated tests."
 
@@ -373,14 +374,23 @@ def read_arg(arguments: list[str], name: str, fallback: str | None = None) -> st
     return fallback
 
 
+def reject_json_constant(value: str) -> NoReturn:
+    raise ValueError(f"Invalid JSON constant: {value}.")
+
+
 def read_manifest(path: Path) -> Manifest:
-    return cast("Manifest", json.loads(path.read_text(encoding="utf-8")))
+    return cast(
+        "Manifest",
+        json.loads(path.read_text(encoding="utf-8"), parse_constant=reject_json_constant),
+    )
 
 
 def selected_generators(arguments: list[str], manifest: Manifest) -> list[str]:
     names = [generator["name"] for generator in manifest["generators"]]
     selected: object = (
-        json.loads(read_arg(arguments, "--generators")) if "--generators" in arguments else names
+        json.loads(read_arg(arguments, "--generators"), parse_constant=reject_json_constant)
+        if "--generators" in arguments
+        else names
     )
     if isinstance(selected, list):
         items = cast("list[object]", selected)
@@ -469,6 +479,9 @@ def main(arguments: list[str]) -> int:
 
 
 if __name__ == "__main__":
+    for stream in (sys.stdout, sys.stderr):
+        if isinstance(stream, TextIOWrapper):
+            stream.reconfigure(encoding="utf-8", newline="\n")
     try:
         sys.exit(main(sys.argv[1:]))
     except (OSError, ValueError, KeyError, TypeError) as error:

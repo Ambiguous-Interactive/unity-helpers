@@ -177,6 +177,23 @@ def test_only_fail_in_evaluation_column_counts(evaluation: str) -> None:
 
 
 @pytest.mark.parametrize(
+    "label", ["normal\u0131sh", "SUSP\u0130CIOUS", "\u017fuspicious", "FA\u0130L !"]
+)
+def test_evaluation_labels_require_ascii_letters(label: str) -> None:
+    assert classify_report(SUSPICIOUS.replace("unusual", label)).observed == "invalid"
+
+
+@pytest.mark.parametrize("invalid", ["NaN", "Infinity", "-Infinity"])
+def test_manifest_rejects_non_json_constants(tmp_path: Path, invalid: str) -> None:
+    manifest = tmp_path / "manifest.json"
+    payload = MANIFEST_PATH.read_text(encoding="utf-8")
+    assert '"PractRand-pre0.95.zip"' in payload
+    manifest.write_text(payload.replace('"PractRand-pre0.95.zip"', invalid), encoding="utf-8")
+    with pytest.raises(ValueError, match="Invalid JSON constant"):
+        read_manifest(manifest)
+
+
+@pytest.mark.parametrize(
     "row",
     [
         FAIL_ROW,
@@ -356,6 +373,36 @@ def test_cli_for_full_inventory_and_selection(tmp_path: Path, width: str) -> Non
     unlisted = invoke([XORSHIFT])
     assert unlisted.returncode == 1
     assert "absent from the selected inventory" in unlisted.stdout
+
+
+def test_redirected_cli_writes_utf8_with_lf(tmp_path: Path) -> None:
+    report = tmp_path / "reports"
+    write_reports(report, {XORSHIFT: FAILED})
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPTS / "evaluate_practrand.py"),
+            "--reports",
+            str(report),
+            "--budget",
+            "1GB",
+            "--seed",
+            "test",
+            "--command",
+            "测量",
+            "--generators",
+            json.dumps([XORSHIFT]),
+        ],
+        cwd=ROOT,
+        env={**os.environ, "PYTHONIOENCODING": "cp1252"},
+        capture_output=True,
+        timeout=30,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "测量".encode() in result.stdout
+    assert b"\r\n" not in result.stdout
+    assert result.stdout.endswith(b"mismatch-count=0\n")
 
 
 WorkflowStep = dict[str, object]
