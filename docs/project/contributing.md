@@ -973,10 +973,10 @@ These tools are required and installed via npm/dotnet:
 - YAML linting: yamllint
 - Workflow linting: actionlint
 
-`npm run lint:markdown` checks tracked Markdown and new files that Git does not ignore,
-then applies `.markdownlintignore`. Tracked files remain eligible even when a Git ignore rule
-matches them. Hidden paths stay excluded, and generated, ignored local artifacts do not slow
-file discovery. The command fails if discovery fails or finds no eligible documents.
+`npm run lint:markdown` uses locked Python to select tracked Markdown and new files
+that Git includes. The installed markdownlint package applies `.markdownlintignore` and runs
+the lint checks. The inventory includes tracked files that match a Git ignore rule and excludes
+hidden paths. The command fails if discovery fails or finds no eligible documents.
 
 `npm run lint:unsafe-code` refuses compiler-unsafe code, unchecked memory access, disabled IL2CPP
 safety checks, and unbounded stack allocations. A variable stack allocation must be the direct

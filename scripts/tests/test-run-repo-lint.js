@@ -491,6 +491,7 @@ runTest("no linter in scripts/ has been left unreachable", () => {
     ["scripts/validate-npm-package.ps1", "npm-package-controls"],
     ["scripts/validate-mcp-config.ps1", "mcp-config-controls"],
     ["scripts/lint-pwsh-invocations.ps1", "pwsh-invocation-controls"],
+    ["scripts/lint-markdown.mjs", "markdown-controls"],
 
     ["scripts/lint-comparison-direction.js", "comparison-controls"],
     ["scripts/validate-build-lock-action-inputs.js", "policy-controls"],
@@ -527,6 +528,10 @@ runTest("no linter in scripts/ has been left unreachable", () => {
   // Only the kinds something actually claims. A registered predicate nothing uses is a dead branch
   // inside the one test whose whole point is that a claim has to be executable.
   const owners = new Map([
+    [
+      "markdown-controls",
+      (file) => registeredControlsInvoke(file, "scripts/tests/test_lint_markdown.py")
+    ],
     [
       "mcp-config-controls",
       (file) => registeredControlsInvoke(file, "scripts/tests/test_mcp_config.py")
