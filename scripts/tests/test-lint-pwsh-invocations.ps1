@@ -74,7 +74,7 @@ function New-FixtureRoot {
     $sourceScripts = [System.IO.Path]::GetDirectoryName($lintScriptPath)
     $fixtureProject = Join-Path $root 'scripts/python~'
     New-Item -ItemType Directory -Path $fixtureProject | Out-Null
-    foreach ($policyFile in @('pwsh_invocation_asts.py', 'pwsh_invocation_text.py')) {
+    foreach ($policyFile in @('pwsh_invocation_asts.py', 'pwsh_invocation_text.py', 'lint_pwsh_invocations.py', 'cli_encoding.py', 'read-pwsh-invocation-facts.ps1')) {
         Copy-Item -LiteralPath (Join-Path $sourceScripts $policyFile) -Destination (Join-Path $root 'scripts')
     }
     foreach ($projectFile in @('pyproject.toml', 'uv.lock')) {

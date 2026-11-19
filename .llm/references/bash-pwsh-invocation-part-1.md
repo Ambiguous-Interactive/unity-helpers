@@ -27,7 +27,7 @@ pwsh -NoProfile -File scripts/lint-foo.ps1 -Paths "${FILES[@]}"
 
 These rules are enforced by:
 
-1. `scripts/lint-pwsh-invocations.ps1` — scans `*.sh`, `.githooks/*`, `.github/workflows/*.yml`, `scripts/**/*.ps1`, and `package.json` for `-File`/`-f <script> --` (code `PWS001`) and extensionless hook `-File`/`-f` targets (code `PWS004`), and reads `scripts/**/*.ps1` plus `.githooks/*.ps1` as an AST for `PWS005` and `PWS006`.
+1. `npm run lint:pwsh-invocations` runs the locked Python scanner. It scans `*.sh`, `.githooks/*`, `.github/workflows/*.yml`, `scripts/**/*.ps1`, and `package.json` for `-File`/`-f <script> --` (code `PWS001`) and extensionless hook `-File`/`-f` targets (code `PWS004`), and reads `scripts/**/*.ps1` plus `.githooks/*.ps1` as an AST for `PWS005` and `PWS006`. PowerShell supplies native syntax and culture facts in one batch. The original PowerShell command forwards to the same scanner.
 2. `.github/workflows/repo-lint.yml` — runs the lint through the repository check registry.
 3. `scripts/tests/test-precommit-integration.sh` — smoke-tests that each pwsh-invoked hook branch works.
 4. `scripts/validate-lint-error-codes.ps1` — enforces that the `PWS` prefix (and any other lint-error-code prefix introduced by a new lint script) is registered in `cspell.json`, so the skill/doc tokens `PWS001`/`PWS002` do not trip the spell checker.

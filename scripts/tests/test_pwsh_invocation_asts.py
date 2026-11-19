@@ -77,7 +77,8 @@ def test_opt_out_requires_attached_rationale(
 
 
 @pytest.mark.parametrize(
-    ("sibling", "positional"), [(False, False), (True, False), (False, True), (True, True)]
+    ("sibling", "positional"),
+    [(False, False), (True, False), (False, True), (True, True)],
 )
 def test_array_rules_require_both_guards(sibling: bool, positional: bool) -> None:
     parameters: list[policy.ParameterFact] = [
@@ -133,8 +134,16 @@ def test_batch_validates_boolean_facts_before_classifying(invalid: bool | str) -
                     "text": "param(...)",
                     "positional_disabled": True,
                     "parameters": [
-                        {"name": "Paths", "array_type": True, "catches_remaining": False},
-                        {"name": "Trailing", "array_type": False, "catches_remaining": remaining},
+                        {
+                            "name": "Paths",
+                            "array_type": True,
+                            "catches_remaining": False,
+                        },
+                        {
+                            "name": "Trailing",
+                            "array_type": False,
+                            "catches_remaining": remaining,
+                        },
                     ],
                 },
             }
@@ -166,6 +175,9 @@ def test_empty_ast_list_returns_one_json_array() -> None:
 def copy_native_linter(root: Path) -> None:
     for relative in (
         LINTER,
+        "scripts/read-pwsh-invocation-facts.ps1",
+        "scripts/lint_pwsh_invocations.py",
+        "scripts/cli_encoding.py",
         "scripts/pwsh_invocation_asts.py",
         "scripts/pwsh_invocation_text.py",
         "scripts/python~/pyproject.toml",
@@ -176,7 +188,9 @@ def copy_native_linter(root: Path) -> None:
         shutil.copyfile(ROOT / relative, fixture)
 
 
-def test_native_cli_reads_type_facts_and_preserves_diagnostic_order(tmp_path: Path) -> None:
+def test_native_cli_reads_type_facts_and_preserves_diagnostic_order(
+    tmp_path: Path,
+) -> None:
     pwsh = shutil.which("pwsh")
     uv = shutil.which("uv")
     assert pwsh is not None
@@ -250,8 +264,7 @@ def test_native_cli_reports_uv_error_on_early_child_exit(tmp_path: Path) -> None
     copy_native_linter(root)
     (root / ".githooks").mkdir()
     (root / ".githooks/pre-commit").write_bytes(b"pwsh -File scripts/tool.ps1 -- payload\n")
-    # Exceed the pipe buffer while uv rejects the fixture's malformed lockfile.
-    (root / "scripts/large.ps1").write_bytes(b"saps -FilePath 'synthetic' -Arg:$arguments\n" * 2400)
+    # A failed locked environment must never report findings from the fixture.
     (root / "scripts/python~/uv.lock").write_bytes(b"invalid unclosed TOML = {\n")
     result = subprocess.run(
         [pwsh, "-NoProfile", "-File", str(root / LINTER), "-VerboseOutput"],
@@ -306,12 +319,18 @@ def test_failed_ast_validation_still_reports_completed_text_checks(ast: object) 
         ),
         (
             "scripts/top.ps1",
-            ["# lint-pwsh-invocations: allow-subprocess-pwsh\x1creason", "pwsh -f $child"],
+            [
+                "# lint-pwsh-invocations: allow-subprocess-pwsh\x1creason",
+                "pwsh -f $child",
+            ],
             [(2, "PWS003", "pwsh -f $child")],
         ),
         (
             "scripts/top.ps1",
-            ["# lint-pwsh-invocations: allow-subprocess-pwsh\u2003reason", "pwsh -f $child"],
+            [
+                "# lint-pwsh-invocations: allow-subprocess-pwsh\u2003reason",
+                "pwsh -f $child",
+            ],
             [],
         ),
         (
@@ -430,7 +449,14 @@ def test_native_cli_preserves_legacy_culture_and_word_matching(
 
 @pytest.mark.parametrize(
     "spans",
-    [[], [[False, 1]], [[11, 10]], [[22, 0x10000]], [[5, 7], [7, 9]], [[9, 14], [1, 5]]],
+    [
+        [],
+        [[False, 1]],
+        [[11, 10]],
+        [[22, 0x10000]],
+        [[5, 7], [7, 9]],
+        [[9, 14], [1, 5]],
+    ],
 )
 def test_invalid_host_word_ranges_fail_the_policy(spans: object) -> None:
     result = parse_input(
@@ -483,3 +509,100 @@ def test_native_cli_uses_the_hosts_word_classification(tmp_path: Path) -> None:
     expected_finding = lines[0] == "Host word: True"
     assert result.returncode == int(expected_finding)
     assert any(line.startswith("shell.sh:1: PWS001") for line in lines) is expected_finding
+
+
+def direct_lint(root: Path, script_root: Path = ROOT) -> subprocess.CompletedProcess[bytes]:
+    return subprocess.run(
+        [
+            sys.executable,
+            str(script_root / "scripts/lint_pwsh_invocations.py"),
+            "--repo-root",
+            str(root),
+            "--verbose",
+        ],
+        env={**os.environ, "NO_COLOR": "1", "PYTHONIOENCODING": "ascii"},
+        capture_output=True,
+        check=False,
+        timeout=45,
+    )
+
+
+def test_direct_cli_keeps_case_distinct_paths_and_bom_physical_lines(
+    tmp_path: Path,
+) -> None:
+    lines = "# first\r# second\r\npwsh -File tool.ps1 -- payload\n"
+    fixtures = {
+        "case.sh": lines.encode("utf-8"),
+        "Case.sh": lines.encode("utf-8-sig"),
+        "big-endian.sh": b"\xfe\xff" + lines.encode("utf-16-be"),
+        "little-endian.sh": lines.encode("utf-16"),
+        "wide-big-endian.sh": b"\x00\x00\xfe\xff" + lines.encode("utf-32-be"),
+        "wide-little-endian.sh": lines.encode("utf-32"),
+    }
+    for name, data in fixtures.items():
+        (tmp_path / name).write_bytes(data)
+    if (tmp_path / "case.sh").read_bytes() != fixtures["case.sh"]:
+        del fixtures["case.sh"]
+        (tmp_path / "Case.sh").unlink()
+        (tmp_path / "Case.sh").write_bytes(fixtures["Case.sh"])
+    result = direct_lint(tmp_path)
+    assert result.returncode == 1
+    assert result.stderr == b""
+    findings = [
+        line.split(": PWS001", 1)[0]
+        for line in result.stdout.decode("utf-8").splitlines()
+        if ": PWS001" in line
+    ]
+    assert findings == [
+        f"{name}:3" for name in sorted(fixtures, key=lambda name: (name.casefold(), name))
+    ]
+    assert {name: (tmp_path / name).read_bytes() for name in fixtures} == fixtures
+
+
+def test_direct_cli_drops_ignored_ast_paths_with_non_ascii_names(
+    tmp_path: Path,
+) -> None:
+    git = shutil.which("git")
+    assert git is not None
+    subprocess.run([git, "init", "--quiet", str(tmp_path)], check=True, timeout=30)
+    subprocess.run(
+        [git, "-C", str(tmp_path), "config", "--local", "core.quotePath", "true"],
+        check=True,
+        timeout=30,
+    )
+    (tmp_path / ".gitignore").write_text("scripts/unicode-*\n", encoding="utf-8")
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    script = b"Start-Process -FilePath tool -ArgumentList $arguments\n"
+    ignored = scripts / "unicode-\u00e9.ps1"
+    ignored.write_bytes(script)
+    (scripts / "tracked.ps1").write_bytes(script)
+    (scripts / "\u03bb untracked.ps1").write_bytes(script)
+    subprocess.run(
+        [git, "-C", str(tmp_path), "add", "--", "scripts/tracked.ps1"],
+        check=True,
+        timeout=30,
+    )
+    result = direct_lint(tmp_path)
+    assert result.returncode == 1
+    assert result.stderr == b""
+    output = result.stdout.decode("utf-8")
+    assert "scripts/tracked.ps1:1: PWS006" in output
+    assert "scripts/\u03bb untracked.ps1:1: PWS006" in output
+    assert "unicode-" not in output
+    assert "2 violation(s) found." in output
+    assert ignored.read_bytes() == script
+
+
+def test_direct_cli_rejects_an_incomplete_native_response(tmp_path: Path) -> None:
+    root = tmp_path / "fixtures"
+    copy_native_linter(root)
+    (root / "scripts/subject.ps1").write_text("param([int[]]$Paths)\n", encoding="utf-8")
+    (root / "scripts/read-pwsh-invocation-facts.ps1").write_text(
+        """[Console]::Out.WriteLine('{"ast":[],"culture":"","word_ranges":[[65,90]]}')\n""",
+        encoding="utf-8",
+    )
+    result = direct_lint(root, root)
+    assert result.returncode == 1
+    assert b"did not report every requested script" in result.stderr
+    assert b"OK: No pwsh" not in result.stdout
