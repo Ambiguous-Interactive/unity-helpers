@@ -61,7 +61,8 @@ jobs:
         working-directory: unity-helpers
         shell: bash
         run: |
-          sha="$(node scripts/resolve-build-lock-pin.js require-confirmed-unity-cleanup)"
+          set -euo pipefail
+          sha="$(uv run --quiet --project scripts/python~ --locked --no-dev --group metadata python scripts/build_lock_inputs.py --resolve require-confirmed-unity-cleanup)"
           printf 'sha=%s\n' "$sha" >> "$GITHUB_OUTPUT"
 
       # Full history, because the build-lock actions are NOT all pinned to one commit and
