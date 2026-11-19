@@ -171,6 +171,7 @@ def test_nearly_all_failing_reports_without_footer() -> None:
     assert not verdict(ALL_FAILING.rstrip().rstrip("-")).ran_battery
 
 
+@pytest.mark.parametrize("launcher", ["python", "bash"])
 @pytest.mark.parametrize(
     ("name", "first", "last", "diagnostic", "status", "expected"),
     [
@@ -180,44 +181,49 @@ def test_nearly_all_failing_reports_without_footer() -> None:
         ("empty", "", "", "", 0, 1),
         ("failed", CONTROL, "", "driver failure\n", 2, 1),
         ("exhausted", CONTROL, "", "input stream exhausted\n", 3, 1),
+        ("exhausted-zero", CONTROL, "", "input stream exhausted\n", 0, 1),
+        ("host-exit", CONTROL, "", "", 0, 0),
     ],
 )
 @pytest.mark.skipif(os.name == "nt", reason="The build control requires a POSIX Bash host.")
 def test_build_control_preserves_streams(
-    tmp_path: Path, name: str, first: str, last: str, diagnostic: str, status: int, expected: int
+    tmp_path: Path,
+    launcher: str,
+    name: str,
+    first: str,
+    last: str,
+    diagnostic: str,
+    status: int,
+    expected: int,
 ) -> None:
     if name == "interleaved":
         last = " outside" + last
-    scripts = tmp_path / "scripts"
     build = tmp_path / "build"
-    sandbox = scripts / "random-quality"
-    sandbox.mkdir(parents=True)
+    sandbox = copy_build_entry_points(tmp_path)
     build.mkdir()
-    python_project = scripts / "python~"
-    python_project.mkdir()
-    for filename in ("pyproject.toml", "uv.lock"):
-        shutil.copyfile(ROOT / "scripts" / "python~" / filename, python_project / filename)
-    for filename in ("build-testu01.sh", "testu01_report.py"):
-        shutil.copyfile(SCRIPTS / filename, sandbox / filename)
     host_name = "WallstopStudios.UnityHelpers.RandomQuality"
     host = tmp_path / "Generator~" / host_name / "bin" / "Release" / "net9.0" / host_name
-    host.parent.mkdir(parents=True)
-    host.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
-    host.chmod(0o755)
-    driver = build / "wallstop-testu01"
-    driver.write_text(
-        "#!/usr/bin/env bash\n"
+    producer_diagnostic = "producer exited early\n" if name == "host-exit" else ""
+    producer_status = 9 if producer_diagnostic else 0
+    write_command(
+        host, f"printf '%s' {shlex.quote(producer_diagnostic)} >&2\nexit {producer_status}"
+    )
+    write_command(
+        build / "wallstop-testu01",
         f"printf '%s' {shlex.quote(first)}\n"
         f"printf '%s' {shlex.quote(diagnostic)} >&2\n"
         f"printf '%s' {shlex.quote(last)}\n"
-        f"exit {status}\n",
-        encoding="utf-8",
+        f"exit {status}",
     )
-    driver.chmod(0o755)
     bash = shutil.which("bash")
     assert bash is not None
+    command = (
+        [bash, str(sandbox / "build-testu01.sh")]
+        if launcher == "bash"
+        else [sys.executable, str(sandbox / "build_testu01.py")]
+    )
     result = subprocess.run(
-        [bash, str(sandbox / "build-testu01.sh")],
+        command,
         cwd=tmp_path,
         env={**os.environ, "TESTU01_BUILD_ROOT": str(build), "UV_PYTHON": sys.executable},
         capture_output=True,
@@ -228,6 +234,7 @@ def test_build_control_preserves_streams(
     assert result.returncode == expected, result.stdout + result.stderr
     assert (build / "self-test/report.txt").read_text(encoding="utf-8") == first + last
     assert (build / "self-test/driver.stderr.log").read_text(encoding="utf-8") == diagnostic
+    assert (build / "self-test/host.stderr.log").read_text(encoding="utf-8") == producer_diagnostic
     assert ("Self-test passed" in result.stdout) is (expected == 0)
 
 
@@ -274,3 +281,124 @@ def test_report_cli(tmp_path: Path, files: dict[str, str], expected: int, messag
     )
     assert result.returncode == expected
     assert message in result.stdout + result.stderr
+
+
+def write_command(path: Path, body: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("#!/usr/bin/env bash\n" + body + "\n", encoding="utf-8")
+    path.chmod(0o755)
+
+
+def copy_build_entry_points(root: Path) -> Path:
+    sandbox = root / "scripts" / "random-quality"
+    sandbox.mkdir(parents=True)
+    python_project = root / "scripts" / "python~"
+    python_project.mkdir()
+    for filename in ("pyproject.toml", "uv.lock"):
+        shutil.copyfile(ROOT / "scripts" / "python~" / filename, python_project / filename)
+    for filename in ("build-testu01.sh", "build_testu01.py", "testu01_report.py"):
+        shutil.copyfile(SCRIPTS / filename, sandbox / filename)
+    return sandbox
+
+
+def cold_build_fixture(root: Path, mode: str) -> tuple[Path, dict[str, str]]:
+    sandbox = copy_build_entry_points(root)
+    tools = root / "mock tools"
+    settings = root / "fixture files"
+    build = root / "build folder"
+    reports = root / "report folder"
+    host_name = "WallstopStudios.UnityHelpers.RandomQuality"
+    host = root / "Generator~" / host_name / "bin" / "Release" / "net9.0" / host_name
+    write_command(
+        settings / "driver",
+        'IFS= read -r payload\n[[ "$payload" = "stream from host" ]] || exit 8\n'
+        "printf '%s' " + shlex.quote(CONTROL),
+    )
+    write_command(
+        settings / "host",
+        "printf 'stream from host\\n'\nprintf 'host diagnostic\\n' >&2",
+    )
+    write_command(
+        settings / "configure",
+        'printf "%s\\n" "$1"\nprintf "configure diagnostic\\n" >&2\n'
+        'if [[ "$BUILD_FIXTURE_MODE" = "configure-failed" ]]; then exit 9; fi',
+    )
+    write_command(tools / "curl", 'printf "%s\\n" "$4" > "$3"')
+    write_command(
+        tools / "unzip",
+        'if [[ "$BUILD_FIXTURE_MODE" = "missing-source" ]]; then exit 0; fi\n'
+        'destination="$5/TestU01-1.2.3"\n'
+        'mkdir -p "$destination"\ncp "$FIXTURE_CONFIGURE" "$destination/configure"',
+    )
+    write_command(tools / "nproc", "printf '3\\n'")
+    write_command(
+        tools / "make",
+        'printf "%s\\n" "$*"\nprintf "make diagnostic\\n" >&2',
+    )
+    write_command(
+        tools / "gcc",
+        'if [[ "$1" = "-dumpversion" ]]; then printf "12.2\\n"; exit 0; fi\n'
+        'if [[ "$BUILD_FIXTURE_MODE" = "link-failed" ]]; then exit 11; fi\n'
+        'while [[ "$1" != "-o" ]]; do shift; done\ncp "$FIXTURE_DRIVER" "$2"',
+    )
+    write_command(
+        tools / "dotnet",
+        'mkdir -p "$(dirname "$FIXTURE_HOST_DEST")"\ncp "$FIXTURE_HOST" "$FIXTURE_HOST_DEST"',
+    )
+    environment = {
+        **os.environ,
+        "PATH": str(tools) + os.pathsep + os.environ["PATH"],
+        "UV_PYTHON": sys.executable,
+        "TESTU01_BUILD_ROOT": str(build),
+        "TESTU01_CONTROL_REPORT_DIRECTORY": str(reports),
+        "TESTU01_URL": "fixture.zip",
+        "BUILD_FIXTURE_MODE": mode,
+        "FIXTURE_CONFIGURE": str(settings / "configure"),
+        "FIXTURE_DRIVER": str(settings / "driver"),
+        "FIXTURE_HOST": str(settings / "host"),
+        "FIXTURE_HOST_DEST": str(host),
+    }
+    return sandbox, environment
+
+
+@pytest.mark.parametrize(
+    ("mode", "expected"),
+    [("success", 0), ("missing-source", 1), ("configure-failed", 9), ("link-failed", 11)],
+)
+@pytest.mark.skipif(os.name == "nt", reason="The TestU01 native build uses POSIX host tools.")
+def test_cold_build_preserves_steps_and_failure_status(
+    tmp_path: Path, mode: str, expected: int
+) -> None:
+    sandbox, environment = cold_build_fixture(tmp_path, mode)
+    result = subprocess.run(
+        [sys.executable, str(sandbox / "build_testu01.py")],
+        cwd=tmp_path,
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert result.returncode == expected, result.stdout + result.stderr
+    build = Path(environment["TESTU01_BUILD_ROOT"])
+    reports = Path(environment["TESTU01_CONTROL_REPORT_DIRECTORY"])
+    assert (build / "TestU01.zip").read_text(encoding="utf-8") == "fixture.zip\n"
+    if mode == "missing-source":
+        assert "archive did not contain a TestU01-*" in result.stdout
+        assert not (build / "configure.log").exists()
+        return
+    assert (build / "configure.log").read_text(encoding="utf-8") == (
+        f"--prefix={build / 'install'}\nconfigure diagnostic\n"
+    )
+    if mode == "configure-failed":
+        assert not (build / "make.log").exists()
+        return
+    assert (build / "make.log").read_text(encoding="utf-8") == "-j3\nmake diagnostic\n"
+    assert (build / "install.log").read_text(encoding="utf-8") == "install\nmake diagnostic\n"
+    if mode == "link-failed":
+        assert not reports.exists()
+        return
+    assert "Self-test passed" in result.stdout
+    assert (reports / "report.txt").read_text(encoding="utf-8") == CONTROL
+    assert (reports / "driver.stderr.log").read_bytes() == b""
+    assert (reports / "host.stderr.log").read_bytes() == b"host diagnostic\n"
