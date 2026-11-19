@@ -7,9 +7,13 @@ import ctypes
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
+import threading
+import time
 import uuid
+from contextlib import nullcontext
 from pathlib import Path
 from typing import cast
 
@@ -24,8 +28,10 @@ from run_ci_modes import (
     ROOT,
     Mode,
     build_modes,
+    cancellation_signals,
     git,
     isolate_sources,
+    package_smoke_mode,
     read_selection,
     run,
 )
@@ -238,12 +244,14 @@ def make_control(
         [string]$Il2CppCompilerConfiguration, [switch]$IncludeIntegrations, [switch]$ShareEditorProject,
         [switch]$IsolateCompilationFixtures, [string]$ManagedStrippingLevel, [string]$ProjectScope,
         [string[]]$AdditionalScriptingDefines, [string]$TestCategory, [switch]$GenerateOnly,
-        [double]$ProjectRootMinimumFreeGb = 60, [string]$EditorPhaseGroup = 'All')
+        [double]$ProjectRootMinimumFreeGb = 60, [string]$EditorPhaseGroup = 'All',
+        [string]$ProjectPath, [string]$ExportPackagePath)
         $ErrorActionPreference = 'Stop'
         . 'HELPER'
         $workerName = if ($EditorPhaseGroup -eq 'Isolated') { 'editmode_isolated' } elseif ($ProjectScope -eq 'proto-only') { 'proto_only' } else { $TestMode }
         $expectedWorkers = [int]$env:CONTROL_MODE_COUNT
         if ($GenerateOnly) {
+            if ($TestMode -eq 'export') { throw 'Export project must be staged before workers start.' }
             $null = Read-UnityLicenseSession -Path $LicenseSessionPath -UnityVersion $UnityVersion -EditorPath $env:UNITY_EDITOR_PATH -State activated
             if ($env:CONTROL_INITIALIZATION_FAILURE -eq $TestMode) { throw 'Controlled project initialization failure.' }
             if ($ProjectRootMinimumFreeGb -ne 0) { throw 'Initializer can prune sibling projects.' }
@@ -256,6 +264,7 @@ def make_control(
             if ($ProjectRootMinimumFreeGb -ne 60) { throw 'Preparation must prune once before workers start.' }
             if ($env:CONTROL_PREPARATION_FAILURE -eq '1') { throw 'Controlled preparation failure.' }
             Complete-UnityLicenseSession -Path $LicenseSessionPath -Session $session
+            [IO.File]::AppendAllText((Join-Path $env:CONTROL_EVENTS 'activation.count'), '1')
             return
         }
         if ($ProjectRootMinimumFreeGb -ne 0) { throw 'Worker can prune sibling projects.' }
@@ -267,6 +276,15 @@ def make_control(
         while (@(Get-ChildItem -LiteralPath $env:CONTROL_EVENTS -Filter '*.started').Count -lt [Math]::Min(4, $expectedWorkers)) {
             if ($deadline -lt [DateTime]::UtcNow) { throw 'Workers did not overlap.' }
             Start-Sleep -Milliseconds 10
+        }
+        if ($env:CONTROL_EXPORT -eq '1' -and $TestMode -eq 'editmode') {
+            while (-not (Test-Path (Join-Path $env:CONTROL_EVENTS 'export.started'))) {
+                if ($deadline -lt [DateTime]::UtcNow) { throw 'Export did not share the worker budget.' }
+                Start-Sleep -Milliseconds 10
+            }
+        }
+        if ($TestMode -eq 'export' -and -not (Test-Path (Join-Path $ProjectPath 'staged'))) {
+            throw 'Export staging witness is missing.'
         }
         if ($env:CONTROL_HANG -eq $TestMode) {
             $start = [Diagnostics.ProcessStartInfo]::new($env:CONTROL_PYTHON)
@@ -287,6 +305,9 @@ def make_control(
                 $null = New-Item -ItemType Directory -Path $folder -Force
                 [IO.File]::WriteAllText((Join-Path $folder 'control.txt'), $part)
             }
+        }
+        if ($TestMode -eq 'export') {
+            [IO.File]::WriteAllText($ExportPackagePath, 'synthetic package')
         }
         [IO.File]::WriteAllText((Join-Path $ArtifactsPath 'fixture-options.json'), (@{
             RepoRoot = $RepoRoot; AssemblyNames = $AssemblyNames; Mode = $TestMode;
@@ -947,6 +968,8 @@ def test_windows_workers_have_private_desktops_and_preserve_exit_and_output(
     probe.write_text(
         """import ctypes
 import sys
+import threading
+import time
 from ctypes import wintypes
 from pathlib import Path
 
@@ -1205,3 +1228,101 @@ def test_legacy_editors_keep_define_configuration_in_the_editor(
     project = tmp_path / "project"
     generate_project_settings(project, tmp_path / "artifacts", "SINGLE_THREADED", version)
     assert not (project / "ProjectSettings/ProjectSettings.asset").exists()
+
+
+@pytest.mark.parametrize("scenario", ["success", "failure", "timeout", "cancellation"])
+def test_package_smoke_shares_worker_budget_and_has_own_verdict(
+    tmp_path: Path, scenario: str
+) -> None:
+    modes, preparation, environment, shell = make_control(tmp_path)
+    project = tmp_path / "export project"
+    project.mkdir()
+    (project / "staged").touch()
+    package = tmp_path / "exported.unitypackage"
+    session = Path(str(preparation.parameters["LicenseSessionPath"]))
+    smoke = package_smoke_mode(
+        version="6000.6.0f1",
+        repository=ROOT,
+        project=project,
+        artifacts=tmp_path / "export-artifacts",
+        output=package,
+        session=session,
+    )
+    modes.append(smoke)
+    environment["CONTROL_EXPORT"] = "1"
+    if scenario == "failure":
+        environment["CONTROL_FAIL"] = "export"
+    if scenario in {"timeout", "cancellation"}:
+        environment["CONTROL_HANG"] = "export"
+    events = Path(environment["CONTROL_EVENTS"])
+    receipt_path = tmp_path / "receipt.json"
+
+    def cancel_export() -> None:
+        deadline = time.monotonic() + 12
+        while not (events / "export.child").is_file():
+            if time.monotonic() >= deadline:
+                return
+            time.sleep(0.02)
+        signal.raise_signal(signal.SIGTERM)
+
+    cancellation = (
+        threading.Thread(target=cancel_export, daemon=True) if scenario == "cancellation" else None
+    )
+    with cancellation_signals():
+        if cancellation is not None:
+            cancellation.start()
+        try:
+            expected_error = {"timeout": TimeoutError, "cancellation": KeyboardInterrupt}.get(
+                scenario
+            )
+            with pytest.raises(expected_error) if expected_error else nullcontext():
+                assert run(
+                    modes,
+                    preparation,
+                    private=tmp_path,
+                    shell=shell,
+                    environment=environment,
+                    timeout=10 if scenario == "timeout" else 15,
+                    receipt=receipt_path,
+                    output=tmp_path / "github-output",
+                    max_workers=3,
+                    independent_outcomes=True,
+                )
+        finally:
+            if cancellation is not None:
+                cancellation.join(timeout=13)
+
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    assert receipt["CleanupFailed"] is False
+    assert (events / "activation.count").read_text() == "1"
+    assert not (events / "export.initialized").exists()
+    assert (tmp_path / "export-artifacts/mode-controller.log").is_file()
+    assert receipt["Outcomes"]["package_smoke"] == (
+        "success" if scenario == "success" else "failure"
+    )
+    assert package.exists() == (scenario == "success")
+    if scenario == "failure":
+        assert all(receipt["Outcomes"][mode.name] == "success" for mode in modes[:-1])
+    if scenario in {"timeout", "cancellation"}:
+        assert set(receipt["Outcomes"].values()) == {"failure"}
+        smoke_worker = next(
+            worker for worker in receipt["Workers"] if worker["Mode"] == "package_smoke"
+        )
+        assert smoke_worker["Forced"] is True
+        child = int((events / "export.child").read_text())
+        status = Path(f"/proc/{child}/stat")
+        assert not status.exists() or status.read_text().rsplit(")", 1)[1].strip().startswith("Z")
+    windows = [
+        (worker["StartedAfterSeconds"], worker["EndedAfterSeconds"], worker["Mode"])
+        for worker in receipt["Workers"]
+    ]
+    assert len(windows) == len(modes)
+    assert (
+        max(
+            sum(start <= instant < end for start, end, _mode in windows)
+            for instant, _, _ in windows
+        )
+        == 3
+    )
+    export_started = next(start for start, _, mode in windows if mode == "package_smoke")
+    assert any(start < export_started < end for start, end, mode in windows if mode == "editmode")

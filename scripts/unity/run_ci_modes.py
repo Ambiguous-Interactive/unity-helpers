@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import base64
 import contextlib
+import hashlib
 import json
 import math
 import os
@@ -21,6 +22,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, BinaryIO, cast
 
 from editmode_shards import merge_results, partition_assemblies
+from stage_unitypackage import stage_unity_package
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator
@@ -36,6 +38,7 @@ WORKER_PRIORITY = (
     "playmode",
     "editmode_shard",
     "proto_only",
+    "package_smoke",
 )
 WORKER = """
 $ErrorActionPreference = 'Stop'
@@ -176,6 +179,39 @@ def build_modes(
     return jobs
 
 
+def package_smoke_mode(
+    *,
+    version: str,
+    repository: Path,
+    project: Path,
+    artifacts: Path,
+    output: Path,
+    session: Path,
+) -> Mode:
+    """Route a separately staged export project through the licensed worker pool."""
+    if not project.is_dir() or output.suffix.lower() != ".unitypackage":
+        raise ValueError("Package smoke requires a staged project and Unity package output")
+    if (
+        output.resolve().is_relative_to(project.resolve())
+        or artifacts.resolve() == project.resolve()
+    ):
+        raise ValueError("Package smoke requires separate project, artifacts and package paths")
+    return Mode(
+        "package_smoke",
+        {
+            "UnityVersion": version,
+            "TestMode": "export",
+            "TestCategory": "",
+            "RepoRoot": str(repository),
+            "ProjectPath": str(project),
+            "ArtifactsPath": str(artifacts),
+            "ExportPackagePath": str(output),
+            "LicenseSessionPath": str(session),
+            "ProjectRootMinimumFreeGb": "0",
+        },
+    )
+
+
 def git(repository: Path, *arguments: str) -> str:
     executable = shutil.which("git")
     if executable is None:
@@ -286,6 +322,9 @@ def launch(
         )
     if mode.name != "standalone":
         child_environment.pop("UH_NATIVE_ALLOCATOR_DIAGNOSTICS", None)
+    if mode.name == "package_smoke":
+        child_environment.pop("UNITY_ACCELERATOR_ENDPOINT", None)
+        child_environment.pop("UH_STREAM_TEST_RESULTS", None)
     command = [
         shell,
         "-NoProfile",
@@ -409,6 +448,8 @@ def run(
             if session.get("State") != "activated" or session.get("OwnerProcessId") != os.getpid():
                 raise RuntimeError("Unity license preparation did not publish its owned session")
             for mode in modes:
+                if mode.name == "package_smoke":
+                    continue
                 initialization = Mode(
                     "initialize-" + mode.key, {**mode.parameters, "GenerateOnly": True}
                 )
@@ -602,8 +643,34 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--timeout-seconds", type=float, default=1800)
     parser.add_argument("--artifacts-root", type=Path, default=ROOT / ".artifacts/unity")
+    parser.add_argument("--package-smoke-project", type=Path)
+    parser.add_argument("--package-smoke-output", type=Path)
     args = parser.parse_args(argv)
+    if bool(args.package_smoke_project) != bool(args.package_smoke_output):
+        parser.error("Select both the package smoke project and output")
     controller_started = time.monotonic()
+    probe_output: Path | None = None
+    if (
+        args.with_single_threaded
+        and os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch"
+        and os.environ.get("GITHUB_REF_NAME") == "task/unity-smoke-probe-20261119"
+    ):
+        project = ROOT / ".artifacts/unity/unitypackage-combined-probe-project"
+        try:
+            manifest = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
+            stage_unity_package(ROOT, project, args.version)
+        except (OSError, ValueError, subprocess.CalledProcessError) as error:
+            print(f"Cannot stage combined package smoke: {error}", file=sys.stderr)
+            return 1
+        probe_output = (
+            ROOT
+            / ".artifacts/unitypackage-combined-probe"
+            / (f"{manifest['name']}-{manifest['version']}.unitypackage")
+        )
+        probe_output.unlink(missing_ok=True)
+        Path(f"{probe_output}.sha256").unlink(missing_ok=True)
+        args.package_smoke_project = project
+        args.package_smoke_output = probe_output
     try:
         selected, profiles = read_selection(
             os.environ["UH_PARALLEL_SELECTED_MODES"],
@@ -668,6 +735,18 @@ def main(argv: list[str] | None = None) -> int:
                 if single_threaded and args.with_single_threaded:
                     isolated = [replace(mode, output_prefix="st_") for mode in isolated]
                 modes.extend(isolated)
+            if args.package_smoke_project is not None and args.package_smoke_output is not None:
+                package_project = args.package_smoke_project.absolute()
+                modes.append(
+                    package_smoke_mode(
+                        version=args.version,
+                        repository=ROOT,
+                        project=package_project,
+                        artifacts=package_project / "unitypackage-output",
+                        output=args.package_smoke_output.absolute(),
+                        session=session,
+                    )
+                )
             preparation_parameters = dict(modes[0].parameters)
             preparation_parameters["PrepareLicenseOnly"] = True
             preparation_parameters.pop("ProjectRootMinimumFreeGb", None)
@@ -702,6 +781,18 @@ def main(argv: list[str] | None = None) -> int:
     ) as error:
         print(f"Cannot run Unity modes: {error}", file=sys.stderr)
         return 1
+    if probe_output is not None:
+        try:
+            sidecar = Path(f"{probe_output}.sha256").read_text(encoding="ascii").split()
+            with probe_output.open("rb") as package:
+                digest = hashlib.file_digest(package, "sha256").hexdigest()
+            size = probe_output.stat().st_size
+            if size <= 0 or sidecar != [digest, probe_output.name]:
+                raise ValueError("Combined package smoke digest or package size is invalid")
+        except (OSError, ValueError) as error:
+            print(f"Cannot validate combined package smoke output: {error}", file=sys.stderr)
+            return 1
+        print(f"Combined package smoke exported {size} bytes with SHA256 {digest}", flush=True)
     return int(not success)
 
 
