@@ -689,6 +689,9 @@ def main(argv: list[str] | None = None) -> int:
             os.environ["UH_PARALLEL_SELECTED_MODES"],
             os.environ["UH_PARALLEL_ASSEMBLY_PROFILES"],
         )
+        if stage_probe is not None and selected == ["editmode"]:
+            args.timeout_seconds = 120
+            print("Combined package smoke timeout control is limited to 120 seconds", flush=True)
         selections = [(args.single_threaded, selected, profiles)]
         if args.with_single_threaded:
             single_selected, single_profiles = read_selection(
