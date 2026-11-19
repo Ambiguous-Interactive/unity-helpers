@@ -445,6 +445,9 @@ jobs:
         with:
           node-version: "22.23.4"
 
+      - name: Setup Python tooling
+        uses: ./.github/actions/setup-python-tools
+
       - name: Assemble perf-results
         id: assemble
         shell: bash
@@ -466,7 +469,7 @@ jobs:
           mkdir -p "${dest}"
           find perf-download -type f -name 'results-*.xml' -exec cp -f {} "${candidate}/" \; 2>/dev/null || true
           decision="${RUNNER_TEMP}/perf-refresh-decision.json"
-          node scripts/unity/lib/evaluate-perf-refresh.js \
+          uv run --quiet --project scripts/python~ --locked --no-dev python scripts/unity/evaluate_perf_refresh.py \
             --benchmark-result "${BENCHMARKS_RESULT}" \
             --allow-baseline-refresh "${ALLOW_BASELINE_REFRESH}" \
             --expected-files "${EXPECTED_RESULT_FILES}" \
