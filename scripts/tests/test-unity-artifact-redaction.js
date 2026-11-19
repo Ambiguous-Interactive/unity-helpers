@@ -421,9 +421,7 @@ runTest("no redaction step scrubs a tree its job does not upload", () => {
   );
 });
 
-runTest("every redaction step can actually run node", () => {
-  // The self-hosted Unity runners have no Node on PATH. A redaction step without a Node toolchain
-  // in front of it fails the job it was added to protect.
+runTest("every redaction job provisions the locked Python tooling", () => {
   const byJob = new Map();
   for (const step of allSteps()) {
     const jobKey = `${step.workflow}#${step.jobId}`;
@@ -438,17 +436,17 @@ runTest("every redaction step can actually run node", () => {
     if (redactionIndex < 0) {
       continue;
     }
-    const hasNode = steps
+    const hasPython = steps
       .slice(0, redactionIndex)
-      .some((step) => step.uses.startsWith("actions/setup-node"));
-    if (!hasNode) {
+      .some((step) => step.uses === "./.github/actions/setup-python-tools");
+    if (!hasPython) {
       missing.push(jobKey);
     }
   }
   assert.deepEqual(
     missing,
     [],
-    "these jobs redact before setting up Node, so the redactor cannot start: " + missing.join(", ")
+    "These jobs redact before provisioning Python tooling: " + missing.join(", ")
   );
 });
 
@@ -470,7 +468,7 @@ runTest("the redaction action exists and runs the shared redactor", () => {
   );
   assert.match(
     body,
-    /node scripts\/unity\/redact-unity-artifacts\.js/,
+    /uv run --quiet --project scripts\/python~ --locked --no-dev python scripts\/unity\/redact_unity_artifacts\.py/,
     "the action must call the tested redactor rather than restating the patterns inline"
   );
   assert.match(

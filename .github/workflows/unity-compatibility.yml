@@ -967,7 +967,7 @@ jobs:
           label: Unity ${{ matrix.unity-version }} standalone
           expected-empty: false
 
-      - name: Setup Node.js for credential redaction
+      - name: Setup Node.js for native acceptance verification
         if: always()
         timeout-minutes: 2
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1

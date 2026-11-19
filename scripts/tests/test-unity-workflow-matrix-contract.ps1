@@ -158,26 +158,25 @@ function Test-WatchdogCadenceFitsRecoveryWindow {
     return ($slowestSeconds * $ThrottleFactor) -lt $windowSeconds
 }
 
-function Test-JobInstallsOnlyRedactionNode {
+function Test-JobInstallsOnlyAcceptanceNode {
     <#
         .SYNOPSIS
-        True when Node installation serves redaction or the guarded native acceptance route.
+        True when Node installations serve the native acceptance runner or verifier.
 
         .DESCRIPTION
-        Node used to arrive on these legs to rediscover asmdefs, and this contract banned
-        `actions/setup-node@` outright to stop that. The ban is on the rediscovery, not on Node
-        itself: `.github/actions/redact-unity-artifacts` removes the Unity license serial from the
-        artifact tree before it is uploaded, it is a Node script, and these runners have no Node on
-        PATH. The existing manual WProto route also requires a pinned Node toolchain. Its
-        exact dispatch, mode, version and held-lock guard must remain intact. Other Node
-        installations still fail the contract.
+        Assembly profiles are computed on the hosted matrix job. Licensed jobs may
+        provision Node for native acceptance only. The WProto runner keeps its
+        exact dispatch, mode, version and held-lock guard.
     #>
     param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$JobText)
 
     $setupNodeCount = @([regex]::Matches($JobText, 'actions/setup-node@')).Count
-    $redactionNodeCount = @(
-        [regex]::Matches($JobText, '- name: Setup Node\.js for credential redaction')
-    ).Count
+    $verifierSteps = [regex]::Matches($JobText, '(?ms)^      - name: Setup Node\.js for native acceptance verification\r?\n.*?(?=^      - name:|\z)')
+    if ($verifierSteps.Count -gt 1) { return $false }
+    if ($verifierSteps.Count -eq 1 -and
+        [regex]::Matches($verifierSteps[0].Value, '(?m)^        uses: actions/setup-node@').Count -ne 1) {
+        return $false
+    }
     $nativeSteps = [regex]::Matches($JobText, '(?ms)^      - name: Setup Node\.js for WProto native acceptance\r?\n(?<body>.*?)(?=^      - name:|\z)')
     if ($nativeSteps.Count -gt 1) { return $false }
     if ($nativeSteps.Count -eq 1) {
@@ -187,12 +186,12 @@ function Test-JobInstallsOnlyRedactionNode {
         $expected = '${{ !cancelled() && github.event_name == ''workflow_dispatch'' && (inputs.acceptance == ''wproto'' || (inputs.native-diagnostics && inputs.test-mode == ''standalone'' && inputs.acceptance == ''none'' && matrix.unity-version == ''6000.6.0f1'')) && (matrix.unity-version == ''2021.3.45f1'' || matrix.unity-version == ''6000.6.0f1'') && steps.unity_lock.outputs.acquired == ''true'' }}'
         if ($folded -cne $expected -or [regex]::Matches($step, 'actions/setup-node@').Count -ne 1) { return $false }
     }
-    return ($setupNodeCount -eq ($redactionNodeCount + $nativeSteps.Count))
+    return ($setupNodeCount -eq ($verifierSteps.Count + $nativeSteps.Count))
 }
 
 $nativeNodeWorkflow = Get-Content -LiteralPath (Join-Path $PSScriptRoot '../../.github/workflows/unity-tests.yml') -Raw
 $nativeNodeSubject = [regex]::Match($nativeNodeWorkflow, '(?ms)^      - name: Setup Node\.js for WProto native acceptance\r?\n.*?(?=^      - name:|\z)').Value
-if ([string]::IsNullOrWhiteSpace($nativeNodeSubject) -or -not (Test-JobInstallsOnlyRedactionNode -JobText $nativeNodeSubject)) {
+if ([string]::IsNullOrWhiteSpace($nativeNodeSubject) -or -not (Test-JobInstallsOnlyAcceptanceNode -JobText $nativeNodeSubject)) {
     throw 'Actual guarded WProto Node step must be recognized.'
 }
 foreach ($control in @(
@@ -201,9 +200,16 @@ foreach ($control in @(
         @('inputs.test-mode == ''standalone''', 'true'),
         @('matrix.unity-version == ''6000.6.0f1''', 'true')
     )) {
-    if (-not $nativeNodeSubject.Contains($control[0]) -or (Test-JobInstallsOnlyRedactionNode -JobText $nativeNodeSubject.Replace($control[0], $control[1]))) {
+    if (-not $nativeNodeSubject.Contains($control[0]) -or (Test-JobInstallsOnlyAcceptanceNode -JobText $nativeNodeSubject.Replace($control[0], $control[1]))) {
         throw 'Weakened WProto Node guard must be rejected.'
     }
+}
+
+$verifierNodeSubject = [regex]::Match($nativeNodeWorkflow, '(?ms)^      - name: Setup Node\.js for native acceptance verification\r?\n.*?(?=^      - name:|\z)').Value
+if ([string]::IsNullOrWhiteSpace($verifierNodeSubject) -or
+    -not (Test-JobInstallsOnlyAcceptanceNode -JobText $verifierNodeSubject) -or
+    (Test-JobInstallsOnlyAcceptanceNode -JobText $verifierNodeSubject.Replace('native acceptance verification', 'assembly discovery'))) {
+    throw 'Only the reviewed native acceptance verifier may install Node.'
 }
 
 function Test-NativeBuildReadbackWorkflow {
@@ -920,7 +926,7 @@ $benchmarkAssemblyDiscoveryIsCentralized = (
     -not $benchmarkJob.Contains('strategy:') -and
     -not $benchmarkJob.Contains('matrix.') -and
     $benchmarkJob.Contains('expected-empty: false') -and
-    (Test-JobInstallsOnlyRedactionNode -JobText $benchmarkJob) -and
+    (Test-JobInstallsOnlyAcceptanceNode -JobText $benchmarkJob) -and
     -not $benchmarkJob.Contains('./.github/actions/compute-unity-assemblies') -and
     -not $benchmarkJob.Contains('steps.compute')
 )
@@ -2488,13 +2494,13 @@ $matrixConfigAssemblyDiscoveryIsCentralized = (
     $unityTestsSingleThreadedJob.Contains('UH_TEST_ASSEMBLIES: ${{ needs.matrix-config.outputs.editmode-core-assemblies }}') -and
     $unityTestsSingleThreadedJob.Contains('UH_TEST_ASSEMBLIES: ${{ needs.matrix-config.outputs.playmode-core-assemblies }}') -and
     $unityTestsSingleThreadedJob.Contains('UH_TEST_ASSEMBLIES: ${{ needs.matrix-config.outputs.standalone-core-assemblies }}') -and
-    (Test-JobInstallsOnlyRedactionNode -JobText $unityTestsMatrixJob) -and
-    (Test-JobInstallsOnlyRedactionNode -JobText $unityTestsSingleThreadedJob) -and
+    (Test-JobInstallsOnlyAcceptanceNode -JobText $unityTestsMatrixJob) -and
+    (Test-JobInstallsOnlyAcceptanceNode -JobText $unityTestsSingleThreadedJob) -and
     -not $unityTestsMatrixJob.Contains('./.github/actions/compute-unity-assemblies') -and
     -not $unityTestsSingleThreadedJob.Contains('./.github/actions/compute-unity-assemblies')
 )
 if (-not $matrixConfigAssemblyDiscoveryIsCentralized) {
-    Write-Host "::error file=.github/workflows/unity-tests.yml::Compute integration and core assembly profiles once in hosted matrix-config, bind those outputs into the reviewed version-grouped Unity jobs, and do not install Node or run asmdef discovery again on self-hosted Unity test legs."
+    Write-Host "::error file=.github/workflows/unity-tests.yml::Compute integration and core assembly profiles once in hosted matrix-config, bind those outputs into the reviewed version-grouped Unity jobs, and restrict self-hosted Node setup to native acceptance."
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info "Checked Unity test assembly discovery is centralized on the hosted matrix job."

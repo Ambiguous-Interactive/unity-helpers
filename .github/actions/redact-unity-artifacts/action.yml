@@ -34,7 +34,7 @@ runs:
         }
         Write-Host "::group::Redacting credentials from Unity artifacts"
         try {
-          node scripts/unity/redact-unity-artifacts.js @paths
+          uv run --quiet --project scripts/python~ --locked --no-dev python scripts/unity/redact_unity_artifacts.py @paths
           if ($LASTEXITCODE -ne 0) {
             throw "Credential redaction failed with exit code $LASTEXITCODE."
           }
