@@ -261,6 +261,14 @@ def test_manifest_accepts_only_qualified_results(width: str) -> None:
     assert result_for(evaluate(changed, reports_for(width), "32GB", width), PCG)["status"] == "ok"
 
 
+def test_missing_clean_depth_does_not_pass() -> None:
+    changed = copy.deepcopy(MANIFEST)
+    subject = next(generator for generator in changed["generators"] if generator["name"] == PCG)
+    del subject["widths"]["32"]["cleanThrough"]
+    with pytest.raises(ValueError, match="no recorded cleanThrough setting"):
+        evaluate(changed, reports_for("32"), "32GB", "32")
+
+
 def test_control_discrimination_uses_actual_width_and_depth() -> None:
     for width, depth, status in (
         ("32", CLEAN_LENGTH, "inconclusive"),

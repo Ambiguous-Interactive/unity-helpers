@@ -188,7 +188,7 @@ def classify_report(text: object) -> Report:
 
 
 def outcome_for(generator: Generator, width: str) -> Outcome:
-    outcome = generator.get("widths", {}).get(width)
+    outcome = (generator.get("widths") or {}).get(width)
     if outcome is None:
         raise ValueError(
             f"{generator['name']} has no recorded outcome for width {width}. "
@@ -205,6 +205,8 @@ def judge(
     length = classified.last_length
     clean_through = outcome.get("cleanThrough")
     if expected == "pass" and observed == "pass":
+        if "cleanThrough" not in outcome:
+            raise ValueError(f"{name} has no recorded cleanThrough setting for width {width}.")
         if clean_through is None:
             return (
                 "inconclusive",
@@ -227,7 +229,7 @@ def judge(
     if expected == "pass":
         message = (
             "No passing baseline was recorded; review this failure and the generator's quality rating."
-            if clean_through is None
+            if "cleanThrough" in outcome and clean_through is None
             else "This is a statistical regression in the generator."
         )
         return (
