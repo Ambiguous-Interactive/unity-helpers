@@ -6,8 +6,9 @@ import json
 import re
 import sys
 from dataclasses import dataclass
+from io import TextIOWrapper
 from pathlib import Path
-from typing import cast
+from typing import NoReturn, cast
 
 DECISIVE = 1e-10
 MAX_SAFE_INTEGER = (1 << 53) - 1
@@ -107,8 +108,15 @@ def read_text(path: Path) -> str:
         return stream.read()
 
 
+def reject_json_constant(value: str) -> NoReturn:
+    raise ValueError(f"Invalid JSON constant: {value}.")
+
+
 def read_expectations(manifest_path: Path) -> dict[str, str | None]:
-    content = cast("dict[str, object]", json.loads(read_text(manifest_path)))
+    content = cast(
+        "dict[str, object]",
+        json.loads(read_text(manifest_path), parse_constant=reject_json_constant),
+    )
     entries = cast("list[dict[str, object]] | None", content.get("generators")) or []
     expectations: dict[str, str | None] = {}
     for entry in entries:
@@ -255,5 +263,12 @@ def main(arguments: list[str]) -> int:
         return 1
 
 
+def configure_cli_output() -> None:
+    for stream in (sys.stdout, sys.stderr):
+        if isinstance(stream, TextIOWrapper):
+            stream.reconfigure(encoding="utf-8", newline="\n")
+
+
 if __name__ == "__main__":
+    configure_cli_output()
     sys.exit(main(sys.argv[1:]))
