@@ -225,6 +225,37 @@ keys, 1.116–1.289× at 1,024, and 1.188–1.253× at 16,384. The source passed
 invalidation and bounded churn on both runtimes. The removal regression and
 the two original-budget misses ruled out the candidate.
 
+### Current main and collision insertion
+
+Two later batches replayed `8b2d09c2` with the same frozen consumer workload and
+runtimes. One rebuilt the exact source. The other ran the archived executables against
+the same inputs. Each batch retained three processes per runtime with 111 cells per
+process, the expected checksum, and 64 slots through one million churn operations.
+The ranges are ratios of median process medians over the same key shapes and sizes
+as the preceding table.
+
+| Runtime |  Hit / 3.7.1 | Miss / 3.7.1 | Insert / 3.7.1 | Iterate / Dictionary |
+| ------- | -----------: | -----------: | -------------: | -------------------: |
+| .NET 10 | 0.911–1.074× | 0.853–1.982× |   0.956–1.210× |         0.818–1.096× |
+| Mono    | 0.971–1.246× | 0.993–1.141× |   0.931–1.228× |         1.058–1.101× |
+
+Each batch passes all 12 required iteration cells and exceeds the 1.10× budget
+in ten of 54 lookup or insertion cells. Separate controls on both runtimes passed
+240 enumerator invalidation and membership checks on this source.
+
+A candidate moved collision handling out of the primary insertion path. Its original
+batch missed the Mono shared-low-bit 1,024-key insertion budget at 1.101×. The
+independent source rebuild missed that insertion budget at 1.111× and the .NET
+sparse 1,024-key miss budget at 1.243×. Replaying the first batch's exact binaries
+missed the .NET sparse 64- and 1,024-key miss budgets at 1.110× and 1.174×.
+All three batches passed the required iteration cells, and the candidate passed
+the mutation and bounded churn controls on both runtimes.
+
+In a separate paired first-removal workload, the candidate took 1.250× main
+at 64 keys and 1.263× at 1,024 on Mono. A follow-up specialized removal for
+group heads and measured 1.022× and 1.099× in a fresh batch. It still missed the Mono 1,024-key shared-low-bit insertion budget
+at 1.134×. Both candidates were rejected.
+
 ## Rejected first-probe split
 
 A separate candidate keeps the first `TryGet` probe inline and moves collision continuation to
