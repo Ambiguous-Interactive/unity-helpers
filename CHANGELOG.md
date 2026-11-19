@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.7.2] - 2026-11-19
+
 ### Added
 
 - Add configurable Unity 6 build-profile scene synchronization, preserving custom lists and supporting automatic updates after scene-list events ([#1185](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1185)).
