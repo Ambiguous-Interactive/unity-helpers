@@ -1756,6 +1756,7 @@ jobs:
       - runner-preflight
     if: >-
       ${{ !cancelled() &&
+        github.event_name == 'workflow_dispatch' &&
         !(github.event_name == 'workflow_dispatch' && inputs.native-readback-run-id != '') &&
         (github.event_name != 'pull_request' ||
           github.event.pull_request.head.repo.full_name == github.repository) &&
@@ -2581,22 +2582,23 @@ jobs:
 
   unity-tests-single-threaded-aggregate:
     name: Unity CI aggregate gate (single-threaded)
-    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.native-readback-run-id != '') && (always()) }}
+    if: ${{ always() }}
     needs:
       - matrix-config
       - runner-preflight
       - unity-tests-single-threaded
-      - unity-tests
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - name: Require single-threaded result
+      - name: Require the selected single-threaded result
         shell: bash
         env:
           RUNNER_PREFLIGHT_RESULT: ${{ needs.runner-preflight.result }}
           UNITY_TESTS_RESULT: ${{ needs.unity-tests-single-threaded.result }}
-          UH_COMBINED: ${{ needs.matrix-config.outputs.combine-variants == 'true' }}
-          UH_COMBINED_RESULT: ${{ needs.unity-tests.result }}
+          LANE_SELECTED: >-
+            ${{ github.event_name == 'workflow_dispatch' &&
+            !(github.event_name == 'workflow_dispatch' && inputs.native-readback-run-id != '') &&
+            needs.matrix-config.outputs.combine-variants != 'true' }}
           FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
           DEPENDABOT_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]' }}
         run: |
@@ -2604,13 +2606,15 @@ jobs:
           if [ "${FORK_PR}" = "true" ] || [ "${DEPENDABOT_PR}" = "true" ]; then
             test "${RUNNER_PREFLIGHT_RESULT}" = skipped
             test "${UNITY_TESTS_RESULT}" = skipped
-          elif [ "$UH_COMBINED" = true ]; then
-            test "${RUNNER_PREFLIGHT_RESULT}" = success
-            test "${UNITY_TESTS_RESULT}" = skipped
-            test "$UH_COMBINED_RESULT" = success
-          else
+          elif [ "${LANE_SELECTED}" = "true" ]; then
             test "${RUNNER_PREFLIGHT_RESULT}" = success
             test "${UNITY_TESTS_RESULT}" = success
+          elif [ "${LANE_SELECTED}" = "false" ]; then
+            test "${RUNNER_PREFLIGHT_RESULT}" = success
+            test "${UNITY_TESTS_RESULT}" = skipped
+          else
+            echo "LANE_SELECTED must be true or false." >&2
+            false
           fi
 
   unitypackage-smoke-aggregate:
