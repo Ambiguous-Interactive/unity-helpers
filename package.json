@@ -252,7 +252,7 @@
     "test:unity-acceptance-workflow:predicates": "uv run --project scripts/python~ --locked pytest scripts/tests/test_native_build_selection.py -q && node scripts/tests/test-unity-acceptance-workflow.js",
     "test:nullable-consumer-matrix": "node scripts/tests/test-nullable-consumer-matrix.js",
     "test:il2cpp-conversion-inputs": "pwsh -NoProfile -File scripts/tests/test-il2cpp-conversion-inputs.ps1",
-    "test:unity-grouped-modes": "node scripts/tests/test-unity-grouped-modes.js && node --test scripts/tests/test-unity-compatibility.js && uv run --quiet --project scripts/python~ --locked pytest scripts/tests/test_compatibility_renderer.py scripts/tests/test_unity_matrix_resolver.py -q",
+    "test:unity-grouped-modes": "node scripts/tests/test-unity-grouped-modes.js && node --test scripts/tests/test-unity-compatibility.js && uv run --quiet --project scripts/python~ --locked pytest scripts/tests/test_compatibility_renderer.py scripts/tests/test_unity_matrix_resolver.py scripts/tests/test_unity_mode_outcomes.py -q",
     "test:standalone-scene-provision": "pwsh -NoProfile -File scripts/tests/test-standalone-scene-provision.ps1",
     "test:perf-tools": "node scripts/unity/lib/extract-perf-metrics.js --self-test && node scripts/unity/lib/evaluate-perf-refresh.js --self-test && uv run --quiet --project scripts/python~ --locked pytest scripts/tests/test_benchmark_refresh.py -q && node scripts/unity/lib/render-perf-deltas.js --self-test && node --test scripts/tests/test-publish-benchmark-docs.js scripts/tests/test-schedule-unity-benchmarks-workflow.js",
     "test:git-path-helpers": "pwsh -NoProfile -File scripts/tests/test-git-path-helpers.ps1 -VerboseOutput",

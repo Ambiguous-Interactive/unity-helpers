@@ -540,7 +540,10 @@ assert.match(
   /required-test-name: WallstopStudios\.UnityHelpers\.Tests\.Serialization\.WProtoOnlyModeTests\.MissingFormatterCannotReachTheLegacyBackend/
 );
 assert.match(onlyUpload, /if-no-files-found: error/);
-assert.match(onlyGate, /assert-test-mode-outcomes\.ps1/);
+assert.match(
+  onlyGate,
+  /run: uv run --quiet --project scripts\/python~ --locked --no-dev python scripts\/unity\/assert_test_mode_outcomes\.py/
+);
 for (const mode of ["EDITMODE", "PLAYMODE"]) {
   for (const stage of ["RUN", "VERIFY", "REDACT", "UPLOAD"]) {
     assert.match(onlyGate, new RegExp(`^          ${mode}_${stage}: "skipped"$`, "m"));
