@@ -38,13 +38,17 @@ New lines start with zero `Progress`. Set it directly or call `AnimateLine(forwa
 resetProgress: true)` to draw the line. `AnimateLine(false)` retracts it from the current fraction.
 Changing `End` after the first successful draw animates the endpoint over `AnimationDuration`.
 Both animations use scaled time and pause while the line cannot be drawn, preserving elapsed
-progress across temporary invalid states. A nonpositive or nonfinite duration settles immediately.
+progress across temporary invalid states. Changing to a positive duration keeps the current
+fraction and applies the new duration to the remaining animation. A nonpositive or nonfinite
+duration settles immediately. Both animations are linear by default. Set
+`line.AnimationEase = BendableLineEase.OutQuad;` for a quick start and a gradual stop.
 Disabling the component stops animation and clears its visible progress. `LateUpdate` applies
 changes; `TryRefresh()` updates immediately and returns whether usable geometry was built.
 
 Sprites use their own UV coordinates without copying pixels or changing importers. Unpacked
-sprite sheets and readable or unreadable rectangular atlases are supported. Tight atlas packing
-and separate alpha textures are refused rather than drawing neighboring art or an opaque mask.
+sprite sheets and readable or unreadable rectangular atlases are supported. The line clears its
+geometry for unsupported sprites, including Tight atlas packing and separate alpha textures.
+Each line logs a warning once per unsupported sprite, with the sprite name and the reason.
 Packed sprite padding is preserved as transparent space. Reassign `Sprite` after overriding a
 sprite's geometry; atlas texture changes are detected automatically.
 

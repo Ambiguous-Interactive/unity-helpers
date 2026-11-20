@@ -12,11 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Add a timed flush and ownership transfer for byte arrays to `LatestWriteFile` ([#1275](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1275)).
+- Add optional OutQuad easing for `BendableLine` drawing and endpoint animations ([#1272](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1272)).
 
 ### Fixed
 
 - Fix stale `LatestWriteFile` saves overwriting newer saves when multiple writers flush the same path ([#1275](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1275)).
 - Reject local Unity package export paths that would overwrite the Unity log or package data ([#859](https://github.com/Ambiguous-Interactive/unity-helpers/issues/859)).
+- Fix `BendableLine` jumping when its animation duration changes, and warn once per unsupported sprite when the line cannot map it ([#1272](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1272)).
 
 ## [3.7.2] - 2026-11-19
 
