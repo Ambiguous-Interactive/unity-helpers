@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
     using System;
     using NUnit.Framework;
     using UnityEngine;
+    using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Tests.Core;
 
@@ -72,22 +73,57 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             }
         }
 
-        [Test]
-        public void UnknownLayerDoesNotMutateAnExistingRange()
+        [TestCase(false)]
+        [TestCase(true)]
+        public void UnknownLayerDisablesMaskAndLogsId(bool hasCustomRange)
         {
             SpriteMask mask = CreateMask();
             int unknown = UnusedLayerId();
-            mask.RangeToItsOwnLayer();
-            int front = mask.frontSortingLayerID;
-            int back = mask.backSortingLayerID;
+            int validLayer = mask.sortingLayerID;
+            if (hasCustomRange)
+            {
+                mask.RangeTo(validLayer);
+            }
+
+            Assert.That(mask.Reaches(validLayer), Is.True);
+            LogAssert.Expect(
+                LogType.Warning,
+                $"Sprite mask disabled because sorting layer ID {unknown} is unknown."
+            );
             mask.RangeTo(unknown);
-            Assert.That(mask.isCustomRangeActive, Is.True);
-            Assert.That(mask.frontSortingLayerID, Is.EqualTo(front));
-            Assert.That(mask.backSortingLayerID, Is.EqualTo(back));
+            Assert.That(mask.enabled, Is.False);
+            Assert.That(mask.isCustomRangeActive, Is.EqualTo(hasCustomRange));
+            foreach (SortingLayer layer in SortingLayer.layers)
+            {
+                Assert.That(mask.Reaches(layer.id), Is.False);
+            }
+
+            mask.RangeToItsOwnLayer();
+            Assert.That(mask.enabled, Is.False);
+            Assert.That(mask.Reaches(validLayer), Is.False);
+            mask.enabled = true;
+            Assert.That(mask.Reaches(validLayer), Is.True);
+        }
+
+        [Test]
+        public void SavedRangeRejectsUnknownIdentifiers()
+        {
+            SpriteMask mask = CreateMask();
+            int unknown = UnusedLayerId();
+            int validLayer = mask.sortingLayerID;
             Assert.That(mask.Reaches(unknown), Is.False);
-            Assert.That(SpriteMaskExtensions.Reaches(false, front, back, unknown), Is.False);
-            Assert.That(SpriteMaskExtensions.Reaches(true, unknown, back, front), Is.False);
-            Assert.That(SpriteMaskExtensions.Reaches(true, front, unknown, back), Is.False);
+            Assert.That(
+                SpriteMaskExtensions.Reaches(false, validLayer, validLayer, unknown),
+                Is.False
+            );
+            Assert.That(
+                SpriteMaskExtensions.Reaches(true, unknown, validLayer, validLayer),
+                Is.False
+            );
+            Assert.That(
+                SpriteMaskExtensions.Reaches(true, validLayer, unknown, validLayer),
+                Is.False
+            );
         }
 
         [Test]

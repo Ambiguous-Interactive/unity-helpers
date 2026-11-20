@@ -9,11 +9,21 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     public static class SpriteMaskExtensions
     {
         /// <summary>Limits a mask to every sorting order on one valid sorting layer.</summary>
-        /// <remarks>A missing mask or unknown layer leaves the mask unchanged.</remarks>
+        /// <remarks>An unknown layer disables the mask and logs its identifier.</remarks>
         public static void RangeTo(this SpriteMask mask, int sortingLayerId)
         {
-            if (mask == null || !SortingLayer.IsValid(sortingLayerId))
+            if (mask == null)
             {
+                return;
+            }
+
+            if (!SortingLayer.IsValid(sortingLayerId))
+            {
+                mask.enabled = false;
+                Debug.LogWarning(
+                    $"Sprite mask disabled because sorting layer ID {sortingLayerId} is unknown.",
+                    mask
+                );
                 return;
             }
 
@@ -25,6 +35,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         /// <summary>Limits a mask to the sorting layer assigned to that mask.</summary>
+        /// <remarks>An unknown layer disables the mask and logs its identifier.</remarks>
         public static void RangeToItsOwnLayer(this SpriteMask mask)
         {
             if (mask != null)
@@ -33,11 +44,12 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
         }
 
-        /// <summary>Reports whether a mask can affect any sorting order on a valid layer.</summary>
+        /// <summary>Reports whether an enabled mask can affect any sorting order on a valid layer.</summary>
         /// <remarks>Order bounds and SortingGroup isolation are not part of this layer-only query.</remarks>
         public static bool Reaches(this SpriteMask mask, int sortingLayerId)
         {
             return mask != null
+                && mask.enabled
                 && Reaches(
                     mask.isCustomRangeActive,
                     mask.frontSortingLayerID,
