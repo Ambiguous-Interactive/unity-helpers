@@ -41,7 +41,13 @@ Both animations use scaled time and pause while the line cannot be drawn, preser
 progress across temporary invalid states. Changing to a positive duration keeps the current
 fraction and applies the new duration to the remaining animation. A nonpositive or nonfinite
 duration settles immediately. Both animations are linear by default. Set
-`line.AnimationEase = BendableLineEase.OutQuad;` for a quick start and a gradual stop.
+`line.AnimationEase = MotionCurve.QuadraticOut;` for a quick start and a gradual stop.
+Back and elastic curves can overshoot the endpoint while draw progress stays within `[0, 1]`.
+
+`WallstopStudios.UnityHelpers.Core.Animation.MotionCurves.Sample(curve, progress)` also
+works independently of the line. `MotionCurve` offers linear and in, out, and in-out variants
+of sine, quadratic, cubic, quartic, quintic, exponential, circular, back, elastic, and bounce.
+The sampler bounds the input to `[0, 1]` and preserves overshoot in its output.
 Disabling the component stops animation and clears its visible progress. `LateUpdate` applies
 changes; `TryRefresh()` updates immediately and returns whether usable geometry was built.
 

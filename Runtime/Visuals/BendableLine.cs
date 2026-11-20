@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Visuals
     using System;
     using System.Collections.Generic;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Animation;
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
 
@@ -143,13 +144,12 @@ namespace WallstopStudios.UnityHelpers.Visuals
         }
 
         /// <summary>The easing for endpoint and draw animations.</summary>
-        public BendableLineEase AnimationEase
+        public MotionCurve AnimationEase
         {
             get => _animationEase;
             set
             {
-                _animationEase =
-                    value == BendableLineEase.OutQuad ? value : BendableLineEase.Linear;
+                _animationEase = MotionCurves.Normalize(value);
                 _dirty = true;
             }
         }
@@ -210,7 +210,7 @@ namespace WallstopStudios.UnityHelpers.Visuals
         private float _animationDuration = 0.25f;
 
         [SerializeField]
-        private BendableLineEase _animationEase = BendableLineEase.Linear;
+        private MotionCurve _animationEase = MotionCurve.Linear;
 
         [SerializeField]
         private int _sortingLayerId;
@@ -382,9 +382,12 @@ namespace WallstopStudios.UnityHelpers.Visuals
                 now,
                 _appliedAnimationDuration
             );
-            float easedEndpointFraction = EaseAnimationFraction(endpointFraction);
             _currentEnd = _animateEnd
-                ? Vector2.Lerp(_endAnimationStart, targetEnd, easedEndpointFraction)
+                ? Vector2.LerpUnclamped(
+                    _endAnimationStart,
+                    targetEnd,
+                    MotionCurves.Sample(_animationEase, endpointFraction)
+                )
                 : targetEnd;
             _animateEnd = _animateEnd && endpointFraction < 1f;
             if (_animateProgress)
@@ -395,7 +398,7 @@ namespace WallstopStudios.UnityHelpers.Visuals
                     now,
                     _appliedAnimationDuration
                 );
-                float easedFraction = EaseAnimationFraction(fraction);
+                float easedFraction = MotionCurves.Sample(_animationEase, fraction);
                 _progress = Mathf.Lerp(_progressAnimationStart, _progressTarget, easedFraction);
                 _animateProgress = fraction < 1f;
             }
@@ -493,13 +496,6 @@ namespace WallstopStudios.UnityHelpers.Visuals
                     _animateProgress = false;
                 }
             }
-        }
-
-        private float EaseAnimationFraction(float fraction)
-        {
-            return _animationEase == BendableLineEase.OutQuad
-                ? fraction * (2f - fraction)
-                : fraction;
         }
 
         private bool EnsureResources()

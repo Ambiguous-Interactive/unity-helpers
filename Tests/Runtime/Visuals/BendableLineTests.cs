@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
     using UnityEngine;
     using UnityEngine.Rendering;
     using UnityEngine.TestTools;
+    using WallstopStudios.UnityHelpers.Core.Animation;
     using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Visuals;
 
@@ -407,12 +408,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         }
 
         [UnityTest]
-        public IEnumerator OutQuadEasesDrawAndEndpointWithTheSameFraction()
+        public IEnumerator QuadraticOutEasesDrawAndEndpointWithTheSameFraction()
         {
             BendableLine line = CreateLine();
             Assert.IsTrue(line.TryRefresh());
-            Assert.That(line.AnimationEase, Is.EqualTo(BendableLineEase.Linear));
-            line.AnimationEase = BendableLineEase.OutQuad;
+            Assert.That(line.AnimationEase, Is.EqualTo(MotionCurve.Linear));
+            line.AnimationEase = MotionCurve.QuadraticOut;
             line.AnimationDuration = 1000f;
             line.End = new Vector2(8f, 0f);
             line.AnimateLine(true, true);
