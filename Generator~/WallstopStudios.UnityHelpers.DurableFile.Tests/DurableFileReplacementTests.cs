@@ -271,6 +271,46 @@ namespace WallstopStudios.UnityHelpers.DurableFile.Tests
             Assert.AreEqual("write-ahead", RealFile.ReadAllText(destinationJournal));
         }
 
+        [Platform("Linux")]
+        [TestCase(false)]
+        [TestCase(true)]
+        public void SidecarMoveRejectsSymbolicLinkInParentPath(bool aliasSource)
+        {
+            string realRoot = Path.Combine(_directory, "real");
+            string aliasRoot = Path.Combine(_directory, "alias");
+            string realParent = Path.Combine(realRoot, "nested");
+            Directory.CreateDirectory(realParent);
+            Directory.CreateSymbolicLink(aliasRoot, realRoot);
+            string aliasParent = Path.Combine(aliasRoot, "nested");
+            string realSource = Path.Combine(realParent, "save.db");
+            string realDestination = realSource + "-wal";
+            string source = Path.Combine(aliasSource ? aliasParent : realParent, "save.db");
+            string destination = Path.Combine(
+                aliasSource ? realParent : aliasParent,
+                "save.db-wal"
+            );
+            RealFile.WriteAllBytes(realSource, ReplacementBytes);
+
+            bool moved = DurableFile.TryMoveWithSidecars(
+                source,
+                destination,
+                new[] { "-wal" },
+                out Exception error
+            );
+
+            bool requestedDestinationExists = RealFile.Exists(realDestination);
+            bool movedIntoOwnSidecar = RealFile.Exists(realDestination + "-wal");
+            Assert.IsFalse(
+                moved,
+                $"Destination present: {requestedDestinationExists}. Moved into its own sidecar: {movedIntoOwnSidecar}."
+            );
+            Assert.IsInstanceOf<IOException>(error);
+            Assert.AreEqual(0, SimulatedFile.MoveCalls);
+            CollectionAssert.AreEqual(ReplacementBytes, RealFile.ReadAllBytes(realSource));
+            Assert.IsFalse(requestedDestinationExists);
+            Assert.IsFalse(movedIntoOwnSidecar);
+        }
+
         [TestCaseSource(nameof(UnsupportedCases))]
         public async Task UnsupportedReplacementPreservesPreviousBytes(
             string operation,

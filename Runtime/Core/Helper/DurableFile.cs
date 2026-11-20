@@ -495,7 +495,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <param name="error">The move failure, or an aggregate with that failure followed by restoration failures.</param>
         /// <remarks>
         /// Failed moves restore completed moves in reverse order. Cooperating calls in this process
-        /// serialize on every group path. Other processes need caller coordination, and a process
+        /// serialize on every group path. Use directory paths with any symbolic links or other
+        /// reparse points resolved. Other processes need caller coordination, and a process
         /// interruption can leave a partly moved group.
         /// </remarks>
         /// <returns>True when the file and all present sidecars moved, or false on failure.</returns>
@@ -1519,15 +1520,23 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         {
             string source = NormalizeMovePath(sourcePath, nameof(sourcePath));
             string destination = NormalizeMovePath(destinationPath, nameof(destinationPath));
+            string sourceParent = Path.GetDirectoryName(source);
+            string destinationParent = Path.GetDirectoryName(destination);
+            RequireUnaliasedMoveDirectory(sourceParent);
+            if (!string.Equals(sourceParent, destinationParent, StringComparison.Ordinal))
+            {
+                RequireUnaliasedMoveDirectory(destinationParent);
+            }
+
             moves[0] = (source, destination, false);
             int next = 1;
             foreach (string suffix in sidecarSuffixes)
             {
                 if (
                     string.IsNullOrWhiteSpace(suffix)
-                    || suffix.IndexOf('/') >= 0
-                    || suffix.IndexOf('\\') >= 0
-                    || suffix.IndexOfAny(InvalidSidecarCharacters) >= 0
+                    || 0 <= suffix.IndexOf('/')
+                    || 0 <= suffix.IndexOf('\\')
+                    || 0 <= suffix.IndexOfAny(InvalidSidecarCharacters)
                 )
                 {
                     throw new ArgumentException(
@@ -1602,6 +1611,27 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return fullPath;
         }
 
+        private static void RequireUnaliasedMoveDirectory(string parent)
+        {
+            for (string directory = parent; !string.IsNullOrEmpty(directory); )
+            {
+                string ancestor = Path.GetDirectoryName(directory);
+                if (ancestor == null)
+                {
+                    break;
+                }
+
+                if ((File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0)
+                {
+                    throw new IOException(
+                        $"Use the resolved directory path in place of '{directory}'."
+                    );
+                }
+
+                directory = ancestor;
+            }
+        }
+
         private static Exception MoveSidecarGroup(
             Span<(string Source, string Destination, bool Moved)> moves,
             uint gateMask
@@ -1629,7 +1659,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 {
                     ref (string Source, string Destination, bool Moved) move = ref moves[index];
                     FileAttributes? sourceAttributes = ReadMoveAttributes(move.Source);
-                    if (!sourceAttributes.HasValue && index > 0)
+                    if (!sourceAttributes.HasValue && 0 < index)
                     {
                         if (ReadMoveAttributes(move.Destination).HasValue)
                         {

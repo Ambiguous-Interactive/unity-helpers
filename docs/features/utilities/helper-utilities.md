@@ -1355,7 +1355,8 @@ cancelled append may have written part of its new record.
 
 Use `DurableFile.TryMoveWithSidecars` to move a closed database and its journal files
 together. Supply the suffixes in move order and use a destination in an existing
-directory. The call moves the database first, then each present sidecar. A collision,
+directory. Use directory paths with symbolic links and other reparse points resolved.
+The call moves the database first, then each present sidecar. A collision,
 including a destination sidecar with no matching source file, makes the call fail.
 
 <!-- doc-sample: compiles -->
