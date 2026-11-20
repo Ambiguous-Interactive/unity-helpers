@@ -7,17 +7,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
     using System;
     using System.Collections.Generic;
 
-    /// <summary>One annotated field, classified into the shape the text reader can judge.</summary>
-    internal readonly struct AuthoredRequirementField
+    /// <summary>Identifies a field judged by an authored requirement scan.</summary>
+    public readonly struct AuthoredRequirementField : IEquatable<AuthoredRequirementField>
     {
         /// <summary>The condition applied to the field.</summary>
         public AuthoredRequirementKind Kind { get; }
-
-        /// <summary>Whether the scalar is serialized as a number or boolean.</summary>
-        public bool IsNumeric { get; }
-
-        /// <summary>Whether the field is a structured value with serialized child values.</summary>
-        public bool IsComposite { get; }
 
         /// <summary>The type declaring the field.</summary>
         public Type DeclaringType { get; }
@@ -25,14 +19,24 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         /// <summary>The field's name.</summary>
         public string Name { get; }
 
+        /// <summary>Whether the scalar is serialized as a number or boolean.</summary>
+        internal bool IsNumeric { get; }
+
+        /// <summary>Whether the field is a structured value with serialized child values.</summary>
+        internal bool IsComposite { get; }
+
         /// <summary>Whether the field holds an object reference rather than a string.</summary>
-        public bool IsObjectReference { get; }
+        internal bool IsObjectReference { get; }
 
         /// <summary>Whether the field holds a collection whose elements are judged one by one.</summary>
-        public bool IsCollection { get; }
+        internal bool IsCollection { get; }
+
+        internal bool IsDictionary { get; }
+
+        internal Type ValueType { get; }
 
         /// <summary>The names older assets still record the field under.</summary>
-        public IReadOnlyList<string> Aliases { get; }
+        internal IReadOnlyList<string> Aliases { get; }
 
         /// <summary>Initializes a new instance of the <see cref="AuthoredRequirementField"/> struct.</summary>
         /// <param name="declaringType">The type declaring the field.</param>
@@ -43,7 +47,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         /// <param name="kind">The requirement applied to the field.</param>
         /// <param name="isNumeric">Whether the scalar is numeric or boolean.</param>
         /// <param name="isComposite">Whether the field contains structured serialized values.</param>
-        public AuthoredRequirementField(
+        /// <param name="isDictionary">Whether the collection stores its keys in a separate sequence.</param>
+        /// <param name="valueType">The serialized value type.</param>
+        internal AuthoredRequirementField(
             Type declaringType,
             string name,
             bool isObjectReference,
@@ -51,7 +57,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             IReadOnlyList<string> aliases,
             AuthoredRequirementKind kind = AuthoredRequirementKind.Assigned,
             bool isNumeric = false,
-            bool isComposite = false
+            bool isComposite = false,
+            bool isDictionary = false,
+            Type valueType = null
         )
         {
             Kind = kind;
@@ -61,7 +69,29 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             Name = name;
             IsObjectReference = isObjectReference;
             IsCollection = isCollection;
+            IsDictionary = isDictionary;
+            ValueType = valueType;
             Aliases = aliases;
+        }
+
+        /// <summary>Compares the field declaration and its requirement kind.</summary>
+        public bool Equals(AuthoredRequirementField other)
+        {
+            return Kind == other.Kind
+                && DeclaringType == other.DeclaringType
+                && string.Equals(Name, other.Name, StringComparison.Ordinal);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is AuthoredRequirementField other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return HashCode.Combine(Kind, DeclaringType, Name);
         }
     }
 #endif
