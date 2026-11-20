@@ -1027,6 +1027,38 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return ToHex(digest);
         }
 
+        /// <summary>Computes the SHA-256 digest of a byte span as 64 lowercase hex characters.</summary>
+        /// <remarks>The returned string is the only managed allocation.</remarks>
+        public static string Sha256Hex(ReadOnlySpan<byte> source)
+        {
+            Span<byte> digest = stackalloc byte[Sha256Digest.Size];
+            Sha256Digest.Compute(source, digest);
+            return ToHex(digest);
+        }
+
+        /// <summary>Writes the 32-byte SHA-256 digest to the start of the destination.</summary>
+        /// <remarks>
+        /// Source and destination can overlap. Any destination bytes after the digest are unchanged.
+        /// </remarks>
+        /// <returns>False without writing if the destination has fewer than 32 bytes.</returns>
+        public static bool TrySha256(ReadOnlySpan<byte> source, Span<byte> destination)
+        {
+            if (destination.Length < Sha256Digest.Size)
+            {
+                return false;
+            }
+
+            Sha256Digest.Compute(source, destination);
+            return true;
+        }
+
+        /// <summary>Returns true when two spans contain the same bytes in the same order.</summary>
+        /// <remarks>This comparison can stop at the first mismatch.</remarks>
+        public static bool BytesEqual(ReadOnlySpan<byte> first, ReadOnlySpan<byte> second)
+        {
+            return MemoryExtensions.SequenceEqual(first, second);
+        }
+
         /// <summary>
         /// Computes the SHA-256 digest of a file's contents as a lowercase hex string.
         /// </summary>
@@ -1062,10 +1094,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 
-        private static string ToHex(byte[] digest)
+        private static string ToHex(ReadOnlySpan<byte> digest)
         {
+            Span<char> hex = stackalloc char[Sha256Digest.Size * 2];
             int digestLength = digest.Length;
-            char[] hex = new char[digestLength * 2];
             for (int i = 0; i < digestLength; ++i)
             {
                 hex[i * 2] = HexDigits[digest[i] >> 4];
