@@ -603,33 +603,53 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         }
 
         [UnityTest]
-        public IEnumerator GlobalSceneEventSynchronizesWhenEnabled()
+        public IEnumerator GlobalSceneEventSynchronizesOnlyInInteractiveMode()
         {
             UnityHelpersSettings.instance._autoSynchronizeBuildProfileScenes = true;
             EditorBuildSettingsScene[] next = { _scenes[2], _scenes[0] };
+            string path = AssetDatabase.GetAssetPath(_inherited);
+            byte[] before = File.ReadAllBytes(path);
             int sceneEvents = 0;
+            bool observedIdleUpdate = false;
             void OnSceneChanged()
             {
                 ++sceneEvents;
+            }
+            void ObserveIdleUpdate()
+            {
+                observedIdleUpdate =
+                    !EditorApplication.isCompiling && !EditorApplication.isUpdating;
             }
             EditorBuildSettings.sceneListChanged += OnSceneChanged;
             try
             {
                 EditorBuildSettings.scenes = next;
-                for (
-                    int frame = 0;
-                    frame < 120 && ReadScenes(_inherited).Length != next.Length;
-                    ++frame
-                )
+                EditorApplication.update += ObserveIdleUpdate;
+                for (int frame = 0; frame < 120 && !observedIdleUpdate; ++frame)
                 {
                     yield return null;
                 }
+                Assert.IsTrue(
+                    observedIdleUpdate,
+                    "The scheduled synchronization must have time to run."
+                );
+                yield return null;
                 Assert.Less(0, sceneEvents);
+
+                if (Application.isBatchMode)
+                {
+                    AssertScenes(Array.Empty<EditorBuildSettingsScene>(), _inherited);
+                    CollectionAssert.AreEqual(before, File.ReadAllBytes(path));
+                    Assert.IsFalse(EditorUtility.IsDirty(_inherited));
+                    BuildProfileSceneSync.SynchronizeConfiguredProfiles();
+                }
+
                 AssertScenes(next, _inherited);
                 AssertScenes(new[] { _scenes[2] }, _custom);
             }
             finally
             {
+                EditorApplication.update -= ObserveIdleUpdate;
                 EditorBuildSettings.sceneListChanged -= OnSceneChanged;
             }
         }

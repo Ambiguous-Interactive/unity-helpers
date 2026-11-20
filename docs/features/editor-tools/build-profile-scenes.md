@@ -10,10 +10,13 @@ choose the folders to search. The default is `Assets`; an empty list selects no
 profiles. Every configured folder must already exist below `Assets`.
 
 Enable **Auto Synchronize Build Profile Scenes** to synchronize after Unity's
-scene-list change event, settings changes, domain reload, and returning to EditMode.
+scene-list change event, settings changes, domain reload, and returning to EditMode
+in an interactive Editor.
 It is off by default. Work is queued once and runs when the Editor is idle; there
 is no continuous scene-list polling. New profiles can be synchronized with the
-menu command before the next scene-list change.
+menu command before the next scene-list change. Batch mode skips automatic
+synchronization. The menu command and API are available for explicit batch-mode
+calls.
 
 The copy preserves scene order, paths, scene GUIDs, and enabled flags, including disabled
 entries. Matching profiles are left alone. Only changed profiles are saved;
