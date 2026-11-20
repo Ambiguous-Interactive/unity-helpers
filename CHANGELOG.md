@@ -26,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix authored requirement scans missing empty dictionaries, default values with empty animation curves, and absent required references ([#1271](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1271)).
 - Fix `BendableLine` jumping when its animation duration changes, and warn once per unsupported sprite when the line cannot map it ([#1272](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1272)).
 
+### Changed
+
+- Use hardware bit counts in `BitOps` on supported .NET targets ([#1285](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1285)).
+
 ## [3.7.2] - 2026-11-19
 
 ### Added

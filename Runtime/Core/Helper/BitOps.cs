@@ -5,16 +5,18 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 {
     using System;
     using System.Runtime.CompilerServices;
+#if NETCOREAPP3_0_OR_GREATER
+    using System.Numerics;
+#endif
 
     /// <summary>
-    /// Allocation-free, IL2CPP-safe bit manipulation helpers. Every method is a pure function of
-    /// its inputs and uses only portable integer arithmetic, so results are identical across the
-    /// editor, Mono and IL2CPP players on every supported platform.
+    /// Allocation-free bit manipulation helpers with identical results across .NET and Unity.
     /// </summary>
     /// <remarks>
     /// Signed overloads interpret their argument as the two's-complement bit pattern, matching
-    /// the unsigned interpretation used by .NET's <c>System.Numerics.BitOperations</c>; negative
-    /// inputs are the unsigned rebitcast.
+    /// unsigned overloads. Builds targeting .NET Core 3.0 or later use
+    /// <c>System.Numerics.BitOperations</c> for population count and trailing zero count.
+    /// Unity uses portable implementations for both.
     /// </remarks>
     public static class BitOps
     {
@@ -240,6 +242,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int PopCount(ulong value)
         {
+#if NETCOREAPP3_0_OR_GREATER
+            return BitOperations.PopCount(value);
+#else
             /*
                 SWAR pairwise reduction: fold adjacent bits, pairs, nibbles, then bytes; the final
                 multiply sums the eight byte counts into the top byte.
@@ -248,6 +253,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             value = (value & 0x3333333333333333UL) + ((value >> 2) & 0x3333333333333333UL);
             value = (value + (value >> 4)) & 0x0F0F0F0F0F0F0F0FUL;
             return (int)((value * 0x0101010101010101UL) >> 56);
+#endif
         }
 
         /// <summary>
@@ -269,7 +275,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int PopCount(uint value)
         {
+#if NETCOREAPP3_0_OR_GREATER
+            return BitOperations.PopCount(value);
+#else
             return PopCount((ulong)value);
+#endif
         }
 
         /// <summary>
@@ -280,7 +290,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int PopCount(int value)
         {
-            return PopCount((ulong)(uint)value);
+            return PopCount((uint)value);
         }
 
         /// <summary>
@@ -291,6 +301,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int TrailingZeroCount(ulong value)
         {
+#if NETCOREAPP3_0_OR_GREATER
+            return BitOperations.TrailingZeroCount(value);
+#else
             if (value == 0)
             {
                 return 64;
@@ -301,6 +314,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return MonoTrailingZeroIndices[index];
 #else
             return TrailingZeroIndices[index];
+#endif
 #endif
         }
 
@@ -323,7 +337,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int TrailingZeroCount(uint value)
         {
+#if NETCOREAPP3_0_OR_GREATER
+            return BitOperations.TrailingZeroCount(value);
+#else
             return value == 0 ? 32 : TrailingZeroCount((ulong)value);
+#endif
         }
 
         /// <summary>

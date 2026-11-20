@@ -2056,11 +2056,14 @@ int[] restored = ArrayConverter.ByteArrayToIntArrayBlockCopy(bytes);
 
 ### Bit Manipulation (`BitOps`)
 
-**One home for the bit math every system re-derives:** `BitOps` centralizes the SWAR popcount,
-trailing zero count, floor log2, highest-bit isolation, power-of-two detection and power-of-two
-ceiling that data structures, sorters and capacity sizing keep re-implementing. Every method is a
-pure, allocation-free function of its inputs; signed overloads interpret their argument as the
-two's-complement bit pattern.
+`BitOps` provides population count, trailing zero count, floor log2, highest-bit isolation,
+power-of-two detection and power-of-two ceiling. Its signed overloads use the two's-complement
+bit pattern.
+
+When compiled for .NET Core 3.0 or later, population count and trailing zero count use
+`System.Numerics.BitOperations`. The runtime can use hardware instructions where available.
+Unity uses the portable implementations for the same results. Trailing zero count on zero
+returns the width of the input, either 32 or 64.
 
 The unsigned `Log2` forms use bit smearing and portable de Bruijn indexing instead of a
 chain of input comparisons.

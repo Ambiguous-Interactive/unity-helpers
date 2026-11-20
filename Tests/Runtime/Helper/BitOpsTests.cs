@@ -272,6 +272,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             }
         }
 
+        [TestCase(0, 0, 32)]
+        [TestCase(1, 1, 0)]
+        [TestCase(int.MinValue, 1, 31)]
+        [TestCase(int.MinValue + 2, 2, 1)]
+        [TestCase(-1, 32, 0)]
+        public void SignedAndUnsignedIntCountsUseThirtyTwoBits(
+            int value,
+            int expectedPopulation,
+            int expectedTrailingZeros
+        )
+        {
+            uint bits = unchecked((uint)value);
+            Assert.AreEqual(expectedPopulation, BitOps.PopCount(value));
+            Assert.AreEqual(expectedPopulation, BitOps.PopCount(bits));
+            Assert.AreEqual(expectedTrailingZeros, BitOps.TrailingZeroCount(value));
+            Assert.AreEqual(expectedTrailingZeros, BitOps.TrailingZeroCount(bits));
+        }
+
         [TestCaseSource(nameof(TrailingZeroCountUlongCases))]
         public void TrailingZeroCountUlongReturnsExpectedIndex(ulong value, int expected)
         {
