@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     using System.Threading;
     using System.Threading.Tasks;
     using WallstopStudios.UnityHelpers.Core.Threading;
+    using WallstopStudios.UnityHelpers.Utils;
 
     /// <summary>
     /// File writes that never leave a torn document behind, for player-owned data such as saves,
@@ -100,7 +101,14 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 try
                 {
                     byte[] bytes = Utf8NoByteOrderMark.GetBytes(contents ?? string.Empty);
-                    return TryWriteStagedBytes(path, temporaryPath, bytes, out error);
+                    return TryWriteStagedBytes(
+                        path,
+                        temporaryPath,
+                        bytes,
+                        0,
+                        bytes.Length,
+                        out error
+                    );
                 }
                 catch (Exception e)
                 {
@@ -182,21 +190,129 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// </example>
         public static bool TryWriteAllBytes(string path, byte[] contents, out Exception error)
         {
+            int count = contents?.Length ?? 0;
+            return TryWriteAllBytes(path, contents, 0, count, out error);
+        }
+
+        /// <summary>Replaces a file with a range from an existing byte array.</summary>
+        /// <remarks>Staging and publication use the same guarantees as a full-array write. Keep the range unchanged until this call returns.</remarks>
+        /// <param name="path">Destination file path. Missing directories are created.</param>
+        /// <param name="contents">The source array. Null is treated as empty.</param>
+        /// <param name="offset">The first byte to write.</param>
+        /// <param name="count">The number of bytes to write.</param>
+        /// <param name="error">The failure when this returns false; null otherwise.</param>
+        /// <returns>True when the destination holds the selected range.</returns>
+        public static bool TryWriteAllBytes(
+            string path,
+            byte[] contents,
+            int offset,
+            int count,
+            out Exception error
+        )
+        {
             if (string.IsNullOrWhiteSpace(path))
             {
                 error = new ArgumentException("A destination path is required.", nameof(path));
+                return false;
+            }
+            byte[] bytes = contents ?? Array.Empty<byte>();
+            if (offset < 0 || bytes.Length < offset)
+            {
+                error = new ArgumentOutOfRangeException(nameof(offset));
+                return false;
+            }
+            if (count < 0 || bytes.Length - offset < count)
+            {
+                error = new ArgumentOutOfRangeException(nameof(count));
                 return false;
             }
 
             string temporaryPath = path + TemporarySuffix;
             using (EnterGate(path))
             {
-                return TryWriteStagedBytes(
-                    path,
-                    temporaryPath,
-                    contents ?? Array.Empty<byte>(),
-                    out error
-                );
+                return TryWriteStagedBytes(path, temporaryPath, bytes, offset, count, out error);
+            }
+        }
+
+        /// <summary>Reads a file into a disposable pooled byte buffer.</summary>
+        /// <remarks>
+        /// Reads one open file handle. The initial file length must fit in a byte array.
+        /// A detected length change reports failure. Concurrent in-place writers can still change
+        /// bytes while the stream is open on platforms that permit them. Read only the logical
+        /// <see cref="PooledArray{T}.length"/> bytes and dispose the lease after use.
+        /// </remarks>
+        /// <param name="path">The path of a file with a known length.</param>
+        /// <param name="contents">The owned buffer on success; default on failure.</param>
+        /// <param name="error">The failure when this returns false; null otherwise.</param>
+        /// <returns>True when the complete file was read.</returns>
+        public static bool TryReadAllBytes(
+            string path,
+            out PooledArray<byte> contents,
+            out Exception error
+        )
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                contents = default;
+                error = new ArgumentException("A source path is required.", nameof(path));
+                return false;
+            }
+
+            PooledArray<byte> rental = default;
+            try
+            {
+                using (
+                    FileStream stream = new(path, FileMode.Open, FileAccess.Read, FileShare.Read)
+                )
+                {
+                    long fileLength = stream.Length;
+                    if (int.MaxValue < fileLength)
+                    {
+                        contents = default;
+                        error = new IOException("The file is too large for a byte array.");
+                        return false;
+                    }
+
+                    int length = (int)fileLength;
+                    rental = SystemArrayPool<byte>.Get(length, out byte[] buffer);
+                    int offset = 0;
+                    while (offset < length)
+                    {
+                        int read = stream.Read(buffer, offset, length - offset);
+                        if (read == 0)
+                        {
+                            contents = default;
+                            error = new EndOfStreamException(
+                                "The file ended before its original length."
+                            );
+                            return false;
+                        }
+                        offset += read;
+                    }
+                    int nextByte = stream.ReadByte();
+                    if (0 <= nextByte)
+                    {
+                        contents = default;
+                        error = new IOException("The file grew while it was being read.");
+                        return false;
+                    }
+                }
+
+                PooledArray<byte> result = rental;
+                rental = default;
+                contents = result;
+                error = null;
+                return true;
+            }
+            catch (Exception failure)
+            {
+                contents = default;
+                error = failure;
+                return false;
+            }
+            finally
+            {
+                rental.Dispose();
             }
         }
 
@@ -220,7 +336,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// Asynchronously replaces a file's bytes, staging and flushing before the swap.
         /// </summary>
         /// <remarks>
-        /// Carries the same durability guarantees as <see cref="TryWriteAllBytes"/>.
+        /// Carries the same durability guarantees as <see cref="TryWriteAllBytes(string, byte[], out Exception)"/>.
         /// Keep the array unchanged until this call completes.
         /// </remarks>
         /// <param name="path">Destination file path. Missing directories are created.</param>
@@ -1291,6 +1407,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             string path,
             string temporaryPath,
             byte[] contents,
+            int offset,
+            int count,
             out Exception error
         )
         {
@@ -1316,7 +1434,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             {
                 using (staging)
                 {
-                    staging.Write(contents, 0, contents.Length);
+                    staging.Write(contents, offset, count);
                     staging.Flush(flushToDisk: true);
                 }
 

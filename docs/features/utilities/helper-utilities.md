@@ -1271,6 +1271,35 @@ if (!DurableFile.TryWriteAllBytes(savePath, serializedBytes, out Exception error
 }
 ```
 
+For a larger or rented source array, call
+`TryWriteAllBytes(path, contents, offset, count, out error)` to publish only that range.
+An invalid range fails before staging. A zero-length range writes an empty file.
+
+`TryReadAllBytes` reads a file of known length into a disposable `PooledArray<byte>`.
+Use its logical length for reads and writes. The rented array can be larger than
+the file. Dispose the lease when finished.
+
+```csharp
+using WallstopStudios.UnityHelpers.Utils;
+
+if (DurableFile.TryReadAllBytes(savePath, out PooledArray<byte> lease, out Exception error))
+{
+    using (lease)
+    {
+        bool saved = DurableFile.TryWriteAllBytes(
+            backupPath, lease.array, 0, lease.length, out Exception backupError
+        );
+        if (!saved)
+        {
+            Debug.LogError($"Could not save backup: {backupError}");
+        }
+    }
+}
+```
+
+The read uses a single open handle and reports a detected length change as a failure.
+An external writer that can modify the file in place may still change bytes during the read.
+
 Every method reports failure instead of throwing, and the async ones return the exception (null on
 success):
 

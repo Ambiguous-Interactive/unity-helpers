@@ -17,7 +17,15 @@
     <Compile Include="../../Runtime/Core/Helper/DurableFile.cs" Link="DurableFile.cs" />
     <Compile Include="../../Runtime/Core/Helper/FileHelper.cs" Link="FileHelper.cs" />
     <Compile Include="../../Runtime/Core/Threading/SemaphoreLease.cs" Link="SemaphoreLease.cs" />
+    <Compile Include="../../Runtime/Utils/BufferAction.cs" Link="BufferAction.cs" />
+    <Compile Include="../../Runtime/Utils/BufferFunc.cs" Link="BufferFunc.cs" />
     <Compile Include="../../Runtime/Utils/DisposalLease.cs" Link="DisposalLease.cs" />
+    <Compile Include="../../Runtime/Utils/PooledArray.cs" Link="PooledArray.cs" />
+    <Compile
+      Include="../../Runtime/Utils/PooledArrayClearPolicy.cs"
+      Link="PooledArrayClearPolicy.cs"
+    />
+    <Compile Include="../../Runtime/Utils/SystemArrayPool.cs" Link="SystemArrayPool.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.12.0" />

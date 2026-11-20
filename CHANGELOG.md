@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add byte-range writes and pooled whole-file reads to `DurableFile` ([#1225](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1225)).
 - Add a timed flush and ownership transfer for byte arrays to `LatestWriteFile` ([#1275](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1275)).
 
 ### Fixed

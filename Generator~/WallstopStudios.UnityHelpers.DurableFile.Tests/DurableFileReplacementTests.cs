@@ -20,12 +20,14 @@ namespace WallstopStudios.UnityHelpers.DurableFile.Tests
     public sealed class DurableFileReplacementTests
     {
         private const string ReplacementText = "replacement player data";
+        private const string SliceWriteOperation = "WriteBytesSlice";
 
         private static readonly string[] Operations =
         {
             nameof(DurableFile.TryWriteAllText),
             nameof(Encoding.Unicode),
             nameof(DurableFile.TryWriteAllBytes),
+            SliceWriteOperation,
             nameof(DurableFile.TryCopy),
             nameof(DurableFile.WriteAllTextAsync),
             nameof(DurableFile.WriteAllBytesAsync),
@@ -333,6 +335,16 @@ namespace WallstopStudios.UnityHelpers.DurableFile.Tests
                     success = DurableFile.TryWriteAllBytes(
                         _destination,
                         ReplacementBytes,
+                        out error
+                    );
+                    break;
+                case SliceWriteOperation:
+                    byte[] largerBuffer = { 91, 42, 0, 255, 16, 91 };
+                    success = DurableFile.TryWriteAllBytes(
+                        _destination,
+                        largerBuffer,
+                        1,
+                        ReplacementBytes.Length,
                         out error
                     );
                     break;
