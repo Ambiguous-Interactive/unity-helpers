@@ -11,6 +11,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         internal static Exception ReplacementFailure { get; set; }
         internal static int ReplacementFailuresRemaining { get; set; } = -1;
         internal static bool RejectMove { get; set; }
+        internal static Action<string, string> BeforeMove { get; set; }
+        internal static Action<string, string> AfterMove { get; set; }
         internal static string ObservedDestination { get; set; }
         internal static int ReplacementCalls { get; private set; }
         internal static int MoveCalls { get; private set; }
@@ -21,6 +23,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             ReplacementFailure = null;
             ReplacementFailuresRemaining = -1;
             RejectMove = false;
+            BeforeMove = null;
+            AfterMove = null;
             ObservedDestination = null;
             ReplacementCalls = 0;
             MoveCalls = 0;
@@ -30,6 +34,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         internal static bool Exists(string path)
         {
             return System.IO.File.Exists(path);
+        }
+
+        internal static FileAttributes GetAttributes(string path)
+        {
+            return System.IO.File.GetAttributes(path);
         }
 
         internal static byte[] ReadAllBytes(string path)
@@ -60,7 +69,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 throw new IOException("Simulated failure publishing staged contents.");
             }
 
+            BeforeMove?.Invoke(source, destination);
             System.IO.File.Move(source, destination);
+            AfterMove?.Invoke(source, destination);
         }
 
         internal static void Replace(

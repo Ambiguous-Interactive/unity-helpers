@@ -15,6 +15,10 @@
       Link="ObjectsHashCodeStub.cs"
     />
     <Compile Include="../../Runtime/Core/Helper/DurableFile.cs" Link="DurableFile.cs" />
+    <Compile
+      Include="../../Tests/Runtime/Helper/DurableFileSidecarMoveTests.cs"
+      Link="DurableFileSidecarMoveTests.cs"
+    />
     <Compile Include="../../Runtime/Core/Helper/FileHelper.cs" Link="FileHelper.cs" />
     <Compile Include="../../Runtime/Core/Threading/SemaphoreLease.cs" Link="SemaphoreLease.cs" />
     <Compile Include="../../Runtime/Utils/BufferAction.cs" Link="BufferAction.cs" />

@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Core.Helper
 {
     using System;
+    using System.Collections.Generic;
     using System.IO;
     using System.Runtime.CompilerServices;
     using System.Runtime.InteropServices;
@@ -75,6 +76,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         private const int ReplacementRetryDelayMilliseconds = 10;
 
         private static readonly SemaphoreSlim[] Gates = CreateGates();
+
+        private static readonly char[] InvalidSidecarCharacters = Path.GetInvalidFileNameChars();
 
         private static readonly UTF8Encoding Utf8NoByteOrderMark = new(
             encoderShouldEmitUTF8Identifier: false
@@ -482,6 +485,59 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 {
                     ReleaseStagingOwnership(ownership);
                 }
+            }
+        }
+
+        /// <summary>Moves a file and its existing sidecars without overwriting any destination.</summary>
+        /// <param name="sourcePath">The file to move. Close any database that owns this file first.</param>
+        /// <param name="destinationPath">The new path in an existing directory.</param>
+        /// <param name="sidecarSuffixes">Unique filename suffixes appended to both paths in order.</param>
+        /// <param name="error">The move failure, or an aggregate with that failure followed by restoration failures.</param>
+        /// <remarks>
+        /// Failed moves restore completed moves in reverse order. Cooperating calls in this process
+        /// serialize on every group path. Use directory paths with any symbolic links or other
+        /// reparse points resolved. Other processes need caller coordination, and a process
+        /// interruption can leave a partly moved group.
+        /// </remarks>
+        /// <returns>True when the file and all present sidecars moved, or false on failure.</returns>
+        public static bool TryMoveWithSidecars(
+            string sourcePath,
+            string destinationPath,
+            ReadOnlySpan<string> sidecarSuffixes,
+            out Exception error
+        )
+        {
+            Exception validation = ValidateCopyPaths(sourcePath, destinationPath);
+            if (validation != null)
+            {
+                error = validation;
+                return false;
+            }
+
+            try
+            {
+                int count = checked(sidecarSuffixes.Length + 1);
+                using PooledArray<(string Source, string Destination, bool Moved)> entries =
+                    SystemArrayPool<(string Source, string Destination, bool Moved)>.Get(
+                        count,
+                        out (string Source, string Destination, bool Moved)[] moves
+                    );
+                Span<(string Source, string Destination, bool Moved)> plan = moves.AsSpan(0, count);
+                uint gates = PlanSidecarMove(sourcePath, destinationPath, sidecarSuffixes, plan);
+                Exception failure = MoveSidecarGroup(plan, gates);
+                if (failure != null)
+                {
+                    error = failure;
+                    return false;
+                }
+
+                error = null;
+                return true;
+            }
+            catch (Exception failure)
+            {
+                error = failure;
+                return false;
             }
         }
 
@@ -1455,6 +1511,261 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 
+        private static uint PlanSidecarMove(
+            string sourcePath,
+            string destinationPath,
+            ReadOnlySpan<string> sidecarSuffixes,
+            Span<(string Source, string Destination, bool Moved)> moves
+        )
+        {
+            string source = NormalizeMovePath(sourcePath, nameof(sourcePath));
+            string destination = NormalizeMovePath(destinationPath, nameof(destinationPath));
+            string sourceParent = Path.GetDirectoryName(source);
+            string destinationParent = Path.GetDirectoryName(destination);
+            RequireUnaliasedMoveDirectory(sourceParent);
+            if (!string.Equals(sourceParent, destinationParent, StringComparison.Ordinal))
+            {
+                RequireUnaliasedMoveDirectory(destinationParent);
+            }
+
+            moves[0] = (source, destination, false);
+            int next = 1;
+            foreach (string suffix in sidecarSuffixes)
+            {
+                if (
+                    string.IsNullOrWhiteSpace(suffix)
+                    || 0 <= suffix.IndexOf('/')
+                    || 0 <= suffix.IndexOf('\\')
+                    || 0 <= suffix.IndexOfAny(InvalidSidecarCharacters)
+                )
+                {
+                    throw new ArgumentException(
+                        "A sidecar suffix must extend the filename.",
+                        nameof(sidecarSuffixes)
+                    );
+                }
+
+                moves[next] = (
+                    NormalizeMovePath(source + suffix, nameof(sidecarSuffixes)),
+                    NormalizeMovePath(destination + suffix, nameof(sidecarSuffixes)),
+                    false
+                );
+                ++next;
+            }
+
+            int pathCount = checked(moves.Length * 2);
+            using PooledArray<string> pathLease = SystemArrayPool<string>.Get(
+                pathCount,
+                out string[] paths
+            );
+            next = 0;
+            uint gateMask = 0;
+            foreach ((string from, string to, bool _) in moves)
+            {
+                paths[next++] = from;
+                paths[next++] = to;
+                gateMask |= (1u << GateIndexFor(from)) | (1u << GateIndexFor(to));
+            }
+
+            Array.Sort(paths, 0, pathCount, StringComparer.OrdinalIgnoreCase);
+            for (int index = 1; index < pathCount; ++index)
+            {
+                if (
+                    string.Equals(
+                        paths[index - 1],
+                        paths[index],
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                )
+                {
+                    throw new ArgumentException(
+                        "A file or sidecar appears more than once in the move."
+                    );
+                }
+            }
+
+            return gateMask;
+        }
+
+        private static string NormalizeMovePath(string path, string parameter)
+        {
+            string fullPath = Path.GetFullPath(path);
+            string filename = Path.GetFileName(fullPath);
+            if (
+                string.IsNullOrWhiteSpace(filename)
+                || (
+                    Path.DirectorySeparatorChar == '\\'
+                    && (
+                        filename.EndsWith(".", StringComparison.Ordinal)
+                        || filename.EndsWith(" ", StringComparison.Ordinal)
+                    )
+                )
+            )
+            {
+                throw new ArgumentException(
+                    "The move requires an unambiguous filename.",
+                    parameter
+                );
+            }
+
+            return fullPath;
+        }
+
+        private static void RequireUnaliasedMoveDirectory(string parent)
+        {
+            for (string directory = parent; !string.IsNullOrEmpty(directory); )
+            {
+                string ancestor = Path.GetDirectoryName(directory);
+                if (ancestor == null)
+                {
+                    break;
+                }
+
+                if ((File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0)
+                {
+                    throw new IOException(
+                        $"Use the resolved directory path in place of '{directory}'."
+                    );
+                }
+
+                directory = ancestor;
+            }
+        }
+
+        private static Exception MoveSidecarGroup(
+            Span<(string Source, string Destination, bool Moved)> moves,
+            uint gateMask
+        )
+        {
+            using PooledArray<SemaphoreLease> gateLease = SystemArrayPool<SemaphoreLease>.Get(
+                GateCount,
+                out SemaphoreLease[] heldGates
+            );
+            int heldCount = 0;
+            try
+            {
+                // Acquire each bucket once, in the same order for every move group.
+                for (int index = 0; index < GateCount; ++index)
+                {
+                    if ((gateMask & (1u << index)) != 0)
+                    {
+                        heldGates[heldCount] = Gates[index].Acquire();
+                        ++heldCount;
+                    }
+                }
+
+                int count = moves.Length;
+                for (int index = 0; index < count; ++index)
+                {
+                    ref (string Source, string Destination, bool Moved) move = ref moves[index];
+                    FileAttributes? sourceAttributes = ReadMoveAttributes(move.Source);
+                    if (!sourceAttributes.HasValue && 0 < index)
+                    {
+                        if (ReadMoveAttributes(move.Destination).HasValue)
+                        {
+                            throw new IOException(
+                                $"The destination already has a sidecar at '{move.Destination}'."
+                            );
+                        }
+
+                        continue;
+                    }
+
+                    if (
+                        sourceAttributes.HasValue
+                        && (sourceAttributes.Value & FileAttributes.Directory) != 0
+                    )
+                    {
+                        throw new IOException(
+                            $"Cannot move a directory as a file: '{move.Source}'."
+                        );
+                    }
+
+                    File.Move(move.Source, move.Destination);
+                    move.Moved = true;
+                    RequireMoveSourceRemoved(move.Source, move.Destination);
+                }
+
+                return null;
+            }
+            catch (Exception failure)
+            {
+                return RestoreSidecarMoves(moves, failure);
+            }
+            finally
+            {
+                for (int index = heldCount - 1; 0 <= index; --index)
+                {
+                    heldGates[index].Dispose();
+                }
+            }
+        }
+
+        private static void RequireMoveSourceRemoved(string source, string destination)
+        {
+            if (ReadMoveAttributes(source).HasValue)
+            {
+                throw new IOException(
+                    $"The move from '{source}' to '{destination}' left the source in place."
+                );
+            }
+        }
+
+        private static FileAttributes? ReadMoveAttributes(string path)
+        {
+            try
+            {
+                return File.GetAttributes(path);
+            }
+            catch (FileNotFoundException)
+            {
+                return null;
+            }
+            catch (DirectoryNotFoundException)
+            {
+                return null;
+            }
+        }
+
+        private static Exception RestoreSidecarMoves(
+            ReadOnlySpan<(string Source, string Destination, bool Moved)> moves,
+            Exception failure
+        )
+        {
+            List<Exception> failures = null;
+            for (int index = moves.Length - 1; 0 <= index; --index)
+            {
+                (string source, string destination, bool moved) = moves[index];
+                if (!moved)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    File.Move(destination, source);
+                    RequireMoveSourceRemoved(destination, source);
+                }
+                catch (Exception restoreFailure)
+                {
+                    failures ??= new List<Exception> { failure };
+                    failures.Add(
+                        new IOException(
+                            $"Could not restore '{source}' from '{destination}'.",
+                            restoreFailure
+                        )
+                    );
+                }
+            }
+
+            return failures == null
+                ? failure
+                : new AggregateException(
+                    "The move failed and some files could not be restored.",
+                    failures
+                );
+        }
+
         private static Exception ValidateCopyPaths(string sourcePath, string destinationPath)
         {
             if (string.IsNullOrWhiteSpace(sourcePath))
@@ -1505,6 +1816,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         private static SemaphoreSlim GateFor(string path)
         {
+            return Gates[GateIndexFor(path)];
+        }
+
+        private static int GateIndexFor(string path)
+        {
             string key = path;
             try
             {
@@ -1516,7 +1832,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
 
             int hash = StringComparer.OrdinalIgnoreCase.GetHashCode(key);
-            return Gates[hash.PositiveMod(GateCount)];
+            return hash.PositiveMod(GateCount);
         }
 
         private static FileStream OpenCopySourceStream(

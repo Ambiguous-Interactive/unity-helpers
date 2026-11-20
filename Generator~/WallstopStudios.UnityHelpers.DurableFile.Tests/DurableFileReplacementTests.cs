@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.DurableFile.Tests
     using System.Threading.Tasks;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Helper;
+    using WallstopStudios.UnityHelpers.Tests.Helper;
     using RealFile = System.IO.File;
     using SimulatedFile = WallstopStudios.UnityHelpers.Core.Helper.File;
 
@@ -154,7 +155,10 @@ namespace WallstopStudios.UnityHelpers.DurableFile.Tests
         public void SetUp()
         {
             SimulatedFile.Reset();
-            _directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+            _directory = Path.Combine(
+                DurableFileSidecarMoveTests.GetTemporaryRoot(),
+                Guid.NewGuid().ToString("N")
+            );
             Directory.CreateDirectory(_directory);
             _destination = Path.Combine(_directory, "player.save");
             _source = Path.Combine(_directory, "source.save");
@@ -170,6 +174,146 @@ namespace WallstopStudios.UnityHelpers.DurableFile.Tests
         {
             SimulatedFile.Reset();
             Directory.Delete(_directory, recursive: true);
+        }
+
+        [Test]
+        public void SidecarMoveReportsAllRestoreFailuresInReverseOrder()
+        {
+            string walSource = _source + "-wal";
+            string sharedMemorySource = _source + "-shm";
+            string journalSource = _source + "-journal";
+            string walDestination = _destination + "-wal";
+            string sharedMemoryDestination = _destination + "-shm";
+            string journalDestination = _destination + "-journal";
+            RealFile.WriteAllText(walSource, "original wal");
+            RealFile.WriteAllText(sharedMemorySource, "original shared memory");
+            RealFile.WriteAllText(journalSource, "original journal");
+            IOException firstFailure = new IOException("The final move was denied.");
+            List<(string Source, string Destination)> attempts = new();
+            SimulatedFile.BeforeMove = (source, destination) =>
+            {
+                attempts.Add((source, destination));
+                if (string.Equals(source, journalSource, StringComparison.Ordinal))
+                {
+                    RealFile.WriteAllText(walSource, "replacement wal");
+                    RealFile.WriteAllText(sharedMemorySource, "replacement shared memory");
+                    throw firstFailure;
+                }
+            };
+
+            Assert.IsFalse(
+                DurableFile.TryMoveWithSidecars(
+                    _source,
+                    _destination,
+                    new[] { "-wal", "-shm", "-journal" },
+                    out Exception error
+                )
+            );
+
+            Assert.IsInstanceOf<AggregateException>(error);
+            AggregateException aggregate = (AggregateException)error;
+            Assert.AreEqual(3, aggregate.InnerExceptions.Count);
+            Assert.AreSame(firstFailure, aggregate.InnerExceptions[0]);
+            StringAssert.Contains(sharedMemorySource, aggregate.InnerExceptions[1].Message);
+            StringAssert.Contains(walSource, aggregate.InnerExceptions[2].Message);
+            CollectionAssert.AreEqual(
+                new[]
+                {
+                    (_source, _destination),
+                    (walSource, walDestination),
+                    (sharedMemorySource, sharedMemoryDestination),
+                    (journalSource, journalDestination),
+                    (sharedMemoryDestination, sharedMemorySource),
+                    (walDestination, walSource),
+                    (_destination, _source),
+                },
+                attempts
+            );
+            CollectionAssert.AreEqual(ReplacementBytes, RealFile.ReadAllBytes(_source));
+            Assert.AreEqual("replacement wal", RealFile.ReadAllText(walSource));
+            Assert.AreEqual("original wal", RealFile.ReadAllText(walDestination));
+            Assert.AreEqual("replacement shared memory", RealFile.ReadAllText(sharedMemorySource));
+            Assert.AreEqual(
+                "original shared memory",
+                RealFile.ReadAllText(sharedMemoryDestination)
+            );
+            Assert.AreEqual("original journal", RealFile.ReadAllText(journalSource));
+            Assert.IsFalse(RealFile.Exists(_destination));
+            Assert.IsFalse(RealFile.Exists(journalDestination));
+        }
+
+        [Test]
+        public void SidecarMoveRefusesCopyWithoutSourceRemoval()
+        {
+            string sourceJournal = _source + "-wal";
+            string destinationJournal = _destination + "-wal";
+            RealFile.WriteAllText(sourceJournal, "write-ahead");
+            SimulatedFile.AfterMove = (source, destination) =>
+            {
+                if (string.Equals(source, sourceJournal, StringComparison.Ordinal))
+                {
+                    RealFile.Copy(destination, source);
+                }
+            };
+
+            Assert.IsFalse(
+                DurableFile.TryMoveWithSidecars(
+                    _source,
+                    _destination,
+                    new[] { "-wal" },
+                    out Exception error
+                )
+            );
+            Assert.IsInstanceOf<AggregateException>(error);
+            AggregateException aggregate = (AggregateException)error;
+            Assert.AreEqual(2, aggregate.InnerExceptions.Count);
+            StringAssert.Contains("left the source in place", aggregate.InnerExceptions[0].Message);
+            StringAssert.Contains(destinationJournal, aggregate.InnerExceptions[1].Message);
+            CollectionAssert.AreEqual(ReplacementBytes, RealFile.ReadAllBytes(_source));
+            Assert.IsFalse(RealFile.Exists(_destination));
+            Assert.AreEqual("write-ahead", RealFile.ReadAllText(sourceJournal));
+            Assert.AreEqual("write-ahead", RealFile.ReadAllText(destinationJournal));
+        }
+
+        [Platform("Linux")]
+        [TestCase(false)]
+        [TestCase(true)]
+        public void SidecarMoveRejectsSymbolicLinkInParentPath(bool aliasSource)
+        {
+            string realRoot = Path.Combine(_directory, "real");
+            string aliasRoot = Path.Combine(_directory, "alias");
+            string realParent = Path.Combine(realRoot, "nested");
+            Directory.CreateDirectory(realParent);
+            Directory.CreateSymbolicLink(aliasRoot, realRoot);
+            string aliasParent = Path.Combine(aliasRoot, "nested");
+            string realSource = Path.Combine(realParent, "save.db");
+            string realDestination = realSource + "-wal";
+            string source = Path.Combine(aliasSource ? aliasParent : realParent, "save.db");
+            string destination = Path.Combine(
+                aliasSource ? realParent : aliasParent,
+                "save.db-wal"
+            );
+            RealFile.WriteAllBytes(realSource, ReplacementBytes);
+
+            bool moved = DurableFile.TryMoveWithSidecars(
+                source,
+                destination,
+                new[] { "-wal" },
+                out Exception error
+            );
+
+            bool requestedDestinationExists = RealFile.Exists(realDestination);
+            bool movedIntoOwnSidecar = RealFile.Exists(realDestination + "-wal");
+            Assert.IsFalse(
+                moved,
+                $"Destination present: {requestedDestinationExists}. Moved into its own sidecar: {movedIntoOwnSidecar}."
+            );
+            Assert.IsInstanceOf<IOException>(error);
+            StringAssert.Contains(aliasRoot, error.Message);
+            Assert.AreEqual(0, SimulatedFile.MoveCalls);
+            CollectionAssert.AreEqual(ReplacementBytes, RealFile.ReadAllBytes(realSource));
+            Assert.IsFalse(requestedDestinationExists);
+            Assert.IsFalse(movedIntoOwnSidecar);
         }
 
         [TestCaseSource(nameof(UnsupportedCases))]
