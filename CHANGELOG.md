@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix sprite masks affecting other sorting layers when a requested layer ID is unknown ([#1273](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1273)).
 - Fix stale `LatestWriteFile` saves overwriting newer saves when multiple writers flush the same path ([#1275](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1275)).
 - Reject local Unity package export paths that would overwrite the Unity log or package data ([#859](https://github.com/Ambiguous-Interactive/unity-helpers/issues/859)).
 - Fix `BendableLine` jumping when its animation duration changes, and warn once per unsupported sprite when the line cannot map it ([#1272](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1272)).
