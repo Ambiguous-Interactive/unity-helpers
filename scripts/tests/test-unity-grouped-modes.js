@@ -209,9 +209,11 @@ function stepText(job, id) {
   return steps[0];
 }
 function runBody(step) {
-  const body = step.match(/^        run: \|\n((?:          [^\n]*\n|\n)+)/m)?.[1];
+  const block = step.match(/^        run: \|\n((?:          [^\n]*\n|\n)+)/m)?.[1];
+  const inline = step.match(/^        run: ([^|\n][^\n]*)$/m)?.[1];
+  const body = block?.replace(/^ {10}/gm, "") ?? inline;
   assert.ok(body, "expected an executable workflow body");
-  return body.replace(/^ {10}/gm, "");
+  return body;
 }
 function runPowerShell(body, env) {
   const result = spawnSync("pwsh", ["-NoProfile", "-NonInteractive", "-Command", body], {
@@ -364,7 +366,7 @@ foreach ($state in @('true', 'false', '', 'unknown')) {
       reject: true
     });
   }
-  for (const selection of [[], ["unknown"], ["editmode", "editmode"]]) {
+  for (const selection of [[], ["unknown"], ["editmode", "editmode"], ["editmode", "EDITMODE"]]) {
     gateCases.push({ name: "invalid selection", selection, outcomes, reject: true });
   }
   runPowerShell(
@@ -376,8 +378,12 @@ foreach ($case in ($env:MODE_GATE_CASES | ConvertFrom-Json)) {
     foreach ($property in $case.outcomes.PSObject.Properties) {
         [Environment]::SetEnvironmentVariable($property.Name, [string]$property.Value, 'Process')
     }
+    $global:LASTEXITCODE = 0
     $rejected = $false
-    try { & $gate } catch { $rejected = $true }
+    try {
+        & $gate
+        $rejected = $LASTEXITCODE -ne 0
+    } catch { $rejected = $true }
     if ($rejected -ne $case.reject) { throw "Wrong mode gate verdict: $($case.name)" }
 }
 `,

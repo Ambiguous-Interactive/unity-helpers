@@ -2341,8 +2341,15 @@ $defaultOutcomeGateIsComplete = (
     $defaultOutcomeGate -match '(?m)^\s+id:\s+require_selected_modes\s*$' -and
     $defaultOutcomeGate.Contains('if: ${{ always() && !cancelled() }}') -and
     $defaultOutcomeGate.Contains('SELECTED_MODES: ${{ needs.matrix-config.outputs.test-modes }}') -and
-    $defaultOutcomeGate.Contains('./scripts/unity/assert-test-mode-outcomes.ps1') -and
+    $defaultOutcomeGate.Contains('uv run --quiet --project scripts/python~ --locked --no-dev python scripts/unity/assert_test_mode_outcomes.py') -and
     -not $defaultOutcomeGate.Contains('.conclusion')
+)
+$combinedOutcomeGate = Get-UnityWorkflowStepText -JobText $unityTestsMatrixJob -StepName 'Require every SINGLE_THREADED Unity mode'
+$defaultOutcomeGateIsComplete = (
+    $defaultOutcomeGateIsComplete -and
+    $combinedOutcomeGate.Contains('CONTROLLER: ${{ steps.run_modes.outcome }}') -and
+    $combinedOutcomeGate.Contains('uv run --quiet --project scripts/python~ --locked --no-dev python scripts/unity/assert_test_mode_outcomes.py --require-controller') -and
+    -not $combinedOutcomeGate.Contains('.conclusion')
 )
 foreach ($mode in $defaultModeContracts) {
     $upper = ([string]$mode.Key).ToUpperInvariant()
@@ -2446,7 +2453,7 @@ $singleThreadedOutcomeGate = Get-UnityWorkflowStepText -JobText $unityTestsSingl
 $singleThreadedModesAreComplete = (
     $singleThreadedModesAreComplete -and
     $singleThreadedOutcomeGate.Contains('SELECTED_MODES: ${{ github.event_name == ''pull_request'' && needs.matrix-config.outputs.test-modes || ''["editmode","playmode","standalone"]'' }}') -and
-    $singleThreadedOutcomeGate.Contains('./scripts/unity/assert-test-mode-outcomes.ps1') -and
+    $singleThreadedOutcomeGate.Contains('uv run --quiet --project scripts/python~ --locked --no-dev python scripts/unity/assert_test_mode_outcomes.py') -and
     -not $singleThreadedOutcomeGate.Contains('.conclusion')
 )
 foreach ($key in @('editmode', 'playmode', 'standalone')) {

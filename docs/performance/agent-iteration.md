@@ -129,6 +129,14 @@ jobs. To repeat the comparison, dispatch all modes for the latest editor with di
 additional acceptance disabled, then choose `split` or `combined` in `latest-mode-scheduling`.
 Each selected mode requires passing native XML, redaction, artifact upload and confirmed cleanup.
 
+The mode outcome gate runs in typed Python through locked uv. It checks all four stage
+outcomes for each selected and unselected mode. Mode names ignore case and must be unique.
+The combined job also requires its
+controller to report success. The PowerShell entry point keeps the same environment
+inputs and exit codes for local callers and requires uv. PowerShell still launches
+Windows Unity and manages the native job and license lifecycle. The workflow contract
+tests still check which steps supply each outcome.
+
 The approved organization policy requires a static version axis to prove matching editor setup
 and license return. The workflow retains that literal universe and uses
 [matrix exclusions](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idstrategymatrixexclude)

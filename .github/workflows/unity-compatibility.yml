@@ -1094,9 +1094,7 @@ jobs:
           STANDALONE_VERIFY: ${{ steps.verify_proto_only.outcome }}
           STANDALONE_REDACT: ${{ steps.redact_proto_only.outcome }}
           STANDALONE_UPLOAD: ${{ steps.upload_proto_only.outcome }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          ./scripts/unity/assert-test-mode-outcomes.ps1
+        run: uv run --quiet --project scripts/python~ --locked --no-dev python scripts/unity/assert_test_mode_outcomes.py
 
       - name: Verify additional native acceptance
         id: verify_acceptance
@@ -1206,9 +1204,7 @@ jobs:
           STANDALONE_VERIFY: ${{ steps.verify_standalone.outcome }}
           STANDALONE_REDACT: ${{ steps.redact_standalone.outcome }}
           STANDALONE_UPLOAD: ${{ steps.upload_standalone.outcome }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          ./scripts/unity/assert-test-mode-outcomes.ps1
+        run: uv run --quiet --project scripts/python~ --locked --no-dev python scripts/unity/assert_test_mode_outcomes.py
 
       - name: Require confirmed Unity cleanup
         if: always()
