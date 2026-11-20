@@ -1298,8 +1298,10 @@ if (DurableFile.TryReadAllBytes(savePath, out PooledArray<byte> lease, out Excep
 }
 ```
 
-The read uses a single open handle and reports a detected length change as a failure.
-An external writer that can modify the file in place may still change bytes during the read.
+The read holds the same-path gate until its file handle closes. Other DurableFile writes on
+that path can proceed while the caller retains the buffer. A detected length change fails
+the read. An external writer that can modify the file in place may still change bytes
+during the read.
 
 Every method reports failure instead of throwing, and the async ones return the exception (null on
 success):

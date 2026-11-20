@@ -236,8 +236,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         /// <summary>Reads a file into a disposable pooled byte buffer.</summary>
         /// <remarks>
-        /// Reads one open file handle. The initial file length must fit in a byte array.
-        /// A detected length change reports failure. Concurrent in-place writers can still change
+        /// Reads one open file handle. DurableFile writers on the same path wait for it to close.
+        /// The initial file length must fit in a byte array. A detected length change reports
+        /// failure. External in-place writers can still change
         /// bytes while the stream is open on platforms that permit them. Read only the logical
         /// <see cref="PooledArray{T}.length"/> bytes and dispose the lease after use.
         /// </remarks>
@@ -261,10 +262,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             PooledArray<byte> rental = default;
             try
             {
-                using (
-                    FileStream stream = new(path, FileMode.Open, FileAccess.Read, FileShare.Read)
-                )
+                using (EnterGate(path))
                 {
+                    using FileStream stream = OpenSourceStream(path, useAsync: false);
                     long fileLength = stream.Length;
                     if (int.MaxValue < fileLength)
                     {
