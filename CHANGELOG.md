@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add SHA-256 hashing over byte spans, with a caller-provided digest buffer or a hex string, and byte-span equality ([#1226](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1226)).
 - Add replaceable UTC and monotonic clocks with `WallTimeProvider` and `ManualTimeProvider` ([#1245](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1245)).
 - Add byte-range writes and pooled whole-file reads to `DurableFile` ([#1225](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1225)).
 - Add a timed flush and ownership transfer for byte arrays to `LatestWriteFile` ([#1275](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1275)).

@@ -1809,6 +1809,25 @@ string digest = Objects.Sha256Hex("save-slot-3");
 // "af3a7b3f7a85f558898483659933264fe4180ccf7eef520d37df1ad063e9128d"
 ```
 
+With a byte span, use `Objects.TrySha256` to write the 32-byte digest into a buffer you
+provide. It uses fixed stack storage and leaves a short destination untouched. Source and
+destination can overlap. A larger destination keeps all bytes past the first 32.
+`Objects.Sha256Hex(ReadOnlySpan<byte>)` uses the same digest and allocates only the result
+string. `Objects.BytesEqual` compares two slices for exact byte equality.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using System;
+using WallstopStudios.UnityHelpers.Core.Helper;
+
+ReadOnlySpan<byte> payload = new byte[] { 97, 98, 99 };
+Span<byte> digestBytes = stackalloc byte[32];
+bool wroteDigest = Objects.TrySha256(payload, digestBytes);
+string digestText = Objects.Sha256Hex(payload);
+bool samePayload = Objects.BytesEqual(payload, new byte[] { 97, 98, 99 });
+```
+
 Use it where a 32-bit stable hash is not enough: content-addressed cache keys, detecting whether a
 download or import actually changed, and tamper checks on player-supplied data. Unlike
 `StableHash32V1`, no adversary can craft a second input with the same digest, and unlike the
