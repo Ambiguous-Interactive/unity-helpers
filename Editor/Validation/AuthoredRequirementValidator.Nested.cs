@@ -376,14 +376,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 }
                 if (!collection)
                 {
-                    ReadOnlySpan<char> inlineValue = entry.InlineValue.AsSpan();
-                    int? emptyObjectLine =
-                        2 <= inlineValue.Length
-                        && inlineValue[0] == '{'
-                        && inlineValue[^1] == '}'
-                        && inlineValue[1..^1].Trim().IsEmpty
-                            ? entry.LineNumber
-                            : null;
                     JudgeNestedRange(
                         assetPath,
                         lines,
@@ -395,11 +387,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                         findings,
                         judged,
                         depth + 1,
-                        emptyObjectLine
+                        IsEmptyInlineMapping(entry.InlineValue) ? entry.LineNumber : null
                     );
                     continue;
                 }
                 int start = 0;
+                int? emptyElementLine = null;
                 foreach (
                     AuthoredSequenceElement element in AuthoredAssetYaml.EnumerateSequenceElements(
                         lines,
@@ -419,10 +412,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                             required,
                             findings,
                             judged,
-                            depth + 1
+                            depth + 1,
+                            emptyElementLine
                         );
                     }
                     start = element.LineNumber;
+                    emptyElementLine = IsEmptyInlineMapping(element.Value) ? start : null;
                 }
                 if (0 < start)
                 {
@@ -436,10 +431,20 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                         required,
                         findings,
                         judged,
-                        depth + 1
+                        depth + 1,
+                        emptyElementLine
                     );
                 }
             }
+        }
+
+        private static bool IsEmptyInlineMapping(string value)
+        {
+            ReadOnlySpan<char> text = value.AsSpan();
+            return 2 <= text.Length
+                && text[0] == '{'
+                && text[^1] == '}'
+                && text[1..^1].Trim().IsEmpty;
         }
 
         private static void JudgeNestedRange(

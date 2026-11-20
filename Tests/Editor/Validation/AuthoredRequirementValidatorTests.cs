@@ -101,6 +101,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             0
         )]
         [TestCase(
+            AuthoredRequirementKind.NotEmpty,
+            "  dictionary:\n    _keys: null\n    _values: []",
+            1
+        )]
+        [TestCase(
+            AuthoredRequirementKind.NotEmpty,
+            "  dictionary:\n    _keys: ~\n    _values: []",
+            1
+        )]
+        [TestCase(
+            AuthoredRequirementKind.NotEmpty,
+            "  dictionary:\n    _keys:\n    - null\n    _values:\n    - 5",
+            0
+        )]
+        [TestCase(AuthoredRequirementKind.NotEmpty, "  names: NULL", 1)]
+        [TestCase(AuthoredRequirementKind.NotEmpty, "  names: [null]", 0)]
+        [TestCase(
             AuthoredRequirementKind.NotDefault,
             "  count: 0\n  enabledFlag: 0\n  amount: -0.0\n  material: {fileID: 0}",
             4
@@ -568,14 +585,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             }
         }
 
-        [TestCase(nameof(AuthoredRequirementTestAsset.nested), "{}", 1)]
-        [TestCase(nameof(AuthoredRequirementTestAsset.nested), "{ }", 1)]
-        [TestCase(nameof(AuthoredRequirementTestAsset.nested), "null", 0)]
-        [TestCase(nameof(AuthoredRequirementTestAsset.nestedList), "[]", 0)]
+        [TestCase(nameof(AuthoredRequirementTestAsset.nested), "{}", new[] { 7 })]
+        [TestCase(nameof(AuthoredRequirementTestAsset.nested), "{ }", new[] { 7 })]
+        [TestCase(nameof(AuthoredRequirementTestAsset.nested), "null", new int[] { })]
+        [TestCase(nameof(AuthoredRequirementTestAsset.nestedList), "[]", new int[] { })]
+        [TestCase(nameof(AuthoredRequirementTestAsset.nestedArray), "\n  - {}", new[] { 8 })]
+        [TestCase(nameof(AuthoredRequirementTestAsset.nestedList), "\n  - null", new int[] { })]
+        [TestCase(
+            nameof(AuthoredRequirementTestAsset.nestedList),
+            "\n  - {}\n  - material: {fileID: 12}\n  - { }",
+            new[] { 8, 10 }
+        )]
         public void ExplicitlyEmptyNestedMappingsReportMissingRequiredReferences(
             string carrier,
             string value,
-            int expected
+            int[] expectedLines
         )
         {
             Assert.IsTrue(
@@ -612,7 +636,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 );
                 Assert.That(inspected, Is.EqualTo(1));
                 Assert.That(unreadable, Is.Empty);
-                Assert.That(findings.Count, Is.EqualTo(expected));
+                Assert.That(
+                    findings.Select(finding => finding.LineNumber),
+                    Is.EqualTo(expectedLines)
+                );
                 foreach (AuthoredRequirementFinding finding in findings)
                 {
                     Assert.That(
@@ -623,7 +650,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                         finding.FieldName,
                         Is.EqualTo(nameof(NestedRequirementTestValue.material))
                     );
-                    Assert.That(finding.LineNumber, Is.EqualTo(7));
                 }
                 Assert.That(
                     judged.Count(field =>
@@ -634,7 +660,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                             StringComparison.Ordinal
                         )
                     ),
-                    Is.EqualTo(expected)
+                    Is.EqualTo(expectedLines.Length == 0 ? 0 : 1)
                 );
             }
             finally

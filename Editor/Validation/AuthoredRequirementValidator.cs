@@ -727,9 +727,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             AuthoredAssetEntry entry
         )
         {
-            if (!string.IsNullOrWhiteSpace(entry.InlineValue))
+            string inlineValue = entry.InlineValue;
+            if (!string.IsNullOrWhiteSpace(inlineValue))
             {
-                return !string.Equals(entry.InlineValue, "[]", StringComparison.Ordinal);
+                return !AuthoredAssetYaml.IsEmptySequence(inlineValue)
+                    && !string.Equals(inlineValue, "null", StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(inlineValue, "~", StringComparison.Ordinal);
             }
             foreach (
                 AuthoredSequenceElement element in AuthoredAssetYaml.EnumerateSequenceElements(

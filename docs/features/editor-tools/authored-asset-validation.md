@@ -113,9 +113,10 @@ object. Other missing keys remain unassessed because an older asset may rely on 
 Required fields on nested serializable values are checked through their carrier script, including
 arrays, lists, and serialized dictionary keys and values. The scan follows the serialized field
 path and reports each empty authored slot at its own line. An explicitly empty nested mapping is
-checked at its carrier line. Closed generic values and inherited generic fields use their
-constructed field types, and findings retain that declaring type. Former field names remain
-supported. The scan does not load the asset or run its validation callbacks.
+checked at the line where the field or sequence element is written. Closed generic values and
+inherited generic fields use their constructed field types, and findings retain that declaring
+type. Former field names remain supported. The scan does not load the asset or run its validation
+callbacks.
 
 An annotated field the check cannot read is reported as a **budget** rather than skipped. Nested
 types with no reachable carrier script remain `NoBoundScript` exemptions. Managed-reference
@@ -133,11 +134,11 @@ fill this" attribute gets the same treatment.
 
 Choose a requirement kind with the overload that takes `AuthoredRequirementKind`:
 
-| Kind         | Condition                                                                                                                                                                                                 |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Assigned`   | A reference or string must be assigned. Collections are checked one element at a time.                                                                                                                    |
-| `NotEmpty`   | A string, array, `List<T>`, or `SerializableDictionary<TKey, TValue>` must contain at least one item. A dictionary is checked using its serialized keys. A collection containing a null item is nonempty. |
-| `NotDefault` | A number, boolean, enum, reference or structured value must differ from its serialized default. An `AnimationCurve` child with no keyframes counts as a default value.                                    |
+| Kind         | Condition                                                                                                                                                                                                                             |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Assigned`   | A reference or string must be assigned. Collections are checked one element at a time.                                                                                                                                                |
+| `NotEmpty`   | A string, array, `List<T>`, or `SerializableDictionary<TKey, TValue>` must contain at least one item. A dictionary is checked using its serialized keys. A null collection is empty. A collection containing a null item is nonempty. |
+| `NotDefault` | A number, boolean, enum, reference or structured value must differ from its serialized default. An `AnimationCurve` child with no keyframes counts as a default value.                                                                |
 
 The attribute type remains a parameter, so projects can pass their own `[NotEmpty]` and
 `[NotDefault]` annotations. The existing overloads keep `Assigned` behavior. `NotEmpty` also supports `[SerializeReference]` arrays and lists because it judges their length, not their elements. Unsupported shapes
