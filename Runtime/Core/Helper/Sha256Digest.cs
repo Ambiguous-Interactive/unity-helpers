@@ -106,6 +106,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 Compress(source.Slice(offset, BlockSize), state, schedule, constants);
             }
 
+            // Initialize the SHA-256 padding explicitly because stack storage can contain data.
             Span<byte> paddedBlock = stackalloc byte[BlockSize];
             paddedBlock.Clear();
             source.Slice(offset).CopyTo(paddedBlock);

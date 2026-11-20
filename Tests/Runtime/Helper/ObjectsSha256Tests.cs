@@ -27,23 +27,33 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         private const string AccentedDigest =
             "cdfab900629099e3849d71299159850f4efde07c77e95c41c1185dcb728a8bd9";
 
-        private static IEnumerable<TestCaseData> KnownDigestCases()
+        private static IEnumerable<TestCaseData> KnownTextDigestCases()
+        {
+            return KnownDigestCases("Text");
+        }
+
+        private static IEnumerable<TestCaseData> KnownSpanDigestCases()
+        {
+            return KnownDigestCases("Span");
+        }
+
+        private static IEnumerable<TestCaseData> KnownDigestCases(string inputKind)
         {
             yield return new TestCaseData(string.Empty, EmptyStringDigest).SetName(
-                "Sha256Hex.Text.EmptyString"
+                $"Sha256Hex.{inputKind}.EmptyString"
             );
-            yield return new TestCaseData("abc", AbcDigest).SetName("Sha256Hex.Text.Abc");
+            yield return new TestCaseData("abc", AbcDigest).SetName($"Sha256Hex.{inputKind}.Abc");
             yield return new TestCaseData(
                 "The quick brown fox jumps over the lazy dog",
                 FoxDigest
-            ).SetName("Sha256Hex.Text.Fox");
+            ).SetName($"Sha256Hex.{inputKind}.Fox");
             yield return new TestCaseData("áéíóú", AccentedDigest).SetName(
-                "Sha256Hex.Text.NonAsciiUtf8"
+                $"Sha256Hex.{inputKind}.NonAsciiUtf8"
             );
         }
 
         [Test]
-        [TestCaseSource(nameof(KnownDigestCases))]
+        [TestCaseSource(nameof(KnownTextDigestCases))]
         public void Sha256HexMatchesKnownDigests(string text, string expected)
         {
             Assert.AreEqual(expected, Objects.Sha256Hex(text));
@@ -59,7 +69,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             );
         }
 
-        [TestCaseSource(nameof(KnownDigestCases))]
+        [TestCaseSource(nameof(KnownSpanDigestCases))]
         public void Sha256HexSpanMatchesKnownDigests(string text, string expected)
         {
             byte[] payload = Encoding.UTF8.GetBytes(text);
