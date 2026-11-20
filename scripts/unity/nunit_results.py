@@ -44,6 +44,42 @@ def _print_failed_tests(root: ET.Element) -> bool:
     return found_failure
 
 
+def assert_isolated_fixtures(results: str, fixture_names: tuple[str, ...]) -> None:
+    root = _read_root(results)
+    cases = list(root.iter("test-case"))
+    if not cases:
+        raise ValueError("The isolated compilation fixture produced no test cases.")
+
+    required = set(fixture_names)
+    if len(required) != len(fixture_names) or any(not name.strip() for name in required):
+        raise ValueError("Required isolated fixture names must be nonempty and unique.")
+    if not required:
+        raise ValueError("At least one isolated fixture must be required.")
+
+    observed: set[str] = set()
+    for case in cases:
+        name = case.get("classname", "")
+        if name not in required or case.get("result") != "Passed":
+            raise ValueError(
+                "Every isolated compilation case must belong to a required fixture and pass."
+            )
+        observed.add(name)
+    if observed != required:
+        raise ValueError("A required isolated fixture did not execute.")
+
+    try:
+        failed = float(root.get("failed", "0"))
+    except ValueError:
+        # Match the existing XPath comparison, where an absent numeric value is not positive.
+        failed = 0
+    if (
+        root.get("result") == "Failed"
+        or failed > 0
+        or any(suite.get("result") == "Failed" for suite in root.iter("test-suite"))
+    ):
+        raise ValueError("Isolated fixture roots and suites must pass.")
+
+
 def summarize(results: str, platform: str) -> int:
     prefix = f"==> [run-tests] {platform}"
     print()
@@ -96,6 +132,13 @@ def summarize(results: str, platform: str) -> int:
 
 def main() -> int:
     configure_output()
+    if len(sys.argv) >= 3 and sys.argv[1] == "--isolated-fixtures":
+        try:
+            assert_isolated_fixtures(sys.argv[2], tuple(sys.argv[3:]))
+        except (ET.ParseError, OSError, ValueError) as error:
+            print(error)
+            return 1
+        return 0
     if len(sys.argv) not in (3, 4):
         print(
             "Usage: nunit_results.py <results.xml> <platform> [published.xml]",

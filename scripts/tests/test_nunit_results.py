@@ -11,9 +11,131 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "unity"))
-from nunit_results import summarize
+from nunit_results import assert_isolated_fixtures, summarize
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+@pytest.mark.parametrize(
+    ("xml", "names", "problem"),
+    [
+        ('<test-run><test-case classname="A" result="Passed"/></test-run>', ("A",), ""),
+        (
+            (
+                '<test-run failed="0"><test-suite result="Passed">'
+                '<test-case classname="A" result="Passed"/>'
+                '<test-case classname="B" result="Passed"/></test-suite></test-run>'
+            ),
+            ("A", "B"),
+            "",
+        ),
+        ("<test-run/>", ("A",), "produced no test cases"),
+        (
+            '<test-run><test-case classname="A" result="Passed"/></test-run>',
+            ("A", "A"),
+            "must be nonempty and unique",
+        ),
+        (
+            '<test-run><test-case classname="A" result="Passed"/></test-run>',
+            (),
+            "At least one isolated fixture",
+        ),
+        (
+            '<test-run><test-case classname="A" result="Passed"/></test-run>',
+            ("A", "\t"),
+            "must be nonempty and unique",
+        ),
+        (
+            '<test-run><test-case classname="A" result="Passed"/></test-run>',
+            ("A", "B"),
+            "did not execute",
+        ),
+        (
+            '<test-run><test-case classname="a" result="Passed"/></test-run>',
+            ("A",),
+            "must belong to a required fixture",
+        ),
+        (
+            '<test-run><test-case classname="A" result="Skipped"/></test-run>',
+            ("A",),
+            "must belong to a required fixture",
+        ),
+        (
+            '<test-run failed="1"><test-case classname="A" result="Passed"/></test-run>',
+            ("A",),
+            "roots and suites must pass",
+        ),
+        (
+            '<test-run result="Failed"><test-case classname="A" result="Passed"/></test-run>',
+            ("A",),
+            "roots and suites must pass",
+        ),
+        (
+            (
+                '<test-run><test-suite result="Failed"><test-case classname="A" result="Passed"/>'
+                "</test-suite></test-run>"
+            ),
+            ("A",),
+            "roots and suites must pass",
+        ),
+        (
+            '<other><test-case classname="A" result="Passed"/></other>',
+            ("A",),
+            "Expected an NUnit test-run root",
+        ),
+        (
+            (
+                '<!DOCTYPE test-run SYSTEM "verdict.dtd">'
+                '<test-run><test-case classname="A" result="Passed"/></test-run>'
+            ),
+            ("A",),
+            "must not declare a document type",
+        ),
+    ],
+)
+def test_isolated_fixture_verdict(
+    tmp_path: Path, xml: str, names: tuple[str, ...], problem: str
+) -> None:
+    result = tmp_path / "isolated fixture Ω.xml"
+    result.write_text(xml, encoding="utf-8")
+    if problem:
+        with pytest.raises(ValueError, match=problem):
+            assert_isolated_fixtures(str(result), names)
+    else:
+        assert_isolated_fixtures(str(result), names)
+    assert result.read_text(encoding="utf-8") == xml
+
+
+def test_powershell_fixture_verdict_preserves_file_and_case_identity(
+    tmp_path: Path,
+) -> None:
+    pwsh = shutil.which("pwsh")
+    if pwsh is None:
+        pytest.skip("The compatibility entry point requires PowerShell")
+    path = tmp_path / "- a fixture Ω.xml"
+    path.write_text(
+        '<test-run><test-case classname="Suite.Ω" result="Passed"/></test-run>',
+        encoding="utf-8",
+    )
+    helper = ROOT / "scripts/unity/lib/compilation-fixture-results.ps1"
+    script = tmp_path / "verdict.ps1"
+    script.write_text(
+        "param($Helper, $Result, $Fixture)\n"
+        "$ErrorActionPreference = 'Stop'\n"
+        ". $Helper\n"
+        "Assert-UnityCompilationFixtureResults -Path $Result -FixtureName $Fixture\n",
+        encoding="utf-8",
+    )
+    for name, status in (("Suite.Ω", 0), ("Suite.ω", 1)):
+        run = subprocess.run(
+            [pwsh, "-NoProfile", "-File", str(script), str(helper), str(path), name],
+            cwd=tmp_path,
+            capture_output=True,
+            timeout=45,
+            check=False,
+        )
+        assert run.returncode == status, run.stderr.decode("utf-8")
+        assert run.stdout == b""
 
 
 @pytest.mark.parametrize(

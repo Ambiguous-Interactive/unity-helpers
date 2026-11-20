@@ -93,6 +93,12 @@ redacted, uploaded, and required by the aggregate gate (#813).
 
 ## Test Execution
 
+The isolated compilation, idle-editor, and migration fixture verdict runs through locked
+Python in [nunit_results.py](../../scripts/unity/nunit_results.py). Its PowerShell facade
+preserves the native runner and composite action entry points. The PowerShell host still
+owns phase scheduling, fixture selection, and the ordinary verifier's root `FileInfo`
+because its callers operate on native process state and PowerShell objects.
+
 Run Unity tests directly via Docker-in-Docker:
 
 1. Check license: `pwsh -NoProfile -File scripts/unity/setup-license.ps1 -Check`
