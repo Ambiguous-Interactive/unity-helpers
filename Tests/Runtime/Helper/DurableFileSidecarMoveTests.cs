@@ -19,10 +19,37 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         private string _source;
         private string _destination;
 
+        internal static string GetTemporaryRoot()
+        {
+#if NET9_0_OR_GREATER
+            return ResolveTemporaryDirectory(new DirectoryInfo(Path.GetTempPath()));
+#else
+            return UnityEngine.Application.temporaryCachePath;
+#endif
+        }
+
+#if NET9_0_OR_GREATER
+        private static string ResolveTemporaryDirectory(DirectoryInfo directory)
+        {
+            DirectoryInfo parent = directory.Parent;
+            if (parent == null)
+            {
+                return directory.FullName;
+            }
+
+            string resolvedParent = ResolveTemporaryDirectory(parent);
+            DirectoryInfo candidate = new(Path.Combine(resolvedParent, directory.Name));
+            FileSystemInfo target = candidate.ResolveLinkTarget(returnFinalTarget: true);
+            return target == null
+                ? candidate.FullName
+                : ResolveTemporaryDirectory(new DirectoryInfo(target.FullName));
+        }
+#endif
+
         [SetUp]
         public void SetUp()
         {
-            _directory = Path.Combine(Path.GetTempPath(), $"durable-sidecars-{Guid.NewGuid():N}");
+            _directory = Path.Combine(GetTemporaryRoot(), $"durable-sidecars-{Guid.NewGuid():N}");
             Directory.CreateDirectory(_directory);
             _source = Path.Combine(_directory, "save.db");
             _destination = Path.Combine(_directory, "save.damaged");

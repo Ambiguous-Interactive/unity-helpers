@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.DurableFile.Tests
     using System.Threading.Tasks;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Helper;
+    using WallstopStudios.UnityHelpers.Tests.Helper;
     using RealFile = System.IO.File;
     using SimulatedFile = WallstopStudios.UnityHelpers.Core.Helper.File;
 
@@ -154,7 +155,10 @@ namespace WallstopStudios.UnityHelpers.DurableFile.Tests
         public void SetUp()
         {
             SimulatedFile.Reset();
-            _directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+            _directory = Path.Combine(
+                DurableFileSidecarMoveTests.GetTemporaryRoot(),
+                Guid.NewGuid().ToString("N")
+            );
             Directory.CreateDirectory(_directory);
             _destination = Path.Combine(_directory, "player.save");
             _source = Path.Combine(_directory, "source.save");
@@ -305,6 +309,7 @@ namespace WallstopStudios.UnityHelpers.DurableFile.Tests
                 $"Destination present: {requestedDestinationExists}. Moved into its own sidecar: {movedIntoOwnSidecar}."
             );
             Assert.IsInstanceOf<IOException>(error);
+            StringAssert.Contains(aliasRoot, error.Message);
             Assert.AreEqual(0, SimulatedFile.MoveCalls);
             CollectionAssert.AreEqual(ReplacementBytes, RealFile.ReadAllBytes(realSource));
             Assert.IsFalse(requestedDestinationExists);
