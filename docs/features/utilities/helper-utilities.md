@@ -20,6 +20,7 @@ Static helper classes and utilities that solve common programming problems witho
 - [Advanced Utilities](#advanced-utilities): `RestorableGlobal<T>`, `BitOps`, statistics, null checks, hashing, SHA-256, formatting
 - [Texture and Sprite Pixel Helpers](#texture-and-sprite-pixel-helpers): Rotation and sprite-region extraction
 - [Stopwatch Timestamps](#stopwatch-timestamps): Elapsed time and exact duration-to-counter conversions
+- [Wall Time Provider](#wall-time-provider): UTC and monotonic time that tests can control
 - [Environment Detection](#environment-detection): CI, batch mode, and runtime environment
 
 ---
@@ -1270,6 +1271,37 @@ if (!DurableFile.TryWriteAllBytes(savePath, serializedBytes, out Exception error
     Debug.LogError($"Could not save binary data: {error}");
 }
 ```
+
+For a larger or rented source array, call
+`TryWriteAllBytes(path, contents, offset, count, out error)` to publish only that range.
+An invalid range fails before staging. A zero-length range writes an empty file.
+
+`TryReadAllBytes` reads a file of known length into a disposable `PooledArray<byte>`.
+Use its logical length for reads and writes. The rented array can be larger than
+the file. Dispose the lease when finished.
+
+```csharp
+using WallstopStudios.UnityHelpers.Utils;
+
+if (DurableFile.TryReadAllBytes(savePath, out PooledArray<byte> lease, out Exception error))
+{
+    using (lease)
+    {
+        bool saved = DurableFile.TryWriteAllBytes(
+            backupPath, lease.array, 0, lease.length, out Exception backupError
+        );
+        if (!saved)
+        {
+            Debug.LogError($"Could not save backup: {backupError}");
+        }
+    }
+}
+```
+
+The read holds the same-path gate until its file handle closes. Other DurableFile writes on
+that path can proceed while the caller retains the buffer. A detected length change fails
+the read. An external writer that can modify the file in place may still change bytes
+during the read.
 
 Every method reports failure instead of throwing, and the async ones return the exception (null on
 success):
@@ -2563,3 +2595,37 @@ durations. `Since` uses wrapping counter subtraction, truncates to `TimeSpan` ti
 at `TimeSpan` limits. A future start can produce a negative duration. Floating-point conversions
 return approximate values in the requested units; timestamps are meaningful only for the same
 counter and runtime.
+
+## Wall Time Provider
+
+`WallTimeProvider` in `WallstopStudios.UnityHelpers.Core.Helper` supplies UTC wall
+time through `GetUtcNow()` and a separate monotonic counter through `GetTimestamp()`.
+`TimestampFrequency` is the number of counter increments per second. Pass timestamps
+from the same provider to `GetElapsedTime`. To time an operation, capture the provider
+once and capture each clock reading when the operation needs it.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using System;
+using WallstopStudios.UnityHelpers.Core.Helper;
+
+public static class WallClockOperation
+{
+    public static (DateTimeOffset StartedAt, TimeSpan Elapsed) Measure(Action operation)
+    {
+        WallTimeProvider clock = WallTimeProvider.Current;
+        DateTimeOffset startedAt = clock.GetUtcNow();
+        long start = clock.GetTimestamp();
+        operation?.Invoke();
+        return (startedAt, clock.GetElapsedTime(start));
+    }
+}
+```
+
+`Current` starts as `WallTimeProvider.System`, which uses `DateTimeOffset.UtcNow` and
+`Stopwatch.GetTimestamp()`. Pass a `ManualTimeProvider` directly to isolated tests, or
+assign it to `Current` in a test that runs without other users of the global and restore
+the prior value in a `finally` block. `SetUtcNow` changes wall time while preserving the
+counter. `TryAdvance` moves both clocks by a nonnegative duration and leaves both
+unchanged if advancing would overflow. The clock types can be used outside Unity.

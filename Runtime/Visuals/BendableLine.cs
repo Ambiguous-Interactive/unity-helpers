@@ -4,7 +4,10 @@
 namespace WallstopStudios.UnityHelpers.Visuals
 {
     using System;
+    using System.Collections.Generic;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Animation;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
 
     /// <summary>Draws and animates a sprite along a quadratic curve without a tween dependency.</summary>
@@ -68,8 +71,10 @@ namespace WallstopStudios.UnityHelpers.Visuals
                 {
                     return;
                 }
+                ApplyAnimationDuration();
                 _end = next;
                 _endAnimationStart = _currentEnd;
+                _endAnimationStartFraction = Zero;
                 _endAnimationTime = Time.timeAsDouble;
                 _animateEnd =
                     _hasCurrentEnd
@@ -126,11 +131,27 @@ namespace WallstopStudios.UnityHelpers.Visuals
             }
         }
 
-        /// <summary>The scaled seconds for endpoint and draw animations; nonpositive or nonfinite values settle immediately.</summary>
+        /// <summary>The scaled seconds for endpoint and draw animations.</summary>
+        /// <remarks>Positive changes preserve the current fraction. Nonpositive or nonfinite values settle immediately.</remarks>
         public float AnimationDuration
         {
             get => _animationDuration;
-            set => _animationDuration = float.IsFinite(value) ? Mathf.Max(Zero, value) : 0f;
+            set
+            {
+                _animationDuration = NormalizeAnimationDuration(value);
+                ApplyAnimationDuration();
+            }
+        }
+
+        /// <summary>The easing for endpoint and draw animations.</summary>
+        public MotionCurve AnimationEase
+        {
+            get => _animationEase;
+            set
+            {
+                _animationEase = MotionCurves.Normalize(value);
+                _dirty = true;
+            }
         }
 
         /// <summary>The renderer sorting layer identifier.</summary>
@@ -189,6 +210,9 @@ namespace WallstopStudios.UnityHelpers.Visuals
         private float _animationDuration = 0.25f;
 
         [SerializeField]
+        private MotionCurve _animationEase = MotionCurve.Linear;
+
+        [SerializeField]
         private int _sortingLayerId;
 
         [SerializeField]
@@ -200,6 +224,9 @@ namespace WallstopStudios.UnityHelpers.Visuals
         private double _endAnimationTime;
         private double _progressAnimationTime;
         private double _animationPausedAt;
+        private float _appliedAnimationDuration;
+        private float _endAnimationStartFraction;
+        private float _progressAnimationStartFraction;
         private float _progressAnimationStart;
         private float _progressTarget;
         private float _progress;
@@ -218,6 +245,7 @@ namespace WallstopStudios.UnityHelpers.Visuals
         private Mesh _mesh;
         private Material _material;
         private Texture2D _examinedTexture;
+        private HashSet<long> _warnedUnmappableSprites;
         private Vector3[] _vertices;
         private Vector2[] _uv;
         private int[] _triangles;
@@ -233,15 +261,38 @@ namespace WallstopStudios.UnityHelpers.Visuals
             return WallMath.IsFinite(position) ? value : null;
         }
 
+        private static float NormalizeAnimationDuration(float value)
+        {
+            return float.IsFinite(value) ? Mathf.Max(Zero, value) : 0f;
+        }
+
+        private static float AnimationFraction(
+            double startTime,
+            float startFraction,
+            double now,
+            float duration
+        )
+        {
+            if (!(Zero < duration))
+            {
+                return 1f;
+            }
+            double elapsed = now - startTime;
+            float fraction = startFraction + (float)(elapsed / duration);
+            return Mathf.Clamp01(fraction);
+        }
+
         /// <summary>Animates drawing toward the end or back to the start, optionally restarting at the opposite extreme.</summary>
         /// <remarks>Animation timing pauses while the line cannot be drawn.</remarks>
         public void AnimateLine(bool forward = true, bool resetProgress = false)
         {
+            ApplyAnimationDuration();
             if (resetProgress)
             {
                 _progress = forward ? 0f : 1f;
             }
             _progressAnimationStart = _progress;
+            _progressAnimationStartFraction = Zero;
             _progressTarget = forward ? 1f : 0f;
             _progressAnimationTime = Time.timeAsDouble;
             _animateProgress = isActiveAndEnabled && 0f < _animationDuration;
@@ -256,6 +307,7 @@ namespace WallstopStudios.UnityHelpers.Visuals
         /// <remarks>Null endpoints, unsupported sprite meshes, missing resources and nonfinite geometry clear the owned mesh.</remarks>
         public bool TryRefresh()
         {
+            ApplyAnimationDuration();
             if (!EnsureResources())
             {
                 PauseAnimations();
@@ -280,7 +332,11 @@ namespace WallstopStudios.UnityHelpers.Visuals
             )
             {
                 _examinedTexture = texture;
-                _hasSpriteMapping = TryReadSpriteMapping();
+                _hasSpriteMapping = TryReadSpriteMapping(out string failureReason);
+                if (failureReason != null)
+                {
+                    WarnAboutUnmappableSprite(failureReason);
+                }
                 Texture2D mappedTexture = _hasSpriteMapping ? _examinedTexture : null;
                 _material.SetTexture(MainTextureId, mappedTexture);
                 _spriteChanged = false;
@@ -319,15 +375,31 @@ namespace WallstopStudios.UnityHelpers.Visuals
             float depth = transform.position.z;
             Vector3 worldEnd = new(requestedEnd.x, requestedEnd.y, depth);
             Vector2 targetEnd = transform.InverseTransformPoint(worldEnd);
-            float endpointFraction = AnimationFraction(_endAnimationTime);
+            double now = Time.timeAsDouble;
+            float endpointFraction = AnimationFraction(
+                _endAnimationTime,
+                _endAnimationStartFraction,
+                now,
+                _appliedAnimationDuration
+            );
             _currentEnd = _animateEnd
-                ? Vector2.Lerp(_endAnimationStart, targetEnd, endpointFraction)
+                ? Vector2.LerpUnclamped(
+                    _endAnimationStart,
+                    targetEnd,
+                    MotionCurves.Sample(_animationEase, endpointFraction)
+                )
                 : targetEnd;
             _animateEnd = _animateEnd && endpointFraction < 1f;
             if (_animateProgress)
             {
-                float fraction = AnimationFraction(_progressAnimationTime);
-                _progress = Mathf.Lerp(_progressAnimationStart, _progressTarget, fraction);
+                float fraction = AnimationFraction(
+                    _progressAnimationTime,
+                    _progressAnimationStartFraction,
+                    now,
+                    _appliedAnimationDuration
+                );
+                float easedFraction = MotionCurves.Sample(_animationEase, fraction);
+                _progress = Mathf.Lerp(_progressAnimationStart, _progressTarget, easedFraction);
                 _animateProgress = fraction < 1f;
             }
             bool built = RebuildMesh();
@@ -372,15 +444,58 @@ namespace WallstopStudios.UnityHelpers.Visuals
             _animationsPaused = false;
         }
 
-        private float AnimationFraction(double startTime)
+        private void ApplyAnimationDuration()
         {
-            if (!(Zero < _animationDuration))
+            float previous = _appliedAnimationDuration;
+            if (previous == _animationDuration)
             {
-                return 1f;
+                return;
             }
-            double elapsed = Time.timeAsDouble - startTime;
-            float fraction = (float)(elapsed / _animationDuration);
-            return Mathf.Clamp01(fraction);
+            _appliedAnimationDuration = _animationDuration;
+            _dirty = true;
+            if (_animationDuration == Zero)
+            {
+                _animateEnd = false;
+                if (_animateProgress)
+                {
+                    _progress = _progressTarget;
+                    _animateProgress = false;
+                }
+                return;
+            }
+
+            if (!_animateEnd && !_animateProgress)
+            {
+                return;
+            }
+
+            double now = _animationsPaused ? _animationPausedAt : Time.timeAsDouble;
+            if (_animateEnd)
+            {
+                _endAnimationStartFraction = AnimationFraction(
+                    _endAnimationTime,
+                    _endAnimationStartFraction,
+                    now,
+                    previous
+                );
+                _endAnimationTime = now;
+                _animateEnd = _endAnimationStartFraction < 1f;
+            }
+            if (_animateProgress)
+            {
+                _progressAnimationStartFraction = AnimationFraction(
+                    _progressAnimationTime,
+                    _progressAnimationStartFraction,
+                    now,
+                    previous
+                );
+                _progressAnimationTime = now;
+                if (1f <= _progressAnimationStartFraction)
+                {
+                    _progress = _progressTarget;
+                    _animateProgress = false;
+                }
+            }
         }
 
         private bool EnsureResources()
@@ -417,14 +532,34 @@ namespace WallstopStudios.UnityHelpers.Visuals
             return true;
         }
 
-        private bool TryReadSpriteMapping()
+        private void WarnAboutUnmappableSprite(string reason)
         {
-            if (
-                _sprite == null
-                || _sprite.associatedAlphaSplitTexture != null
-                || _sprite.texture == null
-            )
+            _warnedUnmappableSprites ??= new HashSet<long>();
+            long spriteId = _sprite.GetUnityObjectId();
+            if (_warnedUnmappableSprites.Add(spriteId))
             {
+                Debug.LogWarning(
+                    $"{nameof(BendableLine)} cannot draw sprite '{_sprite.name}': {reason}",
+                    this
+                );
+            }
+        }
+
+        private bool TryReadSpriteMapping(out string failureReason)
+        {
+            if (_sprite == null)
+            {
+                failureReason = null;
+                return false;
+            }
+            if (_sprite.associatedAlphaSplitTexture != null)
+            {
+                failureReason = "Separate alpha textures are unsupported.";
+                return false;
+            }
+            if (_sprite.texture == null)
+            {
+                failureReason = "The sprite has no texture.";
                 return false;
             }
             if (!_sprite.packed)
@@ -442,16 +577,19 @@ namespace WallstopStudios.UnityHelpers.Visuals
                 float maximumY = originY + uvHeight;
                 Vector4 uvBounds = new(originX, originY, maximumX, maximumY);
                 _material.SetVector(UvBoundsId, uvBounds);
+                failureReason = null;
                 return true;
             }
             if (_sprite.packingMode != SpritePackingMode.Rectangle)
             {
+                failureReason = "Tight atlas packing is unsupported.";
                 return false;
             }
             Vector2[] vertices = _sprite.vertices;
             Vector2[] uv = _sprite.uv;
             if (vertices.Length != 4 || uv.Length != 4)
             {
+                failureReason = "The packed mesh must have four vertices and four UV coordinates.";
                 return false;
             }
             Vector2 minimum = vertices[0];
@@ -463,6 +601,7 @@ namespace WallstopStudios.UnityHelpers.Visuals
             }
             if (!(minimum.x < maximum.x) || !(minimum.y < maximum.y))
             {
+                failureReason = "The packed mesh has empty bounds.";
                 return false;
             }
             int corners = 0;
@@ -472,6 +611,7 @@ namespace WallstopStudios.UnityHelpers.Visuals
                 Vector2 coordinate = uv[index];
                 if (!WallMath.IsFinite(vertex) || !WallMath.IsFinite(coordinate))
                 {
+                    failureReason = "The packed mesh has nonfinite vertices or UV coordinates.";
                     return false;
                 }
                 if (vertex.x == minimum.x && vertex.y == minimum.y)
@@ -496,6 +636,7 @@ namespace WallstopStudios.UnityHelpers.Visuals
             }
             if (corners != 15)
             {
+                failureReason = "The packed mesh is missing rectangular corners.";
                 return false;
             }
             _uvRight -= _uvOrigin;
@@ -518,9 +659,12 @@ namespace WallstopStudios.UnityHelpers.Visuals
                 + (fullMinimum.y - minimum.y) / meshSize.y * _uvUp;
             _uvRight *= fullSize.x / meshSize.x;
             _uvUp *= fullSize.y / meshSize.y;
-            return WallMath.IsFinite(_uvOrigin)
+            bool validMapping =
+                WallMath.IsFinite(_uvOrigin)
                 && WallMath.IsFinite(_uvRight)
                 && WallMath.IsFinite(_uvUp);
+            failureReason = validMapping ? null : "The packed mesh has nonfinite UV bounds.";
+            return validMapping;
         }
 
         private bool RebuildMesh()
@@ -668,7 +812,8 @@ namespace WallstopStudios.UnityHelpers.Visuals
             CurveIntensity = _curveIntensity;
             Thickness = _thickness;
             Segments = _segments;
-            AnimationDuration = _animationDuration;
+            _animationDuration = NormalizeAnimationDuration(_animationDuration);
+            AnimationEase = _animationEase;
             SortingOrder = _sortingOrder;
             _spriteChanged = true;
         }

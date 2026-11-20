@@ -13,5 +13,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation.TestTypes
         public List<string> values;
         public int count;
         public List<Vector3> vectors;
+        public AnimationCurve curve;
     }
 }

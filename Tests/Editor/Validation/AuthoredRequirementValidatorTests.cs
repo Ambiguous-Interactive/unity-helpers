@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     using System.Linq;
     using NUnit.Framework;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Attributes;
     using WallstopStudios.UnityHelpers.Editor.Validation;
     using WallstopStudios.UnityHelpers.Tests.Editor.Validation.TestTypes;
 
@@ -90,6 +91,33 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         )]
         [TestCase(AuthoredRequirementKind.NotEmpty, "  numbers: []\n  text: \"\"", 2)]
         [TestCase(
+            AuthoredRequirementKind.NotEmpty,
+            "  dictionary:\n    _keys: []\n    _values: []",
+            1
+        )]
+        [TestCase(
+            AuthoredRequirementKind.NotEmpty,
+            "  dictionary:\n    _keys:\n    - first\n    _values:\n    - 5",
+            0
+        )]
+        [TestCase(
+            AuthoredRequirementKind.NotEmpty,
+            "  dictionary:\n    _keys: null\n    _values: []",
+            1
+        )]
+        [TestCase(
+            AuthoredRequirementKind.NotEmpty,
+            "  dictionary:\n    _keys: ~\n    _values: []",
+            1
+        )]
+        [TestCase(
+            AuthoredRequirementKind.NotEmpty,
+            "  dictionary:\n    _keys:\n    - null\n    _values:\n    - 5",
+            0
+        )]
+        [TestCase(AuthoredRequirementKind.NotEmpty, "  names: NULL", 1)]
+        [TestCase(AuthoredRequirementKind.NotEmpty, "  names: [null]", 0)]
+        [TestCase(
             AuthoredRequirementKind.NotDefault,
             "  count: 0\n  enabledFlag: 0\n  amount: -0.0\n  material: {fileID: 0}",
             4
@@ -155,6 +183,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             1
         )]
         [TestCase(
+            AuthoredRequirementKind.NotDefault,
+            "  composite:\n    count: 0\n    curve:\n      serializedVersion: 2\n      m_Curve: []\n      m_PreInfinity: 2\n      m_PostInfinity: 2\n      m_RotationOrder: 4",
+            1
+        )]
+        [TestCase(
+            AuthoredRequirementKind.NotDefault,
+            "  composite:\n    curve:\n      m_Curve: []\n      m_PreInfinity: 2\n    count: 1",
+            0
+        )]
+        [TestCase(
+            AuthoredRequirementKind.NotDefault,
+            "  composite:\n    count: 0\n    curve:\n      m_Curve:\n      - time: 0\n        value: 0\n      m_PreInfinity: 2",
+            0
+        )]
+        [TestCase(
+            AuthoredRequirementKind.NotDefault,
+            "  composite:\n    values:\n      m_Curve: []\n      m_PreInfinity: 2",
+            0
+        )]
+        [TestCase(
             AuthoredRequirementKind.NotEmpty,
             "  managedArray: []\n  " + RequirementKindTestAsset.ManagedListFieldName + ": []",
             2
@@ -216,6 +264,68 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 Assert.IsFalse(
                     exemptions.Any(item => item.DeclaringType == typeof(RequirementKindTestAsset))
                 );
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
+
+        [Test]
+        public void ReportsMissingReferenceAndDistinctJudgedDeclarations()
+        {
+            Type fixtureType = typeof(AuthoredRequirementTestAsset);
+            Assert.IsTrue(MonoScriptIndex.TryGetScriptGuid(fixtureType, out string guid));
+            string path = Path.Combine(
+                Path.GetTempPath(),
+                $"required-missing-{Guid.NewGuid():N}.asset"
+            );
+            try
+            {
+                File.WriteAllText(
+                    path,
+                    $"%YAML 1.1\n--- !u!114 &11400000\nMonoBehaviour:\n  m_Script: {{fileID: 11500000, guid: {guid}, type: 3}}\n  legacyIcon: {{fileID: 1}}\n"
+                );
+                List<AuthoredRequirementFinding> findings = new();
+                List<AuthoredRequirementExemption> exemptions = new();
+                List<string> unreadable = new();
+                List<AuthoredRequirementField> judged = new();
+                Assert.IsTrue(
+                    AuthoredRequirementValidator.TryScan(
+                        typeof(WNotNullAttribute),
+                        AuthoredRequirementKind.Assigned,
+                        new[] { path, path },
+                        findings,
+                        exemptions,
+                        unreadable,
+                        judged,
+                        out int inspected
+                    )
+                );
+                Assert.That(inspected, Is.EqualTo(2));
+                Assert.That(findings.Count, Is.EqualTo(2));
+                foreach (AuthoredRequirementFinding finding in findings)
+                {
+                    Assert.That(
+                        finding.FieldName,
+                        Is.EqualTo(nameof(AuthoredRequirementTestAsset.requiredMaterial))
+                    );
+                    Assert.That(finding.LineNumber, Is.EqualTo(2));
+                }
+                Assert.That(unreadable, Is.Empty);
+                CollectionAssert.AreEquivalent(
+                    new[]
+                    {
+                        nameof(AuthoredRequirementTestAsset.requiredMaterial),
+                        nameof(AuthoredRequirementTestAsset.icon),
+                    },
+                    judged.Select(field => field.Name)
+                );
+                foreach (AuthoredRequirementField field in judged)
+                {
+                    Assert.That(field.DeclaringType, Is.EqualTo(fixtureType));
+                    Assert.That(field.Kind, Is.EqualTo(AuthoredRequirementKind.Assigned));
+                }
             }
             finally
             {
@@ -376,7 +486,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         )]
         [TestCase(
             nameof(AuthoredRequirementTestAsset.nested),
-            "    child:\n      material: {fileID: 0}",
+            "    material: {fileID: 12}\n    child:\n      material: {fileID: 0}",
             1
         )]
         [TestCase(
@@ -434,7 +544,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             {
                 File.WriteAllText(
                     path,
-                    $"%YAML 1.1\n--- !u!114 &11400000\nMonoBehaviour:\n  m_Script: {{fileID: 11500000, guid: {guid}, type: 3}}\n  {field}:\n{value}\n"
+                    $"%YAML 1.1\n--- !u!114 &11400000\nMonoBehaviour:\n  m_Script: {{fileID: 11500000, guid: {guid}, type: 3}}\n  requiredMaterial: {{fileID: 1}}\n  legacyIcon: {{fileID: 1}}\n  {field}:\n{value}\n"
                 );
                 List<AuthoredRequirementFinding> findings = new();
                 List<AuthoredRequirementExemption> exemptions = new();
@@ -467,6 +577,90 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                             StringComparison.Ordinal
                         )
                     )
+                );
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
+
+        [TestCase(nameof(AuthoredRequirementTestAsset.nested), "{}", new[] { 7 })]
+        [TestCase(nameof(AuthoredRequirementTestAsset.nested), "{ }", new[] { 7 })]
+        [TestCase(nameof(AuthoredRequirementTestAsset.nested), "null", new int[] { })]
+        [TestCase(nameof(AuthoredRequirementTestAsset.nestedList), "[]", new int[] { })]
+        [TestCase(nameof(AuthoredRequirementTestAsset.nestedArray), "\n  - {}", new[] { 8 })]
+        [TestCase(nameof(AuthoredRequirementTestAsset.nestedList), "\n  - null", new int[] { })]
+        [TestCase(
+            nameof(AuthoredRequirementTestAsset.nestedList),
+            "\n  - {}\n  - material: {fileID: 12}\n  - { }",
+            new[] { 8, 10 }
+        )]
+        public void ExplicitlyEmptyNestedMappingsReportMissingRequiredReferences(
+            string carrier,
+            string value,
+            int[] expectedLines
+        )
+        {
+            Assert.IsTrue(
+                MonoScriptIndex.TryGetScriptGuid(
+                    typeof(AuthoredRequirementTestAsset),
+                    out string guid
+                )
+            );
+            string path = Path.Combine(
+                Path.GetTempPath(),
+                $"empty-nested-requirement-{Guid.NewGuid():N}.asset"
+            );
+            try
+            {
+                File.WriteAllText(
+                    path,
+                    $"%YAML 1.1\n--- !u!114 &11400000\nMonoBehaviour:\n  m_Script: {{fileID: 11500000, guid: {guid}, type: 3}}\n  requiredMaterial: {{fileID: 1}}\n  legacyIcon: {{fileID: 1}}\n  {carrier}: {value}\n"
+                );
+                List<AuthoredRequirementFinding> findings = new();
+                List<AuthoredRequirementExemption> exemptions = new();
+                List<string> unreadable = new();
+                List<AuthoredRequirementField> judged = new();
+                Assert.IsTrue(
+                    AuthoredRequirementValidator.TryScan(
+                        typeof(WNotNullAttribute),
+                        AuthoredRequirementKind.Assigned,
+                        new[] { path },
+                        findings,
+                        exemptions,
+                        unreadable,
+                        judged,
+                        out int inspected
+                    )
+                );
+                Assert.That(inspected, Is.EqualTo(1));
+                Assert.That(unreadable, Is.Empty);
+                Assert.That(
+                    findings.Select(finding => finding.LineNumber),
+                    Is.EqualTo(expectedLines)
+                );
+                foreach (AuthoredRequirementFinding finding in findings)
+                {
+                    Assert.That(
+                        finding.DeclaringType,
+                        Is.EqualTo(typeof(NestedRequirementTestValue))
+                    );
+                    Assert.That(
+                        finding.FieldName,
+                        Is.EqualTo(nameof(NestedRequirementTestValue.material))
+                    );
+                }
+                Assert.That(
+                    judged.Count(field =>
+                        field.DeclaringType == typeof(NestedRequirementTestValue)
+                        && string.Equals(
+                            field.Name,
+                            nameof(NestedRequirementTestValue.material),
+                            StringComparison.Ordinal
+                        )
+                    ),
+                    Is.EqualTo(expectedLines.Length == 0 ? 0 : 1)
                 );
             }
             finally
@@ -549,7 +743,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             {
                 File.WriteAllText(
                     path,
-                    $"%YAML 1.1\n--- !u!114 &11400000\nMonoBehaviour:\n  m_Script: {{fileID: 11500000, guid: {guid}, type: 3}}\n  {field}:\n    material: {material}\n    value: {value}\n"
+                    $"%YAML 1.1\n--- !u!114 &11400000\nMonoBehaviour:\n  m_Script: {{fileID: 11500000, guid: {guid}, type: 3}}\n  requiredMaterial: {{fileID: 1}}\n  legacyIcon: {{fileID: 1}}\n  {field}:\n    material: {material}\n    value: {value}\n"
                 );
                 List<AuthoredRequirementFinding> findings = new();
                 List<AuthoredRequirementExemption> exemptions = new();

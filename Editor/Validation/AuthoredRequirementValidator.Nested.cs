@@ -297,7 +297,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             IReadOnlyList<string> lines,
             AuthoredAssetDocument document,
             List<AuthoredRequirementField> required,
-            List<AuthoredRequirementFinding> findings
+            List<AuthoredRequirementFinding> findings,
+            HashSet<AuthoredRequirementField> judged
         )
         {
             bool hasNestedRequirement = false;
@@ -314,10 +315,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 || !MonoScriptIndex.TryGetScriptType(document.ScriptGuid, out Type type)
             )
             {
-                Judge(assetPath, lines, document, required, findings);
+                Judge(
+                    assetPath,
+                    lines,
+                    document,
+                    required,
+                    findings,
+                    judged,
+                    judgeMissingNested: false
+                );
                 return;
             }
-            JudgeObject(assetPath, lines, document, type, required, findings, 0);
+            JudgeObject(assetPath, lines, document, type, required, findings, judged, 0);
         }
 
         private static void JudgeObject(
@@ -327,6 +336,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             Type type,
             List<AuthoredRequirementField> required,
             List<AuthoredRequirementFinding> findings,
+            HashSet<AuthoredRequirementField> judged,
             int depth
         )
         {
@@ -345,7 +355,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                     direct.Add(field);
                 }
             }
-            Judge(assetPath, lines, document, direct, findings);
+            Judge(assetPath, lines, document, direct, findings, judged);
             foreach (FieldInfo field in ReflectionHelpers.GetInstanceFieldsIncludingBaseTypes(type))
             {
                 Type valueType = SerializedNestedType(field, out bool collection);
@@ -375,11 +385,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                         valueType,
                         required,
                         findings,
-                        depth + 1
+                        judged,
+                        depth + 1,
+                        IsEmptyInlineMapping(entry.InlineValue) ? entry.LineNumber : null
                     );
                     continue;
                 }
                 int start = 0;
+                int? emptyElementLine = null;
                 foreach (
                     AuthoredSequenceElement element in AuthoredAssetYaml.EnumerateSequenceElements(
                         lines,
@@ -398,10 +411,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                             valueType,
                             required,
                             findings,
-                            depth + 1
+                            judged,
+                            depth + 1,
+                            emptyElementLine
                         );
                     }
                     start = element.LineNumber;
+                    emptyElementLine = IsEmptyInlineMapping(element.Value) ? start : null;
                 }
                 if (0 < start)
                 {
@@ -414,10 +430,21 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                         valueType,
                         required,
                         findings,
-                        depth + 1
+                        judged,
+                        depth + 1,
+                        emptyElementLine
                     );
                 }
             }
+        }
+
+        private static bool IsEmptyInlineMapping(string value)
+        {
+            ReadOnlySpan<char> text = value.AsSpan();
+            return 2 <= text.Length
+                && text[0] == '{'
+                && text[^1] == '}'
+                && text[1..^1].Trim().IsEmpty;
         }
 
         private static void JudgeNestedRange(
@@ -429,7 +456,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             Type type,
             List<AuthoredRequirementField> required,
             List<AuthoredRequirementFinding> findings,
-            int depth
+            HashSet<AuthoredRequirementField> judged,
+            int depth,
+            int? emptyObjectLine = null
         )
         {
             using PooledResource<List<AuthoredAssetEntry>> lease =
@@ -457,7 +486,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 }
                 entries.Add(entry);
             }
-            if (entries.Count == 0)
+            if (entries.Count == 0 && !emptyObjectLine.HasValue)
             {
                 return;
             }
@@ -466,11 +495,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 document.UnityTypeId,
                 document.RootKey,
                 false,
-                start,
+                emptyObjectLine ?? start,
                 end,
                 entries
             );
-            JudgeObject(assetPath, lines, nested, type, required, findings, depth);
+            JudgeObject(assetPath, lines, nested, type, required, findings, judged, depth);
         }
     }
 #endif
