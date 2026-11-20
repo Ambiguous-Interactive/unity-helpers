@@ -297,7 +297,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             IReadOnlyList<string> lines,
             AuthoredAssetDocument document,
             List<AuthoredRequirementField> required,
-            List<AuthoredRequirementFinding> findings
+            List<AuthoredRequirementFinding> findings,
+            HashSet<AuthoredRequirementField> judged
         )
         {
             bool hasNestedRequirement = false;
@@ -314,10 +315,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 || !MonoScriptIndex.TryGetScriptType(document.ScriptGuid, out Type type)
             )
             {
-                Judge(assetPath, lines, document, required, findings);
+                Judge(
+                    assetPath,
+                    lines,
+                    document,
+                    required,
+                    findings,
+                    judged,
+                    judgeMissingNested: false
+                );
                 return;
             }
-            JudgeObject(assetPath, lines, document, type, required, findings, 0);
+            JudgeObject(assetPath, lines, document, type, required, findings, judged, 0);
         }
 
         private static void JudgeObject(
@@ -327,6 +336,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             Type type,
             List<AuthoredRequirementField> required,
             List<AuthoredRequirementFinding> findings,
+            HashSet<AuthoredRequirementField> judged,
             int depth
         )
         {
@@ -345,7 +355,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                     direct.Add(field);
                 }
             }
-            Judge(assetPath, lines, document, direct, findings);
+            Judge(assetPath, lines, document, direct, findings, judged);
             foreach (FieldInfo field in ReflectionHelpers.GetInstanceFieldsIncludingBaseTypes(type))
             {
                 Type valueType = SerializedNestedType(field, out bool collection);
@@ -375,6 +385,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                         valueType,
                         required,
                         findings,
+                        judged,
                         depth + 1
                     );
                     continue;
@@ -398,6 +409,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                             valueType,
                             required,
                             findings,
+                            judged,
                             depth + 1
                         );
                     }
@@ -414,6 +426,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                         valueType,
                         required,
                         findings,
+                        judged,
                         depth + 1
                     );
                 }
@@ -429,6 +442,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             Type type,
             List<AuthoredRequirementField> required,
             List<AuthoredRequirementFinding> findings,
+            HashSet<AuthoredRequirementField> judged,
             int depth
         )
         {
@@ -470,7 +484,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 end,
                 entries
             );
-            JudgeObject(assetPath, lines, nested, type, required, findings, depth);
+            JudgeObject(assetPath, lines, nested, type, required, findings, judged, depth);
         }
     }
 #endif

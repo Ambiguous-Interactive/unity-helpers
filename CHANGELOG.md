@@ -12,12 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Add a timed flush and ownership transfer for byte arrays to `LatestWriteFile` ([#1275](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1275)).
+- Add the list of judged fields to authored requirement scans ([#1271](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1271)).
 
 ### Fixed
 
 - Fix sprite masks affecting other sorting layers when a requested layer ID is unknown ([#1273](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1273)).
 - Fix stale `LatestWriteFile` saves overwriting newer saves when multiple writers flush the same path ([#1275](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1275)).
 - Reject local Unity package export paths that would overwrite the Unity log or package data ([#859](https://github.com/Ambiguous-Interactive/unity-helpers/issues/859)).
+- Fix authored requirement scans missing empty dictionaries, default values with empty animation curves, and absent required references ([#1271](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1271)).
 
 ## [3.7.2] - 2026-11-19
 

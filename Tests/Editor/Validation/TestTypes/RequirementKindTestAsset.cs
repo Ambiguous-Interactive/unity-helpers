@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation.TestTypes
     using System.Collections.Generic;
     using UnityEngine;
     using UnityEngine.Serialization;
+    using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
 
     internal sealed class RequirementKindTestAsset : ScriptableObject
     {
@@ -24,6 +25,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation.TestTypes
 
         [NonEmptyRequirementTest]
         public string text;
+
+        [NonEmptyRequirementTest]
+        public SerializableDictionary<string, int> dictionary;
 
         [NonDefaultRequirementTest]
         [FormerlySerializedAs("oldCount")]

@@ -13,6 +13,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
     using UnityEngine;
     using UnityEngine.Serialization;
     using WallstopStudios.UnityHelpers.Core.Attributes;
+    using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Utils;
     using Object = UnityEngine.Object;
 
@@ -29,6 +31,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
     public static partial class AuthoredRequirementValidator
     {
         private const int MaximumDefaultValueDepth = 64;
+        private const string CurveKeysKey = "m_Curve";
 
         /// <summary>
         /// Reports every empty slot a <see cref="WNotNullAttribute"/> requires to be filled.
@@ -198,6 +201,40 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             out int documentsInspected
         )
         {
+            return TryScan(
+                requirementAttributeType,
+                kind,
+                assetPaths,
+                findings,
+                exemptions,
+                unreadable,
+                null,
+                out documentsInspected
+            );
+        }
+
+        /// <summary>Reports requirement results and the distinct declarations the scan judged.</summary>
+        /// <param name="requirementAttributeType">The attribute identifying required fields.</param>
+        /// <param name="kind">The condition applied to those fields.</param>
+        /// <param name="assetPaths">The authored assets to scan.</param>
+        /// <param name="findings">Receives requirement violations.</param>
+        /// <param name="exemptions">Receives fields whose representation cannot be judged.</param>
+        /// <param name="unreadable">Receives asset paths that could not be read.</param>
+        /// <param name="judgedFields">Receives each judged field declaration once.</param>
+        /// <param name="documentsInspected">Receives the number of matching documents.</param>
+        /// <returns>Whether the scan could run.</returns>
+        /// <remarks>Pass null for the coverage list to omit it. Declarations are returned in unspecified order.</remarks>
+        public static bool TryScan(
+            Type requirementAttributeType,
+            AuthoredRequirementKind kind,
+            IReadOnlyList<string> assetPaths,
+            List<AuthoredRequirementFinding> findings,
+            List<AuthoredRequirementExemption> exemptions,
+            List<string> unreadable,
+            List<AuthoredRequirementField> judgedFields,
+            out int documentsInspected
+        )
+        {
             if (
                 requirementAttributeType == null
                 || !typeof(Attribute).IsAssignableFrom(requirementAttributeType)
@@ -219,6 +256,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             findings.Clear();
             exemptions.Clear();
             unreadable.Clear();
+            judgedFields?.Clear();
 
             Dictionary<string, List<AuthoredRequirementField>> byScriptGuid = FieldsByScriptGuid(
                 requirementAttributeType,
@@ -232,6 +270,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 return true;
             }
 
+            using PooledResource<HashSet<AuthoredRequirementField>> judgedLease =
+                judgedFields == null ? default : Buffers<AuthoredRequirementField>.HashSet.Get();
+            HashSet<AuthoredRequirementField> judged = judgedLease.resource;
             int inspected = 0;
             for (int index = 0; index < assetPaths.Count; ++index)
             {
@@ -253,10 +294,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                     continue;
                 }
 
-                inspected += JudgeDocuments(assetPath, lines, documents, byScriptGuid, findings);
+                inspected += JudgeDocuments(
+                    assetPath,
+                    lines,
+                    documents,
+                    byScriptGuid,
+                    findings,
+                    judged
+                );
             }
 
             UnreadableAssetPaths.SortAndDeduplicate(unreadable);
+            judgedFields?.AddRange(judged);
             documentsInspected = inspected;
             return true;
         }
@@ -281,7 +330,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             IReadOnlyList<string> lines,
             IReadOnlyList<AuthoredAssetDocument> documents,
             IReadOnlyDictionary<string, List<AuthoredRequirementField>> byScriptGuid,
-            List<AuthoredRequirementFinding> findings
+            List<AuthoredRequirementFinding> findings,
+            HashSet<AuthoredRequirementField> judged = null
         )
         {
             int inspected = 0;
@@ -306,7 +356,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 }
 
                 ++inspected;
-                JudgeWithNestedValues(assetPath, lines, candidate, required, findings);
+                JudgeWithNestedValues(assetPath, lines, candidate, required, findings, judged);
             }
 
             return inspected;
@@ -468,7 +518,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 return false;
             }
             Type fieldType = field.FieldType;
-            bool isCollection = false;
+            bool isDictionary =
+                kind == AuthoredRequirementKind.NotEmpty && IsSerializableDictionary(fieldType);
+            bool isCollection = isDictionary;
             if (fieldType.IsArray)
             {
                 isCollection = true;
@@ -485,7 +537,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
             if (
                 fieldType == null
-                || isManagedReference && (kind != AuthoredRequirementKind.NotEmpty || !isCollection)
+                || isManagedReference
+                    && (kind != AuthoredRequirementKind.NotEmpty || !isCollection || isDictionary)
             )
             {
                 required = default;
@@ -526,7 +579,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 AliasesOf(field),
                 kind,
                 isNumeric,
-                isComposite
+                isComposite,
+                isDictionary,
+                fieldType
             );
             return true;
         }
@@ -536,33 +591,52 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             IReadOnlyList<string> lines,
             AuthoredAssetDocument document,
             List<AuthoredRequirementField> required,
-            List<AuthoredRequirementFinding> findings
+            List<AuthoredRequirementFinding> findings,
+            HashSet<AuthoredRequirementField> judged,
+            bool judgeMissingNested = true
         )
         {
             foreach (AuthoredRequirementField field in required)
             {
                 if (!TryFindEntry(document, field, out AuthoredAssetEntry entry))
                 {
+                    if (
+                        field.Kind == AuthoredRequirementKind.Assigned
+                        && field.IsObjectReference
+                        && !field.IsCollection
+                        && (
+                            judgeMissingNested
+                            || typeof(Object).IsAssignableFrom(field.DeclaringType)
+                        )
+                    )
+                    {
+                        judged?.Add(field);
+                        findings.Add(
+                            new AuthoredRequirementFinding(
+                                assetPath,
+                                document.StartLineNumber,
+                                field.DeclaringType,
+                                field.Name,
+                                field.Kind
+                            )
+                        );
+                    }
                     continue;
                 }
 
+                judged?.Add(field);
                 if (field.IsCollection)
                 {
                     if (field.Kind == AuthoredRequirementKind.NotEmpty)
                     {
-                        bool hasElement =
-                            !string.IsNullOrEmpty(entry.InlineValue)
-                            && !string.Equals(entry.InlineValue, "[]", StringComparison.Ordinal);
-                        foreach (
-                            AuthoredSequenceElement element in AuthoredAssetYaml.EnumerateSequenceElements(
-                                lines,
-                                entry
-                            )
-                        )
-                        {
-                            hasElement = true;
-                            break;
-                        }
+                        bool hasElement = field.IsDictionary
+                            ? TryGetDirectChild(
+                                document.Entries,
+                                entry,
+                                SerializableDictionaryAssetValidator.KeysKey,
+                                out AuthoredAssetEntry keys
+                            ) && HasCollectionElement(lines, keys)
+                            : HasCollectionElement(lines, entry);
                         if (!hasElement)
                         {
                             findings.Add(
@@ -583,7 +657,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
                 if (
                     field.Kind == AuthoredRequirementKind.NotDefault && field.IsComposite
-                        ? !IsDefaultComposite(lines, document, entry)
+                        ? !IsDefaultComposite(lines, document, entry, field.ValueType)
                         : !IsEmptyValue(field, entry.InlineValue)
                 )
                 {
@@ -602,10 +676,147 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             }
         }
 
+        private static bool IsSerializableDictionary(Type type)
+        {
+            for (Type current = type; current != null; current = current.BaseType)
+            {
+                if (
+                    current.IsGenericType
+                    && current.GetGenericTypeDefinition() == typeof(SerializableDictionary<,>)
+                )
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static bool TryGetDirectChild(
+            IReadOnlyList<AuthoredAssetEntry> entries,
+            AuthoredAssetEntry parent,
+            string key,
+            out AuthoredAssetEntry result,
+            int startIndex = 0
+        )
+        {
+            int indent = parent.Indent + AuthoredAssetYaml.ColumnStep;
+            for (int index = startIndex; index < entries.Count; ++index)
+            {
+                AuthoredAssetEntry candidate = entries[index];
+                if (parent.EndLineNumber <= candidate.LineNumber)
+                {
+                    break;
+                }
+                if (
+                    parent.LineNumber < candidate.LineNumber
+                    && candidate.Indent == indent
+                    && candidate.SequenceDepth == parent.SequenceDepth
+                    && string.Equals(candidate.Key, key, StringComparison.Ordinal)
+                )
+                {
+                    result = candidate;
+                    return true;
+                }
+            }
+            result = default;
+            return false;
+        }
+
+        private static bool HasCollectionElement(
+            IReadOnlyList<string> lines,
+            AuthoredAssetEntry entry
+        )
+        {
+            if (!string.IsNullOrWhiteSpace(entry.InlineValue))
+            {
+                return !string.Equals(entry.InlineValue, "[]", StringComparison.Ordinal);
+            }
+            foreach (
+                AuthoredSequenceElement element in AuthoredAssetYaml.EnumerateSequenceElements(
+                    lines,
+                    entry
+                )
+            )
+            {
+                return true;
+            }
+            return false;
+        }
+
+        private static Type ResolveCompositeChildType(
+            Type rootType,
+            AuthoredAssetEntry root,
+            IReadOnlyList<AuthoredAssetEntry> entries,
+            int index,
+            int depth
+        )
+        {
+            if (MaximumDefaultValueDepth <= depth)
+            {
+                return null;
+            }
+            AuthoredAssetEntry child = entries[index];
+            int parentIndent = child.Indent - AuthoredAssetYaml.ColumnStep;
+            Type parentType = rootType;
+            if (root.Indent < parentIndent)
+            {
+                parentType = null;
+                for (int parent = index - 1; 0 <= parent; --parent)
+                {
+                    AuthoredAssetEntry candidate = entries[parent];
+                    if (candidate.LineNumber <= root.LineNumber)
+                    {
+                        break;
+                    }
+                    if (
+                        candidate.Indent == parentIndent
+                        && candidate.SequenceDepth == child.SequenceDepth
+                        && child.LineNumber < candidate.EndLineNumber
+                    )
+                    {
+                        parentType = ResolveCompositeChildType(
+                            rootType,
+                            root,
+                            entries,
+                            parent,
+                            depth + 1
+                        );
+                        break;
+                    }
+                }
+            }
+            if (parentType == null || parentIndent < root.Indent)
+            {
+                return null;
+            }
+            foreach (
+                FieldInfo field in ReflectionHelpers.GetInstanceFieldsIncludingBaseTypes(parentType)
+            )
+            {
+                if (field.IsStatic || field.IsInitOnly || field.IsNotSerialized)
+                {
+                    continue;
+                }
+                if (string.Equals(field.Name, child.Key, StringComparison.Ordinal))
+                {
+                    return field.FieldType;
+                }
+                foreach (string alias in AliasesOf(field).AsValueEnumerableRequired())
+                {
+                    if (string.Equals(alias, child.Key, StringComparison.Ordinal))
+                    {
+                        return field.FieldType;
+                    }
+                }
+            }
+            return null;
+        }
+
         private static bool IsDefaultComposite(
             IReadOnlyList<string> lines,
             AuthoredAssetDocument document,
-            AuthoredAssetEntry entry
+            AuthoredAssetEntry entry,
+            Type valueType
         )
         {
             if (!string.IsNullOrEmpty(entry.InlineValue))
@@ -627,12 +838,33 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 }
                 if (string.IsNullOrEmpty(child.InlineValue))
                 {
-                    foreach (
-                        AuthoredSequenceElement element in AuthoredAssetYaml.EnumerateSequenceElements(
-                            lines,
-                            child
+                    if (
+                        TryGetDirectChild(
+                            entries,
+                            child,
+                            CurveKeysKey,
+                            out AuthoredAssetEntry keyframes,
+                            index + 1
                         )
+                        && ResolveCompositeChildType(valueType, entry, entries, index, 0)
+                            == typeof(AnimationCurve)
                     )
+                    {
+                        if (HasCollectionElement(lines, keyframes))
+                        {
+                            return false;
+                        }
+                        sawValue = true;
+                        while (
+                            index + 1 < entries.Count
+                            && entries[index + 1].LineNumber < child.EndLineNumber
+                        )
+                        {
+                            ++index;
+                        }
+                        continue;
+                    }
+                    if (HasCollectionElement(lines, child))
                     {
                         return false;
                     }

@@ -134,17 +134,22 @@ fill this" attribute gets the same treatment.
 
 Choose a requirement kind with the overload that takes `AuthoredRequirementKind`:
 
-| Kind         | Condition                                                                                                                                                                |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `Assigned`   | A reference or string must be assigned; collections retain the existing per-element checks.                                                                              |
-| `NotEmpty`   | A string, array or `List<T>` must contain at least one item. A collection containing a null item is still nonempty.                                                      |
-| `NotDefault` | A number, boolean, enum, reference or structured value must differ from its serialized default. Vectors, colors and nested numeric mappings are checked by their values. |
+| Kind         | Condition                                                                                                                                                                                                 |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Assigned`   | A reference or string must be assigned. Collections are checked one element at a time.                                                                                                                    |
+| `NotEmpty`   | A string, array, `List<T>`, or `SerializableDictionary<TKey, TValue>` must contain at least one item. A dictionary is checked using its serialized keys. A collection containing a null item is nonempty. |
+| `NotDefault` | A number, boolean, enum, reference or structured value must differ from its serialized default. An `AnimationCurve` child with no keyframes counts as a default value.                                    |
 
 The attribute type remains a parameter, so projects can pass their own `[NotEmpty]` and
 `[NotDefault]` annotations. The existing overloads keep `Assigned` behavior. `NotEmpty` also supports `[SerializeReference]` arrays and lists because it judges their length, not their elements. Unsupported shapes
-appear in the exemption list. An absent key remains unassessed because a field initializer can supply
-a value when an older asset is loaded. Default checks compare serialized values: Unity writes null
+appear in the exemption list. An absent `Assigned` object-reference field is reported at the start
+of its object. Other absent keys remain unassessed because a field initializer can supply a value
+when an older asset is loaded. Default checks compare serialized values: Unity writes null
 strings as empty strings and may write null collections as empty collections.
+
+Use the `TryScan` overload with a `List<AuthoredRequirementField>` to verify coverage. The
+scan returns each declaration it judged once, including passing fields and reported missing
+references. The declaration identifies its type, field name, and requirement kind.
 
 <!-- doc-sample: compiles-editor -->
 
