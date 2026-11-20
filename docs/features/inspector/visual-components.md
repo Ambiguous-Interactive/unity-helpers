@@ -114,12 +114,14 @@ bool affectsLayer = mask.Reaches(targetLayerId);
 ```
 
 `RangeTo` enables a custom range with both bounds on the selected layer and the full serialized
-sorting-order range, from `short.MinValue` through `short.MaxValue`. Missing masks and unknown
-layer IDs leave settings unchanged. Assign the mask's own sorting layer before calling
-`RangeToItsOwnLayer`.
+sorting-order range, from `short.MinValue` through `short.MaxValue`. Assign the mask's own
+sorting layer before calling `RangeToItsOwnLayer`. If either helper receives an unknown sorting
+layer ID, it disables the mask and logs the ID. To restore the mask, set a valid range and
+set `mask.enabled = true`.
 
-`Reaches` compares layer order values, because IDs do not encode draw order. An unrestricted mask
-reaches every valid layer; an unknown target or invalid custom bound returns false. The overload
+`Reaches` compares layer order values, because IDs do not encode draw order. An enabled mask
+with no custom range reaches every valid layer. A disabled mask, unknown target, or invalid custom
+bound returns false. The overload
 on `SpriteMaskExtensions` accepts saved range identifiers without needing a live mask. These
 queries answer layer coverage only: sorting-order bounds, SortingGroup isolation, sprite alpha,
 and renderer mask interaction can still prevent a particular pixel from being affected.
