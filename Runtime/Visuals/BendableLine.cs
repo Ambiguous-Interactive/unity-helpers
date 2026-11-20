@@ -73,6 +73,7 @@ namespace WallstopStudios.UnityHelpers.Visuals
                 ApplyAnimationDuration();
                 _end = next;
                 _endAnimationStart = _currentEnd;
+                _endAnimationStartFraction = Zero;
                 _endAnimationTime = Time.timeAsDouble;
                 _animateEnd =
                     _hasCurrentEnd
@@ -224,6 +225,8 @@ namespace WallstopStudios.UnityHelpers.Visuals
         private double _progressAnimationTime;
         private double _animationPausedAt;
         private float _appliedAnimationDuration;
+        private float _endAnimationStartFraction;
+        private float _progressAnimationStartFraction;
         private float _progressAnimationStart;
         private float _progressTarget;
         private float _progress;
@@ -263,14 +266,19 @@ namespace WallstopStudios.UnityHelpers.Visuals
             return float.IsFinite(value) ? Mathf.Max(Zero, value) : 0f;
         }
 
-        private static float AnimationFraction(double startTime, double now, float duration)
+        private static float AnimationFraction(
+            double startTime,
+            float startFraction,
+            double now,
+            float duration
+        )
         {
             if (!(Zero < duration))
             {
                 return 1f;
             }
             double elapsed = now - startTime;
-            float fraction = (float)(elapsed / duration);
+            float fraction = startFraction + (float)(elapsed / duration);
             return Mathf.Clamp01(fraction);
         }
 
@@ -284,6 +292,7 @@ namespace WallstopStudios.UnityHelpers.Visuals
                 _progress = forward ? 0f : 1f;
             }
             _progressAnimationStart = _progress;
+            _progressAnimationStartFraction = Zero;
             _progressTarget = forward ? 1f : 0f;
             _progressAnimationTime = Time.timeAsDouble;
             _animateProgress = isActiveAndEnabled && 0f < _animationDuration;
@@ -369,6 +378,7 @@ namespace WallstopStudios.UnityHelpers.Visuals
             double now = Time.timeAsDouble;
             float endpointFraction = AnimationFraction(
                 _endAnimationTime,
+                _endAnimationStartFraction,
                 now,
                 _appliedAnimationDuration
             );
@@ -381,6 +391,7 @@ namespace WallstopStudios.UnityHelpers.Visuals
             {
                 float fraction = AnimationFraction(
                     _progressAnimationTime,
+                    _progressAnimationStartFraction,
                     now,
                     _appliedAnimationDuration
                 );
@@ -458,13 +469,29 @@ namespace WallstopStudios.UnityHelpers.Visuals
             double now = _animationsPaused ? _animationPausedAt : Time.timeAsDouble;
             if (_animateEnd)
             {
-                float fraction = AnimationFraction(_endAnimationTime, now, previous);
-                _endAnimationTime = now - (double)fraction * _animationDuration;
+                _endAnimationStartFraction = AnimationFraction(
+                    _endAnimationTime,
+                    _endAnimationStartFraction,
+                    now,
+                    previous
+                );
+                _endAnimationTime = now;
+                _animateEnd = _endAnimationStartFraction < 1f;
             }
             if (_animateProgress)
             {
-                float fraction = AnimationFraction(_progressAnimationTime, now, previous);
-                _progressAnimationTime = now - (double)fraction * _animationDuration;
+                _progressAnimationStartFraction = AnimationFraction(
+                    _progressAnimationTime,
+                    _progressAnimationStartFraction,
+                    now,
+                    previous
+                );
+                _progressAnimationTime = now;
+                if (1f <= _progressAnimationStartFraction)
+                {
+                    _progress = _progressTarget;
+                    _animateProgress = false;
+                }
             }
         }
 
@@ -524,9 +551,9 @@ namespace WallstopStudios.UnityHelpers.Visuals
 
         private bool TryReadSpriteMapping(out string failureReason)
         {
-            failureReason = null;
             if (_sprite == null)
             {
+                failureReason = null;
                 return false;
             }
             if (_sprite.associatedAlphaSplitTexture != null)
@@ -554,6 +581,7 @@ namespace WallstopStudios.UnityHelpers.Visuals
                 float maximumY = originY + uvHeight;
                 Vector4 uvBounds = new(originX, originY, maximumX, maximumY);
                 _material.SetVector(UvBoundsId, uvBounds);
+                failureReason = null;
                 return true;
             }
             if (_sprite.packingMode != SpritePackingMode.Rectangle)
@@ -639,10 +667,7 @@ namespace WallstopStudios.UnityHelpers.Visuals
                 WallMath.IsFinite(_uvOrigin)
                 && WallMath.IsFinite(_uvRight)
                 && WallMath.IsFinite(_uvUp);
-            if (!validMapping)
-            {
-                failureReason = "The packed mesh has nonfinite UV bounds.";
-            }
+            failureReason = validMapping ? null : "The packed mesh has nonfinite UV bounds.";
             return validMapping;
         }
 

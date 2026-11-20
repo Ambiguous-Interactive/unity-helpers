@@ -399,6 +399,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             Assert.IsTrue(line.TryRefresh());
             Assert.That(line.Progress, Is.EqualTo(progress).Within(0.000001f));
             Assert.That(line.CurrentEnd.Value.x, Is.EqualTo(endpoint.x).Within(0.000001f));
+
+            float beforeShortDuration = line.Progress;
+            line.AnimationDuration = 1e-20f;
+            Assert.IsTrue(line.TryRefresh());
+            Assert.That(line.Progress, Is.EqualTo(beforeShortDuration));
         }
 
         [UnityTest]
