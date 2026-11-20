@@ -13,17 +13,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         /// <summary>The condition applied to the field.</summary>
         public AuthoredRequirementKind Kind { get; }
 
-        /// <summary>Whether the scalar is serialized as a number or boolean.</summary>
-        internal bool IsNumeric { get; }
-
-        /// <summary>Whether the field is a structured value with serialized child values.</summary>
-        internal bool IsComposite { get; }
-
         /// <summary>The type declaring the field.</summary>
         public Type DeclaringType { get; }
 
         /// <summary>The field's name.</summary>
         public string Name { get; }
+
+        /// <summary>Whether the scalar is serialized as a number or boolean.</summary>
+        internal bool IsNumeric { get; }
+
+        /// <summary>Whether the field is a structured value with serialized child values.</summary>
+        internal bool IsComposite { get; }
 
         /// <summary>Whether the field holds an object reference rather than a string.</summary>
         internal bool IsObjectReference { get; }
