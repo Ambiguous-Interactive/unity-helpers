@@ -376,6 +376,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 }
                 if (!collection)
                 {
+                    ReadOnlySpan<char> inlineValue = entry.InlineValue.AsSpan();
+                    int? emptyObjectLine =
+                        2 <= inlineValue.Length
+                        && inlineValue[0] == '{'
+                        && inlineValue[^1] == '}'
+                        && inlineValue[1..^1].Trim().IsEmpty
+                            ? entry.LineNumber
+                            : null;
                     JudgeNestedRange(
                         assetPath,
                         lines,
@@ -386,7 +394,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                         required,
                         findings,
                         judged,
-                        depth + 1
+                        depth + 1,
+                        emptyObjectLine
                     );
                     continue;
                 }
@@ -443,7 +452,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             List<AuthoredRequirementField> required,
             List<AuthoredRequirementFinding> findings,
             HashSet<AuthoredRequirementField> judged,
-            int depth
+            int depth,
+            int? emptyObjectLine = null
         )
         {
             using PooledResource<List<AuthoredAssetEntry>> lease =
@@ -471,7 +481,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 }
                 entries.Add(entry);
             }
-            if (entries.Count == 0)
+            if (entries.Count == 0 && !emptyObjectLine.HasValue)
             {
                 return;
             }
@@ -480,7 +490,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 document.UnityTypeId,
                 document.RootKey,
                 false,
-                start,
+                emptyObjectLine ?? start,
                 end,
                 entries
             );

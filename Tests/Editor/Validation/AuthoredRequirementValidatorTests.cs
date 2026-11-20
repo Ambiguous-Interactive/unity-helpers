@@ -469,7 +469,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         )]
         [TestCase(
             nameof(AuthoredRequirementTestAsset.nested),
-            "    child:\n      material: {fileID: 0}",
+            "    material: {fileID: 12}\n    child:\n      material: {fileID: 0}",
             1
         )]
         [TestCase(
@@ -560,6 +560,81 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                             StringComparison.Ordinal
                         )
                     )
+                );
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
+
+        [TestCase(nameof(AuthoredRequirementTestAsset.nested), "{}", 1)]
+        [TestCase(nameof(AuthoredRequirementTestAsset.nested), "{ }", 1)]
+        [TestCase(nameof(AuthoredRequirementTestAsset.nested), "null", 0)]
+        [TestCase(nameof(AuthoredRequirementTestAsset.nestedList), "[]", 0)]
+        public void ExplicitlyEmptyNestedMappingsReportMissingRequiredReferences(
+            string carrier,
+            string value,
+            int expected
+        )
+        {
+            Assert.IsTrue(
+                MonoScriptIndex.TryGetScriptGuid(
+                    typeof(AuthoredRequirementTestAsset),
+                    out string guid
+                )
+            );
+            string path = Path.Combine(
+                Path.GetTempPath(),
+                $"empty-nested-requirement-{Guid.NewGuid():N}.asset"
+            );
+            try
+            {
+                File.WriteAllText(
+                    path,
+                    $"%YAML 1.1\n--- !u!114 &11400000\nMonoBehaviour:\n  m_Script: {{fileID: 11500000, guid: {guid}, type: 3}}\n  requiredMaterial: {{fileID: 1}}\n  legacyIcon: {{fileID: 1}}\n  {carrier}: {value}\n"
+                );
+                List<AuthoredRequirementFinding> findings = new();
+                List<AuthoredRequirementExemption> exemptions = new();
+                List<string> unreadable = new();
+                List<AuthoredRequirementField> judged = new();
+                Assert.IsTrue(
+                    AuthoredRequirementValidator.TryScan(
+                        typeof(WNotNullAttribute),
+                        AuthoredRequirementKind.Assigned,
+                        new[] { path },
+                        findings,
+                        exemptions,
+                        unreadable,
+                        judged,
+                        out int inspected
+                    )
+                );
+                Assert.That(inspected, Is.EqualTo(1));
+                Assert.That(unreadable, Is.Empty);
+                Assert.That(findings.Count, Is.EqualTo(expected));
+                foreach (AuthoredRequirementFinding finding in findings)
+                {
+                    Assert.That(
+                        finding.DeclaringType,
+                        Is.EqualTo(typeof(NestedRequirementTestValue))
+                    );
+                    Assert.That(
+                        finding.FieldName,
+                        Is.EqualTo(nameof(NestedRequirementTestValue.material))
+                    );
+                    Assert.That(finding.LineNumber, Is.EqualTo(7));
+                }
+                Assert.That(
+                    judged.Count(field =>
+                        field.DeclaringType == typeof(NestedRequirementTestValue)
+                        && string.Equals(
+                            field.Name,
+                            nameof(NestedRequirementTestValue.material),
+                            StringComparison.Ordinal
+                        )
+                    ),
+                    Is.EqualTo(expected)
                 );
             }
             finally
