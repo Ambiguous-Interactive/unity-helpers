@@ -1351,6 +1351,35 @@ cancelled append may have written part of its new record.
   and byte replacement: the complete staged replacement wins, so the external edit is lost. Use a
   shared writer protocol or a transactional store when that loss is unacceptable.
 
+<!-- cspell:ignore shm -->
+
+Use `DurableFile.TryMoveWithSidecars` to move a closed database and its journal files
+together. Supply the suffixes in move order and use a destination in an existing
+directory. The call moves the database first, then each present sidecar. A collision,
+including a destination sidecar with no matching source file, makes the call fail.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using System;
+using WallstopStudios.UnityHelpers.Core.Helper;
+
+string[] sqliteSidecars = { "-journal", "-wal", "-shm" };
+bool moved = DurableFile.TryMoveWithSidecars(
+    "save.db",
+    "save.damaged",
+    sqliteSidecars,
+    out Exception moveError
+);
+```
+
+The call restores completed moves in reverse order after a failure. If a restoration
+fails, the returned aggregate contains the first failure and each restoration error.
+Each restoration error names both paths. If a filesystem move leaves the source in
+place, the call treats that step as failed. Calls through this helper coordinate
+within one process. Close the database and coordinate with other processes before
+moving the group. A process interruption can leave some files at their new names.
+
 A leftover `.tmp` sibling (`DurableFile.TemporarySuffix`) is what an interrupted write leaves behind; it is
 safe to ignore or delete.
 `DurableFile.TryDelete` succeeds when a file is absent and reports failure for a directory or a file it cannot delete.

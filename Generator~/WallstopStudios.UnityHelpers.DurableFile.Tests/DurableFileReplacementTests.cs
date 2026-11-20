@@ -172,6 +172,105 @@ namespace WallstopStudios.UnityHelpers.DurableFile.Tests
             Directory.Delete(_directory, recursive: true);
         }
 
+        [Test]
+        public void SidecarMoveReportsAllRestoreFailuresInReverseOrder()
+        {
+            string walSource = _source + "-wal";
+            string sharedMemorySource = _source + "-shm";
+            string journalSource = _source + "-journal";
+            string walDestination = _destination + "-wal";
+            string sharedMemoryDestination = _destination + "-shm";
+            string journalDestination = _destination + "-journal";
+            RealFile.WriteAllText(walSource, "original wal");
+            RealFile.WriteAllText(sharedMemorySource, "original shared memory");
+            RealFile.WriteAllText(journalSource, "original journal");
+            IOException firstFailure = new IOException("The final move was denied.");
+            List<(string Source, string Destination)> attempts = new();
+            SimulatedFile.BeforeMove = (source, destination) =>
+            {
+                attempts.Add((source, destination));
+                if (string.Equals(source, journalSource, StringComparison.Ordinal))
+                {
+                    RealFile.WriteAllText(walSource, "replacement wal");
+                    RealFile.WriteAllText(sharedMemorySource, "replacement shared memory");
+                    throw firstFailure;
+                }
+            };
+
+            Assert.IsFalse(
+                DurableFile.TryMoveWithSidecars(
+                    _source,
+                    _destination,
+                    new[] { "-wal", "-shm", "-journal" },
+                    out Exception error
+                )
+            );
+
+            Assert.IsInstanceOf<AggregateException>(error);
+            AggregateException aggregate = (AggregateException)error;
+            Assert.AreEqual(3, aggregate.InnerExceptions.Count);
+            Assert.AreSame(firstFailure, aggregate.InnerExceptions[0]);
+            StringAssert.Contains(sharedMemorySource, aggregate.InnerExceptions[1].Message);
+            StringAssert.Contains(walSource, aggregate.InnerExceptions[2].Message);
+            CollectionAssert.AreEqual(
+                new[]
+                {
+                    (_source, _destination),
+                    (walSource, walDestination),
+                    (sharedMemorySource, sharedMemoryDestination),
+                    (journalSource, journalDestination),
+                    (sharedMemoryDestination, sharedMemorySource),
+                    (walDestination, walSource),
+                    (_destination, _source),
+                },
+                attempts
+            );
+            CollectionAssert.AreEqual(ReplacementBytes, RealFile.ReadAllBytes(_source));
+            Assert.AreEqual("replacement wal", RealFile.ReadAllText(walSource));
+            Assert.AreEqual("original wal", RealFile.ReadAllText(walDestination));
+            Assert.AreEqual("replacement shared memory", RealFile.ReadAllText(sharedMemorySource));
+            Assert.AreEqual(
+                "original shared memory",
+                RealFile.ReadAllText(sharedMemoryDestination)
+            );
+            Assert.AreEqual("original journal", RealFile.ReadAllText(journalSource));
+            Assert.IsFalse(RealFile.Exists(_destination));
+            Assert.IsFalse(RealFile.Exists(journalDestination));
+        }
+
+        [Test]
+        public void SidecarMoveRefusesCopyWithoutSourceRemoval()
+        {
+            string sourceJournal = _source + "-wal";
+            string destinationJournal = _destination + "-wal";
+            RealFile.WriteAllText(sourceJournal, "write-ahead");
+            SimulatedFile.AfterMove = (source, destination) =>
+            {
+                if (string.Equals(source, sourceJournal, StringComparison.Ordinal))
+                {
+                    RealFile.Copy(destination, source);
+                }
+            };
+
+            Assert.IsFalse(
+                DurableFile.TryMoveWithSidecars(
+                    _source,
+                    _destination,
+                    new[] { "-wal" },
+                    out Exception error
+                )
+            );
+            Assert.IsInstanceOf<AggregateException>(error);
+            AggregateException aggregate = (AggregateException)error;
+            Assert.AreEqual(2, aggregate.InnerExceptions.Count);
+            StringAssert.Contains("left the source in place", aggregate.InnerExceptions[0].Message);
+            StringAssert.Contains(destinationJournal, aggregate.InnerExceptions[1].Message);
+            CollectionAssert.AreEqual(ReplacementBytes, RealFile.ReadAllBytes(_source));
+            Assert.IsFalse(RealFile.Exists(_destination));
+            Assert.AreEqual("write-ahead", RealFile.ReadAllText(sourceJournal));
+            Assert.AreEqual("write-ahead", RealFile.ReadAllText(destinationJournal));
+        }
+
         [TestCaseSource(nameof(UnsupportedCases))]
         public async Task UnsupportedReplacementPreservesPreviousBytes(
             string operation,
