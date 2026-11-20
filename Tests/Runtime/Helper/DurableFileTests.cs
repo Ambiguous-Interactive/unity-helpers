@@ -15,6 +15,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Tests.Core;
+    using WallstopStudios.UnityHelpers.Utils;
 #if UNITY_EDITOR
     using System.Diagnostics;
 #endif
@@ -473,6 +474,96 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsTrue(error == null);
             Assert.AreEqual(0, new FileInfo(path).Length);
             Assert.IsFalse(File.Exists(path + DurableFile.TemporarySuffix));
+        }
+
+        [Test]
+        public void ByteSliceCreatesAndReplacesUsingOnlyTheSelectedRange()
+        {
+            string path = Path.Combine(_testDirectory, "binary", "slice.bin");
+            byte[] buffer = { 99, 1, 0, 255, 88, 77 };
+            Assert.IsTrue(DurableFile.TryWriteAllBytes(path, buffer, 1, 3, out Exception error));
+            Assert.IsTrue(error == null);
+            CollectionAssert.AreEqual(new byte[] { 1, 0, 255 }, File.ReadAllBytes(path));
+
+            Assert.IsTrue(DurableFile.TryWriteAllBytes(path, buffer, 4, 2, out error));
+            Assert.IsTrue(error == null);
+            CollectionAssert.AreEqual(new byte[] { 88, 77 }, File.ReadAllBytes(path));
+
+            Assert.IsTrue(DurableFile.TryWriteAllBytes(path, buffer, buffer.Length, 0, out error));
+            Assert.IsTrue(error == null);
+            Assert.That(new FileInfo(path).Length, Is.Zero);
+            Assert.IsFalse(File.Exists(path + DurableFile.TemporarySuffix));
+        }
+
+        [TestCase(-1, 1, "offset")]
+        [TestCase(4, 0, "offset")]
+        [TestCase(1, -1, "count")]
+        [TestCase(1, int.MaxValue, "count")]
+        public void InvalidByteSliceLeavesExistingBytesAndOwnershipIntact(
+            int offset,
+            int count,
+            string parameter
+        )
+        {
+            string path = WriteDirectly("slice.bin", "previous");
+            byte[] buffer = { 40, 50, 60 };
+            Assert.IsFalse(
+                DurableFile.TryWriteAllBytes(path, buffer, offset, count, out Exception error)
+            );
+            Assert.That(error, Is.TypeOf<ArgumentOutOfRangeException>());
+            Assert.That(((ArgumentOutOfRangeException)error).ParamName, Is.EqualTo(parameter));
+            Assert.That(File.ReadAllText(path), Is.EqualTo("previous"));
+            string stage = path + DurableFile.TemporarySuffix;
+            Assert.IsFalse(File.Exists(stage));
+            Assert.IsFalse(File.Exists(stage + DurableFile.OwnershipSuffix));
+            Assert.IsTrue(
+                DurableFile.TryWriteAllBytes(path, buffer, 1, 1, out Exception retryError)
+            );
+            Assert.IsTrue(retryError == null);
+            CollectionAssert.AreEqual(new byte[] { 50 }, File.ReadAllBytes(path));
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(31)]
+        [TestCase(4097)]
+        public void PooledReadReturnsExactlyTheLogicalFileContents(int length)
+        {
+            string path = Path.Combine(_testDirectory, "data.bin");
+            byte[] expected = new byte[length];
+            for (int index = 0; index < expected.Length; ++index)
+            {
+                expected[index] = (byte)(index % 251);
+            }
+            File.WriteAllBytes(path, expected);
+
+            bool success = DurableFile.TryReadAllBytes(
+                path,
+                out PooledArray<byte> buffer,
+                out Exception error
+            );
+            using (buffer)
+            {
+                Assert.IsTrue(success, error?.ToString());
+                Assert.That(buffer.length, Is.EqualTo(length));
+                Assert.That(buffer.array.Length, Is.GreaterThanOrEqualTo(length));
+                ReadOnlySpan<byte> contents = buffer.array.AsSpan(0, buffer.length);
+                Assert.IsTrue(contents.SequenceEqual(expected));
+                Assert.IsTrue(error == null);
+            }
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void PooledReadFailureReturnsNoLease(bool directory)
+        {
+            string path = directory ? _testDirectory : Path.Combine(_testDirectory, "missing.bin");
+            Assert.IsFalse(
+                DurableFile.TryReadAllBytes(path, out PooledArray<byte> buffer, out Exception error)
+            );
+            Assert.IsTrue(error != null);
+            PooledArray<byte> empty = default;
+            Assert.IsTrue(buffer.Equals(empty));
         }
 
         [TestCase(null)]

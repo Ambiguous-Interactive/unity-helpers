@@ -11,15 +11,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add replaceable UTC and monotonic clocks with `WallTimeProvider` and `ManualTimeProvider` ([#1245](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1245)).
+- Add byte-range writes and pooled whole-file reads to `DurableFile` ([#1225](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1225)).
 - Add a timed flush and ownership transfer for byte arrays to `LatestWriteFile` ([#1275](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1275)).
 - Add the list of judged fields to authored requirement scans ([#1271](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1271)).
+- Add reusable `MotionCurves` easing presets and use them for `BendableLine` drawing and endpoint animations ([#1272](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1272)).
 
 ### Fixed
 
 - Fix sprite masks affecting other sorting layers when a requested layer ID is unknown ([#1273](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1273)).
 - Fix stale `LatestWriteFile` saves overwriting newer saves when multiple writers flush the same path ([#1275](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1275)).
+- Fix automatic build-profile scene synchronization writing profiles during Unity batch-mode tests ([#1274](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1274)).
 - Reject local Unity package export paths that would overwrite the Unity log or package data ([#859](https://github.com/Ambiguous-Interactive/unity-helpers/issues/859)).
 - Fix authored requirement scans missing empty dictionaries, default values with empty animation curves, and absent required references ([#1271](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1271)).
+- Fix `BendableLine` jumping when its animation duration changes, and warn once per unsupported sprite when the line cannot map it ([#1272](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1272)).
 
 ## [3.7.2] - 2026-11-19
 

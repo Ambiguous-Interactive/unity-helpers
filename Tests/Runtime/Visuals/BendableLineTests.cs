@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
     using UnityEngine;
     using UnityEngine.Rendering;
     using UnityEngine.TestTools;
+    using WallstopStudios.UnityHelpers.Core.Animation;
     using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Visuals;
 
@@ -373,6 +374,63 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         }
 
         [UnityTest]
+        public IEnumerator PositiveDurationChangePreservesRunningDrawAndEndpoint()
+        {
+            BendableLine line = CreateLine();
+            Assert.IsTrue(line.TryRefresh());
+            line.AnimationDuration = 1000f;
+            line.End = new Vector2(8f, 0f);
+            line.AnimateLine(true, true);
+            double startedAt = Time.timeAsDouble;
+            yield return null;
+            yield return null;
+            Assert.IsTrue(line.TryRefresh());
+            double elapsed = Time.timeAsDouble - startedAt;
+            Assert.That(elapsed, Is.GreaterThan(0d));
+            float progress = line.Progress;
+            Vector2 endpoint = line.CurrentEnd.Value;
+            Assert.That(progress, Is.Positive.And.LessThan(1f));
+
+            line.AnimationDuration = (float)(elapsed * 0.5d);
+            Assert.IsTrue(line.TryRefresh());
+            Assert.That(line.Progress, Is.EqualTo(progress).Within(0.000001f));
+            Assert.That(line.CurrentEnd.Value.x, Is.EqualTo(endpoint.x).Within(0.000001f));
+
+            line.AnimationDuration = 1000f;
+            Assert.IsTrue(line.TryRefresh());
+            Assert.That(line.Progress, Is.EqualTo(progress).Within(0.000001f));
+            Assert.That(line.CurrentEnd.Value.x, Is.EqualTo(endpoint.x).Within(0.000001f));
+
+            float beforeShortDuration = line.Progress;
+            line.AnimationDuration = 1e-20f;
+            Assert.IsTrue(line.TryRefresh());
+            Assert.That(line.Progress, Is.EqualTo(beforeShortDuration));
+        }
+
+        [UnityTest]
+        public IEnumerator QuadraticOutEasesDrawAndEndpointWithTheSameFraction()
+        {
+            BendableLine line = CreateLine();
+            Assert.IsTrue(line.TryRefresh());
+            Assert.That(line.AnimationEase, Is.EqualTo(MotionCurve.Linear));
+            line.AnimationEase = MotionCurve.QuadraticOut;
+            line.AnimationDuration = 1000f;
+            line.End = new Vector2(8f, 0f);
+            line.AnimateLine(true, true);
+            double startedAt = Time.timeAsDouble;
+            yield return null;
+            yield return null;
+            Assert.IsTrue(line.TryRefresh());
+            float linear = (float)((Time.timeAsDouble - startedAt) / line.AnimationDuration);
+            Assert.That(linear, Is.Positive.And.LessThan(1f));
+            double remaining = 1d - linear;
+            float eased = (float)(1d - remaining * remaining);
+            Assert.That(line.Progress, Is.GreaterThan(linear));
+            Assert.That(line.Progress, Is.EqualTo(eased).Within(0.000001f));
+            Assert.That(line.CurrentEnd.Value.x, Is.EqualTo(4f + 4f * eased).Within(0.00001f));
+        }
+
+        [UnityTest]
         public IEnumerator PendingAnimationBeginsWhenTheLineFirstBecomesDrawable()
         {
             BendableLine line = CreateLine();
@@ -411,6 +469,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             Assert.IsFalse(line.TryRefresh());
             yield return null;
             yield return null;
+            line.AnimationDuration *= 0.5f;
             line.Sprite = sprite;
             Assert.IsTrue(line.TryRefresh());
             Assert.That(line.Progress, Is.EqualTo(progress).Within(0.00000001f));

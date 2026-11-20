@@ -19,7 +19,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
     /// <summary>Keeps inherited build-profile scene lists equal to the global scene list.</summary>
     /// <remarks>
-    /// Unity 6 only. Custom scene lists are preserved. Automatic synchronization is opt-in.
+    /// Unity 6 only. Custom scene lists are preserved. Automatic synchronization is opt-in and
+    /// runs in interactive Editors.
     /// Call TrySynchronize after programmatic globalScenes assignments, which may not raise
     /// Unity's sceneListChanged event.
     /// </remarks>
@@ -348,6 +349,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         {
             EditorApplication.update -= RunScheduled;
             _scheduled = false;
+            if (Application.isBatchMode)
+            {
+                return;
+            }
+
             try
             {
                 if (_synchronizing || EditorApplication.isCompiling || EditorApplication.isUpdating)

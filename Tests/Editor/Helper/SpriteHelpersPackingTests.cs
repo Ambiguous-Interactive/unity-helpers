@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Tests.Core;
+    using WallstopStudios.UnityHelpers.Visuals;
 
     [TestFixture]
     public sealed class SpriteHelpersPackingTests : CommonTestBase
@@ -60,6 +61,46 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.That(extracted.width, Is.EqualTo(4));
             Assert.That(extracted.height, Is.EqualTo(6));
             CollectionAssert.AreEqual(sprite.texture.GetPixels32(), extracted.GetPixels32());
+        }
+
+        [Test]
+        public void BendableLineWarnsOnceForEachUnsupportedSprite()
+        {
+            GameObject owner = Track(new GameObject(nameof(BendableLine)));
+            BendableLine line = owner.AddComponent<BendableLine>();
+            line.End = Vector2.right;
+            line.Progress = 1f;
+            Sprite tight = CreateSprite(SpritePackingMode.Tight, SpritePackingRotation.None);
+            tight.name = nameof(tight);
+            Sprite other = CreateSprite(SpritePackingMode.Tight, SpritePackingRotation.None);
+            other.name = nameof(other);
+            Rect sourceRect = tight.rect;
+            Sprite valid = Track(Sprite.Create(tight.texture, sourceRect, Vector2.zero));
+            line.Sprite = valid;
+            Assert.IsTrue(line.TryRefresh());
+            Mesh mesh = owner.GetComponent<MeshFilter>().sharedMesh;
+            Assert.That(mesh.vertexCount, Is.Positive);
+
+            LogAssert.Expect(
+                LogType.Warning,
+                $"{nameof(BendableLine)} cannot draw sprite '{tight.name}': Tight atlas packing is unsupported."
+            );
+            line.Sprite = tight;
+            Assert.IsFalse(line.TryRefresh());
+            Assert.That(mesh.vertexCount, Is.Zero);
+            Assert.IsFalse(line.TryRefresh());
+
+            LogAssert.Expect(
+                LogType.Warning,
+                $"{nameof(BendableLine)} cannot draw sprite '{other.name}': Tight atlas packing is unsupported."
+            );
+            line.Sprite = other;
+            Assert.IsFalse(line.TryRefresh());
+            line.Sprite = valid;
+            Assert.IsTrue(line.TryRefresh());
+            line.Sprite = tight;
+            Assert.IsFalse(line.TryRefresh());
+            AssertNoUnexpectedLogs();
         }
 
         private Sprite CreateSprite(SpritePackingMode mode, SpritePackingRotation rotation)
