@@ -50,11 +50,11 @@ function Assert-UnityTestFrameworkEvidence {
     $uv = (Get-Command uv -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
     $arguments = @(
         'run', '--quiet', '--project', (Join-Path $repository 'scripts/python~'), '--locked', '--no-dev',
-        'python', '-I', '-B', (Join-Path $repository 'scripts/unity/framework_evidence.py'), '--process-id', $ProcessId, '--'
+        'python', '-I', '-B', (Join-Path $repository 'scripts/unity/framework_evidence.py')
     )
     $pathComparison = if ($IsWindows) { [StringComparison]::OrdinalIgnoreCase } else { [StringComparison]::Ordinal }
     $streams = [Collections.Generic.Dictionary[string, IO.FileStream]]::new([StringComparer]::Ordinal)
-    $digests = [Collections.Generic.Dictionary[string, string]]::new([StringComparer]::Ordinal)
+    $retainedStates = [ordered]@{}
     $notes = [Collections.Generic.List[string]]::new()
     $PSNativeCommandUseErrorActionPreference = $false
     try {
@@ -62,7 +62,7 @@ function Assert-UnityTestFrameworkEvidence {
             if ($snapshot.Attributes -band [IO.FileAttributes]::ReparsePoint) {
                 throw 'Linked Test Framework snapshot directory.'
             }
-            $output = @(& $uv @arguments $snapshot.FullName 2>&1)
+            $output = @(& $uv @arguments --process-id $ProcessId -- $snapshot.FullName 2>&1)
             if ($LASTEXITCODE -ne 0) { throw ($output -join [Environment]::NewLine) }
             $verified = ($output -join [Environment]::NewLine) | ConvertFrom-Json -AsHashtable
             if (-not [string]::Equals([IO.Path]::GetFullPath($verified.project), [IO.Path]::GetFullPath($Project), $pathComparison)) {
@@ -72,7 +72,6 @@ function Assert-UnityTestFrameworkEvidence {
             foreach ($file in $verified.files.GetEnumerator()) {
                 $path = Join-Path $snapshot.FullName $file.Key
                 $streams[$path] = [IO.File]::Open($path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
-                $digests[$path] = $file.Value
                 if ((Get-FileHash -InputStream $streams[$path] -Algorithm SHA256).Hash -ine $file.Value) {
                     throw "Test Framework evidence changed during verification: $path"
                 }
@@ -91,10 +90,8 @@ function Assert-UnityTestFrameworkEvidence {
                     }
                 } finally { $pe.Dispose() }
             }
+            $retainedStates[$snapshot.FullName] = $verified.states
             $notes.Add("[test-framework] Unity $($verified.unity), resolved $($verified.version) ($($verified.source)); $($verified.source_count) source files, three bound modules, PID $ProcessId.")
-        }
-        if ((Get-UnityFrameworkVerifierIdentity -Repository $repository) -cne $toolIdentity) {
-            throw 'The Test Framework verifier checkout changed during verification.'
         }
         $current = @(Get-ChildItem -LiteralPath $Directory -Directory -Name -ErrorAction Stop)
         if (($current -join [char]0) -cne ($snapshots.Name -join [char]0)) {
@@ -106,12 +103,13 @@ function Assert-UnityTestFrameworkEvidence {
             }
         }
         if (-not $IsWindows) {
-            # POSIX writers outside .NET can ignore the read share.
-            foreach ($file in $digests.GetEnumerator()) {
-                if ((Get-FileHash -LiteralPath $file.Key -Algorithm SHA256 -ErrorAction Stop).Hash -ine $file.Value) {
-                    throw "Test Framework evidence changed during verification: $($file.Key)"
-                }
-            }
+            # Bind the checked bytes to one snapshot after every content and CLR read.
+            $receipt = ConvertTo-Json -InputObject $retainedStates -Depth 5 -Compress -EscapeHandling EscapeNonAscii
+            $output = @($receipt | & $uv @arguments --check-retained-state 2>&1)
+            if ($LASTEXITCODE -ne 0) { throw ($output -join [Environment]::NewLine) }
+        }
+        if ((Get-UnityFrameworkVerifierIdentity -Repository $repository) -cne $toolIdentity) {
+            throw 'The Test Framework verifier checkout changed during verification.'
         }
         foreach ($note in $notes) { Write-Host $note }
     } finally {

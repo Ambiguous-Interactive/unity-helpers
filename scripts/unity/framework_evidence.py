@@ -32,6 +32,7 @@ class _VerifiedSnapshot(TypedDict):
     source: str
     source_count: int
     files: dict[str, str]
+    states: dict[str, tuple[int, int, int, int, int]]
     modules: list[_Module]
 
 
@@ -87,10 +88,26 @@ def _ordinary_path(snapshot: Path, relative: str) -> Path:
     return path
 
 
-def _read_payload(snapshot: Path, relative: str, physical: dict[str, str]) -> bytes:
-    data = _ordinary_path(snapshot, relative).read_bytes()
-    physical[relative] = hashlib.sha256(data).hexdigest()
-    return data
+def _file_state(path: Path) -> tuple[int, int, int, int, int]:
+    state = path.stat()
+    return (state.st_dev, state.st_ino, state.st_size, state.st_mtime_ns, state.st_ctime_ns)
+
+
+class _SnapshotContents:
+    def __init__(self, root: Path) -> None:
+        self.root = root
+        self.files: dict[str, str] = {}
+        self.states: dict[str, tuple[int, int, int, int, int]] = {}
+
+    def path(self, relative: str) -> Path:
+        path = _ordinary_path(self.root, relative)
+        self.states[relative] = _file_state(path)
+        return path
+
+    def read(self, relative: str) -> bytes:
+        data = self.path(relative).read_bytes()
+        self.files[relative] = hashlib.sha256(data).hexdigest()
+        return data
 
 
 def _digest(stream: IO[bytes]) -> tuple[str, int]:
@@ -116,9 +133,8 @@ def _source_entries(archive: zipfile.ZipFile) -> dict[str, zipfile.ZipInfo]:
 
 
 def _verify_files(
-    snapshot: Path,
+    snapshot: _SnapshotContents,
     receipt: dict[str, object],
-    physical: dict[str, str],
     archive: zipfile.ZipFile | None,
 ) -> tuple[set[str], dict[str, bytes]]:
     entries = {} if archive is None else _source_entries(archive)
@@ -146,12 +162,12 @@ def _verify_files(
             with archive.open(archived) as stream:
                 digest, length = _digest(stream)
         elif path in {_PACKAGE_METADATA, "packages-lock.json"}:
-            metadata[path] = _read_payload(snapshot, path, physical)
-            digest, length = physical[path], len(metadata[path])
+            metadata[path] = snapshot.read(path)
+            digest, length = snapshot.files[path], len(metadata[path])
         else:
-            with _ordinary_path(snapshot, path).open("rb") as stream:
+            with snapshot.path(path).open("rb") as stream:
                 digest, length = _digest(stream)
-            physical[path] = digest
+            snapshot.files[path] = digest
         if length != _integer(file["Length"]) or digest != file["Sha256"]:
             raise ValueError(f"Test Framework evidence bytes differ: {path}")
     if entries:
@@ -164,21 +180,21 @@ def _verify_files(
 def verify(snapshot: Path, process_id: int) -> _VerifiedSnapshot:
     if (snapshot / "capture-error.txt").exists():
         raise ValueError("Test Framework source capture was incomplete.")
-    physical: dict[str, str] = {}
-    receipt = _object(json.loads(_read_payload(snapshot, "receipt.json", physical)))
+    contents = _SnapshotContents(snapshot)
+    receipt = _object(json.loads(contents.read("receipt.json")))
     schema = _integer(receipt["SchemaVersion"])
     if schema not in (2, 3) or process_id <= 0 or _integer(receipt["ProcessId"]) != process_id:
         raise ValueError("Test Framework snapshot does not match this Unity process/project.")
     if schema == 3:
         if receipt["SourceArchive"] != "sources.zip":
             raise ValueError("Malformed Test Framework source archive path.")
-        with _ordinary_path(snapshot, "sources.zip").open("rb") as stream:
-            physical["sources.zip"] = hashlib.file_digest(stream, "sha256").hexdigest()
+        with contents.path("sources.zip").open("rb") as stream:
+            contents.files["sources.zip"] = hashlib.file_digest(stream, "sha256").hexdigest()
             stream.seek(0)
             with zipfile.ZipFile(stream) as archive:
-                paths, metadata = _verify_files(snapshot, receipt, physical, archive)
+                paths, metadata = _verify_files(contents, receipt, archive)
     else:
-        paths, metadata = _verify_files(snapshot, receipt, physical, None)
+        paths, metadata = _verify_files(contents, receipt, None)
     source_count = sum(path.startswith("package/") and path.endswith(".cs") for path in paths)
     if source_count < 1 or source_count != _integer(receipt["SourceCount"]):
         raise ValueError("Test Framework source inventory is empty or incomplete.")
@@ -217,17 +233,47 @@ def verify(snapshot: Path, process_id: int) -> _VerifiedSnapshot:
         "version": version,
         "source": _string(receipt["PackageSource"]),
         "source_count": source_count,
-        "files": physical,
+        "files": contents.files,
+        "states": contents.states,
         "modules": modules,
     }
 
 
+def _assert_snapshot_states(value: object) -> None:
+    # Every initial state precedes its content read. A shared point exists after
+    # all content and CLR checks, before this pass starts, when all the observed
+    # file identities still match. A change to an earlier file during a later
+    # content read invalidates that common snapshot.
+    for directory, states in _object(value).items():
+        snapshot = Path(directory)
+        for relative, state in _object(states).items():
+            try:
+                actual = _file_state(_ordinary_path(snapshot, relative))
+            except (OSError, ValueError) as error:
+                raise ValueError(
+                    f"Test Framework evidence changed during verification: {snapshot / relative}"
+                ) from error
+            if list(actual) != state:
+                raise ValueError(
+                    f"Test Framework evidence changed during verification: {snapshot / relative}"
+                )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--process-id", type=int, required=True)
-    parser.add_argument("snapshot", type=Path)
+    modes = parser.add_mutually_exclusive_group(required=True)
+    modes.add_argument("--process-id", type=int)
+    modes.add_argument("--check-retained-state", action="store_true")
+    parser.add_argument("snapshot", type=Path, nargs="?")
     args = parser.parse_args()
     try:
+        if args.check_retained_state:
+            if args.snapshot is not None:
+                parser.error("--check-retained-state reads snapshot identities from stdin")
+            _assert_snapshot_states(json.load(sys.stdin.buffer))
+            return 0
+        if args.snapshot is None:
+            parser.error("--process-id requires a snapshot directory")
         verified = verify(args.snapshot, args.process_id)
     except (
         KeyError,

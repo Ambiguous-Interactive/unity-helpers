@@ -130,21 +130,24 @@ class FrameworkEvidenceTests(unittest.TestCase):
             raise AssertionError(build.stdout + build.stderr)
         cls.verifier = cls.root / "verify.ps1"
         cls.verifier.write_text(
-            r"""param([string]$Library, [string]$Directory, [int]$ExpectedProcessId, [string]$Project, [string]$ChangeAfterRead)
+            r"""param([string]$Library, [string]$Directory, [int]$ExpectedProcessId, [string]$Project, [string]$ChangeAfterRead, [switch]$AfterDigest)
             Set-StrictMode -Version Latest
             $ErrorActionPreference = 'Stop'
             . $Library
             if ($ChangeAfterRead) {
                 $script:Changed = $false
+                $script:TargetMatched = $false
                 function Get-FileHash {
                     [CmdletBinding()]
                     param([string[]]$LiteralPath, [IO.Stream]$InputStream, [string]$Algorithm)
                     if ($InputStream) {
-                        if (-not $script:Changed) {
+                        if (-not $script:Changed -and (-not $AfterDigest -or $script:TargetMatched)) {
                             [IO.File]::AppendAllText($ChangeAfterRead, 'changed')
                             $script:Changed = $true
                         }
-                        Microsoft.PowerShell.Utility\Get-FileHash -InputStream $InputStream -Algorithm $Algorithm
+                        $hash = Microsoft.PowerShell.Utility\Get-FileHash -InputStream $InputStream -Algorithm $Algorithm
+                        if ($InputStream.Name -ceq $ChangeAfterRead) { $script:TargetMatched = $true }
+                        $hash
                     } else {
                         Microsoft.PowerShell.Utility\Get-FileHash -LiteralPath $LiteralPath -Algorithm $Algorithm
                     }
@@ -286,6 +289,7 @@ class FrameworkEvidenceTests(unittest.TestCase):
         project: Path | None = None,
         *,
         change_after_read: Path | None = None,
+        after_digest: bool = False,
         recorded_revision: str | None = None,
     ) -> subprocess.CompletedProcess[str]:
         if process_id is None:
@@ -309,6 +313,7 @@ class FrameworkEvidenceTests(unittest.TestCase):
                 "-Project",
                 str(project or self.project),
                 *(["-ChangeAfterRead", str(change_after_read)] if change_after_read else []),
+                *(["-AfterDigest"] if after_digest else []),
             ],
             env=environment,
             capture_output=True,
@@ -674,6 +679,21 @@ class FrameworkEvidenceTests(unittest.TestCase):
             assert "[test-framework]" not in result.stdout
             assert path.read_bytes() == payload + b"changed"
             path.write_bytes(payload)
+        assert self.verify().returncode == 0
+
+    @unittest.skipIf(os.name == "nt", "Windows holds read shares through verification")
+    def test_posix_rejects_a_write_to_an_already_matched_file(self) -> None:
+        result = self.capture()
+        assert result.returncode == 0, result.stdout + result.stderr
+        receipt, _ = self.receipt()
+        manifest = receipt.parent / "manifest.json"
+        original = manifest.read_bytes()
+        result = self.verify(change_after_read=manifest, after_digest=True)
+        assert manifest.read_bytes() == original + b"changed"
+        assert result.returncode != 0
+        assert "Test Framework evidence changed during verification" in result.stderr
+        assert "[test-framework]" not in result.stdout
+        manifest.write_bytes(original)
         assert self.verify().returncode == 0
 
     def test_verifier_rejects_an_unrelated_recorded_checkout(self) -> None:
