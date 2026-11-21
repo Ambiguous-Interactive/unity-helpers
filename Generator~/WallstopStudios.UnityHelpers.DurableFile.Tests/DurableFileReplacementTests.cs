@@ -20,6 +20,8 @@ namespace WallstopStudios.UnityHelpers.DurableFile.Tests
     [NonParallelizable]
     public sealed class DurableFileReplacementTests
     {
+        private const int UnableToMoveReplacement = unchecked((int)0x80070498);
+        private const int UnableToMoveReplacementAfterBackup = unchecked((int)0x80070499);
         private const string ReplacementText = "replacement player data";
         private const string SliceWriteOperation = "WriteBytesSlice";
 
@@ -124,6 +126,26 @@ namespace WallstopStudios.UnityHelpers.DurableFile.Tests
                 : new NotSupportedException("Simulated unsupported atomic replacement.");
         }
 
+        private static IEnumerable<TestCaseData> WindowsPublicationFailureCases()
+        {
+            foreach (string operation in Operations)
+            {
+                yield return new TestCaseData(operation, UnableToMoveReplacement, false).SetName(
+                    $"WindowsReplacement.{operation}.KeepOriginal"
+                );
+                yield return new TestCaseData(
+                    operation,
+                    UnableToMoveReplacementAfterBackup,
+                    false
+                ).SetName($"WindowsReplacement.{operation}.RestoreBackup");
+                yield return new TestCaseData(
+                    operation,
+                    UnableToMoveReplacementAfterBackup,
+                    true
+                ).SetName($"WindowsReplacement.{operation}.PreserveBackupOnConflict");
+            }
+        }
+
         private static byte[] ExpectedBytes(string operation)
         {
             if (string.Equals(operation, nameof(Encoding.Unicode), StringComparison.Ordinal))
@@ -173,6 +195,7 @@ namespace WallstopStudios.UnityHelpers.DurableFile.Tests
         public void TearDown()
         {
             SimulatedFile.Reset();
+            RuntimeInformation.SimulateWindows = false;
             Directory.Delete(_directory, recursive: true);
         }
 
@@ -364,6 +387,10 @@ namespace WallstopStudios.UnityHelpers.DurableFile.Tests
             Assert.AreEqual(existingDestination ? 0 : 1, SimulatedFile.MoveCalls);
             Assert.AreEqual(0, SimulatedFile.DestinationDeleteCalls);
             AssertPublicationCleanup();
+            CollectionAssert.AreEquivalent(
+                new[] { _source, _destination },
+                Directory.GetFiles(_directory)
+            );
         }
 
         [TestCaseSource(nameof(UnsupportedCreationCases))]
@@ -456,6 +483,77 @@ namespace WallstopStudios.UnityHelpers.DurableFile.Tests
             Assert.AreEqual(0, SimulatedFile.DestinationDeleteCalls);
             Assert.AreEqual(0, SimulatedFile.MoveCalls);
             AssertPublicationCleanup();
+        }
+
+        [TestCaseSource(nameof(WindowsPublicationFailureCases))]
+        public async Task FailedWindowsReplacementPreservesPreviousBytes(
+            string operation,
+            int errorCode,
+            bool conflictingDestination
+        )
+        {
+            RuntimeInformation.SimulateWindows = true;
+            RealFile.WriteAllBytes(_destination, OriginalBytes);
+            IOException failure = new IOException("Simulated Windows rename refusal.", errorCode);
+            SimulatedFile.ReplacementFailure = failure;
+            string backup = null;
+            SimulatedFile.BeforeFailedReplacement = (destination, backupPath) =>
+            {
+                backup = backupPath;
+                if (errorCode == UnableToMoveReplacementAfterBackup)
+                {
+                    string movedOriginal = backupPath ?? Path.Combine(_directory, "native-backup");
+                    RealFile.Move(destination, movedOriginal);
+                }
+                else if (backupPath == null)
+                {
+                    RealFile.Delete(destination);
+                }
+
+                if (conflictingDestination)
+                {
+                    RealFile.WriteAllBytes(destination, ReplacementBytes);
+                }
+            };
+
+            Exception error = await Execute(operation);
+
+            Assert.Multiple(() =>
+            {
+                Assert.IsTrue(
+                    RealFile.Exists(_destination),
+                    "The previous save lost its destination."
+                );
+                Assert.IsNotNull(backup, "Replacement must request a Windows backup.");
+                Assert.AreEqual(1, SimulatedFile.ReplacementCalls);
+                Assert.AreEqual(0, SimulatedFile.DestinationDeleteCalls);
+                Assert.AreEqual(
+                    errorCode == UnableToMoveReplacement ? 0 : 1,
+                    SimulatedFile.MoveCalls
+                );
+                AssertPublicationCleanup();
+            });
+
+            if (conflictingDestination)
+            {
+                Assert.IsInstanceOf<IOException>(error);
+                StringAssert.Contains(backup, error.Message);
+                Assert.IsInstanceOf<AggregateException>(error.InnerException);
+                AggregateException details = (AggregateException)error.InnerException;
+                Assert.AreSame(failure, details.InnerExceptions[0]);
+                Assert.IsInstanceOf<IOException>(details.InnerExceptions[1]);
+                CollectionAssert.AreEqual(ReplacementBytes, RealFile.ReadAllBytes(_destination));
+                CollectionAssert.AreEqual(OriginalBytes, RealFile.ReadAllBytes(backup));
+                SimulatedFile.Reset();
+                Assert.IsNull(await Execute(operation));
+                CollectionAssert.AreEqual(OriginalBytes, RealFile.ReadAllBytes(backup));
+            }
+            else
+            {
+                Assert.AreSame(failure, error);
+                CollectionAssert.AreEqual(OriginalBytes, RealFile.ReadAllBytes(_destination));
+                Assert.IsFalse(RealFile.Exists(backup));
+            }
         }
 
         private async ValueTask<Exception> Execute(string operation)

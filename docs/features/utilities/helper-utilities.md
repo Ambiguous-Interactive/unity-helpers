@@ -1329,19 +1329,21 @@ cancelled append may have written part of its new record.
 
 **What it promises:**
 
-- On platforms with `File.Replace`, a reader sees either complete old or complete new contents.
+- A supported replacement publishes a complete file. If Windows moves the previous file aside and
+  then refuses replacement, the destination can be temporarily absent while `DurableFile` restores
+  it. If restoration fails, the error gives the path to the retained backup. Restoration leaves a
+  destination created by another writer in place.
 - Unsupported `File.Replace` reports failure and preserves the existing destination. Creating an absent
   destination still uses a move; subsequent replacements require platform support.
 - The data is forced out of the page cache before the swap makes it live.
 - Concurrent writes to the same path from your game are serialized.
-- Windows sharing violations and replacement error 1175 receive up to three replacement attempts with 10 ms and 20 ms waits. The staged bytes and ownership remain held through these attempts. Persistent contention reports failure and preserves the previous save. Other replacement failures propagate immediately.
+- Windows sharing violations and replacement error 1175 receive up to three replacement attempts with 10 ms and 20 ms waits. The staged bytes and ownership remain held through these attempts. Persistent contention reports failure and preserves the previous save.
 - A second process using the public `DurableFile` write, append, or delete APIs cannot change the same
   destination while the first operation owns it. Its competing operation reports failure.
 
 **What it does not promise:**
 
-- It is **not** full crash safety. .NET cannot flush a directory, so a filesystem may still reorder the
-  rename behind the data write.
+- Power loss can roll back a directory update even after the file data has been flushed.
 - The ownership applies to one destination at a time. It is not a transaction across several files.
 - Tools that do not use `DurableFile` do not share this ownership and can still edit a destination.
 - An internal compare-then-replace operation checks a file before staging its replacement, but
@@ -1381,8 +1383,10 @@ place, the call treats that step as failed. Calls through this helper coordinate
 within one process. Close the database and coordinate with other processes before
 moving the group. A process interruption can leave some files at their new names.
 
-A leftover `.tmp` sibling (`DurableFile.TemporarySuffix`) is what an interrupted write leaves behind; it is
-safe to ignore or delete.
+An interrupted write can leave a `.tmp` sibling (`DurableFile.TemporarySuffix`). You can discard that
+staged file once the writer has stopped. A Windows recovery backup has a separate name. If
+`DurableFile` reports a restore failure, keep the named backup until you recover the previous
+contents.
 `DurableFile.TryDelete` succeeds when a file is absent and reports failure for a directory or a file it cannot delete.
 
 ### Coalesce Repeated Saves

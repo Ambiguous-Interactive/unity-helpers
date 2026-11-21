@@ -8,8 +8,10 @@ This pure .NET NUnit project compiles the repository's actual
 rewrite, or inject test hooks into those production files.
 
 The project-local `File` type occupies the helper namespace only in this test assembly. It forwards
-filesystem calls to `System.IO.File`, except explicitly simulated `NotSupportedException`,
-`PlatformNotSupportedException`, and optional move failures. Tests perform real staging writes,
+filesystem calls to `System.IO.File` and simulates specific replacement and move failures.
+The test-local `RuntimeInformation` forwards platform queries to the host by default. The Windows
+failure cases select the Windows branch and model the on-disk outcomes that Microsoft documents
+for replacement errors 1176 and 1177. Tests perform real staging writes,
 flushes, ownership acquisition, cleanup, supported replacement, and creation on the host filesystem.
 These capability failures are controlled simulations, not evidence that a Unity player or native
 filesystem rejects atomic replacement.
@@ -19,11 +21,14 @@ Its arithmetic body follows [WallMath](../../Runtime/Core/Helper/WallMath.cs); i
 not the production math library under test. The real production semaphore and disposal leases remain
 linked. No Unity objects or Unity APIs are involved.
 
-The nonparallel fixture exercises seven public publication paths: text, encoded text, bytes, copy,
-async text, async bytes, and async copy. It checks both unsupported exception forms, whether a later
+The nonparallel fixture exercises eight public publication paths: text, encoded text, whole and
+ranged bytes, copy, async text, async bytes, and async copy. It checks both unsupported exception forms, whether a later
 move would succeed or fail, supported existing-file replacement, first creation, and supported retry
 following a rejected replacement. It asserts exact previous bytes, returned errors, absence of
-fallback deletion, staged-file cleanup, and release of staging ownership.
+fallback deletion, staged-file cleanup, and release of staging ownership. The Windows controls
+check that a failed replacement leaves the old file in place, restores the backup, or retains the
+backup when a competing destination blocks restoration. They also check that another write
+leaves the retained backup intact.
 
 `FileHelperInitializationTests` starts the same assembly as an isolated executable on 64-bit Linux.
 Its child lowers its own `RLIMIT_FSIZE` and ignores `SIGXFSZ` before calling the actual source-linked

@@ -15,8 +15,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     using WallstopStudios.UnityHelpers.Utils;
 
     /// <summary>
-    /// File writes that never leave a torn document behind, for player-owned data such as saves,
-    /// settings and ledgers.
+    /// Stages complete writes for player-owned data such as saves, settings and ledgers.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -26,20 +25,15 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     /// only then swaps the staged file over the destination.
     /// </para>
     /// <para>
-    /// <b>Scope — what this does and does not promise.</b>
-    /// It <b>does</b> stage and flush new contents before replacement. Where <c>File.Replace</c>
-    /// is supported, a reader observes either the complete previous contents or the complete new
-    /// ones. It <b>does</b> serialize concurrent operations on the same path within this process.
-    /// It is <b>not</b> full crash safety — .NET cannot flush a <i>directory</i>, so a filesystem
-    /// may still reorder the rename behind the data write. On platforms without
-    /// <c>File.Replace</c>, replacement reports failure and preserves the existing destination.
+    /// Each replacement publishes complete contents. Directory updates can still be lost on power
+    /// failure. Unsupported replacement reports failure and preserves the existing destination.
+    /// On Windows, a replacement uses a temporary backup of the previous file. If Windows
+    /// moves the previous file aside and then refuses publication, this helper tries to restore it.
+    /// If restoration fails, the returned error identifies the backup path.
     /// Windows sharing violations and inability to remove the replaced file receive up to three
     /// replacement attempts with 10 ms and 20 ms waits while retaining staged contents and ownership.
-    /// Persistent contention reports failure and preserves the existing destination.
-    /// Creating an absent destination remains supported. A second process using the public write,
-    /// append, or delete APIs cannot take ownership of the same destination while one of them is active; its operation
-    /// reports failure instead. This is ownership isolation, not a cross-process transaction or a
-    /// multi-file lock. Do not describe consumers of this type as crash-safe.
+    /// Creating an absent destination remains supported. Cooperating writes, appends, and deletes
+    /// serialize per destination in this process and refuse concurrent ownership across processes.
     /// </para>
     /// <para>
     /// Where the format allows a log of records, <see cref="TryAppendAllText"/> is strictly stronger
@@ -72,6 +66,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         private const int GateCount = 32;
         private const int SharingViolationHResult = unchecked((int)0x80070020);
         private const int UnableToRemoveReplacedHResult = unchecked((int)0x80070497);
+        private const int UnableToMoveReplacementAfterBackupHResult = unchecked((int)0x80070499);
         private const int ReplacementAttemptLimit = 3;
         private const int ReplacementRetryDelayMilliseconds = 10;
 
@@ -1907,11 +1902,24 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         private static void Replace(string temporaryPath, string path)
         {
+            string backupPath = null;
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                // ReplaceFileW can remove the destination on error 1176 when no backup is requested.
+                string directory = Path.GetDirectoryName(path) ?? string.Empty;
+                string backupName = $".{Guid.NewGuid():N}.bak";
+                backupPath = Path.Combine(directory, backupName);
+            }
+
             for (int attempt = 1; ; ++attempt)
             {
                 try
                 {
-                    File.Replace(temporaryPath, path, destinationBackupFileName: null);
+                    File.Replace(temporaryPath, path, backupPath);
+                    if (backupPath != null)
+                    {
+                        DiscardStagedFile(backupPath);
+                    }
                     return;
                 }
                 catch (IOException failure)
@@ -1924,6 +1932,25 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 {
                     // These Windows errors retain both names, so the same staged bytes can be retried.
                     Thread.Sleep(ReplacementRetryDelayMilliseconds * attempt);
+                }
+                catch (IOException failure)
+                    when (backupPath != null
+                        && failure.HResult == UnableToMoveReplacementAfterBackupHResult
+                    )
+                {
+                    try
+                    {
+                        File.Move(backupPath, path);
+                    }
+                    catch (Exception restoreFailure)
+                    {
+                        AggregateException details = new(failure, restoreFailure);
+                        throw new IOException(
+                            $"Could not restore the previous file from '{backupPath}'.",
+                            details
+                        );
+                    }
+                    throw;
                 }
                 catch (FileNotFoundException)
                 {
