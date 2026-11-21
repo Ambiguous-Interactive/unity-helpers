@@ -6,8 +6,10 @@ import argparse
 import hashlib
 import json
 import re
+import shutil
 import stat
 import sys
+import tempfile
 import zipfile
 from pathlib import Path, PurePosixPath
 from typing import IO, TypedDict, cast
@@ -100,6 +102,8 @@ class _SnapshotContents:
         self.states: dict[str, tuple[int, int, int, int, int]] = {}
 
     def path(self, relative: str) -> Path:
+        if relative in self.states:
+            raise ValueError(f"Duplicate physical Test Framework evidence path: {relative}")
         path = _ordinary_path(self.root, relative)
         self.states[relative] = _file_state(path)
         return path
@@ -188,10 +192,14 @@ def verify(snapshot: Path, process_id: int) -> _VerifiedSnapshot:
     if schema == 3:
         if receipt["SourceArchive"] != "sources.zip":
             raise ValueError("Malformed Test Framework source archive path.")
-        with contents.path("sources.zip").open("rb") as stream:
-            contents.files["sources.zip"] = hashlib.file_digest(stream, "sha256").hexdigest()
-            stream.seek(0)
-            with zipfile.ZipFile(stream) as archive:
+        with tempfile.SpooledTemporaryFile(max_size=1024 * 1024) as retained:
+            # The archive digest and decompressed members must come from the same bytes.
+            with contents.path("sources.zip").open("rb") as stream:
+                shutil.copyfileobj(stream, retained)
+            retained.seek(0)
+            contents.files["sources.zip"], _ = _digest(retained)
+            retained.seek(0)
+            with zipfile.ZipFile(retained) as archive:
                 paths, metadata = _verify_files(contents, receipt, archive)
     else:
         paths, metadata = _verify_files(contents, receipt, None)

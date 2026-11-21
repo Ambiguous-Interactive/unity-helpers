@@ -399,6 +399,13 @@ jobs:
         shell: pwsh
         run: npm run test:unity-test-filter
 
+      - name: Verify loaded framework evidence on Windows
+        if: matrix.phase == 'orchestration'
+        shell: pwsh
+        run: >-
+          uv run --project scripts/python~ --locked pytest scripts/tests/test-unity-framework-evidence.py -q
+          -k "archive_cannot_register or identical_bytes_cannot_replace or persistent_changes_after_python_verification"
+
   assembly-tools-windows:
     name: Assembly tools (Windows)
     needs: windows-tool-phases

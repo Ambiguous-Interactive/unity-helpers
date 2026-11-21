@@ -21,6 +21,7 @@ class EvidenceFile(TypedDict):
     OriginalPath: str
     Path: str
     Sha256: str
+    Length: int
 
 
 class AssemblyIdentity(TypedDict):
@@ -130,7 +131,7 @@ class FrameworkEvidenceTests(unittest.TestCase):
             raise AssertionError(build.stdout + build.stderr)
         cls.verifier = cls.root / "verify.ps1"
         cls.verifier.write_text(
-            r"""param([string]$Library, [string]$Directory, [int]$ExpectedProcessId, [string]$Project, [string]$ChangeAfterRead, [switch]$AfterDigest)
+            r"""param([string]$Library, [string]$Directory, [int]$ExpectedProcessId, [string]$Project, [string]$ChangeAfterRead, [switch]$AfterDigest, [switch]$ReplaceFile)
             Set-StrictMode -Version Latest
             $ErrorActionPreference = 'Stop'
             . $Library
@@ -142,7 +143,13 @@ class FrameworkEvidenceTests(unittest.TestCase):
                     param([string[]]$LiteralPath, [IO.Stream]$InputStream, [string]$Algorithm)
                     if ($InputStream) {
                         if (-not $script:Changed -and (-not $AfterDigest -or $script:TargetMatched)) {
-                            [IO.File]::AppendAllText($ChangeAfterRead, 'changed')
+                            if ($ReplaceFile) {
+                                $replacement = "$ChangeAfterRead.replacement"
+                                [IO.File]::Copy($ChangeAfterRead, $replacement)
+                                [IO.File]::Move($replacement, $ChangeAfterRead, $true)
+                            } else {
+                                [IO.File]::AppendAllText($ChangeAfterRead, 'changed')
+                            }
                             $script:Changed = $true
                         }
                         $hash = Microsoft.PowerShell.Utility\Get-FileHash -InputStream $InputStream -Algorithm $Algorithm
@@ -290,6 +297,7 @@ class FrameworkEvidenceTests(unittest.TestCase):
         *,
         change_after_read: Path | None = None,
         after_digest: bool = False,
+        replace_file: bool = False,
         recorded_revision: str | None = None,
     ) -> subprocess.CompletedProcess[str]:
         if process_id is None:
@@ -314,6 +322,7 @@ class FrameworkEvidenceTests(unittest.TestCase):
                 str(project or self.project),
                 *(["-ChangeAfterRead", str(change_after_read)] if change_after_read else []),
                 *(["-AfterDigest"] if after_digest else []),
+                *(["-ReplaceFile"] if replace_file else []),
             ],
             env=environment,
             capture_output=True,
@@ -383,6 +392,25 @@ class FrameworkEvidenceTests(unittest.TestCase):
                     with self.assertWarns(UserWarning):
                         archive.writestr(next(iter(entries)), b"// duplicate")
             assert self.verify().returncode != 0, mode
+
+    def test_archive_cannot_register_as_a_second_physical_input(self) -> None:
+        self.capture()
+        path, receipt = self.receipt()
+        archive = path.parent / receipt["SourceArchive"]
+        payload = archive.read_bytes()
+        receipt["Files"].append(
+            {
+                "Path": archive.name,
+                "OriginalPath": archive.name,
+                "Length": len(payload),
+                "Sha256": hashlib.sha256(payload).hexdigest(),
+            }
+        )
+        path.write_text(json.dumps(receipt))
+        result = self.verify()
+        assert result.returncode != 0
+        assert "Duplicate physical Test Framework evidence path" in result.stderr
+        assert "[test-framework]" not in result.stdout
 
     def test_archive_path_cannot_escape_snapshot(self) -> None:
         self.capture()
@@ -695,6 +723,19 @@ class FrameworkEvidenceTests(unittest.TestCase):
         assert "[test-framework]" not in result.stdout
         manifest.write_bytes(original)
         assert self.verify().returncode == 0
+
+    def test_identical_bytes_cannot_replace_an_already_observed_file(self) -> None:
+        self.capture()
+        receipt, _ = self.receipt()
+        manifest = receipt.parent / "manifest.json"
+        original = manifest.read_bytes()
+        inode = manifest.stat().st_ino
+        result = self.verify(change_after_read=manifest, replace_file=True)
+        assert manifest.read_bytes() == original
+        assert manifest.stat().st_ino != inode
+        assert result.returncode != 0
+        assert "Test Framework evidence changed during verification" in result.stderr
+        assert "[test-framework]" not in result.stdout
 
     def test_verifier_rejects_an_unrelated_recorded_checkout(self) -> None:
         result = self.capture()

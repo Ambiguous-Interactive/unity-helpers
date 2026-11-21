@@ -102,12 +102,10 @@ function Assert-UnityTestFrameworkEvidence {
                 throw 'Test Framework source capture was incomplete.'
             }
         }
-        if (-not $IsWindows) {
-            # Bind the checked bytes to one snapshot after every content and CLR read.
-            $receipt = ConvertTo-Json -InputObject $retainedStates -Depth 5 -Compress -EscapeHandling EscapeNonAscii
-            $output = @($receipt | & $uv @arguments --check-retained-state 2>&1)
-            if ($LASTEXITCODE -ne 0) { throw ($output -join [Environment]::NewLine) }
-        }
+        # Bind all checked bytes to the same snapshot before reporting success.
+        $receipt = ConvertTo-Json -InputObject $retainedStates -Depth 5 -Compress -EscapeHandling EscapeNonAscii
+        $output = @($receipt | & $uv @arguments --check-retained-state 2>&1)
+        if ($LASTEXITCODE -ne 0) { throw ($output -join [Environment]::NewLine) }
         if ((Get-UnityFrameworkVerifierIdentity -Repository $repository) -cne $toolIdentity) {
             throw 'The Test Framework verifier checkout changed during verification.'
         }
