@@ -137,6 +137,11 @@ inputs and exit codes for local callers and requires uv. PowerShell still launch
 Windows Unity and manages the native job and license lifecycle. The workflow contract
 tests still check which steps supply each outcome.
 
+WProto qualification uses the locked Python strict evidence reader for NUnit and TRX reports.
+The reader requires passed cases, matching summaries, and exact case identities. The existing
+PowerShell command still returns the same case and run objects to the acceptance runner and host
+collector. PowerShell owns process execution, artifact provenance, and receipt validation.
+
 The approved organization policy requires a static version axis to prove matching editor setup
 and license return. The workflow retains that literal universe and uses
 [matrix exclusions](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idstrategymatrixexclude)

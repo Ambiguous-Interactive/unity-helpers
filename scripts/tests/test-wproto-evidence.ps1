@@ -103,7 +103,8 @@ function New-ControlFixture {
     if ($LASTEXITCODE -ne 0) { throw 'Cannot create isolated empty control commit.' }
     $revision = (& git -C $root rev-parse HEAD) -join ''
     [void][IO.Directory]::CreateDirectory((Join-Path $root 'Editor'))
-    foreach ($relative in @('scripts/unity/frozen_files.py', 'scripts/unity/lib/source-census-python.ps1', 'scripts/python~/pyproject.toml', 'scripts/python~/uv.lock')) {
+    foreach ($relative in @('scripts/unity/frozen_files.py', 'scripts/unity/lib/source-census-python.ps1',
+            'scripts/unity/lib/test-result-evidence.ps1', 'scripts/unity/test_result_evidence.py', 'scripts/python~/pyproject.toml', 'scripts/python~/uv.lock')) {
         $target = Join-Path $root $relative
         [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($target))
         [IO.File]::Copy((Join-Path $repository $relative), $target)
@@ -252,6 +253,42 @@ try {
     $accepted = Assert-WProtoEvidence $fixture.Root $fixture.Receipt 'synthetic-receipt-control'
     if ($accepted.fixtureEvidenceAccepted -ne 3 -or $accepted.completeCatalogQualified -ne $false -or $accepted.unboundFixtures.Count -ne 0) { throw 'Positive synthetic receipt control did not preserve partial qualification.' }
     ++$checks
+    # Give the alternate checkout honest snapshots of each divergent input.
+    foreach ($relative in @('scripts/unity/lib/test-result-evidence.ps1', 'scripts/unity/test_result_evidence.py',
+            'scripts/python~/pyproject.toml', 'scripts/python~/uv.lock')) {
+        $tool = Join-Path $fixture.Root $relative
+        [IO.File]::AppendAllText($tool, "`n# alternate checkout evidence tool`n")
+        $fixture.Record.sourceFiles = @(Get-WProtoSourceInventory $fixture.Root)
+        $fixture.Record.sourceFilesAfterRun = $fixture.Record.sourceFiles
+        Write-ControlJson $fixture.Receipt $fixture.Record
+        $refused = $false
+        try { Assert-WProtoEvidence $fixture.Root $fixture.Receipt 'synthetic-receipt-control' | Out-Null }
+        catch { $refused = $_.Exception.Message -clike "*evidence reader differs*$relative" }
+        if (-not $refused) { throw "A receipt accepted different tool bytes: $relative" }
+        ++$checks
+        Restore-ControlFixture
+    }
+    $readEvidence = ${function:Read-TestResultEvidence}
+    foreach ($changed in @('source', 'report')) {
+        $refused = & {
+            function Read-TestResultEvidence {
+                param([string]$Path, [string]$Format, [string]$RepositoryRoot)
+                $result = & $readEvidence @PSBoundParameters
+                $target = if ($changed -ceq 'source') { Join-Path $RepositoryRoot 'scripts/unity/test_result_evidence.py' }
+                else { $Path }
+                [IO.File]::AppendAllText($target, "`n")
+                return $result
+            }
+            try { Assert-WProtoEvidence $fixture.Root $fixture.Receipt 'synthetic-receipt-control' | Out-Null; $false }
+            catch {
+                if ($changed -ceq 'source') { $_.Exception.Message -ceq 'Source inventory differs.' }
+                else { $_.Exception.Message -clike 'Artifact changed:*' }
+            }
+        }
+        if (-not $refused) { throw "Qualification accepted $changed changes while reading the result." }
+        ++$checks
+        Restore-ControlFixture
+    }
     $mutations = @(
         @{ Name = 'wrong invocation'; Change = { param($f) $f.Record.runId = 'another-run' } },
         @{ Name = 'wrong build command'; Change = { param($f) $f.Record.build.arguments = @('--version') } },

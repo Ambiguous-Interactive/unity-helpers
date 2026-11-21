@@ -318,9 +318,9 @@ function Assert-WProtoEvidence {
     if ($record.catalogSha256 -cne (Get-WProtoFileHash $model.catalogPath) -or $record.bindingsSha256 -cne (Get-WProtoFileHash $model.bindingsPath)) { throw 'Catalog or case bindings changed.' }
     $revision = (& git -C $Root rev-parse HEAD) -join ''
     if ($LASTEXITCODE -ne 0 -or $revision -cne $record.sourceRevision) { throw 'Source revision differs.' }
-    $currentSources = @(Get-WProtoSourceInventory $Root)
+    $sourceSnapshot = ConvertTo-Json -InputObject @(Get-WProtoSourceInventory $Root) -Depth 5 -Compress
     foreach ($snapshot in @('sourceFiles', 'sourceFilesAfterRun')) {
-        if ((ConvertTo-Json -InputObject $currentSources -Depth 5 -Compress) -cne (ConvertTo-Json -InputObject $record[$snapshot] -Depth 5 -Compress)) { throw 'Source inventory differs.' }
+        if ($sourceSnapshot -cne (ConvertTo-Json -InputObject $record[$snapshot] -Depth 5 -Compress)) { throw 'Source inventory differs.' }
     }
     foreach ($field in @('backend', 'profile', 'oracle', 'configuration', 'sdkVersion')) { Assert-WProtoString $record.environment[$field] "environment.$field" }
     $lane = @($model.catalog.lanes | Where-Object { $_.id -ceq $record.lane })
@@ -379,7 +379,7 @@ function Assert-WProtoEvidence {
     if ([IO.File]::ReadAllText($record.sdkLog.path).Trim() -cne $record.environment.sdkVersion) { throw 'SDK identity differs from its observation.' }
     $testBinaries = @($record.binaries | Where-Object { $_.role -ceq 'test-assembly' })
     if ($testBinaries.Count -ne 1) { throw 'Exactly one test assembly is required.' }
-    $result = Read-TestResultEvidence -Path $record.results.path -Format $record.results.format
+    $result = Read-TestResultEvidence -Path $record.results.path -Format $record.results.format -RepositoryRoot $Root
     $resultStarted = [DateTimeOffset]::Parse($result.StartedUtc)
     $resultEnded = [DateTimeOffset]::Parse($result.CompletedUtc)
     if ([string]::IsNullOrWhiteSpace($result.RunId) -or $result.RunId -cne $record.resultRunId -or $resultStarted -lt $started -or $resultStarted -gt $resultEnded -or $resultEnded -gt $ended) { throw 'Results do not belong to the observed process.' }
@@ -403,6 +403,8 @@ function Assert-WProtoEvidence {
     }
     $missing = @($model.bindings.fixtures | Where-Object { @($_.lanes | Where-Object { $_.lane -ceq $record.lane -and $_.status -ceq 'missing-discovery' }).Count -gt 0 })
     $unbound = @($result.Cases | Where-Object { $_.Fixture -cnotin @($fixtures.fixture) } | Select-Object -ExpandProperty Fixture -Unique)
+    if ((ConvertTo-Json -InputObject @(Get-WProtoSourceInventory $Root) -Depth 5 -Compress) -cne $sourceSnapshot) { throw 'Source inventory differs.' }
+    if ((Get-WProtoFileHash $record.results.path) -cne $record.results.sha256) { throw "Artifact changed: $($record.results.path)" }
     return [ordered]@{ runId = $RunId; lane = $record.lane; fixtureEvidenceAccepted = $fixtures.Count; missingFixtureDiscovery = $missing.Count; unboundFixtures = $unbound; processObservation = $process.observationScope; completeCatalogQualified = $false }
 }
 

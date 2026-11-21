@@ -21,6 +21,18 @@ function Read-Control {
     Read-TestResultEvidence -Path $path -Format $Format
 }
 
+function Read-DirectControl {
+    param([string]$Path, [string]$Format)
+
+    $arguments = @(
+        'run', '--quiet', '--project', (Join-Path $PSScriptRoot '../python~'), '--locked', '--no-dev',
+        'python', (Join-Path $PSScriptRoot '../unity/test_result_evidence.py'), '--format', $Format, '--', $Path
+    )
+    $PSNativeCommandUseErrorActionPreference = $false
+    $output = @(& uv @arguments 2>&1)
+    return [pscustomobject]@{ ExitCode = $LASTEXITCODE; Output = $output }
+}
+
 function Assert-Rejected {
     param([string]$Content, [string]$Format, [string]$Name)
     $rejected = $false
@@ -135,6 +147,40 @@ try {
         try { Read-TestResultEvidence -Path $path -Format NUnit | Out-Null } catch { $rejected = $true }
         Assert-Control $rejected 'reject oversized, directory and missing artifact paths'
     }
+    foreach ($format in @('NUnit', 'Trx')) {
+        $path = Join-Path $temporary "direct [evidence].$format"
+        $content = if ($format -ceq 'NUnit') { $nunit } else { $trx }
+        [IO.File]::WriteAllText($path, $content, [Text.UTF32Encoding]::new($true, $true, $true))
+        $compatibility = Read-TestResultEvidence -Path $path -Format $format
+        $direct = Read-DirectControl $path $format
+        $expected = ConvertTo-Json -InputObject $compatibility -Depth 5 -Compress
+        Assert-Control ($direct.ExitCode -eq 0 -and $direct.Output.Count -eq 1 -and
+            $direct.Output[0] -ceq $expected) "$format direct CLI and compatibility object agree for UTF-32"
+        $utf32 = [Text.UTF32Encoding]::new($true, $true, $true)
+        [IO.File]::WriteAllText($path, '<?xml version="1.0" encoding="UTF-32"?>' + $content, $utf32)
+        $direct = Read-DirectControl $path $format
+        Assert-Control ($direct.ExitCode -eq 0 -and $direct.Output.Count -eq 1 -and
+            $direct.Output[0] -ceq $expected) "$format declared UTF-32 returns the same evidence"
+        foreach ($encoding in @('bogus-encoding', 'UTF-8')) {
+            [IO.File]::WriteAllText($path, ('<?xml version="1.0" encoding="' + $encoding + '"?>' + $content), $utf32)
+            $direct = Read-DirectControl $path $format
+            Assert-Control ($direct.ExitCode -eq 1 -and
+                @($direct.Output | Where-Object { $_ -is [string] }).Count -eq 0) "$format rejects conflicting or unknown UTF-32 declarations"
+        }
+        [IO.File]::WriteAllText($path, $content.Replace('total="2"', 'total="0"'))
+        $direct = Read-DirectControl $path $format
+        Assert-Control ($direct.ExitCode -eq 1 -and
+            @($direct.Output | Where-Object { $_ -is [string] }).Count -eq 0 -and
+            ($direct.Output -join '') -clike '*summary differs from passed cases: total.*') "$format direct CLI rejects bad totals without a result"
+    }
+    $path = Join-Path $temporary 'shift-jis.xml'
+    $name = 'Legacy.' + [char]0x65e5 + [char]0x672c + [char]0x2460 + [char]0xff5e
+    $shiftJis = [Text.Encoding]::GetEncoding(932)
+    [IO.File]::WriteAllText($path, '<?xml version="1.0" encoding="Shift_JIS"?>' +
+        $legacy.Replace('Legacy.Case', $name), $shiftJis)
+    $observed = Read-TestResultEvidence -Path $path -Format NUnit
+    Assert-Control ($observed.Cases.Count -eq 1 -and $observed.Cases[0].FullName -ceq $name) 'declared Shift JIS preserves case identity'
+    Assert-Rejected ('<?xml version="1.0" encoding="UTF-7"?>' + $legacy) NUnit 'UTF-7 stays disabled'
     Write-Host "Test result evidence controls passed: $checks"
 } finally {
     Remove-Item -LiteralPath $temporary -Recurse -Force
