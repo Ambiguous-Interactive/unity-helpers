@@ -130,10 +130,26 @@ class FrameworkEvidenceTests(unittest.TestCase):
             raise AssertionError(build.stdout + build.stderr)
         cls.verifier = cls.root / "verify.ps1"
         cls.verifier.write_text(
-            """param([string]$Library, [string]$Directory, [int]$ExpectedProcessId, [string]$Project)
+            r"""param([string]$Library, [string]$Directory, [int]$ExpectedProcessId, [string]$Project, [string]$ChangeAfterRead)
             Set-StrictMode -Version Latest
             $ErrorActionPreference = 'Stop'
             . $Library
+            if ($ChangeAfterRead) {
+                $script:Changed = $false
+                function Get-FileHash {
+                    [CmdletBinding()]
+                    param([string[]]$LiteralPath, [IO.Stream]$InputStream, [string]$Algorithm)
+                    if ($InputStream) {
+                        if (-not $script:Changed) {
+                            [IO.File]::AppendAllText($ChangeAfterRead, 'changed')
+                            $script:Changed = $true
+                        }
+                        Microsoft.PowerShell.Utility\Get-FileHash -InputStream $InputStream -Algorithm $Algorithm
+                    } else {
+                        Microsoft.PowerShell.Utility\Get-FileHash -LiteralPath $LiteralPath -Algorithm $Algorithm
+                    }
+                }
+            }
             Assert-UnityTestFrameworkEvidence -Directory $Directory -ProcessId $ExpectedProcessId -Project $Project
         """
         )
@@ -265,11 +281,19 @@ class FrameworkEvidenceTests(unittest.TestCase):
             (receipt_path.parent / entry["Path"]).write_bytes(payload)
 
     def verify(
-        self, process_id: int | None = None, project: Path | None = None
+        self,
+        process_id: int | None = None,
+        project: Path | None = None,
+        *,
+        change_after_read: Path | None = None,
+        recorded_revision: str | None = None,
     ) -> subprocess.CompletedProcess[str]:
         if process_id is None:
             _, receipt = self.receipt()
             process_id = receipt["ProcessId"]
+        environment = self.environment.copy()
+        if recorded_revision is not None:
+            environment["GITHUB_SHA"] = recorded_revision
         return subprocess.run(
             [
                 require_tool("pwsh"),
@@ -284,7 +308,9 @@ class FrameworkEvidenceTests(unittest.TestCase):
                 str(process_id),
                 "-Project",
                 str(project or self.project),
+                *(["-ChangeAfterRead", str(change_after_read)] if change_after_read else []),
             ],
+            env=environment,
             capture_output=True,
             text=True,
             check=False,
@@ -630,6 +656,33 @@ class FrameworkEvidenceTests(unittest.TestCase):
                     )
             else:
                 assert result.returncode != 0, control
+
+    def test_persistent_changes_after_python_verification_are_refused(self) -> None:
+        result = self.capture()
+        assert result.returncode == 0, result.stdout + result.stderr
+        receipt, _ = self.receipt()
+        for relative in (
+            "manifest.json",
+            "sources.zip",
+            "assemblies/nunit.framework.dll",
+        ):
+            path = receipt.parent / relative
+            payload = path.read_bytes()
+            result = self.verify(change_after_read=path)
+            assert result.returncode != 0
+            assert "Test Framework evidence changed during verification" in result.stderr
+            assert "[test-framework]" not in result.stdout
+            assert path.read_bytes() == payload + b"changed"
+            path.write_bytes(payload)
+        assert self.verify().returncode == 0
+
+    def test_verifier_rejects_an_unrelated_recorded_checkout(self) -> None:
+        result = self.capture()
+        assert result.returncode == 0, result.stdout + result.stderr
+        result = self.verify(recorded_revision="0" * 40)
+        assert result.returncode != 0
+        assert "verifier checkout does not match" in result.stderr
+        assert "[test-framework]" not in result.stdout
 
     def test_no_snapshot_is_not_success(self) -> None:
         self.output.mkdir()
