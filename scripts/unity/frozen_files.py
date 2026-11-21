@@ -52,6 +52,7 @@ HOST_GIT_INPUTS = (
     "scripts/verify-wproto-evidence.ps1",
     "scripts/run-wproto-evidence.ps1",
     "scripts/unity/lib/test-result-evidence.ps1",
+    "scripts/unity/test_result_evidence.py",
     "scripts/unity/lib/catastrophic-patterns.ps1",
 )
 HOST_TOOL_INPUTS = (
