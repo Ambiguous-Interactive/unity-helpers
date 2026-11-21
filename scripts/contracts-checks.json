@@ -656,7 +656,11 @@
     "id": "il2cpp-conversion-inputs",
     "name": "IL2CPP conversion input controls",
     "run": "npm run test:il2cpp-conversion-inputs",
-    "inputs": ["@tooling", "scripts/tests/test-il2cpp-conversion-inputs.ps1"]
+    "inputs": [
+      "@tooling",
+      "scripts/tests/test-il2cpp-conversion-inputs.ps1",
+      "scripts/tests/test_player_manifest.py"
+    ]
   },
   {
     "id": "unity-grouped-modes",
