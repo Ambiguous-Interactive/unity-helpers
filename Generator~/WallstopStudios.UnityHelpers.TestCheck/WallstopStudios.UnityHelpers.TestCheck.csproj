@@ -17,7 +17,7 @@
     WHAT IT DOES NOT COVER, deliberately:
 
       1. Everything `typecheck:unity` excludes, for the same reasons (uGUI, the DI integrations),
-         and the five fixtures that drive them: EnhancedImageTests, the two
+         and the six fixtures that drive them: EnhancedImageTests, NonDrawingGraphicTests, the two
          MatchColliderToSprite fixtures, UnityExtensionsComprehensiveTests and PointerCameraFallbackTests.
       2. Editor tests. They need UnityEditor, which the reference assemblies do not carry.
       3. The test framework's BEHAVIOUR. `UnityEngine.TestTools` ships with Unity's test framework
@@ -157,7 +157,7 @@
     />
     <Compile
       Include="$(RepoRoot)/Runtime/**/*.cs"
-      Exclude="$(RepoRoot)/Runtime/Integrations/**/*.cs;$(RepoRoot)/Runtime/Analyzers/**/*.cs;$(RepoRoot)/Runtime/Core/Extension/Partials/UI.cs;$(RepoRoot)/Runtime/Utils/MatchColliderToSprite.cs;$(RepoRoot)/Runtime/Visuals/UGUI/EnhancedImage.cs"
+      Exclude="$(RepoRoot)/Runtime/Integrations/**/*.cs;$(RepoRoot)/Runtime/Analyzers/**/*.cs;$(RepoRoot)/Runtime/Core/Extension/Partials/UI.cs;$(RepoRoot)/Runtime/Utils/MatchColliderToSprite.cs;$(RepoRoot)/Runtime/Visuals/UGUI/EnhancedImage.cs;$(RepoRoot)/Runtime/Visuals/UGUI/NonDrawingGraphic.cs"
     />
     <!-- `Tests/Core/Editor/**` is excluded to make the header's third exclusion TRUE rather than
          approximately true. Those four fixtures are `WallstopStudios.UnityHelpers.Tests.Core.Editor`,
@@ -173,7 +173,7 @@
     <Compile
       Condition="'$(WallstopIterationTestSources)' == ''"
       Include="$(RepoRoot)/Tests/Runtime/**/*.cs"
-      Exclude="$(RepoRoot)/Tests/Runtime/Integrations/**/*.cs;$(RepoRoot)/Tests/Runtime/Visuals/EnhancedImageTests.cs;$(RepoRoot)/Tests/Runtime/Utils/MatchColliderToSpriteTests.cs;$(RepoRoot)/Tests/Runtime/Utils/MatchColliderToSpriteAdditionalTests.cs;$(RepoRoot)/Tests/Runtime/Extensions/UnityExtensionsComprehensiveTests.cs;$(RepoRoot)/Tests/Runtime/Extensions/PointerCameraFallbackTests.cs"
+      Exclude="$(RepoRoot)/Tests/Runtime/Integrations/**/*.cs;$(RepoRoot)/Tests/Runtime/Visuals/EnhancedImageTests.cs;$(RepoRoot)/Tests/Runtime/Visuals/NonDrawingGraphicTests.cs;$(RepoRoot)/Tests/Runtime/Utils/MatchColliderToSpriteTests.cs;$(RepoRoot)/Tests/Runtime/Utils/MatchColliderToSpriteAdditionalTests.cs;$(RepoRoot)/Tests/Runtime/Extensions/UnityExtensionsComprehensiveTests.cs;$(RepoRoot)/Tests/Runtime/Extensions/PointerCameraFallbackTests.cs"
     />
   </ItemGroup>
   <!--

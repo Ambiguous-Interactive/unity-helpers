@@ -5,6 +5,7 @@
 - **AnimatedSpriteLayer**: Data structure for packaging sprite animation frames with per-frame offsets and transparency
 - **LayeredImage**: UI Toolkit element that composites multiple sprite animation layers into a single animated image
 - **EnhancedImage**: Extended Unity UI Image with HDR color support and shape masking
+- **NonDrawingGraphic**: Rectangular or circular hit areas for uGUI controls drawn elsewhere
 
 These components solve the problem of creating complex, multi-layer sprite animations without pre-rendering every combination into massive sprite sheets.
 
@@ -487,6 +488,21 @@ image.HdrColor = new Color(2f, 0.5f, 0.1f, 1f); // RGB values > 1 for bloom
 // Shape mask
 image.shapeMask = myMaskTexture; // Black areas are transparent
 ```
+
+---
+
+## NonDrawingGraphic (uGUI)
+
+Use `NonDrawingGraphic` to receive pointer events over artwork drawn by another component.
+Add it under a Canvas with a `GraphicRaycaster`, leave **Raycast Target** enabled, and attach
+a `Button` or another pointer event handler to the target.
+
+- **Rect** accepts the entire local `RectTransform` and is the default.
+- **Inscribed Circle** accepts the centered circle whose diameter is the rectangle's shorter side.
+
+The target follows the transform and the Canvas's usual raycast order and group rules. It
+does not bind material or generate vertices. Set **Shape** in the Inspector or assign
+`NonDrawingGraphic.HitShape.InscribedCircle` to the component's `Shape` property.
 
 ---
 

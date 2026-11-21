@@ -23,9 +23,9 @@
 
     WHAT IT DOES NOT COVER, deliberately and explicitly:
 
-      1. Three uGUI-dependent files (UI.cs, MatchColliderToSprite.cs, EnhancedImage.cs).
+      1. Four uGUI-dependent files (UI.cs, MatchColliderToSprite.cs, EnhancedImage.cs, NonDrawingGraphic.cs).
          UnityEngine.UI ships as a Unity package (com.unity.ugui) with no NuGet equivalent, and those
-         three are UI utilities with no serialization role. `ColorBlock` IS shimmed, because
+         four are UI utilities with no serialization role. `ColorBlock` IS shimmed, because
          Serializer reaches it through ColorBlockConverter.
       2. The three Integrations assemblies, each its own asmdef gated on a third-party DI package.
          That exclusion is inherited verbatim by EditorCheck, TestCheck and EditorTestCheck, so for
@@ -185,7 +185,7 @@
     <!-- The main runtime asmdef's scope, minus the exclusions documented at the top. -->
     <Compile
       Include="$(RepoRoot)/Runtime/**/*.cs"
-      Exclude="$(RepoRoot)/Runtime/TestSupport/**/*.cs;$(RepoRoot)/Runtime/Integrations/**/*.cs;$(RepoRoot)/Runtime/Analyzers/**/*.cs;$(RepoRoot)/Runtime/Core/Extension/Partials/UI.cs;$(RepoRoot)/Runtime/Utils/MatchColliderToSprite.cs;$(RepoRoot)/Runtime/Visuals/UGUI/EnhancedImage.cs"
+      Exclude="$(RepoRoot)/Runtime/TestSupport/**/*.cs;$(RepoRoot)/Runtime/Integrations/**/*.cs;$(RepoRoot)/Runtime/Analyzers/**/*.cs;$(RepoRoot)/Runtime/Core/Extension/Partials/UI.cs;$(RepoRoot)/Runtime/Utils/MatchColliderToSprite.cs;$(RepoRoot)/Runtime/Visuals/UGUI/EnhancedImage.cs;$(RepoRoot)/Runtime/Visuals/UGUI/NonDrawingGraphic.cs"
     />
   </ItemGroup>
   <!--
