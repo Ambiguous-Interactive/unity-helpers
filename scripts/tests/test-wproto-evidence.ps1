@@ -268,6 +268,27 @@ try {
         ++$checks
         Restore-ControlFixture
     }
+    $readEvidence = ${function:Read-TestResultEvidence}
+    foreach ($changed in @('source', 'report')) {
+        $refused = & {
+            function Read-TestResultEvidence {
+                param([string]$Path, [string]$Format, [string]$RepositoryRoot)
+                $result = & $readEvidence @PSBoundParameters
+                $target = if ($changed -ceq 'source') { Join-Path $RepositoryRoot 'scripts/unity/test_result_evidence.py' }
+                else { $Path }
+                [IO.File]::AppendAllText($target, "`n")
+                return $result
+            }
+            try { Assert-WProtoEvidence $fixture.Root $fixture.Receipt 'synthetic-receipt-control' | Out-Null; $false }
+            catch {
+                if ($changed -ceq 'source') { $_.Exception.Message -ceq 'Source inventory differs.' }
+                else { $_.Exception.Message -clike 'Artifact changed:*' }
+            }
+        }
+        if (-not $refused) { throw "Qualification accepted $changed changes while reading the result." }
+        ++$checks
+        Restore-ControlFixture
+    }
     $mutations = @(
         @{ Name = 'wrong invocation'; Change = { param($f) $f.Record.runId = 'another-run' } },
         @{ Name = 'wrong build command'; Change = { param($f) $f.Record.build.arguments = @('--version') } },

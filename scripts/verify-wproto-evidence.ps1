@@ -318,9 +318,9 @@ function Assert-WProtoEvidence {
     if ($record.catalogSha256 -cne (Get-WProtoFileHash $model.catalogPath) -or $record.bindingsSha256 -cne (Get-WProtoFileHash $model.bindingsPath)) { throw 'Catalog or case bindings changed.' }
     $revision = (& git -C $Root rev-parse HEAD) -join ''
     if ($LASTEXITCODE -ne 0 -or $revision -cne $record.sourceRevision) { throw 'Source revision differs.' }
-    $currentSources = @(Get-WProtoSourceInventory $Root)
+    $sourceSnapshot = ConvertTo-Json -InputObject @(Get-WProtoSourceInventory $Root) -Depth 5 -Compress
     foreach ($snapshot in @('sourceFiles', 'sourceFilesAfterRun')) {
-        if ((ConvertTo-Json -InputObject $currentSources -Depth 5 -Compress) -cne (ConvertTo-Json -InputObject $record[$snapshot] -Depth 5 -Compress)) { throw 'Source inventory differs.' }
+        if ($sourceSnapshot -cne (ConvertTo-Json -InputObject $record[$snapshot] -Depth 5 -Compress)) { throw 'Source inventory differs.' }
     }
     foreach ($field in @('backend', 'profile', 'oracle', 'configuration', 'sdkVersion')) { Assert-WProtoString $record.environment[$field] "environment.$field" }
     $lane = @($model.catalog.lanes | Where-Object { $_.id -ceq $record.lane })
@@ -403,6 +403,8 @@ function Assert-WProtoEvidence {
     }
     $missing = @($model.bindings.fixtures | Where-Object { @($_.lanes | Where-Object { $_.lane -ceq $record.lane -and $_.status -ceq 'missing-discovery' }).Count -gt 0 })
     $unbound = @($result.Cases | Where-Object { $_.Fixture -cnotin @($fixtures.fixture) } | Select-Object -ExpandProperty Fixture -Unique)
+    if ((ConvertTo-Json -InputObject @(Get-WProtoSourceInventory $Root) -Depth 5 -Compress) -cne $sourceSnapshot) { throw 'Source inventory differs.' }
+    if ((Get-WProtoFileHash $record.results.path) -cne $record.results.sha256) { throw "Artifact changed: $($record.results.path)" }
     return [ordered]@{ runId = $RunId; lane = $record.lane; fixtureEvidenceAccepted = $fixtures.Count; missingFixtureDiscovery = $missing.Count; unboundFixtures = $unbound; processObservation = $process.observationScope; completeCatalogQualified = $false }
 }
 
