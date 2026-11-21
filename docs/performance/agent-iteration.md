@@ -140,8 +140,11 @@ tests still check which steps supply each outcome.
 The Unity result verification action uses locked Python to read the root NUnit report and any
 required isolated fixture reports. It checks each report again before publishing a passing
 verdict. The action checks the verifier files against the recorded Git checkout and confirms the
-report hashes before it reports success. PowerShell still selects the isolated fixtures and
-writes GitHub annotations, including redacted failure messages and native log diagnostics.
+report hashes before it reports success. On the Windows CI runners, it holds every required report
+open with read sharing through verdict publication. Writes and replacements must wait until the step
+releases those handles. Local non-Windows runs recheck the live paths before publication.
+PowerShell still selects the isolated fixtures and writes GitHub annotations, including redacted
+failure messages and native log diagnostics.
 
 WProto qualification uses the locked Python strict evidence reader for NUnit and TRX reports.
 The reader requires passed cases, matching summaries, and exact case identities. The existing

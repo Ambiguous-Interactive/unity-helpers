@@ -486,6 +486,55 @@ function uv {
             $isolationChecks++
         }
 
+        # Try to change the already checked root when the compilation hash completes.
+        $rootResult = Join-Path $env:UH_RESULTS_DIR 'results.xml'
+        $originalRoot = [IO.File]::ReadAllBytes($rootResult)
+        $lateWriter = @'
+function Get-FileHash {
+    [CmdletBinding()]
+    param([string[]]$LiteralPath, [IO.Stream]$InputStream)
+    $result = & (Get-Command Get-FileHash -CommandType Cmdlet) @PSBoundParameters
+    $compilation = Join-Path $env:UH_RESULTS_DIR 'compilation/results.xml'
+    if (($LiteralPath.Count -eq 1 -and $LiteralPath[0] -eq $compilation) -or
+        ($InputStream -and $InputStream.Name -eq $compilation)) {
+        $root = Join-Path $env:UH_RESULTS_DIR 'results.xml'
+        if ($IsWindows) {
+            try {
+                [IO.File]::WriteAllText($root, 'report changed during final check')
+                throw 'The concurrent write was allowed.'
+            } catch [IO.IOException] {
+                Write-Host 'Concurrent write refused.'
+            }
+            try {
+                [IO.File]::Move($root, "$root.moved")
+                throw 'The concurrent rename was allowed.'
+            } catch [IO.IOException] {
+                Write-Host 'Concurrent rename refused.'
+            }
+        } else {
+            & (Get-Command python3 -CommandType Application | Select-Object -First 1).Source -c 'from pathlib import Path; import sys; Path(sys.argv[1]).write_text("report changed during final check")' $root
+            if ($LASTEXITCODE -ne 0) { throw 'The independent report writer failed to run.' }
+        }
+    }
+    $result
+}
+'@
+        Set-Content -LiteralPath $mutatingScript -Value ($lateWriter + "`n" + $verifierProgram)
+        $output = & (Get-Process -Id $PID).Path -NoProfile -File $mutatingScript 2>&1 | Out-String
+        $lateWriterExit = $LASTEXITCODE
+        if ($IsWindows) {
+            if ($lateWriterExit -ne 0 -or -not $output.Contains('Concurrent write refused.') -or
+                -not $output.Contains('Concurrent rename refused.') -or
+                -not $output.Contains('::notice::result ownership control:')) {
+                throw "The Windows action must protect the observed result through publication: $output"
+            }
+        } elseif ($lateWriterExit -eq 0 -or -not $output.Contains('changed during verification') -or
+            $output.Contains('::notice::result ownership control:')) {
+            throw "The action published after the root changed during another hash: $output"
+        }
+        [IO.File]::WriteAllBytes($rootResult, $originalRoot)
+        $isolationChecks++
+
         # The legacy benchmark caller supplies no isolated or positive-control inputs.
         $env:UH_REQUIRED_COMPILATION_FIXTURE = ''
         $env:UH_UNITY_VERSION = ''

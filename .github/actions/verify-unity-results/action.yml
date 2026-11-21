@@ -670,14 +670,6 @@ runs:
           if (($verifierExit -eq 0) -ne ($decoded.status -ceq 'passed')) {
             throw 'The Unity result verifier exit does not match its verdict.'
           }
-          if ($verifierExit -eq 0) {
-            foreach ($relative in $reportPaths) {
-              $digest = (Get-FileHash -LiteralPath (Join-Path $dir $relative) -ErrorAction Stop).Hash
-              if ($digest -ne $decoded.report_hashes[$relative]) {
-                throw "The NUnit report changed during verification: $relative"
-              }
-            }
-          }
           $decoded
         }
         if (-not $verdict -or $verdict.status -ceq 'missing') {
@@ -690,10 +682,42 @@ runs:
         }
         if ($verdict.counts) {
           $counts = "total=$($verdict.counts.total) passed=$($verdict.counts.passed) failed=$($verdict.counts.failed) skipped=$($verdict.counts.skipped)"
-          Write-Host "Results: $counts (results.xml)"
+          if ($verdict.status -cne 'passed') {
+            Write-Host "Results: $counts (results.xml)"
+          }
         }
         switch -CaseSensitive ($verdict.status) {
-          'passed' { Write-Host "::notice::${label}: $counts" }
+          'passed' {
+            # Hold every report open until the verdict is published. All hosted callers run on Windows.
+            $reports = [ordered]@{}
+            try {
+              foreach ($relative in $reportPaths) {
+                $path = Join-Path $dir $relative
+                $reports[$relative] = [IO.File]::Open($path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+              }
+              foreach ($relative in $reportPaths) {
+                $digest = (Get-FileHash -InputStream $reports[$relative] -ErrorAction Stop).Hash
+                if ($digest -ne $verdict.report_hashes[$relative]) {
+                  throw "The NUnit report changed during verification: $relative"
+                }
+              }
+              if (-not $IsWindows) {
+                # Unrelated POSIX writers do not honor the read share. Recheck the live paths as well.
+                foreach ($relative in $reportPaths) {
+                  $digest = (Get-FileHash -LiteralPath (Join-Path $dir $relative) -ErrorAction Stop).Hash
+                  if ($digest -ne $verdict.report_hashes[$relative]) {
+                    throw "The NUnit report changed during verification: $relative"
+                  }
+                }
+              }
+              Write-Host "Results: $counts (results.xml)"
+              Write-Host "::notice::${label}: $counts"
+            } finally {
+              foreach ($report in $reports.Values) {
+                $report.Dispose()
+              }
+            }
+          }
           'zero' {
             Write-UnityExecutionSymptomDiagnostics -ResultsDir $dir -Label $label
             Write-UnityHangCulpritDiagnostic -ResultsDir $dir -Label $label
