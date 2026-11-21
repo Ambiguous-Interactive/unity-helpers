@@ -149,6 +149,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
             Assert.IsTrue(error == null);
             Assert.AreEqual("short", File.ReadAllText(path));
+            CollectionAssert.AreEquivalent(new[] { path }, Directory.GetFiles(_testDirectory));
         }
 
         [Test]

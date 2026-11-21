@@ -9,7 +9,7 @@ Choose the format for the data your players and tools need to read:
 | Compact saves or messages with generated IL2CPP-compatible models | [Adopt WallstopProto](./wallstop-proto-public-survey.md)                                                                                           |
 | Keep an existing protobuf-net save system working                 | [Protobuf examples](#protobuf-examples) and the [migration checklist](./wallstop-proto-public-survey.md#move-an-existing-protobuf-net-save-system) |
 | Show dictionaries, nullable values or IDs in the Unity Inspector  | [Serializable wrappers](./serialization-types.md)                                                                                                  |
-| Preserve the last good save if a write fails                      | [Durable file writes](#writes-do-not-destroy-the-previous-file)                                                                                    |
+| Preserve the last good save if a write fails                      | [Durable file writes](#staged-json-file-writes)                                                                                                    |
 
 Start with the examples, then use the sections below as an API reference. Keep a
 copy of released saves when changing a model or serializer. A successful round trip
@@ -254,13 +254,13 @@ SaveData loaded = Serializer.Deserialize<SaveData>(bytes, SerializationType.Json
 
 Unity Helpers provides several advanced APIs for fast, reliable file operations.
 
-### Writes Do Not Destroy the Previous File
+### Staged JSON File Writes
 
-Every `WriteToJsonFile` / `WriteToJsonFileAsync` overload writes through
-[`DurableFile`](../utilities/helper-utilities.md#durable-writes-for-player-data): the document is staged in
-a sibling file, flushed to disk, and swapped over the destination. A write interrupted by a crash, a power
-loss, or a full disk therefore leaves the previous save readable instead of truncating it. Missing
-directories are created for you. Failures still throw, exactly as before.
+Every `WriteToJsonFile` and `WriteToJsonFileAsync` overload uses
+[`DurableFile`](../utilities/helper-utilities.md#durable-writes-for-player-data) to stage and flush a
+complete document before replacing the destination. A staging failure leaves the previous file
+intact. Windows replacement errors can report the path to a retained backup. Power loss can still
+roll back the directory update. The write creates missing directories and throws on failure.
 
 ### Async File Operations
 

@@ -48,7 +48,10 @@ namespace WallstopStudios.UnityHelpers.DurableFile.Tests
             int maximumBytes
         )
         {
-            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux) || !Environment.Is64BitProcess)
+            if (
+                !System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(OSPlatform.Linux)
+                || !Environment.Is64BitProcess
+            )
             {
                 Assert.Ignore("Requires the Linux 64-bit RLIMIT_FSIZE ABI.");
             }
