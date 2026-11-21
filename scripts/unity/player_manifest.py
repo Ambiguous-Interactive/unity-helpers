@@ -68,9 +68,9 @@ def _inventory(
     for path, state in states.items():
         if not stat.S_ISREG(state.st_mode):
             continue
-        if os.name == "nt":
-            retained.enter_context(open_source(path))
-        files[path.relative_to(root).as_posix()] = file_hash(path, state)[0]
+        files[path.relative_to(root).as_posix()] = file_hash(
+            path, state, retained=retained if os.name == "nt" else None
+        )[0]
     for required in _REQUIRED:
         if required not in files:
             raise ValueError(f"Required actual player file missing: {required}")

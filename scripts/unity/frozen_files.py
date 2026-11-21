@@ -13,12 +13,14 @@ import stat
 import subprocess
 import sys
 import uuid
+from contextlib import nullcontext
 from functools import cache
 from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict, cast
 
 if TYPE_CHECKING:
     import io
+    from contextlib import ExitStack
 
 SOURCE_ROOTS = ("Runtime", "Editor", "Tests", "Generator~", "scripts/unity")
 GENERATOR_SUFFIXES = frozenset(
@@ -104,8 +106,14 @@ def regular_path(path: Path, *, directory: bool) -> Path:
     return absolute
 
 
-def content_identity(info: os.stat_result) -> tuple[int, int, int, int, int]:
-    return (info.st_dev, info.st_ino, info.st_mode, info.st_size, info.st_mtime_ns)
+def content_identity(
+    info: os.stat_result, *, comparing_descriptor: bool = False
+) -> tuple[int, int, int, int, int]:
+    # Windows path stat infers execute bits from the extension; fstat has no filename.
+    mode = (
+        info.st_mode & ~0o111 if comparing_descriptor and sys.platform == "win32" else info.st_mode
+    )
+    return (info.st_dev, info.st_ino, mode, info.st_size, info.st_mtime_ns)
 
 
 def identity(info: os.stat_result) -> tuple[int, int, int, int, int, int]:
@@ -160,12 +168,20 @@ else:
         return cast("io.BufferedReader[io.FileIO]", path.open("rb"))
 
 
-def file_hash(path: Path, observed: os.stat_result | None = None) -> tuple[str, int]:
+def file_hash(
+    path: Path, observed: os.stat_result | None = None, *, retained: ExitStack | None = None
+) -> tuple[str, int]:
     before = ordinary(path, directory=False) if observed is None else observed
-    with open_source(path) as stream:
+    opened_source = open_source(path)
+    context = (
+        opened_source if retained is None else nullcontext(retained.enter_context(opened_source))
+    )
+    with context as stream:
         opened = os.fstat(stream.fileno())
         # Windows Python 3.11 stat and fstat expose different meanings for ctime.
-        if content_identity(before) != content_identity(opened):
+        if content_identity(before, comparing_descriptor=True) != content_identity(
+            opened, comparing_descriptor=True
+        ):
             raise ValueError(f"Frozen file changed before hashing: {path}")
         digest = hashlib.file_digest(stream, "sha256").hexdigest()
         after_read = os.fstat(stream.fileno())
