@@ -2,10 +2,19 @@
 
 from __future__ import annotations
 
+import argparse
+import io
+import json
 import os
 import sys
 import xml.etree.ElementTree as ET
+from dataclasses import asdict, dataclass, field
+from hashlib import file_digest, sha256
 from pathlib import Path
+from typing import TYPE_CHECKING, Literal, TypedDict, cast
+
+if TYPE_CHECKING:
+    from typing import BinaryIO
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from cli_encoding import configure_output
@@ -23,7 +32,7 @@ def _count(root: ET.Element, field: str, default: str | None = None) -> str:
     return value
 
 
-def _read_root(path: str) -> ET.Element:
+def _read_root(path: str | BinaryIO) -> ET.Element:
     parser = ET.XMLParser(target=_NUnitTree())  # noqa: S314 - the target rejects document types.
     root = ET.parse(path, parser=parser).getroot()  # noqa: S314 - the target rejects document types.
     if root.tag != "test-run":
@@ -45,7 +54,10 @@ def _print_failed_tests(root: ET.Element) -> bool:
 
 
 def assert_isolated_fixtures(results: str, fixture_names: tuple[str, ...]) -> None:
-    root = _read_root(results)
+    _assert_isolated_root(_read_root(results), fixture_names)
+
+
+def _assert_isolated_root(root: ET.Element, fixture_names: tuple[str, ...]) -> None:
     cases = list(root.iter("test-case"))
     if not cases:
         raise ValueError("The isolated compilation fixture produced no test cases.")
@@ -130,8 +142,161 @@ def summarize(results: str, platform: str) -> int:
     return status
 
 
+_SINGLETON_PREFIX = (
+    "WallstopStudios.UnityHelpers.Tests.Utils.ScriptableObjectSingletonTests."
+    "MetadataAssetTracksSingletonEntries("
+)
+
+
+@dataclass(frozen=True)
+class _Failure:
+    name: str
+    message: str
+    stack_trace: str
+
+
+class _ResultCounts(TypedDict):
+    total: int
+    passed: int
+    failed: int
+    skipped: int
+
+
+@dataclass(frozen=True)
+class _CompositeVerdict:
+    status: Literal["missing", "zero", "failed", "rejected", "passed"]
+    counts: _ResultCounts | None = None
+    failure_count: int = 0
+    omitted_failure_details: int = 0
+    failure_details: tuple[_Failure, ...] = ()
+    diagnostic: str = ""
+    report_hashes: dict[str, str] = field(default_factory=dict[str, str])
+
+
+def _failed_nodes(root: ET.Element) -> list[ET.Element]:
+    failed_cases = [case for case in root.iter("test-case") if case.get("result") == "Failed"]
+    failed_suites = [
+        suite
+        for suite in root.iter("test-suite")
+        if suite.get("result") == "Failed"
+        and suite.get("site") != "Child"
+        and suite.find("failure") is not None
+    ]
+    return failed_cases + failed_suites
+
+
+def _failure_details(nodes: list[ET.Element]) -> tuple[tuple[_Failure, ...], int]:
+    seen: set[str] = set()
+    details: list[_Failure] = []
+    for node in nodes:
+        name = node.get("fullname") or node.get("name") or "(unnamed test)"
+        if name in seen:
+            continue
+        seen.add(name)
+        if len(details) < 50:
+            message = node.find("failure/message")
+            stack = node.find("failure/stack-trace")
+            details.append(
+                _Failure(
+                    name,
+                    "" if message is None else "".join(message.itertext()),
+                    "" if stack is None else "".join(stack.itertext()),
+                )
+            )
+    return tuple(details), len(seen) - len(details)
+
+
+def _required_case_passed(root: ET.Element, required_name: str) -> bool:
+    identities: set[str] = set()
+    required_results: list[str] = []
+    for case in root.iter("test-case"):
+        name = case.get("fullname", "")
+        if required_name and name == required_name:
+            required_results.append(case.get("result", ""))
+        if name.startswith(_SINGLETON_PREFIX):
+            if name in identities:
+                raise ValueError(f"Duplicate singleton metadata scenario identity: {name}")
+            identities.add(name)
+    return not required_name or required_results == ["Passed"]
+
+
+def _capture_report(path: Path, receipts: dict[Path, bytes]) -> ET.Element:
+    payload = path.read_bytes()
+    receipts[path] = sha256(payload).digest()
+    return _read_root(io.BytesIO(payload))
+
+
+def _verify_composite(
+    directory: Path, required_name: str, isolated: dict[str, tuple[str, ...]]
+) -> _CompositeVerdict:
+    receipts: dict[Path, bytes] = {}
+    try:
+        root = _capture_report(directory / "results.xml", receipts)
+    except (ET.ParseError, OSError, ValueError):
+        return _CompositeVerdict("missing")
+    counts = _ResultCounts(
+        total=int(_count(root, "total", "0")),
+        passed=int(_count(root, "passed", "0")),
+        failed=int(_count(root, "failed", "0")),
+        skipped=int(_count(root, "skipped", "0")),
+    )
+    required_passed = _required_case_passed(root, required_name)
+    if not counts["total"]:
+        return _CompositeVerdict("zero", counts)
+    failures = _failed_nodes(root)
+    if counts["failed"] or failures:
+        details, omitted = _failure_details(failures)
+        return _CompositeVerdict(
+            "failed",
+            counts,
+            failure_count=len(failures),
+            failure_details=details,
+            omitted_failure_details=omitted,
+        )
+    if not required_passed:
+        return _CompositeVerdict(
+            "rejected",
+            counts,
+            diagnostic=f"Required native test '{required_name}' must have exactly one passed result.",
+        )
+    for relative, fixtures in isolated.items():
+        path = directory / relative
+        try:
+            _assert_isolated_root(_capture_report(path, receipts), fixtures)
+        except (ET.ParseError, OSError, ValueError) as error:
+            return _CompositeVerdict("rejected", counts, diagnostic=f"{relative}: {error}")
+    report_hashes: dict[str, str] = {}
+    for path, digest in receipts.items():
+        with path.open("rb") as stream:
+            if file_digest(stream, "sha256").digest() != digest:
+                raise ValueError(f"The NUnit report changed during verification: {path}")
+        report_hashes[path.relative_to(directory).as_posix()] = digest.hex()
+    return _CompositeVerdict("passed", counts, report_hashes=report_hashes)
+
+
+def _composite_main(arguments: list[str]) -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("directory", type=Path)
+    parser.add_argument("--required-name", default="")
+    parser.add_argument("--isolated", nargs="+", action="append", default=[])
+    args = parser.parse_args(arguments)
+    isolated: dict[str, tuple[str, ...]] = {}
+    for relative, *fixtures in cast("list[list[str]]", args.isolated):
+        if relative in isolated:
+            parser.error(f"Duplicate isolated report path: {relative}")
+        isolated[relative] = tuple(fixtures)
+    try:
+        verdict = _verify_composite(args.directory, args.required_name, isolated)
+    except (OSError, ValueError) as error:
+        verdict = _CompositeVerdict("rejected", diagnostic=str(error))
+    print(json.dumps(asdict(verdict), ensure_ascii=True))
+    return 0 if verdict.status == "passed" else 1
+
+
 def main() -> int:
     configure_output()
+    if sys.argv[1:2] == ["--verify-composite"]:
+        return _composite_main(sys.argv[2:])
     if len(sys.argv) >= 3 and sys.argv[1] == "--isolated-fixtures":
         try:
             assert_isolated_fixtures(sys.argv[2], tuple(sys.argv[3:]))

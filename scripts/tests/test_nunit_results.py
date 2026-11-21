@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -11,6 +12,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "unity"))
+import nunit_results
 from nunit_results import assert_isolated_fixtures, summarize
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -407,3 +409,145 @@ def test_runner_only_qualifies_the_current_result(
     else:
         assert stable_report.read_text(encoding="utf-8") == (report or old_report)
         assert list(results.iterdir()) == [stable_report]
+
+
+_COMPOSITE_PREFIX = (
+    "WallstopStudios.UnityHelpers.Tests.Utils.ScriptableObjectSingletonTests."
+    "MetadataAssetTracksSingletonEntries("
+)
+
+
+@pytest.mark.parametrize(
+    ("required", "body", "diagnostic"),
+    [
+        ("", "", ""),
+        ("Exact", '<test-case fullname="Exact" result="Passed"/>', ""),
+        ("Exact", "", "must have exactly one passed result"),
+        ("Exact", '<test-case fullname="exact" result="Passed"/>', "must have exactly one"),
+        ("Exact", '<test-case fullname="Exact" result="Skipped"/>', "must have exactly one"),
+        ("Exact", '<test-case fullname="Exact" result="Inconclusive"/>', "must have exactly one"),
+        ("Exact", '<test-case fullname="Exact" result="Passed"/>' * 2, "must have exactly one"),
+        ("", '<test-case fullname="Other.Test" result="Passed"/>' * 2, ""),
+        (
+            "",
+            (
+                f'<test-case fullname="{_COMPOSITE_PREFIX}A)" result="Passed"/>'
+                f'<test-case fullname="{_COMPOSITE_PREFIX}B)" result="Passed"/>'
+            ),
+            "",
+        ),
+        (
+            "",
+            f'<test-case fullname="{_COMPOSITE_PREFIX}A)" result="Passed"/>' * 2,
+            "Duplicate singleton metadata scenario identity",
+        ),
+    ],
+)
+def test_composite_cli_qualifies_exact_case_and_unique_metadata_identity(
+    tmp_path: Path, required: str, body: str, diagnostic: str
+) -> None:
+    record = tmp_path / "results.xml"
+    written = f'<test-run total="1" passed="1" failed="0">{body}</test-run>'
+    record.write_text(written, encoding="utf-8")
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-I",
+            "-B",
+            str(ROOT / "scripts/unity/nunit_results.py"),
+            "--verify-composite",
+            f"--required-name={required}",
+            str(tmp_path),
+        ],
+        check=False,
+        capture_output=True,
+    )
+    verdict = json.loads(result.stdout)
+    assert result.returncode == bool(diagnostic), result.stderr
+    assert verdict["status"] == ("rejected" if diagnostic else "passed")
+    assert diagnostic in verdict["diagnostic"]
+    assert record.read_text(encoding="utf-8") == written
+
+
+def test_composite_cli_counts_own_suite_failures_from_same_bytes(tmp_path: Path) -> None:
+    (tmp_path / "results.xml").write_text(
+        """<test-run total="4" passed="4" failed="0">
+        <test-suite fullname="Parent" result="Failed" site="Child">
+          <failure><message>Rolled up</message></failure>
+          <test-case fullname="Leaf" result="Failed"><failure><message>Leaf detail</message>
+            <stack-trace>Leaf stack</stack-trace></failure></test-case>
+        </test-suite>
+        <test-suite fullname="Fixture" result="Failed" site="TearDown">
+          <failure><message>Cleanup detail</message></failure>
+          <test-case fullname="Leaf" result="Failed"/>
+        </test-suite>
+        <test-suite fullname="Aggregate" result="Failed"/>
+        </test-run>""",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts/unity/nunit_results.py"),
+            "--verify-composite",
+            str(tmp_path),
+        ],
+        check=False,
+        capture_output=True,
+    )
+    verdict = json.loads(result.stdout)
+    assert result.returncode == 1
+    assert verdict["status"] == "failed"
+    assert verdict["failure_count"] == 3
+    assert verdict["failure_details"] == [
+        {"name": "Leaf", "message": "Leaf detail", "stack_trace": "Leaf stack"},
+        {"name": "Fixture", "message": "Cleanup detail", "stack_trace": ""},
+    ]
+
+
+def test_composite_caps_diagnostics_without_dropping_failure_count(tmp_path: Path) -> None:
+    cases = "".join(f'<test-case fullname="Case{i}" result="Failed"/>' for i in range(53))
+    (tmp_path / "results.xml").write_text(
+        f'<test-run total="53" passed="0" failed="53">{cases}</test-run>', encoding="utf-8"
+    )
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts/unity/nunit_results.py"),
+            "--verify-composite",
+            str(tmp_path),
+        ],
+        check=False,
+        capture_output=True,
+    )
+    verdict = json.loads(result.stdout)
+    assert result.returncode == 1
+    assert verdict["failure_count"] == 53
+    assert verdict["omitted_failure_details"] == 3
+    assert [failure["name"] for failure in verdict["failure_details"]] == [
+        f"Case{i}" for i in range(50)
+    ]
+
+
+@pytest.mark.parametrize("change_target", ["results.xml", "first.xml", "last.xml"])
+def test_composite_refuses_reports_changed_after_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, change_target: str
+) -> None:
+    passing = '<test-run total="1" passed="1" failed="0"><test-case classname="Subject" result="Passed"/></test-run>'
+    for name in ("results.xml", "first.xml", "last.xml"):
+        (tmp_path / name).write_text(passing, encoding="utf-8")
+    read_bytes = Path.read_bytes
+
+    def change_after_final_read(path: Path) -> bytes:
+        contents = read_bytes(path)
+        if path.name == "last.xml":
+            (tmp_path / change_target).write_text(
+                passing.replace('result="Passed"', 'result="Failed"'), encoding="utf-8"
+            )
+        return contents
+
+    monkeypatch.setattr(Path, "read_bytes", change_after_final_read)
+    with pytest.raises(ValueError, match="report changed during verification"):
+        nunit_results._verify_composite(  # pyright: ignore[reportPrivateUsage]
+            tmp_path, "", {"first.xml": ("Subject",), "last.xml": ("Subject",)}
+        )

@@ -154,6 +154,10 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Setup Python tooling
+        if: ${{ steps.checkout.outcome == 'success' && always() }}
+        uses: ./.github/actions/setup-python-tools
+
       - name: Print runner diagnostics
         # Never use plain `shell: bash` on self-hosted Windows runners (the WSL
         # stub at C:\Windows\System32\bash.exe can win PATH resolution and fail).
@@ -312,10 +316,6 @@ jobs:
       # artifact, so the upload below would hand the serial to anyone who can
       # download it. Scrub the tree after the last Unity invocation and before
       # the first upload that can carry a log.
-      - name: Setup Python tooling for artifact redaction
-        if: ${{ steps.checkout.outcome == 'success' && always() }}
-        uses: ./.github/actions/setup-python-tools
-
       # Scope is exactly what this job uploads. A wider scope reaches files the
       # job never publishes -- the Docker license cache under this tree is
       # written by root and cannot be rewritten by the runner -- and the

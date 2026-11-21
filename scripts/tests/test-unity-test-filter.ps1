@@ -36,71 +36,9 @@ Invoke-Expression $nativeDescriptions.Extent.Text
 . (Join-Path $PSScriptRoot '../unity/lib/compilation-fixture-results.ps1')
 
 $verifier = Get-Content -LiteralPath (Join-Path $PSScriptRoot '../../.github/actions/verify-unity-results/action.yml') -Raw
-foreach ($diagnosticSource in @($source, $verifier)) {
-    if ([regex]::Matches($diagnosticSource, [regex]::Escape("not(@site='Child')")).Count -ne 2) {
-        throw 'Both Unity result readers must exclude rolled-up child suite failures from annotations and counts.'
-    }
+if ([regex]::Matches($source, [regex]::Escape("not(@site='Child')")).Count -ne 2) {
+    throw 'The native runner must exclude rolled-up child suite failures from annotations and counts.'
 }
-
-$requiredStart = $verifier.IndexOf('function Assert-RequiredNativeTest {')
-if ($requiredStart -lt 0) { throw 'Missing required native-test gate.' }
-$requiredAst = [System.Management.Automation.Language.Parser]::ParseInput(
-    $verifier.Substring($requiredStart), [ref]$tokens, [ref]$parseErrors)
-$requiredFunction = $requiredAst.Find({
-        param($node)
-        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
-        $node.Name -eq 'Assert-RequiredNativeTest'
-    }, $true)
-if ($null -eq $requiredFunction) { throw 'The native positive-control gate must parse.' }
-Invoke-Expression $requiredFunction.Extent.Text
-foreach ($fixture in @(
-        @{ Required = ''; Body = ''; Pass = $true },
-        @{ Required = 'Control'; Body = '<test-case fullname="Control" result="Passed" />'; Pass = $true },
-        @{ Required = 'Control'; Body = ''; Pass = $false },
-        @{ Required = 'Control'; Body = '<test-case fullname="control" result="Passed" />'; Pass = $false },
-        @{ Required = 'Control'; Body = '<test-case fullname="Control" result="Skipped" />'; Pass = $false },
-        @{ Required = 'Control'; Body = '<test-case fullname="Control" result="Failed" />'; Pass = $false },
-        @{ Required = 'Control'; Body = '<test-case fullname="Control" result="Inconclusive" />'; Pass = $false },
-        @{ Required = 'Control'; Body = '<test-case fullname="Control" result="Passed" /><test-case fullname="Control" result="Passed" />'; Pass = $false }
-    )) {
-    [xml]$requiredXml = '<test-run>' + $fixture.Body + '</test-run>'
-    $accepted = $true
-    try { Assert-RequiredNativeTest -Doc $requiredXml -RequiredTestName $fixture.Required }
-    catch { $accepted = $false }
-    if ($accepted -ne $fixture.Pass) { throw 'Required native-test positive/negative control mismatch.' }
-}
-
-$identityStart = $verifier.IndexOf('function Assert-SingletonMetadataIdentities {')
-if ($identityStart -lt 0) { throw 'Missing singleton metadata identity gate.' }
-$identityAst = [System.Management.Automation.Language.Parser]::ParseInput(
-    $verifier.Substring($identityStart), [ref]$tokens, [ref]$parseErrors)
-$identityFunction = $identityAst.Find({
-        param($node)
-        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
-        $node.Name -eq 'Assert-SingletonMetadataIdentities'
-    }, $true)
-if ($null -eq $identityFunction) { throw 'The singleton identity gate must parse.' }
-Invoke-Expression $identityFunction.Extent.Text
-$identityPrefix = 'WallstopStudios.UnityHelpers.Tests.Utils.ScriptableObjectSingletonTests.MetadataAssetTracksSingletonEntries('
-foreach ($fixture in @(
-        @{ Names = @(); Pass = $true },
-        @{ Names = @('Other.Test', 'Other.Test'); Pass = $true },
-        @{ Names = @(($identityPrefix + 'Default)'), ($identityPrefix + 'Custom)')); Pass = $true },
-        @{ Names = @(($identityPrefix + 'Default)'), ($identityPrefix + 'Default)')); Pass = $false },
-        @{ Names = @(($identityPrefix + 'A)'), ($identityPrefix + 'B)'), ($identityPrefix + 'A)')); Pass = $false }
-    )) {
-    [xml]$identityXml = '<test-run>' + (($fixture.Names | ForEach-Object {
-                '<test-case fullname="' + $_ + '" result="Passed" />'
-            }) -join '') + '</test-run>'
-    $accepted = $true
-    try { Assert-SingletonMetadataIdentities -Doc $identityXml }
-    catch { $accepted = $false }
-    if ($accepted -ne $fixture.Pass) { throw 'Singleton identity positive/negative control mismatch.' }
-}
-if (-not $verifier.Contains('Assert-SingletonMetadataIdentities -Doc $doc')) {
-    throw 'Singleton identity validation must run on the actual NUnit document.'
-}
-Write-Host '[test-unity-test-filter] Five singleton identity controls passed.'
 
 # Diagnostics are not the subject; the actual XML gate and invocation sites are.
 function Write-CiError { param([string]$Message) }
@@ -358,12 +296,40 @@ try {
     $verifierProgram = ($verifierProgram -split "`n" | ForEach-Object { $_ -replace '^        ', '' }) -join "`n"
     $verifierScript = Join-Path $temporary 'verify-action.ps1'
     Set-Content -LiteralPath $verifierScript -Value $verifierProgram
+    # Exercise the checkout binding with a committed copy of the candidate files.
+    $sourceRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
+    $verifierCheckout = Join-Path $temporary 'verifier checkout'
+    New-Item -ItemType Directory -Path $verifierCheckout | Out-Null
+    git -C $verifierCheckout init --quiet
+    foreach ($relative in @(
+            '.github/actions/verify-unity-results/action.yml',
+            'scripts/python~/pyproject.toml',
+            'scripts/python~/uv.lock',
+            'scripts/cli_encoding.py',
+            'scripts/unity/nunit_results.py',
+            'scripts/unity/lib/compilation-fixture-results.ps1',
+            'scripts/unity/lib/catastrophic-patterns.ps1',
+            'scripts/unity/lib/credential-redaction.ps1',
+            'scripts/unity/log-patterns.json',
+            '.gitattributes'
+        )) {
+        $destination = Join-Path $verifierCheckout $relative
+        New-Item -ItemType Directory -Force -Path (Split-Path $destination -Parent) | Out-Null
+        Copy-Item -LiteralPath (Join-Path $sourceRoot $relative) -Destination $destination
+    }
+    git -C $verifierCheckout add -- .
+    git -C $verifierCheckout -c user.name=Fixture -c user.email=fixture@example.invalid -c commit.gpgsign=false commit --quiet -m 'Record checkout'
+    if ($LASTEXITCODE -ne 0) { throw 'Could not commit the verifier fixture checkout.' }
+    $recordedRevision = git -C $verifierCheckout rev-parse HEAD
+    $verifierReader = Join-Path $verifierCheckout 'scripts/unity/nunit_results.py'
+    $readerBytes = [IO.File]::ReadAllBytes($verifierReader)
     $oldEnvironment = @{}
-    foreach ($key in @('GITHUB_WORKSPACE', 'UH_RESULTS_DIR', 'UH_LABEL', 'UH_EXPECTED_EMPTY', 'UH_REQUIRED_TEST_NAME', 'UH_REQUIRED_COMPILATION_FIXTURE', 'UH_UNITY_VERSION')) {
+    foreach ($key in @('GITHUB_WORKSPACE', 'GITHUB_SHA', 'UH_RESULTS_DIR', 'UH_LABEL', 'UH_EXPECTED_EMPTY', 'UH_REQUIRED_TEST_NAME', 'UH_REQUIRED_COMPILATION_FIXTURE', 'UH_UNITY_VERSION')) {
         $oldEnvironment[$key] = [Environment]::GetEnvironmentVariable($key)
     }
     try {
-        $env:GITHUB_WORKSPACE = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
+        $env:GITHUB_WORKSPACE = $verifierCheckout
+        $env:GITHUB_SHA = $recordedRevision
         $env:UH_LABEL = 'result ownership control'
         $env:UH_EXPECTED_EMPTY = 'false'
         $env:UH_REQUIRED_TEST_NAME = ''
@@ -466,6 +432,88 @@ try {
             if (($LASTEXITCODE -eq 0) -ne ($damage -eq 'healthy')) { throw "Idle-editor verifier accepted $damage or rejected healthy results: $output" }
             $isolationChecks++
         }
+        # The normal action must refuse a different revision or uncommitted reader.
+        $env:GITHUB_SHA = '0000000000000000000000000000000000000000'
+        $output = & (Get-Process -Id $PID).Path -NoProfile -File $verifierScript 2>&1 | Out-String
+        if ($LASTEXITCODE -eq 0 -or -not $output.Contains('does not match the recorded revision')) {
+            throw "The verifier accepted a different recorded revision: $output"
+        }
+        $env:GITHUB_SHA = $recordedRevision
+        Add-Content -LiteralPath $verifierReader -Value '# uncommitted verifier'
+        $output = & (Get-Process -Id $PID).Path -NoProfile -File $verifierScript 2>&1 | Out-String
+        if ($LASTEXITCODE -eq 0 -or -not $output.Contains('inputs do not match the recorded checkout')) {
+            throw "The verifier accepted a substituted reader: $output"
+        }
+        [IO.File]::WriteAllBytes($verifierReader, $readerBytes)
+        $isolationChecks += 2
+
+        if (-not $IsWindows) {
+            $foreignReader = Join-Path $temporary 'foreign-reader.py'
+            [IO.File]::WriteAllBytes($foreignReader, $readerBytes)
+            Remove-Item -LiteralPath $verifierReader
+            New-Item -ItemType SymbolicLink -Path $verifierReader -Target $foreignReader | Out-Null
+            $output = & (Get-Process -Id $PID).Path -NoProfile -File $verifierScript 2>&1 | Out-String
+            if ($LASTEXITCODE -eq 0 -or -not $output.Contains('ordinary checkout paths')) {
+                throw "The verifier used a reader outside the recorded checkout: $output"
+            }
+            Remove-Item -LiteralPath $verifierReader
+            [IO.File]::WriteAllBytes($verifierReader, $readerBytes)
+            $isolationChecks++
+        }
+
+        # Mutate the verified bytes after the real locked Python process returns.
+        $mutatingScript = Join-Path $temporary 'verify-mutating.ps1'
+        foreach ($relative in @('scripts/unity/nunit_results.py', 'results.xml', 'compilation/results.xml')) {
+            $target = if ($relative.StartsWith('scripts/')) {
+                Join-Path $verifierCheckout $relative
+            } else {
+                Join-Path $env:UH_RESULTS_DIR $relative
+            }
+            $originalBytes = [IO.File]::ReadAllBytes($target)
+            $safeTarget = $target.Replace("'", "''")
+            $injectMutation = @"
+function uv {
+    & (Get-Command uv -CommandType Application | Select-Object -First 1).Source @args
+    Add-Content -LiteralPath '$safeTarget' -Value 'bytes replaced during verification'
+}
+"@
+            Set-Content -LiteralPath $mutatingScript -Value ($injectMutation + "`n" + $verifierProgram)
+            $output = & (Get-Process -Id $PID).Path -NoProfile -File $mutatingScript 2>&1 | Out-String
+            if ($LASTEXITCODE -eq 0 -or -not $output.Contains('changed during verification')) {
+                throw "Persistent mutation of $relative was missed: $output"
+            }
+            [IO.File]::WriteAllBytes($target, $originalBytes)
+            $isolationChecks++
+        }
+
+        # The legacy benchmark caller supplies no isolated or positive-control inputs.
+        $env:UH_REQUIRED_COMPILATION_FIXTURE = ''
+        $env:UH_UNITY_VERSION = ''
+        $output = & (Get-Process -Id $PID).Path -NoProfile -File $verifierScript 2>&1 | Out-String
+        if ($LASTEXITCODE -ne 0 -or -not $output.Contains('::notice::result ownership control:')) {
+            throw "The root-only benchmark caller lost its verdict: $output"
+        }
+
+        # The WProto lane requires an exact positive control and allows an explicit empty selection.
+        $env:UH_REQUIRED_TEST_NAME = 'Control'
+        $output = & (Get-Process -Id $PID).Path -NoProfile -File $verifierScript 2>&1 | Out-String
+        if ($LASTEXITCODE -eq 0 -or -not $output.Contains('Required native test') -or
+            -not $output.Contains('Results: total=1 passed=1 failed=0 skipped=0')) {
+            throw "Required case refusal lost the actual NUnit totals or accepted an absent case: $output"
+        }
+        Set-Content -LiteralPath (Join-Path $env:UH_RESULTS_DIR 'results.xml') -Value '<test-run total="1" passed="1" failed="0"><test-case fullname="Control" result="Passed" /></test-run>'
+        $output = & (Get-Process -Id $PID).Path -NoProfile -File $verifierScript 2>&1 | Out-String
+        if ($LASTEXITCODE -ne 0) { throw "The exact required case did not qualify: $output" }
+        $env:UH_EXPECTED_EMPTY = 'true'
+        $env:UH_RESULTS_DIR = Join-Path $temporary 'intentionally absent'
+        $output = & (Get-Process -Id $PID).Path -NoProfile -File $verifierScript 2>&1 | Out-String
+        if ($LASTEXITCODE -ne 0 -or -not $output.Contains('No unity-helpers test assemblies')) {
+            throw "The explicit empty selection changed: $output"
+        }
+        $isolationChecks += 4
+        $env:UH_RESULTS_DIR = Join-Path $temporary 'dump diagnostics'
+        $env:GITHUB_WORKSPACE = $sourceRoot
+        New-Item -ItemType Directory -Path (Join-Path $env:UH_RESULTS_DIR 'compilation') -Force | Out-Null
         $env:UH_UNITY_VERSION = ''
         $dumpAction = Get-Content -LiteralPath (Join-Path $PSScriptRoot '../../.github/actions/dump-unity-log-tail/action.yml') -Raw
         $dumpStart = $dumpAction.IndexOf($runMarker)

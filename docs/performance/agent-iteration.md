@@ -137,6 +137,12 @@ inputs and exit codes for local callers and requires uv. PowerShell still launch
 Windows Unity and manages the native job and license lifecycle. The workflow contract
 tests still check which steps supply each outcome.
 
+The Unity result verification action uses locked Python to read the root NUnit report and any
+required isolated fixture reports. It checks each report again before publishing a passing
+verdict. The action checks the verifier files against the recorded Git checkout and confirms the
+report hashes before it reports success. PowerShell still selects the isolated fixtures and
+writes GitHub annotations, including redacted failure messages and native log diagnostics.
+
 WProto qualification uses the locked Python strict evidence reader for NUnit and TRX reports.
 The reader requires passed cases, matching summaries, and exact case identities. The existing
 PowerShell command still returns the same case and run objects to the acceptance runner and host
