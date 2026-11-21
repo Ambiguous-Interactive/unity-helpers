@@ -15,8 +15,10 @@ function Stop-WProtoSourceCensusWorker {
 
 function Invoke-WProtoSourceCensus {
     param(
-        [ValidateSet('sources', 'host-sources')][string]$Operation,
-        [string]$Root
+        [ValidateSet('sources', 'host-sources', 'inventory')][string]$Operation,
+        [string]$Root,
+        [AllowNull()][object[]]$DeclaredFiles = $null,
+        [int]$MaximumFiles = 4096
     )
     $implementation = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../frozen_files.py'))
     $project = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../python~'))
@@ -54,6 +56,11 @@ function Invoke-WProtoSourceCensus {
         } catch { $process.Dispose(); throw }
     }
     $request = [ordered]@{ protocol = 1; requestId = [Guid]::NewGuid().ToString('N'); operation = $Operation; root = $Root }
+    if ($Operation -ceq 'inventory') {
+        $request.repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../..'))
+        $request.declaredFiles = $DeclaredFiles
+        $request.maximumFiles = $MaximumFiles
+    }
     try {
         $state.Process.StandardInput.WriteLine((ConvertTo-Json -InputObject $request -Depth 8 -Compress))
         $responseTask = $state.Process.StandardOutput.ReadLineAsync()
