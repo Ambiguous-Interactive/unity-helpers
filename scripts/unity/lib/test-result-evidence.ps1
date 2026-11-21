@@ -1,8 +1,24 @@
+function Assert-TestResultEvidenceCheckout {
+    param([string]$RepositoryRoot)
+
+    $wrapperRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../..'))
+    foreach ($relative in @(
+            'scripts/unity/lib/test-result-evidence.ps1',
+            'scripts/unity/test_result_evidence.py',
+            'scripts/python~/pyproject.toml',
+            'scripts/python~/uv.lock')) {
+        $actual = (Get-FileHash -LiteralPath (Join-Path $wrapperRoot $relative) -Algorithm SHA256 -ErrorAction Stop).Hash
+        $recorded = (Get-FileHash -LiteralPath (Join-Path $RepositoryRoot $relative) -Algorithm SHA256 -ErrorAction Stop).Hash
+        if ($actual -cne $recorded) { throw "Test evidence reader differs from the repository inputs: $relative" }
+    }
+}
+
 function Read-TestResultEvidence {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)][string]$Path,
-        [Parameter(Mandatory = $true)][ValidateSet('NUnit', 'Trx')][string]$Format
+        [Parameter(Mandatory = $true)][ValidateSet('NUnit', 'Trx')][string]$Format,
+        [string]$RepositoryRoot
     )
 
     $file = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
@@ -13,6 +29,7 @@ function Read-TestResultEvidence {
         'run', '--quiet', '--project', (Join-Path $PSScriptRoot '../../python~'), '--locked', '--no-dev',
         'python', (Join-Path $PSScriptRoot '../test_result_evidence.py'), '--format', $Format, '--', $file.FullName
     )
+    if ($RepositoryRoot) { Assert-TestResultEvidenceCheckout $RepositoryRoot }
     $PSNativeCommandUseErrorActionPreference = $false
     $output = @(& uv @arguments 2>&1)
     if ($LASTEXITCODE -ne 0) {
@@ -20,6 +37,8 @@ function Read-TestResultEvidence {
         if (-not [string]::IsNullOrWhiteSpace($diagnostic)) { throw $diagnostic }
         throw "The test evidence reader exited $LASTEXITCODE."
     }
+
+    if ($RepositoryRoot) { Assert-TestResultEvidenceCheckout $RepositoryRoot }
 
     # Keep identities and timestamps as strings on every supported PowerShell version.
     $json = ($output | Where-Object { $_ -is [string] }) -join [Environment]::NewLine

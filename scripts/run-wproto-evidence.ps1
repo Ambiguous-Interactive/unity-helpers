@@ -113,6 +113,7 @@ function Invoke-WProtoEvidenceRun {
     $receiptPath = Join-Path $directory 'receipt.json'
     $sourceInventoryCaptured = $false
     try {
+        Assert-TestResultEvidenceCheckout $Root
         $model = Read-WProtoCatalog $Root
         $lane = @($model.catalog.lanes | Where-Object { $_.id -ceq $receipt.lane })
         if ($lane.Count -ne 1 -or $lane[0].backend -cne 'CoreCLR') { throw 'Only catalogued CoreCLR host lanes can be invoked.' }
@@ -147,7 +148,7 @@ function Invoke-WProtoEvidenceRun {
         Assert-WProtoProcess $receipt.process 'Ordinary host tests'
         if ($null -eq $receipt.results) { throw 'Test process produced no TRX.' }
         if ((ConvertTo-Json -InputObject $receipt.binaries -Depth 5 -Compress) -cne (ConvertTo-Json -InputObject $receipt.binariesAfterRun -Depth 5 -Compress)) { throw 'Binary inventory changed during tests.' }
-        $result = Read-TestResultEvidence -Path $resultPath -Format Trx
+        $result = Read-TestResultEvidence -Path $resultPath -Format Trx -RepositoryRoot $Root
         $receipt.resultRunId = $result.RunId
         $oracleCase = @($result.Cases | Where-Object { $_.Fixture -ceq 'WallstopStudios.UnityHelpers.Proto.Generator.Tests.OracleIdentityTests' -and $_.FullName -ceq 'LoadedOracleHasTheExpectedPhysicalIdentity' -and $_.Result -ceq 'Passed' })
         if ($oracleCase.Count -ne 1) { throw 'The physical oracle identity test did not pass exactly once.' }

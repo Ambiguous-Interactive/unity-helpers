@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import codecs
 import json
+import re
 import stat
 import sys
 import xml.etree.ElementTree as ET
@@ -14,6 +15,7 @@ from typing import TYPE_CHECKING, TypedDict
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+    from typing import BinaryIO
 
 MAX_BYTES = 32 * 1024 * 1024
 TRX = "{http://microsoft.com/schemas/VisualStudio/TeamTest/2010}"
@@ -48,26 +50,76 @@ class _Tree(ET.TreeBuilder):
         raise ValueError("Test evidence XML must not declare a document type.")
 
 
+def _blocks(stream: BinaryIO) -> Iterator[bytes]:
+    size = 0
+    while block := stream.read(64 * 1024):
+        size += len(block)
+        if size > MAX_BYTES:
+            raise ValueError(SIZE_ERROR)
+        yield block
+
+
+def _xml_declaration(
+    first: bytes, blocks: Iterator[bytes], probe: str, offset: int
+) -> tuple[bytes | bytearray, str | None]:
+    opening = "<?xml".encode(probe)
+    start = offset + len(opening)
+    if not first.startswith(opening, offset) or not any(
+        first.startswith(char.encode(probe), start) for char in " \r\n\t"
+    ):
+        return first, None
+
+    closing = "?>".encode(probe)
+    prefix = bytearray(first)
+    while (end := prefix.find(closing, start)) < 0:
+        block = next(blocks, None)
+        if block is None:
+            raise ValueError("Test evidence has an unterminated XML declaration.")
+        start = max(start, len(prefix) - len(closing) + 1)
+        prefix.extend(block)
+    declaration = prefix[offset : end + len(closing)].decode(probe)
+    match = re.search(
+        r"""[ \r\n\t]encoding[ \r\n\t]*=[ \r\n\t]*(["'])([A-Za-z][A-Za-z0-9._-]*)\1""", declaration
+    )
+    return prefix, codecs.lookup(match[2]).name if match else None
+
+
+def _xml_input(first: bytes, blocks: Iterator[bytes]) -> tuple[bytes | bytearray, str | None]:
+    marker = first[:4]
+    utf32 = {
+        codecs.BOM_UTF32_LE: "utf-32-le",
+        codecs.BOM_UTF32_BE: "utf-32-be",
+        b"<\x00\x00\x00": "utf-32-le",
+        b"\x00\x00\x00<": "utf-32-be",
+    }.get(marker)
+    if utf32:
+        offset = 4 if marker in (codecs.BOM_UTF32_LE, codecs.BOM_UTF32_BE) else 0
+        prefix, declared = _xml_declaration(first, blocks, utf32, offset)
+        if declared not in (None, "utf-32", utf32):
+            raise ValueError("Test evidence XML declaration differs from its UTF-32 bytes.")
+        return prefix, "utf-32" if offset else utf32
+
+    # Expat reads Unicode byte signatures directly. Decode other declared text
+    # encodings here so XML documents can also use multibyte code pages.
+    prefix, declared = _xml_declaration(first, blocks, "ascii", 0)
+    if declared == "utf-7":
+        raise ValueError("Test evidence XML does not support UTF-7.")
+    if declared and "<?xml".encode(declared) != b"<?xml":
+        raise ValueError("Test evidence XML declaration differs from its bytes.")
+    # The PowerShell host resolves Shift_JIS to Windows code page 932.
+    return prefix, "cp932" if declared == "shift_jis" else declared
+
+
 def _root(path: Path) -> ET.Element:
     info = path.stat()
     if not stat.S_ISREG(info.st_mode) or not 1 <= info.st_size <= MAX_BYTES:
         raise ValueError(SIZE_ERROR)
-    parser = ET.XMLParser(target=_Tree())  # noqa: S314 - rejects DTDs.
+    parser = ET.XMLParser(target=_Tree())  # noqa: S314 - rejects document types.
     with path.open("rb") as stream:
-        first = stream.read(64 * 1024)
-        marker = first[:4]
-        encoding = {
-            codecs.BOM_UTF32_LE: "utf-32",
-            codecs.BOM_UTF32_BE: "utf-32",
-            b"<\x00\x00\x00": "utf-32-le",
-            b"\x00\x00\x00<": "utf-32-be",
-        }.get(marker)
+        blocks = _blocks(stream)
+        first, encoding = _xml_input(next(blocks, b""), blocks)
         decoder = codecs.getincrementaldecoder(encoding)() if encoding else None
-        size = 0
-        for block in chain((first,), iter(lambda: stream.read(64 * 1024), b"")):
-            size += len(block)
-            if size > MAX_BYTES:
-                raise ValueError(SIZE_ERROR)
+        for block in chain((first,), blocks):
             parser.feed(decoder.decode(block) if decoder else block)
         if decoder:
             parser.feed(decoder.decode(b"", final=True))

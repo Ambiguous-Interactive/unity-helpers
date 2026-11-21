@@ -51,11 +51,11 @@ HOST_GIT_INPUTS = (
     ".github/workflows/wproto-generator.yml",
     "scripts/verify-wproto-evidence.ps1",
     "scripts/run-wproto-evidence.ps1",
-    "scripts/unity/lib/test-result-evidence.ps1",
-    "scripts/unity/test_result_evidence.py",
     "scripts/unity/lib/catastrophic-patterns.ps1",
 )
 HOST_TOOL_INPUTS = (
+    "scripts/unity/lib/test-result-evidence.ps1",
+    "scripts/unity/test_result_evidence.py",
     "scripts/unity/lib/source-census-python.ps1",
     "scripts/unity/frozen_files.py",
     "scripts/python~/pyproject.toml",

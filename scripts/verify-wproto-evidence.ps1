@@ -379,7 +379,7 @@ function Assert-WProtoEvidence {
     if ([IO.File]::ReadAllText($record.sdkLog.path).Trim() -cne $record.environment.sdkVersion) { throw 'SDK identity differs from its observation.' }
     $testBinaries = @($record.binaries | Where-Object { $_.role -ceq 'test-assembly' })
     if ($testBinaries.Count -ne 1) { throw 'Exactly one test assembly is required.' }
-    $result = Read-TestResultEvidence -Path $record.results.path -Format $record.results.format
+    $result = Read-TestResultEvidence -Path $record.results.path -Format $record.results.format -RepositoryRoot $Root
     $resultStarted = [DateTimeOffset]::Parse($result.StartedUtc)
     $resultEnded = [DateTimeOffset]::Parse($result.CompletedUtc)
     if ([string]::IsNullOrWhiteSpace($result.RunId) -or $result.RunId -cne $record.resultRunId -or $resultStarted -lt $started -or $resultStarted -gt $resultEnded -or $resultEnded -gt $ended) { throw 'Results do not belong to the observed process.' }
