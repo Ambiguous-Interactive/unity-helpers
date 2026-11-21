@@ -64,8 +64,8 @@ runs:
         UH_UNITY_VERSION: ${{ inputs.unity-version }}
       run: |
         $repoRoot = if ($env:GITHUB_WORKSPACE) { $env:GITHUB_WORKSPACE } else { (Get-Location).Path }
+        $repoRoot = [IO.Path]::TrimEndingDirectorySeparator((Convert-Path -LiteralPath $repoRoot))
         . (Join-Path $repoRoot 'scripts/unity/lib/credential-redaction.ps1')
-        . (Join-Path $repoRoot 'scripts/unity/lib/compilation-fixture-results.ps1')
         $dir = $env:UH_RESULTS_DIR
         $label = $env:UH_LABEL
         # When the caller resolved an empty unity-helpers test-assembly list for
@@ -309,26 +309,6 @@ runs:
           }
         }
 
-        # DIAGNOSTIC: when results.xml reports failures, name WHICH tests failed
-        # and print their assertion messages. The aggregate "failed=N" count is
-        # not actionable on its own (a real 2021.3 PlayMode run failed 1 of 697
-        # tests and the logs never named it). Emits a single-line ::error::
-        # annotation per failed test plus a ::group:: console block with the full
-        # multi-line message + stack trace. Two classes are enumerated:
-        #   (1) failed leaf cases: //test-case[@result='Failed'], and
-        #   (2) failed suites with their OWN direct <failure> child whose
-        #       failure site is not Child (the
-        #       OneTimeSetUp/OneTimeTearDown shape, e.g. a [OneTimeTearDown]
-        #       Assert.Fail), which manifest as a failed SUITE. Reported even when
-        #       the suite also has a failed child case, so the teardown's own
-        #       message is not lost; fullname de-dup keeps it distinct from the
-        #       child cases. An aggregate-only suite (no direct <failure>) is
-        #       skipped.
-        # De-duplicated by fullname, capped at the first 50 (with a truncation
-        # notice), and best-effort (never throws -- a diagnostic must not mask
-        # the real failure below). Attribute reads use XmlElement.GetAttribute
-        # (returns '' when absent, never throws) so behavior stays synchronized
-        # with run-ci-tests.ps1 even though this script does not set StrictMode.
         function ConvertTo-SingleLineDiagnostic {
           param([string]$Text)
           if (-not $Text) {
@@ -376,75 +356,18 @@ runs:
         function New-WorkflowCommandStopToken {
           return ('uh-stop-commands-{0}' -f [guid]::NewGuid().ToString('N'))
         }
-        # Resolve a node's display name via XmlElement.GetAttribute (returns ''
-        # for an ABSENT attribute, never throws) -- kept synchronized with
-        # run-ci-tests.ps1's StrictMode-safe Get-NUnitNodeFullName. Prefers
-        # fullname, then name, then a '(unnamed test)' fallback.
-        function Get-NUnitNodeFullName {
-          param([Parameter(Mandatory = $true)]$Node)
-          $fullName = $Node.GetAttribute('fullname')
-          if (-not $fullName) {
-            $fullName = $Node.GetAttribute('name')
-          }
-          if (-not $fullName) {
-            $fullName = '(unnamed test)'
-          }
-          return $fullName
-        }
         function Write-FailedTestAnnotations {
           param(
-            [Parameter(Mandatory = $true)]$Doc,
+            [AllowEmptyCollection()][object[]]$Failures,
             [Parameter(Mandatory = $true)][string]$Label,
-            [int]$MaxFailures = 50
+            [int]$Omitted
           )
 
           try {
-            $failedCases = @($Doc.SelectNodes("//test-case[@result='Failed']"))
-            $failedSuites = @($Doc.SelectNodes("//test-suite[@result='Failed'][not(@site='Child')]"))
-            # Report a failed suite on its OWN merits whenever it carries a
-            # direct <failure> child (even if it also has a failed descendant
-            # case) so a [OneTimeTearDown] message is not lost. fullname de-dup
-            # keeps it distinct from its child cases; an aggregate-only suite
-            # (no direct <failure>) is skipped.
-            $ownFailureSuites = @(
-              foreach ($suite in $failedSuites) {
-                $directFailure = $suite.SelectSingleNode('failure')
-                if ($directFailure) {
-                  $suite
-                }
-              }
-            )
-            $failedNodes = @($failedCases) + @($ownFailureSuites)
-            if ($failedNodes.Count -lt 1) {
-              return
-            }
-
-            $seen = New-Object 'System.Collections.Generic.HashSet[string]'
-            $uniqueNodes = New-Object 'System.Collections.Generic.List[object]'
-            foreach ($node in $failedNodes) {
-              $fullName = Get-NUnitNodeFullName -Node $node
-              if ($seen.Add($fullName)) {
-                $uniqueNodes.Add($node)
-              }
-            }
-
-            $totalFailed = $uniqueNodes.Count
-            $shown = @($uniqueNodes | Select-Object -First $MaxFailures)
-            foreach ($node in $shown) {
-              $fullName = Get-NUnitNodeFullName -Node $node
-              $failureNode = $node.SelectSingleNode('failure')
-              $message = ''
-              $stackTrace = ''
-              if ($failureNode) {
-                $messageNode = $failureNode.SelectSingleNode('message')
-                if ($messageNode) {
-                  $message = $messageNode.InnerText
-                }
-                $stackNode = $failureNode.SelectSingleNode('stack-trace')
-                if ($stackNode) {
-                  $stackTrace = $stackNode.InnerText
-                }
-              }
+            foreach ($failure in $Failures) {
+              $fullName = ConvertTo-SingleLineDiagnostic -Text $failure.name
+              $message = $failure.message
+              $stackTrace = $failure.stack_trace
               $firstLine = ConvertTo-SingleLineDiagnostic -Text $message
               # The single-line ::error:: annotation stays OUTSIDE the fence so
               # GitHub still processes it; it is already flattened to one line.
@@ -475,23 +398,12 @@ runs:
               Write-Host "::endgroup::"
             }
 
-            if ($totalFailed -gt $shown.Count) {
-              $omitted = $totalFailed - $shown.Count
-              Write-Host "::notice::${Label}: $omitted additional failed test(s) not shown (showing first $($shown.Count) of $totalFailed)."
+            if ($Omitted -gt 0) {
+              $totalFailed = $Omitted + $Failures.Count
+              Write-Host "::notice::${Label}: $Omitted additional failed test(s) not shown (showing first $($Failures.Count) of $totalFailed)."
             }
           } catch {
             Write-Host "::warning::Could not enumerate failed tests for ${Label}: $($_.Exception.Message)"
-          }
-        }
-        function Get-FailedNodeCount {
-          param([Parameter(Mandatory = $true)]$Doc)
-
-          try {
-            $failedCases = @($Doc.SelectNodes("//test-case[@result='Failed']"))
-            $failedSuitesWithOwnFailure = @($Doc.SelectNodes("//test-suite[@result='Failed'][failure][not(@site='Child')]"))
-            return $failedCases.Count + $failedSuitesWithOwnFailure.Count
-          } catch {
-            return 0
           }
         }
         function Write-UnityExecutionSymptomDiagnostics {
@@ -673,12 +585,94 @@ runs:
           Write-Host "::error::No artifacts directory ($dir) -- Unity Test Runner did not produce results for $label"
           exit 1
         }
-        $xml = Get-UnityRootNUnitResultFile -ResultsDirectory $dir
-        if (-not $xml) {
-          # Catastrophic patterns were already scanned at the TOP of this
-          # step (see the Write-UnityCatastrophicPatternHits call above the
-          # Test-Path block); a second call here would emit duplicate
-          # `::error::` annotations for the same hits.
+        $xmlPath = Join-Path $dir 'results.xml'
+        $verdict = if (Test-Path -LiteralPath $xmlPath -PathType Leaf) {
+          $sourcePaths = @(
+            '.github/actions/verify-unity-results/action.yml'
+            'scripts/python~/pyproject.toml'
+            'scripts/python~/uv.lock'
+            'scripts/cli_encoding.py'
+            'scripts/unity/nunit_results.py'
+            'scripts/unity/lib/compilation-fixture-results.ps1'
+          )
+          $checkout = git -C $repoRoot rev-parse --verify HEAD
+          if ($LASTEXITCODE -ne 0 -or ($env:GITHUB_SHA -and $checkout -cne $env:GITHUB_SHA)) {
+            throw 'The Unity verifier checkout does not match the recorded revision.'
+          }
+          function Get-VerifierGitObjects {
+            $observed = @(git -C $repoRoot hash-object -- @sourcePaths)
+            if ($LASTEXITCODE -ne 0 -or $observed.Count -ne $sourcePaths.Count) {
+              throw 'The Unity verifier could not read the checkout inputs.'
+            }
+            return $observed
+          }
+          $objectNames = @($sourcePaths | ForEach-Object { "${checkout}:$_" })
+          $expected = @(git -C $repoRoot rev-parse @objectNames)
+          if ($LASTEXITCODE -ne 0 -or $expected.Count -ne $sourcePaths.Count -or
+              ((Get-VerifierGitObjects) -join ',') -cne ($expected -join ',')) {
+            throw 'The Unity verifier inputs do not match the recorded checkout.'
+          }
+          $sourceFiles = @($sourcePaths | ForEach-Object { Join-Path $repoRoot $_ })
+          $sourceEntries = @(
+            foreach ($file in $sourceFiles) {
+              $entry = $file
+              while ($entry -ne $repoRoot) {
+                $entry
+                $entry = Split-Path -LiteralPath $entry
+              }
+            }
+          ) | Select-Object -Unique
+          function Get-VerifierByteHashes {
+            foreach ($entry in @(Get-Item -LiteralPath $sourceEntries -Force -ErrorAction Stop)) {
+              if ($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+                throw "Unity verifier inputs must be ordinary checkout paths: $($entry.FullName)"
+              }
+            }
+            return ((Get-FileHash -LiteralPath $sourceFiles -ErrorAction Stop).Hash -join ',')
+          }
+          $sourceHashes = Get-VerifierByteHashes
+          . (Join-Path $repoRoot 'scripts/unity/lib/compilation-fixture-results.ps1')
+          $arguments = @(
+            'run', '--quiet', '--project', (Join-Path $repoRoot 'scripts/python~'), '--locked', '--no-dev'
+            'python', '-I', '-B', (Join-Path $repoRoot 'scripts/unity/nunit_results.py')
+            '--verify-composite', ('--required-name=' + $env:UH_REQUIRED_TEST_NAME)
+          )
+          $reportPaths = @('results.xml')
+          if (-not [string]::IsNullOrWhiteSpace($env:UH_REQUIRED_COMPILATION_FIXTURE)) {
+            $reportPaths += 'compilation/results.xml'
+            $arguments += @('--isolated', 'compilation/results.xml', $env:UH_REQUIRED_COMPILATION_FIXTURE)
+            foreach ($idleFixture in @(Get-UnityIdleEditorIsolationFixtures -UnityVersion $env:UH_UNITY_VERSION)) {
+              $relative = 'idle-editor/' + $idleFixture + '/results.xml'
+              $reportPaths += $relative
+              $arguments += @('--isolated', $relative, $idleFixture)
+            }
+            foreach ($group in @(Get-UnityMigrationIsolationGroups)) {
+              $relative = 'migration/' + $group.Name + '/results.xml'
+              $reportPaths += $relative
+              $arguments += @('--isolated', $relative) + $group.Fixtures
+            }
+          }
+          $arguments += @('--', (Convert-Path -LiteralPath $dir))
+          $PSNativeCommandUseErrorActionPreference = $false
+          $receipt = & uv @arguments
+          $verifierExit = $LASTEXITCODE
+          if ($verifierExit -notin @(0, 1) -or -not $receipt) {
+            throw "The Unity result verifier exited $verifierExit without a verdict."
+          }
+          $current = git -C $repoRoot rev-parse --verify HEAD
+          $currentExit = $LASTEXITCODE
+          $currentHashes = Get-VerifierByteHashes
+          if ($currentExit -ne 0 -or $current -cne $checkout -or $currentHashes -cne $sourceHashes -or
+              ((Get-VerifierGitObjects) -join ',') -cne ($expected -join ',')) {
+            throw 'The Unity verifier checkout changed during verification.'
+          }
+          $decoded = $receipt | ConvertFrom-Json -AsHashtable -ErrorAction Stop
+          if (($verifierExit -eq 0) -ne ($decoded.status -ceq 'passed')) {
+            throw 'The Unity result verifier exit does not match its verdict.'
+          }
+          $decoded
+        }
+        if (-not $verdict -or $verdict.status -ceq 'missing') {
           Write-UnityPackageManagerFailureHints -ResultsDir $dir
           Write-UnityExecutionSymptomDiagnostics -ResultsDir $dir -Label $label
           Write-UnityHangCulpritDiagnostic -ResultsDir $dir -Label $label
@@ -686,69 +680,60 @@ runs:
           Write-Host "::error::No NUnit results.xml (with a <test-run> element) under $dir -- tests did not run for $label"
           exit 1
         }
-        function Assert-RequiredNativeTest {
-          param([xml]$Doc, [string]$RequiredTestName)
-          if ([string]::IsNullOrEmpty($RequiredTestName)) { return }
-          $cases = @($Doc.SelectNodes('//test-case') | Where-Object {
-            $_.GetAttribute('fullname') -ceq $RequiredTestName
-          })
-          if ($cases.Count -ne 1 -or $cases[0].GetAttribute('result') -cne 'Passed') {
-            throw "Required native test '$RequiredTestName' must have exactly one passed result."
+        if ($verdict.counts) {
+          $counts = "total=$($verdict.counts.total) passed=$($verdict.counts.passed) failed=$($verdict.counts.failed) skipped=$($verdict.counts.skipped)"
+          if ($verdict.status -cne 'passed') {
+            Write-Host "Results: $counts (results.xml)"
           }
         }
-
-        function Assert-SingletonMetadataIdentities {
-          param([xml]$Doc)
-          $prefix = 'WallstopStudios.UnityHelpers.Tests.Utils.ScriptableObjectSingletonTests.MetadataAssetTracksSingletonEntries('
-          $identities = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
-          foreach ($case in @($Doc.SelectNodes("//test-case[starts-with(@fullname, '$prefix')]"))) {
-            $identity = $case.GetAttribute('fullname')
-            if (-not $identities.Add($identity)) {
-              throw "Duplicate singleton metadata scenario identity: $identity"
+        switch -CaseSensitive ($verdict.status) {
+          'passed' {
+            # Hold every report open until the verdict is published. All hosted callers run on Windows.
+            $reports = [ordered]@{}
+            try {
+              foreach ($relative in $reportPaths) {
+                $path = Join-Path $dir $relative
+                $reports[$relative] = [IO.File]::Open($path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+              }
+              foreach ($relative in $reportPaths) {
+                $digest = (Get-FileHash -InputStream $reports[$relative] -ErrorAction Stop).Hash
+                if ($digest -ne $verdict.report_hashes[$relative]) {
+                  throw "The NUnit report changed during verification: $relative"
+                }
+              }
+              if (-not $IsWindows) {
+                # Unrelated POSIX writers do not honor the read share. Recheck the live paths as well.
+                foreach ($relative in $reportPaths) {
+                  $digest = (Get-FileHash -LiteralPath (Join-Path $dir $relative) -ErrorAction Stop).Hash
+                  if ($digest -ne $verdict.report_hashes[$relative]) {
+                    throw "The NUnit report changed during verification: $relative"
+                  }
+                }
+              }
+              Write-Host "Results: $counts (results.xml)"
+              Write-Host "::notice::${label}: $counts"
+            } finally {
+              foreach ($report in $reports.Values) {
+                $report.Dispose()
+              }
             }
           }
-        }
-
-        [xml]$doc = Get-Content -LiteralPath $xml.FullName
-        Assert-SingletonMetadataIdentities -Doc $doc
-        $run = $doc.SelectSingleNode('//test-run')
-        $total = [int]($run.total)
-        $passed = [int]($run.passed)
-        $failed = [int]($run.failed)
-        $skipped = [int]($run.skipped)
-        $failedNodeCount = Get-FailedNodeCount -Doc $doc
-        Write-Host "Results: total=$total passed=$passed failed=$failed skipped=$skipped ($($xml.Name))"
-        if ($total -lt 1) {
-          Write-UnityExecutionSymptomDiagnostics -ResultsDir $dir -Label $label
-          Write-UnityHangCulpritDiagnostic -ResultsDir $dir -Label $label
-          $zeroCountMessage = @(
-            "::error::$label produced zero-count NUnit XML."
-            "This can be a failed or aborted Unity run with misleading results.xml,"
-            "not proof of an empty assembly list; inspect Unity execution diagnostics above."
-          ) -join " "
-          Write-Host $zeroCountMessage
-          exit 1
-        }
-        if ($failed -gt 0 -or $failedNodeCount -gt 0) {
-          Write-FailedTestAnnotations -Doc $doc -Label $label
-          $failureCountForMessage = [Math]::Max($failed, $failedNodeCount)
-          Write-Host "::error::$label reported $failureCountForMessage failed test(s); see $($xml.FullName)"
-          exit 1
-        }
-        Assert-RequiredNativeTest -Doc $doc -RequiredTestName $env:UH_REQUIRED_TEST_NAME
-        if (-not [string]::IsNullOrWhiteSpace($env:UH_REQUIRED_COMPILATION_FIXTURE)) {
-          Assert-UnityCompilationFixtureResults `
-            -Path (Join-Path $dir 'compilation/results.xml') `
-            -FixtureName $env:UH_REQUIRED_COMPILATION_FIXTURE
-          foreach ($idleFixture in @(Get-UnityIdleEditorIsolationFixtures -UnityVersion $env:UH_UNITY_VERSION)) {
-            Assert-UnityCompilationFixtureResults `
-              -Path (Join-Path $dir ('idle-editor/' + $idleFixture + '/results.xml')) `
-              -FixtureName $idleFixture
+          'zero' {
+            Write-UnityExecutionSymptomDiagnostics -ResultsDir $dir -Label $label
+            Write-UnityHangCulpritDiagnostic -ResultsDir $dir -Label $label
+            $zeroCountMessage = @(
+              "::error::$label produced zero-count NUnit XML."
+              "This can be a failed or aborted Unity run with misleading results.xml,"
+              "not proof of an empty assembly list; inspect Unity execution diagnostics above."
+            ) -join " "
+            Write-Host $zeroCountMessage
+            exit 1
           }
-          foreach ($group in @(Get-UnityMigrationIsolationGroups)) {
-            Assert-UnityCompilationFixtureResults `
-              -Path (Join-Path $dir ('migration/' + $group.Name + '/results.xml')) `
-              -FixtureName $group.Fixtures
+          'failed' {
+            Write-FailedTestAnnotations -Failures $verdict.failure_details -Label $label -Omitted $verdict.omitted_failure_details
+            $failureCountForMessage = [Math]::Max([int]$verdict.counts.failed, [int]$verdict.failure_count)
+            Write-Host "::error::$label reported $failureCountForMessage failed test(s); see $(Convert-Path -LiteralPath $dir)/results.xml"
+            exit 1
           }
+          default { throw (ConvertTo-SingleLineDiagnostic -Text "Unity result verification rejected: $($verdict.diagnostic)") }
         }
-        Write-Host "::notice::${label}: total=$total passed=$passed failed=$failed skipped=$skipped"

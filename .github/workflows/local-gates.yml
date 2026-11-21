@@ -394,6 +394,11 @@ jobs:
           scripts/tests/test_pwsh_invocation_asts.py
           -vv --durations=20
 
+      - name: Verify Unity result publication on Windows
+        if: matrix.phase == 'orchestration'
+        shell: pwsh
+        run: npm run test:unity-test-filter
+
   assembly-tools-windows:
     name: Assembly tools (Windows)
     needs: windows-tool-phases

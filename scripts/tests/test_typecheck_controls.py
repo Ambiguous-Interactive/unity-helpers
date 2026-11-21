@@ -646,6 +646,13 @@ def test_windows_phases_preserve_every_suite_and_bounded_concurrency() -> None:
     assert phase["timeout-minutes"] == 10
     assert phase["runs-on"] == "windows-latest"
     assert "continue-on-error" not in phase
+    publication_controls = [
+        step for step in steps(phase) if step.get("run") == "npm run test:unity-test-filter"
+    ]
+    assert len(publication_controls) == 1
+    assert publication_controls[0]["if"] == "matrix.phase == 'orchestration'"
+    assert publication_controls[0]["shell"] == "pwsh"
+    assert "continue-on-error" not in publication_controls[0]
     commands = [step for step in steps(phase) if "pytest" in str(step.get("run", ""))]
     covered: list[str] = []
     for step in commands:
