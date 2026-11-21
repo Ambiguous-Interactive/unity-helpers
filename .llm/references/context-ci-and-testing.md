@@ -49,7 +49,7 @@ redacted, uploaded, and required by the aggregate gate (#813).
     the newest ever published** -- so a 2021.2/2021.3 member reads as absent: #553 one notch worse.
     Exclude such a file rather than "fixing" the source; the seven exclusions and their
     compile shims are enumerated in the csproj. **These exclusions still lack complete local API binding checks**. The editor build runs a
-    separate WUH013/WUH019/WUH021/WUH023/WUH026/WUH028 audit over nine excluded runtime/editor subjects, including the dictionary and set
+    separate WUH013/WUH019/WUH021/WUH023/WUH026/WUH028 audit over ten excluded runtime/editor subjects, including the dictionary and set
     drawers, with in-compilation reporting controls; this certifies only these collection, public struct equality, boolean operator, and fresh pooled-clear diagnostics.
     Other changes still require real Unity verification. Copy the check
     project, drop those two `<Compile Remove>` lines and build that: the only `CS####` it should

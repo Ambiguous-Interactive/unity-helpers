@@ -117,11 +117,12 @@ namespace WallstopStudios.UnityHelpers.CountingLoopAudit
                     "/Runtime/Core/Extension/Partials/UI.cs",
                     "/Runtime/Utils/MatchColliderToSprite.cs",
                     "/Runtime/Visuals/UGUI/EnhancedImage.cs",
+                    "/Runtime/Visuals/UGUI/NonDrawingGraphic.cs",
                 };
                 if (!HasRequiredSubjects(sources, subjects, requiredSubjects))
                 {
                     throw new InvalidOperationException(
-                        "The nine excluded production sources must all be audit subjects."
+                        "The ten excluded production sources must all be audit subjects."
                     );
                 }
 

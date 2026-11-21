@@ -343,7 +343,7 @@
     <!-- The runtime, with TypeCheck's exclusions. TypeCheck remains the gate that JUDGES it. -->
     <Compile
       Include="$(RepoRoot)/Runtime/**/*.cs"
-      Exclude="$(RepoRoot)/Runtime/Integrations/**/*.cs;$(RepoRoot)/Runtime/Analyzers/**/*.cs;$(RepoRoot)/Runtime/Core/Extension/Partials/UI.cs;$(RepoRoot)/Runtime/Utils/MatchColliderToSprite.cs;$(RepoRoot)/Runtime/Visuals/UGUI/EnhancedImage.cs"
+      Exclude="$(RepoRoot)/Runtime/Integrations/**/*.cs;$(RepoRoot)/Runtime/Analyzers/**/*.cs;$(RepoRoot)/Runtime/Core/Extension/Partials/UI.cs;$(RepoRoot)/Runtime/Utils/MatchColliderToSprite.cs;$(RepoRoot)/Runtime/Visuals/UGUI/EnhancedImage.cs;$(RepoRoot)/Runtime/Visuals/UGUI/NonDrawingGraphic.cs"
     />
     <!-- The UI Toolkit styles referenced by the progress-control editmode fixtures. -->
     <Compile Include="$(RepoRoot)/Styles/**/*.cs" />
