@@ -76,7 +76,7 @@ foreach ($file in $consumerInputs) {
     $consumerHashes.Add($file.FullName, $hash)
     $sourceRows.Add("$hash  $relative")
 }
-$acceptanceTools = @('run-nullable-consumer.ps1','run-nullable-consumer-player-matrix.ps1','verify-nullable-consumer.ps1','lib/il2cpp-conversion-inputs.ps1','run-acceptance.ps1','verify-acceptance.ps1','resolve-test-matrix.js')
+$acceptanceTools = @('run-nullable-consumer.ps1','run-nullable-consumer-player-matrix.ps1','verify-nullable-consumer.ps1','lib/il2cpp-conversion-inputs.ps1','run-acceptance.ps1','verify-acceptance.ps1','resolve-test-matrix.js','player_manifest.py','frozen_files.py')
 foreach ($relative in $acceptanceTools) {
     $path = Join-Path $PSScriptRoot $relative
     $hash = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -95,7 +95,7 @@ foreach ($file in $consumerInputs) {
     New-Item -ItemType Directory -Force -Path ([IO.Path]::GetDirectoryName($destination)) | Out-Null
     Copy-Item -LiteralPath $file.FullName -Destination $destination
 }
-foreach ($relative in @('.github/unity-versions.json','.github/unity-test-project-modules.json')) {
+foreach ($relative in @('.github/unity-versions.json','.github/unity-test-project-modules.json','scripts/python~/pyproject.toml','scripts/python~/uv.lock')) {
     $path = Join-Path $repoPath $relative
     $hash = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
     $packageHashes.Add($path,$hash)

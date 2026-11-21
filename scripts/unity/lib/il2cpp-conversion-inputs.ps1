@@ -173,54 +173,24 @@ function Get-QualifiedConversionModules {
         @{ invocation = $conversion; modules = $modules }
     }
 }
-function Get-Il2CppPlayerInventory {
-    param([Parameter(Mandatory)][string]$PlayerRoot)
-    $root = [IO.Path]::GetFullPath($PlayerRoot)
-    if (-not (Test-Path -LiteralPath $root -PathType Container)) { throw 'Actual player directory missing' }
-    $rootItem = Get-Item -LiteralPath $root -Force
-    $items = @(Get-ChildItem -LiteralPath $root -Recurse -Force)
-    foreach ($item in @($rootItem) + $items) {
-        if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'Player inventory cannot contain linked paths' }
-    }
-    $files = [Collections.Generic.Dictionary[string,string]]::new([StringComparer]::Ordinal)
-    foreach ($file in $items) {
-        if ($file.PSIsContainer) { continue }
-        $relative = [IO.Path]::GetRelativePath($root, $file.FullName).Replace('\', '/')
-        $files.Add($relative, (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant())
-    }
-    foreach ($required in @('IndependentConsumer.exe', 'GameAssembly.dll', 'UnityPlayer.dll', 'IndependentConsumer_Data/il2cpp_data/Metadata/global-metadata.dat')) {
-        if (-not $files.ContainsKey($required)) { throw "Required actual player file missing: $required" }
-    }
-    [string[]]$paths = @($files.Keys)
-    [Array]::Sort($paths, [StringComparer]::Ordinal)
-    foreach ($path in $paths) { @{ path = $path; sha256 = $files[$path] } }
+function Invoke-Il2CppPlayerManifest {
+    param([string]$Operation, [string]$PlayerRoot, [string]$ManifestPath, [string[]]$Options = @())
+    $arguments = @(
+        'run', '--quiet', '--project', (Join-Path $PSScriptRoot '../../python~'), '--locked', '--no-dev',
+        'python', '-B', (Join-Path $PSScriptRoot '../player_manifest.py'), $Operation
+    ) + @($Options) + @('--', [IO.Path]::GetFullPath($PlayerRoot), [IO.Path]::GetFullPath($ManifestPath))
+    $PSNativeCommandUseErrorActionPreference = $false
+    $result = @(& uv @arguments 2>&1) -join [Environment]::NewLine
+    if ($LASTEXITCODE -ne 0) { throw $result }
+    if ($Operation -ceq 'create') { $result }
 }
 function Assert-Il2CppPlayerManifest {
     param([Parameter(Mandatory)][string]$PlayerRoot, [Parameter(Mandatory)][string]$ManifestPath, [Parameter(Mandatory)][string]$ExpectedSHA256)
-    if ($ExpectedSHA256 -notmatch '^[0-9a-f]{64}$' -or (Get-FileHash -LiteralPath $ManifestPath -Algorithm SHA256).Hash.ToLowerInvariant() -ne $ExpectedSHA256) { throw 'Actual player manifest hash differs' }
-    $rows = @(Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json)
-    $expected = [Collections.Generic.Dictionary[string,string]]::new([StringComparer]::Ordinal)
-    foreach ($row in $rows) {
-        if ($row.path -isnot [string] -or $row.path -match '(^/|\\|:|[\r\n]|(?:^|/)\.{1,2}(?:/|$)|//|/$)' -or [string]::IsNullOrWhiteSpace($row.path) -or $row.sha256 -notmatch '^[0-9a-f]{64}$' -or -not $expected.TryAdd($row.path, $row.sha256)) { throw 'Malformed or duplicated actual player manifest entry' }
-    }
-    $actual = @(Get-Il2CppPlayerInventory -PlayerRoot $PlayerRoot)
-    if ($expected.Count -ne $actual.Count) { throw 'Actual player file inventory differs' }
-    foreach ($row in $actual) {
-        if (-not $expected.ContainsKey($row.path) -or $expected[$row.path] -ne $row.sha256) { throw "Actual player file differs: $($row.path)" }
-    }
+    Invoke-Il2CppPlayerManifest -Operation verify -PlayerRoot $PlayerRoot -ManifestPath $ManifestPath -Options @("--expected-sha=$ExpectedSHA256")
 }
 function New-Il2CppPlayerManifest {
     param([Parameter(Mandatory)][string]$PlayerRoot, [Parameter(Mandatory)][string]$ManifestPath)
-    $root = [IO.Path]::GetFullPath($PlayerRoot)
-    $path = [IO.Path]::GetFullPath($ManifestPath)
-    $relative = [IO.Path]::GetRelativePath($root, $path)
-    if ($relative -ne '..' -and -not $relative.StartsWith('..' + [IO.Path]::DirectorySeparatorChar, [StringComparison]::Ordinal)) { throw 'Player manifest must be outside the player directory' }
-    if (Test-Path -LiteralPath $path) { throw 'Refusing existing actual player manifest' }
-    $rows = @(Get-Il2CppPlayerInventory -PlayerRoot $root)
-    $rows | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $path -Encoding utf8
-    $hash = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
-    Assert-Il2CppPlayerManifest -PlayerRoot $root -ManifestPath $path -ExpectedSHA256 $hash
-    $hash
+    Invoke-Il2CppPlayerManifest -Operation create -PlayerRoot $PlayerRoot -ManifestPath $ManifestPath
 }
 
 # The producer and verifier share this recipe; Unity-added dependencies are not ignored.

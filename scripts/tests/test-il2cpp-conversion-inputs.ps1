@@ -156,7 +156,7 @@ try {
         [IO.File]::WriteAllBytes($path, $original)
         Remove-Item -LiteralPath $path -Force
         Require-PlayerRejection { Assert-Il2CppPlayerManifest -PlayerRoot $player -ManifestPath $manifest -ExpectedSHA256 $manifestHash } 'Required actual player file missing:' "player-required-removal-rejected-$name"
-        Require-PlayerRejection { Get-Il2CppPlayerInventory -PlayerRoot $player } 'Required actual player file missing:' "player-baseline-required-file-absent-rejected-$name"
+        Require-PlayerRejection { New-Il2CppPlayerManifest -PlayerRoot $player -ManifestPath (Join-Path $root 'incomplete-player-tree.json') } 'Required actual player file missing:' "player-baseline-required-file-absent-rejected-$name"
         [IO.File]::WriteAllBytes($path, $original)
     }
     foreach ($name in @('added.bin', '.hidden-native-file')) {

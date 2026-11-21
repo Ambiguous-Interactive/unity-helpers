@@ -43,14 +43,14 @@ $expectedPackage.Add('package/package.json') | Out-Null
 if (-not $rows.ContainsKey('package/package.json')) { throw 'Current package.json absent from bound manifest' }
 Require-Hash (Join-Path $repoPath 'package.json') $rows['package/package.json']
 if (@($rows.Keys | Where-Object { $_.StartsWith('package/',[StringComparison]::Ordinal) }).Count -ne $expectedPackage.Count) { throw 'Current checkout package inventory differs from manifest' }
-$tools = @('run-nullable-consumer.ps1','run-nullable-consumer-player-matrix.ps1','verify-nullable-consumer.ps1','lib/il2cpp-conversion-inputs.ps1','run-acceptance.ps1','verify-acceptance.ps1','resolve-test-matrix.js')
+$tools = @('run-nullable-consumer.ps1','run-nullable-consumer-player-matrix.ps1','verify-nullable-consumer.ps1','lib/il2cpp-conversion-inputs.ps1','run-acceptance.ps1','verify-acceptance.ps1','resolve-test-matrix.js','player_manifest.py','frozen_files.py')
 foreach ($relative in $tools) {
     $label = 'acceptance-tools/' + $relative
     if (-not $rows.ContainsKey($label)) { throw 'Current acceptance tool missing from bound manifest' }
     Require-Hash (Join-Path $repoPath ('scripts/unity/'+$relative)) $rows[$label]
 }
 if (@($rows.Keys | Where-Object { $_.StartsWith('acceptance-tools/',[StringComparison]::Ordinal) }).Count -ne $tools.Count) { throw 'Current acceptance tool inventory differs' }
-$configs = @('.github/unity-versions.json','.github/unity-test-project-modules.json')
+$configs = @('.github/unity-versions.json','.github/unity-test-project-modules.json','scripts/python~/pyproject.toml','scripts/python~/uv.lock')
 foreach ($relative in $configs) {
     $label = 'acceptance-config/'+$relative
     if (-not $rows.ContainsKey($label)) { throw 'Current acceptance configuration missing from bound manifest' }
