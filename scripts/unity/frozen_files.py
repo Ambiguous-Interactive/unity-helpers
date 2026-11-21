@@ -13,14 +13,14 @@ import stat
 import subprocess
 import sys
 import uuid
-from contextlib import nullcontext
+from contextlib import contextmanager
 from functools import cache
 from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict, cast
 
 if TYPE_CHECKING:
     import io
-    from contextlib import ExitStack
+    from collections.abc import Generator
 
 SOURCE_ROOTS = ("Runtime", "Editor", "Tests", "Generator~", "scripts/unity")
 GENERATOR_SUFFIXES = frozenset(
@@ -141,9 +141,7 @@ if sys.platform == "win32":
         kernel.CloseHandle.restype = wintypes.BOOL
         return kernel
 
-    def open_source(path: Path) -> io.BufferedReader[io.FileIO]:
-        import msvcrt
-
+    def _open_windows_handle(path: Path) -> int:
         kernel = windows_kernel32()
         generic_read, share_read, open_existing, ordinary_attributes = 0x80000000, 1, 3, 0x80
         handle: int | None = kernel.CreateFileW(
@@ -151,6 +149,13 @@ if sys.platform == "win32":
         )
         if handle is None or handle == ctypes.c_void_p(-1).value:
             raise ctypes.WinError(ctypes.get_last_error())
+        return handle
+
+    def open_source(path: Path) -> io.BufferedReader[io.FileIO]:
+        import msvcrt
+
+        kernel = windows_kernel32()
+        handle = _open_windows_handle(path)
         try:
             descriptor = msvcrt.open_osfhandle(handle, os.O_RDONLY | os.O_BINARY)
         except BaseException:
@@ -168,15 +173,21 @@ else:
         return cast("io.BufferedReader[io.FileIO]", path.open("rb"))
 
 
-def file_hash(
-    path: Path, observed: os.stat_result | None = None, *, retained: ExitStack | None = None
-) -> tuple[str, int]:
+@contextmanager
+def retain_source(path: Path) -> Generator[None, None, None]:
+    if sys.platform == "win32":
+        handle = _open_windows_handle(path)
+        try:
+            yield
+        finally:
+            windows_kernel32().CloseHandle(handle)
+    else:
+        yield
+
+
+def file_hash(path: Path, observed: os.stat_result | None = None) -> tuple[str, int]:
     before = ordinary(path, directory=False) if observed is None else observed
-    opened_source = open_source(path)
-    context = (
-        opened_source if retained is None else nullcontext(retained.enter_context(opened_source))
-    )
-    with context as stream:
+    with open_source(path) as stream:
         opened = os.fstat(stream.fileno())
         # Windows Python 3.11 stat and fstat expose different meanings for ctime.
         if content_identity(before, comparing_descriptor=True) != content_identity(

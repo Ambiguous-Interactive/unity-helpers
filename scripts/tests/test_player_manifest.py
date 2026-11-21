@@ -129,3 +129,21 @@ def test_wrong_checkout_leaves_no_manifest(
     assert run_cli(monkeypatch, "create", str(player), str(manifest)) == 1
     assert "Player manifest checkout differs" in capsys.readouterr().err
     assert not manifest.exists()
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows CRT descriptor limit")
+def test_player_inventory_can_exceed_the_windows_descriptor_limit(
+    player: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    extra = player / "extra"
+    extra.mkdir()
+    for index in range(8200):
+        (extra / f"{index}.bin").touch()
+    manifest = tmp_path / "manifest.json"
+    digest = create(player, manifest, monkeypatch, capsys)
+    assert len(json.loads(manifest.read_bytes())) == 8204
+    assert run_cli(monkeypatch, "verify", str(player), str(manifest), "--expected-sha", digest) == 0
+    assert capsys.readouterr().err == ""

@@ -20,6 +20,7 @@ from frozen_files import (
     open_source,
     ordinal_key,
     regular_path,
+    retain_source,
     walk,
 )
 
@@ -68,9 +69,9 @@ def _inventory(
     for path, state in states.items():
         if not stat.S_ISREG(state.st_mode):
             continue
-        files[path.relative_to(root).as_posix()] = file_hash(
-            path, state, retained=retained if os.name == "nt" else None
-        )[0]
+        if os.name == "nt":
+            retained.enter_context(retain_source(path))
+        files[path.relative_to(root).as_posix()] = file_hash(path, state)[0]
     for required in _REQUIRED:
         if required not in files:
             raise ValueError(f"Required actual player file missing: {required}")
@@ -117,7 +118,9 @@ def _match_manifest(
     if not _HEX.fullmatch(expected_sha):
         raise ValueError("Actual player manifest hash differs")
     initial = manifest.stat()
-    data = retained.enter_context(open_source(manifest)).read()
+    retained.enter_context(retain_source(manifest))
+    with open_source(manifest) as stream:
+        data = stream.read()
     if hashlib.sha256(data).hexdigest() != expected_sha.lower():
         raise ValueError("Actual player manifest hash differs")
     expected = _parse_manifest(data)
@@ -183,7 +186,7 @@ def main() -> int:
             if os.name == "nt":
                 for path in _TOOL_INPUTS:
                     retained.enter_context(
-                        open_source(regular_path(repository / path, directory=False))
+                        retain_source(regular_path(repository / path, directory=False))
                     )
             before = _tool_identity(repository)
             root = Path(os.path.abspath(args.player_root))  # noqa: PTH100 - retain path entries.
