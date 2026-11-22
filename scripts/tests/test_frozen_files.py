@@ -1109,14 +1109,19 @@ def test_recorded_request_binds_the_file_inside_an_aliased_temp_directory(
 
 
 @pytest.mark.parametrize(
-    ("scope", "message"),
+    ("scope", "replacement_is_file", "message"),
     [
-        ("root", "WProto recorded inventory root changed"),
-        ("nested", "WProto recorded directory changed kind"),
+        ("root", False, "WProto recorded inventory root changed"),
+        ("nested", False, "WProto recorded directory changed kind"),
+        ("nested", True, "WProto recorded directory changed kind"),
     ],
 )
 def test_recorded_subset_refuses_a_directory_replaced_during_input_checks(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, scope: str, message: str
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    scope: str,
+    replacement_is_file: bool,
+    message: str,
 ) -> None:
     root = tmp_path / "retained"
     (root / "nested").mkdir(parents=True)
@@ -1128,17 +1133,21 @@ def test_recorded_subset_refuses_a_directory_replaced_during_input_checks(
 
     replaced = root if scope == "root" else root / "nested"
     previous = replaced.with_name("previous")
+    nested = root / "nested"
 
     def replace_directory() -> None:
         replaced.rename(previous)
-        (root / "nested").mkdir(parents=True)
+        if replacement_is_file:
+            nested.touch()
+        else:
+            nested.mkdir(parents=True)
 
     with pytest.raises(ValueError, match=message):
         frozen_files.verify_recorded_inventory(
             root, rows, complete=False, check_inputs=replace_directory
         )
     assert previous.is_dir()
-    assert (root / "nested").is_dir()
+    assert nested.is_file() if replacement_is_file else nested.is_dir()
 
 
 def test_recorded_subset_refuses_duplicate_normalized_paths(tmp_path: Path) -> None:
