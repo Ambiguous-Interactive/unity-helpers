@@ -654,8 +654,8 @@ def _reserve_linux_recorded_descriptors(lease_count: int) -> Generator[None, Non
             finally:
                 if adjusted != soft:
                     resource.setrlimit(limit, (soft, hard))
-        return
-    yield
+    else:
+        yield
 
 
 @contextmanager
