@@ -997,8 +997,9 @@ def test_recorded_inventory_rechecks_checkout_after_the_final_scan(
 
 @pytest.mark.skipif(sys.platform != "linux", reason="Linux mapped writes and change observation")
 @pytest.mark.parametrize("changed", ["player", "receipt"])
+@pytest.mark.parametrize("already_dirty", [False, True])
 def test_recorded_inventory_rechecks_mapped_writes_during_checkout(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, changed: str
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, changed: str, already_dirty: bool
 ) -> None:
     request, player, receipt = recorded_request(tmp_path)
     target = player if changed == "player" else receipt
@@ -1011,13 +1012,19 @@ def test_recorded_inventory_rechecks_mapped_writes_during_checkout(
         if arguments == ["rev-parse", "--verify", "HEAD"]:
             checkout_reads += 1
             if checkout_reads == 2:
-                with target.open("r+b") as stream, mmap.mmap(stream.fileno(), 0) as mapped:
-                    mapped[:] = content
+                mapped[:] = content
+                if not already_dirty:
                     mapped.flush()
         return original_git(root, arguments)
 
-    monkeypatch.setattr(frozen_files, "git_output", check_checkout)
-    outcome = frozen_files.execute_request(request)
+    with target.open("r+b") as stream, mmap.mmap(stream.fileno(), 0) as mapped:
+        if already_dirty:
+            mapped[:1] = mapped[:1]
+        before = frozen_files.identity(target.stat())
+        monkeypatch.setattr(frozen_files, "git_output", check_checkout)
+        outcome = frozen_files.execute_request(request)
+        if already_dirty:
+            assert frozen_files.identity(target.stat()) == before
     assert checkout_reads == 2
     assert target.read_bytes() == content
     assert (

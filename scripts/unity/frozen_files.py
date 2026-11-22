@@ -602,13 +602,25 @@ def _assert_recorded_directory(
         raise RecordedInventoryError("WProto recorded directory changed kind.")
 
 
+def _assert_recorded_hash(
+    path: Path, before: os.stat_result, expected: str, diagnostic: str
+) -> None:
+    try:
+        actual, _ = file_hash(path, before)
+    except (OSError, ValueError) as error:
+        raise RecordedInventoryError(diagnostic) from error
+    if actual != expected:
+        raise RecordedInventoryError(diagnostic)
+
+
 def _assert_recorded_state(
     root: Path,
     root_before: os.stat_result,
     recorded_names: set[str],
-    observed: dict[Path, tuple[bool, os.stat_result]],
+    observed: dict[Path, tuple[os.stat_result, str | None]],
     *,
     complete: bool,
+    rehash: bool = False,
 ) -> None:
     if complete:
         try:
@@ -618,10 +630,12 @@ def _assert_recorded_state(
         if actual_names != recorded_names:
             raise RecordedInventoryError("WProto complete inventory membership changed.")
     regular_path(root, directory=True)
-    for path, (directory, before) in observed.items():
+    for path, (before, digest) in observed.items():
         current = recorded_stat(root, path)
-        if directory:
+        if digest is None:
             _assert_recorded_directory(before, current, complete=complete)
+        elif rehash:
+            _assert_recorded_hash(path, before, digest, "WProto recorded file changed.")
         elif identity(current) != identity(before):
             raise RecordedInventoryError("WProto recorded file changed.")
     _assert_recorded_root(root, root_before, complete=complete)
@@ -633,26 +647,26 @@ def verify_recorded_inventory(
     *,
     complete: bool,
     check_inputs: Callable[[], None] | None = None,
-    records_path: Path | None = None,
+    receipt: tuple[Path, str] | None = None,
 ) -> None:
     root = regular_path(root_path, directory=True)
     root_before = ordinary(root, directory=True)
     recheck_after_inputs = check_inputs is not None and sys.platform != "win32"
     receipt_before = (
-        ordinary(records_path, directory=False)
-        if recheck_after_inputs and records_path is not None
+        ordinary(receipt[0], directory=False)
+        if recheck_after_inputs and receipt is not None
         else None
     )
     if not isinstance(records, list):
         raise RecordedInventoryError("WProto recorded inventory is empty.")
     recorded_names: set[str] = set()
-    observed: dict[Path, tuple[bool, os.stat_result]] = {}
+    observed: dict[Path, tuple[os.stat_result, str | None]] = {}
     with ExitStack() as retained, observe_windows_membership(root, root_before, complete=complete):
         watcher = LinuxRecordedInventoryWatch(retained) if INOTIFY_OPEN_FLAGS else None
         if watcher is not None:
             watcher.add(root, directory=True, complete=complete)
-            if records_path is not None:
-                watcher.add(records_path, directory=False, complete=False)
+            if receipt is not None:
+                watcher.add(receipt[0], directory=False, complete=False)
         for row in cast("list[object]", records):
             record = cast("dict[str, object]", row) if isinstance(row, dict) else {}
             relative = record.get("Path")
@@ -674,29 +688,29 @@ def verify_recorded_inventory(
                     if parent == root:
                         break
                 watcher.add(path, directory=directory, complete=complete)
+            digest: str | None = None
             if directory:
                 if not stat.S_ISDIR(info.st_mode):
                     raise RecordedInventoryError("WProto recorded directory changed kind.")
             elif record.get("Kind") == "file":
-                digest = record.get("Sha256")
+                expected = record.get("Sha256")
                 if (
                     not stat.S_ISREG(info.st_mode)
-                    or not isinstance(digest, str)
-                    or not re.fullmatch(r"[a-f0-9]{64}", digest)
+                    or not isinstance(expected, str)
+                    or not re.fullmatch(r"[a-f0-9]{64}", expected)
                     or info.st_size != record.get("Length")
                 ):
                     raise RecordedInventoryError("WProto recorded file changed.")
                 try:
                     if sys.platform == "win32":
                         retained.enter_context(retain_source(path))
-                    actual, _ = file_hash(path, info)
-                except (OSError, ValueError) as error:
+                except OSError as error:
                     raise RecordedInventoryError("WProto recorded file changed.") from error
-                if actual != digest:
-                    raise RecordedInventoryError("WProto recorded file changed.")
+                _assert_recorded_hash(path, info, expected, "WProto recorded file changed.")
+                digest = expected
             else:
                 raise RecordedInventoryError("WProto recorded inventory kind is invalid.")
-            observed[path] = (directory, info)
+            observed[path] = (info, digest)
 
         if not recorded_names:
             raise RecordedInventoryError("WProto recorded inventory is empty.")
@@ -707,22 +721,26 @@ def verify_recorded_inventory(
                 # A subset has no membership watch. Recheck its recorded directories
                 # by identity so unrelated entries may still be added or removed.
                 _assert_recorded_root(root, root_before, complete=False)
-                for path, (directory, before) in observed.items():
-                    if directory:
+                for path, (before, digest) in observed.items():
+                    if digest is None:
                         _assert_recorded_directory(
                             before, recorded_stat(root, path), complete=False
                         )
         if recheck_after_inputs:
             if watcher is not None:
                 watcher.verify()
-            # Linux does not report memory-mapped writes as change events.
-            _assert_recorded_state(root, root_before, recorded_names, observed, complete=complete)
-            if (
-                records_path is not None
-                and receipt_before is not None
-                and identity(ordinary(records_path, directory=False)) != identity(receipt_before)
-            ):
-                raise RecordedInventoryError("WProto recorded receipt changed during verification.")
+            # A shared mapping can change bytes without a stat change or a notification.
+            _assert_recorded_state(
+                root, root_before, recorded_names, observed, complete=complete, rehash=True
+            )
+            if receipt is not None and receipt_before is not None:
+                path, digest = receipt
+                _assert_recorded_hash(
+                    path,
+                    receipt_before,
+                    digest,
+                    "WProto recorded receipt changed during verification.",
+                )
         if watcher is not None:
             # Local filesystem notifications cover earlier paths after their final stat.
             watcher.verify()
@@ -780,7 +798,7 @@ def _verify_recorded_request(
                 records,
                 complete=complete,
                 check_inputs=check_inputs,
-                records_path=records_path,
+                receipt=(records_path, digest),
             )
         except RecordedInventoryError as error:
             return str(error)
