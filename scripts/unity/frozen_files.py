@@ -490,6 +490,12 @@ def recorded_stat(root: Path, path: Path) -> os.stat_result:
     return info
 
 
+if sys.platform == "linux":
+    INOTIFY_OPEN_FLAGS = os.O_CLOEXEC | os.O_NONBLOCK
+else:
+    INOTIFY_OPEN_FLAGS = 0
+
+
 class LinuxRecordedInventoryWatch:
     _IN_MODIFY = 0x00000002
     _IN_ATTRIB = 0x00000004
@@ -508,7 +514,7 @@ class LinuxRecordedInventoryWatch:
         libc.inotify_add_watch.argtypes = (ctypes.c_int, ctypes.c_char_p, ctypes.c_uint32)
         libc.inotify_add_watch.restype = ctypes.c_int
         self._add_watch = libc.inotify_add_watch
-        self._descriptor: int = libc.inotify_init1(os.O_CLOEXEC | os.O_NONBLOCK)
+        self._descriptor: int = libc.inotify_init1(INOTIFY_OPEN_FLAGS)
         if self._descriptor < 0:
             raise OSError(ctypes.get_errno(), "Cannot observe recorded inventory changes.")
         cleanup.callback(os.close, self._descriptor)
@@ -542,6 +548,7 @@ def verify_recorded_inventory(
     *,
     complete: bool,
     check_inputs: Callable[[], None] | None = None,
+    records_path: Path | None = None,
 ) -> None:
     root = regular_path(root_path, directory=True)
     root_before = ordinary(root, directory=True)
@@ -550,11 +557,11 @@ def verify_recorded_inventory(
     recorded_names: set[str] = set()
     observed: dict[Path, tuple[bool, os.stat_result]] = {}
     with ExitStack() as retained:
-        watcher = (
-            LinuxRecordedInventoryWatch(retained) if sys.platform.startswith("linux") else None
-        )
+        watcher = LinuxRecordedInventoryWatch(retained) if INOTIFY_OPEN_FLAGS else None
         if watcher is not None:
             watcher.add(root, directory=True, complete=complete)
+            if records_path is not None:
+                watcher.add(records_path, directory=False, complete=False)
         for row in cast("list[object]", records):
             record = cast("dict[str, object]", row) if isinstance(row, dict) else {}
             relative = record.get("Path")
@@ -598,8 +605,6 @@ def verify_recorded_inventory(
 
         if not recorded_names:
             raise RecordedInventoryError("WProto recorded inventory is empty.")
-        if check_inputs is not None:
-            check_inputs()
         if complete:
             try:
                 actual_names = {path.relative_to(root).as_posix() for path, _, _ in walk(root)}
@@ -628,6 +633,8 @@ def verify_recorded_inventory(
             raise RecordedInventoryError("WProto complete inventory membership changed.")
         if (root_before.st_dev, root_before.st_ino) != (root_after.st_dev, root_after.st_ino):
             raise RecordedInventoryError("WProto recorded inventory root changed.")
+        if check_inputs is not None:
+            check_inputs()
         if watcher is not None:
             # Local filesystem notifications cover earlier paths after their final stat.
             watcher.verify()
@@ -670,7 +677,13 @@ def _verify_recorded_request(
             check_checkout()
 
         try:
-            verify_recorded_inventory(root, records, complete=complete, check_inputs=check_inputs)
+            verify_recorded_inventory(
+                root,
+                records,
+                complete=complete,
+                check_inputs=check_inputs,
+                records_path=records_path,
+            )
         except RecordedInventoryError as error:
             return str(error)
     return None

@@ -815,25 +815,32 @@ def test_recorded_inventory_distinguishes_subsets_from_complete_membership(tmp_p
         frozen_files.verify_recorded_inventory(tmp_path, [*rows, rows[0]], complete=False)
 
 
-@pytest.mark.parametrize("changed", ["receipt", "checkout", "hash"])
-def test_recorded_inventory_request_has_bound_inputs(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, changed: str
-) -> None:
+def recorded_request(
+    tmp_path: Path, contents: bytes = b"retained"
+) -> tuple[dict[str, object], Path, Path]:
     payload = tmp_path / "retained"
-    path = write(payload / "player.txt", b"retained")
+    player = write(payload / "player.txt", contents)
     rows = frozen_files.frozen_player_inventory(payload, None, 1)["rows"]
-    receipt = write(tmp_path / "rows.json", json.dumps(rows).encode())
-    digest = hashlib.sha256(receipt.read_bytes()).hexdigest()
-    request = {
+    records = write(tmp_path / "rows.json", json.dumps(rows).encode())
+    request: dict[str, object] = {
         "protocol": 1,
         "requestId": "1" * 32,
         "operation": "verify-recorded",
         "root": str(payload),
         "repository": str(ROOT),
-        "recordsPath": str(receipt),
-        "recordsSha256": digest,
+        "recordsPath": str(records),
+        "recordsSha256": hashlib.sha256(records.read_bytes()).hexdigest(),
         "complete": True,
     }
+    return request, player, records
+
+
+@pytest.mark.parametrize("changed", ["receipt", "checkout", "hash"])
+def test_recorded_inventory_request_has_bound_inputs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, changed: str
+) -> None:
+    request, path, receipt = recorded_request(tmp_path)
+    digest = request["recordsSha256"]
     assert frozen_files.execute_request(request) is None
     if changed == "hash":
         request["recordsSha256"] = "0" * 64
@@ -905,50 +912,44 @@ def test_recorded_inventory_refuses_change_after_earlier_final_stat(
     assert first.read_bytes() == b"new!"
 
 
-@pytest.mark.parametrize("phase", ["records", "checkout"])
+@pytest.mark.skipif(
+    sys.platform not in ("linux", "win32"), reason="Requires filesystem observation or read sharing"
+)
+@pytest.mark.parametrize("phase", ["records", "checkout", "receipt-after-hash"])
 def test_recorded_inventory_keeps_files_observed_through_request_checks(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, phase: str
 ) -> None:
-    payload = tmp_path / "retained"
-    player = write(payload / "player.txt", b"before")
-    rows = frozen_files.frozen_player_inventory(payload, None, 1)["rows"]
-    records = write(tmp_path / "rows.json", json.dumps(rows).encode())
-    request = {
-        "protocol": 1,
-        "requestId": "1" * 32,
-        "operation": "verify-recorded",
-        "root": str(payload),
-        "repository": str(ROOT),
-        "recordsPath": str(records),
-        "recordsSha256": hashlib.sha256(records.read_bytes()).hexdigest(),
-        "complete": True,
-    }
+    request, player, records = recorded_request(tmp_path, b"before")
     assert frozen_files.execute_request(request) is None
     original_hash = frozen_files.file_hash
     original_git = frozen_files.git_output
     checkout_reads = 0
     attempts = 0
 
-    def change_player() -> None:
+    target = records if phase == "receipt-after-hash" else player
+    original_contents = target.read_bytes()
+    changed_contents = b"x" * len(original_contents)
+
+    def change_input() -> None:
         nonlocal attempts
         attempts += 1
         if sys.platform == "win32":
             with pytest.raises(PermissionError):
-                player.write_bytes(b"after!")
+                target.write_bytes(changed_contents)
         else:
-            player.write_bytes(b"after!")
+            target.write_bytes(changed_contents)
 
     def check_receipt(path: Path, observed: stat_result | None = None) -> tuple[str, int]:
         if phase == "records" and path == records:
-            change_player()
+            change_input()
         return original_hash(path, observed)
 
     def check_checkout(root: Path, arguments: list[str]) -> bytes:
         nonlocal checkout_reads
         if arguments == ["rev-parse", "--verify", "HEAD"]:
             checkout_reads += 1
-            if phase == "checkout" and checkout_reads == 2:
-                change_player()
+            if phase != "records" and checkout_reads == 2:
+                change_input()
         return original_git(root, arguments)
 
     monkeypatch.setattr(frozen_files, "file_hash", check_receipt)
@@ -958,8 +959,35 @@ def test_recorded_inventory_keeps_files_observed_through_request_checks(
     assert checkout_reads == 2
     if sys.platform == "win32":
         assert outcome is None
-        assert player.read_bytes() == b"before"
-        player.write_bytes(b"after!")
+        assert target.read_bytes() == original_contents
+        target.write_bytes(changed_contents)
     else:
-        assert outcome == "WProto recorded file changed."
-    assert player.read_bytes() == b"after!"
+        assert outcome == "WProto recorded file changed during verification."
+    assert target.read_bytes() == changed_contents
+
+
+def test_recorded_inventory_rechecks_checkout_after_the_final_scan(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    request, player, _ = recorded_request(tmp_path)
+    assert frozen_files.execute_request(request) is None
+    original_git = frozen_files.git_output
+    original_stat = frozen_files.recorded_stat
+    observations = 0
+
+    def show_checkout_change(root: Path, arguments: list[str]) -> bytes:
+        if observations == 2 and arguments == ["rev-parse", "--verify", "HEAD"]:
+            return b"0" * 40 + b"\n"
+        return original_git(root, arguments)
+
+    def mark_final_observation(root: Path, path: Path) -> stat_result:
+        nonlocal observations
+        if path == player:
+            observations += 1
+        return original_stat(root, path)
+
+    monkeypatch.setattr(frozen_files, "git_output", show_checkout_change)
+    monkeypatch.setattr(frozen_files, "recorded_stat", mark_final_observation)
+    with pytest.raises(ValueError, match="checkout changed during the request"):
+        frozen_files.execute_request(request)
+    assert observations == 2
