@@ -139,6 +139,16 @@ if sys.platform == "win32":
         kernel.CreateFileW.restype = wintypes.HANDLE
         kernel.CloseHandle.argtypes = (wintypes.HANDLE,)
         kernel.CloseHandle.restype = wintypes.BOOL
+        kernel.FindFirstChangeNotificationW.argtypes = (
+            wintypes.LPCWSTR,
+            wintypes.BOOL,
+            wintypes.DWORD,
+        )
+        kernel.FindFirstChangeNotificationW.restype = wintypes.HANDLE
+        kernel.FindCloseChangeNotification.argtypes = (wintypes.HANDLE,)
+        kernel.FindCloseChangeNotification.restype = wintypes.BOOL
+        kernel.WaitForSingleObject.argtypes = (wintypes.HANDLE, wintypes.DWORD)
+        kernel.WaitForSingleObject.restype = wintypes.DWORD
         return kernel
 
     def _open_windows_handle(path: Path) -> int:
@@ -461,6 +471,36 @@ class RecordedInventoryError(ValueError):
     """A rejection of the recorded inventory, reported through the original entry point."""
 
 
+@contextmanager
+def observe_windows_membership(
+    root: Path, root_before: os.stat_result, *, complete: bool
+) -> Generator[None, None, None]:
+    if sys.platform == "win32":
+        if complete:
+            kernel = windows_kernel32()
+            file_name_change, directory_name_change = 0x00000001, 0x00000002
+            handle: int | None = kernel.FindFirstChangeNotificationW(
+                str(root), True, file_name_change | directory_name_change
+            )
+            if handle is None or handle == ctypes.c_void_p(-1).value:
+                raise ctypes.WinError(ctypes.get_last_error())
+            try:
+                yield
+                # The subtree notification excludes the root itself.
+                if identity(ordinary(root, directory=True)) != identity(root_before):
+                    raise RecordedInventoryError("WProto complete inventory membership changed.")
+                wait_object, wait_timeout = 0x00000000, 0x00000102
+                status: int = kernel.WaitForSingleObject(handle, 0)
+                if status == wait_object:
+                    raise RecordedInventoryError("WProto complete inventory membership changed.")
+                if status != wait_timeout:
+                    raise ctypes.WinError(ctypes.get_last_error())
+            finally:
+                kernel.FindCloseChangeNotification(handle)
+            return
+    yield
+
+
 def _recorded_path(root: Path, relative: str) -> Path:
     if re.search(r"^/|\\|:|(?:^|/)\.\.?(?:/|$)", relative):
         raise RecordedInventoryError(
@@ -556,7 +596,7 @@ def verify_recorded_inventory(
         raise RecordedInventoryError("WProto recorded inventory is empty.")
     recorded_names: set[str] = set()
     observed: dict[Path, tuple[bool, os.stat_result]] = {}
-    with ExitStack() as retained:
+    with ExitStack() as retained, observe_windows_membership(root, root_before, complete=complete):
         watcher = LinuxRecordedInventoryWatch(retained) if INOTIFY_OPEN_FLAGS else None
         if watcher is not None:
             watcher.add(root, directory=True, complete=complete)

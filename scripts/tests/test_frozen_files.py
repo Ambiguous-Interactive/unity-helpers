@@ -819,7 +819,7 @@ def recorded_request(
     tmp_path: Path, contents: bytes = b"retained"
 ) -> tuple[dict[str, object], Path, Path]:
     payload = tmp_path / "retained"
-    player = write(payload / "player.txt", contents)
+    player = write(payload / "nested" / "player.txt", contents)
     rows = frozen_files.frozen_player_inventory(payload, None, 1)["rows"]
     records = write(tmp_path / "rows.json", json.dumps(rows).encode())
     request: dict[str, object] = {
@@ -991,3 +991,37 @@ def test_recorded_inventory_rechecks_checkout_after_the_final_scan(
     with pytest.raises(ValueError, match="checkout changed during the request"):
         frozen_files.execute_request(request)
     assert observations == 2
+
+
+@pytest.mark.skipif(
+    sys.platform not in ("linux", "win32"), reason="Requires directory change notifications"
+)
+@pytest.mark.parametrize("complete", [False, True])
+def test_recorded_inventory_observes_nested_membership_through_checkout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, complete: bool
+) -> None:
+    request, player, _ = recorded_request(tmp_path)
+    request["complete"] = complete
+    assert frozen_files.execute_request(request) is None
+    original_git = frozen_files.git_output
+    checkout_reads = 0
+    extra = player.with_name("extra.txt")
+
+    def check_checkout(root: Path, arguments: list[str]) -> bytes:
+        nonlocal checkout_reads
+        if arguments == ["rev-parse", "--verify", "HEAD"]:
+            checkout_reads += 1
+            if checkout_reads == 2:
+                extra.touch()
+        return original_git(root, arguments)
+
+    monkeypatch.setattr(frozen_files, "git_output", check_checkout)
+    outcome = frozen_files.execute_request(request)
+    assert checkout_reads == 2
+    assert extra.is_file()
+    if not complete:
+        assert outcome is None
+    elif sys.platform == "win32":
+        assert outcome == "WProto complete inventory membership changed."
+    else:
+        assert outcome == "WProto recorded file changed during verification."
