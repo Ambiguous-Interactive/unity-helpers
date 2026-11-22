@@ -622,51 +622,54 @@ def retain_linux_recorded_files(
     receipt: tuple[Path, os.stat_result] | None,
 ) -> Generator[None, None, None]:
     """Hold Linux inputs through acceptance. Other POSIX hosts use the final read."""
-    if sys.platform != "linux" or not INOTIFY_OPEN_FLAGS:
-        yield
-        return
+    if sys.platform == "linux" and INOTIFY_OPEN_FLAGS:
+        import fcntl
 
-    import fcntl
-
-    # Python 3.11 lacks the Linux UAPI constants for targeting lease breaks at a thread.
-    set_owner = getattr(fcntl, "F_SETOWN_EX", 15)
-    owner_thread = getattr(fcntl, "F_OWNER_TID", 0)
-    owner = struct.pack("ii", owner_thread, threading.get_native_id())
-    lease_signal = {signal.SIGIO}
-    previous_mask = signal.pthread_sigmask(signal.SIG_BLOCK, lease_signal)
-    if signal.SIGIO in signal.sigpending():
-        signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
-        raise RecordedInventoryError("Cannot observe recorded input leases during verification.")
-    try:
-        with ExitStack() as leases:
-
-            def retain(path: Path, before: os.stat_result, diagnostic: str) -> None:
-                try:
-                    descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
-                    leases.callback(os.close, descriptor)
-                    if identity(os.fstat(descriptor)) != identity(before):
-                        raise RecordedInventoryError(diagnostic)
-                    fcntl.fcntl(descriptor, set_owner, owner)
-                    fcntl.fcntl(descriptor, fcntl.F_SETLEASE, fcntl.F_RDLCK)
-                except BlockingIOError as error:
-                    raise RecordedInventoryError(diagnostic) from error
-                except OSError as error:
-                    raise RecordedInventoryError(
-                        f"Cannot retain recorded input during verification: {path}: {error.strerror}"
-                    ) from error
-
-            for path, (before, digest) in observed.items():
-                if digest is not None:
-                    retain(path, before, "WProto recorded file changed.")
-            if receipt is not None:
-                retain(*receipt, "WProto recorded receipt changed during verification.")
-            yield
-            if signal.SIGIO in signal.sigpending():
-                raise RecordedInventoryError("WProto recorded file changed during verification.")
-    finally:
+        # Python 3.11 lacks the Linux UAPI constants for targeting lease breaks at a thread.
+        set_owner = getattr(fcntl, "F_SETOWN_EX", 15)
+        owner_thread = getattr(fcntl, "F_OWNER_TID", 0)
+        owner = struct.pack("ii", owner_thread, threading.get_native_id())
+        lease_signal = {signal.SIGIO}
+        previous_mask = signal.pthread_sigmask(signal.SIG_BLOCK, lease_signal)
         if signal.SIGIO in signal.sigpending():
-            signal.sigwait(lease_signal)
-        signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
+            signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
+            raise RecordedInventoryError(
+                "Cannot observe recorded input leases during verification."
+            )
+        try:
+            with ExitStack() as leases:
+
+                def retain(path: Path, before: os.stat_result, diagnostic: str) -> None:
+                    try:
+                        descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+                        leases.callback(os.close, descriptor)
+                        if identity(os.fstat(descriptor)) != identity(before):
+                            raise RecordedInventoryError(diagnostic)
+                        fcntl.fcntl(descriptor, set_owner, owner)
+                        fcntl.fcntl(descriptor, fcntl.F_SETLEASE, fcntl.F_RDLCK)
+                    except BlockingIOError as error:
+                        raise RecordedInventoryError(diagnostic) from error
+                    except OSError as error:
+                        raise RecordedInventoryError(
+                            f"Cannot retain recorded input during verification: {path}: {error.strerror}"
+                        ) from error
+
+                for path, (before, digest) in observed.items():
+                    if digest is not None:
+                        retain(path, before, "WProto recorded file changed.")
+                if receipt is not None:
+                    retain(*receipt, "WProto recorded receipt changed during verification.")
+                yield
+                if signal.SIGIO in signal.sigpending():
+                    raise RecordedInventoryError(
+                        "WProto recorded file changed during verification."
+                    )
+        finally:
+            if signal.SIGIO in signal.sigpending():
+                signal.sigwait(lease_signal)
+            signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
+        return
+    yield
 
 
 def _assert_recorded_state(

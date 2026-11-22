@@ -1066,7 +1066,7 @@ def test_recorded_inventory_retains_earlier_files_through_final_hashes(
             later_hashes += 1
             if later_hashes == 2:
                 try:
-                    descriptor = os.open(first, os.O_WRONLY | os.O_NONBLOCK)
+                    descriptor = os.open(first, os.O_WRONLY | frozen_files.INOTIFY_OPEN_FLAGS)
                 except BlockingIOError:
                     write_open_refused = True
                 else:
