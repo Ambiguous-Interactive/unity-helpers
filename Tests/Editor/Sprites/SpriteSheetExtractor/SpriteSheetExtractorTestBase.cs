@@ -300,13 +300,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         /// </summary>
         protected Object GetCachedOutputDirectory()
         {
-            if (_cachedOutputDirectoryPath != OutputDir)
+            string outputDirectory = OutputDir;
+            if (_cachedOutputDirectoryPath != outputDirectory)
             {
                 _cachedOutputDirectory = null;
-                _cachedOutputDirectoryPath = OutputDir;
+                _cachedOutputDirectoryPath = outputDirectory;
             }
 
-            return _cachedOutputDirectory ??= AssetDatabase.LoadAssetAtPath<Object>(OutputDir);
+            return SharedSpriteTestFixtures.LoadCachedAsset(
+                outputDirectory,
+                ref _cachedOutputDirectory
+            );
         }
 
         /// <summary>

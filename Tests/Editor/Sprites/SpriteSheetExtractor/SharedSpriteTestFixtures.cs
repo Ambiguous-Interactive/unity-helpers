@@ -107,179 +107,164 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         /// Gets the cached 2x2 texture, loading it on first access.
         /// </summary>
         public static Texture2D Shared2x2Texture =>
-            _cached2x2Texture ??= AssetDatabase.LoadAssetAtPath<Texture2D>(Shared2x2Path);
+            LoadCachedAsset(Shared2x2Path, ref _cached2x2Texture);
 
         /// <summary>
         /// Gets the cached 4x4 texture, loading it on first access.
         /// </summary>
         public static Texture2D Shared4x4Texture =>
-            _cached4x4Texture ??= AssetDatabase.LoadAssetAtPath<Texture2D>(Shared4x4Path);
+            LoadCachedAsset(Shared4x4Path, ref _cached4x4Texture);
 
         /// <summary>
         /// Gets the cached 8x8 texture, loading it on first access.
         /// </summary>
         public static Texture2D Shared8x8Texture =>
-            _cached8x8Texture ??= AssetDatabase.LoadAssetAtPath<Texture2D>(Shared8x8Path);
+            LoadCachedAsset(Shared8x8Path, ref _cached8x8Texture);
 
         /// <summary>
         /// Gets the cached single-mode texture, loading it on first access.
         /// </summary>
         public static Texture2D SharedSingleTexture =>
-            _cachedSingleTexture ??= AssetDatabase.LoadAssetAtPath<Texture2D>(SharedSingleModePath);
+            LoadCachedAsset(SharedSingleModePath, ref _cachedSingleTexture);
 
         /// <summary>
         /// Gets the cached wide texture, loading it on first access.
         /// </summary>
         public static Texture2D SharedWideTexture =>
-            _cachedWideTexture ??= AssetDatabase.LoadAssetAtPath<Texture2D>(SharedWidePath);
+            LoadCachedAsset(SharedWidePath, ref _cachedWideTexture);
 
         /// <summary>
         /// Gets the cached tall texture, loading it on first access.
         /// </summary>
         public static Texture2D SharedTallTexture =>
-            _cachedTallTexture ??= AssetDatabase.LoadAssetAtPath<Texture2D>(SharedTallPath);
+            LoadCachedAsset(SharedTallPath, ref _cachedTallTexture);
 
         /// <summary>
         /// Gets the cached odd dimensions texture, loading it on first access.
         /// </summary>
         public static Texture2D SharedOddTexture =>
-            _cachedOddTexture ??= AssetDatabase.LoadAssetAtPath<Texture2D>(SharedOddPath);
+            LoadCachedAsset(SharedOddPath, ref _cachedOddTexture);
 
         /// <summary>
         /// Gets the cached large 512x512 texture, loading it on first access.
         /// </summary>
         public static Texture2D SharedLarge512Texture =>
-            _cachedLarge512Texture ??= AssetDatabase.LoadAssetAtPath<Texture2D>(SharedLarge512Path);
+            LoadCachedAsset(SharedLarge512Path, ref _cachedLarge512Texture);
 
         /// <summary>
         /// Gets the cached NPOT 100x200 texture, loading it on first access.
         /// </summary>
         public static Texture2D SharedNpot100x200Texture =>
-            _cachedNpot100x200Texture ??= AssetDatabase.LoadAssetAtPath<Texture2D>(
-                SharedNpot100x200Path
-            );
+            LoadCachedAsset(SharedNpot100x200Path, ref _cachedNpot100x200Texture);
 
         /// <summary>
         /// Gets the cached asymmetric NPOT 150x75 texture, loading it on first access.
         /// </summary>
         public static Texture2D SharedNpot150x75Texture =>
-            _cachedNpot150x75Texture ??= AssetDatabase.LoadAssetAtPath<Texture2D>(
-                SharedNpot150x75Path
-            );
+            LoadCachedAsset(SharedNpot150x75Path, ref _cachedNpot150x75Texture);
 
         /// <summary>
         /// Gets the cached prime 127x127 texture, loading it on first access.
         /// </summary>
         public static Texture2D SharedPrime127Texture =>
-            _cachedPrime127Texture ??= AssetDatabase.LoadAssetAtPath<Texture2D>(SharedPrime127Path);
+            LoadCachedAsset(SharedPrime127Path, ref _cachedPrime127Texture);
 
         /// <summary>
         /// Gets the cached small 16x16 texture, loading it on first access.
         /// </summary>
         public static Texture2D SharedSmall16x16Texture =>
-            _cachedSmall16x16Texture ??= AssetDatabase.LoadAssetAtPath<Texture2D>(
-                SharedSmall16x16Path
-            );
+            LoadCachedAsset(SharedSmall16x16Path, ref _cachedSmall16x16Texture);
 
         /// <summary>
         /// Gets the cached boundary 256x256 texture, loading it on first access.
         /// </summary>
         public static Texture2D SharedBoundary256Texture =>
-            _cachedBoundary256Texture ??= AssetDatabase.LoadAssetAtPath<Texture2D>(
-                SharedBoundary256Path
-            );
+            LoadCachedAsset(SharedBoundary256Path, ref _cachedBoundary256Texture);
 
         /// <summary>
         /// Gets the cached 2x2 texture importer, loading it on first access.
         /// </summary>
         public static TextureImporter Shared2x2Importer =>
-            _cached2x2Importer ??= AssetImporter.GetAtPath(Shared2x2Path) as TextureImporter;
+            LoadCachedImporter(Shared2x2Path, ref _cached2x2Importer);
 
         /// <summary>
         /// Gets the cached 4x4 texture importer, loading it on first access.
         /// </summary>
         public static TextureImporter Shared4x4Importer =>
-            _cached4x4Importer ??= AssetImporter.GetAtPath(Shared4x4Path) as TextureImporter;
+            LoadCachedImporter(Shared4x4Path, ref _cached4x4Importer);
 
         /// <summary>
         /// Gets the cached 8x8 texture importer, loading it on first access.
         /// </summary>
         public static TextureImporter Shared8x8Importer =>
-            _cached8x8Importer ??= AssetImporter.GetAtPath(Shared8x8Path) as TextureImporter;
+            LoadCachedImporter(Shared8x8Path, ref _cached8x8Importer);
 
         /// <summary>
         /// Gets the cached single-mode texture importer, loading it on first access.
         /// </summary>
         public static TextureImporter SharedSingleImporter =>
-            _cachedSingleImporter ??=
-                AssetImporter.GetAtPath(SharedSingleModePath) as TextureImporter;
+            LoadCachedImporter(SharedSingleModePath, ref _cachedSingleImporter);
 
         /// <summary>
         /// Gets the cached wide texture importer, loading it on first access.
         /// </summary>
         public static TextureImporter SharedWideImporter =>
-            _cachedWideImporter ??= AssetImporter.GetAtPath(SharedWidePath) as TextureImporter;
+            LoadCachedImporter(SharedWidePath, ref _cachedWideImporter);
 
         /// <summary>
         /// Gets the cached tall texture importer, loading it on first access.
         /// </summary>
         public static TextureImporter SharedTallImporter =>
-            _cachedTallImporter ??= AssetImporter.GetAtPath(SharedTallPath) as TextureImporter;
+            LoadCachedImporter(SharedTallPath, ref _cachedTallImporter);
 
         /// <summary>
         /// Gets the cached odd dimensions texture importer, loading it on first access.
         /// </summary>
         public static TextureImporter SharedOddImporter =>
-            _cachedOddImporter ??= AssetImporter.GetAtPath(SharedOddPath) as TextureImporter;
+            LoadCachedImporter(SharedOddPath, ref _cachedOddImporter);
 
         /// <summary>
         /// Gets the cached large 512x512 texture importer, loading it on first access.
         /// </summary>
         public static TextureImporter SharedLarge512Importer =>
-            _cachedLarge512Importer ??=
-                AssetImporter.GetAtPath(SharedLarge512Path) as TextureImporter;
+            LoadCachedImporter(SharedLarge512Path, ref _cachedLarge512Importer);
 
         /// <summary>
         /// Gets the cached NPOT 100x200 texture importer, loading it on first access.
         /// </summary>
         public static TextureImporter SharedNpot100x200Importer =>
-            _cachedNpot100x200Importer ??=
-                AssetImporter.GetAtPath(SharedNpot100x200Path) as TextureImporter;
+            LoadCachedImporter(SharedNpot100x200Path, ref _cachedNpot100x200Importer);
 
         /// <summary>
         /// Gets the cached asymmetric NPOT 150x75 texture importer, loading it on first access.
         /// </summary>
         public static TextureImporter SharedNpot150x75Importer =>
-            _cachedNpot150x75Importer ??=
-                AssetImporter.GetAtPath(SharedNpot150x75Path) as TextureImporter;
+            LoadCachedImporter(SharedNpot150x75Path, ref _cachedNpot150x75Importer);
 
         /// <summary>
         /// Gets the cached prime 127x127 texture importer, loading it on first access.
         /// </summary>
         public static TextureImporter SharedPrime127Importer =>
-            _cachedPrime127Importer ??=
-                AssetImporter.GetAtPath(SharedPrime127Path) as TextureImporter;
+            LoadCachedImporter(SharedPrime127Path, ref _cachedPrime127Importer);
 
         /// <summary>
         /// Gets the cached small 16x16 texture importer, loading it on first access.
         /// </summary>
         public static TextureImporter SharedSmall16x16Importer =>
-            _cachedSmall16x16Importer ??=
-                AssetImporter.GetAtPath(SharedSmall16x16Path) as TextureImporter;
+            LoadCachedImporter(SharedSmall16x16Path, ref _cachedSmall16x16Importer);
 
         /// <summary>
         /// Gets the cached boundary 256x256 texture importer, loading it on first access.
         /// </summary>
         public static TextureImporter SharedBoundary256Importer =>
-            _cachedBoundary256Importer ??=
-                AssetImporter.GetAtPath(SharedBoundary256Path) as TextureImporter;
+            LoadCachedImporter(SharedBoundary256Path, ref _cachedBoundary256Importer);
 
         /// <summary>
         /// Gets the cached directory object for the shared fixtures folder.
         /// Used by CreateExtractorWithSharedFixtures to avoid repeated LoadAssetAtPath calls.
         /// </summary>
         public static Object SharedDirectoryObject =>
-            _cachedDirectoryObject ??= AssetDatabase.LoadAssetAtPath<Object>(StaticAssetsDir);
+            LoadCachedAsset(StaticAssetsDir, ref _cachedDirectoryObject);
 
         /// <summary>
         /// Gets the current reference count for diagnostic purposes.
@@ -642,6 +627,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             return DynamicAssetsDir;
         }
 
+        internal static TAsset LoadCachedAsset<TAsset>(string path, ref TAsset cachedAsset)
+            where TAsset : Object
+        {
+            if (cachedAsset == null)
+            {
+                cachedAsset = AssetDatabase.LoadAssetAtPath<TAsset>(path);
+            }
+
+            return cachedAsset;
+        }
+
         /// <summary>
         /// Creates a dynamic sprite sheet with the specified parameters.
         /// </summary>
@@ -802,6 +798,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             VerifyAndCacheAsset(SharedPrime127Path, ref _cachedPrime127Texture);
             VerifyAndCacheAsset(SharedSmall16x16Path, ref _cachedSmall16x16Texture);
             VerifyAndCacheAsset(SharedBoundary256Path, ref _cachedBoundary256Texture);
+        }
+
+        private static TextureImporter LoadCachedImporter(
+            string path,
+            ref TextureImporter cachedImporter
+        )
+        {
+            if (cachedImporter == null)
+            {
+                cachedImporter = AssetImporter.GetAtPath(path) as TextureImporter;
+            }
+
+            return cachedImporter;
         }
 
         private static void VerifyAndCacheAsset(string path, ref Texture2D cachedTexture)
