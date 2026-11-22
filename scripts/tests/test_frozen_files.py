@@ -768,3 +768,109 @@ def test_player_inventory_request_rechecks_the_checkout(
     request["repository"] = str(ROOT / "scripts")
     with pytest.raises((ValueError, FileNotFoundError)):
         frozen_files.execute_request(request)
+
+
+@pytest.mark.parametrize("complete", [False, True])
+def test_recorded_inventory_verifies_each_file_until_completion(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, complete: bool
+) -> None:
+    first = write(tmp_path / "01.txt", b"old!")
+    second = write(tmp_path / "02.txt", b"next")
+    rows = frozen_files.frozen_player_inventory(tmp_path, None, 2)["rows"]
+    frozen_files.verify_recorded_inventory(tmp_path, rows, complete=complete)
+    original_hash = frozen_files.file_hash
+
+    def change_after_first_hash(path: Path, observed: stat_result | None = None) -> tuple[str, int]:
+        if path == second:
+            if sys.platform == "win32":
+                with pytest.raises(PermissionError):
+                    first.write_bytes(b"new!")
+            else:
+                first.write_bytes(b"new!")
+        return original_hash(path, observed)
+
+    monkeypatch.setattr(frozen_files, "file_hash", change_after_first_hash)
+    if sys.platform == "win32":
+        frozen_files.verify_recorded_inventory(tmp_path, rows, complete=complete)
+        assert first.read_bytes() == b"old!"
+        first.write_bytes(b"new!")
+    else:
+        with pytest.raises(ValueError, match="WProto recorded file changed"):
+            frozen_files.verify_recorded_inventory(tmp_path, rows, complete=complete)
+    assert first.read_bytes() == b"new!"
+
+
+def test_recorded_inventory_distinguishes_subsets_from_complete_membership(tmp_path: Path) -> None:
+    write(tmp_path / "build" / "player.txt", b"retained")
+    (tmp_path / "empty").mkdir()
+    rows = frozen_files.frozen_player_inventory(tmp_path, None, 2)["rows"]
+    frozen_files.verify_recorded_inventory(tmp_path, rows, complete=True)
+    write(tmp_path / "build" / "unrecorded.txt", b"extra")
+    frozen_files.verify_recorded_inventory(tmp_path, rows, complete=False)
+    with pytest.raises(ValueError, match="WProto complete inventory membership changed"):
+        frozen_files.verify_recorded_inventory(tmp_path, rows, complete=True)
+    with pytest.raises(ValueError, match="invalid or repeated relative path"):
+        frozen_files.verify_recorded_inventory(tmp_path, [*rows, rows[0]], complete=False)
+
+
+@pytest.mark.parametrize("changed", ["receipt", "checkout", "hash"])
+def test_recorded_inventory_request_has_bound_inputs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, changed: str
+) -> None:
+    payload = tmp_path / "retained"
+    path = write(payload / "player.txt", b"retained")
+    rows = frozen_files.frozen_player_inventory(payload, None, 1)["rows"]
+    receipt = write(tmp_path / "rows.json", json.dumps(rows).encode())
+    digest = hashlib.sha256(receipt.read_bytes()).hexdigest()
+    request = {
+        "protocol": 1,
+        "requestId": "1" * 32,
+        "operation": "verify-recorded",
+        "root": str(payload),
+        "repository": str(ROOT),
+        "recordsPath": str(receipt),
+        "recordsSha256": digest,
+        "complete": True,
+    }
+    assert frozen_files.execute_request(request) is None
+    if changed == "hash":
+        request["recordsSha256"] = "0" * 64
+        with pytest.raises(ValueError, match="does not match its input hash"):
+            frozen_files.execute_request(request)
+        return
+
+    original_hash = frozen_files.file_hash
+    original_git = frozen_files.git_output
+    head_reads = 0
+    changed_receipt = receipt.read_bytes().replace(b"player.txt", b"Player.txt")
+
+    def try_receipt_write(candidate: Path, observed: stat_result | None = None) -> tuple[str, int]:
+        if changed == "receipt" and candidate == path:
+            if sys.platform == "win32":
+                with pytest.raises(PermissionError):
+                    receipt.write_bytes(changed_receipt)
+            else:
+                receipt.write_bytes(changed_receipt)
+        return original_hash(candidate, observed)
+
+    def read_checkout(root: Path, arguments: list[str]) -> bytes:
+        nonlocal head_reads
+        if arguments == ["rev-parse", "--verify", "HEAD"]:
+            head_reads += 1
+            if changed == "checkout" and head_reads == 2:
+                return b"0" * 40 + b"\n"
+        return original_git(root, arguments)
+
+    monkeypatch.setattr(frozen_files, "file_hash", try_receipt_write)
+    monkeypatch.setattr(frozen_files, "git_output", read_checkout)
+    if changed == "checkout":
+        with pytest.raises(ValueError, match="checkout changed during the request"):
+            frozen_files.execute_request(request)
+        assert head_reads == 2
+    elif sys.platform == "win32":
+        assert frozen_files.execute_request(request) is None
+        assert hashlib.sha256(receipt.read_bytes()).hexdigest() == digest
+    else:
+        with pytest.raises(ValueError, match="request changed during verification"):
+            frozen_files.execute_request(request)
+        assert receipt.read_bytes() == changed_receipt

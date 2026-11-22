@@ -457,6 +457,150 @@ def frozen_player_inventory(root_path: Path, declaration: object, maximum: int) 
     return InventoryResult(rows=rows, error=problem)
 
 
+class RecordedInventoryError(ValueError):
+    """A rejection of the recorded inventory, reported through the original entry point."""
+
+
+def _recorded_path(root: Path, relative: str) -> Path:
+    if re.search(r"^/|\\|:|(?:^|/)\.\.?(?:/|$)", relative):
+        raise RecordedInventoryError(
+            "WProto recorded inventory contains an invalid or repeated relative path."
+        )
+    path = Path(os.path.abspath(root / relative))  # noqa: PTH100
+    if not path.is_relative_to(root) or path == root:
+        raise RecordedInventoryError("WProto recorded path leaves its root.")
+    return path
+
+
+def _recorded_stat(root: Path, path: Path) -> os.stat_result:
+    try:
+        info = path.lstat()
+        for current in (path, *path.parents):
+            ancestor = info if current == path else current.lstat()
+            if stat.S_ISLNK(ancestor.st_mode) or (
+                getattr(ancestor, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT
+            ):
+                raise RecordedInventoryError("WProto recorded path has a reparse ancestor.")
+            if current == root:
+                break
+    except FileNotFoundError as error:
+        raise RecordedInventoryError(
+            f"Cannot find path '{path}' because it does not exist."
+        ) from error
+    return info
+
+
+def verify_recorded_inventory(root_path: Path, records: object, *, complete: bool) -> None:
+    root = regular_path(root_path, directory=True)
+    root_before = ordinary(root, directory=True)
+    if not isinstance(records, list):
+        raise RecordedInventoryError("WProto recorded inventory is empty.")
+    recorded_names: set[str] = set()
+    observed: dict[Path, tuple[bool, os.stat_result]] = {}
+    with ExitStack() as retained:
+        for row in cast("list[object]", records):
+            record = cast("dict[str, object]", row) if isinstance(row, dict) else {}
+            relative = record.get("Path")
+            if not isinstance(relative, str) or relative in recorded_names:
+                raise RecordedInventoryError(
+                    "WProto recorded inventory contains an invalid or repeated relative path."
+                )
+            path = _recorded_path(root, relative)
+            recorded_names.add(relative)
+            info = _recorded_stat(root, path)
+            directory = record.get("Kind") == "directory"
+            if directory:
+                if not stat.S_ISDIR(info.st_mode):
+                    raise RecordedInventoryError("WProto recorded directory changed kind.")
+            elif record.get("Kind") == "file":
+                digest = record.get("Sha256")
+                if (
+                    not stat.S_ISREG(info.st_mode)
+                    or not isinstance(digest, str)
+                    or not re.fullmatch(r"[a-f0-9]{64}", digest)
+                    or info.st_size != record.get("Length")
+                ):
+                    raise RecordedInventoryError("WProto recorded file changed.")
+                try:
+                    if sys.platform == "win32":
+                        retained.enter_context(retain_source(path))
+                    actual, _ = file_hash(path, info)
+                except (OSError, ValueError) as error:
+                    raise RecordedInventoryError("WProto recorded file changed.") from error
+                if actual != digest:
+                    raise RecordedInventoryError("WProto recorded file changed.")
+            else:
+                raise RecordedInventoryError("WProto recorded inventory kind is invalid.")
+            observed[path] = (directory, info)
+
+        if not recorded_names:
+            raise RecordedInventoryError("WProto recorded inventory is empty.")
+        if complete:
+            try:
+                actual_names = {path.relative_to(root).as_posix() for path, _, _ in walk(root)}
+            except (OSError, ValueError) as error:
+                raise RecordedInventoryError(
+                    "WProto complete inventory membership changed."
+                ) from error
+            if actual_names != recorded_names:
+                raise RecordedInventoryError("WProto complete inventory membership changed.")
+        regular_path(root, directory=True)
+        for path, (directory, before) in observed.items():
+            current = _recorded_stat(root, path)
+            if directory:
+                if complete and identity(current) != identity(before):
+                    raise RecordedInventoryError("WProto complete inventory membership changed.")
+                if (before.st_dev, before.st_ino, before.st_mode) != (
+                    current.st_dev,
+                    current.st_ino,
+                    current.st_mode,
+                ):
+                    raise RecordedInventoryError("WProto recorded directory changed kind.")
+            elif identity(current) != identity(before):
+                raise RecordedInventoryError("WProto recorded file changed.")
+        root_after = ordinary(root, directory=True)
+        if complete and identity(root_before) != identity(root_after):
+            raise RecordedInventoryError("WProto complete inventory membership changed.")
+        if (root_before.st_dev, root_before.st_ino) != (root_after.st_dev, root_after.st_ino):
+            raise RecordedInventoryError("WProto recorded inventory root changed.")
+
+
+def _verify_recorded_request(root: Path, request: dict[str, object]) -> str | None:
+    path, digest, complete = (
+        request.get("recordsPath"),
+        request.get("recordsSha256"),
+        request.get("complete"),
+    )
+    if (
+        not isinstance(path, str)
+        or not Path(path).is_absolute()
+        or not isinstance(digest, str)
+        or not re.fullmatch(r"[a-f0-9]{64}", digest)
+        or type(complete) is not bool
+    ):
+        raise ValueError("Recorded inventory request has invalid fields.")
+    records_path = regular_path(Path(path), directory=False)
+    with retain_source(records_path):
+        before = ordinary(records_path, directory=False)
+        with open_source(records_path) as stream:
+            payload = stream.read()
+        if hashlib.sha256(payload).hexdigest() != digest:
+            raise ValueError("Recorded inventory request does not match its input hash.")
+        records: object = json.loads(payload)
+        diagnostic = None
+        try:
+            verify_recorded_inventory(root, records, complete=complete)
+        except RecordedInventoryError as error:
+            diagnostic = str(error)
+        try:
+            final_digest, _ = file_hash(records_path, before)
+        except (OSError, ValueError) as error:
+            raise ValueError("Recorded inventory request changed during verification.") from error
+        if final_digest != digest:
+            raise ValueError("Recorded inventory request changed during verification.")
+        return diagnostic
+
+
 def execute_request(value: object) -> object:
     if not isinstance(value, dict):
         raise ValueError("Frozen inventory requests must be objects.")
@@ -465,6 +609,8 @@ def execute_request(value: object) -> object:
     allowed = {"protocol", "requestId", "operation", "root"}
     if operation == "inventory":
         allowed.update(("repository", "declaredFiles", "maximumFiles"))
+    if operation == "verify-recorded":
+        allowed.update(("repository", "recordsPath", "recordsSha256", "complete"))
     if set(request) - allowed:
         raise ValueError("Source census request has unknown fields.")
     protocol = request.get("protocol")
@@ -475,7 +621,7 @@ def execute_request(value: object) -> object:
         or protocol != 1
         or not isinstance(identifier, str)
         or not re.fullmatch(r"[a-f0-9]{32}", identifier)
-        or operation not in ("sources", "host-sources", "inventory")
+        or operation not in ("sources", "host-sources", "inventory", "verify-recorded")
         or not isinstance(root, str)
         or not root.strip()
     ):
@@ -485,10 +631,16 @@ def execute_request(value: object) -> object:
     if operation == "host-sources":
         return host_source_files(Path(root))
     repository, maximum = request.get("repository"), request.get("maximumFiles")
-    if not isinstance(repository, str) or not repository.strip() or type(maximum) is not int:
+    if not isinstance(repository, str) or not repository.strip():
         raise ValueError("Frozen inventory checkout or file bound is invalid.")
     checkout = _inventory_checkout(Path(repository))
-    result = frozen_player_inventory(Path(root), request.get("declaredFiles"), maximum)
+    result: InventoryResult | str | None
+    if operation == "verify-recorded":
+        result = _verify_recorded_request(Path(root), request)
+    elif type(maximum) is int:
+        result = frozen_player_inventory(Path(root), request.get("declaredFiles"), maximum)
+    else:
+        raise ValueError("Frozen inventory checkout or file bound is invalid.")
     if _inventory_checkout(Path(repository)) != checkout:
         raise ValueError("Frozen inventory checkout changed during the request.")
     return result
