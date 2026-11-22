@@ -637,12 +637,10 @@ def verify_recorded_inventory(
 ) -> None:
     root = regular_path(root_path, directory=True)
     root_before = ordinary(root, directory=True)
-    portable_recheck = (
-        check_inputs is not None and sys.platform != "win32" and not INOTIFY_OPEN_FLAGS
-    )
+    recheck_after_inputs = check_inputs is not None and sys.platform != "win32"
     receipt_before = (
         ordinary(records_path, directory=False)
-        if portable_recheck and records_path is not None
+        if recheck_after_inputs and records_path is not None
         else None
     )
     if not isinstance(records, list):
@@ -714,8 +712,10 @@ def verify_recorded_inventory(
                         _assert_recorded_directory(
                             before, recorded_stat(root, path), complete=False
                         )
-        if portable_recheck:
-            # Compare the same identities on both sides of the receipt and checkout checks.
+        if recheck_after_inputs:
+            if watcher is not None:
+                watcher.verify()
+            # Linux does not report memory-mapped writes as change events.
             _assert_recorded_state(root, root_before, recorded_names, observed, complete=complete)
             if (
                 records_path is not None

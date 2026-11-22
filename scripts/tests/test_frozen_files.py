@@ -5,6 +5,7 @@ from __future__ import annotations
 import errno
 import hashlib
 import json
+import mmap
 import os
 import shutil
 import subprocess
@@ -992,6 +993,40 @@ def test_recorded_inventory_rechecks_checkout_after_the_final_scan(
     with pytest.raises(ValueError, match="checkout changed during the request"):
         frozen_files.execute_request(request)
     assert observations == 2
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="Linux mapped writes and change observation")
+@pytest.mark.parametrize("changed", ["player", "receipt"])
+def test_recorded_inventory_rechecks_mapped_writes_during_checkout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, changed: str
+) -> None:
+    request, player, receipt = recorded_request(tmp_path)
+    target = player if changed == "player" else receipt
+    content = b"x" * target.stat().st_size
+    original_git = frozen_files.git_output
+    checkout_reads = 0
+
+    def check_checkout(root: Path, arguments: list[str]) -> bytes:
+        nonlocal checkout_reads
+        if arguments == ["rev-parse", "--verify", "HEAD"]:
+            checkout_reads += 1
+            if checkout_reads == 2:
+                with target.open("r+b") as stream, mmap.mmap(stream.fileno(), 0) as mapped:
+                    mapped[:] = content
+                    mapped.flush()
+        return original_git(root, arguments)
+
+    monkeypatch.setattr(frozen_files, "git_output", check_checkout)
+    outcome = frozen_files.execute_request(request)
+    assert checkout_reads == 2
+    assert target.read_bytes() == content
+    assert (
+        outcome
+        == {
+            "player": "WProto recorded file changed.",
+            "receipt": "WProto recorded receipt changed during verification.",
+        }[changed]
+    )
 
 
 @pytest.mark.skipif(
