@@ -627,6 +627,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             return DynamicAssetsDir;
         }
 
+        internal static TAsset LoadCachedAsset<TAsset>(string path, ref TAsset cachedAsset)
+            where TAsset : Object
+        {
+            if (cachedAsset == null)
+            {
+                cachedAsset = AssetDatabase.LoadAssetAtPath<TAsset>(path);
+            }
+
+            return cachedAsset;
+        }
+
         /// <summary>
         /// Creates a dynamic sprite sheet with the specified parameters.
         /// </summary>
@@ -787,17 +798,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             VerifyAndCacheAsset(SharedPrime127Path, ref _cachedPrime127Texture);
             VerifyAndCacheAsset(SharedSmall16x16Path, ref _cachedSmall16x16Texture);
             VerifyAndCacheAsset(SharedBoundary256Path, ref _cachedBoundary256Texture);
-        }
-
-        private static TAsset LoadCachedAsset<TAsset>(string path, ref TAsset cachedAsset)
-            where TAsset : Object
-        {
-            if (cachedAsset == null)
-            {
-                cachedAsset = AssetDatabase.LoadAssetAtPath<TAsset>(path);
-            }
-
-            return cachedAsset;
         }
 
         private static TextureImporter LoadCachedImporter(
