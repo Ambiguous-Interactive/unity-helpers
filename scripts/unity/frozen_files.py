@@ -9,9 +9,12 @@ import json
 import os
 import re
 import shutil
+import signal
 import stat
+import struct
 import subprocess
 import sys
+import threading
 import uuid
 from contextlib import ExitStack, contextmanager
 from functools import cache
@@ -20,7 +23,7 @@ from typing import TYPE_CHECKING, TypedDict, cast
 
 if TYPE_CHECKING:
     import io
-    from collections.abc import Generator
+    from collections.abc import Callable, Generator
 
 SOURCE_ROOTS = ("Runtime", "Editor", "Tests", "Generator~", "scripts/unity")
 GENERATOR_SUFFIXES = frozenset(
@@ -139,6 +142,16 @@ if sys.platform == "win32":
         kernel.CreateFileW.restype = wintypes.HANDLE
         kernel.CloseHandle.argtypes = (wintypes.HANDLE,)
         kernel.CloseHandle.restype = wintypes.BOOL
+        kernel.FindFirstChangeNotificationW.argtypes = (
+            wintypes.LPCWSTR,
+            wintypes.BOOL,
+            wintypes.DWORD,
+        )
+        kernel.FindFirstChangeNotificationW.restype = wintypes.HANDLE
+        kernel.FindCloseChangeNotification.argtypes = (wintypes.HANDLE,)
+        kernel.FindCloseChangeNotification.restype = wintypes.BOOL
+        kernel.WaitForSingleObject.argtypes = (wintypes.HANDLE, wintypes.DWORD)
+        kernel.WaitForSingleObject.restype = wintypes.DWORD
         return kernel
 
     def _open_windows_handle(path: Path) -> int:
@@ -457,6 +470,507 @@ def frozen_player_inventory(root_path: Path, declaration: object, maximum: int) 
     return InventoryResult(rows=rows, error=problem)
 
 
+class RecordedInventoryError(ValueError):
+    """A rejection of the recorded inventory, reported through the original entry point."""
+
+
+def _assert_recorded_root(root: Path, root_before: os.stat_result, *, complete: bool) -> None:
+    root_after = ordinary(root, directory=True)
+    if complete and identity(root_before) != identity(root_after):
+        raise RecordedInventoryError("WProto complete inventory membership changed.")
+    if (root_before.st_dev, root_before.st_ino) != (root_after.st_dev, root_after.st_ino):
+        raise RecordedInventoryError("WProto recorded inventory root changed.")
+
+
+@contextmanager
+def observe_windows_membership(
+    root: Path, root_before: os.stat_result, *, complete: bool
+) -> Generator[None, None, None]:
+    if sys.platform == "win32":
+        if complete:
+            kernel = windows_kernel32()
+            file_name_change, directory_name_change = 0x00000001, 0x00000002
+            handle: int | None = kernel.FindFirstChangeNotificationW(
+                str(root), True, file_name_change | directory_name_change
+            )
+            if handle is None or handle == ctypes.c_void_p(-1).value:
+                raise ctypes.WinError(ctypes.get_last_error())
+            try:
+                yield
+                # The subtree notification excludes the root itself.
+                _assert_recorded_root(root, root_before, complete=True)
+                wait_object, wait_timeout = 0x00000000, 0x00000102
+                status: int = kernel.WaitForSingleObject(handle, 0)
+                if status == wait_object:
+                    raise RecordedInventoryError("WProto complete inventory membership changed.")
+                if status != wait_timeout:
+                    raise ctypes.WinError(ctypes.get_last_error())
+            finally:
+                kernel.FindCloseChangeNotification(handle)
+            return
+    yield
+
+
+def _recorded_path(root: Path, relative: str) -> Path:
+    if re.search(r"^/|\\|:|(?:^|/)\.\.?(?:/|$)", relative):
+        raise RecordedInventoryError(
+            "WProto recorded inventory contains an invalid or repeated relative path."
+        )
+    path = Path(os.path.abspath(root / relative))  # noqa: PTH100
+    if not path.is_relative_to(root) or path == root:
+        raise RecordedInventoryError("WProto recorded path leaves its root.")
+    return path
+
+
+def recorded_stat(root: Path, path: Path) -> os.stat_result:
+    try:
+        info = path.lstat()
+        for current in (path, *path.parents):
+            ancestor = info if current == path else current.lstat()
+            if stat.S_ISLNK(ancestor.st_mode) or (
+                getattr(ancestor, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT
+            ):
+                raise RecordedInventoryError("WProto recorded path has a reparse ancestor.")
+            if current == root:
+                break
+    except FileNotFoundError as error:
+        raise RecordedInventoryError(
+            f"Cannot find path '{path}' because it does not exist."
+        ) from error
+    return info
+
+
+if sys.platform == "linux":
+    INOTIFY_OPEN_FLAGS = os.O_CLOEXEC | os.O_NONBLOCK
+else:
+    INOTIFY_OPEN_FLAGS = 0
+_LINUX_DESCRIPTOR_BUDGET_LOCK = threading.Lock()
+# These filesystem implementations attach native leases to the inode used by shared mappings.
+_LINUX_READ_LEASE_FILESYSTEMS = frozenset(("btrfs", "ext4", "tmpfs", "xfs"))
+
+
+class LinuxRecordedInventoryWatch:
+    _IN_MODIFY = 0x00000002
+    _IN_ATTRIB = 0x00000004
+    _IN_MOVED_FROM = 0x00000040
+    _IN_MOVED_TO = 0x00000080
+    _IN_CREATE = 0x00000100
+    _IN_DELETE = 0x00000200
+    _IN_DELETE_SELF = 0x00000400
+    _IN_MOVE_SELF = 0x00000800
+    _IN_DONT_FOLLOW = 0x02000000
+
+    def __init__(self, cleanup: ExitStack) -> None:
+        libc = ctypes.CDLL(None, use_errno=True)
+        libc.inotify_init1.argtypes = (ctypes.c_int,)
+        libc.inotify_init1.restype = ctypes.c_int
+        libc.inotify_add_watch.argtypes = (ctypes.c_int, ctypes.c_char_p, ctypes.c_uint32)
+        libc.inotify_add_watch.restype = ctypes.c_int
+        self._add_watch = libc.inotify_add_watch
+        self._descriptor: int = libc.inotify_init1(INOTIFY_OPEN_FLAGS)
+        if self._descriptor < 0:
+            raise OSError(ctypes.get_errno(), "Cannot observe recorded inventory changes.")
+        cleanup.callback(os.close, self._descriptor)
+        self._watched: set[Path] = set()
+
+    def add(self, path: Path, *, directory: bool, complete: bool) -> None:
+        if path in self._watched:
+            return
+        mask = self._IN_DELETE_SELF | self._IN_MOVE_SELF | self._IN_DONT_FOLLOW
+        if directory:
+            if complete:
+                mask |= self._IN_MOVED_FROM | self._IN_MOVED_TO | self._IN_CREATE | self._IN_DELETE
+        else:
+            mask |= self._IN_MODIFY | self._IN_ATTRIB
+        if self._add_watch(self._descriptor, os.fsencode(path), mask) < 0:
+            raise OSError(ctypes.get_errno(), "Cannot observe recorded inventory path.", path)
+        self._watched.add(path)
+
+    def verify(self) -> None:
+        try:
+            events = os.read(self._descriptor, 4096)
+        except BlockingIOError:
+            return
+        if events:
+            raise RecordedInventoryError("WProto recorded file changed during verification.")
+
+
+def _assert_recorded_directory(
+    before: os.stat_result, current: os.stat_result, *, complete: bool
+) -> None:
+    if complete and identity(current) != identity(before):
+        raise RecordedInventoryError("WProto complete inventory membership changed.")
+    if (before.st_dev, before.st_ino, before.st_mode) != (
+        current.st_dev,
+        current.st_ino,
+        current.st_mode,
+    ):
+        raise RecordedInventoryError("WProto recorded directory changed kind.")
+
+
+def _assert_recorded_hash(
+    path: Path, before: os.stat_result, expected: str, diagnostic: str
+) -> None:
+    try:
+        actual, _ = file_hash(path, before)
+    except (OSError, ValueError) as error:
+        raise RecordedInventoryError(diagnostic) from error
+    if actual != expected:
+        raise RecordedInventoryError(diagnostic)
+
+
+@contextmanager
+def _reserve_linux_recorded_descriptors(lease_count: int) -> Generator[None, None, None]:
+    if sys.platform == "linux":
+        import resource
+
+        # The budget is process-wide. Hold it until every lease has closed.
+        with _LINUX_DESCRIPTOR_BUDGET_LOCK:
+            limit = resource.RLIMIT_NOFILE
+            soft, hard = resource.getrlimit(limit)
+            adjusted = soft
+            if soft != resource.RLIM_INFINITY:
+                try:
+                    open_descriptors = sum(1 for _ in Path("/proc/self/fd").iterdir())
+                except OSError:
+                    open_descriptors = 3  # Standard streams when procfs is unavailable.
+                # The final Git check uses two output pipes and a child error pipe.
+                required = open_descriptors + lease_count + 6
+                if hard != resource.RLIM_INFINITY and required > hard:
+                    raise RecordedInventoryError(
+                        f"WProto recorded inventory requires {required} open file descriptors. "
+                        f"The process hard limit is {hard}."
+                    )
+                preferred = required + 8  # Leave room for other short-lived worker descriptors.
+                if hard != resource.RLIM_INFINITY:
+                    preferred = min(preferred, hard)
+                adjusted = max(soft, preferred)
+            if adjusted != soft:
+                try:
+                    resource.setrlimit(limit, (adjusted, hard))
+                except (OSError, ValueError) as error:
+                    raise RecordedInventoryError(
+                        f"Cannot provide {adjusted} file descriptors for recorded verification."
+                    ) from error
+            try:
+                yield
+            finally:
+                if adjusted != soft:
+                    resource.setrlimit(limit, (soft, hard))
+    else:
+        yield
+
+
+def _linux_lease_mount_types() -> dict[str, str]:
+    mounts: dict[str, str] = {}
+    try:
+        with Path("/proc/self/mountinfo").open(
+            encoding="utf-8", errors="surrogateescape"
+        ) as stream:
+            for line in stream:
+                location, separator, filesystem = line.partition(" - ")
+                if separator:
+                    mounts[location.split(maxsplit=1)[0]] = filesystem.split(maxsplit=1)[0]
+    except OSError as error:
+        raise RecordedInventoryError(
+            "Cannot identify Linux mounts for recorded verification."
+        ) from error
+    return mounts
+
+
+def linux_lease_filesystem(descriptor: int, mounts: dict[str, str]) -> str:
+    with Path(f"/proc/self/fdinfo/{descriptor}").open(encoding="ascii") as stream:
+        for line in stream:
+            field, _, value = line.partition(":")
+            if field == "mnt_id":
+                return mounts.get(value.strip(), "an unknown Linux filesystem")
+    return "an unknown Linux filesystem"
+
+
+@contextmanager
+def retain_linux_recorded_files(
+    observed: dict[Path, tuple[os.stat_result, str | None]],
+    receipt: tuple[Path, os.stat_result] | None,
+) -> Generator[None, None, None]:
+    """Hold Linux inputs through acceptance. Other POSIX hosts use the final read."""
+    if sys.platform == "linux" and INOTIFY_OPEN_FLAGS:
+        import fcntl
+
+        # Python 3.11 lacks the Linux UAPI constants for targeting lease breaks at a thread.
+        set_owner = getattr(fcntl, "F_SETOWN_EX", 15)
+        owner_thread = getattr(fcntl, "F_OWNER_TID", 0)
+        owner = struct.pack("ii", owner_thread, threading.get_native_id())
+        lease_signal = {signal.SIGIO}
+        previous_mask = signal.pthread_sigmask(signal.SIG_BLOCK, lease_signal)
+        if signal.SIGIO in signal.sigpending():
+            signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
+            raise RecordedInventoryError(
+                "Cannot observe recorded input leases during verification."
+            )
+        lease_count = sum(digest is not None for _, digest in observed.values())
+        lease_count += int(receipt is not None)
+        try:
+            with _reserve_linux_recorded_descriptors(lease_count), ExitStack() as leases:
+                mounts = _linux_lease_mount_types()
+
+                def retain(path: Path, before: os.stat_result, diagnostic: str) -> None:
+                    try:
+                        descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+                        leases.callback(os.close, descriptor)
+                        if identity(os.fstat(descriptor)) != identity(before):
+                            raise RecordedInventoryError(diagnostic)
+                        filesystem = linux_lease_filesystem(descriptor, mounts)
+                        if filesystem not in _LINUX_READ_LEASE_FILESYSTEMS:
+                            raise RecordedInventoryError(
+                                f"Cannot retain recorded input {path} on {filesystem}. "
+                                "Use a Btrfs, ext4, tmpfs, or XFS filesystem."
+                            )
+                        fcntl.fcntl(descriptor, set_owner, owner)
+                        fcntl.fcntl(descriptor, fcntl.F_SETLEASE, fcntl.F_RDLCK)
+                    except BlockingIOError as error:
+                        raise RecordedInventoryError(diagnostic) from error
+                    except OSError as error:
+                        raise RecordedInventoryError(
+                            f"Cannot retain recorded input during verification: {path}: {error.strerror}"
+                        ) from error
+
+                for path, (before, digest) in observed.items():
+                    if digest is not None:
+                        retain(path, before, "WProto recorded file changed.")
+                if receipt is not None:
+                    retain(*receipt, "WProto recorded receipt changed during verification.")
+                yield
+                if signal.SIGIO in signal.sigpending():
+                    raise RecordedInventoryError(
+                        "WProto recorded file changed during verification."
+                    )
+        finally:
+            if signal.SIGIO in signal.sigpending():
+                signal.sigwait(lease_signal)
+            signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
+        return
+    yield
+
+
+def _assert_recorded_state(
+    root: Path,
+    root_before: os.stat_result,
+    recorded_names: set[str],
+    observed: dict[Path, tuple[os.stat_result, str | None]],
+    *,
+    complete: bool,
+    rehash: bool = False,
+) -> None:
+    if complete:
+        try:
+            actual_names = {path.relative_to(root).as_posix() for path, _, _ in walk(root)}
+        except (OSError, ValueError) as error:
+            raise RecordedInventoryError("WProto complete inventory membership changed.") from error
+        if actual_names != recorded_names:
+            raise RecordedInventoryError("WProto complete inventory membership changed.")
+    regular_path(root, directory=True)
+    for path, (before, digest) in observed.items():
+        current = recorded_stat(root, path)
+        if digest is None:
+            _assert_recorded_directory(before, current, complete=complete)
+        elif rehash:
+            _assert_recorded_hash(path, before, digest, "WProto recorded file changed.")
+        elif identity(current) != identity(before):
+            raise RecordedInventoryError("WProto recorded file changed.")
+    _assert_recorded_root(root, root_before, complete=complete)
+
+
+def verify_recorded_inventory(
+    root_path: Path,
+    records: object,
+    *,
+    complete: bool,
+    check_inputs: Callable[[], None] | None = None,
+    check_checkout: Callable[[], None] | None = None,
+    receipt: tuple[Path, str] | None = None,
+) -> None:
+    root = regular_path(root_path, directory=True)
+    root_before = ordinary(root, directory=True)
+    recheck_after_inputs = check_inputs is not None and sys.platform != "win32"
+    receipt_before = (
+        ordinary(receipt[0], directory=False)
+        if recheck_after_inputs and receipt is not None
+        else None
+    )
+    if not isinstance(records, list):
+        raise RecordedInventoryError("WProto recorded inventory is empty.")
+    recorded_names: set[str] = set()
+    observed: dict[Path, tuple[os.stat_result, str | None]] = {}
+    with ExitStack() as retained, observe_windows_membership(root, root_before, complete=complete):
+        watcher = LinuxRecordedInventoryWatch(retained) if INOTIFY_OPEN_FLAGS else None
+        if watcher is not None:
+            watcher.add(root, directory=True, complete=complete)
+            if receipt is not None:
+                watcher.add(receipt[0], directory=False, complete=False)
+        for row in cast("list[object]", records):
+            record = cast("dict[str, object]", row) if isinstance(row, dict) else {}
+            relative = record.get("Path")
+            if not isinstance(relative, str):
+                raise RecordedInventoryError(
+                    "WProto recorded inventory contains an invalid or repeated relative path."
+                )
+            path = _recorded_path(root, relative)
+            if path in observed:
+                raise RecordedInventoryError(
+                    "WProto recorded inventory contains an invalid or repeated relative path."
+                )
+            recorded_names.add(relative)
+            info = recorded_stat(root, path)
+            directory = record.get("Kind") == "directory"
+            if watcher is not None:
+                for parent in path.parents:
+                    watcher.add(parent, directory=True, complete=complete)
+                    if parent == root:
+                        break
+                watcher.add(path, directory=directory, complete=complete)
+            digest: str | None = None
+            if directory:
+                if not stat.S_ISDIR(info.st_mode):
+                    raise RecordedInventoryError("WProto recorded directory changed kind.")
+            elif record.get("Kind") == "file":
+                expected = record.get("Sha256")
+                if (
+                    not stat.S_ISREG(info.st_mode)
+                    or not isinstance(expected, str)
+                    or not re.fullmatch(r"[a-f0-9]{64}", expected)
+                    or info.st_size != record.get("Length")
+                ):
+                    raise RecordedInventoryError("WProto recorded file changed.")
+                try:
+                    if sys.platform == "win32":
+                        retained.enter_context(retain_source(path))
+                except OSError as error:
+                    raise RecordedInventoryError("WProto recorded file changed.") from error
+                _assert_recorded_hash(path, info, expected, "WProto recorded file changed.")
+                digest = expected
+            else:
+                raise RecordedInventoryError("WProto recorded inventory kind is invalid.")
+            observed[path] = (info, digest)
+
+        if not recorded_names:
+            raise RecordedInventoryError("WProto recorded inventory is empty.")
+        _assert_recorded_state(root, root_before, recorded_names, observed, complete=complete)
+        if check_inputs is not None:
+            check_inputs()
+            if sys.platform == "win32" and not complete:
+                # A subset has no membership watch. Recheck its recorded directories
+                # by identity so unrelated entries may still be added or removed.
+                _assert_recorded_root(root, root_before, complete=False)
+                for path, (before, digest) in observed.items():
+                    if digest is None:
+                        _assert_recorded_directory(
+                            before, recorded_stat(root, path), complete=False
+                        )
+        if recheck_after_inputs:
+            if watcher is not None:
+                watcher.verify()
+            receipt_state = (
+                (receipt[0], receipt_before)
+                if receipt is not None and receipt_before is not None
+                else None
+            )
+            with retain_linux_recorded_files(observed, receipt_state):
+                # Reread bytes changed through a mapping that closed before the final pass.
+                _assert_recorded_state(
+                    root, root_before, recorded_names, observed, complete=complete, rehash=True
+                )
+                if receipt is not None and receipt_before is not None:
+                    path, digest = receipt
+                    _assert_recorded_hash(
+                        path,
+                        receipt_before,
+                        digest,
+                        "WProto recorded receipt changed during verification.",
+                    )
+                if check_checkout is not None:
+                    check_checkout()
+                    if watcher is None:
+                        _assert_recorded_state(
+                            root, root_before, recorded_names, observed, complete=complete
+                        )
+                        if (
+                            receipt is not None
+                            and receipt_before is not None
+                            and identity(ordinary(receipt[0], directory=False))
+                            != identity(receipt_before)
+                        ):
+                            raise RecordedInventoryError(
+                                "WProto recorded receipt changed during verification."
+                            )
+                if watcher is not None:
+                    watcher.verify()
+        elif watcher is not None:
+            watcher.verify()
+
+
+def _owned_records_path(path: Path) -> Path:
+    # The OS temporary directory can have an alias, but the receipt file must be ordinary.
+    return regular_path(path.parent.resolve(strict=True) / path.name, directory=False)
+
+
+def _verify_recorded_request(
+    root: Path, request: dict[str, object], check_checkout: Callable[[], None]
+) -> str | None:
+    path, digest, complete = (
+        request.get("recordsPath"),
+        request.get("recordsSha256"),
+        request.get("complete"),
+    )
+    if (
+        not isinstance(path, str)
+        or not Path(path).is_absolute()
+        or not isinstance(digest, str)
+        or not re.fullmatch(r"[a-f0-9]{64}", digest)
+        or type(complete) is not bool
+    ):
+        raise ValueError("Recorded inventory request has invalid fields.")
+    declared_path = Path(path)
+    records_path = _owned_records_path(declared_path)
+    with retain_source(records_path):
+        before = ordinary(records_path, directory=False)
+        with open_source(records_path) as stream:
+            payload = stream.read()
+        if hashlib.sha256(payload).hexdigest() != digest:
+            raise ValueError("Recorded inventory request does not match its input hash.")
+        records: object = json.loads(payload)
+
+        def check_request_checkout() -> None:
+            check_checkout()
+            if _owned_records_path(declared_path) != records_path:
+                raise ValueError(
+                    "Recorded inventory request directory changed during verification."
+                )
+
+        def check_inputs() -> None:
+            try:
+                final_digest, _ = file_hash(records_path, before)
+            except (OSError, ValueError) as error:
+                raise ValueError(
+                    "Recorded inventory request changed during verification."
+                ) from error
+            if final_digest != digest:
+                raise ValueError("Recorded inventory request changed during verification.")
+            check_request_checkout()
+
+        try:
+            verify_recorded_inventory(
+                root,
+                records,
+                complete=complete,
+                check_inputs=check_inputs,
+                check_checkout=check_request_checkout,
+                receipt=(records_path, digest),
+            )
+        except RecordedInventoryError as error:
+            return str(error)
+    return None
+
+
 def execute_request(value: object) -> object:
     if not isinstance(value, dict):
         raise ValueError("Frozen inventory requests must be objects.")
@@ -465,6 +979,8 @@ def execute_request(value: object) -> object:
     allowed = {"protocol", "requestId", "operation", "root"}
     if operation == "inventory":
         allowed.update(("repository", "declaredFiles", "maximumFiles"))
+    if operation == "verify-recorded":
+        allowed.update(("repository", "recordsPath", "recordsSha256", "complete"))
     if set(request) - allowed:
         raise ValueError("Source census request has unknown fields.")
     protocol = request.get("protocol")
@@ -475,7 +991,7 @@ def execute_request(value: object) -> object:
         or protocol != 1
         or not isinstance(identifier, str)
         or not re.fullmatch(r"[a-f0-9]{32}", identifier)
-        or operation not in ("sources", "host-sources", "inventory")
+        or operation not in ("sources", "host-sources", "inventory", "verify-recorded")
         or not isinstance(root, str)
         or not root.strip()
     ):
@@ -485,12 +1001,21 @@ def execute_request(value: object) -> object:
     if operation == "host-sources":
         return host_source_files(Path(root))
     repository, maximum = request.get("repository"), request.get("maximumFiles")
-    if not isinstance(repository, str) or not repository.strip() or type(maximum) is not int:
+    if not isinstance(repository, str) or not repository.strip():
         raise ValueError("Frozen inventory checkout or file bound is invalid.")
-    checkout = _inventory_checkout(Path(repository))
+    repository_path = Path(repository)
+    checkout = _inventory_checkout(repository_path)
+
+    def check_checkout() -> None:
+        if _inventory_checkout(repository_path) != checkout:
+            raise ValueError("Frozen inventory checkout changed during the request.")
+
+    if operation == "verify-recorded":
+        return _verify_recorded_request(Path(root), request, check_checkout)
+    if type(maximum) is not int:
+        raise ValueError("Frozen inventory checkout or file bound is invalid.")
     result = frozen_player_inventory(Path(root), request.get("declaredFiles"), maximum)
-    if _inventory_checkout(Path(repository)) != checkout:
-        raise ValueError("Frozen inventory checkout changed during the request.")
+    check_checkout()
     return result
 
 

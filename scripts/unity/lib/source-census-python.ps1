@@ -15,10 +15,13 @@ function Stop-WProtoSourceCensusWorker {
 
 function Invoke-WProtoSourceCensus {
     param(
-        [ValidateSet('sources', 'host-sources', 'inventory')][string]$Operation,
+        [ValidateSet('sources', 'host-sources', 'inventory', 'verify-recorded')][string]$Operation,
         [string]$Root,
         [AllowNull()][object[]]$DeclaredFiles = $null,
-        [int]$MaximumFiles = 4096
+        [int]$MaximumFiles = 4096,
+        [string]$RecordsPath,
+        [string]$RecordsSha256,
+        [switch]$Complete
     )
     $implementation = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../frozen_files.py'))
     $project = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../python~'))
@@ -56,10 +59,16 @@ function Invoke-WProtoSourceCensus {
         } catch { $process.Dispose(); throw }
     }
     $request = [ordered]@{ protocol = 1; requestId = [Guid]::NewGuid().ToString('N'); operation = $Operation; root = $Root }
-    if ($Operation -ceq 'inventory') {
+    if ($Operation -cin @('inventory', 'verify-recorded')) {
         $request.repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../..'))
+    }
+    if ($Operation -ceq 'inventory') {
         $request.declaredFiles = $DeclaredFiles
         $request.maximumFiles = $MaximumFiles
+    } elseif ($Operation -ceq 'verify-recorded') {
+        $request.recordsPath = $RecordsPath
+        $request.recordsSha256 = $RecordsSha256
+        $request.complete = $Complete.IsPresent
     }
     try {
         $state.Process.StandardInput.WriteLine((ConvertTo-Json -InputObject $request -Depth 8 -Compress))

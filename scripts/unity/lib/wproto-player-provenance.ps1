@@ -230,38 +230,28 @@ function Get-WProtoProjectInputs {
 
 function Assert-WProtoRecordedInventory {
     param([string]$Root, $Entries, [switch]$Complete)
-    $rootPath = [IO.Path]::GetFullPath($Root).TrimEnd([IO.Path]::DirectorySeparatorChar)
-    $observed = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
-    foreach ($entry in @($Entries)) {
-        if ($entry.Path -isnot [string] -or $entry.Path -match '(^/|\\|:|(^|/)\.\.?(/|$))' -or -not $observed.Add($entry.Path)) {
-            throw 'WProto recorded inventory contains an invalid or repeated relative path.'
-        }
-        $path = [IO.Path]::GetFullPath((Join-Path $rootPath $entry.Path))
-        if (-not $path.StartsWith($rootPath + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'WProto recorded path leaves its root.' }
-        $item = Get-Item -LiteralPath $path -Force -ErrorAction Stop
-        $parent = $item
-        while ($null -ne $parent) {
-            if ($parent.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'WProto recorded path has a reparse ancestor.' }
-            $parentPath = Split-Path -Parent $parent.FullName
-            $parent = if ($parentPath) { Get-Item -LiteralPath $parentPath -Force } else { $null }
-        }
-        if ($entry.Kind -ceq 'directory') {
-            if (-not $item.PSIsContainer) { throw 'WProto recorded directory changed kind.' }
-        } elseif ($entry.Kind -ceq 'file') {
-            if ($item.PSIsContainer -or $entry.Sha256 -isnot [string] -or $entry.Sha256 -cnotmatch '^[a-f0-9]{64}$' -or
-                $item.Length -ne $entry.Length -or (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant() -cne $entry.Sha256) {
-                throw 'WProto recorded file changed.'
+    $records = @(
+        foreach ($entry in @($Entries)) {
+            $record = @{ Path = $entry.Path; Kind = $entry.Kind }
+            if ($entry.Kind -ceq 'file') {
+                $record.Length = $entry.Length
+                $record.Sha256 = $entry.Sha256
             }
-        } else { throw 'WProto recorded inventory kind is invalid.' }
-    }
-    if ($observed.Count -eq 0) { throw 'WProto recorded inventory is empty.' }
-    if ($Complete) {
-        $actual = @(Get-ChildItem -LiteralPath $rootPath -Recurse -Force)
-        if ($actual.Count -ne $observed.Count) { throw 'WProto complete inventory membership changed.' }
-        foreach ($item in $actual) {
-            if (-not $observed.Contains($item.FullName.Substring($rootPath.Length + 1).Replace('\', '/'))) { throw 'WProto complete inventory membership changed.' }
+            $record
         }
-    }
+    )
+    $bytes = [Text.UTF8Encoding]::new($false).GetBytes((ConvertTo-Json -InputObject $records -Depth 8 -Compress))
+    $hash = [Security.Cryptography.SHA256]::Create()
+    try { $digest = [BitConverter]::ToString($hash.ComputeHash($bytes)).Replace('-', '').ToLowerInvariant() }
+    finally { $hash.Dispose() }
+    # A full player inventory can exceed the worker's request-line bound.
+    $recordsPath = [IO.Path]::GetTempFileName()
+    try {
+        [IO.File]::WriteAllBytes($recordsPath, $bytes)
+        $diagnostic = Invoke-WProtoSourceCensus -Operation verify-recorded -Root ([IO.Path]::GetFullPath($Root)) `
+            -RecordsPath $recordsPath -RecordsSha256 $digest -Complete:$Complete
+        if ($null -ne $diagnostic) { throw $diagnostic }
+    } finally { [IO.File]::Delete($recordsPath) }
 }
 
 function Assert-WProtoSnapshotInventory {
