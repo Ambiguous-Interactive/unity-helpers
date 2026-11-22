@@ -677,7 +677,7 @@ def _linux_lease_mount_types() -> dict[str, str]:
     return mounts
 
 
-def _linux_lease_filesystem(descriptor: int, mounts: dict[str, str]) -> str:
+def linux_lease_filesystem(descriptor: int, mounts: dict[str, str]) -> str:
     with Path(f"/proc/self/fdinfo/{descriptor}").open(encoding="ascii") as stream:
         for line in stream:
             field, _, value = line.partition(":")
@@ -718,7 +718,7 @@ def retain_linux_recorded_files(
                         leases.callback(os.close, descriptor)
                         if identity(os.fstat(descriptor)) != identity(before):
                             raise RecordedInventoryError(diagnostic)
-                        filesystem = _linux_lease_filesystem(descriptor, mounts)
+                        filesystem = linux_lease_filesystem(descriptor, mounts)
                         if filesystem not in _LINUX_READ_LEASE_FILESYSTEMS:
                             raise RecordedInventoryError(
                                 f"Cannot retain recorded input {path} on {filesystem}. "

@@ -1119,14 +1119,14 @@ def test_recorded_inventory_requires_a_filesystem_with_native_read_leases(
     assert frozen_files.execute_request(request) is None
     target = player if changed == "player" else receipt
     target_identity = frozen_files.identity(target.stat())
-    filesystem_for_descriptor = frozen_files._linux_lease_filesystem
+    filesystem_for_descriptor = frozen_files.linux_lease_filesystem
 
     def identify_filesystem(descriptor: int, mounts: dict[str, str]) -> str:
         if frozen_files.identity(os.fstat(descriptor)) == target_identity:
             return "overlay"
         return filesystem_for_descriptor(descriptor, mounts)
 
-    monkeypatch.setattr(frozen_files, "_linux_lease_filesystem", identify_filesystem)
+    monkeypatch.setattr(frozen_files, "linux_lease_filesystem", identify_filesystem)
     assert frozen_files.execute_request(request) == (
         f"Cannot retain recorded input {target} on overlay. "
         "Use a Btrfs, ext4, tmpfs, or XFS filesystem."
