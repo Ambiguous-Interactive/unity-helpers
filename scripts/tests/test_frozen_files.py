@@ -997,9 +997,15 @@ def test_recorded_inventory_rechecks_checkout_after_the_final_scan(
 
 @pytest.mark.skipif(sys.platform != "linux", reason="Linux mapped writes and change observation")
 @pytest.mark.parametrize("changed", ["player", "receipt"])
-@pytest.mark.parametrize("already_dirty", [False, True])
+@pytest.mark.parametrize(
+    ("already_dirty", "close_before_recheck"), [(False, True), (True, True), (True, False)]
+)
 def test_recorded_inventory_rechecks_mapped_writes_during_checkout(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, changed: str, already_dirty: bool
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    changed: str,
+    already_dirty: bool,
+    close_before_recheck: bool,
 ) -> None:
     request, player, receipt = recorded_request(tmp_path)
     target = player if changed == "player" else receipt
@@ -1015,9 +1021,13 @@ def test_recorded_inventory_rechecks_mapped_writes_during_checkout(
                 mapped[:] = content
                 if not already_dirty:
                     mapped.flush()
+                if close_before_recheck:
+                    mapped.close()
         return original_git(root, arguments)
 
-    with target.open("r+b") as stream, mmap.mmap(stream.fileno(), 0) as mapped:
+    with target.open("r+b") as stream:
+        mapped = mmap.mmap(stream.fileno(), 0)
+    with mapped:
         if already_dirty:
             mapped[:1] = mapped[:1]
         before = frozen_files.identity(target.stat())
@@ -1034,6 +1044,41 @@ def test_recorded_inventory_rechecks_mapped_writes_during_checkout(
             "receipt": "WProto recorded receipt changed during verification.",
         }[changed]
     )
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="Linux file leases")
+def test_recorded_inventory_retains_earlier_files_through_final_hashes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    request, first, receipt = recorded_request(tmp_path)
+    root = first.parent.parent
+    later = write(root / "zz-player.txt")
+    rows = frozen_files.frozen_player_inventory(root, None, 2)["rows"]
+    receipt.write_bytes(json.dumps(rows).encode())
+    request["recordsSha256"] = hashlib.sha256(receipt.read_bytes()).hexdigest()
+    original_hash = frozen_files.file_hash
+    later_hashes = 0
+    write_open_refused = False
+
+    def check_hash(path: Path, info: stat_result | None = None) -> tuple[str, int]:
+        nonlocal later_hashes, write_open_refused
+        if path == later:
+            later_hashes += 1
+            if later_hashes == 2:
+                try:
+                    descriptor = os.open(first, os.O_WRONLY | os.O_NONBLOCK)
+                except BlockingIOError:
+                    write_open_refused = True
+                else:
+                    os.close(descriptor)
+        return original_hash(path, info)
+
+    monkeypatch.setattr(frozen_files, "file_hash", check_hash)
+    outcome = frozen_files.execute_request(request)
+    assert later_hashes == 2
+    assert write_open_refused
+    assert outcome == "WProto recorded file changed during verification."
+    first.write_bytes(b"after lease release")
 
 
 @pytest.mark.skipif(

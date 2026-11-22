@@ -9,9 +9,12 @@ import json
 import os
 import re
 import shutil
+import signal
 import stat
+import struct
 import subprocess
 import sys
+import threading
 import uuid
 from contextlib import ExitStack, contextmanager
 from functools import cache
@@ -613,6 +616,59 @@ def _assert_recorded_hash(
         raise RecordedInventoryError(diagnostic)
 
 
+@contextmanager
+def retain_linux_recorded_files(
+    observed: dict[Path, tuple[os.stat_result, str | None]],
+    receipt: tuple[Path, os.stat_result] | None,
+) -> Generator[None, None, None]:
+    """Hold Linux inputs through acceptance. Other POSIX hosts use the final read."""
+    if sys.platform != "linux" or not INOTIFY_OPEN_FLAGS:
+        yield
+        return
+
+    import fcntl
+
+    # Python 3.11 lacks the Linux UAPI constants for targeting lease breaks at a thread.
+    set_owner = getattr(fcntl, "F_SETOWN_EX", 15)
+    owner_thread = getattr(fcntl, "F_OWNER_TID", 0)
+    owner = struct.pack("ii", owner_thread, threading.get_native_id())
+    lease_signal = {signal.SIGIO}
+    previous_mask = signal.pthread_sigmask(signal.SIG_BLOCK, lease_signal)
+    if signal.SIGIO in signal.sigpending():
+        signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
+        raise RecordedInventoryError("Cannot observe recorded input leases during verification.")
+    try:
+        with ExitStack() as leases:
+
+            def retain(path: Path, before: os.stat_result, diagnostic: str) -> None:
+                try:
+                    descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+                    leases.callback(os.close, descriptor)
+                    if identity(os.fstat(descriptor)) != identity(before):
+                        raise RecordedInventoryError(diagnostic)
+                    fcntl.fcntl(descriptor, set_owner, owner)
+                    fcntl.fcntl(descriptor, fcntl.F_SETLEASE, fcntl.F_RDLCK)
+                except BlockingIOError as error:
+                    raise RecordedInventoryError(diagnostic) from error
+                except OSError as error:
+                    raise RecordedInventoryError(
+                        f"Cannot retain recorded input during verification: {path}: {error.strerror}"
+                    ) from error
+
+            for path, (before, digest) in observed.items():
+                if digest is not None:
+                    retain(path, before, "WProto recorded file changed.")
+            if receipt is not None:
+                retain(*receipt, "WProto recorded receipt changed during verification.")
+            yield
+            if signal.SIGIO in signal.sigpending():
+                raise RecordedInventoryError("WProto recorded file changed during verification.")
+    finally:
+        if signal.SIGIO in signal.sigpending():
+            signal.sigwait(lease_signal)
+        signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
+
+
 def _assert_recorded_state(
     root: Path,
     root_before: os.stat_result,
@@ -729,20 +785,27 @@ def verify_recorded_inventory(
         if recheck_after_inputs:
             if watcher is not None:
                 watcher.verify()
-            # A shared mapping can change bytes without a stat change or a notification.
-            _assert_recorded_state(
-                root, root_before, recorded_names, observed, complete=complete, rehash=True
+            receipt_state = (
+                (receipt[0], receipt_before)
+                if receipt is not None and receipt_before is not None
+                else None
             )
-            if receipt is not None and receipt_before is not None:
-                path, digest = receipt
-                _assert_recorded_hash(
-                    path,
-                    receipt_before,
-                    digest,
-                    "WProto recorded receipt changed during verification.",
+            with retain_linux_recorded_files(observed, receipt_state):
+                # Reread bytes changed through a mapping that closed before the final pass.
+                _assert_recorded_state(
+                    root, root_before, recorded_names, observed, complete=complete, rehash=True
                 )
-        if watcher is not None:
-            # Local filesystem notifications cover earlier paths after their final stat.
+                if receipt is not None and receipt_before is not None:
+                    path, digest = receipt
+                    _assert_recorded_hash(
+                        path,
+                        receipt_before,
+                        digest,
+                        "WProto recorded receipt changed during verification.",
+                    )
+                if watcher is not None:
+                    watcher.verify()
+        elif watcher is not None:
             watcher.verify()
 
 
