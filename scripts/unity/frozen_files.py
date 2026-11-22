@@ -706,6 +706,11 @@ def verify_recorded_inventory(
             watcher.verify()
 
 
+def _owned_records_path(path: Path) -> Path:
+    # The OS temporary directory can have an alias, but the receipt file must be ordinary.
+    return regular_path(path.parent.resolve(strict=True) / path.name, directory=False)
+
+
 def _verify_recorded_request(
     root: Path, request: dict[str, object], check_checkout: Callable[[], None]
 ) -> str | None:
@@ -722,7 +727,8 @@ def _verify_recorded_request(
         or type(complete) is not bool
     ):
         raise ValueError("Recorded inventory request has invalid fields.")
-    records_path = regular_path(Path(path), directory=False)
+    declared_path = Path(path)
+    records_path = _owned_records_path(declared_path)
     with retain_source(records_path):
         before = ordinary(records_path, directory=False)
         with open_source(records_path) as stream:
@@ -741,6 +747,10 @@ def _verify_recorded_request(
             if final_digest != digest:
                 raise ValueError("Recorded inventory request changed during verification.")
             check_checkout()
+            if _owned_records_path(declared_path) != records_path:
+                raise ValueError(
+                    "Recorded inventory request directory changed during verification."
+                )
 
         try:
             verify_recorded_inventory(

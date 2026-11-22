@@ -1065,3 +1065,43 @@ def test_portable_recorded_inventory_rechecks_after_request_inputs(
         "membership": "WProto complete inventory membership changed.",
     }[changed]
     assert outcome == (expected if complete else None)
+
+
+@pytest.mark.parametrize("change", ["none", "parent", "file"])
+def test_recorded_request_binds_the_file_inside_an_aliased_temp_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, change: str
+) -> None:
+    request, _, receipt = recorded_request(tmp_path / "original")
+    alias = tmp_path / "native-temp"
+    try:
+        alias.symlink_to(receipt.parent, target_is_directory=True)
+        if change == "file":
+            (receipt.parent / "alias.json").symlink_to(receipt)
+    except OSError as error:
+        pytest.skip(f"Symlink creation unavailable: {error}")
+    request["recordsPath"] = str(alias / ("alias.json" if change == "file" else receipt.name))
+    if change == "file":
+        with pytest.raises(ValueError, match="reparse ancestor"):
+            frozen_files.execute_request(request)
+        return
+    assert frozen_files.execute_request(request) is None
+    if change == "none":
+        return
+
+    replacement = write(tmp_path / "replacement" / receipt.name, receipt.read_bytes())
+    original_git = frozen_files.git_output
+    checkout_reads = 0
+
+    def replace_alias(root: Path, arguments: list[str]) -> bytes:
+        nonlocal checkout_reads
+        if arguments == ["rev-parse", "--verify", "HEAD"]:
+            checkout_reads += 1
+            if checkout_reads == 2:
+                alias.unlink()
+                alias.symlink_to(replacement.parent, target_is_directory=True)
+        return original_git(root, arguments)
+
+    monkeypatch.setattr(frozen_files, "git_output", replace_alias)
+    with pytest.raises(ValueError, match="request directory changed during verification"):
+        frozen_files.execute_request(request)
+    assert checkout_reads == 2
