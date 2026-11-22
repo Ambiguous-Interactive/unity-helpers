@@ -1108,8 +1108,15 @@ def test_recorded_request_binds_the_file_inside_an_aliased_temp_directory(
     assert checkout_reads == 2
 
 
-def test_recorded_subset_refuses_a_root_replaced_during_input_checks(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    ("scope", "message"),
+    [
+        ("root", "WProto recorded inventory root changed"),
+        ("nested", "WProto recorded directory changed kind"),
+    ],
+)
+def test_recorded_subset_refuses_a_directory_replaced_during_input_checks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, scope: str, message: str
 ) -> None:
     root = tmp_path / "retained"
     (root / "nested").mkdir(parents=True)
@@ -1119,15 +1126,18 @@ def test_recorded_subset_refuses_a_root_replaced_during_input_checks(
         monkeypatch.setattr(frozen_files, "INOTIFY_OPEN_FLAGS", 0)
     frozen_files.verify_recorded_inventory(root, rows, complete=False)
 
-    def replace_root() -> None:
-        root.rename(root.with_name("previous"))
+    replaced = root if scope == "root" else root / "nested"
+    previous = replaced.with_name("previous")
+
+    def replace_directory() -> None:
+        replaced.rename(previous)
         (root / "nested").mkdir(parents=True)
 
-    with pytest.raises(ValueError, match="WProto recorded inventory root changed"):
+    with pytest.raises(ValueError, match=message):
         frozen_files.verify_recorded_inventory(
-            root, rows, complete=False, check_inputs=replace_root
+            root, rows, complete=False, check_inputs=replace_directory
         )
-    assert (tmp_path / "previous" / "nested").is_dir()
+    assert previous.is_dir()
     assert (root / "nested").is_dir()
 
 

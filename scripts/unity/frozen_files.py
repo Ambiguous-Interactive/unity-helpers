@@ -589,6 +589,19 @@ class LinuxRecordedInventoryWatch:
             raise RecordedInventoryError("WProto recorded file changed during verification.")
 
 
+def _assert_recorded_directory(
+    before: os.stat_result, current: os.stat_result, *, complete: bool
+) -> None:
+    if complete and identity(current) != identity(before):
+        raise RecordedInventoryError("WProto complete inventory membership changed.")
+    if (before.st_dev, before.st_ino, before.st_mode) != (
+        current.st_dev,
+        current.st_ino,
+        current.st_mode,
+    ):
+        raise RecordedInventoryError("WProto recorded directory changed kind.")
+
+
 def _assert_recorded_state(
     root: Path,
     root_before: os.stat_result,
@@ -608,14 +621,7 @@ def _assert_recorded_state(
     for path, (directory, before) in observed.items():
         current = recorded_stat(root, path)
         if directory:
-            if complete and identity(current) != identity(before):
-                raise RecordedInventoryError("WProto complete inventory membership changed.")
-            if (before.st_dev, before.st_ino, before.st_mode) != (
-                current.st_dev,
-                current.st_ino,
-                current.st_mode,
-            ):
-                raise RecordedInventoryError("WProto recorded directory changed kind.")
+            _assert_recorded_directory(before, current, complete=complete)
         elif identity(current) != identity(before):
             raise RecordedInventoryError("WProto recorded file changed.")
     _assert_recorded_root(root, root_before, complete=complete)
@@ -699,8 +705,15 @@ def verify_recorded_inventory(
         _assert_recorded_state(root, root_before, recorded_names, observed, complete=complete)
         if check_inputs is not None:
             check_inputs()
-        if sys.platform == "win32" and not complete:
-            _assert_recorded_root(root, root_before, complete=False)
+            if sys.platform == "win32" and not complete:
+                # A subset has no membership watch. Recheck its recorded directories
+                # by identity so unrelated entries may still be added or removed.
+                _assert_recorded_root(root, root_before, complete=False)
+                for path, (directory, before) in observed.items():
+                    if directory:
+                        _assert_recorded_directory(
+                            before, recorded_stat(root, path), complete=False
+                        )
         if portable_recheck:
             # Compare the same identities on both sides of the receipt and checkout checks.
             _assert_recorded_state(root, root_before, recorded_names, observed, complete=complete)
