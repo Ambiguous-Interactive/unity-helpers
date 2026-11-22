@@ -634,7 +634,8 @@ def _reserve_linux_recorded_descriptors(lease_count: int) -> Generator[None, Non
                     open_descriptors = sum(1 for _ in Path("/proc/self/fd").iterdir())
                 except OSError:
                     open_descriptors = 3  # Standard streams when procfs is unavailable.
-                required = open_descriptors + lease_count + 2  # Traversal and hash streams.
+                # The final Git check uses two output pipes and a child error pipe.
+                required = open_descriptors + lease_count + 6
                 if hard != resource.RLIM_INFINITY and required > hard:
                     raise RecordedInventoryError(
                         f"WProto recorded inventory requires {required} open file descriptors. "
