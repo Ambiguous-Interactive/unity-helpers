@@ -1,4 +1,4 @@
-"""Inventory exact WProto source bytes without following filesystem redirects."""
+"""Inventory WProto sources and frozen player inputs without following filesystem redirects."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ import stat
 import subprocess
 import sys
 import uuid
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from functools import cache
 from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict, cast
@@ -143,9 +143,20 @@ if sys.platform == "win32":
 
     def _open_windows_handle(path: Path) -> int:
         kernel = windows_kernel32()
-        generic_read, share_read, open_existing, ordinary_attributes = 0x80000000, 1, 3, 0x80
+        generic_read, share_read, open_existing, ordinary_attributes = (
+            0x80000000,
+            1,
+            3,
+            0x80,
+        )
         handle: int | None = kernel.CreateFileW(
-            str(path), generic_read, share_read, None, open_existing, ordinary_attributes, None
+            str(path),
+            generic_read,
+            share_read,
+            None,
+            open_existing,
+            ordinary_attributes,
+            None,
         )
         if handle is None or handle == ctypes.c_void_p(-1).value:
             raise ctypes.WinError(ctypes.get_last_error())
@@ -285,7 +296,15 @@ def host_source_files(repository: Path) -> list[HostSourceFile]:
         raise ValueError("Host source census requires the Git repository root.")
     listing = git_output(
         root,
-        ["ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", *HOST_GIT_INPUTS],
+        [
+            "ls-files",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+            "-z",
+            "--",
+            *HOST_GIT_INPUTS,
+        ],
     )
     paths = {
         path.decode("utf-8", errors="surrogateescape") for path in listing.split(b"\0") if path
@@ -311,29 +330,168 @@ def host_source_files(repository: Path) -> list[HostSourceFile]:
     ]
 
 
+class InventoryRow(TypedDict):
+    Path: str
+    Kind: str
+    Length: int | None
+    Sha256: str | None
+
+
+class InventoryResult(TypedDict):
+    rows: list[InventoryRow]
+    error: str | None
+
+
+def _inventory_checkout(repository: Path) -> tuple[Path, bytes]:
+    root = regular_path(repository, directory=True)
+    tool = regular_path(root / "scripts/unity/frozen_files.py", directory=False)
+    actual_root = Path(
+        os.fsdecode(git_output(root, ["rev-parse", "--show-toplevel"]).rstrip(b"\r\n"))
+    )
+    if actual_root != root or Path(os.path.abspath(__file__)) != tool:  # noqa: PTH100
+        raise ValueError("Frozen inventory tool does not belong to the requested checkout.")
+    revision = git_output(root, ["rev-parse", "--verify", "HEAD"]).strip()
+    if not re.fullmatch(rb"[a-f0-9]{40}", revision):
+        raise ValueError("Frozen inventory checkout has no valid commit identity.")
+    return root, revision
+
+
+def _declared_hashes(declaration: object, maximum: int) -> dict[str, str]:
+    if not isinstance(declaration, list):
+        raise ValueError("Frozen input lists must be arrays.")
+    declarations = cast("list[object]", declaration)
+    if not 1 <= len(declarations) <= maximum:
+        raise ValueError(f"Frozen input lists require between 1 and {maximum} files.")
+    result: dict[str, str] = {}
+    for row in declarations:
+        if not isinstance(row, dict):
+            raise ValueError("Frozen input paths and hashes must be scalar strings.")
+        entry = cast("dict[str, object]", row)
+        relative, digest = entry.get("Path"), entry.get("Sha256")
+        if not isinstance(relative, str) or not isinstance(digest, str):
+            raise ValueError("Frozen input paths and hashes must be scalar strings.")
+        if (
+            not relative.strip()
+            or len(ordinal_key(relative)) > 2048
+            or re.search(r'[\\:<>"|?*\x00-\x1f]', relative)
+            or any(
+                part in ("", ".", "..") or part.endswith((".", " ")) for part in relative.split("/")
+            )
+            or not re.fullmatch(r"[a-f0-9]{64}", digest)
+            or relative in result
+        ):
+            raise ValueError(f"Invalid or colliding frozen input path/hash: {relative}")
+        result[relative] = digest
+    return result
+
+
+def _payload_states(root: Path) -> dict[str, tuple[bool, os.stat_result]]:
+    states = {
+        path.relative_to(root).as_posix(): (directory, info) for path, directory, info in walk(root)
+    }
+    if any("\\" in name for name in states):
+        raise ValueError("Frozen payload contains a backslash in a relative path.")
+    if not any(not directory for directory, _ in states.values()):
+        raise ValueError("Frozen payload contains no files.")
+    return states
+
+
+def frozen_player_inventory(root_path: Path, declaration: object, maximum: int) -> InventoryResult:
+    root = regular_path(root_path, directory=True)
+    before_root = ordinary(root, directory=True)
+    declared = None if declaration is None else _declared_hashes(declaration, maximum)
+    payload = _payload_states(root) if declared is None else {}
+    rows: list[InventoryRow] = []
+    observed: dict[Path, os.stat_result] = {}
+    problem: str | None = None
+    with ExitStack() as retained:
+        for relative in sorted(payload if declared is None else declared, key=ordinal_key):
+            path = root / relative
+            try:
+                if declared is None:
+                    directory, info = payload[relative]
+                else:
+                    info = path.lstat()
+                    if stat.S_ISDIR(info.st_mode):
+                        raise ValueError(f"Frozen input is not a file: {relative}")
+                    regular_path(path, directory=False)
+                    directory = False
+                if directory:
+                    rows.append(
+                        InventoryRow(Path=relative, Kind="directory", Length=None, Sha256=None)
+                    )
+                    continue
+                if sys.platform == "win32":
+                    retained.enter_context(retain_source(path))
+                digest, size = file_hash(path, info)
+                observed[path] = info
+                rows.append(InventoryRow(Path=relative, Kind="file", Length=size, Sha256=digest))
+                if declared is not None and declared[relative] != digest:
+                    raise ValueError(f"Frozen declared file hash does not match: {relative}")
+            except (OSError, ValueError) as error:
+                problem = str(error)
+                break
+        regular_path(root, directory=True)
+        after_root = ordinary(root, directory=True)
+        if declared is None:
+            current = _payload_states(root)
+            if (
+                current.keys() != payload.keys()
+                or identity(before_root) != identity(after_root)
+                or any(
+                    identity(state) != identity(current[name][1])
+                    for name, (_, state) in payload.items()
+                )
+            ):
+                raise ValueError("Frozen player payload changed during inventory.")
+        elif (before_root.st_dev, before_root.st_ino) != (
+            after_root.st_dev,
+            after_root.st_ino,
+        ):
+            raise ValueError("Frozen player inventory root changed.")
+        for path, info in observed.items():
+            if declared is not None:
+                regular_path(path, directory=False)
+            if identity(info) != identity(ordinary(path, directory=False)):
+                raise ValueError(f"Frozen file changed during inventory: {path.relative_to(root)}")
+    return InventoryResult(rows=rows, error=problem)
+
+
 def execute_request(value: object) -> object:
     if not isinstance(value, dict):
         raise ValueError("Frozen inventory requests must be objects.")
     request = cast("dict[str, object]", value)
-    if set(request) - {"protocol", "requestId", "operation", "root"}:
+    operation = request.get("operation")
+    allowed = {"protocol", "requestId", "operation", "root"}
+    if operation == "inventory":
+        allowed.update(("repository", "declaredFiles", "maximumFiles"))
+    if set(request) - allowed:
         raise ValueError("Source census request has unknown fields.")
     protocol = request.get("protocol")
     identifier = request.get("requestId")
-    operation = request.get("operation")
     root = request.get("root")
     if (
         type(protocol) is not int
         or protocol != 1
         or not isinstance(identifier, str)
         or not re.fullmatch(r"[a-f0-9]{32}", identifier)
-        or operation not in ("sources", "host-sources")
+        or operation not in ("sources", "host-sources", "inventory")
         or not isinstance(root, str)
         or not root.strip()
     ):
         raise ValueError("Frozen inventory request has invalid fields.")
     if operation == "sources":
         return source_files(Path(root))
-    return host_source_files(Path(root))
+    if operation == "host-sources":
+        return host_source_files(Path(root))
+    repository, maximum = request.get("repository"), request.get("maximumFiles")
+    if not isinstance(repository, str) or not repository.strip() or type(maximum) is not int:
+        raise ValueError("Frozen inventory checkout or file bound is invalid.")
+    checkout = _inventory_checkout(Path(repository))
+    result = frozen_player_inventory(Path(root), request.get("declaredFiles"), maximum)
+    if _inventory_checkout(Path(repository)) != checkout:
+        raise ValueError("Frozen inventory checkout changed during the request.")
+    return result
 
 
 def request_identifier(value: object) -> object:

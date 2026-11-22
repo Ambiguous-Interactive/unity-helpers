@@ -682,3 +682,89 @@ try {
     assert reply["third"] == reply["second"]
     assert reply["stopped"] is True
     assert reply["workerExited"] is True
+
+
+def test_player_inventory_keeps_sorted_rows_and_declared_refusal(
+    tmp_path: Path,
+) -> None:
+    digest = hashlib.sha256(b"content").hexdigest()
+    write(tmp_path / "one" / "entry.txt", b"content")
+    (tmp_path / "empty").mkdir()
+    result = frozen_files.frozen_player_inventory(tmp_path, None, 4096)
+    assert result == {
+        "rows": [
+            {"Path": "empty", "Kind": "directory", "Length": None, "Sha256": None},
+            {"Path": "one", "Kind": "directory", "Length": None, "Sha256": None},
+            {"Path": "one/entry.txt", "Kind": "file", "Length": 7, "Sha256": digest},
+        ],
+        "error": None,
+    }
+    declared = [{"Path": "one/entry.txt", "Sha256": "0" * 64}]
+    outcome = frozen_files.frozen_player_inventory(tmp_path, declared, 1)
+    assert outcome["rows"] == result["rows"][2:]
+    assert outcome["error"] == "Frozen declared file hash does not match: one/entry.txt"
+
+
+@pytest.mark.parametrize("declared", [False, True])
+def test_player_inventory_refuses_persistent_same_length_change(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, declared: bool
+) -> None:
+    first = write(tmp_path / "01.txt", b"AAAA")
+    second = write(tmp_path / "02.txt", b"CCCC")
+    rows = [
+        {"Path": path.name, "Sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+        for path in (first, second)
+    ]
+    original_hash = frozen_files.file_hash
+
+    def hash_then_change(path: Path, observed: stat_result | None = None) -> tuple[str, int]:
+        if path == second:
+            if sys.platform == "win32":
+                with pytest.raises(PermissionError):
+                    first.write_bytes(b"BBBB")
+            else:
+                first.write_bytes(b"BBBB")
+        return original_hash(path, observed)
+
+    monkeypatch.setattr(frozen_files, "file_hash", hash_then_change)
+    if sys.platform == "win32":
+        result = frozen_files.frozen_player_inventory(tmp_path, rows if declared else None, 2)
+        assert result["error"] is None
+        assert first.read_bytes() == b"AAAA"
+    else:
+        with pytest.raises(ValueError, match="changed during inventory"):
+            frozen_files.frozen_player_inventory(tmp_path, rows if declared else None, 2)
+        assert first.read_bytes() == b"BBBB"
+
+
+def test_player_inventory_request_rechecks_the_checkout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    write(tmp_path / "file", b"data")
+    original_git = frozen_files.git_output
+    head_reads = 0
+
+    def git_with_changed_head(root: Path, arguments: list[str]) -> bytes:
+        nonlocal head_reads
+        if arguments == ["rev-parse", "--verify", "HEAD"]:
+            head_reads += 1
+            if head_reads == 2:
+                return b"0" * 40 + b"\n"
+        return original_git(root, arguments)
+
+    monkeypatch.setattr(frozen_files, "git_output", git_with_changed_head)
+    request = {
+        "protocol": 1,
+        "requestId": "1" * 32,
+        "operation": "inventory",
+        "root": str(tmp_path),
+        "repository": str(ROOT),
+        "declaredFiles": None,
+        "maximumFiles": 4096,
+    }
+    with pytest.raises(ValueError, match="checkout changed during the request"):
+        frozen_files.execute_request(request)
+    assert head_reads == 2
+    request["repository"] = str(ROOT / "scripts")
+    with pytest.raises((ValueError, FileNotFoundError)):
+        frozen_files.execute_request(request)

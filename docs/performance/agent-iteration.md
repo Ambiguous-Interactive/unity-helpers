@@ -151,6 +151,12 @@ The reader requires passed cases, matching summaries, and exact case identities.
 PowerShell command still returns the same case and run objects to the acceptance runner and host
 collector. PowerShell owns process execution, artifact provenance, and receipt validation.
 
+The frozen player inventory uses the same locked Python worker for declared files, built player
+payloads, and replay project inputs. It checks the tool checkout before and after each request and
+detects persistent changes to files it has hashed. On Windows, read handles prevent writes and
+replacement through the final inventory recheck. PowerShell still produces the provenance receipts
+and supplies their ordered path, kind, length, and SHA-256 rows.
+
 The approved organization policy requires a static version axis to prove matching editor setup
 and license return. The workflow retains that literal universe and uses
 [matrix exclusions](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idstrategymatrixexclude)
