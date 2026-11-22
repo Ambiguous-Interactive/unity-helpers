@@ -411,6 +411,31 @@ jobs:
         shell: pwsh
         run: npm run test:il2cpp-conversion-inputs
 
+      - name: Setup .NET for CSharpier on Windows
+        if: matrix.phase == 'orchestration'
+        id: windows-formatter-dotnet
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/unity-helpers-dotnet
+        with:
+          dotnet-version: "10.0.403"
+
+      - name: Require the installed CSharpier SDK on Windows
+        if: matrix.phase == 'orchestration'
+        shell: bash
+        env:
+          EXPECTED_DOTNET_SDK: ${{ steps.windows-formatter-dotnet.outputs.dotnet-version }}
+        run: |
+          set -euo pipefail
+          selected_sdk="$(dotnet --version | tr -d '\r')"
+          printf 'Selected CSharpier SDK: %s\n' "$selected_sdk"
+          test "$selected_sdk" = "${EXPECTED_DOTNET_SDK:?Missing installed CSharpier SDK version}"
+
+      - name: Verify C# formatting on Windows
+        if: matrix.phase == 'orchestration'
+        shell: pwsh
+        run: npm run format:csharp:check
+
   assembly-tools-windows:
     name: Assembly tools (Windows)
     needs: windows-tool-phases
