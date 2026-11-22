@@ -407,13 +407,16 @@ fi
 
 if awk '
     /^USER vscode([[:space:]]|$)/ { exit }
-    /^[[:space:]]*&& chown vscode:vscode \/home\/vscode\/\.local([[:space:]]|$)/ { owns_prefix = 1 }
-    END { exit !owns_prefix }
+    /^[[:space:]]*&& chown vscode:vscode / {
+        if ($0 ~ /[[:space:]]\/home\/vscode\/\.local([[:space:]]|$)/) owns_prefix = 1
+        if ($0 ~ /[[:space:]]\/home\/vscode\/\.local\/share([[:space:]]|$)/) owns_share = 1
+    }
+    END { exit !(owns_prefix && owns_share) }
 ' "$DOCKERFILE"; then
-    pass "Dockerfile gives vscode ownership of the npm global prefix before installing tools"
+    pass "Dockerfile makes local tool directories writable before installing tools"
 else
-    fail "Dockerfile gives vscode ownership of the npm global prefix before installing tools" \
-        "The vscode user must be able to create .local/lib and .local/bin."
+    fail "Dockerfile makes local tool directories writable before installing tools" \
+        "The vscode user needs .local for npm and .local/share for CSharpier and uv."
 fi
 
 if grep -q '"@z_ai/mcp-server@latest"' "$DOCKERFILE" && grep -q '"mcp-remote@latest"' "$DOCKERFILE"; then
