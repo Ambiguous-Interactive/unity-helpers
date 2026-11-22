@@ -485,6 +485,7 @@ def test_all_pinned_sdk_installations_have_controls() -> None:
         ("local-gates.yml", "contract-suites", "dotnet"),
         ("local-gates.yml", "contract-suites", "formatter-dotnet"),
         ("local-gates.yml", "typecheck-phases", "dotnet"),
+        ("local-gates.yml", "windows-tool-phases", "windows-formatter-dotnet"),
         ("random-quality.yml", "battery", "dotnet"),
         ("random-quality.yml", "resolve", "dotnet"),
         ("random-quality.yml", "testu01", "dotnet"),
@@ -646,6 +647,22 @@ def test_windows_phases_preserve_every_suite_and_bounded_concurrency() -> None:
     assert phase["timeout-minutes"] == 10
     assert phase["runs-on"] == "windows-latest"
     assert "continue-on-error" not in phase
+    phase_steps = steps(phase)
+    formatter_setup = next(
+        (
+            index
+            for index, step in enumerate(phase_steps)
+            if step.get("id") == "windows-formatter-dotnet"
+        ),
+        None,
+    )
+    assert formatter_setup is not None, "Windows must install the CSharpier SDK before running it."
+    formatter_steps = phase_steps[formatter_setup : formatter_setup + 3]
+    assert len(formatter_steps) == 3
+    assert all(step["if"] == "matrix.phase == 'orchestration'" for step in formatter_steps)
+    assert all("continue-on-error" not in step for step in formatter_steps)
+    assert formatter_steps[2]["shell"] == "pwsh"
+    assert formatter_steps[2]["run"] == "npm run format:csharp:check"
     publication_controls = [
         step for step in steps(phase) if step.get("run") == "npm run test:unity-test-filter"
     ]
