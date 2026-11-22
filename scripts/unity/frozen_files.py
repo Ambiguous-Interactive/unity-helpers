@@ -471,6 +471,14 @@ class RecordedInventoryError(ValueError):
     """A rejection of the recorded inventory, reported through the original entry point."""
 
 
+def _assert_recorded_root(root: Path, root_before: os.stat_result, *, complete: bool) -> None:
+    root_after = ordinary(root, directory=True)
+    if complete and identity(root_before) != identity(root_after):
+        raise RecordedInventoryError("WProto complete inventory membership changed.")
+    if (root_before.st_dev, root_before.st_ino) != (root_after.st_dev, root_after.st_ino):
+        raise RecordedInventoryError("WProto recorded inventory root changed.")
+
+
 @contextmanager
 def observe_windows_membership(
     root: Path, root_before: os.stat_result, *, complete: bool
@@ -487,8 +495,7 @@ def observe_windows_membership(
             try:
                 yield
                 # The subtree notification excludes the root itself.
-                if identity(ordinary(root, directory=True)) != identity(root_before):
-                    raise RecordedInventoryError("WProto complete inventory membership changed.")
+                _assert_recorded_root(root, root_before, complete=True)
                 wait_object, wait_timeout = 0x00000000, 0x00000102
                 status: int = kernel.WaitForSingleObject(handle, 0)
                 if status == wait_object:
@@ -611,11 +618,7 @@ def _assert_recorded_state(
                 raise RecordedInventoryError("WProto recorded directory changed kind.")
         elif identity(current) != identity(before):
             raise RecordedInventoryError("WProto recorded file changed.")
-    root_after = ordinary(root, directory=True)
-    if complete and identity(root_before) != identity(root_after):
-        raise RecordedInventoryError("WProto complete inventory membership changed.")
-    if (root_before.st_dev, root_before.st_ino) != (root_after.st_dev, root_after.st_ino):
-        raise RecordedInventoryError("WProto recorded inventory root changed.")
+    _assert_recorded_root(root, root_before, complete=complete)
 
 
 def verify_recorded_inventory(
@@ -649,11 +652,15 @@ def verify_recorded_inventory(
         for row in cast("list[object]", records):
             record = cast("dict[str, object]", row) if isinstance(row, dict) else {}
             relative = record.get("Path")
-            if not isinstance(relative, str) or relative in recorded_names:
+            if not isinstance(relative, str):
                 raise RecordedInventoryError(
                     "WProto recorded inventory contains an invalid or repeated relative path."
                 )
             path = _recorded_path(root, relative)
+            if path in observed:
+                raise RecordedInventoryError(
+                    "WProto recorded inventory contains an invalid or repeated relative path."
+                )
             recorded_names.add(relative)
             info = recorded_stat(root, path)
             directory = record.get("Kind") == "directory"
@@ -692,6 +699,8 @@ def verify_recorded_inventory(
         _assert_recorded_state(root, root_before, recorded_names, observed, complete=complete)
         if check_inputs is not None:
             check_inputs()
+        if sys.platform == "win32" and not complete:
+            _assert_recorded_root(root, root_before, complete=False)
         if portable_recheck:
             # Compare the same identities on both sides of the receipt and checkout checks.
             _assert_recorded_state(root, root_before, recorded_names, observed, complete=complete)

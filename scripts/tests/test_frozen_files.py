@@ -11,6 +11,7 @@ import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
@@ -1105,3 +1106,36 @@ def test_recorded_request_binds_the_file_inside_an_aliased_temp_directory(
     with pytest.raises(ValueError, match="request directory changed during verification"):
         frozen_files.execute_request(request)
     assert checkout_reads == 2
+
+
+def test_recorded_subset_refuses_a_root_replaced_during_input_checks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "retained"
+    (root / "nested").mkdir(parents=True)
+    rows = [{"Path": "nested", "Kind": "directory", "Length": None, "Sha256": None}]
+    if sys.platform != "win32":
+        monkeypatch.setattr(frozen_files, "sys", SimpleNamespace(platform="win32"))
+        monkeypatch.setattr(frozen_files, "INOTIFY_OPEN_FLAGS", 0)
+    frozen_files.verify_recorded_inventory(root, rows, complete=False)
+
+    def replace_root() -> None:
+        root.rename(root.with_name("previous"))
+        (root / "nested").mkdir(parents=True)
+
+    with pytest.raises(ValueError, match="WProto recorded inventory root changed"):
+        frozen_files.verify_recorded_inventory(
+            root, rows, complete=False, check_inputs=replace_root
+        )
+    assert (tmp_path / "previous" / "nested").is_dir()
+    assert (root / "nested").is_dir()
+
+
+def test_recorded_subset_refuses_duplicate_normalized_paths(tmp_path: Path) -> None:
+    write(tmp_path / "nested" / "player.txt")
+    rows = frozen_files.frozen_player_inventory(tmp_path, None, 2)["rows"]
+    file = next(row for row in rows if row["Kind"] == "file")
+    alias = {**file, "Path": "nested//player.txt"}
+    frozen_files.verify_recorded_inventory(tmp_path, [alias], complete=False)
+    with pytest.raises(ValueError, match="invalid or repeated relative path"):
+        frozen_files.verify_recorded_inventory(tmp_path, [file, alias], complete=False)
