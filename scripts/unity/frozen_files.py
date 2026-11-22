@@ -785,6 +785,7 @@ def verify_recorded_inventory(
     *,
     complete: bool,
     check_inputs: Callable[[], None] | None = None,
+    check_checkout: Callable[[], None] | None = None,
     receipt: tuple[Path, str] | None = None,
 ) -> None:
     root = regular_path(root_path, directory=True)
@@ -885,6 +886,8 @@ def verify_recorded_inventory(
                         digest,
                         "WProto recorded receipt changed during verification.",
                     )
+                if check_checkout is not None:
+                    check_checkout()
                 if watcher is not None:
                     watcher.verify()
         elif watcher is not None:
@@ -922,6 +925,13 @@ def _verify_recorded_request(
             raise ValueError("Recorded inventory request does not match its input hash.")
         records: object = json.loads(payload)
 
+        def check_request_checkout() -> None:
+            check_checkout()
+            if _owned_records_path(declared_path) != records_path:
+                raise ValueError(
+                    "Recorded inventory request directory changed during verification."
+                )
+
         def check_inputs() -> None:
             try:
                 final_digest, _ = file_hash(records_path, before)
@@ -931,11 +941,7 @@ def _verify_recorded_request(
                 ) from error
             if final_digest != digest:
                 raise ValueError("Recorded inventory request changed during verification.")
-            check_checkout()
-            if _owned_records_path(declared_path) != records_path:
-                raise ValueError(
-                    "Recorded inventory request directory changed during verification."
-                )
+            check_request_checkout()
 
         try:
             verify_recorded_inventory(
@@ -943,6 +949,7 @@ def _verify_recorded_request(
                 records,
                 complete=complete,
                 check_inputs=check_inputs,
+                check_checkout=check_request_checkout,
                 receipt=(records_path, digest),
             )
         except RecordedInventoryError as error:

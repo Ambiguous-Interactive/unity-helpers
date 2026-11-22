@@ -968,8 +968,18 @@ def test_recorded_inventory_keeps_files_observed_through_request_checks(
     assert target.read_bytes() == changed_contents
 
 
+@pytest.mark.parametrize(
+    "scan_observations",
+    [
+        2,
+        pytest.param(
+            3,
+            marks=pytest.mark.skipif(sys.platform == "win32", reason="POSIX final rehash"),
+        ),
+    ],
+)
 def test_recorded_inventory_rechecks_checkout_after_the_final_scan(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, scan_observations: int
 ) -> None:
     request, player, _ = recorded_request(tmp_path)
     assert frozen_files.execute_request(request) is None
@@ -978,7 +988,7 @@ def test_recorded_inventory_rechecks_checkout_after_the_final_scan(
     observations = 0
 
     def show_checkout_change(root: Path, arguments: list[str]) -> bytes:
-        if observations == 2 and arguments == ["rev-parse", "--verify", "HEAD"]:
+        if observations == scan_observations and arguments == ["rev-parse", "--verify", "HEAD"]:
             return b"0" * 40 + b"\n"
         return original_git(root, arguments)
 
@@ -992,7 +1002,7 @@ def test_recorded_inventory_rechecks_checkout_after_the_final_scan(
     monkeypatch.setattr(frozen_files, "recorded_stat", mark_final_observation)
     with pytest.raises(ValueError, match="checkout changed during the request"):
         frozen_files.execute_request(request)
-    assert observations == 2
+    assert observations == scan_observations
 
 
 @pytest.mark.skipif(sys.platform != "linux", reason="Linux mapped writes and change observation")
@@ -1157,7 +1167,7 @@ def test_recorded_inventory_observes_nested_membership_through_checkout(
 
     monkeypatch.setattr(frozen_files, "git_output", check_checkout)
     outcome = frozen_files.execute_request(request)
-    assert checkout_reads == 2
+    assert checkout_reads == (3 if not complete and sys.platform == "linux" else 2)
     assert extra.is_file()
     if not complete:
         assert outcome is None
@@ -1197,7 +1207,7 @@ def test_portable_recorded_inventory_rechecks_after_request_inputs(
 
     monkeypatch.setattr(frozen_files, "git_output", check_checkout)
     outcome = frozen_files.execute_request(request)
-    assert checkout_reads == 2
+    assert checkout_reads == (2 if complete else 3)
     assert target.read_bytes() == content
     expected = {
         "player": "WProto recorded file changed.",
@@ -1207,7 +1217,18 @@ def test_portable_recorded_inventory_rechecks_after_request_inputs(
     assert outcome == (expected if complete else None)
 
 
-@pytest.mark.parametrize("change", ["none", "parent", "file"])
+@pytest.mark.parametrize(
+    "change",
+    [
+        "none",
+        "parent",
+        "file",
+        pytest.param(
+            "late-parent",
+            marks=pytest.mark.skipif(sys.platform == "win32", reason="POSIX final rehash"),
+        ),
+    ],
+)
 def test_recorded_request_binds_the_file_inside_an_aliased_temp_directory(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, change: str
 ) -> None:
@@ -1231,12 +1252,13 @@ def test_recorded_request_binds_the_file_inside_an_aliased_temp_directory(
     replacement = write(tmp_path / "replacement" / receipt.name, receipt.read_bytes())
     original_git = frozen_files.git_output
     checkout_reads = 0
+    replace_at = 3 if change == "late-parent" else 2
 
     def replace_alias(root: Path, arguments: list[str]) -> bytes:
         nonlocal checkout_reads
         if arguments == ["rev-parse", "--verify", "HEAD"]:
             checkout_reads += 1
-            if checkout_reads == 2:
+            if checkout_reads == replace_at:
                 alias.unlink()
                 alias.symlink_to(replacement.parent, target_is_directory=True)
         return original_git(root, arguments)
@@ -1244,7 +1266,7 @@ def test_recorded_request_binds_the_file_inside_an_aliased_temp_directory(
     monkeypatch.setattr(frozen_files, "git_output", replace_alias)
     with pytest.raises(ValueError, match="request directory changed during verification"):
         frozen_files.execute_request(request)
-    assert checkout_reads == 2
+    assert checkout_reads == replace_at
 
 
 @pytest.mark.parametrize(
