@@ -1025,3 +1025,43 @@ def test_recorded_inventory_observes_nested_membership_through_checkout(
         assert outcome == "WProto complete inventory membership changed."
     else:
         assert outcome == "WProto recorded file changed during verification."
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Exercises the portable filesystem observation")
+@pytest.mark.parametrize(
+    ("changed", "complete"),
+    [("player", True), ("receipt", True), ("membership", True), ("membership", False)],
+)
+def test_portable_recorded_inventory_rechecks_after_request_inputs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, changed: str, complete: bool
+) -> None:
+    request, player, receipt = recorded_request(tmp_path)
+    request["complete"] = complete
+    target = {
+        "player": player,
+        "receipt": receipt,
+        "membership": player.with_name("extra.txt"),
+    }[changed]
+    content = b"x" * (target.stat().st_size if target.exists() else 1)
+    monkeypatch.setattr(frozen_files, "INOTIFY_OPEN_FLAGS", 0)
+    original_git = frozen_files.git_output
+    checkout_reads = 0
+
+    def check_checkout(root: Path, arguments: list[str]) -> bytes:
+        nonlocal checkout_reads
+        if arguments == ["rev-parse", "--verify", "HEAD"]:
+            checkout_reads += 1
+            if checkout_reads == 2:
+                target.write_bytes(content)
+        return original_git(root, arguments)
+
+    monkeypatch.setattr(frozen_files, "git_output", check_checkout)
+    outcome = frozen_files.execute_request(request)
+    assert checkout_reads == 2
+    assert target.read_bytes() == content
+    expected = {
+        "player": "WProto recorded file changed.",
+        "receipt": "WProto recorded receipt changed during verification.",
+        "membership": "WProto complete inventory membership changed.",
+    }[changed]
+    assert outcome == (expected if complete else None)

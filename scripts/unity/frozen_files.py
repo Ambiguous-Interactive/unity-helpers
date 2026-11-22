@@ -582,6 +582,42 @@ class LinuxRecordedInventoryWatch:
             raise RecordedInventoryError("WProto recorded file changed during verification.")
 
 
+def _assert_recorded_state(
+    root: Path,
+    root_before: os.stat_result,
+    recorded_names: set[str],
+    observed: dict[Path, tuple[bool, os.stat_result]],
+    *,
+    complete: bool,
+) -> None:
+    if complete:
+        try:
+            actual_names = {path.relative_to(root).as_posix() for path, _, _ in walk(root)}
+        except (OSError, ValueError) as error:
+            raise RecordedInventoryError("WProto complete inventory membership changed.") from error
+        if actual_names != recorded_names:
+            raise RecordedInventoryError("WProto complete inventory membership changed.")
+    regular_path(root, directory=True)
+    for path, (directory, before) in observed.items():
+        current = recorded_stat(root, path)
+        if directory:
+            if complete and identity(current) != identity(before):
+                raise RecordedInventoryError("WProto complete inventory membership changed.")
+            if (before.st_dev, before.st_ino, before.st_mode) != (
+                current.st_dev,
+                current.st_ino,
+                current.st_mode,
+            ):
+                raise RecordedInventoryError("WProto recorded directory changed kind.")
+        elif identity(current) != identity(before):
+            raise RecordedInventoryError("WProto recorded file changed.")
+    root_after = ordinary(root, directory=True)
+    if complete and identity(root_before) != identity(root_after):
+        raise RecordedInventoryError("WProto complete inventory membership changed.")
+    if (root_before.st_dev, root_before.st_ino) != (root_after.st_dev, root_after.st_ino):
+        raise RecordedInventoryError("WProto recorded inventory root changed.")
+
+
 def verify_recorded_inventory(
     root_path: Path,
     records: object,
@@ -592,6 +628,14 @@ def verify_recorded_inventory(
 ) -> None:
     root = regular_path(root_path, directory=True)
     root_before = ordinary(root, directory=True)
+    portable_recheck = (
+        check_inputs is not None and sys.platform != "win32" and not INOTIFY_OPEN_FLAGS
+    )
+    receipt_before = (
+        ordinary(records_path, directory=False)
+        if portable_recheck and records_path is not None
+        else None
+    )
     if not isinstance(records, list):
         raise RecordedInventoryError("WProto recorded inventory is empty.")
     recorded_names: set[str] = set()
@@ -645,36 +689,18 @@ def verify_recorded_inventory(
 
         if not recorded_names:
             raise RecordedInventoryError("WProto recorded inventory is empty.")
-        if complete:
-            try:
-                actual_names = {path.relative_to(root).as_posix() for path, _, _ in walk(root)}
-            except (OSError, ValueError) as error:
-                raise RecordedInventoryError(
-                    "WProto complete inventory membership changed."
-                ) from error
-            if actual_names != recorded_names:
-                raise RecordedInventoryError("WProto complete inventory membership changed.")
-        regular_path(root, directory=True)
-        for path, (directory, before) in observed.items():
-            current = recorded_stat(root, path)
-            if directory:
-                if complete and identity(current) != identity(before):
-                    raise RecordedInventoryError("WProto complete inventory membership changed.")
-                if (before.st_dev, before.st_ino, before.st_mode) != (
-                    current.st_dev,
-                    current.st_ino,
-                    current.st_mode,
-                ):
-                    raise RecordedInventoryError("WProto recorded directory changed kind.")
-            elif identity(current) != identity(before):
-                raise RecordedInventoryError("WProto recorded file changed.")
-        root_after = ordinary(root, directory=True)
-        if complete and identity(root_before) != identity(root_after):
-            raise RecordedInventoryError("WProto complete inventory membership changed.")
-        if (root_before.st_dev, root_before.st_ino) != (root_after.st_dev, root_after.st_ino):
-            raise RecordedInventoryError("WProto recorded inventory root changed.")
+        _assert_recorded_state(root, root_before, recorded_names, observed, complete=complete)
         if check_inputs is not None:
             check_inputs()
+        if portable_recheck:
+            # Compare the same identities on both sides of the receipt and checkout checks.
+            _assert_recorded_state(root, root_before, recorded_names, observed, complete=complete)
+            if (
+                records_path is not None
+                and receipt_before is not None
+                and identity(ordinary(records_path, directory=False)) != identity(receipt_before)
+            ):
+                raise RecordedInventoryError("WProto recorded receipt changed during verification.")
         if watcher is not None:
             # Local filesystem notifications cover earlier paths after their final stat.
             watcher.verify()
