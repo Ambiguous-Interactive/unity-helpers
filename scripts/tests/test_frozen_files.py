@@ -1182,8 +1182,13 @@ def test_recorded_inventory_observes_nested_membership_through_checkout(
     ("changed", "complete"),
     [("player", True), ("receipt", True), ("membership", True), ("membership", False)],
 )
+@pytest.mark.parametrize("checkout_to_modify", [2, 3])
 def test_portable_recorded_inventory_rechecks_after_request_inputs(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, changed: str, complete: bool
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    changed: str,
+    complete: bool,
+    checkout_to_modify: int,
 ) -> None:
     request, player, receipt = recorded_request(tmp_path)
     request["complete"] = complete
@@ -1201,13 +1206,13 @@ def test_portable_recorded_inventory_rechecks_after_request_inputs(
         nonlocal checkout_reads
         if arguments == ["rev-parse", "--verify", "HEAD"]:
             checkout_reads += 1
-            if checkout_reads == 2:
+            if checkout_reads == checkout_to_modify:
                 target.write_bytes(content)
         return original_git(root, arguments)
 
     monkeypatch.setattr(frozen_files, "git_output", check_checkout)
     outcome = frozen_files.execute_request(request)
-    assert checkout_reads == (2 if complete else 3)
+    assert checkout_reads == (checkout_to_modify if complete else 3)
     assert target.read_bytes() == content
     expected = {
         "player": "WProto recorded file changed.",

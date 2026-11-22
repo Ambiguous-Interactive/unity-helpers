@@ -889,6 +889,19 @@ def verify_recorded_inventory(
                     )
                 if check_checkout is not None:
                     check_checkout()
+                    if watcher is None:
+                        _assert_recorded_state(
+                            root, root_before, recorded_names, observed, complete=complete
+                        )
+                        if (
+                            receipt is not None
+                            and receipt_before is not None
+                            and identity(ordinary(receipt[0], directory=False))
+                            != identity(receipt_before)
+                        ):
+                            raise RecordedInventoryError(
+                                "WProto recorded receipt changed during verification."
+                            )
                 if watcher is not None:
                     watcher.verify()
         elif watcher is not None:

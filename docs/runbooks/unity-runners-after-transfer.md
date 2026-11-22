@@ -820,6 +820,8 @@ On Linux, recorded WProto verification holds read leases on the retained inputs 
 temporary receipt. Keep the inputs and `TMPDIR` on `btrfs`, `ext4`, `tmpfs`, or `xfs` so their files
 can be leased during verification. The worker restores its soft file descriptor limit when
 verification ends. If the hard limit is too low, the error reports the required count.
+On other POSIX hosts, finish writing the retained inputs before verification and keep the
+checkout fixed until it returns.
 
 The additional WProto step allows 150 minutes. Its scoped configure timeout is 900 seconds per
 attempt (at most one existing package-resolution retry), build timeout is 1800 seconds, and player
