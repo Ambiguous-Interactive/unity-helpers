@@ -335,6 +335,52 @@ try {
         $env:UH_REQUIRED_TEST_NAME = ''
         $env:UH_REQUIRED_COMPILATION_FIXTURE = 'Subject'
         $env:UH_UNITY_VERSION = ''
+        foreach ($progress in @(
+                @{
+                    Name = 'startup'
+                    Log = @('Fatal Error! Failed to initialise UDS client in the Editor')
+                    Expected = 'Unity Data Store client initialization failed in the primary Unity log.'
+                    Forbidden = 'streamed leaves finished'
+                },
+                @{
+                    Name = 'active'
+                    Log = @('[uh-test-stream] TEST-STARTED Primary.Active')
+                    Expected = "primary Unity log shows 'Primary.Active' started without a matching result."
+                    Forbidden = 'watchdog tree-killed'
+                },
+                @{
+                    Name = 'finished'
+                    Log = @('[uh-test-stream] TEST-STARTED Primary.Finished', '[uh-test-stream] Passed Primary.Finished (0.1s)')
+                    Expected = '1 of 1 streamed leaves finished in the primary Unity log.'
+                    Forbidden = 'aborted BETWEEN leaves'
+                },
+                @{
+                    Name = 'sibling only'
+                    Log = @()
+                    Expected = 'No NUnit results.xml'
+                    Forbidden = 'streamed leaves finished'
+                }
+            )) {
+            $env:UH_RESULTS_DIR = Join-Path $temporary ('progress-' + $progress.Name)
+            $siblingPath = Join-Path $env:UH_RESULTS_DIR 'shards/1'
+            New-Item -ItemType Directory -Path $siblingPath -Force | Out-Null
+            Set-Content -LiteralPath (Join-Path $siblingPath 'unity.log') -Value @(
+                '[uh-test-stream] TEST-STARTED Sibling.Passed'
+                '[uh-test-stream] Passed Sibling.Passed (0.1s)'
+                '[uh-test-stream] TEST-STARTED Sibling.Active'
+                'UnexpectedLogMessageException: sibling-only symptom'
+            )
+            if ($progress.Log.Count -gt 0) {
+                Set-Content -LiteralPath (Join-Path $env:UH_RESULTS_DIR 'unity.log') -Value $progress.Log
+            }
+            $output = & (Get-Process -Id $PID).Path -NoProfile -File $verifierScript 2>&1 | Out-String
+            if ($LASTEXITCODE -ne 1 -or -not $output.Contains($progress.Expected) -or
+                $output.Contains($progress.Forbidden) -or $output.Contains('Sibling.Active') -or
+                $output.Contains('Unity Test Framework rejected an unexpected log')) {
+                throw "The verifier misclassified $($progress.Name) progress: $output"
+            }
+            $isolationChecks++
+        }
         foreach ($fixture in @(
                 @{ Root = $null; Child = 'Passed'; Exit = 1 },
                 @{ Root = 'Passed'; Child = $null; Exit = 1 },
