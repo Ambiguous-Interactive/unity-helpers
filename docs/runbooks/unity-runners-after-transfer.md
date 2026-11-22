@@ -1,4 +1,4 @@
-<!-- cspell:ignore winget pwsh prereqs redist UCRT WSL Redistributables MSVCP MSVCR VCRUNTIME NDK -->
+<!-- cspell:ignore winget pwsh prereqs redist UCRT WSL Redistributables MSVCP MSVCR VCRUNTIME NDK btrfs -->
 
 # Unity Runners After Repository Transfer Runbook
 
@@ -815,6 +815,11 @@ remain in place.
 The workflow installs the pinned Node.js runtime before WProto acceptance. Direct script runs
 also require a working `node` executable on `PATH`; the launcher checks it before creating a
 campaign or starting Unity. A failed Node setup prevents the workflow from starting that campaign.
+
+On Linux, recorded WProto verification holds read leases on the retained inputs and its
+temporary receipt. Keep the inputs and `TMPDIR` on `btrfs`, `ext4`, `tmpfs`, or `xfs` so their files
+can be leased during verification. The worker restores its soft file descriptor limit when
+verification ends. If the hard limit is too low, the error reports the required count.
 
 The additional WProto step allows 150 minutes. Its scoped configure timeout is 900 seconds per
 attempt (at most one existing package-resolution retry), build timeout is 1800 seconds, and player

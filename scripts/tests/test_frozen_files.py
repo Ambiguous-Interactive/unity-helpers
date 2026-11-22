@@ -1110,6 +1110,29 @@ def test_recorded_inventory_provisions_descriptors_above_the_soft_limit(tmp_path
             resource.setrlimit(descriptor_limit, original)
 
 
+@pytest.mark.skipif(sys.platform != "linux", reason="Linux read lease filesystem behavior")
+@pytest.mark.parametrize("changed", ["player", "receipt"])
+def test_recorded_inventory_requires_a_filesystem_with_native_read_leases(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, changed: str
+) -> None:
+    request, player, receipt = recorded_request(tmp_path)
+    assert frozen_files.execute_request(request) is None
+    target = player if changed == "player" else receipt
+    target_identity = frozen_files.identity(target.stat())
+    filesystem_for_descriptor = frozen_files._linux_lease_filesystem
+
+    def identify_filesystem(descriptor: int, mounts: dict[str, str]) -> str:
+        if frozen_files.identity(os.fstat(descriptor)) == target_identity:
+            return "overlay"
+        return filesystem_for_descriptor(descriptor, mounts)
+
+    monkeypatch.setattr(frozen_files, "_linux_lease_filesystem", identify_filesystem)
+    assert frozen_files.execute_request(request) == (
+        f"Cannot retain recorded input {target} on overlay. "
+        "Use a Btrfs, ext4, tmpfs, or XFS filesystem."
+    )
+
+
 @pytest.mark.skipif(
     sys.platform not in ("linux", "win32"), reason="Requires directory change notifications"
 )

@@ -545,6 +545,8 @@ if sys.platform == "linux":
 else:
     INOTIFY_OPEN_FLAGS = 0
 _LINUX_DESCRIPTOR_BUDGET_LOCK = threading.Lock()
+# These filesystem implementations attach native leases to the inode used by shared mappings.
+_LINUX_READ_LEASE_FILESYSTEMS = frozenset(("btrfs", "ext4", "tmpfs", "xfs"))
 
 
 class LinuxRecordedInventoryWatch:
@@ -658,6 +660,32 @@ def _reserve_linux_recorded_descriptors(lease_count: int) -> Generator[None, Non
         yield
 
 
+def _linux_lease_mount_types() -> dict[str, str]:
+    mounts: dict[str, str] = {}
+    try:
+        with Path("/proc/self/mountinfo").open(
+            encoding="utf-8", errors="surrogateescape"
+        ) as stream:
+            for line in stream:
+                location, separator, filesystem = line.partition(" - ")
+                if separator:
+                    mounts[location.split(maxsplit=1)[0]] = filesystem.split(maxsplit=1)[0]
+    except OSError as error:
+        raise RecordedInventoryError(
+            "Cannot identify Linux mounts for recorded verification."
+        ) from error
+    return mounts
+
+
+def _linux_lease_filesystem(descriptor: int, mounts: dict[str, str]) -> str:
+    with Path(f"/proc/self/fdinfo/{descriptor}").open(encoding="ascii") as stream:
+        for line in stream:
+            field, _, value = line.partition(":")
+            if field == "mnt_id":
+                return mounts.get(value.strip(), "an unknown Linux filesystem")
+    return "an unknown Linux filesystem"
+
+
 @contextmanager
 def retain_linux_recorded_files(
     observed: dict[Path, tuple[os.stat_result, str | None]],
@@ -682,6 +710,7 @@ def retain_linux_recorded_files(
         lease_count += int(receipt is not None)
         try:
             with _reserve_linux_recorded_descriptors(lease_count), ExitStack() as leases:
+                mounts = _linux_lease_mount_types()
 
                 def retain(path: Path, before: os.stat_result, diagnostic: str) -> None:
                     try:
@@ -689,6 +718,12 @@ def retain_linux_recorded_files(
                         leases.callback(os.close, descriptor)
                         if identity(os.fstat(descriptor)) != identity(before):
                             raise RecordedInventoryError(diagnostic)
+                        filesystem = _linux_lease_filesystem(descriptor, mounts)
+                        if filesystem not in _LINUX_READ_LEASE_FILESYSTEMS:
+                            raise RecordedInventoryError(
+                                f"Cannot retain recorded input {path} on {filesystem}. "
+                                "Use a Btrfs, ext4, tmpfs, or XFS filesystem."
+                            )
                         fcntl.fcntl(descriptor, set_owner, owner)
                         fcntl.fcntl(descriptor, fcntl.F_SETLEASE, fcntl.F_RDLCK)
                     except BlockingIOError as error:
