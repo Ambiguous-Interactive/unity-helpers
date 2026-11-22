@@ -805,8 +805,10 @@ def test_recorded_inventory_distinguishes_subsets_from_complete_membership(tmp_p
     (tmp_path / "empty").mkdir()
     rows = frozen_files.frozen_player_inventory(tmp_path, None, 2)["rows"]
     frozen_files.verify_recorded_inventory(tmp_path, rows, complete=True)
-    write(tmp_path / "build" / "unrecorded.txt", b"extra")
-    frozen_files.verify_recorded_inventory(tmp_path, rows, complete=False)
+    unrecorded = write(tmp_path / "build" / "unrecorded.txt", b"extra")
+    frozen_files.verify_recorded_inventory(
+        tmp_path, rows, complete=False, check_inputs=unrecorded.touch
+    )
     with pytest.raises(ValueError, match="WProto complete inventory membership changed"):
         frozen_files.verify_recorded_inventory(tmp_path, rows, complete=True)
     with pytest.raises(ValueError, match="invalid or repeated relative path"):
@@ -874,3 +876,90 @@ def test_recorded_inventory_request_has_bound_inputs(
         with pytest.raises(ValueError, match="request changed during verification"):
             frozen_files.execute_request(request)
         assert receipt.read_bytes() == changed_receipt
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="Linux filesystem change observation")
+@pytest.mark.parametrize("complete", [False, True])
+def test_recorded_inventory_refuses_change_after_earlier_final_stat(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, complete: bool
+) -> None:
+    first = write(tmp_path / "01.txt", b"old!")
+    second = write(tmp_path / "02.txt", b"next")
+    rows = frozen_files.frozen_player_inventory(tmp_path, None, 2)["rows"]
+    original_stat = frozen_files.recorded_stat
+    second_stats = 0
+
+    def change_after_earlier_observation(root: Path, path: Path) -> stat_result:
+        nonlocal second_stats
+        result = original_stat(root, path)
+        if path == second:
+            second_stats += 1
+            if second_stats == 2:
+                first.write_bytes(b"new!")
+        return result
+
+    monkeypatch.setattr(frozen_files, "recorded_stat", change_after_earlier_observation)
+    with pytest.raises(ValueError, match="recorded file changed"):
+        frozen_files.verify_recorded_inventory(tmp_path, rows, complete=complete)
+    assert second_stats == 2
+    assert first.read_bytes() == b"new!"
+
+
+@pytest.mark.parametrize("phase", ["records", "checkout"])
+def test_recorded_inventory_keeps_files_observed_through_request_checks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, phase: str
+) -> None:
+    payload = tmp_path / "retained"
+    player = write(payload / "player.txt", b"before")
+    rows = frozen_files.frozen_player_inventory(payload, None, 1)["rows"]
+    records = write(tmp_path / "rows.json", json.dumps(rows).encode())
+    request = {
+        "protocol": 1,
+        "requestId": "1" * 32,
+        "operation": "verify-recorded",
+        "root": str(payload),
+        "repository": str(ROOT),
+        "recordsPath": str(records),
+        "recordsSha256": hashlib.sha256(records.read_bytes()).hexdigest(),
+        "complete": True,
+    }
+    assert frozen_files.execute_request(request) is None
+    original_hash = frozen_files.file_hash
+    original_git = frozen_files.git_output
+    checkout_reads = 0
+    attempts = 0
+
+    def change_player() -> None:
+        nonlocal attempts
+        attempts += 1
+        if sys.platform == "win32":
+            with pytest.raises(PermissionError):
+                player.write_bytes(b"after!")
+        else:
+            player.write_bytes(b"after!")
+
+    def check_receipt(path: Path, observed: stat_result | None = None) -> tuple[str, int]:
+        if phase == "records" and path == records:
+            change_player()
+        return original_hash(path, observed)
+
+    def check_checkout(root: Path, arguments: list[str]) -> bytes:
+        nonlocal checkout_reads
+        if arguments == ["rev-parse", "--verify", "HEAD"]:
+            checkout_reads += 1
+            if phase == "checkout" and checkout_reads == 2:
+                change_player()
+        return original_git(root, arguments)
+
+    monkeypatch.setattr(frozen_files, "file_hash", check_receipt)
+    monkeypatch.setattr(frozen_files, "git_output", check_checkout)
+    outcome = frozen_files.execute_request(request)
+    assert attempts == 1
+    assert checkout_reads == 2
+    if sys.platform == "win32":
+        assert outcome is None
+        assert player.read_bytes() == b"before"
+        player.write_bytes(b"after!")
+    else:
+        assert outcome == "WProto recorded file changed."
+    assert player.read_bytes() == b"after!"

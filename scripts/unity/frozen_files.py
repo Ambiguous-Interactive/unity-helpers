@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, TypedDict, cast
 
 if TYPE_CHECKING:
     import io
-    from collections.abc import Generator
+    from collections.abc import Callable, Generator
 
 SOURCE_ROOTS = ("Runtime", "Editor", "Tests", "Generator~", "scripts/unity")
 GENERATOR_SUFFIXES = frozenset(
@@ -472,7 +472,7 @@ def _recorded_path(root: Path, relative: str) -> Path:
     return path
 
 
-def _recorded_stat(root: Path, path: Path) -> os.stat_result:
+def recorded_stat(root: Path, path: Path) -> os.stat_result:
     try:
         info = path.lstat()
         for current in (path, *path.parents):
@@ -490,7 +490,59 @@ def _recorded_stat(root: Path, path: Path) -> os.stat_result:
     return info
 
 
-def verify_recorded_inventory(root_path: Path, records: object, *, complete: bool) -> None:
+class LinuxRecordedInventoryWatch:
+    _IN_MODIFY = 0x00000002
+    _IN_ATTRIB = 0x00000004
+    _IN_MOVED_FROM = 0x00000040
+    _IN_MOVED_TO = 0x00000080
+    _IN_CREATE = 0x00000100
+    _IN_DELETE = 0x00000200
+    _IN_DELETE_SELF = 0x00000400
+    _IN_MOVE_SELF = 0x00000800
+    _IN_DONT_FOLLOW = 0x02000000
+
+    def __init__(self, cleanup: ExitStack) -> None:
+        libc = ctypes.CDLL(None, use_errno=True)
+        libc.inotify_init1.argtypes = (ctypes.c_int,)
+        libc.inotify_init1.restype = ctypes.c_int
+        libc.inotify_add_watch.argtypes = (ctypes.c_int, ctypes.c_char_p, ctypes.c_uint32)
+        libc.inotify_add_watch.restype = ctypes.c_int
+        self._add_watch = libc.inotify_add_watch
+        self._descriptor: int = libc.inotify_init1(os.O_CLOEXEC | os.O_NONBLOCK)
+        if self._descriptor < 0:
+            raise OSError(ctypes.get_errno(), "Cannot observe recorded inventory changes.")
+        cleanup.callback(os.close, self._descriptor)
+        self._watched: set[Path] = set()
+
+    def add(self, path: Path, *, directory: bool, complete: bool) -> None:
+        if path in self._watched:
+            return
+        mask = self._IN_DELETE_SELF | self._IN_MOVE_SELF | self._IN_DONT_FOLLOW
+        if directory:
+            if complete:
+                mask |= self._IN_MOVED_FROM | self._IN_MOVED_TO | self._IN_CREATE | self._IN_DELETE
+        else:
+            mask |= self._IN_MODIFY | self._IN_ATTRIB
+        if self._add_watch(self._descriptor, os.fsencode(path), mask) < 0:
+            raise OSError(ctypes.get_errno(), "Cannot observe recorded inventory path.", path)
+        self._watched.add(path)
+
+    def verify(self) -> None:
+        try:
+            events = os.read(self._descriptor, 4096)
+        except BlockingIOError:
+            return
+        if events:
+            raise RecordedInventoryError("WProto recorded file changed during verification.")
+
+
+def verify_recorded_inventory(
+    root_path: Path,
+    records: object,
+    *,
+    complete: bool,
+    check_inputs: Callable[[], None] | None = None,
+) -> None:
     root = regular_path(root_path, directory=True)
     root_before = ordinary(root, directory=True)
     if not isinstance(records, list):
@@ -498,6 +550,11 @@ def verify_recorded_inventory(root_path: Path, records: object, *, complete: boo
     recorded_names: set[str] = set()
     observed: dict[Path, tuple[bool, os.stat_result]] = {}
     with ExitStack() as retained:
+        watcher = (
+            LinuxRecordedInventoryWatch(retained) if sys.platform.startswith("linux") else None
+        )
+        if watcher is not None:
+            watcher.add(root, directory=True, complete=complete)
         for row in cast("list[object]", records):
             record = cast("dict[str, object]", row) if isinstance(row, dict) else {}
             relative = record.get("Path")
@@ -507,8 +564,14 @@ def verify_recorded_inventory(root_path: Path, records: object, *, complete: boo
                 )
             path = _recorded_path(root, relative)
             recorded_names.add(relative)
-            info = _recorded_stat(root, path)
+            info = recorded_stat(root, path)
             directory = record.get("Kind") == "directory"
+            if watcher is not None:
+                for parent in path.parents:
+                    watcher.add(parent, directory=True, complete=complete)
+                    if parent == root:
+                        break
+                watcher.add(path, directory=directory, complete=complete)
             if directory:
                 if not stat.S_ISDIR(info.st_mode):
                     raise RecordedInventoryError("WProto recorded directory changed kind.")
@@ -535,6 +598,8 @@ def verify_recorded_inventory(root_path: Path, records: object, *, complete: boo
 
         if not recorded_names:
             raise RecordedInventoryError("WProto recorded inventory is empty.")
+        if check_inputs is not None:
+            check_inputs()
         if complete:
             try:
                 actual_names = {path.relative_to(root).as_posix() for path, _, _ in walk(root)}
@@ -546,7 +611,7 @@ def verify_recorded_inventory(root_path: Path, records: object, *, complete: boo
                 raise RecordedInventoryError("WProto complete inventory membership changed.")
         regular_path(root, directory=True)
         for path, (directory, before) in observed.items():
-            current = _recorded_stat(root, path)
+            current = recorded_stat(root, path)
             if directory:
                 if complete and identity(current) != identity(before):
                     raise RecordedInventoryError("WProto complete inventory membership changed.")
@@ -563,9 +628,14 @@ def verify_recorded_inventory(root_path: Path, records: object, *, complete: boo
             raise RecordedInventoryError("WProto complete inventory membership changed.")
         if (root_before.st_dev, root_before.st_ino) != (root_after.st_dev, root_after.st_ino):
             raise RecordedInventoryError("WProto recorded inventory root changed.")
+        if watcher is not None:
+            # Local filesystem notifications cover earlier paths after their final stat.
+            watcher.verify()
 
 
-def _verify_recorded_request(root: Path, request: dict[str, object]) -> str | None:
+def _verify_recorded_request(
+    root: Path, request: dict[str, object], check_checkout: Callable[[], None]
+) -> str | None:
     path, digest, complete = (
         request.get("recordsPath"),
         request.get("recordsSha256"),
@@ -587,18 +657,23 @@ def _verify_recorded_request(root: Path, request: dict[str, object]) -> str | No
         if hashlib.sha256(payload).hexdigest() != digest:
             raise ValueError("Recorded inventory request does not match its input hash.")
         records: object = json.loads(payload)
-        diagnostic = None
+
+        def check_inputs() -> None:
+            try:
+                final_digest, _ = file_hash(records_path, before)
+            except (OSError, ValueError) as error:
+                raise ValueError(
+                    "Recorded inventory request changed during verification."
+                ) from error
+            if final_digest != digest:
+                raise ValueError("Recorded inventory request changed during verification.")
+            check_checkout()
+
         try:
-            verify_recorded_inventory(root, records, complete=complete)
+            verify_recorded_inventory(root, records, complete=complete, check_inputs=check_inputs)
         except RecordedInventoryError as error:
-            diagnostic = str(error)
-        try:
-            final_digest, _ = file_hash(records_path, before)
-        except (OSError, ValueError) as error:
-            raise ValueError("Recorded inventory request changed during verification.") from error
-        if final_digest != digest:
-            raise ValueError("Recorded inventory request changed during verification.")
-        return diagnostic
+            return str(error)
+    return None
 
 
 def execute_request(value: object) -> object:
@@ -633,16 +708,19 @@ def execute_request(value: object) -> object:
     repository, maximum = request.get("repository"), request.get("maximumFiles")
     if not isinstance(repository, str) or not repository.strip():
         raise ValueError("Frozen inventory checkout or file bound is invalid.")
-    checkout = _inventory_checkout(Path(repository))
-    result: InventoryResult | str | None
+    repository_path = Path(repository)
+    checkout = _inventory_checkout(repository_path)
+
+    def check_checkout() -> None:
+        if _inventory_checkout(repository_path) != checkout:
+            raise ValueError("Frozen inventory checkout changed during the request.")
+
     if operation == "verify-recorded":
-        result = _verify_recorded_request(Path(root), request)
-    elif type(maximum) is int:
-        result = frozen_player_inventory(Path(root), request.get("declaredFiles"), maximum)
-    else:
+        return _verify_recorded_request(Path(root), request, check_checkout)
+    if type(maximum) is not int:
         raise ValueError("Frozen inventory checkout or file bound is invalid.")
-    if _inventory_checkout(Path(repository)) != checkout:
-        raise ValueError("Frozen inventory checkout changed during the request.")
+    result = frozen_player_inventory(Path(root), request.get("declaredFiles"), maximum)
+    check_checkout()
     return result
 
 
