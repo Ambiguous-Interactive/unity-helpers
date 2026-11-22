@@ -1081,6 +1081,35 @@ def test_recorded_inventory_retains_earlier_files_through_final_hashes(
     first.write_bytes(b"after lease release")
 
 
+@pytest.mark.skipif(sys.platform != "linux", reason="Linux file descriptor limits")
+def test_recorded_inventory_provisions_descriptors_above_the_soft_limit(tmp_path: Path) -> None:
+    if sys.platform == "linux":
+        import resource
+
+        descriptor_limit = resource.RLIMIT_NOFILE
+        original = resource.getrlimit(descriptor_limit)
+        _, hard = original
+        if hard != resource.RLIM_INFINITY and hard < 1200:
+            pytest.skip("The process hard limit is too low for this descriptor budget control.")
+        request, first, receipt = recorded_request(tmp_path)
+        root = first.parent.parent
+        for index in range(1099):
+            write(root / f"player-{index}.txt")
+        rows = frozen_files.frozen_player_inventory(root, None, 1100)["rows"]
+        receipt.write_bytes(json.dumps(rows).encode())
+        request["recordsSha256"] = hashlib.sha256(receipt.read_bytes()).hexdigest()
+        constrained = (1024, hard)
+        resource.setrlimit(descriptor_limit, constrained)
+        try:
+            assert frozen_files.execute_request(request) is None
+            assert resource.getrlimit(descriptor_limit) == constrained
+            with (root / "player-999.txt").open("r+b"):
+                assert frozen_files.execute_request(request) == "WProto recorded file changed."
+            assert resource.getrlimit(descriptor_limit) == constrained
+        finally:
+            resource.setrlimit(descriptor_limit, original)
+
+
 @pytest.mark.skipif(
     sys.platform not in ("linux", "win32"), reason="Requires directory change notifications"
 )

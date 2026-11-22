@@ -544,6 +544,7 @@ if sys.platform == "linux":
     INOTIFY_OPEN_FLAGS = os.O_CLOEXEC | os.O_NONBLOCK
 else:
     INOTIFY_OPEN_FLAGS = 0
+_LINUX_DESCRIPTOR_BUDGET_LOCK = threading.Lock()
 
 
 class LinuxRecordedInventoryWatch:
@@ -617,6 +618,47 @@ def _assert_recorded_hash(
 
 
 @contextmanager
+def _reserve_linux_recorded_descriptors(lease_count: int) -> Generator[None, None, None]:
+    if sys.platform == "linux":
+        import resource
+
+        # The budget is process-wide. Hold it until every lease has closed.
+        with _LINUX_DESCRIPTOR_BUDGET_LOCK:
+            limit = resource.RLIMIT_NOFILE
+            soft, hard = resource.getrlimit(limit)
+            adjusted = soft
+            if soft != resource.RLIM_INFINITY:
+                try:
+                    open_descriptors = sum(1 for _ in Path("/proc/self/fd").iterdir())
+                except OSError:
+                    open_descriptors = 3  # Standard streams when procfs is unavailable.
+                required = open_descriptors + lease_count + 2  # Traversal and hash streams.
+                if hard != resource.RLIM_INFINITY and required > hard:
+                    raise RecordedInventoryError(
+                        f"WProto recorded inventory requires {required} open file descriptors. "
+                        f"The process hard limit is {hard}."
+                    )
+                preferred = required + 8  # Leave room for other short-lived worker descriptors.
+                if hard != resource.RLIM_INFINITY:
+                    preferred = min(preferred, hard)
+                adjusted = max(soft, preferred)
+            if adjusted != soft:
+                try:
+                    resource.setrlimit(limit, (adjusted, hard))
+                except (OSError, ValueError) as error:
+                    raise RecordedInventoryError(
+                        f"Cannot provide {adjusted} file descriptors for recorded verification."
+                    ) from error
+            try:
+                yield
+            finally:
+                if adjusted != soft:
+                    resource.setrlimit(limit, (soft, hard))
+        return
+    yield
+
+
+@contextmanager
 def retain_linux_recorded_files(
     observed: dict[Path, tuple[os.stat_result, str | None]],
     receipt: tuple[Path, os.stat_result] | None,
@@ -636,8 +678,10 @@ def retain_linux_recorded_files(
             raise RecordedInventoryError(
                 "Cannot observe recorded input leases during verification."
             )
+        lease_count = sum(digest is not None for _, digest in observed.values())
+        lease_count += int(receipt is not None)
         try:
-            with ExitStack() as leases:
+            with _reserve_linux_recorded_descriptors(lease_count), ExitStack() as leases:
 
                 def retain(path: Path, before: os.stat_result, diagnostic: str) -> None:
                     try:
