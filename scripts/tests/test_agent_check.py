@@ -35,7 +35,13 @@ CASES = [mapping(case) for case in cast("list[object]", RAW_CASES)]
 def test_original_plan(case: dict[str, object]) -> None:
     tier = case["tier"]
     assert isinstance(tier, str)
-    assert agent_check.select(strings(case["files"]), tier) == case["expected"]
+    plan = agent_check.select(strings(case["files"]), tier)
+    # Preserve the frozen source and verify the single intentional change to its plans.
+    for command in plan["commands"]:
+        if command[:5] == ["npm", "run", "typecheck:iterate", "--", "runtime"]:
+            assert command[5:] == ["--server"]
+            command.pop()
+    assert plan == case["expected"]
 
 
 @pytest.mark.parametrize("file", ["../outside", "/outside", "C:/outside", "a/./b", "", "a\0b"])

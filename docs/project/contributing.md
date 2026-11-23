@@ -46,6 +46,10 @@ Internal symbolic links use the target's path and line-ending policy in the repa
 
 ### Fast C# Feedback
 
+The iterate tier reuses the Roslyn compiler server for runtime source edits. Each edit still
+runs the compiler and source generators. To compare with a fresh compiler process, use
+`npm run typecheck:iterate -- runtime`.
+
 Use fixture-scoped builds while editing runtime or Editor tests. The npm command runs the
 locked Python tool through uv and uses the installed .NET SDK:
 
