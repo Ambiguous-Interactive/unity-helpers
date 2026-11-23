@@ -24,6 +24,13 @@ CORPUS = cast(
 )
 
 
+@pytest.fixture(autouse=True)
+def isolated_git_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    for key in list(os.environ):
+        if key.startswith("GIT_"):
+            monkeypatch.delenv(key, raising=False)
+
+
 def populate(root: Path, files: dict[str, str]) -> Repository:
     for name, text in files.items():
         file = root / name
