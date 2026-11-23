@@ -62,6 +62,7 @@ def snapshot(root: Path) -> dict[str, bytes]:
     [
         ("", "", True),
         ("shard: [0, 1, 2]", "shard: [0, 1]", False),
+        ("shard: [0, 1, 2]", "shard: [0, 1, 2]\n        exclude:\n          - shard: 2", False),
         ('--shard "$LINT_SHARD"', "--shard 0/3", False),
         ("${{ strategy.job-total }}", "2", False),
     ],
@@ -73,6 +74,32 @@ def test_repo_lint_matrix_covers_devcontainer_publication(
     assert original in source
     source = source.replace(original, replacement)
     assert checker.workflow_covers_publish(source) is expected
+
+
+def test_unrelated_workflow_job_cannot_supply_lint_shard_coverage() -> None:
+    source = (checker.ROOT / ".github/workflows/repo-lint.yml").read_text(encoding="utf-8")
+    partial = source.replace("shard: [0, 1, 2]", "shard: [0, 1]", 1)
+    unrelated = """
+  unrelated:
+    strategy:
+      matrix:
+        shard: [0, 1, 2]
+    steps:
+      - env:
+          LINT_SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
+        run: echo unrelated
+"""
+    assert not checker.workflow_covers_publish(partial + unrelated)
+
+
+def test_unrelated_step_cannot_supply_lint_shard_environment() -> None:
+    source = (checker.ROOT / ".github/workflows/repo-lint.yml").read_text(encoding="utf-8")
+    assignment = "          LINT_SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}"
+    reports = "      - name: Report memory safety findings"
+    unrelated = f"      - name: Unrelated\n        env:\n{assignment}\n        run: echo unrelated"
+    partial = source.replace(assignment, "", 1).replace(reports, f"{unrelated}\n\n{reports}", 1)
+    assert partial != source
+    assert not checker.workflow_covers_publish(partial)
 
 
 @pytest.mark.parametrize("case", CORPUS["cases"], ids=lambda case: case["name"])

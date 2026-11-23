@@ -1448,9 +1448,22 @@ function Test-LintRegistryWorkflowCoverage {
   if ($Content.Contains('run-repo-lint.js') -or $Content -match ($registryCall + '\s*$')) {
     return $true
   }
-  return ($Content -match ($registryCall + ' --shard "\$LINT_SHARD"\s*$') -and
-    $Content -match '(?m)^\s*shard:\s*\[0,\s*1,\s*2\]\s*$' -and
-    $Content.Contains('LINT_SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}'))
+  $jobsBlock = [regex]::Match($Content, '(?ms)^jobs:[ \t]*\r?\n(.*?)(?=^\S|\z)').Groups[1].Value
+  $shardEnvironment = '(?m)^(?: {8})?env:[ \t]*\r?\n(?: {10}[^\n]*\n)*? {10}LINT_SHARD: \$\{\{ matrix\.shard \}\}/\$\{\{ strategy\.job-total \}\}[ \t]*\r?$'
+  foreach ($job in $jobsBlock -split '(?m)^ {2}[\w-]+:[ \t]*\r?$') {
+    $preamble, $steps = $job -split '(?m)^ {4}steps:[ \t]*\r?$', 2
+    if ($preamble -notmatch '(?m)^ {6}matrix:[ \t]*\r?\n {8}shard: \[0,\s*1,\s*2\][ \t]*\r?$' -or
+      $preamble -match '(?m)^(?: {4}if:| {8}exclude:)') {
+      continue
+    }
+    foreach ($step in $steps -split '(?m)^ {6}- ') {
+      if ($step -match ($registryCall + ' --shard "\$LINT_SHARD"\s*$') -and
+        $step -match $shardEnvironment -and $step -notmatch '(?m)^(?: {8})?if:') {
+        return $true
+      }
+    }
+  }
+  return $false
 }
 
 function Run-DocumentationWorkflowContractTests {
@@ -1515,9 +1528,16 @@ function Run-DocumentationWorkflowContractTests {
   }
 
   $shardedRegistry = @'
-shard: [0, 1, 2]
-LINT_SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
-run: uv run --project scripts/python~ --locked --no-dev python scripts/check_registries.py lint --direct --ci --shard "$LINT_SHARD"
+jobs:
+  lint:
+    strategy:
+      matrix:
+        shard: [0, 1, 2]
+    steps:
+      - name: Lint
+        env:
+          LINT_SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
+        run: uv run --project scripts/python~ --locked --no-dev python scripts/check_registries.py lint --direct --ci --shard "$LINT_SHARD"
 '@
   Write-TestResult -TestName 'Complete lint matrix runs the documentation registry' -Passed (
     Test-LintRegistryWorkflowCoverage -Content $shardedRegistry
@@ -1525,6 +1545,33 @@ run: uv run --project scripts/python~ --locked --no-dev python scripts/check_reg
   Write-TestResult -TestName 'Missing lint shard leaves the documentation registry unqualified' -Passed (
     -not (Test-LintRegistryWorkflowCoverage -Content ($shardedRegistry.Replace('[0, 1, 2]', '[0, 1]')))
   ) -Message $shardedRegistry
+  $excluded = $shardedRegistry.Replace('shard: [0, 1, 2]', "shard: [0, 1, 2]`n        exclude:`n          - shard: 2")
+  Write-TestResult -TestName 'Excluded lint shard leaves the documentation registry unqualified' -Passed (
+    -not (Test-LintRegistryWorkflowCoverage -Content $excluded)
+  ) -Message $excluded
+  $unrelatedJob = @'
+  unrelated:
+    strategy:
+      matrix:
+        shard: [0, 1, 2]
+    steps:
+      - env:
+          LINT_SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
+        run: echo unrelated
+'@
+  $partial = $shardedRegistry.Replace('[0, 1, 2]', '[0, 1]') + "`n" + $unrelatedJob
+  Write-TestResult -TestName 'Unrelated job cannot qualify lint shard coverage' -Passed (
+    -not (Test-LintRegistryWorkflowCoverage -Content $partial)
+  ) -Message $partial
+  $unrelatedStep = @'
+      - env:
+          LINT_SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
+        run: echo unrelated
+'@
+  $partial = $shardedRegistry.Replace('LINT_SHARD:', 'OTHER:') + "`n" + $unrelatedStep
+  Write-TestResult -TestName 'Unrelated step cannot configure the lint shard command' -Passed (
+    -not (Test-LintRegistryWorkflowCoverage -Content $partial)
+  ) -Message $partial
 
   # `-Mode All` is the linter's default and enables both halves, so it satisfies this on its own;
   # otherwise both explicit modes must appear. Spelling it out this way means the contract tracks
