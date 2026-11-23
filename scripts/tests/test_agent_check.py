@@ -36,11 +36,16 @@ def test_original_plan(case: dict[str, object]) -> None:
     tier = case["tier"]
     assert isinstance(tier, str)
     plan = agent_check.select(strings(case["files"]), tier)
-    # Preserve the frozen source and verify the single intentional change to its plans.
+    # Preserve the frozen plans apart from compiler reuse in the measured scopes.
     for command in plan["commands"]:
-        if command[:5] == ["npm", "run", "typecheck:iterate", "--", "runtime"]:
-            assert command[5:] == ["--server"]
-            command.pop()
+        if command[:4] == ["npm", "run", "typecheck:iterate", "--"] and command[4] in {
+            "runtime",
+            "editor",
+            "tests",
+            "editor-tests",
+        }:
+            assert command[5:6] == ["--server"]
+            command.pop(5)
     assert plan == case["expected"]
 
 
