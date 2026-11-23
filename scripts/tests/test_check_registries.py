@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from dataclasses import asdict
@@ -10,6 +11,7 @@ from pathlib import Path
 from typing import Literal
 
 import pytest
+import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import check_runner
@@ -368,3 +370,114 @@ def test_ci_pr_requires_its_base(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("AGENT_CHECK_BASE", raising=False)
     assert main(["lint", "--ci", "--list"]) == 1
     assert main(["lint", "--ci", "--base", "HEAD"]) == 1
+
+
+@pytest.mark.parametrize(
+    "changed_path",
+    [None, "scripts/check_registries.py", "Runtime/Utils/RuntimeSingleton.cs"],
+)
+def test_contract_shards_cover_unsharded_ci_selection_once(
+    changed_path: str | None,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    import agent_check
+
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "push" if changed_path is None else "pull_request")
+    monkeypatch.setenv("AGENT_CHECK_BASE", "origin/main")
+
+    def inventory(base: str) -> list[str]:
+        assert base == "origin/main"
+        assert changed_path is not None
+        return [changed_path]
+
+    monkeypatch.setattr(agent_check, "changed_files", inventory)
+    args = ["contracts", "--include-hook-regressions", "--direct", "--ci", "--list"]
+    assert main(args) == 0
+    original = capsys.readouterr().out.splitlines()
+    assert original
+    shards: list[list[str]] = []
+    for index in range(4):
+        assert main([*args, "--shard", f"{index}/4"]) == 0
+        shards.append(capsys.readouterr().out.splitlines())
+    assert sorted(identifier for shard in shards for identifier in shard) == sorted(original)
+    if changed_path is None:
+        assert shards[0] == ["agent-preflight"]
+        assert all(shards)
+    if changed_path == "Runtime/Utils/RuntimeSingleton.cs":
+        assert not shards[0]
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        ["--shard"],
+        ["--shard", "4/4"],
+        ["--shard", "0/0"],
+        ["--shard", "0/4", "--only", "agent-preflight"],
+    ],
+)
+def test_malformed_contract_shard_fails_closed(
+    options: list[str], capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert main(["contracts", "--list", *options]) == 1
+    assert "shard" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    ("result", "receipt", "expected"),
+    [
+        ("success", "complete", 0),
+        ("success", "missing", 1),
+        ("success", "wrong-sha", 1),
+        ("failure", "complete", 1),
+        ("skipped", "complete", 1),
+        ("cancelled", "complete", 1),
+    ],
+)
+def test_required_contract_check_waits_for_every_shard(
+    result: str, receipt: str, expected: int, tmp_path: Path
+) -> None:
+    workflow = yaml.safe_load(
+        (ROOT / ".github/workflows/local-gates.yml").read_text(encoding="utf-8")
+    )
+    jobs = workflow["jobs"]
+    shards = jobs["contract-suites"]
+    strategy = shards["strategy"]
+    assert strategy["matrix"] == {"shard": [0, 1, 2, 3]}
+    assert strategy["fail-fast"] is False
+    assert "if" not in shards
+    assert all("continue-on-error" not in step for step in shards["steps"])
+    suite = next(step for step in shards["steps"] if step["name"] == "Run contract suites")
+    assert "if" not in suite
+    assert suite["run"] == 'npm run validate:tests -- --ci --shard "$CONTRACT_SHARD"'
+    assert suite["env"]["CONTRACT_SHARD"] == "${{ matrix.shard }}/${{ strategy.job-total }}"
+    retain = shards["steps"][-1]
+    assert retain["with"]["if-no-files-found"] == "error"
+    assert retain["with"]["name"] == "contract-shard-${{ matrix.shard }}"
+    assert "if" not in retain
+    gate = jobs["contract-suites-success"]
+    assert gate["name"] == "Contract Suites"
+    assert gate["needs"] == "contract-suites"
+    assert gate["if"] == "${{ always() }}"
+    download, step = gate["steps"]
+    assert download["with"]["pattern"] == "contract-shard-*"
+    assert step["env"]["SHARDS_RESULT"] == "${{ needs.contract-suites.result }}"
+    sha = "a" * 40
+    for index in strategy["matrix"]["shard"]:
+        if index == 3 and receipt == "missing":
+            continue
+        value = "b" * 40 if index == 3 and receipt == "wrong-sha" else sha
+        (tmp_path / f"contract-shard-{index}.txt").write_text(f"{value}\n", encoding="utf-8")
+    gate_result = subprocess.run(
+        [check_runner.resolve_bash(), "-c", step["run"]],
+        env={
+            **os.environ,
+            "SHARDS_RESULT": result,
+            "SHARD_RECEIPTS": tmp_path.as_posix(),
+            "GITHUB_SHA": sha,
+        },
+        check=False,
+        timeout=10,
+    )
+    assert gate_result.returncode == expected

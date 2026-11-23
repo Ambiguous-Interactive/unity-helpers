@@ -5,7 +5,7 @@ name: Local Gates
 # `validate:tests` composes the fast contract suite with exhaustive synthetic hook regressions.
 # Developer `validate:prepush` is intentionally a fast last-resort safety check;
 # `validate:local` retains the old complete developer aggregate, and this job remains the
-# authoritative entry point for both test subsets (affected PR checks; full main checks). Before this job existed, `--no-verify`, a squash merge
+# authoritative entry point for both test subsets (affected PR checks; full main checks). Before this gate existed, `--no-verify`, a squash merge
 # from the web UI, or a push from another environment could leave a pull request fully green with a
 # broken suite -- which happened in PR #334. `typecheck:unity` compiles the real Runtime sources with
 # the shipped analyzer loaded and likewise had no workflow coverage.
@@ -27,8 +27,12 @@ concurrency:
 
 jobs:
   contract-suites:
-    name: Contract Suites
+    name: Contract Suites (shard ${{ matrix.shard }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
     steps:
       # The cleanup classifier contract compares this repository against the central policy
       # repository and needs both trees side by side.
@@ -135,6 +139,7 @@ jobs:
           fi
 
       - name: Validate migrated Python scripts
+        if: matrix.shard == 0
         working-directory: unity-helpers
         run: npm run lint:python
 
@@ -157,6 +162,7 @@ jobs:
           fi
 
       - name: Run bounded-random arithmetic proof
+        if: matrix.shard == 0
         working-directory: unity-helpers
         run: |
           set -euo pipefail
@@ -194,6 +200,7 @@ jobs:
       # This suite also stages the release .unitypackage payload under Assets and verifies that its
       # runtime asmdef keeps the same default-on serialization path as a Package Manager install.
       - name: Record task selection and native coverage proposal
+        if: matrix.shard == 0
         working-directory: unity-helpers
         env:
           AGENT_CHECK_BASE: ${{ github.event.pull_request.base.sha || 'HEAD^' }}
@@ -204,7 +211,54 @@ jobs:
         env:
           BUILD_LOCK_POLICY_ROOT: ${{ github.workspace }}/build-lock-policy
           AGENT_CHECK_BASE: ${{ github.event.pull_request.base.sha }}
-        run: npm run validate:tests -- --ci
+          CONTRACT_SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
+        run: npm run validate:tests -- --ci --shard "$CONTRACT_SHARD"
+
+      - name: Record completed shard
+        working-directory: unity-helpers
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: git rev-parse HEAD > "$RUNNER_TEMP/contract-shard-$SHARD.txt"
+
+      - name: Retain completed shard
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: contract-shard-${{ matrix.shard }}
+          path: ${{ runner.temp }}/contract-shard-${{ matrix.shard }}.txt
+          if-no-files-found: error
+          overwrite: true
+
+  contract-suites-success:
+    name: Contract Suites
+    runs-on: ubuntu-latest
+    needs: contract-suites
+    if: ${{ always() }}
+    steps:
+      # Require positive evidence even if Actions misreports an abandoned matrix job.
+      - name: Download shard receipts
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          pattern: contract-shard-*
+          path: ${{ runner.temp }}/contract-shards
+          merge-multiple: true
+
+      - name: Require every contract shard to pass
+        env:
+          SHARDS_RESULT: ${{ needs.contract-suites.result }}
+          SHARD_RECEIPTS: ${{ runner.temp }}/contract-shards
+        run: |
+          set -euo pipefail
+          if [[ "$SHARDS_RESULT" != success ]]; then
+            printf '::error::Contract shard jobs finished with result %s.\n' "$SHARDS_RESULT"
+            exit 1
+          fi
+          for shard in 0 1 2 3; do
+            receipt="$SHARD_RECEIPTS/contract-shard-$shard.txt"
+            if [[ ! -f "$receipt" || "$(<"$receipt")" != "$GITHUB_SHA" ]]; then
+              printf '::error::Missing or invalid completion receipt for contract shard %s.\n' "$shard"
+              exit 1
+            fi
+          done
 
   typecheck-phases:
     name: Type-check (${{ matrix.phase }})
