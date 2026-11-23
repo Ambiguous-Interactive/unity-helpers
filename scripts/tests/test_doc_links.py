@@ -25,15 +25,18 @@ CORPUS = cast(
 
 
 @pytest.fixture(autouse=True)
-def isolated_git_environment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def isolated_git_environment(
+    tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
+) -> None:
     for key in list(os.environ):
         if key.startswith("GIT_"):
             monkeypatch.delenv(key, raising=False)
-    configuration = tmp_path / "git-config"
+    environment = tmp_path_factory.mktemp("git-environment")
+    configuration = environment / "config"
     configuration.touch()
     monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(configuration))
     monkeypatch.setenv("GIT_CONFIG_SYSTEM", str(configuration))
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(environment / "xdg"))
 
 
 def populate(root: Path, files: dict[str, str]) -> Repository:
@@ -254,12 +257,16 @@ def test_scoped_cli_only_scans_untracked_for_existing_unknown_paths(
     assert sum("--others" in query for query in queries) == int(scans_untracked)
 
 
-def test_non_repository_and_empty_inventory_fail_closed(tmp_path: Path) -> None:
+def test_non_repository_and_empty_inventory_fail_closed(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     assert main(["--repo-root", str(tmp_path)]) == 1
+    capsys.readouterr()
     git = shutil.which("git")
     assert git
     subprocess.run([git, "init", "-q", str(tmp_path)], check=True)
     assert main(["--repo-root", str(tmp_path)]) == 1
+    assert "The documentation source inventory is empty." in capsys.readouterr().err
 
 
 @pytest.mark.parametrize(
