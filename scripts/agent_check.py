@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import TypedDict, cast
 
@@ -61,11 +62,14 @@ def changed_files(base: str, cwd: Path = ROOT) -> list[str]:
             raise ValueError("Affected inventory timed out") from error
 
     revision = query(["rev-parse", "--verify", f"{base}^{{commit}}"]).strip()
-    inventories = [
-        query(["diff", "--name-only", "--no-renames", "-z", f"{revision}...HEAD", "--"]),
-        query(["diff", "--name-only", "--no-renames", "-z", "HEAD", "--"]),
-        query(["ls-files", "--others", "--exclude-standard", "-z"]),
+    commands = [
+        ["diff", "--name-only", "--no-renames", "-z", f"{revision}...HEAD", "--"],
+        ["diff", "--name-only", "--no-renames", "-z", "HEAD", "--"],
+        ["ls-files", "--others", "--exclude-standard", "-z"],
     ]
+    # Overlap the read-only working tree scans on shared filesystems.
+    with ThreadPoolExecutor(max_workers=len(commands)) as executor:
+        inventories = list(executor.map(query, commands))
     return sorted(
         {file for inventory in inventories for file in inventory.split("\0") if file},
         key=lambda file: file.encode("utf-16-be", errors="surrogatepass"),
