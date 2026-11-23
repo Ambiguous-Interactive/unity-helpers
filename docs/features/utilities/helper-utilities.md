@@ -885,7 +885,7 @@ async Task<string> GetTextFromMainThread()
 
 ### SingleThreadedThreadPool
 
-Supply `onException` to handle work failures on the worker without polling its exception queue:
+Supply `onException` to handle work failures without polling the exception queue.
 
 ```csharp
 using SingleThreadedThreadPool pool = new(
@@ -898,9 +898,15 @@ using SingleThreadedThreadPool pool = new(
 A successful callback handles the error without retaining it in `Exceptions`. If the callback
 throws, the queue keeps both failures in an `AggregateException`, bounded to the latest 64
 callback failures, and the worker continues. A null callback preserves the original queue behavior.
-The callback runs on the worker; it must return before that worker can finish draining or disposing.
+The callback runs in the same context as the queued work and must return before the pool can
+finish draining or disposing.
 
-**Run background work one item at a time, in enqueue order:**
+In `SINGLE_THREADED` builds and Web players, construct the pool on Unity's main thread. It posts
+work to Unity's synchronization context and runs one item at a time. The constructor accepts
+`runInBackground` and `noWorkWaitTime` for compatibility with other targets. In this mode, async
+delegates can yield between frames. CPU-heavy synchronous work consumes main-thread frame time.
+
+#### Background workers
 
 The optional `noWorkWaitTime` controls how long an idle worker waits for a signal. Invalid delays
 use the default one-second interval, so a mistaken negative or oversized timeout cannot stop the
@@ -928,8 +934,10 @@ protect it from later disposal. Stop producers and drain the pool when accepted 
 draining it, so anything enqueued but not yet started is dropped; the `await` inside
 `DisposeAsync()` waits only for the item already in flight. Disposal immediately removes pending
 work and releases the queue's references to its delegates; concurrent submissions cannot leave new
-work in a shut-down queue. Concurrent disposal calls all wait for the same in-flight item and handle
-cleanup, so none returns while shutdown is still running. `Count` reaches zero once the in-flight
+work in a shut-down queue. `DisposeAsync()` waits for the same in-flight item across disposal calls.
+On threaded targets, `Dispose()` also waits. In `SINGLE_THREADED` builds and Web players,
+`Dispose()` initiates shutdown and returns so the in-flight delegate can resume on Unity's
+main thread. `Count` reaches zero once the in-flight
 item finishes. That is what you want for work that can
 simply be redone, such as a generation pass, and not what you want for durable work such as a
 persistence write.
