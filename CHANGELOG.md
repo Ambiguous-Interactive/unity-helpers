@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Expose `AuthoredAssetYaml.TryGetOnlyDirectEntry` for finding a unique root field before reading its YAML block ([#1127](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1127)).
 - Add `NonDrawingGraphic` for rectangular or circular uGUI hit targets without drawing content ([#1291](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1291)).
 - Add grouped moves for saves and their sidecars, with reverse-order rollback on failure ([#1227](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1227)).
 - Add SHA-256 hashing over byte spans, with a caller-provided digest buffer or a hex string, and byte-span equality ([#1226](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1226)).

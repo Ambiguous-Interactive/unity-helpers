@@ -346,6 +346,7 @@ if (document.TryGetEntry("settings", out AuthoredAssetEntry settings)
   key returns the first value. `Field` returns an empty string for absence; use the Try method
   to distinguish an absent field from a present empty value.
 - `TryGetOnlyField` searches every parsed depth and fails when the name occurs more than once.
+- `TryGetOnlyDirectEntry` finds a unique root field and returns its source span for block reads.
 - `TryDescend` checks the supplied parent's document membership and line span, accepts only
   children one indentation level below it, and refuses duplicate matching children.
 - `ValueWithDirectChildren` joins the inline value and nonempty direct child values, skipping

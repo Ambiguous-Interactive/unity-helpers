@@ -32,6 +32,38 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         }
 
         [Test]
+        public void UniqueDirectEntryIdentifiesTheRootBlockWhenAChildSharesItsName()
+        {
+            string[] lines =
+            {
+                "--- !u!114 &7",
+                "MonoBehaviour:",
+                "  child:",
+                "    values:",
+                "    - nested",
+                "  values:",
+                "  - root",
+            };
+            AuthoredAssetDocument document = Parse(lines);
+
+            Assert.That(
+                AuthoredAssetYaml.TryGetOnlyDirectEntry(
+                    document,
+                    "values:",
+                    out AuthoredAssetEntry entry
+                ),
+                Is.True
+            );
+            IReadOnlyList<AuthoredSequenceElement> items = AuthoredAssetYaml.ReadBlockItems(
+                lines,
+                entry
+            );
+            Assert.That(items.Count, Is.EqualTo(1));
+            Assert.That(items[0].Value, Is.EqualTo("root"));
+            Assert.That(AuthoredAssetYaml.CountBlockItems(lines, entry), Is.EqualTo(1));
+        }
+
+        [Test]
         public void BlockReadsKeepDirectElementsAndSourceLines()
         {
             string[] lines =
