@@ -57,6 +57,24 @@ def snapshot(root: Path) -> dict[str, bytes]:
     }
 
 
+@pytest.mark.parametrize(
+    ("original", "replacement", "expected"),
+    [
+        ("", "", True),
+        ("shard: [0, 1, 2]", "shard: [0, 1]", False),
+        ('--shard "$LINT_SHARD"', "--shard 0/3", False),
+        ("${{ strategy.job-total }}", "2", False),
+    ],
+)
+def test_repo_lint_matrix_covers_devcontainer_publication(
+    original: str, replacement: str, expected: bool
+) -> None:
+    source = (checker.ROOT / ".github/workflows/repo-lint.yml").read_text(encoding="utf-8")
+    assert original in source
+    source = source.replace(original, replacement)
+    assert checker.workflow_covers_publish(source) is expected
+
+
 @pytest.mark.parametrize("case", CORPUS["cases"], ids=lambda case: case["name"])
 def test_original_executable_decisions(
     case: Case, tmp_path: Path, capsys: pytest.CaptureFixture[str]

@@ -31,8 +31,11 @@ LANGUAGES = (
 )
 REGISTRY = re.compile(
     r"(?m)^\s*(?:run:\s*)?uv run --project scripts/python~ --locked --no-dev "
-    r"python scripts/check_registries\.py lint(?: --direct)?(?: --ci)?\s*$"
+    r"python scripts/check_registries\.py lint(?: --direct)?(?: --ci)?"
+    r'(?P<sharded> --shard "\$LINT_SHARD")?\s*$'
 )
+LINT_MATRIX = re.compile(r"(?m)^\s*shard:\s*\[0,\s*1,\s*2\]\s*$")
+LINT_SHARD_ENV = "LINT_SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}"
 
 
 def read_text(path: Path) -> str:
@@ -48,10 +51,14 @@ def read_text(path: Path) -> str:
 
 def workflow_covers_publish(content: str) -> bool:
     content = "\n".join(re.sub(r"#.*$", "", line) for line in content.split("\n"))
+    complete_matrix = LINT_MATRIX.search(content) is not None and LINT_SHARD_ENV in content
     invokes = (
         "validate-devcontainer-config.ps1" in content
         or "run-repo-lint.js" in content
-        or REGISTRY.search(content) is not None
+        or any(
+            match.group("sharded") is None or complete_matrix
+            for match in REGISTRY.finditer(content)
+        )
     )
     changes = re.search(r"(?m)^\s*(?:push|pull_request):\s*$", content) is not None
     filtered = re.search(r"(?m)^\s+paths:\s*$", content) is not None
