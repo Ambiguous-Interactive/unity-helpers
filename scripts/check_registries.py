@@ -19,6 +19,14 @@ Registry = Literal["lint", "contracts"]
 ROOT = Path(__file__).resolve().parents[1]
 NPM_COMMAND = re.compile(r"npm run ([\w:.-]+)", re.ASCII)
 
+# Run the two longest independent checks on separate hosted runners.
+LINT_CHECK_SHARD = {
+    "unity-mode-coordinator": 0,
+    "bundled-assemblies": 1,
+    "unsafe-code": 1,
+    "unsafe-code-test": 1,
+}
+
 # Rounded median job timings from four full hosted runs. New or short checks get six seconds.
 CONTRACT_CHECK_SECONDS = {
     "unity-framework": 160,
@@ -220,6 +228,7 @@ def main(argv: list[str] | None = None) -> int:
         if not arguments or arguments[0] not in {"lint", "contracts"}:
             raise ValueError("Expected lint or contracts registry")
         registry = cast("Registry", arguments.pop(0))
+        label = "Contract" if registry == "contracts" else "Lint"
         if "--focused-ids" in arguments:
             if arguments[:2] != ["--focused-ids", "--files"] or len(arguments) < 3:
                 raise ValueError("--focused-ids requires --files and affected paths")
@@ -242,13 +251,15 @@ def main(argv: list[str] | None = None) -> int:
             position = arguments.index("--shard")
             value = arguments[position + 1] if position + 1 < len(arguments) else ""
             match = re.fullmatch(r"([0-9]{1,3})/([0-9]{1,3})", value)
-            if registry != "contracts" or match is None or arguments.count("--shard") != 1:
-                raise ValueError("Contract --shard requires one INDEX/TOTAL")
+            if match is None or arguments.count("--shard") != 1:
+                raise ValueError(f"{label} --shard requires one INDEX/TOTAL")
             index, total = int(match[1]), int(match[2])
             if not 0 <= index < total or total < 2 or "--only" in arguments:
                 raise ValueError(
-                    "Contract --shard requires 0 <= INDEX < TOTAL, TOTAL >= 2 and no --only"
+                    f"{label} --shard requires 0 <= INDEX < TOTAL, TOTAL >= 2 and no --only"
                 )
+            if registry == "lint" and total != 3:
+                raise ValueError("Lint --shard requires TOTAL = 3")
             if check_runner.parse_arguments(arguments)["jobsInvalid"] is not None:
                 raise ValueError("::error::--jobs must be a positive integer")
             shard = (index, total)
@@ -301,10 +312,15 @@ def main(argv: list[str] | None = None) -> int:
         if direct:
             command += " --direct"
         if shard is not None:
-            checks = contract_shard(checks, *shard)
+            if registry == "contracts":
+                checks = contract_shard(checks, *shard)
+            else:
+                checks = [
+                    check for check in checks if LINT_CHECK_SHARD.get(check.id, 2) == shard[0]
+                ]
             if not checks:
                 if "--list" not in options:
-                    print(f"Contract shard {shard[0]}/{shard[1]} has no selected checks.")
+                    print(f"{label} shard {shard[0]}/{shard[1]} has no selected checks.")
                 return 0
         return run_registry(
             checks,

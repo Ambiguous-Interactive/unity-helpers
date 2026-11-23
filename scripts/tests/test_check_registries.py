@@ -425,6 +425,94 @@ def test_malformed_contract_shard_fails_closed(
 
 
 @pytest.mark.parametrize(
+    "changed_path",
+    [None, "scripts/check_registries.py", "Runtime/Utils/RuntimeSingleton.cs", "README.md"],
+)
+def test_lint_shards_preserve_ci_selection_and_report_dependencies(
+    changed_path: str | None,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    import agent_check
+
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "push" if changed_path is None else "pull_request")
+    monkeypatch.setenv("AGENT_CHECK_BASE", "origin/main")
+
+    def inventory(base: str) -> list[str]:
+        assert base == "origin/main"
+        assert changed_path is not None
+        return [changed_path]
+
+    monkeypatch.setattr(agent_check, "changed_files", inventory)
+    args = ["lint", "--direct", "--ci", "--list"]
+    assert main(args) == 0
+    original = set(capsys.readouterr().out.splitlines())
+    shards: list[list[str]] = []
+    for index in range(3):
+        assert main([*args, "--shard", f"{index}/3"]) == 0
+        shards.append(capsys.readouterr().out.splitlines())
+    assert sorted(identifier for shard in shards for identifier in shard) == sorted(original)
+    assert shards[0] == (["unity-mode-coordinator"] if "unity-mode-coordinator" in original else [])
+    assert {"unsafe-code", "bundled-assemblies"} <= set(shards[1])
+    assert set(shards[1]) <= {"unsafe-code", "unsafe-code-test", "bundled-assemblies"}
+    assert main([*args, "--shard", "0/4"]) == 1
+    assert "shard" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    ("result", "last_receipt", "expected"),
+    [
+        ("success", "current", 0),
+        ("success", "missing", 1),
+        ("success", "stale", 1),
+        ("failure", "current", 1),
+        ("skipped", "current", 1),
+        ("cancelled", "current", 1),
+    ],
+)
+def test_required_lint_check_waits_for_every_shard(
+    result: str, last_receipt: str, expected: int, tmp_path: Path
+) -> None:
+    workflow = yaml.safe_load(
+        (ROOT / ".github/workflows/repo-lint.yml").read_text(encoding="utf-8")
+    )
+    jobs = workflow["jobs"]
+    shards = jobs["repo-lint"]
+    assert shards["strategy"] == {"fail-fast": False, "matrix": {"shard": [0, 1, 2]}}
+    checks = next(step for step in shards["steps"] if step.get("id") == "checks")
+    assert 'lint --direct --ci --shard "$LINT_SHARD"' in checks["run"]
+    assert checks["env"]["LINT_SHARD"] == "${{ matrix.shard }}/${{ strategy.job-total }}"
+    assert "if" not in shards["steps"][-1]
+    assert shards["steps"][-1]["with"]["if-no-files-found"] == "error"
+
+    gate = jobs["repo-lint-success"]
+    assert gate["name"] == "Repo Lint"
+    assert gate["needs"] == "repo-lint"
+    assert gate["if"] == "${{ always() }}"
+    download, step = gate["steps"]
+    assert download["with"]["pattern"] == "lint-shard-*"
+    assert step["env"]["SHARDS_RESULT"] == "${{ needs.repo-lint.result }}"
+    sha = "a" * 40
+    for index in range(3):
+        if index == 2 and last_receipt == "missing":
+            continue
+        value = "b" * 40 if index == 2 and last_receipt == "stale" else sha
+        (tmp_path / f"lint-shard-{index}.txt").write_text(f"{value}\n", encoding="utf-8")
+    process = subprocess.run(
+        [check_runner.resolve_bash(), "-c", step["run"]],
+        env={
+            **os.environ,
+            "SHARDS_RESULT": result,
+            "SHARD_RECEIPTS": tmp_path.as_posix(),
+            "GITHUB_SHA": sha,
+        },
+        check=False,
+        timeout=10,
+    )
+    assert process.returncode == expected
+
+
+@pytest.mark.parametrize(
     ("result", "receipt", "expected"),
     [
         ("success", "complete", 0),

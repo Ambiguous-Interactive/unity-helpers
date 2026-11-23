@@ -1,35 +1,24 @@
 name: Repo Lint
 
-# Every fast lint and contract check in one job.
+# Lint and contract checks share a registry and one required check.
 #
 # This replaces 24 single-purpose workflows. Each of them booted its own runner and did its own
 # checkout to run a script that finished in seconds: measured on `main` at e94d04d5, ~810 s of
 # billable runner time for well under two minutes of work, and five separate workflows each ran
-# scripts/tests/test-comment-stripping.ps1. One boot, one checkout, one `npm install` now serve all
-# of it.
+# scripts/tests/test-comment-stripping.ps1.
 #
 # The registry lives in scripts/lint-checks.json: the typed Python runner keeps
 # going after a failure and reports every failing check at once, and
 # scripts/tests/test-run-repo-lint.js asserts no linter in scripts/ has been left unreachable.
 #
-# The checks run concurrently, one worker per core, which is why this is still one job rather than
-# the balanced matrix the plan proposed. All three rows measured, none projected:
+# The historical checks ran concurrently, one worker per core. All three rows were measured:
 #
 #   20 workflows (before #444)   128 s wall clock   ~730 s billable
 #   1 serial job (#444)          317 s wall clock    317 s billable
-#   1 concurrent job (this)      179 s wall clock    179 s billable   (147 s in Repository checks)
+#   1 concurrent job            179 s wall clock    179 s billable   (147 s in Repository checks)
 #
-# Concurrency inside the job pays the boot, checkout and npm install once, where a 3-leg matrix pays
-# them three times: the checks are independent processes that only read the tree. The runner takes
-# `--jobs` and defaults to the core count, so nothing here needs to know how large the runner is.
-#
-# The speedup on this runner is 1.93x (284 s -> 147 s), NOT the ~3x that four cores suggests and
-# eight real cores deliver locally (5.12x). Hosted vCPUs are shared, and the tail is bounded by the
-# slowest single check. Wall clock is therefore still ~40% above the twenty-workflow fan-out while
-# billable is 4.1x better than it -- a deliberate trade, and the honest numbers for anyone revisiting
-# it. Sharding on top of this would buy roughly 179 s -> 70 s for about +30 s billable; it has not
-# been done because a three-minute lint signal is nowhere near the critical path behind a 40-minute
-# Unity matrix.
+# The coordinator and memory safety tests now have dedicated shards to reduce contention.
+# Each shard uses the same hosted runner class and retains its normal check selection.
 #
 # Deliberately NOT folded in:
 #   * LLM Instructions Lint runs the skills-index generator on Windows as well, to catch a
@@ -54,12 +43,16 @@ concurrency:
 
 jobs:
   repo-lint:
-    name: Repo Lint
+    name: Repo Lint (shard ${{ matrix.shard }})
     runs-on: ubuntu-latest
     # Bounded because the doc-link checks this job absorbed were bounded before it: a link walk that
     # hangs should fail the job, not hold a runner for six hours. This is a hang guard rather than a
-    # performance number, so it keeps its headroom over the measured run above.
+    # performance target.
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2]
     steps:
       # Full history: scripts/audit-license-years.sh compares committed years against the dates the
       # files were actually touched, and a depth-1 checkout makes every file look new.
@@ -103,8 +96,6 @@ jobs:
         with:
           dotnet-version: "9.0.320"
 
-      # The three check groups each record an outcome instead of ending the job, so one failure
-      # never hides the other two. The gate at the end is what actually reds the run.
       - name: Require the installed .NET SDK
         shell: bash
         env:
@@ -117,6 +108,7 @@ jobs:
 
       - name: actionlint
         id: actionlint
+        if: ${{ matrix.shard == 2 }}
         continue-on-error: true
         uses: raven-actions/actionlint@3d39aea434753780c3b3d4a1a31c854b4dbf49d7
 
@@ -125,6 +117,7 @@ jobs:
       # quietly loosened the gate while the check still looked present.
       - name: yamllint
         id: yamllint
+        if: ${{ matrix.shard == 2 }}
         continue-on-error: true
         uses: ibiqlik/action-yamllint@2576378a8e339169678f9939646ee3ee325e845c
         with:
@@ -137,17 +130,18 @@ jobs:
         continue-on-error: true
         env:
           AGENT_CHECK_BASE: ${{ github.event.pull_request.base.sha }}
-        run: uv run --project scripts/python~ --locked --no-dev python scripts/check_registries.py lint --direct --ci
+          LINT_SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
+        run: uv run --project scripts/python~ --locked --no-dev python scripts/check_registries.py lint --direct --ci --shard "$LINT_SHARD"
 
       - name: Report memory safety findings
         id: safety
-        if: always()
+        if: ${{ always() && matrix.shard == 1 }}
         continue-on-error: true
         run: test -s artifacts/unsafe-code.sarif
 
       - name: Retain memory safety report
         id: safety_report
-        if: always()
+        if: ${{ always() && matrix.shard == 1 }}
         continue-on-error: true
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
@@ -156,9 +150,10 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Gate
+      - name: Require selected lint checks and reports
         if: always()
         env:
+          SHARD: ${{ matrix.shard }}
           ACTIONLINT: ${{ steps.actionlint.outcome }}
           YAMLLINT: ${{ steps.yamllint.outcome }}
           CHECKS: ${{ steps.checks.outcome }}
@@ -167,13 +162,61 @@ jobs:
         run: |
           set -euo pipefail
           failed=""
-          [ "$ACTIONLINT" = "failure" ] && failed="$failed actionlint"
-          [ "$YAMLLINT" = "failure" ] && failed="$failed yamllint"
-          [ "$CHECKS" = "failure" ] && failed="$failed repository-checks"
-          [ "$SAFETY" != "success" ] && failed="$failed memory-safety"
-          [ "$SAFETY_REPORT" != "success" ] && failed="$failed memory-safety-report"
+          if [[ "$SHARD" == 2 ]]; then
+            [ "$ACTIONLINT" != "success" ] && failed="$failed actionlint"
+            [ "$YAMLLINT" != "success" ] && failed="$failed yamllint"
+          fi
+          [ "$CHECKS" != "success" ] && failed="$failed repository-checks"
+          if [[ "$SHARD" == 1 ]]; then
+            [ "$SAFETY" != "success" ] && failed="$failed memory-safety"
+            [ "$SAFETY_REPORT" != "success" ] && failed="$failed memory-safety-report"
+          fi
           if [ -n "$failed" ]; then
-            echo "::error::Repo Lint failed:$failed"
+            echo "::error::Repo Lint shard $SHARD failed:$failed"
             exit 1
           fi
-          echo "Repo Lint passed."
+
+      - name: Record completed shard
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: git rev-parse HEAD > "$RUNNER_TEMP/lint-shard-$SHARD.txt"
+
+      - name: Retain completed shard
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: lint-shard-${{ matrix.shard }}
+          path: ${{ runner.temp }}/lint-shard-${{ matrix.shard }}.txt
+          if-no-files-found: error
+          overwrite: true
+
+  repo-lint-success:
+    name: Repo Lint
+    runs-on: ubuntu-latest
+    needs: repo-lint
+    if: ${{ always() }}
+    steps:
+      # Require positive evidence even if Actions misreports an abandoned matrix job.
+      - name: Download shard receipts
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          pattern: lint-shard-*
+          path: ${{ runner.temp }}/lint-shards
+          merge-multiple: true
+
+      - name: Require every lint shard to pass
+        env:
+          SHARDS_RESULT: ${{ needs.repo-lint.result }}
+          SHARD_RECEIPTS: ${{ runner.temp }}/lint-shards
+        run: |
+          set -euo pipefail
+          if [[ "$SHARDS_RESULT" != success ]]; then
+            printf '::error::Lint shard jobs finished with result %s.\n' "$SHARDS_RESULT"
+            exit 1
+          fi
+          for shard in 0 1 2; do
+            receipt="$SHARD_RECEIPTS/lint-shard-$shard.txt"
+            if [[ ! -f "$receipt" || "$(<"$receipt")" != "$GITHUB_SHA" ]]; then
+              printf '::error::Missing or invalid completion receipt for lint shard %s.\n' "$shard"
+              exit 1
+            fi
+          done
