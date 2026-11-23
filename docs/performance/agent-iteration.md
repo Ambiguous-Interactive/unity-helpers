@@ -134,6 +134,9 @@ Iteration runs the compiler scope and contract controls needed for the changed t
 changed file immediately; run changed-file preflight before publication, once the task is ready.
 The `pr` tier includes that preflight. An edit-loop task without a compiler, documentation or owned
 contract check falls back to preflight, so an unowned input cannot silently pass with no checks.
+When an edit changes only existing Markdown files and their metadata, iterate checks links in the
+changed Markdown files. Deletions, renames, symlinks, and mixed source edits retain the full link
+scan to catch references from unchanged files. Publication runs the full link scan.
 Fixture-only edits compile the named existing fixtures plus production and shared test sources.
 Mixed production/shared changes, deleted fixtures and metadata-only scopes retain whole-scope compilation; shared test
 changes check both runtime and editor fixtures. If a fixture needs another fixture's declarations,
