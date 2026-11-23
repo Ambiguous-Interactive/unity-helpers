@@ -138,6 +138,13 @@ Fixture-only edits compile the named existing fixtures plus production and share
 Mixed production/shared changes, deleted fixtures and metadata-only scopes retain whole-scope compilation; shared test
 changes check both runtime and editor fixtures. If a fixture needs another fixture's declarations,
 use `npm run typecheck:iterate -- tests` or `editor-tests` for the complete tree.
+Linux iteration puts generated compiler and restore files in a cache keyed by checkout and
+build variant. The dev container stores this cache in its persistent Linux volume, so the
+Windows Editor can use the shared source without sharing NuGet assets with the Linux compiler.
+The first build for a project restores dependencies. After changing project or NuGet restore
+settings, run `npm run typecheck:iterate -- runtime --restore` with the affected scope and
+variant. Set `UNITY_HELPERS_ITERATE_CACHE` to select a different Linux cache directory.
+
 Iteration also runs contract controls whose non-group input paths or patterns match a changed file,
 including declared dependencies.
 The typed registry selector owns pattern matching and dependency validation for both local iteration and CI.
