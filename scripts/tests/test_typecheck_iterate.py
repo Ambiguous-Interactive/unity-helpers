@@ -49,6 +49,7 @@ def test_build_arguments(project: str, variant: str) -> None:
         "quiet",
         "-p:RunAnalyzers=false",
         "-p:UseSharedCompilation=false",
+        "-p:WProtoParallelClosureScan=true",
         *VARIANTS[variant],
         f"-p:OutputPath=bin/iteration/{variant}/",
         f"-p:IntermediateOutputPath=obj/iteration/{variant}/",
@@ -137,7 +138,8 @@ def test_scoped_arguments(project: str, variant: str, fixtures: list[str]) -> No
     assert args[-2] == "-p:WallstopIterationTestSources=" + "%3B".join(
         str(ROOT / fixture) for fixture in fixtures
     )
-    assert args[8:-4] == list(VARIANTS[variant])
+    assert "-p:WProtoParallelClosureScan=true" in args
+    assert args[9:-4] == list(VARIANTS[variant])
     assert "-p:UseSharedCompilation=true" in args
 
 

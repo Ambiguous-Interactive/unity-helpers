@@ -115,6 +115,7 @@ def build_arguments(args: list[str], root: Path = ROOT) -> list[str]:
         "quiet",
         "-p:RunAnalyzers=false",
         f"-p:UseSharedCompilation={str(shared).lower()}",
+        "-p:WProtoParallelClosureScan=true",
         *VARIANTS[variant],
         f"-p:OutputPath=bin/iteration/{variant}/",
         f"-p:IntermediateOutputPath=obj/iteration/{variant}/",

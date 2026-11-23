@@ -5,6 +5,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 {
     using System.Collections.Generic;
     using System.Collections.Immutable;
+    using System.Linq;
+    using System.Threading.Tasks;
     using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.CSharp;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -21,7 +23,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
     /// because <c>MakeGenericType</c> is the one call IL2CPP cannot compile, so the closure has to
     /// be named in source that the consumer's own build compiles.
     /// </remarks>
-    internal static class ClosureScan
+    internal static partial class ClosureScan
     {
         /// <summary>
         /// Resolves source type uses once for every registration scan in this compilation.
@@ -37,15 +39,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         internal static List<TypeUse> Types(
             Compilation compilation,
             Dictionary<SyntaxTree, SemanticModel> models,
-            List<IArrayTypeSymbol> arrays = null
+            List<IArrayTypeSymbol> arrays = null,
+            bool parallel = false
         )
         {
-            List<TypeUse> uses = new List<TypeUse>();
-            List<MethodUse> calls = new List<MethodUse>();
-            Dictionary<IMethodSymbol, SerializationRequirements> requirements = new Dictionary<
-                IMethodSymbol,
-                SerializationRequirements
-            >(SymbolEqualityComparer.Default);
+            ScanResult result = new ScanResult(arrays);
             INamedTypeSymbol[] serializationApis =
             {
                 compilation.GetTypeByMetadataName(
@@ -110,15 +108,69 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     "System.Runtime.Serialization.DataMemberAttribute"
                 ),
             };
-            foreach (SyntaxTree tree in compilation.SyntaxTrees)
+            if (parallel && compilation.Options.ConcurrentBuild)
             {
-                if (!models.TryGetValue(tree, out SemanticModel model))
+                SyntaxTree[] trees = compilation.SyntaxTrees.ToArray();
+                SemanticModel[] retained = new SemanticModel[trees.Length];
+                for (int index = 0; index < trees.Length; ++index)
                 {
-                    model = compilation.GetSemanticModel(tree);
+                    models.TryGetValue(trees[index], out retained[index]);
                 }
+                models.Clear();
 
-                models.Remove(tree);
+                ScanResult[] perTree = new ScanResult[trees.Length];
+                Parallel.For(
+                    0,
+                    trees.Length,
+                    new ParallelOptions { MaxDegreeOfParallelism = 2 },
+                    index =>
+                    {
+                        SyntaxTree tree = trees[index];
+                        SemanticModel model = retained[index] ?? compilation.GetSemanticModel(tree);
+                        retained[index] = null;
+                        ScanResult local = new ScanResult(
+                            arrays == null ? null : new List<IArrayTypeSymbol>()
+                        );
+                        ScanTree(tree, model, local);
+                        perTree[index] = local;
+                    }
+                );
 
+                // Preserve source order and diagnostic precedence across tree workers.
+                foreach (ScanResult local in perTree)
+                {
+                    result.Uses.AddRange(local.Uses);
+                    result.Calls.AddRange(local.Calls);
+                    foreach (
+                        KeyValuePair<
+                            IMethodSymbol,
+                            SerializationRequirements
+                        > pair in local.Requirements
+                    )
+                    {
+                        result.Requirements[pair.Key] = pair.Value;
+                    }
+                    result.Arrays?.AddRange(local.Arrays);
+                }
+            }
+            else
+            {
+                foreach (SyntaxTree tree in compilation.SyntaxTrees)
+                {
+                    if (!models.TryGetValue(tree, out SemanticModel model))
+                    {
+                        model = compilation.GetSemanticModel(tree);
+                    }
+                    models.Remove(tree);
+                    ScanTree(tree, model, result);
+                }
+            }
+
+            PropagateSerializationRequirements(result.Calls, result.Requirements, result.Uses);
+            return result.Uses;
+
+            void ScanTree(SyntaxTree tree, SemanticModel model, ScanResult destination)
+            {
                 foreach (SyntaxNode node in tree.GetRoot().DescendantNodes())
                 {
                     ITypeSymbol resolved;
@@ -166,13 +218,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                             )
                             {
                                 MethodUse call = DescribeCall(invocation, method, model);
-                                calls.Add(call);
+                                destination.Calls.Add(call);
                                 if (api)
                                 {
-                                    requirements[method.OriginalDefinition] = ApiRequirements(
-                                        method,
-                                        compilation.GetTypeByMetadataName("System.Type")
-                                    );
+                                    destination.Requirements[method.OriginalDefinition] =
+                                        ApiRequirements(
+                                            method,
+                                            compilation.GetTypeByMetadataName("System.Type")
+                                        );
                                     serializationDependency = true;
                                 }
                             }
@@ -183,16 +236,18 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         continue;
                     }
 
-                    if (resolved is IArrayTypeSymbol array && arrays != null)
+                    if (resolved is IArrayTypeSymbol array && destination.Arrays != null)
                     {
-                        arrays.Add(array);
+                        destination.Arrays.Add(array);
                     }
-                    CollectTypes(resolved, node.GetLocation(), uses, serializationDependency);
+                    CollectTypes(
+                        resolved,
+                        node.GetLocation(),
+                        destination.Uses,
+                        serializationDependency
+                    );
                 }
             }
-
-            PropagateSerializationRequirements(calls, requirements, uses);
-            return uses;
         }
 
         internal static bool IsIncidentalUnnameableTuple(TypeUse use, Compilation compilation)

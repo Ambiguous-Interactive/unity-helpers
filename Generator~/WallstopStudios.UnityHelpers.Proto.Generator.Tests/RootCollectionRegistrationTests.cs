@@ -12,24 +12,34 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     [TestFixture]
     public sealed class RootCollectionRegistrationTests
     {
-        [Test]
-        public void ImplicitArrayConstructionsExposeTheirClosedRootType()
+        [TestCase(false)]
+        [TestCase(true)]
+        public void ImplicitArrayConstructionsExposeTheirClosedRootTypesInSourceOrder(bool parallel)
         {
             CSharpCompilation compilation = CSharpCompilation.Create(
-                nameof(ImplicitArrayConstructionsExposeTheirClosedRootType),
+                nameof(ImplicitArrayConstructionsExposeTheirClosedRootTypesInSourceOrder),
                 new[]
                 {
                     CSharpSyntaxTree.ParseText(
                         "public sealed class Consumer { public object Value = new[] { 1, 2 }; }"
+                    ),
+                    CSharpSyntaxTree.ParseText(
+                        "public sealed class OtherConsumer { public object Value = new[] { 1.0, 2.0 }; }"
                     ),
                 },
                 new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
             );
             List<IArrayTypeSymbol> arrays = new List<IArrayTypeSymbol>();
-            ClosureScan.Types(compilation, new Dictionary<SyntaxTree, SemanticModel>(), arrays);
-            Assert.AreEqual(1, arrays.Count);
+            ClosureScan.Types(
+                compilation,
+                new Dictionary<SyntaxTree, SemanticModel>(),
+                arrays,
+                parallel
+            );
+            Assert.AreEqual(2, arrays.Count);
             Assert.AreEqual(SpecialType.System_Int32, arrays[0].ElementType.SpecialType);
+            Assert.AreEqual(SpecialType.System_Double, arrays[1].ElementType.SpecialType);
         }
 
         [Test]
