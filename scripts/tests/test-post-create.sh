@@ -804,6 +804,15 @@ while IFS= read -r line; do
     fi
 done < "$DEVCONTAINER_JSON"
 
+# Workspace paths are resolved when the container starts, after image build.
+modules_target='${containerWorkspaceFolder}/node_modules'
+if grep -qF "source=unity-helpers-\${devcontainerId}-node-modules,target=$modules_target,type=volume,volume-nocopy" "$DEVCONTAINER_JSON"; then
+    pass "workspace npm dependencies use a dedicated empty volume on first create"
+else
+    fail "workspace npm dependencies use a dedicated empty volume on first create" \
+        "Expected a per-container node_modules volume at the workspace root"
+fi
+
 if [[ ${#VOLUME_TARGETS[@]} -eq 0 ]]; then
     fail "devcontainer.json has volume mounts" "No volume mounts found"
 else
@@ -816,6 +825,21 @@ else
         # Skip system-managed volumes (e.g., /var/lib/docker from DinD feature)
         if is_system_managed "$target"; then
             pass "volume target is system-managed (skip chown check): $target"
+            continue
+        fi
+
+        if [[ "$target" == "$modules_target" ]]; then
+            if grep -qF 'mountpoint --nofollow -q -- node_modules' <<<"$post_create_body" &&
+                grep -qF 'sudo chown --no-dereference "$(id -u):$(id -g)" -- node_modules' <<<"$post_create_body"; then
+                pass "setup gives the container user access to the mounted dependency directory"
+            else
+                fail "setup gives the container user access to the mounted dependency directory" \
+                    "Expected a mountpoint check and a non-recursive ownership change"
+            fi
+            continue
+        fi
+        if [[ "$target" != /* ]]; then
+            fail "recognized volume target: $target" "Expected an absolute path or the workspace dependency directory"
             continue
         fi
 

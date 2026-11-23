@@ -124,6 +124,12 @@ fi
 
 log_step "Installing npm dependencies"
 
+# Docker creates the empty workspace volume as root. Only its top directory
+# needs an owner before npm populates it as the container user.
+if mountpoint --nofollow -q -- node_modules && [ ! -w node_modules ]; then
+    sudo chown --no-dereference "$(id -u):$(id -g)" -- node_modules
+fi
+
 if [ -f package-lock.json ]; then
     npm ci
     log_ok "npm ci succeeded (from lockfile)"

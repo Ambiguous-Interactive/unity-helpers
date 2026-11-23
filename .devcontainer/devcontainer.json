@@ -488,6 +488,8 @@
   },
   // Mount settings
   "mounts": [
+    // Keep Linux npm tools on native storage while the Windows Editor reads the shared source.
+    "source=unity-helpers-${devcontainerId}-node-modules,target=${containerWorkspaceFolder}/node_modules,type=volume,volume-nocopy",
     "source=unity-helpers-${devcontainerId}-codex,target=/home/vscode/.codex,type=volume",
     "source=unity-helpers-${devcontainerId}-claude,target=/home/vscode/.claude,type=volume",
     "source=unity-helpers-${devcontainerId}-claude-zai,target=/home/vscode/.claude-zai,type=volume",
