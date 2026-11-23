@@ -42,16 +42,21 @@ Respect explicit user priorities and scope. Resolve dependencies that prevent hi
 ## Work Selection and Delivery
 
 At session start, check canonical main's CI and inventory open PRs (including drafts) and
-unfinished local work. Resume the active delivery. Keep one task in implementation from the
-first branch, worktree or edit until its PR has merged and the landed tree is verified.
-While CI or review is pending, investigate that task or wait. Leave the next task in the backlog.
+unfinished local work. Resume the active delivery. For an ordinary PR, keep one task in
+implementation from the first branch, worktree or edit through verified merge. While CI or
+review is pending, investigate that task or wait. Leave the next task in the backlog.
 
-Before starting the next task, verify all applicable checks and required reviews on the current
-head, resolve actionable feedback, confirm GitHub reports the PR merged, and compare the landed
-tree with the qualified integration tree. Branch the next task from updated canonical main.
-Deliver dependencies in merge order. When the user explicitly requests a stack, follow the
-[native stack procedure](../references/github-stacked-pull-requests.md) and verify the whole
-stack landed before starting another delivery.
+Before merge, record the Git tree of the current PR head integrated with the current canonical
+base. Use the merge queue's tested merge group when enabled, or the PR test merge commit.
+Verify the applicable required checks passed on that tree and required reviews cover the current
+head. If CI tests only the head, bring the base into the branch and qualify the updated head.
+Requalify if the base or head changes the integration tree. Resolve actionable feedback, confirm
+GitHub reports the PR merged, and compare the landed commit's tree with the recorded tree.
+Start the next task from updated canonical main after they match.
+
+An explicitly requested native stack counts as one delivery. Prepare its dependent branches and
+PRs together under the [native stack procedure](../references/github-stacked-pull-requests.md).
+Verify its atomic merge and landed tree before starting any other task.
 
 1. Review the complete current issue backlog with terminal pagination before choosing work.
 2. Select the highest-priority actionable work, accounting for dependencies and user direction.
