@@ -201,7 +201,7 @@ def select(files: list[str], tier: str, root: Path = ROOT) -> Selection:
                     )
                     for scope in scopes:
                         command = ["npm", "run", "typecheck:iterate", "--", scope]
-                        if scope == "runtime":
+                        if scope in {"runtime", "editor", "tests", "editor-tests"}:
                             command.append("--server")
                         prefix = "Tests/Runtime/" if scope == "tests" else "Tests/Editor/"
                         scoped = (
