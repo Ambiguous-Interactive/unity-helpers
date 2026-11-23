@@ -131,6 +131,7 @@ def test_linux_iteration_restores_cold_and_on_request(
     monkeypatch.setattr(typecheck_iterate, "iteration_cache", lambda: tmp_path)
     artifacts = tmp_path / "legacy"
     assets = artifacts / "obj" / Path(PROJECTS["runtime"]).stem / "project.assets.json"
+    receipt = assets.with_name("project.nuget.cache")
     commands: list[list[str]] = []
 
     def launch(command: list[str], *, cwd: Path, check: bool) -> subprocess.CompletedProcess[bytes]:
@@ -143,13 +144,16 @@ def test_linux_iteration_restores_cold_and_on_request(
         commands.append(command)
         assets.parent.mkdir(parents=True, exist_ok=True)
         assets.write_text("{}", encoding="utf-8")
-        return subprocess.CompletedProcess(command, 0)
+        succeeded = len(commands) > 1
+        receipt.write_text(json.dumps({"success": succeeded}), encoding="utf-8")
+        return subprocess.CompletedProcess(command, 0 if succeeded else 1)
 
     monkeypatch.setattr(subprocess, "run", launch)
-    assert run(["runtime", "legacy"]) == 0
+    assert run(["runtime", "legacy"]) == 1
     assert run(["runtime", "legacy"]) == 0
     assert run(["runtime", "legacy", "--restore"]) == 0
-    assert ["--no-restore" in command for command in commands] == [False, True, False]
+    assert run(["runtime", "legacy"]) == 0
+    assert ["--no-restore" in command for command in commands] == [False, False, False, True]
 
 
 def test_server_identity_includes_every_payload() -> None:

@@ -91,16 +91,20 @@ def scoped_source(root: Path, scope: Path, name: str) -> str:
 
 
 def iteration_cache() -> Path | None:
-    if sys.platform != "linux" or any(
-        name.lower() == "msbuildprojectextensionspath" and value
-        for name, value in os.environ.items()
-    ):
-        return None
-    configured = os.environ.get("UNITY_HELPERS_ITERATE_CACHE")
-    default = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache")
-    base = Path(configured).expanduser() if configured else default / "unity-helpers" / "iterate"
-    checkout = hashlib.sha256(os.fsencode(ROOT)).hexdigest()
-    return base.resolve() / checkout
+    if sys.platform == "linux":
+        if any(
+            name.lower() == "msbuildprojectextensionspath" and value
+            for name, value in os.environ.items()
+        ):
+            return None
+        configured = os.environ.get("UNITY_HELPERS_ITERATE_CACHE")
+        default = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache")
+        base = (
+            Path(configured).expanduser() if configured else default / "unity-helpers" / "iterate"
+        )
+        checkout = hashlib.sha256(os.fsencode(ROOT)).hexdigest()
+        return base.resolve() / checkout
+    return None
 
 
 def build_arguments(args: list[str], root: Path = ROOT, cache: Path | None = None) -> list[str]:
@@ -163,21 +167,32 @@ def build_arguments(args: list[str], root: Path = ROOT, cache: Path | None = Non
     return command
 
 
+def restore_completed(assets: Path) -> bool:
+    if not assets.is_file():
+        return False
+    try:
+        receipt: object = json.loads(
+            assets.with_name("project.nuget.cache").read_text(encoding="utf-8")
+        )
+    except (OSError, ValueError):
+        return False
+    return isinstance(receipt, dict) and cast("dict[str, object]", receipt).get("success") is True
+
+
 def compile_iteration(command: list[str]) -> int:
-    if "--artifacts-path" not in command:
-        return subprocess.run(["dotnet", *command], cwd=ROOT, check=False).returncode  # noqa: S603, S607
+    if sys.platform == "linux" and "--artifacts-path" in command:
+        # Restore and build can both update outputs used by another scope's project references.
+        import fcntl
 
-    # Restore and build can both update outputs used by another scope's project references.
-    import fcntl
-
-    artifacts = Path(command[command.index("--artifacts-path") + 1])
-    artifacts.mkdir(parents=True, exist_ok=True)
-    assets = artifacts / "obj" / Path(command[1]).stem / "project.assets.json"
-    with (artifacts / "build.lock").open("ab") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
-        if "--no-restore" in command and not assets.is_file():
-            command = [arg for arg in command if arg != "--no-restore"]
-        return subprocess.run(["dotnet", *command], cwd=ROOT, check=False).returncode  # noqa: S603, S607
+        artifacts = Path(command[command.index("--artifacts-path") + 1])
+        artifacts.mkdir(parents=True, exist_ok=True)
+        assets = artifacts / "obj" / Path(command[1]).stem / "project.assets.json"
+        with (artifacts / "build.lock").open("ab") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            if "--no-restore" in command and not restore_completed(assets):
+                command = [arg for arg in command if arg != "--no-restore"]
+            return subprocess.run(["dotnet", *command], cwd=ROOT, check=False).returncode  # noqa: S603, S607
+    return subprocess.run(["dotnet", *command], cwd=ROOT, check=False).returncode  # noqa: S603, S607
 
 
 def run(args: list[str]) -> int:
