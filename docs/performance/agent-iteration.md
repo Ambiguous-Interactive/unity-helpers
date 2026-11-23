@@ -1,5 +1,60 @@
 # Agent iteration and CI feedback
 
+## Feedback budgets
+
+Measure warm, saved edit to final result for the complete iterate tier. The target is p95 below
+one second for each representative edit class. Measure cold workspaces separately. For CI, the
+target is p95 below five minutes from publishing a PR revision to its last required automated
+check passing. Include runner queue, retries and cleanup. Observe review latency separately.
+Retain failures and superseded revisions when reporting the denominator.
+
+### Required CI on November 23, 2026
+
+Among the latest 100 distinct branch/head pairs with pull-request workflows, 69 reached green,
+17 were superseded before their last check completed, and 14 failed. For the 69 green revisions,
+median push-to-green was **23m05s**, nearest-rank p95 **83m23s**, and maximum **112m42s**.
+The fastest was **10m21s**. Zero green revisions met the five-minute budget.
+
+Unity CI Success finished last on 62 green revisions, Contract Suites on seven. On those 62
+Unity revisions the selected-modes job waited a median 365 seconds from creation to start. Its
+controller step alone took a median 501.5 seconds (range 378–1,486). Both queue time and native
+execution need attention. Among those native jobs, runner diagnostics took a median 33 seconds,
+license-lock acquisition five seconds, and license return and lock release four seconds each.
+These phase medians are descriptive. Adding them does not reconstruct a particular revision.
+
+The [per-revision receipts](./required-ci-feedback.csv) retain every sampled head, push activity
+ID, outcome, observed required-check IDs and native job timings where Unity finished last.
+To repeat the collection with the GitHub REST API:
+
+1. Read the active status-check rules at `rules/branches/main`, including required app identities.
+   This sample required Unity CI Success from GitHub Actions, Repo Lint, and Contract Suites.
+2. List `actions/runs?event=pull_request`, newest first, paginating to 100 distinct branch/head
+   pairs. Match the branch and SHA to a repository activity record of type push, force push or
+   branch creation. Use its timestamp as the start. Keep ambiguous or missing matches visible.
+3. List each revision's check runs with `filter=all`. Match required contexts, app IDs and
+   check suites belonging to that branch's PR workflows. Use the latest check ID per context,
+   retaining earlier IDs. For a complete set of successes, subtract the push timestamp from the
+   last completion. Classify a later push of a different head on the branch before completion as
+   superseded. The CSV also preserves the eventual check outcome in those cases.
+4. Read the Unity workflow jobs for the winning revision and locate its selected-modes job.
+   Use the job's creation, start and finish and the controller step's start and finish. Inspect
+   sibling jobs separately because their durations overlap. For example, on the final revision
+   of PR 1318 the native job waited 362 seconds, executed for 895 seconds, and spent 784 seconds
+   inside the controller. All three required checks passed after 1,355 seconds.
+
+The SINGLE_THREADED EditMode artifact on that revision shows why NUnit duration alone can
+mislead shard balancing. The dictionary migration integration fixture launched at 03:48:26 UTC
+and exited at 03:54:29, about 364 seconds later. Its final XML reports seven cases and 0.95
+seconds. The editor log contains 29 domain reload profiles and 101 asset refresh records; the
+fixture explicitly requests script recompilation across reloads. The process also exited with
+the recorded native access violation after writing results. These observations identify a
+candidate for a controlled timing experiment. They do not establish that any reload is redundant.
+See the [workflow and artifacts](https://github.com/Ambiguous-Interactive/unity-helpers/actions/runs/45107062901).
+
+The cohort covers pushes from November 19–23 and applies the required-context definitions read
+on November 23. Time between branch publication and PR opening is included. The sampling frame
+requires a PR workflow to exist. This is a workload baseline on shared runners.
+
 ## Root cause
 
 Feedback time includes discovery, setup, validation, runner queues, license waits, and review.
@@ -55,6 +110,12 @@ npm run agent:check -- --tier iterate --files Runtime/Core/Helper/WallMath.cs
 npm run agent:check -- --tier pr --base origin/main --plan
 npm run agent:check -- --tier full --base origin/main
 ```
+
+For phase timings, add `--json --timings` to the actual iterate invocation. After the selected
+commands finish, a final JSON line reports seconds spent discovering paths, selecting checks,
+and reporting and running them. Each command still reports its own duration and exit status.
+Time the invocation from the calling process to include npm, uv, interpreter startup and final
+output. A planning receipt has `executed: false`. A failing check keeps its exit code.
 
 The base uses a merge-base diff, then includes staged, unstaged, and untracked changes.
 Both sides of renames and deleted paths remain visible. A commit does not erase task scope.
@@ -354,8 +415,8 @@ Shared-pool load, host, cache, event and generated-stamp differences prevent cau
 
 Measure cold and warm feedback separately with at least three paired local runs. Compare CI
 queue, setup, execution, and cleanup on comparable runners. Report median, p95, runner time,
-and seat occupancy. The target is a 50% reduction in warm local feedback and ordinary PR elapsed
-time; no such improvement is established by the selector tests.
+and seat occupancy. The historical pilot targeted a 50% reduction in warm local feedback and ordinary PR elapsed
+time. Use the absolute feedback budgets above for new experiments.
 
 Head-specific pilot acceptance, raw samples and CI qualification are tracked in
 [the task record](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1206).
