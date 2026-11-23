@@ -24,6 +24,21 @@ CORPUS = cast(
 )
 
 
+@pytest.fixture(autouse=True)
+def isolated_git_environment(
+    tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for key in list(os.environ):
+        if key.startswith("GIT_"):
+            monkeypatch.delenv(key, raising=False)
+    environment = tmp_path_factory.mktemp("git-environment")
+    configuration = environment / "config"
+    configuration.touch()
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(configuration))
+    monkeypatch.setenv("GIT_CONFIG_SYSTEM", str(configuration))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(environment / "xdg"))
+
+
 def populate(root: Path, files: dict[str, str]) -> Repository:
     for name, text in files.items():
         file = root / name
@@ -193,12 +208,65 @@ def test_git_inventory_and_cli_anchor_paths_at_the_selected_repository(
     assert "does not exist" in capsys.readouterr().err
 
 
-def test_non_repository_and_empty_inventory_fail_closed(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("target", "expected_status", "scans_untracked"),
+    [
+        ("docs/tracked.md", 0, False),
+        ("docs", 0, False),
+        ("docs/missing.md", 1, False),
+        ("new/guide.md", 0, True),
+        ("new", 0, True),
+        ("ignored", 1, True),
+        ("ignored/guide.md", 1, True),
+    ],
+)
+def test_scoped_cli_only_scans_untracked_for_existing_unknown_paths(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    target: str,
+    expected_status: int,
+    scans_untracked: bool,
+) -> None:
+    git = shutil.which("git")
+    assert git
+    root = tmp_path / "repo"
+    populate(
+        root,
+        {
+            ".gitignore": "/ignored/\n",
+            "README.md": f"[guide](./{target})\n",
+            "docs/tracked.md": "# Tracked\n",
+            "new/guide.md": "# Untracked\n",
+            "ignored/guide.md": "# Ignored\n",
+        },
+    )
+    subprocess.run([git, "init", "-q", str(root)], check=True)
+    subprocess.run([git, "-C", str(root), "add", ".gitignore", "README.md", "docs"], check=True)
+    trace = tmp_path / "git-trace.jsonl"
+    monkeypatch.setenv("GIT_TRACE2_EVENT", str(trace))
+
+    assert main(["--repo-root", str(root), "--paths", "README.md"]) == expected_status
+    output = capsys.readouterr().out
+    if expected_status:
+        assert f"link target './{target}' does not resolve" in output
+    else:
+        assert "Markdown link lint passed" in output
+    records = [json.loads(line) for line in trace.read_text(encoding="utf-8").splitlines()]
+    queries = [record["argv"] for record in records if record["event"] == "start"]
+    assert sum("--others" in query for query in queries) == int(scans_untracked)
+
+
+def test_non_repository_and_empty_inventory_fail_closed(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     assert main(["--repo-root", str(tmp_path)]) == 1
+    capsys.readouterr()
     git = shutil.which("git")
     assert git
     subprocess.run([git, "init", "-q", str(tmp_path)], check=True)
     assert main(["--repo-root", str(tmp_path)]) == 1
+    assert "The documentation source inventory is empty." in capsys.readouterr().err
 
 
 @pytest.mark.parametrize(

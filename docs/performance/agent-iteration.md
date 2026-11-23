@@ -137,6 +137,9 @@ contract check falls back to preflight, so an unowned input cannot silently pass
 When an edit changes only existing Markdown files and their metadata, iterate checks links in the
 changed Markdown files. Deletions, renames, symlinks, and mixed source edits retain the full link
 scan to catch references from unchanged files. Publication runs the full link scan.
+The path-scoped link checker reads Git's index first. It scans untracked files if it encounters
+an existing source or link target outside the tracked inventory, so newly created documents
+and directories still resolve while ignored paths stay excluded.
 Fixture-only edits compile the named existing fixtures plus production and shared test sources.
 Mixed production/shared changes, deleted fixtures and metadata-only scopes retain whole-scope compilation; shared test
 changes check both runtime and editor fixtures. If a fixture needs another fixture's declarations,

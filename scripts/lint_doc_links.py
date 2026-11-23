@@ -108,6 +108,7 @@ def is_local(target: str) -> bool:
 class Repository:
     root: Path
     files: list[str]
+    untracked_pending: bool = False
     entries: set[str] = field(init=False)
     targets: dict[tuple[str, str, bool], bool] = field(
         default_factory=dict[tuple[str, str, bool], bool]
@@ -115,6 +116,9 @@ class Repository:
 
     def __post_init__(self) -> None:
         self.root = self.root.resolve()
+        self._index_entries()
+
+    def _index_entries(self) -> None:
         self.entries = {"."}
         for name in self.files:
             self.entries.add(name)
@@ -128,6 +132,10 @@ class Repository:
             resolved.relative_to(self.root)
         except (OSError, ValueError, RuntimeError):
             return False
+        if relative not in self.entries and self.untracked_pending and normalized.exists():
+            self.files = inventory(self.root)
+            self._index_entries()
+            self.untracked_pending = False
         return relative in self.entries and normalized.exists()
 
     def resolve(self, source: str, target: str, *, root_fallback: bool = True) -> bool:
@@ -152,7 +160,7 @@ class Repository:
         return found
 
 
-def inventory(root: Path) -> list[str]:
+def inventory(root: Path, *, tracked_only: bool = False) -> list[str]:
     git = shutil.which("git")
     if git is None:
         raise ValueError("Git is required to inventory documentation sources.")
@@ -163,15 +171,14 @@ def inventory(root: Path) -> list[str]:
             str(root),
             "ls-files",
             "--cached",
-            "--others",
-            "--exclude-standard",
+            *([] if tracked_only else ["--others", "--exclude-standard"]),
             "-z",
         ],
         capture_output=True,
         check=True,
     )
     names = sorted({os.fsdecode(name) for name in result.stdout.split(b"\0") if name})
-    if not names:
+    if not names and not tracked_only:
         raise ValueError("The documentation source inventory is empty.")
     return names
 
@@ -539,7 +546,12 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         root = args.repo_root.resolve()
-        repository = Repository(root, inventory(root))
+        tracked = inventory(root, tracked_only=True) if args.paths else []
+        repository = (
+            Repository(root, tracked, untracked_pending=True)
+            if tracked
+            else Repository(root, inventory(root))
+        )
         paths: list[str] = repository.files
         if args.paths:
             paths = []
