@@ -91,20 +91,18 @@ def scoped_source(root: Path, scope: Path, name: str) -> str:
 
 
 def iteration_cache() -> Path | None:
-    if sys.platform == "linux":
-        if any(
-            name.lower() == "msbuildprojectextensionspath" and value
-            for name, value in os.environ.items()
-        ):
-            return None
-        configured = os.environ.get("UNITY_HELPERS_ITERATE_CACHE")
-        default = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache")
-        base = (
-            Path(configured).expanduser() if configured else default / "unity-helpers" / "iterate"
-        )
-        checkout = hashlib.sha256(os.fsencode(ROOT)).hexdigest()
-        return base.resolve() / checkout
-    return None
+    # Read the platform at runtime so both paths are type-checked.
+    platform = sys.platform
+    if platform != "linux" or any(
+        name.lower() == "msbuildprojectextensionspath" and value
+        for name, value in os.environ.items()
+    ):
+        return None
+    configured = os.environ.get("UNITY_HELPERS_ITERATE_CACHE")
+    default = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache")
+    base = Path(configured).expanduser() if configured else default / "unity-helpers" / "iterate"
+    checkout = hashlib.sha256(os.fsencode(ROOT)).hexdigest()
+    return base.resolve() / checkout
 
 
 def build_arguments(args: list[str], root: Path = ROOT, cache: Path | None = None) -> list[str]:
