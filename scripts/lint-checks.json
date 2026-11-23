@@ -431,7 +431,7 @@
   {
     "id": "devcontainer-config",
     "name": "Devcontainer config",
-    "run": "uv run --quiet --project scripts/python~ --locked --no-dev python scripts/validate_devcontainer_config.py --verbose",
+    "run": "uv run --quiet --project scripts/python~ --locked --no-dev --group metadata python scripts/validate_devcontainer_config.py --verbose",
     "inputs": ["@tooling"]
   },
   {

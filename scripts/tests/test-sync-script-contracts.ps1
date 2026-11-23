@@ -1466,6 +1466,15 @@ function Run-DocumentationWorkflowContractTests {
     ''
   }
 
+  $pythonProject = Join-Path $repoRoot 'scripts/python~'
+  $lintCoverageScript = Join-Path $repoRoot 'scripts/validate_devcontainer_config.py'
+  $lintRegistryWorkflows = @(
+    & uv run --quiet --project $pythonProject --locked --no-dev --group metadata python $lintCoverageScript --repo-root $repoRoot --lint-registry-workflows
+  )
+  if ($LASTEXITCODE -ne 0) {
+    throw 'Cannot read lint registry workflow coverage.'
+  }
+
   # A workflow owns the doc-link checks if it invokes the linter directly or runs the registry.
   #
   # Comments are stripped first. They are where the reason for a move is written -- both
@@ -1480,8 +1489,7 @@ function Run-DocumentationWorkflowContractTests {
         $candidateText = Get-WorkflowContentWithoutComments -Path $_.FullName
         # Anchored so `test-lint-doc-links.ps1` does not read as an invocation of the linter itself.
         ($candidateText -match '(?<![\w-])(?:lint-doc-links\.ps1|lint_doc_links\.py)') -or
-        $candidateText.Contains('run-repo-lint.js') -or
-        $candidateText -match '(?m)^\s*(?:run:\s*)?uv run --project scripts/python~ --locked --no-dev python scripts/check_registries\.py lint(?: --direct)?(?: --ci)?\s*$'
+        ($_.Name -cin $lintRegistryWorkflows)
       }
   )
 
@@ -1491,17 +1499,11 @@ function Run-DocumentationWorkflowContractTests {
   # The registry counts ONLY if some workflow invokes the runner. Seeding coverage from the registry
   # unconditionally let a file nobody invoked satisfy the contract while CI ran something else -- the
   # modes would be present in a script nothing called.
-  $runnerIsInvoked = $false
   [string]$docLinkSources = ''
   foreach ($workflowFile in $docLinkWorkflows) {
-    $ownerText = Get-WorkflowContentWithoutComments -Path $workflowFile.FullName
-    $docLinkSources += $ownerText
-    if ($ownerText.Contains('run-repo-lint.js') -or
-      $ownerText -match '(?m)^\s*(?:run:\s*)?uv run --project scripts/python~ --locked --no-dev python scripts/check_registries\.py lint(?: --direct)?(?: --ci)?\s*$') {
-      $runnerIsInvoked = $true
-    }
+    $docLinkSources += Get-WorkflowContentWithoutComments -Path $workflowFile.FullName
   }
-  if ($runnerIsInvoked) {
+  if ($lintRegistryWorkflows.Count -gt 0) {
     $docLinkSources += $runnerContent
   }
 

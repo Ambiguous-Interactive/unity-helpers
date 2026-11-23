@@ -57,6 +57,99 @@ def snapshot(root: Path) -> dict[str, bytes]:
     }
 
 
+@pytest.mark.parametrize(
+    ("original", "replacement", "expected"),
+    [
+        ("", "", True),
+        ("shard: [0, 1, 2]", "shard: [0, 1]", False),
+        ("shard: [0, 1, 2]", "shard: [0, 1, 2]\n        exclude:\n          - shard: 2", False),
+        ('--shard "$LINT_SHARD"', "--shard 0/3", False),
+        ("${{ strategy.job-total }}", "2", False),
+    ],
+)
+def test_repo_lint_matrix_covers_devcontainer_publication(
+    original: str, replacement: str, expected: bool
+) -> None:
+    source = (checker.ROOT / ".github/workflows/repo-lint.yml").read_text(encoding="utf-8")
+    assert original in source
+    source = source.replace(original, replacement)
+    assert checker.workflow_covers_publish(source) is expected
+
+
+def test_unrelated_workflow_job_cannot_supply_lint_shard_coverage() -> None:
+    source = (checker.ROOT / ".github/workflows/repo-lint.yml").read_text(encoding="utf-8")
+    partial = source.replace("shard: [0, 1, 2]", "shard: [0, 1]", 1)
+    unrelated = """
+  unrelated:
+    strategy:
+      matrix:
+        shard: [0, 1, 2]
+    steps:
+      - env:
+          LINT_SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
+        run: echo unrelated
+"""
+    assert not checker.workflow_covers_publish(partial + unrelated)
+
+
+def test_unrelated_step_cannot_supply_lint_shard_environment() -> None:
+    source = (checker.ROOT / ".github/workflows/repo-lint.yml").read_text(encoding="utf-8")
+    assignment = "          LINT_SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}"
+    reports = "      - name: Report memory safety findings"
+    unrelated = f"      - name: Unrelated\n        env:\n{assignment}\n        run: echo unrelated"
+    partial = source.replace(assignment, "", 1).replace(reports, f"{unrelated}\n\n{reports}", 1)
+    assert partial != source
+    assert not checker.workflow_covers_publish(partial)
+
+
+def test_lint_command_in_a_step_name_does_not_execute(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    source = (checker.ROOT / ".github/workflows/repo-lint.yml").read_text(encoding="utf-8")
+    command = (
+        "uv run --project scripts/python~ --locked --no-dev python scripts/check_registries.py "
+        'lint --direct --ci --shard "$LINT_SHARD"'
+    )
+    modified = source.replace(
+        "      - name: Repository checks\n",
+        f"      - name: |\n          {command}\n",
+        1,
+    ).replace(f"        run: {command}", "        run: echo skipped", 1)
+    assert modified != source
+    assert not checker.workflow_covers_publish(modified)
+    workflows = tmp_path / ".github/workflows"
+    workflows.mkdir(parents=True)
+    (workflows / "valid.yml").write_text(source, encoding="utf-8")
+    (workflows / "label-only.yml").write_text(modified, encoding="utf-8")
+    assert checker.main(["--repo-root", str(tmp_path), "--lint-registry-workflows"]) == 0
+    assert capsys.readouterr().out.splitlines() == ["valid.yml"]
+
+
+def test_workflow_coverage_requires_a_yaml_parser(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setitem(sys.modules, "yaml", None)
+    assert checker.main(["--lint-registry-workflows"]) == 1
+    assert "metadata dependency group" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    ("suffix", "expected"),
+    [(" # lint all three shards", True), (' "# argument, not a comment"', False)],
+)
+def test_sharded_registry_run_block_handles_trailing_shell_comment(
+    suffix: str, expected: bool
+) -> None:
+    source = (checker.ROOT / ".github/workflows/repo-lint.yml").read_text(encoding="utf-8")
+    command = next(
+        line.strip()[5:] for line in source.splitlines() if '--shard "$LINT_SHARD"' in line
+    )
+    original = f"        run: {command}"
+    assert original in source
+    modified = source.replace(original, f"        run: |\n          {command}{suffix}", 1)
+    assert checker.workflow_covers_publish(modified) is expected
+
+
 @pytest.mark.parametrize("case", CORPUS["cases"], ids=lambda case: case["name"])
 def test_original_executable_decisions(
     case: Case, tmp_path: Path, capsys: pytest.CaptureFixture[str]
