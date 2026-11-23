@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 {
+    using System.Collections.Generic;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Core.Serialization;
@@ -12,6 +13,21 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     [Category("Fast")]
     public sealed class BitSetShiftOwnershipTests
     {
+        private static readonly int[] LogicalShifts =
+        {
+            int.MinValue,
+            -1,
+            0,
+            1,
+            2,
+            31,
+            63,
+            64,
+            65,
+            127,
+            int.MaxValue,
+        };
+
         private static BitSet CreateWithTrailingWords(int capacity)
         {
             byte[] payload = new byte[46];
@@ -29,12 +45,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             return Serializer.ProtoDeserialize<BitSet>(payload);
         }
 
-        [Test]
-        public void LeftShiftMatchesLogicalSnapshot(
-            [Values(1, 2, 63, 64, 65, 127, 128, 129, 255, 256, 4097, 10240)] int capacity,
-            [Values(int.MinValue, -1, 0, 1, 2, 31, 63, 64, 65, 127, int.MaxValue)] int shift,
-            [Values(0, 1, 2, 3)] int pattern
-        )
+        private static string CheckLogicalSnapshot(int capacity, int shift, int pattern)
         {
             BitSet bits = new BitSet(capacity);
             bool[] before = new bool[capacity];
@@ -56,23 +67,54 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                     shift <= 0 ? before[index] : shift <= index && before[index - shift];
                 if (expected != bits[index])
                 {
-                    Assert.Fail(
-                        $"Shifted bit {index} differs: expected {expected}, actual {bits[index]}."
-                    );
+                    return $"Shifted bit {index} differs: expected {expected}, actual {bits[index]}.";
                 }
                 if (before[index] != snapshot[index])
                 {
-                    Assert.Fail(
-                        $"Snapshot bit {index} differs: expected {before[index]}, actual {snapshot[index]}."
-                    );
+                    return $"Snapshot bit {index} differs: expected {before[index]}, actual {snapshot[index]}.";
                 }
                 if (expected)
                 {
                     ++expectedCount;
                 }
             }
-            Assert.AreEqual(capacity, bits.Capacity);
-            Assert.AreEqual(expectedCount, bits.CountSetBits());
+            if (capacity != bits.Capacity)
+            {
+                return $"Expected capacity {capacity}, actual {bits.Capacity}.";
+            }
+            int actualCount = bits.CountSetBits();
+            return expectedCount == actualCount
+                ? null
+                : $"Expected set count {expectedCount}, actual {actualCount}.";
+        }
+
+        [Test]
+        public void LeftShiftMatchesLogicalSnapshot(
+            [Values(1, 2, 63, 64, 65, 127, 128, 129, 255, 256, 4097, 10240)] int capacity
+        )
+        {
+            /*
+                Group independent inputs with fresh state to reduce PlayMode scheduling overhead.
+            */
+            List<string> failures = null;
+            foreach (int shift in LogicalShifts)
+            {
+                for (int pattern = 0; pattern < 4; ++pattern)
+                {
+                    string failure = CheckLogicalSnapshot(capacity, shift, pattern);
+                    if (failure != null)
+                    {
+                        failures ??= new List<string>();
+                        failures.Add(
+                            $"Capacity {capacity}, shift {shift}, pattern {pattern}: {failure}"
+                        );
+                    }
+                }
+            }
+            if (failures != null)
+            {
+                Assert.Fail(string.Join("\n", failures));
+            }
         }
 
         [Test]
