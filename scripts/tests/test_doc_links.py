@@ -25,10 +25,15 @@ CORPUS = cast(
 
 
 @pytest.fixture(autouse=True)
-def isolated_git_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+def isolated_git_environment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     for key in list(os.environ):
         if key.startswith("GIT_"):
             monkeypatch.delenv(key, raising=False)
+    configuration = tmp_path / "git-config"
+    configuration.touch()
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(configuration))
+    monkeypatch.setenv("GIT_CONFIG_SYSTEM", str(configuration))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
 
 
 def populate(root: Path, files: dict[str, str]) -> Repository:
