@@ -30,15 +30,16 @@ LANGUAGES = (
     ("hlsl", "*.hlsl", "(formatOnSave: false)"),
     ("shaderlab", "*.shader", "(formatOnSave: false)"),
 )
+SHELL_COMMENT = r"(?:[ \t]+#.*)?"
 REGISTRY = re.compile(
     r"uv run --project scripts/python~ --locked --no-dev "
     r"python scripts/check_registries\.py lint(?: --direct)?(?: --ci)?"
-    r'(?P<sharded> --shard "\$LINT_SHARD")?'
+    r'(?P<sharded> --shard "\$LINT_SHARD")?' + SHELL_COMMENT
 )
-LEGACY_LINT = re.compile(r"node (?:\./)?scripts/run-repo-lint\.js")
+LEGACY_LINT = re.compile(r"node (?:\./)?scripts/run-repo-lint\.js" + SHELL_COMMENT)
 DIRECT_VALIDATOR = re.compile(
     r"(?:pwsh (?:-NoProfile )?-File )?(?:\./)?scripts/validate-devcontainer-config\.ps1"
-    r"(?: -VerboseOutput)?"
+    r"(?: -VerboseOutput)?" + SHELL_COMMENT
 )
 LINT_SHARD = "${{ matrix.shard }}/${{ strategy.job-total }}"
 

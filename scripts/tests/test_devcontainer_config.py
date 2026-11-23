@@ -133,6 +133,23 @@ def test_workflow_coverage_requires_a_yaml_parser(
     assert "metadata dependency group" in capsys.readouterr().err
 
 
+@pytest.mark.parametrize(
+    ("suffix", "expected"),
+    [(" # lint all three shards", True), (' "# argument, not a comment"', False)],
+)
+def test_sharded_registry_run_block_handles_trailing_shell_comment(
+    suffix: str, expected: bool
+) -> None:
+    source = (checker.ROOT / ".github/workflows/repo-lint.yml").read_text(encoding="utf-8")
+    command = next(
+        line.strip()[5:] for line in source.splitlines() if '--shard "$LINT_SHARD"' in line
+    )
+    original = f"        run: {command}"
+    assert original in source
+    modified = source.replace(original, f"        run: |\n          {command}{suffix}", 1)
+    assert checker.workflow_covers_publish(modified) is expected
+
+
 @pytest.mark.parametrize("case", CORPUS["cases"], ids=lambda case: case["name"])
 def test_original_executable_decisions(
     case: Case, tmp_path: Path, capsys: pytest.CaptureFixture[str]
