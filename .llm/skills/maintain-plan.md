@@ -29,6 +29,14 @@ The issue tracker owns the current backlog and each issue's scope and acceptance
 - Update these files only when the user changes the objective, strategy, or broad completion criteria.
   Starting or completing an issue or session does not require a goal or plan update.
 
+## Session Limit
+
+Keep the **hard three-hour wall-clock limit** in the goal and plan. Follow the
+[production session plan](../PLAN.d/production-session.md) for the 120-minute checkpoint,
+150-minute intake cutoff, and 180-minute deadline. Count CI, review, and handoff against the same
+clock across turns. Finish the handoff before the deadline and stop work at the cutoff. Resume
+unfinished acceptance only in a newly authorized session.
+
 ## Priority Order
 
 1. Gameplay correctness and retained player data.
@@ -49,15 +57,15 @@ review is pending, investigate that task or wait. Leave the next task in the bac
 Resolve actionable feedback and verify required reviews on the current head before requesting
 merge. For a direct merge, record the PR test merge commit's tree and verify all applicable
 required checks passed on it. If CI tests only the head, integrate the current canonical base
-into the branch and qualify the updated head. Requalify changes to the integration tree.
+into the branch and qualify the updated head. Repeat qualification when the integration tree changes.
 
 For a queued merge, let the queue enforce required checks on its merge group. Read the tested
 group's tree and check results when available, including after an automatic merge. For either
 path, confirm GitHub reports the PR merged and compare the landed integration tree with the
 tested tree before starting the next task from updated canonical main.
 
-An explicitly requested native stack counts as one delivery. Prepare its dependent branches and
-PRs together under the [native stack procedure](../references/github-stacked-pull-requests.md).
+A native stack of dependent PRs counts as one delivery. Prepare its branches and PRs together
+under the [native stack procedure](../references/github-stacked-pull-requests.md).
 Verify its atomic merge and landed tree before starting any other task.
 
 1. Review the complete current issue backlog with terminal pagination before choosing work.
@@ -67,8 +75,8 @@ Verify its atomic merge and landed tree before starting any other task.
 5. Validate with appropriate tests and evidence; verify the current PR head and every feedback surface.
 6. Close an issue only when its full acceptance criteria are proven. Retain partial work and remaining
    requirements in the canonical issue; an inventory or documentation cleanup does not prove closure.
-7. Reassess the backlog and repeat until no actionable open issues remain. Report blocked or
-   unauthorized issues accurately rather than treating them as closed.
+7. Reassess the backlog and repeat within the session deadline while actionable issues remain.
+   Report blocked or unauthorized issues accurately and preserve unfinished acceptance.
 
 ## Route Work Records
 

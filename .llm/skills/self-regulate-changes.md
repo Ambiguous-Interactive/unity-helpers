@@ -44,6 +44,11 @@ Every fix made during a review or QA pass accumulates risk. Track risk using thi
 
 ## Hard Caps
 
+Goal sessions have a hard three-hour wall-clock limit under the
+[production session plan](../PLAN.d/production-session.md). CI, review, and handoff count toward
+the limit. Use the remaining time to close out work and stop at the deadline even if the risk
+budget has room.
+
 | Threshold                                                  | Action                                                                           |
 | ---------------------------------------------------------- | -------------------------------------------------------------------------------- |
 | Risk score reaches **15**                                  | Pause. Review all changes made so far. Document remaining issues without fixing. |
