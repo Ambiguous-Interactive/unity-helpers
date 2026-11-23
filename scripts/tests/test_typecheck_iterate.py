@@ -14,6 +14,7 @@ from typing import cast
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import typecheck_iterate
 from typecheck_iterate import (
     NOTICE,
     ROOT,
@@ -89,6 +90,8 @@ def test_invalid_input_does_not_launch(args: list[str], monkeypatch: pytest.Monk
 def test_process_status(
     status: int | None, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    monkeypatch.setattr(typecheck_iterate, "iteration_cache", lambda: None)
+
     def launch(command: list[str], *, cwd: Path, check: bool) -> subprocess.CompletedProcess[bytes]:
         assert command == ["dotnet", *build_arguments(["tests", "odin"])]
         assert cwd == ROOT
@@ -103,6 +106,54 @@ def test_process_status(
     assert NOTICE in error
     if status is None:
         assert "missing SDK" in error
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="Linux-only artifact cache")
+def test_linux_cache_separates_checkouts_and_honors_explicit_assets(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("UNITY_HELPERS_ITERATE_CACHE", str(tmp_path))
+    monkeypatch.delenv("MSBuildProjectExtensionsPath", raising=False)
+    monkeypatch.delenv("MSBUILDPROJECTEXTENSIONSPATH", raising=False)
+    first = typecheck_iterate.iteration_cache()
+    assert first is not None
+    assert first.parent == tmp_path
+    monkeypatch.setattr(typecheck_iterate, "ROOT", tmp_path / "other")
+    assert typecheck_iterate.iteration_cache() != first
+    monkeypatch.setenv("MSBUILDPROJECTEXTENSIONSPATH", str(tmp_path / "private-assets"))
+    assert typecheck_iterate.iteration_cache() is None
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="Linux-only artifact cache")
+def test_linux_iteration_restores_cold_and_on_request(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(typecheck_iterate, "iteration_cache", lambda: tmp_path)
+    artifacts = tmp_path / "legacy"
+    assets = artifacts / "obj" / Path(PROJECTS["runtime"]).stem / "project.assets.json"
+    receipt = assets.with_name("project.nuget.cache")
+    commands: list[list[str]] = []
+
+    def launch(command: list[str], *, cwd: Path, check: bool) -> subprocess.CompletedProcess[bytes]:
+        assert cwd == ROOT
+        assert check is False
+        assert command[command.index("--artifacts-path") + 1] == str(artifacts)
+        assert not any(
+            arg.startswith(("-p:OutputPath=", "-p:IntermediateOutputPath=")) for arg in command
+        )
+        commands.append(command)
+        assets.parent.mkdir(parents=True, exist_ok=True)
+        assets.write_text("{}", encoding="utf-8")
+        succeeded = len(commands) > 1
+        receipt.write_text(json.dumps({"success": succeeded}), encoding="utf-8")
+        return subprocess.CompletedProcess(command, 0 if succeeded else 1)
+
+    monkeypatch.setattr(subprocess, "run", launch)
+    assert run(["runtime", "legacy"]) == 1
+    assert run(["runtime", "legacy"]) == 0
+    assert run(["runtime", "legacy", "--restore"]) == 0
+    assert run(["runtime", "legacy"]) == 0
+    assert ["--no-restore" in command for command in commands] == [False, False, False, True]
 
 
 def test_server_identity_includes_every_payload() -> None:

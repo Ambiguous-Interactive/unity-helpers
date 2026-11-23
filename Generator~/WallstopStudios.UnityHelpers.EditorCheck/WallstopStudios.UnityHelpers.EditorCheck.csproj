@@ -334,6 +334,11 @@
        This audit does not certify their API binding; its in-compilation reporting control proves
        those known compiler errors cannot silently disable the collection-size diagnostics. -->
   <Target Name="AuditExcludedCountingLoops" AfterTargets="Build">
+    <PropertyGroup>
+      <CountingLoopManifestDirectory>$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)'))</CountingLoopManifestDirectory>
+      <CountingLoopAuditArtifacts Condition="'$(UseArtifactsOutput)' == 'true'"
+        > --artifacts-path &quot;$(ArtifactsPath)&quot;</CountingLoopAuditArtifacts>
+    </PropertyGroup>
     <ItemGroup>
       <CountingLoopSubject Include="$(RepoRoot)/Editor/Visuals/EnhancedImageEditor.cs;$(RepoRoot)/Editor/CustomEditors/MatchColliderToSpriteEditor.cs;$(RepoRoot)/Editor/AnimationEventEditor.cs;$(RepoRoot)/Editor/CustomDrawers/SerializableDictionaryPropertyDrawer.cs;$(RepoRoot)/Editor/CustomDrawers/Utils/ValidationShared.cs;$(RepoRoot)/Editor/CustomDrawers/SerializableSetPropertyDrawer.cs;$(RepoRoot)/Runtime/Core/Extension/Partials/UI.cs;$(RepoRoot)/Runtime/Utils/MatchColliderToSprite.cs;$(RepoRoot)/Runtime/Visuals/UGUI/EnhancedImage.cs;$(RepoRoot)/Runtime/Visuals/UGUI/NonDrawingGraphic.cs" />
       <CountingLoopSubject
@@ -363,6 +368,6 @@
       Lines="$(DefineConstants)"
       Overwrite="true"
     />
-    <Exec Command="dotnet run --project &quot;$(MSBuildThisFileDirectory)../WallstopStudios.UnityHelpers.CountingLoopAudit/WallstopStudios.UnityHelpers.CountingLoopAudit.csproj&quot; -- &quot;$(MSBuildProjectDirectory)/$(IntermediateOutputPath)counting-loop-sources.txt&quot; &quot;$(MSBuildProjectDirectory)/$(IntermediateOutputPath)counting-loop-references.txt&quot; &quot;$(MSBuildProjectDirectory)/$(IntermediateOutputPath)counting-loop-symbols.txt&quot; &quot;$(MSBuildProjectDirectory)/$(IntermediateOutputPath)counting-loop-subjects.txt&quot;" />
+    <Exec Command="dotnet run --project &quot;$(MSBuildThisFileDirectory)../WallstopStudios.UnityHelpers.CountingLoopAudit/WallstopStudios.UnityHelpers.CountingLoopAudit.csproj&quot;$(CountingLoopAuditArtifacts) -- &quot;$(CountingLoopManifestDirectory)counting-loop-sources.txt&quot; &quot;$(CountingLoopManifestDirectory)counting-loop-references.txt&quot; &quot;$(CountingLoopManifestDirectory)counting-loop-symbols.txt&quot; &quot;$(CountingLoopManifestDirectory)counting-loop-subjects.txt&quot;" />
   </Target>
 </Project>

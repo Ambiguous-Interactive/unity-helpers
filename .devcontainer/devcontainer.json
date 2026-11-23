@@ -37,6 +37,7 @@
   },
   // Container settings
   "containerEnv": {
+    "UNITY_HELPERS_ITERATE_CACHE": "/home/vscode/.cache/unity-helpers-devcontainer/iterate",
     "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
     "DOTNET_NOLOGO": "1",
     "CODEX_HOME": "/home/vscode/.codex",

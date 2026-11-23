@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -18,7 +19,7 @@ NOTICE = (
 USAGE = (
     "Usage: npm run typecheck:iterate -- <runtime|editor|tests|editor-tests|integrations> "
     "[default|legacy|odin|singlethreaded|proto-only] "
-    "[--server] [--files Tests/{Runtime,Editor}/Fixture.cs ...]"
+    "[--server] [--restore] [--files Tests/{Runtime,Editor}/Fixture.cs ...]"
 )
 VARIANTS: dict[str, tuple[str, ...]] = {
     "default": (),
@@ -89,13 +90,31 @@ def scoped_source(root: Path, scope: Path, name: str) -> str:
     return str(resolved)
 
 
-def build_arguments(args: list[str], root: Path = ROOT) -> list[str]:
+def iteration_cache() -> Path | None:
+    # Read the platform at runtime so both paths are type-checked.
+    platform = sys.platform
+    if platform != "linux" or any(
+        name.lower() == "msbuildprojectextensionspath" and value
+        for name, value in os.environ.items()
+    ):
+        return None
+    configured = os.environ.get("UNITY_HELPERS_ITERATE_CACHE")
+    default = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache")
+    base = Path(configured).expanduser() if configured else default / "unity-helpers" / "iterate"
+    checkout = hashlib.sha256(os.fsencode(ROOT)).hexdigest()
+    return base.resolve() / checkout
+
+
+def build_arguments(args: list[str], root: Path = ROOT, cache: Path | None = None) -> list[str]:
     if not args:
         raise ValueError(USAGE)
     project_id, *remaining = args
     shared = "--server" in remaining
     if shared:
         remaining.remove("--server")
+    restore = "--restore" in remaining
+    if restore:
+        remaining.remove("--restore")
     variant = remaining.pop(0) if remaining and remaining[0] != "--files" else "default"
     projects = load_projects(root)
     tree = TEST_TREES.get(project_id)
@@ -109,7 +128,7 @@ def build_arguments(args: list[str], root: Path = ROOT) -> list[str]:
     command = [
         "build",
         projects[project_id],
-        "--no-restore",
+        *([] if restore else ["--no-restore"]),
         "--nologo",
         "-v",
         "quiet",
@@ -117,9 +136,23 @@ def build_arguments(args: list[str], root: Path = ROOT) -> list[str]:
         f"-p:UseSharedCompilation={str(shared).lower()}",
         "-p:WProtoParallelClosureScan=true",
         *VARIANTS[variant],
-        f"-p:OutputPath=bin/iteration/{variant}/",
-        f"-p:IntermediateOutputPath=obj/iteration/{variant}/",
     ]
+    if cache is None:
+        command.extend(
+            [
+                f"-p:OutputPath=bin/iteration/{variant}/",
+                f"-p:IntermediateOutputPath=obj/iteration/{variant}/",
+            ]
+        )
+    else:
+        artifacts = str(cache / variant)
+        if MSBUILD_SPECIAL.search(artifacts) or any(
+            character in artifacts for character in "$`'\\"
+        ):
+            raise ValueError(
+                "Set UNITY_HELPERS_ITERATE_CACHE to a path without MSBuild or shell special characters."
+            )
+        command.extend(["--artifacts-path", artifacts])
     if tree is not None and remaining:
         sources = dict.fromkeys(scoped_source(root, root / tree, name) for name in remaining[1:])
         command.append("-p:WallstopIterationTestSources=" + "%3B".join(sources))
@@ -132,9 +165,37 @@ def build_arguments(args: list[str], root: Path = ROOT) -> list[str]:
     return command
 
 
+def restore_completed(assets: Path) -> bool:
+    if not assets.is_file():
+        return False
+    try:
+        receipt: object = json.loads(
+            assets.with_name("project.nuget.cache").read_text(encoding="utf-8")
+        )
+    except (OSError, ValueError):
+        return False
+    return isinstance(receipt, dict) and cast("dict[str, object]", receipt).get("success") is True
+
+
+def compile_iteration(command: list[str]) -> int:
+    if sys.platform == "linux" and "--artifacts-path" in command:
+        # Restore and build can both update outputs used by another scope's project references.
+        import fcntl
+
+        artifacts = Path(command[command.index("--artifacts-path") + 1])
+        artifacts.mkdir(parents=True, exist_ok=True)
+        assets = artifacts / "obj" / Path(command[1]).stem / "project.assets.json"
+        with (artifacts / "build.lock").open("ab") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            if "--no-restore" in command and not restore_completed(assets):
+                command = [arg for arg in command if arg != "--no-restore"]
+            return subprocess.run(["dotnet", *command], cwd=ROOT, check=False).returncode  # noqa: S603, S607
+    return subprocess.run(["dotnet", *command], cwd=ROOT, check=False).returncode  # noqa: S603, S607
+
+
 def run(args: list[str]) -> int:
     try:
-        command = build_arguments(args)
+        command = build_arguments(args, ROOT, iteration_cache())
     except (OSError, ValueError) as error:
         print(error, file=sys.stderr)
         return 2
@@ -153,11 +214,11 @@ def run(args: list[str]) -> int:
             file=sys.stderr,
         )
     try:
-        result = subprocess.run(["dotnet", *command], cwd=ROOT, check=False)  # noqa: S603, S607
+        status = compile_iteration(command)
     except OSError as error:
         print(error, file=sys.stderr)
         return 1
-    return result.returncode if result.returncode >= 0 else 1
+    return status if status >= 0 else 1
 
 
 if __name__ == "__main__":
