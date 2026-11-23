@@ -436,7 +436,8 @@ def test_editor_halves_require_both_and_publish_fixture_evidence(
         private=tmp_path,
         shell=shell,
         environment=environment,
-        timeout=20,
+        # This backstop includes up to eleven PowerShell starts on a busy hosted runner.
+        timeout=45,
         receipt=tmp_path / "receipt.json",
         output=None,
     )
