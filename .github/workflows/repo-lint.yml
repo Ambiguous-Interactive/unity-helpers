@@ -131,6 +131,8 @@ jobs:
         env:
           AGENT_CHECK_BASE: ${{ github.event.pull_request.base.sha }}
           LINT_SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
+          # Shard 0 runs only the coordinator tests. A crashed worker must fail the check.
+          PYTEST_ADDOPTS: ${{ matrix.shard == 0 && '-n 2 --max-worker-restart=0' || '' }}
         run: uv run --project scripts/python~ --locked --no-dev python scripts/check_registries.py lint --direct --ci --shard "$LINT_SHARD"
 
       - name: Report memory safety findings
