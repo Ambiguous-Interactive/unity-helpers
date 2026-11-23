@@ -756,12 +756,24 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             return false;
         }
 
-        internal static bool TryGetOnlyDirectEntry(
+        /// <summary>Finds a uniquely named direct entry in a Unity YAML document.</summary>
+        /// <remarks>Nested entries are ignored. Duplicate direct entries return false.</remarks>
+        /// <param name="document">The document to inspect.</param>
+        /// <param name="field">The exact serialized key, with an optional trailing colon.</param>
+        /// <param name="entry">The matching entry, or the default entry when the lookup fails.</param>
+        /// <returns>Whether exactly one direct entry matches.</returns>
+        public static bool TryGetOnlyDirectEntry(
             AuthoredAssetDocument document,
             string field,
             out AuthoredAssetEntry entry
         )
         {
+            if (document == null || string.IsNullOrWhiteSpace(field))
+            {
+                entry = default;
+                return false;
+            }
+
             bool found = false;
             AuthoredAssetEntry selected = default;
             IReadOnlyList<AuthoredAssetEntry> entries = document.Entries;

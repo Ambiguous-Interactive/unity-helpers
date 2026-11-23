@@ -46,6 +46,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             Assert.That(AuthoredAssetYaml.TryGetOnlyField(document, field, out value), Is.False);
             Assert.That(value, Is.EqualTo(string.Empty));
             Assert.That(AuthoredAssetYaml.Field(document, field), Is.EqualTo(string.Empty));
+            Assert.That(
+                AuthoredAssetYaml.TryGetOnlyDirectEntry(
+                    document,
+                    field,
+                    out AuthoredAssetEntry entry
+                ),
+                Is.False
+            );
+            Assert.That(entry, Is.EqualTo(default(AuthoredAssetEntry)));
         }
 
         [Test]
@@ -61,6 +70,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 Is.False
             );
             Assert.That(value, Is.Empty);
+            Assert.That(
+                AuthoredAssetYaml.TryGetOnlyDirectEntry(
+                    document,
+                    "value",
+                    out AuthoredAssetEntry entry
+                ),
+                Is.False
+            );
+            Assert.That(entry, Is.EqualTo(default(AuthoredAssetEntry)));
             Assert.That(AuthoredAssetYaml.TryGetField(document, "_renamed", out value), Is.False);
             Assert.That(value, Is.Empty);
         }
@@ -75,6 +93,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 Is.False
             );
             Assert.That(value, Is.Empty);
+            Assert.That(
+                AuthoredAssetYaml.TryGetOnlyDirectEntry(
+                    document,
+                    "value:",
+                    out AuthoredAssetEntry entry
+                ),
+                Is.False
+            );
+            Assert.That(entry, Is.EqualTo(default(AuthoredAssetEntry)));
         }
 
         [Test]
@@ -134,6 +161,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             Assert.That(value, Is.Empty);
             Assert.That(AuthoredAssetYaml.Field(null, "value"), Is.Empty);
             Assert.That(AuthoredAssetYaml.ValueWithDirectChildren(null, "value"), Is.Empty);
+            Assert.That(
+                AuthoredAssetYaml.TryGetOnlyDirectEntry(
+                    null,
+                    "value",
+                    out AuthoredAssetEntry entry
+                ),
+                Is.False
+            );
+            Assert.That(entry, Is.EqualTo(default(AuthoredAssetEntry)));
             Assert.That(
                 AuthoredAssetYaml.TryDescend(null, default, "value", out AuthoredAssetEntry child),
                 Is.False
