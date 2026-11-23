@@ -435,6 +435,7 @@ multiple mappings, and trailing text other than a comment. A missing file ID is 
 Call it on Unity's main thread; the parsing helpers require no editor API calls.
 An unknown GUID remains the label; a blank input returns an empty string. `AssetsRoot`,
 `SceneExtensions`, `AssetExtensions`, and `AllExtensions` expose the authored file groups.
+Pass a group directly to `EnumerateAuthoredAssets` to select those files.
 `MonoBehaviourType`, `TransformType`, and `RectTransformType` name their serialized document roots.
 For a type's script GUID, continue to use `MonoScriptIndex.TryGetScriptGuid`; production code
 should not depend on a test assertion to require that a script exists.

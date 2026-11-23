@@ -300,14 +300,42 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 Directory.CreateDirectory(nested);
                 File.WriteAllText(Path.Combine(root, "Level.unity"), "%YAML 1.1");
                 File.WriteAllText(Path.Combine(root, "Level.unityproj"), "%YAML 1.1");
+                File.WriteAllText(Path.Combine(root, "Settings.ASSET"), "%YAML 1.1");
                 File.WriteAllText(Path.Combine(nested, "Player.prefab"), "%YAML 1.1");
                 File.WriteAllText(Path.Combine(nested, "Notes.txt"), "hello");
 
                 IReadOnlyList<string> found = AuthoredAssetYaml.EnumerateAuthoredAssets(root);
 
-                Assert.AreEqual(2, found.Count, string.Join(", ", found));
+                Assert.AreEqual(3, found.Count, string.Join(", ", found));
                 Assert.IsTrue(found[0].EndsWith("Level.unity"), found[0]);
-                Assert.IsTrue(found[1].EndsWith("Player.prefab"), found[1]);
+                Assert.IsTrue(found[1].EndsWith("Settings.ASSET"), found[1]);
+                Assert.IsTrue(found[2].EndsWith("Player.prefab"), found[2]);
+
+                CollectionAssert.AreEqual(
+                    new[] { found[0], found[2] },
+                    AuthoredAssetYaml.EnumerateAuthoredAssets(
+                        root,
+                        AuthoredAssetYaml.SceneExtensions
+                    )
+                );
+                CollectionAssert.AreEqual(
+                    new[] { found[1] },
+                    AuthoredAssetYaml.EnumerateAuthoredAssets(
+                        root,
+                        AuthoredAssetYaml.AssetExtensions
+                    )
+                );
+                CollectionAssert.AreEqual(
+                    found,
+                    AuthoredAssetYaml.EnumerateAuthoredAssets(root, AuthoredAssetYaml.AllExtensions)
+                );
+                CollectionAssert.AreEqual(
+                    found,
+                    AuthoredAssetYaml.EnumerateAuthoredAssets(
+                        root,
+                        System.Array.AsReadOnly(System.Array.Empty<string>())
+                    )
+                );
             }
             finally
             {

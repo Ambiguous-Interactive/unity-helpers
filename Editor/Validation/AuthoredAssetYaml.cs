@@ -69,6 +69,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             params string[] extensions
         )
         {
+            return EnumerateAuthoredAssets(rootDirectory, (IReadOnlyList<string>)extensions);
+        }
+
+        /// <summary>Enumerates authored files matching a read-only list of extensions.</summary>
+        /// <param name="rootDirectory">The directory to walk, recursively.</param>
+        /// <param name="extensions">The extensions to accept, leading dot included. A null or empty list uses <see cref="AuthoredExtensions"/>.</param>
+        /// <returns>Matching paths in ordinal order, with forward slashes.</returns>
+        public static IReadOnlyList<string> EnumerateAuthoredAssets(
+            string rootDirectory,
+            IReadOnlyList<string> extensions
+        )
+        {
             List<string> matches = new();
             if (string.IsNullOrWhiteSpace(rootDirectory))
             {
@@ -76,7 +88,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             }
 
             IReadOnlyList<string> accepted =
-                extensions == null || extensions.Length <= 0 ? AuthoredExtensions : extensions;
+                extensions == null || extensions.Count == 0 ? AuthoredExtensions : extensions;
 
             try
             {
