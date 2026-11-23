@@ -17,6 +17,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.Threading
     [NUnit.Framework.Category("Fast")]
     public sealed class SingleThreadedThreadPoolContextTests
     {
+        private static IEnumerator AwaitCompletion(Task task)
+        {
+            for (int frame = 0; frame < 120 && !task.IsCompleted; ++frame)
+            {
+                yield return null;
+            }
+
+            Assert.That(task.IsCompleted, Is.True, "Task did not complete after 120 frames.");
+        }
+
         [UnityTest]
         public IEnumerator WorkRunsInOrderOnUnityContextAndReportsFailures()
         {
@@ -140,16 +150,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.Threading
             Assert.That(finished, Is.True);
             Assert.That(droppedItemRan, Is.False);
             Assert.That(pool.Count, Is.Zero);
-        }
-
-        private static IEnumerator AwaitCompletion(Task task)
-        {
-            for (int frame = 0; frame < 120 && !task.IsCompleted; ++frame)
-            {
-                yield return null;
-            }
-
-            Assert.That(task.IsCompleted, Is.True, "Task did not complete after 120 frames.");
         }
     }
 #endif
