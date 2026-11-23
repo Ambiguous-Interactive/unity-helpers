@@ -4613,10 +4613,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             HashSet<string> hintNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             List<IArrayTypeSymbol> arrayTypes = new List<IArrayTypeSymbol>();
+            bool parallelClosureScan =
+                context.AnalyzerConfigOptions.GlobalOptions.TryGetValue(
+                    "build_property.WProtoParallelClosureScan",
+                    out string parallelValue
+                ) && string.Equals(parallelValue, "true", StringComparison.OrdinalIgnoreCase);
             List<ClosureScan.TypeUse> typeUses = ClosureScan.Types(
                 context.Compilation,
                 models,
-                arrayTypes
+                arrayTypes,
+                parallelClosureScan
             );
 
             foreach (Emission emission in emissions)

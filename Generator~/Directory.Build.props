@@ -27,6 +27,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <CompilerVisibleProperty
+      Include="WProtoParallelClosureScan"
+      Condition="'$(WProtoParallelClosureScan)' == 'true'"
+    />
     <!-- Every owned .NET project self-hosts and enforces the exact analyzer binaries shipped to Unity. -->
     <Analyzer Include="$(MSBuildThisFileDirectory)../Runtime/Analyzers/WallstopStudios.UnityHelpers.Proto.Generator.dll" />
     <Analyzer Include="$(MSBuildThisFileDirectory)../Runtime/Analyzers/WallstopStudios.UnityHelpers.Analyzers.dll" />
