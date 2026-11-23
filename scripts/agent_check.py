@@ -218,8 +218,17 @@ def select(files: list[str], tier: str, root: Path = ROOT) -> Selection:
                 for name in ("lint:repo", "validate:tests")
             )
         else:
-            if any(file.endswith(".md") for file in files):
-                commands.append(npm("lint:docs"))
+            markdown_files = [file for file in files if file.endswith(".md")]
+            if markdown_files:
+                link_check = npm("lint:docs")
+                if all(
+                    (file.endswith((".md", ".md.meta")) or file == ".llm/skill-splits.json")
+                    and (root / file).is_file()
+                    and not (root / file).is_symlink()
+                    for file in files
+                ):
+                    link_check.extend(["--", "--paths", *(f"./{file}" for file in markdown_files)])
+                commands.append(link_check)
             controls = affected_checks(
                 checks_for("contracts", root=root), files, direct_inputs_only=True
             )

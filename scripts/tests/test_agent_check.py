@@ -49,6 +49,39 @@ def test_original_plan(case: dict[str, object]) -> None:
     assert plan == case["expected"]
 
 
+@pytest.mark.parametrize(
+    ("extra_file", "exists", "scope_links"),
+    [
+        ("docs/guide.md.meta", True, True),
+        (".llm/skill-splits.json", True, True),
+        ("docs/previous.md", False, False),
+        ("docs/screenshot.png", False, False),
+        ("scripts/helper.py", True, False),
+    ],
+)
+def test_iterate_link_scope_for_documentation_changes(
+    tmp_path: Path, extra_file: str, exists: bool, scope_links: bool
+) -> None:
+    (tmp_path / "scripts").mkdir()
+    shutil.copyfile(
+        ROOT / "scripts/contracts-checks.json",
+        tmp_path / "scripts/contracts-checks.json",
+    )
+    guide = "docs/guide ü.md"
+    (tmp_path / "docs").mkdir()
+    (tmp_path / guide).write_text("# Guide\n", encoding="utf-8")
+    if exists:
+        extra_path = tmp_path / extra_file
+        extra_path.parent.mkdir(parents=True, exist_ok=True)
+        extra_path.write_text("fixture\n", encoding="utf-8")
+
+    command = ["npm", "run", "lint:docs"]
+    if scope_links:
+        command.extend(["--", "--paths", f"./{guide}"])
+    assert command in agent_check.select([guide, extra_file], "iterate", tmp_path)["commands"]
+    assert command not in agent_check.select([guide, extra_file], "pr", tmp_path)["commands"]
+
+
 @pytest.mark.parametrize("file", ["../outside", "/outside", "C:/outside", "a/./b", "", "a\0b"])
 def test_invalid_paths(file: str) -> None:
     with pytest.raises(ValueError, match="repository-relative"):
