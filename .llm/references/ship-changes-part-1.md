@@ -25,6 +25,8 @@
 ## Ship Workflow
 
 Execute these steps in order. Each step must pass before proceeding.
+Keep this task active through required CI, review, merge and landed-tree verification. Resume
+[task selection](../skills/maintain-plan.md#work-selection-and-delivery) only after that verification.
 
 ### Step 1: Pre-Flight Checks
 

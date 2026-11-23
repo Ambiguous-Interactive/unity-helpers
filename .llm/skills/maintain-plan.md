@@ -41,6 +41,25 @@ Respect explicit user priorities and scope. Resolve dependencies that prevent hi
 
 ## Work Selection and Delivery
 
+At session start, check canonical main's CI and inventory open PRs (including drafts) and
+unfinished local work. Resume the active delivery. For an ordinary PR, keep one task in
+implementation from the first branch, worktree or edit through verified merge. While CI or
+review is pending, investigate that task or wait. Leave the next task in the backlog.
+
+Resolve actionable feedback and verify required reviews on the current head before requesting
+merge. For a direct merge, record the PR test merge commit's tree and verify all applicable
+required checks passed on it. If CI tests only the head, integrate the current canonical base
+into the branch and qualify the updated head. Requalify changes to the integration tree.
+
+For a queued merge, let the queue enforce required checks on its merge group. Read the tested
+group's tree and check results when available, including after an automatic merge. For either
+path, confirm GitHub reports the PR merged and compare the landed integration tree with the
+tested tree before starting the next task from updated canonical main.
+
+An explicitly requested native stack counts as one delivery. Prepare its dependent branches and
+PRs together under the [native stack procedure](../references/github-stacked-pull-requests.md).
+Verify its atomic merge and landed tree before starting any other task.
+
 1. Review the complete current issue backlog with terminal pagination before choosing work.
 2. Select the highest-priority actionable work, accounting for dependencies and user direction.
 3. Read the canonical issue's full scope and acceptance criteria; reproduce the problem before fixing it.
