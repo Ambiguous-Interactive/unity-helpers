@@ -7,6 +7,7 @@ import codecs
 import re
 import sys
 from pathlib import Path
+from typing import cast
 
 from cli_encoding import configure_output
 
@@ -29,18 +30,17 @@ LANGUAGES = (
     ("hlsl", "*.hlsl", "(formatOnSave: false)"),
     ("shaderlab", "*.shader", "(formatOnSave: false)"),
 )
-REGISTRY_CALL = (
-    r"(?m)^\s*(?:run:\s*)?uv run --project scripts/python~ --locked --no-dev "
+REGISTRY = re.compile(
+    r"uv run --project scripts/python~ --locked --no-dev "
     r"python scripts/check_registries\.py lint(?: --direct)?(?: --ci)?"
+    r'(?P<sharded> --shard "\$LINT_SHARD")?'
 )
-REGISTRY = re.compile(REGISTRY_CALL + r"\s*$")
-SHARDED_REGISTRY = re.compile(REGISTRY_CALL + r' --shard "\$LINT_SHARD"\s*$')
-WORKFLOW_JOBS = re.compile(r"(?ms)^jobs:[ \t]*\n(.*?)(?=^\S|\Z)")
-LINT_MATRIX = re.compile(r"(?m)^ {6}matrix:[ \t]*\n {8}shard: \[0,\s*1,\s*2\][ \t]*$")
-LINT_SHARD_ENV = re.compile(
-    r"(?m)^(?: {8})?env:[ \t]*\n(?: {10}[^\n]*\n)*?"
-    r" {10}LINT_SHARD: \$\{\{ matrix\.shard \}\}/\$\{\{ strategy\.job-total \}\}[ \t]*$"
+LEGACY_LINT = re.compile(r"node (?:\./)?scripts/run-repo-lint\.js")
+DIRECT_VALIDATOR = re.compile(
+    r"(?:pwsh (?:-NoProfile )?-File )?(?:\./)?scripts/validate-devcontainer-config\.ps1"
+    r"(?: -VerboseOutput)?"
 )
+LINT_SHARD = "${{ matrix.shard }}/${{ strategy.job-total }}"
 
 
 def read_text(path: Path) -> str:
@@ -54,37 +54,72 @@ def read_text(path: Path) -> str:
     return data.decode("utf-8-sig")
 
 
-def sharded_lint_runs(content: str) -> bool:
-    jobs = WORKFLOW_JOBS.search(content)
-    if jobs is None:
-        return False
-    for job in re.split(r"(?m)^ {2}[\w-]+:[ \t]*$", jobs[1]):
-        preamble, _, steps = job.partition("\n    steps:\n")
-        if LINT_MATRIX.search(preamble) is None or re.search(
-            r"(?m)^(?: {4}if:| {8}exclude:)", preamble
-        ):
+def mapping(value: object) -> dict[str, object]:
+    return cast("dict[str, object]", value) if isinstance(value, dict) else {}
+
+
+def parse_workflow(content: str) -> dict[str, object]:
+    try:
+        import yaml
+    except ModuleNotFoundError as error:
+        raise ValueError(
+            "Workflow validation requires the Python metadata dependency group."
+        ) from error
+    try:
+        return mapping(cast("object", yaml.safe_load(content)))
+    except yaml.YAMLError as error:
+        raise ValueError(f"Cannot parse workflow YAML: {error}") from error
+
+
+def invokes_lint_registry(workflow: dict[str, object], *, include_direct: bool = False) -> bool:
+    for value in mapping(workflow.get("jobs")).values():
+        job = mapping(value)
+        steps = job.get("steps")
+        if not isinstance(steps, list):
             continue
-        for step in re.split(r"(?m)^ {6}- ", steps):
-            if (
-                SHARDED_REGISTRY.search(step)
-                and LINT_SHARD_ENV.search(step)
-                and not re.search(r"(?m)^(?: {8})?if:", step)
-            ):
-                return True
+        matrix = mapping(mapping(job.get("strategy")).get("matrix"))
+        for step_value in cast("list[object]", steps):
+            step = mapping(step_value)
+            run = step.get("run")
+            if not isinstance(run, str):
+                continue
+            for line in run.splitlines():
+                command = line.strip()
+                if command.startswith("#"):
+                    continue
+                if LEGACY_LINT.fullmatch(command) or (
+                    include_direct and DIRECT_VALIDATOR.fullmatch(command)
+                ):
+                    return True
+                match = REGISTRY.fullmatch(command)
+                if match is None:
+                    continue
+                if match.group("sharded") is None:
+                    return True
+                environment = {
+                    **mapping(workflow.get("env")),
+                    **mapping(job.get("env")),
+                    **mapping(step.get("env")),
+                }
+                if (
+                    matrix == {"shard": [0, 1, 2]}
+                    and environment.get("LINT_SHARD") == LINT_SHARD
+                    and "if" not in job
+                    and "if" not in step
+                ):
+                    return True
     return False
 
 
 def workflow_covers_publish(content: str) -> bool:
-    content = "\n".join(re.sub(r"#.*$", "", line) for line in content.splitlines())
-    invokes = (
-        "validate-devcontainer-config.ps1" in content
-        or "run-repo-lint.js" in content
-        or REGISTRY.search(content) is not None
-        or sharded_lint_runs(content)
+    triggers = "\n".join(re.sub(r"#.*$", "", line) for line in content.splitlines())
+    changes = re.search(r"(?m)^\s*(?:push|pull_request):\s*$", triggers) is not None
+    filtered = re.search(r"(?m)^\s+paths:\s*$", triggers) is not None
+    return (
+        changes
+        and (not filtered or PUBLISH in triggers)
+        and invokes_lint_registry(parse_workflow(content), include_direct=True)
     )
-    changes = re.search(r"(?m)^\s*(?:push|pull_request):\s*$", content) is not None
-    filtered = re.search(r"(?m)^\s+paths:\s*$", content) is not None
-    return invokes and changes and (not filtered or PUBLISH in content)
 
 
 def validate(root: Path, *, verbose: bool = False) -> int:
@@ -162,9 +197,15 @@ def main(arguments: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", default=str(ROOT))
     parser.add_argument("--verbose", action="store_true")
+    parser.add_argument("--lint-registry-workflows", action="store_true")
     args = parser.parse_args(arguments)
     root = Path(args.repo_root) if args.repo_root.strip() else ROOT
     try:
+        if args.lint_registry_workflows:
+            for path in sorted((root / ".github/workflows").glob("*.yml")):
+                if invokes_lint_registry(parse_workflow(read_text(path))):
+                    print(path.name)
+            return 0
         return validate(root, verbose=args.verbose)
     except (OSError, ValueError) as error:
         print(f"ERROR: {error}", file=sys.stderr)

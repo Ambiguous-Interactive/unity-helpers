@@ -102,6 +102,37 @@ def test_unrelated_step_cannot_supply_lint_shard_environment() -> None:
     assert not checker.workflow_covers_publish(partial)
 
 
+def test_lint_command_in_a_step_name_does_not_execute(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    source = (checker.ROOT / ".github/workflows/repo-lint.yml").read_text(encoding="utf-8")
+    command = (
+        "uv run --project scripts/python~ --locked --no-dev python scripts/check_registries.py "
+        'lint --direct --ci --shard "$LINT_SHARD"'
+    )
+    modified = source.replace(
+        "      - name: Repository checks\n",
+        f"      - name: |\n          {command}\n",
+        1,
+    ).replace(f"        run: {command}", "        run: echo skipped", 1)
+    assert modified != source
+    assert not checker.workflow_covers_publish(modified)
+    workflows = tmp_path / ".github/workflows"
+    workflows.mkdir(parents=True)
+    (workflows / "valid.yml").write_text(source, encoding="utf-8")
+    (workflows / "label-only.yml").write_text(modified, encoding="utf-8")
+    assert checker.main(["--repo-root", str(tmp_path), "--lint-registry-workflows"]) == 0
+    assert capsys.readouterr().out.splitlines() == ["valid.yml"]
+
+
+def test_workflow_coverage_requires_a_yaml_parser(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setitem(sys.modules, "yaml", None)
+    assert checker.main(["--lint-registry-workflows"]) == 1
+    assert "metadata dependency group" in capsys.readouterr().err
+
+
 @pytest.mark.parametrize("case", CORPUS["cases"], ids=lambda case: case["name"])
 def test_original_executable_decisions(
     case: Case, tmp_path: Path, capsys: pytest.CaptureFixture[str]
