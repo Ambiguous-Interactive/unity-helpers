@@ -19,6 +19,57 @@ Registry = Literal["lint", "contracts"]
 ROOT = Path(__file__).resolve().parents[1]
 NPM_COMMAND = re.compile(r"npm run ([\w:.-]+)", re.ASCII)
 
+# Rounded median job timings from four full hosted runs. New or short checks get six seconds.
+CONTRACT_CHECK_SECONDS = {
+    "unity-framework": 160,
+    "lint-pwsh-invocations": 135,
+    "git-staging-helpers": 115,
+    "license-year-copy-detection": 100,
+    "runner-maintenance": 95,
+    "precommit-integration": 85,
+    "unity-test-filter": 80,
+    "unity-frozen-player-provenance": 80,
+    "version-sync": 50,
+    "shell-portability": 50,
+    "wproto-evidence": 45,
+    "analyzer-placement": 45,
+    "unity-workflow-matrix-contract": 40,
+    "configure-git-defaults": 40,
+    "il2cpp-conversion-inputs": 40,
+    "native-fault-capture": 35,
+    "python-compatibility": 35,
+    "validate-hook-permissions": 35,
+    "python-policy": 30,
+    "csharp-syntax": 30,
+    "agent-skill-migration": 30,
+    "random-quality-stream": 25,
+    "sync-script-contracts": 25,
+    "native-build-readback": 25,
+    "unity-grouped-modes": 25,
+    "devcontainer-persistence": 25,
+    "validate-lint-error-codes": 25,
+    "unity-acceptance-runner": 20,
+    "create-unitypackage": 20,
+    "project-workspace": 20,
+    "npm-package-changelog": 20,
+}
+
+
+def contract_shard(checks: list[Check], index: int, total: int) -> list[Check]:
+    """Give the longest regression its own runner and balance the remaining work."""
+    if index == 0:
+        return [check for check in checks if check.id == "agent-preflight"]
+    work = [check for check in checks if check.id != "agent-preflight"]
+    ranked = sorted(work, key=lambda check: -CONTRACT_CHECK_SECONDS.get(check.id, 6))
+    loads = [0] * (total - 1)
+    selected: list[Check] = []
+    for check in ranked:
+        lightest = loads.index(min(loads))
+        loads[lightest] += CONTRACT_CHECK_SECONDS.get(check.id, 6)
+        if lightest == index - 1:
+            selected.append(check)
+    return selected
+
 
 def load_checks(name: str, root: Path = ROOT) -> list[Check]:
     if name not in {"lint", "contracts", "hooks"}:
@@ -186,6 +237,22 @@ def main(argv: list[str] | None = None) -> int:
                 arguments.extend(["--base", base])
         include_hooks = "--include-hook-regressions" in arguments
         direct = "--direct" in arguments
+        shard: tuple[int, int] | None = None
+        if "--shard" in arguments:
+            position = arguments.index("--shard")
+            value = arguments[position + 1] if position + 1 < len(arguments) else ""
+            match = re.fullmatch(r"([0-9]{1,3})/([0-9]{1,3})", value)
+            if registry != "contracts" or match is None or arguments.count("--shard") != 1:
+                raise ValueError("Contract --shard requires one INDEX/TOTAL")
+            index, total = int(match[1]), int(match[2])
+            if not 0 <= index < total or total < 2 or "--only" in arguments:
+                raise ValueError(
+                    "Contract --shard requires 0 <= INDEX < TOTAL, TOTAL >= 2 and no --only"
+                )
+            if check_runner.parse_arguments(arguments)["jobsInvalid"] is not None:
+                raise ValueError("::error::--jobs must be a positive integer")
+            shard = (index, total)
+            del arguments[position : position + 2]
         checks = checks_for(registry, include_hooks, direct)
         if "--base" in arguments or "--files" in arguments:
             requested = check_runner.parse_arguments(arguments)
@@ -233,6 +300,12 @@ def main(argv: list[str] | None = None) -> int:
             command += " --include-hook-regressions"
         if direct:
             command += " --direct"
+        if shard is not None:
+            checks = contract_shard(checks, *shard)
+            if not checks:
+                if "--list" not in options:
+                    print(f"Contract shard {shard[0]}/{shard[1]} has no selected checks.")
+                return 0
         return run_registry(
             checks,
             "Repo Lint" if registry == "lint" else "Contract Tests",

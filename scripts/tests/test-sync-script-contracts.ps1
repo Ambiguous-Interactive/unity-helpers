@@ -182,7 +182,7 @@ function Run-AgentValidationContractTests {
   $unconditionalAggregateRunners = @(
     Find-UnconditionalWorkflowSteps `
       -RepoRoot $repoRoot `
-      -RunPattern '(?m)^\s+run: npm run validate:tests(?: -- --ci)?\s*$'
+      -RunPattern '(?m)^\s+run: npm run validate:tests(?: -- --ci(?: --shard "\$CONTRACT_SHARD")?)?\s*$'
   )
   Write-TestResult `
     -TestName 'Some workflow runs the CI test entry point unconditionally' `
