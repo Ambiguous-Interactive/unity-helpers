@@ -13,20 +13,28 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     [Category("Fast")]
     public sealed class SpatialTreeStoredGeometryTests
     {
-        private static IEnumerable<TestCaseData> InvalidGeometryCases()
+        private static readonly string[] Variants =
         {
-            string[] variants =
-            {
-                "Kd2Balanced",
-                "Kd2Unbalanced",
-                "Quad",
-                "QuadEntries",
-                "R2",
-                "Kd3Balanced",
-                "Kd3Unbalanced",
-                "Oct",
-                "R3",
-            };
+            "Kd2Balanced",
+            "Kd2Unbalanced",
+            "Quad",
+            "QuadEntries",
+            "R2",
+            "Kd3Balanced",
+            "Kd3Unbalanced",
+            "Oct",
+            "R3",
+        };
+
+        private static IEnumerable<(
+            int Axis,
+            float InvalidValue,
+            int BucketSize,
+            int FiniteCount,
+            int InsertionIndex,
+            bool InvalidSize
+        )> InvalidGeometryCases(string variant)
+        {
             float[] invalidValues =
             {
                 float.PositiveInfinity,
@@ -36,62 +44,49 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             };
             int[] bucketSizes = { 1, 32 };
             int[] finiteCounts = { 0, 1, 12 };
-            foreach (string variant in variants)
+            int dimensions =
+                IsThreeDimensional(variant)
+                || string.Equals(variant, "R2", System.StringComparison.Ordinal)
+                    ? 3
+                    : 2;
+            foreach (float invalidValue in invalidValues)
             {
-                int dimensions =
-                    IsThreeDimensional(variant)
-                    || string.Equals(variant, "R2", System.StringComparison.Ordinal)
-                        ? 3
-                        : 2;
-                foreach (float invalidValue in invalidValues)
+                for (int axis = 0; axis < dimensions; ++axis)
                 {
-                    for (int axis = 0; axis < dimensions; ++axis)
+                    foreach (int bucketSize in bucketSizes)
                     {
-                        foreach (int bucketSize in bucketSizes)
+                        foreach (int finiteCount in finiteCounts)
                         {
-                            foreach (int finiteCount in finiteCounts)
+                            int[] insertionIndices =
+                                finiteCount == 0 ? new[] { 0 }
+                                : finiteCount == 1 ? new[] { 0, 1 }
+                                : new[] { 0, finiteCount / 2, finiteCount };
+                            foreach (int insertionIndex in insertionIndices)
                             {
-                                int[] insertionIndices =
-                                    finiteCount == 0 ? new[] { 0 }
-                                    : finiteCount == 1 ? new[] { 0, 1 }
-                                    : new[] { 0, finiteCount / 2, finiteCount };
-                                foreach (int insertionIndex in insertionIndices)
+                                if (!float.IsFinite(invalidValue))
                                 {
-                                    if (!float.IsFinite(invalidValue))
-                                    {
-                                        yield return new TestCaseData(
-                                            variant,
-                                            axis,
-                                            invalidValue,
-                                            bucketSize,
-                                            finiteCount,
-                                            insertionIndex,
-                                            false
-                                        );
-                                    }
-                                    if (
-                                        string.Equals(
-                                            variant,
-                                            "R2",
-                                            System.StringComparison.Ordinal
-                                        )
-                                        || string.Equals(
-                                            variant,
-                                            "R3",
-                                            System.StringComparison.Ordinal
-                                        )
-                                    )
-                                    {
-                                        yield return new TestCaseData(
-                                            variant,
-                                            axis,
-                                            invalidValue,
-                                            bucketSize,
-                                            finiteCount,
-                                            insertionIndex,
-                                            true
-                                        );
-                                    }
+                                    yield return (
+                                        axis,
+                                        invalidValue,
+                                        bucketSize,
+                                        finiteCount,
+                                        insertionIndex,
+                                        false
+                                    );
+                                }
+                                if (
+                                    string.Equals(variant, "R2", System.StringComparison.Ordinal)
+                                    || string.Equals(variant, "R3", System.StringComparison.Ordinal)
+                                )
+                                {
+                                    yield return (
+                                        axis,
+                                        invalidValue,
+                                        bucketSize,
+                                        finiteCount,
+                                        insertionIndex,
+                                        true
+                                    );
                                 }
                             }
                         }
@@ -100,62 +95,38 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
         }
 
-        private static IEnumerable<TestCaseData> FiniteExtremeCases()
+        private static IEnumerable<(
+            int Axis,
+            int BucketSize,
+            int Sign,
+            int Layout,
+            int BoundaryKind
+        )> FiniteExtremeCases(string variant)
         {
-            string[] variants =
-            {
-                "Kd2Balanced",
-                "Kd2Unbalanced",
-                "Quad",
-                "QuadEntries",
-                "R2",
-                "Kd3Balanced",
-                "Kd3Unbalanced",
-                "Oct",
-                "R3",
-            };
             int[] bucketSizes = { 1, 32 };
             int[] signs = { -1, 1 };
-            foreach (string variant in variants)
+            int dimensions = IsThreeDimensional(variant) ? 3 : 2;
+            for (int axis = 0; axis < dimensions; ++axis)
             {
-                int dimensions = IsThreeDimensional(variant) ? 3 : 2;
-                for (int axis = 0; axis < dimensions; ++axis)
+                foreach (int bucketSize in bucketSizes)
                 {
-                    foreach (int bucketSize in bucketSizes)
+                    foreach (int sign in signs)
                     {
-                        foreach (int sign in signs)
+                        for (int layout = 0; layout < 7; ++layout)
                         {
-                            for (int layout = 0; layout < 7; ++layout)
-                            {
-                                int boundaryCount =
-                                    string.Equals(variant, "Quad", System.StringComparison.Ordinal)
-                                    || string.Equals(
-                                        variant,
-                                        "QuadEntries",
-                                        System.StringComparison.Ordinal
-                                    )
-                                    || string.Equals(
-                                        variant,
-                                        "Oct",
-                                        System.StringComparison.Ordinal
-                                    )
-                                        ? 3
-                                        : 1;
-                                for (
-                                    int boundaryKind = 0;
-                                    boundaryKind < boundaryCount;
-                                    ++boundaryKind
+                            int boundaryCount =
+                                string.Equals(variant, "Quad", System.StringComparison.Ordinal)
+                                || string.Equals(
+                                    variant,
+                                    "QuadEntries",
+                                    System.StringComparison.Ordinal
                                 )
-                                {
-                                    yield return new TestCaseData(
-                                        variant,
-                                        axis,
-                                        bucketSize,
-                                        sign,
-                                        layout,
-                                        boundaryKind
-                                    );
-                                }
+                                || string.Equals(variant, "Oct", System.StringComparison.Ordinal)
+                                    ? 3
+                                    : 1;
+                            for (int boundaryKind = 0; boundaryKind < boundaryCount; ++boundaryKind)
+                            {
+                                yield return (axis, bucketSize, sign, layout, boundaryKind);
                             }
                         }
                     }
@@ -267,9 +238,28 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
         }
 
-        [TestCaseSource(nameof(InvalidGeometryCases))]
-        [Timeout(10000)]
-        public void InvalidStoredGeometryPreservesFiniteSourceIdentities(
+        private static void CheckCases<T>(string variant, IEnumerable<T> cases, Action<T> check)
+        {
+            List<string> failures = null;
+            foreach (T input in cases)
+            {
+                try
+                {
+                    check(input);
+                }
+                catch (AssertionException error)
+                {
+                    failures ??= new List<string>();
+                    failures.Add($"{variant} {input}: {error.Message}");
+                }
+            }
+            if (failures != null)
+            {
+                Assert.Fail(string.Join("\n", failures));
+            }
+        }
+
+        private static void CheckInvalidStoredGeometry(
             string variant,
             int axis,
             float invalidValue,
@@ -351,63 +341,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             );
         }
 
-        [TestCase("R2", 0)]
-        [TestCase("R2", 1)]
-        [TestCase("R2", 2)]
-        [TestCase("R3", 0)]
-        [TestCase("R3", 1)]
-        [TestCase("R3", 2)]
-        public void OverflowedStoredBoundsExcludeOnlyTheirSourceEntry(string variant, int axis)
-        {
-            int[] source = { 0, 1, 2 };
-            Vector3[] positions = { Vector3.zero, Vector3.zero, Vector3.zero };
-            Vector3 center = Vector3.zero;
-            center[axis] = float.MaxValue;
-            Vector3 size = Vector3.zero;
-            size[axis] = float.MaxValue;
-            Bounds[] bounds =
-            {
-                new(Vector3.zero, Vector3.zero),
-                new(center, size),
-                new(Vector3.zero, Vector3.zero),
-            };
-            Assert.IsTrue(
-                float.IsPositiveInfinity(bounds[1].max[axis]),
-                "The stored edge must overflow"
-            );
-            object tree = CreateTree(variant, source, positions, bounds, 1);
-            List<int> actual = new() { -1 };
-            Bounds query = new(Vector3.zero, Vector3.one);
-            if (tree is RTree2D<int> r2)
-            {
-                r2.GetElementsWithCentersInBounds(query, actual);
-            }
-            else
-            {
-                ((RTree3D<int>)tree).GetElementsWithCentersInBounds(query, actual);
-            }
-            CollectionAssert.AreEquivalent(new[] { 0, 2 }, actual);
-        }
-
-        [Test]
-        public void ExplicitInfiniteOctTreeBoundaryPreservesFinitePoints()
-        {
-            Vector3[] points = { Vector3.left, new(float.PositiveInfinity, 0f, 0f), Vector3.right };
-            Bounds boundary = new(
-                Vector3.zero,
-                new Vector3(float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity)
-            );
-            OctTree3D<Vector3> tree = new(points, static point => point, boundary, bucketSize: 1);
-            List<Vector3> actual = new();
-            tree.GetElementsInRange(Vector3.zero, float.PositiveInfinity, actual);
-            CollectionAssert.AreEquivalent(new[] { Vector3.left, Vector3.right }, actual);
-            tree.GetElementsInBounds(boundary, actual);
-            CollectionAssert.AreEquivalent(new[] { Vector3.left, Vector3.right }, actual);
-        }
-
-        [TestCaseSource(nameof(FiniteExtremeCases))]
-        [Timeout(10000)]
-        public void FiniteExtremesMatchIndependentQueryOracles(
+        private static void CheckFiniteExtremes(
             string variant,
             int axis,
             int bucketSize,
@@ -718,6 +652,97 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                     }
                 }
             }
+        }
+
+        [Test]
+        [Timeout(10000)]
+        public void InvalidStoredGeometryPreservesFiniteSourceIdentities(
+            [ValueSource(nameof(Variants))] string variant
+        )
+        {
+            CheckCases(variant, InvalidGeometryCases(variant), input =>
+                CheckInvalidStoredGeometry(
+                    variant,
+                    input.Axis,
+                    input.InvalidValue,
+                    input.BucketSize,
+                    input.FiniteCount,
+                    input.InsertionIndex,
+                    input.InvalidSize
+                )
+            );
+        }
+
+        [Test]
+        [Timeout(10000)]
+        public void FiniteExtremesMatchIndependentQueryOracles(
+            [ValueSource(nameof(Variants))] string variant
+        )
+        {
+            CheckCases(variant, FiniteExtremeCases(variant), input =>
+                CheckFiniteExtremes(
+                    variant,
+                    input.Axis,
+                    input.BucketSize,
+                    input.Sign,
+                    input.Layout,
+                    input.BoundaryKind
+                )
+            );
+        }
+
+        [TestCase("R2", 0)]
+        [TestCase("R2", 1)]
+        [TestCase("R2", 2)]
+        [TestCase("R3", 0)]
+        [TestCase("R3", 1)]
+        [TestCase("R3", 2)]
+        public void OverflowedStoredBoundsExcludeOnlyTheirSourceEntry(string variant, int axis)
+        {
+            int[] source = { 0, 1, 2 };
+            Vector3[] positions = { Vector3.zero, Vector3.zero, Vector3.zero };
+            Vector3 center = Vector3.zero;
+            center[axis] = float.MaxValue;
+            Vector3 size = Vector3.zero;
+            size[axis] = float.MaxValue;
+            Bounds[] bounds =
+            {
+                new(Vector3.zero, Vector3.zero),
+                new(center, size),
+                new(Vector3.zero, Vector3.zero),
+            };
+            Assert.IsTrue(
+                float.IsPositiveInfinity(bounds[1].max[axis]),
+                "The stored edge must overflow"
+            );
+            object tree = CreateTree(variant, source, positions, bounds, 1);
+            List<int> actual = new() { -1 };
+            Bounds query = new(Vector3.zero, Vector3.one);
+            if (tree is RTree2D<int> r2)
+            {
+                r2.GetElementsWithCentersInBounds(query, actual);
+            }
+            else
+            {
+                ((RTree3D<int>)tree).GetElementsWithCentersInBounds(query, actual);
+            }
+            CollectionAssert.AreEquivalent(new[] { 0, 2 }, actual);
+        }
+
+        [Test]
+        public void ExplicitInfiniteOctTreeBoundaryPreservesFinitePoints()
+        {
+            Vector3[] points = { Vector3.left, new(float.PositiveInfinity, 0f, 0f), Vector3.right };
+            Bounds boundary = new(
+                Vector3.zero,
+                new Vector3(float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity)
+            );
+            OctTree3D<Vector3> tree = new(points, static point => point, boundary, bucketSize: 1);
+            List<Vector3> actual = new();
+            tree.GetElementsInRange(Vector3.zero, float.PositiveInfinity, actual);
+            CollectionAssert.AreEquivalent(new[] { Vector3.left, Vector3.right }, actual);
+            tree.GetElementsInBounds(boundary, actual);
+            CollectionAssert.AreEquivalent(new[] { Vector3.left, Vector3.right }, actual);
         }
     }
 }
