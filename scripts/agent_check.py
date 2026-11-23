@@ -197,6 +197,8 @@ def select(files: list[str], tier: str, root: Path = ROOT) -> Selection:
                     )
                     for scope in scopes:
                         command = ["npm", "run", "typecheck:iterate", "--", scope]
+                        if scope == "runtime":
+                            command.append("--server")
                         prefix = "Tests/Runtime/" if scope == "tests" else "Tests/Editor/"
                         scoped = (
                             [file for file in fixtures if file.startswith(prefix)]
