@@ -46,13 +46,15 @@ unfinished local work. Resume the active delivery. For an ordinary PR, keep one 
 implementation from the first branch, worktree or edit through verified merge. While CI or
 review is pending, investigate that task or wait. Leave the next task in the backlog.
 
-Before merge, record the Git tree of the current PR head integrated with the current canonical
-base. Use the merge queue's tested merge group when enabled, or the PR test merge commit.
-Verify the applicable required checks passed on that tree and required reviews cover the current
-head. If CI tests only the head, bring the base into the branch and qualify the updated head.
-Requalify if the base or head changes the integration tree. Resolve actionable feedback, confirm
-GitHub reports the PR merged, and compare the landed commit's tree with the recorded tree.
-Start the next task from updated canonical main after they match.
+Resolve actionable feedback and verify required reviews on the current head before requesting
+merge. For a direct merge, record the PR test merge commit's tree and verify all applicable
+required checks passed on it. If CI tests only the head, integrate the current canonical base
+into the branch and qualify the updated head. Requalify changes to the integration tree.
+
+For a queued merge, let the queue enforce required checks on its merge group. Read the tested
+group's tree and check results when available, including after an automatic merge. For either
+path, confirm GitHub reports the PR merged and compare the landed integration tree with the
+tested tree before starting the next task from updated canonical main.
 
 An explicitly requested native stack counts as one delivery. Prepare its dependent branches and
 PRs together under the [native stack procedure](../references/github-stacked-pull-requests.md).
