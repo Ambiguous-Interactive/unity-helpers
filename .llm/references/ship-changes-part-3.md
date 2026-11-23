@@ -5,9 +5,16 @@
 ### Step 10: Read the checks, and know which ones are ours
 
 Use GitHub MCP first to read pull-request checks, workflow runs, jobs, annotations, and failed logs.
-Poll through GitHub MCP until repository-owned checks reach terminal states. Use a repository script
-or direct API only when the exposed MCP tools lack the exact operation, as defined in
-[github-operations](../skills/github-operations.md).
+Poll until repository-owned checks reach terminal states or the session reaches its deadline.
+Use a repository script or direct API only when the exposed MCP tools lack the exact operation, as
+defined in [github-operations](../skills/github-operations.md).
+
+Goal sessions have a hard three-hour wall-clock limit under the
+[production session plan](../PLAN.d/production-session.md). CI, review, and handoff count toward the
+limit. Check the remaining time before each retry, push, or merge. Before the deadline, save the
+exact head, base, integration tree, pending gates, and live handles. Stop polling and making changes
+at the recorded session deadline, including any shorter limit set by the user. Resume in a newly
+authorized session and verify live state before acting.
 
 "All checks green" means **every repository-owned check**: the workflows in
 `.github/workflows/`, which this repository can fix. A pull request also carries
