@@ -23,7 +23,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
     /// because <c>MakeGenericType</c> is the one call IL2CPP cannot compile, so the closure has to
     /// be named in source that the consumer's own build compiles.
     /// </remarks>
-    internal static class ClosureScan
+    internal static partial class ClosureScan
     {
         /// <summary>
         /// Resolves source type uses once for every registration scan in this compilation.
@@ -932,22 +932,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 Type = type;
                 Location = location;
                 IsSerializationDependency = serializationDependency;
-            }
-        }
-
-        private sealed class ScanResult
-        {
-            internal readonly List<TypeUse> Uses = new List<TypeUse>();
-            internal readonly List<MethodUse> Calls = new List<MethodUse>();
-            internal readonly Dictionary<IMethodSymbol, SerializationRequirements> Requirements =
-                new Dictionary<IMethodSymbol, SerializationRequirements>(
-                    SymbolEqualityComparer.Default
-                );
-            internal readonly List<IArrayTypeSymbol> Arrays;
-
-            internal ScanResult(List<IArrayTypeSymbol> arrays)
-            {
-                Arrays = arrays;
             }
         }
 
