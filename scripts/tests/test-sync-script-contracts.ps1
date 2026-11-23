@@ -1442,6 +1442,17 @@ function Test-DocLinkModeCoverage {
   return ($coversAll -or ($coversTargets -and $coversFormat))
 }
 
+function Test-LintRegistryWorkflowCoverage {
+  param([string]$Content)
+  $registryCall = '(?m)^\s*(?:run:\s*)?uv run --project scripts/python~ --locked --no-dev python scripts/check_registries\.py lint(?: --direct)?(?: --ci)?'
+  if ($Content.Contains('run-repo-lint.js') -or $Content -match ($registryCall + '\s*$')) {
+    return $true
+  }
+  return ($Content -match ($registryCall + ' --shard "\$LINT_SHARD"\s*$') -and
+    $Content -match '(?m)^\s*shard:\s*\[0,\s*1,\s*2\]\s*$' -and
+    $Content.Contains('LINT_SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}'))
+}
+
 function Run-DocumentationWorkflowContractTests {
   Write-Host ""
   Write-Host "Documentation workflow contracts:" -ForegroundColor Magenta
@@ -1480,8 +1491,7 @@ function Run-DocumentationWorkflowContractTests {
         $candidateText = Get-WorkflowContentWithoutComments -Path $_.FullName
         # Anchored so `test-lint-doc-links.ps1` does not read as an invocation of the linter itself.
         ($candidateText -match '(?<![\w-])(?:lint-doc-links\.ps1|lint_doc_links\.py)') -or
-        $candidateText.Contains('run-repo-lint.js') -or
-        $candidateText -match '(?m)^\s*(?:run:\s*)?uv run --project scripts/python~ --locked --no-dev python scripts/check_registries\.py lint(?: --direct)?(?: --ci)?\s*$'
+        (Test-LintRegistryWorkflowCoverage -Content $candidateText)
       }
   )
 
@@ -1496,14 +1506,25 @@ function Run-DocumentationWorkflowContractTests {
   foreach ($workflowFile in $docLinkWorkflows) {
     $ownerText = Get-WorkflowContentWithoutComments -Path $workflowFile.FullName
     $docLinkSources += $ownerText
-    if ($ownerText.Contains('run-repo-lint.js') -or
-      $ownerText -match '(?m)^\s*(?:run:\s*)?uv run --project scripts/python~ --locked --no-dev python scripts/check_registries\.py lint(?: --direct)?(?: --ci)?\s*$') {
+    if (Test-LintRegistryWorkflowCoverage -Content $ownerText) {
       $runnerIsInvoked = $true
     }
   }
   if ($runnerIsInvoked) {
     $docLinkSources += $runnerContent
   }
+
+  $shardedRegistry = @'
+shard: [0, 1, 2]
+LINT_SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
+run: uv run --project scripts/python~ --locked --no-dev python scripts/check_registries.py lint --direct --ci --shard "$LINT_SHARD"
+'@
+  Write-TestResult -TestName 'Complete lint matrix runs the documentation registry' -Passed (
+    Test-LintRegistryWorkflowCoverage -Content $shardedRegistry
+  ) -Message $shardedRegistry
+  Write-TestResult -TestName 'Missing lint shard leaves the documentation registry unqualified' -Passed (
+    -not (Test-LintRegistryWorkflowCoverage -Content ($shardedRegistry.Replace('[0, 1, 2]', '[0, 1]')))
+  ) -Message $shardedRegistry
 
   # `-Mode All` is the linter's default and enables both halves, so it satisfies this on its own;
   # otherwise both explicit modes must appear. Spelling it out this way means the contract tracks
