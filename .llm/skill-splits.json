@@ -378,7 +378,7 @@
     },
     {
       "name": "ship-changes",
-      "sha256": "8c55922695b631676d31fed9ca6af531b057fb397155d95ef2a8c51990a0652e",
+      "sha256": "e0ac5b70096f48d6d0ada9483ce06c13d167e75ca1941d73c75d0e9d87e05bf5",
       "parts": ["ship-changes-part-1.md", "ship-changes-part-2.md", "ship-changes-part-3.md"],
       "routerSha256": "852ebc3ef301ae063b169fbae6aef48f853fe5997de9e79b0fcae01d9331f184"
     },

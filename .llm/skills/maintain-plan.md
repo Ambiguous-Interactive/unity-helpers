@@ -34,8 +34,9 @@ The issue tracker owns the current backlog and each issue's scope and acceptance
 Keep the **hard three-hour wall-clock limit** in the goal and plan. Follow the
 [production session plan](../PLAN.d/production-session.md) for the 120-minute checkpoint,
 150-minute intake cutoff, and 180-minute deadline. Count CI, review, and handoff against the same
-clock across turns. Finish the handoff before the deadline and stop work at the cutoff. Resume
-unfinished acceptance only in a newly authorized session.
+clock across turns. Stop new intake at 150 minutes. Use the remaining time for delivery and
+handoff. Stop work at the 180-minute deadline. Resume unfinished acceptance only in a newly
+authorized session.
 
 ## Priority Order
 

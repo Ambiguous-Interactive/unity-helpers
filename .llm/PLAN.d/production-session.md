@@ -9,11 +9,11 @@ Follow the user's explicit scope and priorities. Honor any shorter time limit th
 
 Read the repository's [agent guidance](../context.md) and [Maintain Plan skill](../skills/maintain-plan.md).
 Read the root goal and work plan if they are present. In a fresh checkout, apply this objective
-directly. Close as many production defects as the session can fully verify and deliver.
-Aim for zero open production defects while protecting correctness, compatibility and reliability.
-Scope this work to ordinary production defects and tooling with a direct path to closure.
-Use investigations and reporting to diagnose and close those defects.
-Exclude cybersecurity work.
+directly. Scope this work to ordinary production defects and tooling with a direct path to
+closure. Use investigations and reporting to diagnose and close those defects. Exclude
+cybersecurity work.
+Aim for zero open defects within that scope while protecting correctness, compatibility, and
+reliability. Close as many in-scope defects as the session can fully verify and deliver.
 
 ## Open the Session
 
