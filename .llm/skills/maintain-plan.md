@@ -41,6 +41,18 @@ Respect explicit user priorities and scope. Resolve dependencies that prevent hi
 
 ## Work Selection and Delivery
 
+At session start, check canonical main's CI and inventory open PRs (including drafts) and
+unfinished local work. Resume the active delivery. Keep one task in implementation from the
+first branch, worktree or edit until its PR has merged and the landed tree is verified.
+While CI or review is pending, investigate that task or wait. Leave the next task in the backlog.
+
+Before starting the next task, verify all applicable checks and required reviews on the current
+head, resolve actionable feedback, confirm GitHub reports the PR merged, and compare the landed
+tree with the qualified integration tree. Branch the next task from updated canonical main.
+Deliver dependencies in merge order. When the user explicitly requests a stack, follow the
+[native stack procedure](../references/github-stacked-pull-requests.md) and verify the whole
+stack landed before starting another delivery.
+
 1. Review the complete current issue backlog with terminal pagination before choosing work.
 2. Select the highest-priority actionable work, accounting for dependencies and user direction.
 3. Read the canonical issue's full scope and acceptance criteria; reproduce the problem before fixing it.
