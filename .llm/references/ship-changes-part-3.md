@@ -13,7 +13,8 @@ Goal sessions have a hard three-hour wall-clock limit under the
 [production session plan](../PLAN.d/production-session.md). CI, review, and handoff count toward the
 limit. Check the remaining time before each retry, push, or merge. Before the deadline, save the
 exact head, base, integration tree, pending gates, and live handles. Stop polling and making changes
-at the 180-minute deadline. Resume in a newly authorized session and verify live state before acting.
+at the recorded session deadline, including any shorter limit set by the user. Resume in a newly
+authorized session and verify live state before acting.
 
 "All checks green" means **every repository-owned check**: the workflows in
 `.github/workflows/`, which this repository can fix. A pull request also carries
