@@ -717,16 +717,30 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             );
             object tree = CreateTree(variant, source, positions, bounds, 1);
             List<int> actual = new() { -1 };
-            Bounds query = new(Vector3.zero, Vector3.one);
-            if (tree is RTree2D<int> r2)
+            Bounds[] queries =
             {
-                r2.GetElementsWithCentersInBounds(query, actual);
-            }
-            else
+                new(Vector3.zero, Vector3.one),
+                new(
+                    Vector3.zero,
+                    new Vector3(
+                        float.PositiveInfinity,
+                        float.PositiveInfinity,
+                        float.PositiveInfinity
+                    )
+                ),
+            };
+            foreach (Bounds query in queries)
             {
-                ((RTree3D<int>)tree).GetElementsWithCentersInBounds(query, actual);
+                if (tree is RTree2D<int> r2)
+                {
+                    r2.GetElementsWithCentersInBounds(query, actual);
+                }
+                else
+                {
+                    ((RTree3D<int>)tree).GetElementsWithCentersInBounds(query, actual);
+                }
+                CollectionAssert.AreEquivalent(new[] { 0, 2 }, actual, $"Entries within {query}");
             }
-            CollectionAssert.AreEquivalent(new[] { 0, 2 }, actual);
         }
 
         [Test]
