@@ -1,5 +1,26 @@
 [
   {
+    "id": "unity-mode-coordinator",
+    "name": "Concurrent Unity mode controls",
+    "run": "npm run test:unity-modes",
+    "inputs": [
+      "package.json",
+      ".github/**",
+      ".githooks/**",
+      ".config/**",
+      "scripts/python~/**",
+      "scripts/*checks.json",
+      "scripts/check-inputs.json",
+      "scripts/check_runner.py",
+      "scripts/check_registries.py",
+      "scripts/git-staging-helpers.*",
+      "scripts/tests/fixtures/**",
+      "scripts/unity/**",
+      "scripts/tests/test_ci_modes.py",
+      "scripts/tests/test_editmode_shards.py"
+    ]
+  },
+  {
     "id": "comment-stripping",
     "name": "Comment-stripping helper",
     "run": "pwsh -NoProfile -File scripts/tests/test-comment-stripping.ps1 -VerboseOutput",
@@ -460,27 +481,6 @@
     "name": "Test linter self-test",
     "run": "uv run --quiet --project scripts/python~ --locked pytest scripts/tests/test_lifecycle_lint.py -q",
     "inputs": ["@tooling"]
-  },
-  {
-    "id": "unity-mode-coordinator",
-    "name": "Concurrent Unity mode controls",
-    "run": "npm run test:unity-modes",
-    "inputs": [
-      "package.json",
-      ".github/**",
-      ".githooks/**",
-      ".config/**",
-      "scripts/python~/**",
-      "scripts/*checks.json",
-      "scripts/check-inputs.json",
-      "scripts/check_runner.py",
-      "scripts/check_registries.py",
-      "scripts/git-staging-helpers.*",
-      "scripts/tests/fixtures/**",
-      "scripts/unity/**",
-      "scripts/tests/test_ci_modes.py",
-      "scripts/tests/test_editmode_shards.py"
-    ]
   },
   {
     "id": "report-slow-tests",
