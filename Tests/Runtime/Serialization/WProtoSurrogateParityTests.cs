@@ -296,7 +296,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             AssertParity(
                 mismatches,
                 mode,
+#pragma warning disable CS0618 // The legacy conversion supplies the wire-format reference for this check.
                 (Resolution value) => (ResolutionSurrogate)value,
+#pragma warning restore CS0618
                 new Resolution { width = 1920, height = 1080 },
                 default,
                 new Resolution { width = int.MaxValue, height = -1 }
