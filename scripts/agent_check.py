@@ -299,6 +299,7 @@ def main(arguments: list[str], *, capture_output: bool = False) -> int:
     base = "origin/main"
     plan = False
     compact = False
+    timings = False
     files: list[str] = []
     arguments = list(arguments)
     while arguments:
@@ -315,6 +316,8 @@ def main(arguments: list[str], *, capture_output: bool = False) -> int:
             plan = True
         elif argument == "--json":
             compact = True
+        elif argument == "--timings":
+            timings = True
         elif argument == "--files":
             if not arguments or arguments[0].startswith("--"):
                 raise ValueError("Missing paths for --files")
@@ -322,13 +325,29 @@ def main(arguments: list[str], *, capture_output: bool = False) -> int:
                 files.append(arguments.pop(0))
         else:
             raise ValueError(f"Unknown argument: {argument}")
-    selection = select(files or changed_files(base), tier)
+    started = time.monotonic()
+    inventory = files or changed_files(base)
+    discovered = time.monotonic()
+    selection = select(inventory, tier)
+    selected = time.monotonic()
     print(json.dumps(selection, indent=None if compact else 2), flush=True)
-    return (
-        0
-        if plan or selection["status"] == "not-applicable"
-        else execute_checks(selection["commands"], capture_output=capture_output)
-    )
+    execute = not plan and selection["status"] != "not-applicable"
+    status = execute_checks(selection["commands"], capture_output=capture_output) if execute else 0
+    if timings:
+        print(
+            json.dumps(
+                {
+                    "tier": tier,
+                    "discoverySeconds": discovered - started,
+                    "selectionSeconds": selected - discovered,
+                    "reportAndRunSeconds": time.monotonic() - selected,
+                    "executed": execute,
+                    "exitCode": status,
+                }
+            ),
+            flush=True,
+        )
+    return status
 
 
 def bridge() -> int:

@@ -7,6 +7,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import cast
 
@@ -280,3 +281,37 @@ def test_native_cli_shallow_clone(tmp_path: Path) -> None:
     )
     assert result.returncode != 0
     assert "immutable PR base" in result.stderr
+
+
+@pytest.mark.parametrize(("plan", "status"), [(False, 0), (False, 7), (True, 0)])
+def test_phase_timing_receipt(
+    plan: bool, status: int, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    ticks = iter([2.0, 2.25, 2.75, 4.75])
+    monkeypatch.setattr(time, "monotonic", lambda: next(ticks))
+
+    def inventory(base: str) -> list[str]:
+        assert base == "origin/main"
+        return ["docs/guide.md"]
+
+    monkeypatch.setattr(agent_check, "changed_files", inventory)
+    calls: list[list[list[str]]] = []
+
+    def run(commands: list[list[str]], *, capture_output: bool) -> int:
+        assert not capture_output
+        calls.append(commands)
+        return status
+
+    monkeypatch.setattr(agent_check, "execute_checks", run)
+    args = ["--tier", "iterate", "--json", "--timings"]
+    assert agent_check.main(args + (["--plan"] if plan else [])) == status
+    selected, timing = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    assert calls == ([] if plan else [selected["commands"]])
+    assert timing == {
+        "tier": "iterate",
+        "discoverySeconds": 0.25,
+        "selectionSeconds": 0.5,
+        "reportAndRunSeconds": 2.0,
+        "executed": not plan,
+        "exitCode": status,
+    }
