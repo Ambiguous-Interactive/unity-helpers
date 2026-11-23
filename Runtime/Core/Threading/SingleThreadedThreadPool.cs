@@ -3,14 +3,13 @@
 
 namespace WallstopStudios.UnityHelpers.Core.Threading
 {
-#if !SINGLE_THREADED
     using System;
     using System.Collections.Concurrent;
     using System.Threading;
     using System.Threading.Tasks;
 
     /// <summary>
-    /// Runs enqueued work one item at a time on a single background worker, in enqueue order.
+    /// Runs enqueued work one item at a time, in enqueue order.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -23,8 +22,9 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
     /// call <see cref="DrainAsync"/> first when queued items must run.
     /// </para>
     /// <para>
-    /// The window is narrow enough to hide in testing. Work enqueued a millisecond or more before
-    /// disposal almost always completes; work enqueued immediately before it almost never does.
+    /// In single-threaded builds and Web players, construct the pool on Unity's main thread.
+    /// Work is posted to that thread's synchronization context. Synchronous disposal discards
+    /// pending work and returns immediately; await <see cref="DisposeAsync"/> to join in-flight work.
     /// </para>
     /// </remarks>
     /// <example>
@@ -40,10 +40,6 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
     public sealed class SingleThreadedThreadPool : IDisposable
     {
         private const int MaximumCallbackFailures = 64;
-
-        private static readonly TimeSpan DefaultNoWorkWaitTime = TimeSpan.FromSeconds(1);
-
-        private static readonly TimeSpan DrainPollInterval = TimeSpan.FromMilliseconds(1);
 
         /// <summary>
         /// Work failures when no callback is supplied, or the last 64 callback failures, in catch order.
@@ -67,26 +63,38 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
         private volatile bool _disposed;
 
         private readonly object _workGate = new();
-        private Task _disposalTask;
-        private readonly Task _workerTask;
         private readonly ConcurrentQueue<WorkItem> _work;
-        private readonly SemaphoreSlim _workAvailable;
         private readonly ConcurrentQueue<Exception> _exceptions;
         private readonly Action<Exception> _onException;
+
+#if SINGLE_THREADED || (UNITY_WEBGL && !UNITY_EDITOR)
+        private readonly SynchronizationContext _context;
+        private readonly SendOrPostCallback _processNext;
+        private bool _posted;
+        private TaskCompletionSource<bool> _drainCompletion;
+        private TaskCompletionSource<bool> _disposalCompletion;
+#else
+        private static readonly TimeSpan DefaultNoWorkWaitTime = TimeSpan.FromSeconds(1);
+        private static readonly TimeSpan DrainPollInterval = TimeSpan.FromMilliseconds(1);
+        private Task _disposalTask;
+        private readonly Task _workerTask;
+        private readonly SemaphoreSlim _workAvailable;
         private readonly TimeSpan _noWorkWaitTime;
         private readonly CancellationTokenSource _cancellationTokenSource;
+#endif
 
         /// <summary>
-        /// Starts the worker immediately.
+        /// Creates a pool ready to accept work.
         /// </summary>
         /// <param name="runInBackground">
         /// When <see langword="true"/> the worker runs on a thread pool thread; otherwise it gets
-        /// its own long-running thread.
+        /// its own long-running thread. Ignored when work runs on Unity's main thread.
         /// </param>
         /// <param name="noWorkWaitTime">
         /// How long the idle worker waits for a signal before re-checking the queue. Defaults to
         /// one second. Delays outside SemaphoreSlim's supported integer-millisecond range use
         /// that default; valid fractional delays and Timeout.InfiniteTimeSpan remain supported.
+        /// Ignored when work runs on Unity's main thread.
         /// </param>
         public SingleThreadedThreadPool(
             bool runInBackground = true,
@@ -94,7 +102,7 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
         )
             : this(runInBackground, noWorkWaitTime, null) { }
 
-        /// <summary>Starts a worker that delivers failures to a callback instead of retaining them.</summary>
+        /// <summary>Creates a pool that delivers failures to a callback instead of retaining them.</summary>
         /// <param name="onException">Receives each work failure on the worker; null retains the original exception-queue behavior.</param>
         /// <param name="runInBackground">Use a thread-pool worker instead of a dedicated long-running thread.</param>
         /// <param name="noWorkWaitTime">The idle signal wait, with the same validation as the original constructor.</param>
@@ -108,6 +116,13 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
             _onException = onException;
             _work = new ConcurrentQueue<WorkItem>();
             _exceptions = new ConcurrentQueue<Exception>();
+#if SINGLE_THREADED || (UNITY_WEBGL && !UNITY_EDITOR)
+            _context = SynchronizationContext.Current
+                ?? throw new InvalidOperationException(
+                    "Construct the single-threaded pool on Unity's main thread."
+                );
+            _processNext = ProcessNextOnContext;
+#else
             _workAvailable = new SemaphoreSlim(0);
             TimeSpan requestedWaitTime = noWorkWaitTime ?? DefaultNoWorkWaitTime;
             long waitMilliseconds = (long)requestedWaitTime.TotalMilliseconds;
@@ -120,6 +135,7 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
             _workerTask = runInBackground
                 ? Task.Run(DoWorkAsync)
                 : Task.Factory.StartNew(DoWorkAsync, TaskCreationOptions.LongRunning).Unwrap();
+#endif
         }
 
         /// <summary>
@@ -221,6 +237,37 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
         /// </example>
         public async ValueTask<bool> DrainAsync(CancellationToken cancellationToken = default)
         {
+#if SINGLE_THREADED || (UNITY_WEBGL && !UNITY_EDITOR)
+            Task<bool> drain;
+            lock (_workGate)
+            {
+                if (_disposed)
+                {
+                    return false;
+                }
+
+                _acceptingWork = false;
+                if (_work.IsEmpty && !_isWorking)
+                {
+                    return true;
+                }
+
+                _drainCompletion ??= new TaskCompletionSource<bool>();
+                drain = _drainCompletion.Task;
+            }
+
+            if (!cancellationToken.CanBeCanceled)
+            {
+                return await drain;
+            }
+
+            TaskCompletionSource<bool> cancellation = new TaskCompletionSource<bool>();
+            using CancellationTokenRegistration registration = cancellationToken.Register(() =>
+                cancellation.TrySetResult(false)
+            );
+            Task<bool> completed = await Task.WhenAny(drain, cancellation.Task);
+            return await completed;
+#else
             lock (_workGate)
             {
                 if (_disposed)
@@ -256,6 +303,7 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
             }
 
             return HasCompletedDrain();
+#endif
         }
 
         /// <summary>
@@ -270,38 +318,50 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
         /// </remarks>
         public ValueTask DisposeAsync()
         {
+#if SINGLE_THREADED || (UNITY_WEBGL && !UNITY_EDITOR)
+            return new ValueTask(BeginContextDisposal());
+#else
             lock (_workGate)
             {
                 if (_disposalTask == null)
                 {
-                    _acceptingWork = false;
-                    _active = false;
-                    _disposed = true;
-                    _work.Clear();
+                    StopAcceptingAndClear();
                     _disposalTask = DisposeWorkerAsync();
                 }
 
                 return new ValueTask(_disposalTask);
             }
+#endif
         }
 
         /// <summary>
         /// Cancels the worker and releases its handles, discarding any work still queued.
         /// </summary>
         /// <remarks>
-        /// Blocks the calling thread until the in-flight item finishes. This is safe for work
-        /// items that do not resume on a captured synchronization context; the pool itself uses
-        /// <c>ConfigureAwait(false)</c> throughout, so it posts nothing back to Unity's main
-        /// thread. A work item whose own continuations capture the main thread's context would
-        /// deadlock here, because <c>OnDestroy</c> runs on that thread. Prefer
-        /// <see cref="DisposeAsync"/> when the work items await anything context-bound. Calling
-        /// this method from a work item waits on that same item and cannot complete.
+        /// With a background worker, blocks the calling thread until the in-flight item finishes.
+        /// Work items running on that worker must not call this method or await the calling
+        /// thread's synchronization context while it is blocked. Use <see cref="DisposeAsync"/>
+        /// to await shutdown without blocking the calling thread.
+        /// On a single-threaded target, this method starts shutdown and returns immediately.
         /// </remarks>
         public void Dispose()
         {
+#if SINGLE_THREADED || (UNITY_WEBGL && !UNITY_EDITOR)
+            _ = BeginContextDisposal();
+#else
             DisposeAsync().AsTask().GetAwaiter().GetResult();
+#endif
         }
 
+        private void StopAcceptingAndClear()
+        {
+            _acceptingWork = false;
+            _active = false;
+            _disposed = true;
+            _work.Clear();
+        }
+
+#if !SINGLE_THREADED && (!UNITY_WEBGL || UNITY_EDITOR)
         internal Task<bool> WaitForWorkAsync(CancellationToken cancellationToken)
         {
             return _workAvailable.WaitAsync(_noWorkWaitTime, cancellationToken);
@@ -334,6 +394,7 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
                 return !_disposed && _work.IsEmpty && !_isWorking;
             }
         }
+#endif
 
         private bool EnqueueWork(WorkItem work)
         {
@@ -373,12 +434,95 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
 
         private void Signal()
         {
+#if SINGLE_THREADED || (UNITY_WEBGL && !UNITY_EDITOR)
+            lock (_workGate)
+            {
+                if (_posted || _isWorking || _disposed || _work.IsEmpty)
+                {
+                    return;
+                }
+
+                _posted = true;
+            }
+
+            _context.Post(_processNext, null);
+#else
             try
             {
                 _workAvailable.Release();
             }
             catch { }
+#endif
         }
+
+#if SINGLE_THREADED || (UNITY_WEBGL && !UNITY_EDITOR)
+        private Task BeginContextDisposal()
+        {
+            TaskCompletionSource<bool> interruptedDrain = null;
+            Task disposal = Task.CompletedTask;
+            lock (_workGate)
+            {
+                if (!_disposed)
+                {
+                    StopAcceptingAndClear();
+                    interruptedDrain = _drainCompletion;
+                    _drainCompletion = null;
+                }
+
+                if (_isWorking)
+                {
+                    _disposalCompletion ??= new TaskCompletionSource<bool>();
+                    disposal = _disposalCompletion.Task;
+                }
+            }
+
+            interruptedDrain?.TrySetResult(false);
+            return disposal;
+        }
+
+        private async void ProcessNextOnContext(object state)
+        {
+            WorkItem workItem;
+            lock (_workGate)
+            {
+                _posted = false;
+                if (!TryStartWork(out workItem))
+                {
+                    return;
+                }
+            }
+
+            try
+            {
+                await workItem.ExecuteAsync();
+            }
+            catch (Exception error)
+            {
+                ReportException(error);
+            }
+            finally
+            {
+                TaskCompletionSource<bool> completedDrain = null;
+                TaskCompletionSource<bool> completedDisposal;
+                lock (_workGate)
+                {
+                    _isWorking = false;
+                    if (_work.IsEmpty)
+                    {
+                        completedDrain = _drainCompletion;
+                        _drainCompletion = null;
+                    }
+
+                    completedDisposal = _disposalCompletion;
+                    _disposalCompletion = null;
+                }
+
+                Signal();
+                completedDrain?.TrySetResult(true);
+                completedDisposal?.TrySetResult(true);
+            }
+        }
+#endif
 
         private void ReportException(Exception error)
         {
@@ -402,6 +546,7 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
             }
         }
 
+#if !SINGLE_THREADED && (!UNITY_WEBGL || UNITY_EDITOR)
         private async Task DoWorkAsync()
         {
             CancellationToken cancellationToken = _cancellationTokenSource.Token;
@@ -443,6 +588,7 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
                 }
             }
         }
+#endif
 
         private enum WorkItemType
         {
@@ -506,9 +652,12 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
 
             private async ValueTask ExecuteTask()
             {
+#if SINGLE_THREADED || (UNITY_WEBGL && !UNITY_EDITOR)
+                await _taskFunc();
+#else
                 await _taskFunc().ConfigureAwait(false);
+#endif
             }
         }
     }
-#endif
 }

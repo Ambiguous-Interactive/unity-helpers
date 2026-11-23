@@ -3,7 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.Core.Threading
 {
-#if !SINGLE_THREADED
+#if !SINGLE_THREADED && (!UNITY_WEBGL || UNITY_EDITOR)
     using System;
     using System.Threading;
     using System.Threading.Tasks;
