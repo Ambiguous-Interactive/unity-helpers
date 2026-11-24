@@ -2055,7 +2055,7 @@ function Test-GitHubAppTokenIdentityStepText {
         [Parameter(Mandatory = $true)][string]$IdentitySecret
     )
 
-    $action = 'uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510'
+    $action = 'uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc'
     $identity = 'client-id: ${{ secrets.' + $IdentitySecret + ' }}'
     $privateKey = 'private-key: ${{ secrets.' + $IdentitySecret.Replace('_APP_ID', '_APP_PRIVATE_KEY') + ' }}'
     return (
