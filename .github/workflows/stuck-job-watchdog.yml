@@ -141,7 +141,7 @@ jobs:
         # is an upgrade to the inventory lookup, and the unreadable-inventory
         # guard below is what decides whether the run can proceed.
         continue-on-error: true
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc
         with:
           # The retained App ID is an accepted JWT issuer for this pinned action.
           client-id: ${{ secrets.BUILD_LOCK_READER_APP_ID }}
