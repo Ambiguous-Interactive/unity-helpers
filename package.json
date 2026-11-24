@@ -442,7 +442,7 @@
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",
-    "cspell": "10.5.0",
+    "cspell": "10.5.2",
     "markdownlint-cli": "0.50.0",
     "prettier": "3.10.1",
     "smol-toml": "1.9.1"
