@@ -671,6 +671,13 @@ def test_windows_phases_preserve_every_suite_and_bounded_concurrency() -> None:
     assert publication_controls[0]["shell"] == "pwsh"
     assert "continue-on-error" not in publication_controls[0]
     commands = [step for step in steps(phase) if "pytest" in str(step.get("run", ""))]
+    metadata_validation = next(
+        step for step in commands if step["name"] == "Verify metadata validation on Windows"
+    )
+    assert metadata_validation["if"] == "matrix.phase == 'metadata'"
+    metadata_command = str(metadata_validation["run"])
+    assert "--group parallel-tests pytest -n 2 --dist loadfile " in metadata_command
+    assert " --max-worker-restart=0 " in metadata_command
     covered: list[str] = []
     for step in commands:
         command = str(step["run"])
