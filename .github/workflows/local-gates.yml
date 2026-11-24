@@ -401,8 +401,10 @@ jobs:
       - name: Verify metadata validation on Windows
         if: matrix.phase == 'metadata'
         shell: pwsh
+        # Keep each test file in one worker. A worker crash fails the check.
         run: >-
-          uv run --project scripts/python~ --locked pytest
+          uv run --project scripts/python~ --locked --group parallel-tests
+          pytest -n 2 --dist loadfile --max-worker-restart=0
           scripts/tests/test_agent_check.py scripts/tests/test_release_tag.py scripts/tests/test_release_tools.py
           scripts/tests/test_npm_package.py scripts/tests/test_release_automation.py
           scripts/tests/test_version_sync.py scripts/tests/test_hook_validation.py
