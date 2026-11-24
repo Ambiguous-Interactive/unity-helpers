@@ -248,6 +248,21 @@ def test_real_release_payload_roundtrip(tmp_path: Path) -> None:
     assert {"name": "Unity", "expression": "2021.3", "define": "WALLSTOP_PROTO"} in cast(
         "list[object]", asmdef["versionDefines"]
     )
+    test_support = by_path[
+        f"{ASSET_ROOT}/Runtime/TestSupport/WallstopStudios.UnityHelpers.TestSupport.asmdef"
+    ]
+    support_definition = cast(
+        "dict[str, object]", json.loads(entries[f"{test_support.guid}/asset"])
+    )
+    assert {
+        "name": "com.unity.test-framework",
+        "expression": "0.0.1",
+        "define": "WALLSTOP_UNITY_HELPERS_TEST_FRAMEWORK",
+    } in cast("list[object]", support_definition["versionDefines"])
+    assert set(cast("list[str]", support_definition["defineConstraints"])) == {
+        "UNITY_INCLUDE_TESTS",
+        "WALLSTOP_UNITY_HELPERS_TEST_FRAMEWORK",
+    }
 
 
 @pytest.mark.parametrize("script", ["create_unitypackage.py", "stage_unitypackage.py"])

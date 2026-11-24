@@ -4,10 +4,14 @@ This guide documents patterns for testing states that "should never happen" but 
 
 ## Reuse the packaged test helpers
 
-Add `WallstopStudios.UnityHelpers.TestSupport` to your test assembly's references, keep
-`UNITY_INCLUDE_TESTS` in its define constraints, and reference `nunit.framework.dll` when
-`overrideReferences` is enabled. The support assembly is disabled outside test compilation;
-it does not require the package's `Tests/Core` sources.
+You can import Unity Helpers without Unity Test Framework. To reuse these helpers, install Test
+Framework and add `WallstopStudios.UnityHelpers.TestSupport` to your test assembly's references.
+Keep `UNITY_INCLUDE_TESTS` in its define constraints and reference `nunit.framework.dll` when
+`overrideReferences` is enabled. The support assembly uses its own packaged sources independently of `Tests/Core`.
+
+For registry, Git, and external local-path installations, add
+`com.wallstop-studios.unity-helpers` to `testables` in your project's `Packages/manifest.json`.
+See [Unity's package test setup](https://docs.unity3d.com/6000.0/Documentation/Manual/cus-tests.html).
 
 Derive synchronous NUnit fixtures from `UnityObjectTrackingTestBase` in
 `WallstopStudios.UnityHelpers.TestSupport`. `Track`, `TrackRange`, and
