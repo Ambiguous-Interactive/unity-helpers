@@ -295,6 +295,37 @@ def test_focused_ids_cli_returns_owned_controls(capsys: pytest.CaptureFixture[st
 
 
 @pytest.mark.parametrize(
+    ("paths", "focused"),
+    [
+        (["docs/performance/agent-iteration.md"], False),
+        (["docs/performance/agent-ci-baseline.json"], False),
+        (["docs/features/serialization/wallstop-proto-public-survey.md"], True),
+        (
+            [
+                "docs/performance/agent-iteration.md",
+                "docs/features/serialization/wallstop-proto-public-survey.md",
+            ],
+            True,
+        ),
+    ],
+)
+def test_wproto_documentation_retains_publication_controls(paths: list[str], focused: bool) -> None:
+    from check_registries import affected_checks
+
+    checks = load_checks("contracts")
+    controls = {
+        "wproto-annotations",
+        "wproto-evidence",
+        "run-wproto-evidence",
+        "wproto-corpus",
+        "frozen-files",
+    }
+    assert controls <= {check.id for check in affected_checks(checks, paths)}
+    selected = {check.id for check in affected_checks(checks, paths, direct_inputs_only=True)}
+    assert controls & selected == (controls if focused else set())
+
+
+@pytest.mark.parametrize(
     "arguments", [[], ["contracts", "--focused-ids", "--files", "docs/guide.md"]]
 )
 def test_cli_restores_caller_output_protocol(
