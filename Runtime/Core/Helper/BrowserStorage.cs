@@ -118,8 +118,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             );
             if (status == RegistrySuccess)
             {
-                _ = RegCloseKey(key);
-                return true;
+                return RegCloseKey(key) == RegistrySuccess;
             }
             return status == RegistryFileNotFound || status == RegistryPathNotFound;
         }
