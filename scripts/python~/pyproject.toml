@@ -31,6 +31,9 @@ metadata = [
     "pyyaml>=6.0.3",
     "yamllint>=1.38.0",
 ]
+parallel-tests = [
+    "pytest-xdist>=3.8.0",
+]
 proof = [
     "z3-solver==5.4.1.0",
 ]
