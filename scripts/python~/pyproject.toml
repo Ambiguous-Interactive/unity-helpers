@@ -17,7 +17,7 @@ dev = [
     "mypy>=2.4.1",
     "pyright>=1.1.414",
     "pytest>=9.2.0",
-    "ruff>=0.17.3",
+    "ruff>=0.17.6",
     "types-pyyaml>=6.0.12.20261030",
 ]
 documentation = [
@@ -28,7 +28,7 @@ fixtures = [
     "pillow>=13.0.0",
 ]
 metadata = [
-    "pyyaml>=6.0.3",
+    "pyyaml>=6.0.4",
     "yamllint>=1.38.0",
 ]
 parallel-tests = [
