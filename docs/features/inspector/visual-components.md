@@ -415,7 +415,8 @@ the cached composited texture as the animation advances:
 
 **Performance optimization:**
 
-- Uses parallel row processing for sprites with at least 2,048 pixels and more than one row
+- Uses parallel row processing on threaded targets for sprites with at least 2,048 pixels and more
+  than one row. Web players and `SINGLE_THREADED` builds composite on the calling thread.
 - Employs array pooling to minimize GC allocations
 - Caches every composited frame for playback
 

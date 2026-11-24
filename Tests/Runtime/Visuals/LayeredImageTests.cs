@@ -677,7 +677,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         }
 
         [Test]
-        public void ComputeTexturesHandlesLargeSpritesWithParallelPath()
+        public void ComputeTexturesBlendsLargeSprites()
         {
             Sprite large = VisualsTestHelpers.CreateSprite(
                 _trackedObjects,
@@ -700,35 +700,40 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
                 VisualsTestHelpers
                     .GetPixel(frame, 25, 25)
                     .Approximately(new Color32(255, 0, 0, 255)),
-                "Expected parallel blending path to produce correct color."
+                "Expected the composited frame to preserve the sprite color."
             );
             Assert.IsTrue(
                 VisualsTestHelpers.GetPixel(frame, 0, 0).Approximately(new Color32(255, 0, 0, 255)),
-                "Expected lower-left corner to survive parallel blending."
+                "Expected lower-left corner to survive blending."
             );
             Assert.IsTrue(
                 VisualsTestHelpers
                     .GetPixel(frame, 49, 0)
                     .Approximately(new Color32(255, 0, 0, 255)),
-                "Expected lower-right corner to survive parallel blending."
+                "Expected lower-right corner to survive blending."
             );
             Assert.IsTrue(
                 VisualsTestHelpers
                     .GetPixel(frame, 0, 49)
                     .Approximately(new Color32(255, 0, 0, 255)),
-                "Expected upper-left corner to survive parallel blending."
+                "Expected upper-left corner to survive blending."
             );
             Assert.IsTrue(
                 VisualsTestHelpers
                     .GetPixel(frame, 49, 49)
                     .Approximately(new Color32(255, 0, 0, 255)),
-                "Expected upper-right corner to survive parallel blending."
+                "Expected upper-right corner to survive blending."
             );
         }
 
         [Test]
-        public void ParallelBlendPolicyUsesMeasuredWorkAndRowBounds()
+        public void ParallelBlendPolicyUsesPlatformAndRowBounds()
         {
+#if SINGLE_THREADED || (UNITY_WEBGL && !UNITY_EDITOR)
+            const bool parallelAvailable = false;
+#else
+            const bool parallelAvailable = true;
+#endif
             (int width, int height, bool expected)[] cases =
             {
                 (0, 2048, false),
@@ -736,9 +741,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
                 (2047, 1, false),
                 (2048, 1, false),
                 (4096, 1, false),
-                (1024, 2, true),
-                (64, 32, true),
-                (int.MaxValue, 2, true),
+                (1024, 2, parallelAvailable),
+                (64, 32, parallelAvailable),
+                (int.MaxValue, 2, parallelAvailable),
             };
 
             foreach ((int width, int height, bool expected) testCase in cases)
@@ -752,7 +757,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         }
 
         [Test]
-        public void SequentialAndParallelBlendPathsProduceIdenticalPixels()
+        public void RequestingParallelBlendPreservesSequentialPixels()
         {
             const int bufferWidth = 72;
             const int bufferHeight = 36;

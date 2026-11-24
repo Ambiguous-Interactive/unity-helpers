@@ -4,12 +4,14 @@
 namespace WallstopStudios.UnityHelpers.Tests.Utils
 {
     using System;
-    using System.Text.RegularExpressions;
     using NUnit.Framework;
     using UnityEngine;
-    using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Utils;
+#if !SINGLE_THREADED && (!UNITY_WEBGL || UNITY_EDITOR)
+    using System.Text.RegularExpressions;
+    using UnityEngine.TestTools;
+#endif
 
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
@@ -104,10 +106,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         {
             Color[] source = new Color[64];
             Color[] destination = new Color[4];
+#if !SINGLE_THREADED && (!UNITY_WEBGL || UNITY_EDITOR)
             if (1 < cores)
             {
                 LogAssert.Expect(LogType.Exception, new Regex(nameof(IndexOutOfRangeException)));
             }
+#endif
             Assert.Throws<IndexOutOfRangeException>(() =>
                 TextureScale.ScalePixels(source, destination, 8, 8, 4, 8, useBilinear, cores)
             );

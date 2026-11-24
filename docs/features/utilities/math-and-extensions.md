@@ -887,7 +887,8 @@ and a ratio in `[1, 21]` rather than nonsense.
 
 `TextureResampling` is the matching single rule for scaling: where a destination pixel samples the
 source, and how colors of different opacity are allowed to mix. `TextureScale`, the Image Blur tool
-and the sprite sheet extractor's previews all go through it.
+and the sprite sheet extractor's previews all go through it. `TextureScale` processes rows on the
+calling thread in Web players and `SINGLE_THREADED` builds.
 
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Helper;

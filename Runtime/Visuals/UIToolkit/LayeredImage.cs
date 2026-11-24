@@ -7,15 +7,21 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
     using System.Collections.Generic;
     using System.Diagnostics;
     using System.Runtime.CompilerServices;
-    using System.Threading.Tasks;
     using UnityEngine;
     using UnityEngine.UIElements;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Utils;
+#if !SINGLE_THREADED && (!UNITY_WEBGL || UNITY_EDITOR)
+    using System.Threading.Tasks;
+#endif
 
+    /// <summary>Composites sprite animation layers into one UI Toolkit image.</summary>
+    /// <remarks>Web players and SINGLE_THREADED builds composite rows on the calling thread.</remarks>
     public sealed class LayeredImage : VisualElement
     {
+#if !SINGLE_THREADED && (!UNITY_WEBGL || UNITY_EDITOR)
         private const int ParallelBlendThreshold = 2048;
+#endif
 
         public float Fps
         {
@@ -115,9 +121,13 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
 
         internal static bool ShouldBlendInParallel(int spriteWidth, int spriteHeight)
         {
+#if SINGLE_THREADED || (UNITY_WEBGL && !UNITY_EDITOR)
+            return false;
+#else
             return 1 < spriteHeight
                 && 0 < spriteWidth
                 && ParallelBlendThreshold <= (long)spriteWidth * spriteHeight;
+#endif
         }
 
         internal static void ComposeSpriteOntoBuffer(
@@ -179,11 +189,13 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
                 pixelCutoff
             );
 
+#if !SINGLE_THREADED && (!UNITY_WEBGL || UNITY_EDITOR)
             if (useParallel)
             {
                 Parallel.For(0, spriteHeight, job.Execute);
                 return;
             }
+#endif
 
             job.RunSequential(spriteHeight);
         }

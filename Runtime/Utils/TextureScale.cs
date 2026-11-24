@@ -9,14 +9,16 @@
 namespace WallstopStudios.UnityHelpers.Utils
 {
     using System;
+    using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
+#if !SINGLE_THREADED && (!UNITY_WEBGL || UNITY_EDITOR)
     using System.Runtime.ExceptionServices;
     using System.Threading;
     using System.Threading.Tasks;
-    using UnityEngine;
-    using WallstopStudios.UnityHelpers.Core.Helper;
+#endif
 
     /// <summary>
-    /// Provides high-performance texture scaling operations using pooled buffers and parallel processing.
+    /// Scales textures using pooled pixel buffers.
     /// </summary>
     /// <remarks>
     /// Original implementation based on:
@@ -103,6 +105,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 out Color[] premultipliedColors
             );
 
+#if !SINGLE_THREADED && (!UNITY_WEBGL || UNITY_EDITOR)
             if (1 < cores)
             {
                 int slice = newHeight / cores;
@@ -245,41 +248,42 @@ namespace WallstopStudios.UnityHelpers.Utils
                 {
                     ExceptionDispatchInfo.Capture(workerFailure).Throw();
                 }
+                return;
+            }
+#endif
+
+            if (useBilinear)
+            {
+                BilinearScale(
+                    texColors,
+                    premultipliedColors,
+                    newColors,
+                    sourceWidth,
+                    sourceHeight,
+                    newWidth,
+                    ratioX,
+                    ratioY,
+                    0,
+                    newHeight
+                );
             }
             else
             {
-                if (useBilinear)
-                {
-                    BilinearScale(
-                        texColors,
-                        premultipliedColors,
-                        newColors,
-                        sourceWidth,
-                        sourceHeight,
-                        newWidth,
-                        ratioX,
-                        ratioY,
-                        0,
-                        newHeight
-                    );
-                }
-                else
-                {
-                    PointScale(
-                        texColors,
-                        newColors,
-                        sourceWidth,
-                        sourceHeight,
-                        newWidth,
-                        ratioX,
-                        ratioY,
-                        0,
-                        newHeight
-                    );
-                }
+                PointScale(
+                    texColors,
+                    newColors,
+                    sourceWidth,
+                    sourceHeight,
+                    newWidth,
+                    ratioX,
+                    ratioY,
+                    0,
+                    newHeight
+                );
             }
         }
 
+#if !SINGLE_THREADED && (!UNITY_WEBGL || UNITY_EDITOR)
         /// <summary>
         /// Keeps the first slice failure, and keeps a later one so it can be logged.
         /// </summary>
@@ -303,6 +307,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             Interlocked.CompareExchange(ref discarded, failure, null);
         }
+#endif
 
         private static void ValidateInputs(Texture2D tex, int newWidth, int newHeight)
         {

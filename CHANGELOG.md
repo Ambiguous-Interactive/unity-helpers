@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix texture scaling and layered sprite compositing on Web players and in `SINGLE_THREADED` builds ([#1277](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1277)).
 - Fix automatic `LatestWriteFile` saves on Web players by writing on the submitting thread ([#1277](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1277)).
 - Make `SingleThreadedThreadPool` available in `SINGLE_THREADED` builds and Web players, where queued work runs on Unity's main thread ([#1277](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1277)).
 - Fix Windows `DurableFile` replacement failures that could lose the previous save. If restoration fails, the error gives the path to the retained backup ([#1302](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1302)).
