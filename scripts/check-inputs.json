@@ -19,5 +19,6 @@
     "prettier.config.*",
     ".prettierignore"
   ],
-  "documentation": ["docs/**", "*.md", "mkdocs.yml"]
+  "documentation": ["docs/**", "*.md", "mkdocs.yml"],
+  "performance-documentation": ["docs/performance/**"]
 }
