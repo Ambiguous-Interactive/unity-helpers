@@ -99,6 +99,32 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return true;
         }
 
+#if UNITY_EDITOR_WIN
+        private static bool CanQueryEditorPreferences()
+        {
+            // PlayerPrefs reports a denied registry query as a missing key.
+            string path = string.Concat(
+                @"Software\Unity\UnityEditor\",
+                Application.companyName,
+                @"\",
+                Application.productName
+            );
+            int status = RegOpenKeyExW(
+                new IntPtr(CurrentUserRegistryHive),
+                path,
+                0,
+                RegistryQueryValue,
+                out IntPtr key
+            );
+            if (status == RegistrySuccess)
+            {
+                _ = RegCloseKey(key);
+                return true;
+            }
+            return status == RegistryFileNotFound || status == RegistryPathNotFound;
+        }
+#endif
+
         /// <summary>Checks key existence and reports detected backend failures separately from absence.</summary>
         /// <remarks>
         /// Returns false with exists=false for invalid keys, an invalid scope, or detected backend failure.
@@ -229,32 +255,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return false;
             }
         }
-
-#if UNITY_EDITOR_WIN
-        private static bool CanQueryEditorPreferences()
-        {
-            // PlayerPrefs reports a denied registry query as a missing key.
-            string path = string.Concat(
-                @"Software\Unity\UnityEditor\",
-                Application.companyName,
-                @"\",
-                Application.productName
-            );
-            int status = RegOpenKeyExW(
-                new IntPtr(CurrentUserRegistryHive),
-                path,
-                0,
-                RegistryQueryValue,
-                out IntPtr key
-            );
-            if (status == RegistrySuccess)
-            {
-                _ = RegCloseKey(key);
-                return true;
-            }
-            return status == RegistryFileNotFound || status == RegistryPathNotFound;
-        }
-#endif
 
         private bool TryGetStorageKey(string key, out string storageKey)
         {
