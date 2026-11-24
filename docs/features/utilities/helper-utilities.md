@@ -1438,8 +1438,8 @@ if (!writer.Flush(out Exception writeError))
 ```
 
 A successful submission means accepted, not saved. The default processes writes in the background;
-`writeInBackground: false` batches until an explicit `Flush` or disposal. In `SINGLE_THREADED`
-builds, automatic processing runs synchronously instead. `PendingPathCount` excludes the batch
+`writeInBackground: false` batches until an explicit `Flush` or disposal. Automatic processing runs
+synchronously on Web players and in `SINGLE_THREADED` builds. `PendingPathCount` excludes the batch
 already being written. The example explicitly batches both changes and writes the latest one.
 
 `Flush` waits for an earlier write to finish, then writes the captured pending batch. Concurrent
@@ -1452,8 +1452,9 @@ even for a manual writer. If the wait expires, it returns `false` with a `Timeou
 The worker continues and records any write failure through the usual callback and `Failure`
 property. `TimeSpan.Zero` starts the work without waiting. Calling `Dispose` immediately after
 a timeout can wait for the same write. `Timeout.InfiniteTimeSpan` uses ordinary synchronous flush.
-A finite limit in a `SINGLE_THREADED` build returns a `PlatformNotSupportedException` and
-leaves manual batches queued. Use synchronous flush on those builds.
+On Web players and in `SINGLE_THREADED` builds, a finite limit returns a
+`PlatformNotSupportedException` and leaves manual batches queued. Use synchronous flush on those
+builds.
 
 Write failures invoke the callback outside the writer's locks, on the thread attempting the write.
 `Failure` and `Flush(out error)` also expose unresolved failures. A later successful write to the

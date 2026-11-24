@@ -9,7 +9,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     using System.Threading;
     using PendingWrite = WallstopStudios.UnityHelpers.Core.Helper.LatestWriteFilePathOrder.PendingWrite;
     using WritePayload = WallstopStudios.UnityHelpers.Core.OneOf.FastOneOf<string, byte[]>;
-#if !SINGLE_THREADED
+#if !SINGLE_THREADED && (!UNITY_WEBGL || UNITY_EDITOR)
     using System.Diagnostics;
     using System.Threading.Tasks;
 #endif
@@ -24,7 +24,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     /// </remarks>
     public sealed class LatestWriteFile : IDisposable
     {
-#if !SINGLE_THREADED
+#if !SINGLE_THREADED && (!UNITY_WEBGL || UNITY_EDITOR)
         private static readonly TimeSpan MaximumWait = TimeSpan.FromMilliseconds(int.MaxValue);
 #endif
 
@@ -60,7 +60,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             string,
             Exception
         >(LatestWriteFilePathOrder.PathComparer);
-#if !SINGLE_THREADED
+#if !SINGLE_THREADED && (!UNITY_WEBGL || UNITY_EDITOR)
         private readonly WaitCallback _drainCallback;
         private readonly Func<Exception> _flushCallback;
         private Task<Exception> _queuedFlush;
@@ -72,7 +72,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         private bool _workerScheduled;
 
         /// <summary>Creates a writer with background processing or explicit flush-only batching.</summary>
-        /// <param name="writeInBackground">Process queued writes automatically; SINGLE_THREADED builds flush these submissions synchronously.</param>
+        /// <param name="writeInBackground">Process queued writes automatically. Web players and SINGLE_THREADED builds flush these submissions synchronously.</param>
         /// <param name="onFailure">Receives the normalized path and failure outside the writer's locks, on the thread attempting the write.</param>
         public LatestWriteFile(
             bool writeInBackground = true,
@@ -81,7 +81,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         {
             _writeInBackground = writeInBackground;
             _onFailure = onFailure;
-#if !SINGLE_THREADED
+#if !SINGLE_THREADED && (!UNITY_WEBGL || UNITY_EDITOR)
             _drainCallback = DrainPendingWrites;
             _flushCallback = FlushInBackground;
 #endif
@@ -172,7 +172,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// A timeout returns false with a <see cref="TimeoutException"/>. The flush continues in the background.
         /// Failure callbacks may run on a worker thread even for a manual writer.
         /// <see cref="Timeout.InfiniteTimeSpan"/> performs a synchronous flush.
-        /// Finite limits require a threaded build.
+        /// On Web players and in SINGLE_THREADED builds, finite limits return a
+        /// <see cref="PlatformNotSupportedException"/> and leave the pending batch queued.
         /// </remarks>
         public bool Flush(TimeSpan limit, out Exception error)
         {
@@ -185,7 +186,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 error = new ArgumentOutOfRangeException(nameof(limit));
                 return false;
             }
-#if SINGLE_THREADED
+#if SINGLE_THREADED || (UNITY_WEBGL && !UNITY_EDITOR)
             error = new PlatformNotSupportedException(
                 "A timed flush requires a background thread."
             );
@@ -243,7 +244,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     Dictionary<string, PendingWrite> batch;
                     lock (_stateGate)
                     {
-#if !SINGLE_THREADED
+#if !SINGLE_THREADED && (!UNITY_WEBGL || UNITY_EDITOR)
                         if (queued)
                         {
                             _queuedFlush = null;
@@ -318,7 +319,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
             if (schedule)
             {
-#if SINGLE_THREADED
+#if SINGLE_THREADED || (UNITY_WEBGL && !UNITY_EDITOR)
                 DrainPendingWrites(null);
 #else
                 try
@@ -375,7 +376,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 
-#if !SINGLE_THREADED
+#if !SINGLE_THREADED && (!UNITY_WEBGL || UNITY_EDITOR)
         private Exception FlushInBackground()
         {
             FlushBatch(queued: true, out Exception error);
