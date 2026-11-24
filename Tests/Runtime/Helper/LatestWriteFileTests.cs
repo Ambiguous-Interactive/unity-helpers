@@ -10,7 +10,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     using System.Text;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Helper;
-#if !SINGLE_THREADED
+#if !SINGLE_THREADED && (!UNITY_WEBGL || UNITY_EDITOR)
     using System.Threading;
     using System.Threading.Tasks;
 #endif
@@ -227,14 +227,38 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.That(File.ReadAllText(path), Is.EqualTo("queued"));
         }
 
-#if SINGLE_THREADED
+#if SINGLE_THREADED || (UNITY_WEBGL && !UNITY_EDITOR)
         [Test]
-        public void FiniteFlushPreservesPendingWorkWhenBackgroundThreadsAreUnavailable()
+        public void AutomaticWritesFinishOnTheSubmittingThread()
+        {
+            string path = Path.Combine(_directory, "blocked");
+            Directory.CreateDirectory(path);
+            int failureThread = 0;
+            using LatestWriteFile writer = new(
+                onFailure: (_, _) => failureThread = Environment.CurrentManagedThreadId
+            );
+
+            Assert.IsTrue(writer.TryEnqueueText(path, "failed write", out _));
+            Assert.That(failureThread, Is.EqualTo(Environment.CurrentManagedThreadId));
+            Assert.That(writer.Failure, Is.Not.Null);
+
+            Directory.Delete(path);
+            Assert.IsTrue(writer.TryEnqueueText(path, "recovered write", out _));
+            Assert.That(File.ReadAllText(path), Is.EqualTo("recovered write"));
+            Assert.That(writer.PendingPathCount, Is.Zero);
+            Assert.That(writer.Failure, Is.Null);
+        }
+
+        [TestCase(0L)]
+        [TestCase(long.MaxValue)]
+        public void FiniteFlushPreservesPendingWorkWhenBackgroundThreadsAreUnavailable(
+            long limitTicks
+        )
         {
             string path = Path.Combine(_directory, "timed.txt");
             using LatestWriteFile writer = new(writeInBackground: false);
             Assert.IsTrue(writer.TryEnqueueText(path, "queued", out _));
-            Assert.IsFalse(writer.Flush(TimeSpan.Zero, out Exception error));
+            Assert.IsFalse(writer.Flush(TimeSpan.FromTicks(limitTicks), out Exception error));
             Assert.That(error, Is.InstanceOf<PlatformNotSupportedException>());
             Assert.That(writer.PendingPathCount, Is.EqualTo(1));
             Assert.IsFalse(File.Exists(path));
@@ -385,7 +409,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             }
         }
 
-#if !SINGLE_THREADED
+#if !SINGLE_THREADED && (!UNITY_WEBGL || UNITY_EDITOR)
         [Test]
         public void TimedFlushReturnsWhileItsWorkerContinuesTheManualBatch()
         {

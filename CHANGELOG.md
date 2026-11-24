@@ -17,13 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add SHA-256 hashing over byte spans, with a caller-provided digest buffer or a hex string, and byte-span equality ([#1226](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1226)).
 - Add replaceable UTC and monotonic clocks with `WallTimeProvider` and `ManualTimeProvider` ([#1245](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1245)).
 - Add byte-range writes and pooled whole-file reads to `DurableFile` ([#1225](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1225)).
-- Add a timed flush and ownership transfer for byte arrays to `LatestWriteFile` ([#1275](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1275)).
+- Add a timed flush on threaded targets and ownership transfer for byte arrays to `LatestWriteFile` ([#1275](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1275)).
 - Add the list of judged fields to authored requirement scans ([#1271](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1271)).
 - Add reusable `MotionCurves` easing presets and use them for `BendableLine` drawing and endpoint animations ([#1272](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1272)).
 - Add support for passing read-only extension lists directly to `AuthoredAssetYaml.EnumerateAuthoredAssets` ([#1127](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1127)).
 
 ### Fixed
 
+- Fix automatic `LatestWriteFile` saves on Web players by writing on the submitting thread ([#1277](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1277)).
 - Make `SingleThreadedThreadPool` available in `SINGLE_THREADED` builds and Web players, where queued work runs on Unity's main thread ([#1277](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1277)).
 - Fix Windows `DurableFile` replacement failures that could lose the previous save. If restoration fails, the error gives the path to the retained backup ([#1302](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1302)).
 - Fix sprite masks affecting other sorting layers when a requested layer ID is unknown ([#1273](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1273)).
