@@ -2459,10 +2459,11 @@ constructor still isolates its keys; passing a blank scope does not enable raw m
 Raw mode shares the backend's key namespace with other callers. It does not copy, migrate,
 or delete existing saves when created.
 
-`TryHasKey(key, out bool exists)` distinguishes absence from backend failure. It returns
-true with `exists == true` for a present key, including an empty value, and true with
-`exists == false` for an absent key. Invalid keys, invalid scoped stores, and blocked storage
-return false with `exists == false`. Existence does not validate the stored value's text or type.
+`TryHasKey(key, out bool exists)` returns true with `exists == true` for a present key,
+including an empty value, and true with `exists == false` for an absent key. Invalid keys and
+invalid scoped stores return false with `exists == false`. WebGL and the Windows Editor also
+return false when access to the store is denied. Other PlayerPrefs targets rely on Unity to
+report backend errors. Existence does not validate the stored value's text or type.
 
 Writes and deletes are synchronous browser operations. The PlayerPrefs backend calls `Save` after
 each mutation. Success means the backend accepted the operation; it does not guarantee disk flush,
