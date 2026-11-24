@@ -8,7 +8,13 @@
   "overrideReferences": true,
   "precompiledReferences": ["nunit.framework.dll"],
   "autoReferenced": false,
-  "defineConstraints": ["UNITY_INCLUDE_TESTS"],
-  "versionDefines": [],
+  "defineConstraints": ["UNITY_INCLUDE_TESTS", "WALLSTOP_UNITY_HELPERS_TEST_FRAMEWORK"],
+  "versionDefines": [
+    {
+      "name": "com.unity.test-framework",
+      "expression": "0.0.1",
+      "define": "WALLSTOP_UNITY_HELPERS_TEST_FRAMEWORK"
+    }
+  ],
   "noEngineReferences": false
 }
