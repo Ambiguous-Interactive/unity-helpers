@@ -364,7 +364,7 @@ RUN mkdir -p /home/vscode/.npm \
 
 # Install CSharpier as a global .NET tool for the vscode user
 USER vscode
-RUN dotnet tool install -g csharpier --version 1.4.0
+RUN dotnet tool install -g csharpier --version 1.4.1
 
 # Point npm's global prefix at a user-owned directory so `npm install -g` works
 # without sudo for the vscode user (npm docs: "resolving EACCES permissions
