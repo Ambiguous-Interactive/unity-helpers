@@ -69,7 +69,7 @@ def test_every_source_root_supplies_namespaces(root: str, tmp_path: Path) -> Non
     assert gate.analyze(tmp_path).violations == []
 
 
-@pytest.mark.parametrize("folder", [*gate.SKIPPED, ".hidden"])
+@pytest.mark.parametrize("folder", [*sorted(gate.SKIPPED), ".hidden"])
 def test_hidden_and_generated_folders_cannot_satisfy_references(
     folder: str, tmp_path: Path
 ) -> None:
