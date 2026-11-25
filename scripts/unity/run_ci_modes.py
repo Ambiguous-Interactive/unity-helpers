@@ -22,6 +22,9 @@ from typing import TYPE_CHECKING, BinaryIO, cast
 
 from editmode_shards import merge_results, partition_assemblies
 
+if sys.platform == "win32":
+    from desktop_worker import WindowsWorkerJob
+
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator
     from types import FrameType
@@ -272,6 +275,7 @@ def launch(
     shell: str,
     environment: dict[str, str],
     stream: BinaryIO,
+    job_handle: int | None,
 ) -> Worker:
     config = directory / f"{mode.key}.json"
     config.write_text(json.dumps(mode.parameters), encoding="utf-8")
@@ -295,6 +299,7 @@ def launch(
         "-EncodedCommand",
         base64.b64encode(WORKER.encode("utf-16-le")).decode("ascii"),
     ]
+    startup = None
     if sys.platform == "win32":
         command = [
             sys.executable,
@@ -304,14 +309,24 @@ def launch(
             "--encoded-worker",
             base64.b64encode(WORKER.encode("utf-16-le")).decode("ascii"),
         ]
+        if job_handle is not None:
+            command.extend(("--inherited-job", str(job_handle)))
+            startup = subprocess.STARTUPINFO(lpAttributeList={"handle_list": [job_handle]})
     started = time.monotonic()
-    process = subprocess.Popen(  # noqa: S603 - fixed PowerShell program; options travel as JSON data.
-        command,
-        env=child_environment,
-        stdout=stream,
-        stderr=subprocess.STDOUT,
-        start_new_session=os.name != "nt",
-    )
+    if sys.platform == "win32" and job_handle is not None:
+        os.set_handle_inheritable(job_handle, True)
+    try:
+        process = subprocess.Popen(  # noqa: S603 - fixed PowerShell program and typed options.
+            command,
+            env=child_environment,
+            stdout=stream,
+            stderr=subprocess.STDOUT,
+            startupinfo=startup,
+            start_new_session=os.name != "nt",
+        )
+    finally:
+        if sys.platform == "win32" and job_handle is not None:
+            os.set_handle_inheritable(job_handle, False)
     return Worker(mode, process, started)
 
 
@@ -392,10 +407,19 @@ def run(
     initializers: list[Worker] = []
     worker_logs: dict[str, BinaryIO] = {}
     completed = False
+    cleanup_failed = False
+    windows_job = None
     try:
+        # Editors can connect to a licensing client started by a different
+        # mode. Keep the shared process tree until all modes have finished.
+        if sys.platform == "win32":
+            windows_job = WindowsWorkerJob()
+        job_handle = windows_job.handle if windows_job is not None else None
         with contextlib.ExitStack() as streams:
             preparation_log = streams.enter_context((private / "activation.log").open("wb"))
-            preparation_worker = launch(preparation, private, shell, environment, preparation_log)
+            preparation_worker = launch(
+                preparation, private, shell, environment, preparation_log, job_handle
+            )
             wait([preparation_worker], started + min(timeout, 600))
             if preparation_worker.process.returncode != 0:
                 raise RuntimeError(
@@ -416,7 +440,7 @@ def run(
                     (private / f"{initialization.name}.log").open("wb")
                 )
                 initializer = launch(
-                    initialization, private, shell, environment, initialization_log
+                    initialization, private, shell, environment, initialization_log, job_handle
                 )
                 initializers.append(initializer)
                 wait([initializer], started + timeout)
@@ -448,9 +472,16 @@ def run(
                     folder.mkdir(parents=True, exist_ok=True)
                     stream = streams.enter_context((folder / "mode-controller.log").open("wb"))
                     worker_logs[mode.key] = stream
-                    workers.append(launch(mode, private, shell, environment, stream))
+                    workers.append(launch(mode, private, shell, environment, stream, job_handle))
 
             wait(workers, started + timeout, fill_available_slots)
+            if sys.platform == "win32" and windows_job is not None:
+                job, windows_job = windows_job, None
+                try:
+                    job.close()
+                except OSError:
+                    cleanup_failed = True
+                    raise
             for worker in workers:
                 if worker.mode.name == "editmode_isolated" and worker.process.returncode == 0:
                     folder = Path(str(worker.mode.parameters["ArtifactsPath"]))
@@ -505,7 +536,6 @@ def run(
                     )
             completed = True
     finally:
-        cleanup_failed = False
         for worker in (
             initializers
             + ([preparation_worker] if preparation_worker is not None else [])
@@ -517,6 +547,12 @@ def run(
                 cleanup_failed = True
             if worker.ended is None:
                 worker.ended = time.monotonic()
+        if sys.platform == "win32" and windows_job is not None:
+            try:
+                windows_job.close()
+            except OSError as error:
+                cleanup_failed = True
+                print(f"Could not reap the Unity controller job: {error}", file=sys.stderr)
         outcomes = dict.fromkeys((mode.outcome_key for mode in modes), "failure")
         if completed and not cleanup_failed:
             for name in outcomes:

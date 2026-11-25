@@ -276,6 +276,17 @@ starts and leaves that project in place. Preserve and isolate it before retrying
 do not delete an active migration pointer or its backups to make a test pass.
 A failed move also stops the run without clearing the original project.
 
+On Windows, the mode controller owns the preparation and test processes in one job
+object. Concurrent modes can use the same Unity licensing client until their work
+finishes. The controller reaps the job before it collects mode artifacts or reports
+success. A cleanup failure is recorded in the mode receipt.
+
+If retention still fails, preserve the reported source and destination and wait for
+license return and lock release. Check the mode receipt and the CI job that owns the
+workspace before retrying. If a process still holds the directory, verify its
+ownership before stopping it. Keep the original project and migration evidence
+intact while the holder is unknown.
+
 EditMode runs compiler-isolation fixtures in a fresh editor process before the broader suite.
 These cases carry `CompilationIsolation` and must all pass without skips. Their results and log
 remain under the mode's `compilation/` artifact directory.
