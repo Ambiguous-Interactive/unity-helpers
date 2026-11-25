@@ -100,7 +100,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
 
                 string destination = Path.GetFullPath(path);
-                for (int index = Pending.Count - 1; index >= 0; --index)
+                for (int index = Pending.Count - 1; 0 <= index; --index)
                 {
                     DurableFileWindowsBackup item = Pending[index];
                     if (
@@ -123,7 +123,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return;
             }
 
-            for (int index = matches.Count - 1; index >= 0; --index)
+            for (int index = matches.Count - 1; 0 <= index; --index)
             {
                 DurableFileWindowsBackup item = matches[index];
                 if (TryReclaim(item._backup, item._previous))
