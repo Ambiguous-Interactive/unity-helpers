@@ -449,6 +449,8 @@ repeat the action against the current decisions. A simultaneous action can repor
 and can be retried.
 The first save publishes only while the file is absent. If another tool creates the file after
 Sentinel reads it, the save reports a conflict and preserves the other tool's decisions.
+On macOS and Linux, first saves require a project filesystem that supports exclusive rename or
+hard links.
 Direct edits to an existing file outside Sentinel can still race with replacement or Undo.
 
 JSON and JUnit exports use the last completed interactive run. JUnit marks suppressed findings as
