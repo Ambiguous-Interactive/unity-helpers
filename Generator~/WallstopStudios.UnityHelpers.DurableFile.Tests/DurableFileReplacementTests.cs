@@ -226,11 +226,17 @@ namespace WallstopStudios.UnityHelpers.DurableFile.Tests
             );
         }
 
-        [TestCase(false)]
-        [TestCase(true)]
-        public void CompareMissingTextPublishesWhenDestinationStaysAbsent(bool simulateWindows)
+        [TestCase(false, 12)]
+        [TestCase(true, 12)]
+        [TestCase(false, 220)]
+        [TestCase(true, 220)]
+        public void CompareMissingTextPublishesWhenDestinationStaysAbsent(
+            bool simulateWindows,
+            int basenameLength
+        )
         {
             RuntimeInformation.SimulateWindows = simulateWindows;
+            _destination = Path.Combine(_directory, new string('s', basenameLength));
 
             bool completed = DurableFile.TryCompareThenReplaceAllText(
                 _destination,

@@ -838,7 +838,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             using (EnterGate(path))
             {
-                string temporaryPath = UniqueCreationStagingPath(path);
+                string temporaryPath = null;
                 FileStream ownership = null;
                 bool ownsTemporary = false;
                 bool moved = false;
@@ -849,6 +849,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     {
                         return false;
                     }
+                    temporaryPath = UniqueCreationStagingPath(path);
                     using (
                         FileStream staging = OpenStagingStream(
                             temporaryPath,
@@ -1408,7 +1409,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         private static string UniqueCreationStagingPath(string path)
         {
-            return path + ".create." + Guid.NewGuid().ToString("N") + TemporarySuffix;
+            return Path.Combine(
+                Path.GetDirectoryName(Path.GetFullPath(path)),
+                ".create." + Guid.NewGuid().ToString("N") + TemporarySuffix
+            );
         }
 
         // A hard link is also exclusive and covers volumes that reject the rename flag.
