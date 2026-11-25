@@ -521,8 +521,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             Assert.IsFalse(SpriteSettingsApplierAPI.ProfilesMatchExpected(null, 1, expectedJson));
         }
 
-        [Test]
-        public void SuccessfulStagingCleanupRemovesOnlyTheStagedAsset()
+        [TestCase(false, false)]
+        [TestCase(true, false)]
+        [TestCase(false, true)]
+        public void StagingCleanupRemovesOnlyTheUnchangedStagedAsset(
+            bool editContents,
+            bool changeIdentity
+        )
         {
             Assert.IsTrue(
                 SpriteSettingsApplierAPI.TrySaveProfiles(
@@ -538,11 +543,42 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 ScriptableObject.CreateInstance<SpriteSettingsProfileCollection>()
             );
             AssetDatabase.CreateAsset(staged, stagedPath);
-            Assert.IsTrue(
-                SpriteSettingsApplierAPI.TryDeleteProfileAsset(stagedPath, out error),
-                error
+            string guid = AssetDatabase.AssetPathToGUID(stagedPath);
+            byte[] contents = File.ReadAllBytes(stagedPath);
+            if (editContents)
+            {
+                File.AppendAllText(stagedPath, "\n# later staged edit\n");
+            }
+            if (changeIdentity)
+            {
+                string replacementPath = Root + "/replacement.asset";
+                Assert.IsTrue(AssetDatabase.CopyAsset(stagedPath, replacementPath));
+                Assert.IsTrue(AssetDatabase.DeleteAsset(stagedPath));
+                Assert.AreEqual(string.Empty, AssetDatabase.MoveAsset(replacementPath, stagedPath));
+                Assert.AreNotEqual(guid, AssetDatabase.AssetPathToGUID(stagedPath));
+            }
+
+            byte[] beforeCleanup = File.ReadAllBytes(stagedPath);
+            bool removed = SpriteSettingsApplierAPI.TryDeleteProfileAsset(
+                stagedPath,
+                guid,
+                contents,
+                out error
             );
-            Assert.IsTrue(AssetDatabase.LoadMainAssetAtPath(stagedPath) == null);
+
+            if (editContents || changeIdentity)
+            {
+                Assert.IsFalse(removed);
+                StringAssert.Contains("changed before cleanup", error);
+                CollectionAssert.AreEqual(beforeCleanup, File.ReadAllBytes(stagedPath));
+                Assert.IsTrue(AssetDatabase.LoadMainAssetAtPath(stagedPath) != null);
+            }
+            else
+            {
+                Assert.IsTrue(removed, error);
+                Assert.IsFalse(File.Exists(stagedPath));
+                Assert.IsTrue(AssetDatabase.LoadMainAssetAtPath(stagedPath) == null);
+            }
             Assert.IsTrue(AssetDatabase.LoadMainAssetAtPath(ProfilePath) != null);
         }
 
