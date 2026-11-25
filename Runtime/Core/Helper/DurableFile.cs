@@ -914,6 +914,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// A successful rename consumes the staged name. A collision keeps it on every platform.
         /// </remarks>
         /// <returns>True if published, false if the destination was already occupied.</returns>
+        /// <exception cref="PlatformNotSupportedException">The platform has no supported publication operation.</exception>
         internal static bool TryPublishStagedFileWithoutOverwrite(
             string stagedPath,
             string destinationPath,
@@ -957,9 +958,16 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return renamed;
             }
 
-            int result = isMac
-                ? CreateHardLinkMac(stagedPath, destinationPath)
-                : CreateHardLinkLinux(stagedPath, destinationPath);
+            int result;
+            if (isMac)
+            {
+                result = CreateHardLinkMac(stagedPath, destinationPath);
+            }
+            else
+            {
+                result = CreateHardLinkLinux(stagedPath, destinationPath);
+            }
+
             if (result == 0)
             {
                 leavesStaged = true;
@@ -1320,9 +1328,15 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             bool createNew = false
         )
         {
+            FileMode mode = FileMode.Create;
+            if (createNew)
+            {
+                mode = FileMode.CreateNew;
+            }
+
             return new FileStream(
                 temporaryPath,
-                createNew ? FileMode.CreateNew : FileMode.Create,
+                mode,
                 FileAccess.Write,
                 FileShare.None,
                 DefaultBufferSize,
@@ -1426,15 +1440,20 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             int result;
             try
             {
-                result = isMac
-                    ? RenameExclusiveMac(stagedPath, destinationPath, MacRenameExclusive)
-                    : RenameExclusiveLinux(
+                if (isMac)
+                {
+                    result = RenameExclusiveMac(stagedPath, destinationPath, MacRenameExclusive);
+                }
+                else
+                {
+                    result = RenameExclusiveLinux(
                         LinuxCurrentDirectory,
                         stagedPath,
                         LinuxCurrentDirectory,
                         destinationPath,
                         LinuxRenameNoReplace
                     );
+                }
             }
             catch (EntryPointNotFoundException)
             {
@@ -1453,12 +1472,20 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 renamed = false;
                 return true;
             }
-            bool unavailable = isMac
-                ? error
-                    is MacOperationUnsupported
-                        or MacOperationUnavailable
-                        or MacOperationNotSupportedOnSocket
-                : error is LinuxOperationUnavailable or LinuxOperationUnsupported;
+            bool unavailable;
+            if (isMac)
+            {
+                unavailable =
+                    error
+                        is MacOperationUnsupported
+                            or MacOperationUnavailable
+                            or MacOperationNotSupportedOnSocket;
+            }
+            else
+            {
+                unavailable = error is LinuxOperationUnavailable or LinuxOperationUnsupported;
+            }
+
             if (unavailable || error is UnixOperationNotPermitted or UnixInvalidArgument)
             {
                 renamed = false;

@@ -8,13 +8,16 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
     internal static class RuntimeInformation
     {
-        internal static bool SimulateWindows { get; set; }
+        internal static OSPlatform? SimulatedPlatform { get; set; }
 
         internal static bool IsOSPlatform(OSPlatform platform)
         {
-            return SimulateWindows
-                ? platform == OSPlatform.Windows
-                : HostRuntimeInformation.IsOSPlatform(platform);
+            if (SimulatedPlatform is OSPlatform simulated)
+            {
+                return platform == simulated;
+            }
+
+            return HostRuntimeInformation.IsOSPlatform(platform);
         }
     }
 }
