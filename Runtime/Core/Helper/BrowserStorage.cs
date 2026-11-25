@@ -6,7 +6,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     using System;
     using System.Globalization;
     using UnityEngine;
-#if UNITY_EDITOR_WIN || (UNITY_WEBGL && !UNITY_EDITOR)
+#if UNITY_WEBGL && !UNITY_EDITOR
     using System.Runtime.InteropServices;
 #endif
 
@@ -15,13 +15,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     public sealed class BrowserStorage
     {
         private const string StoragePrefix = "WallstopBrowserStorage:";
-#if UNITY_EDITOR_WIN
-        private const int CurrentUserRegistryHive = unchecked((int)0x80000001);
-        private const int RegistryQueryValue = 1;
-        private const int RegistrySuccess = 0;
-        private const int RegistryFileNotFound = 2;
-        private const int RegistryPathNotFound = 3;
-#endif
 
         /// <summary>Gets a store that uses keys unchanged to read existing raw-key saves.</summary>
         /// <remarks>Shares the backend's key namespace with other callers; it does not migrate or delete existing data.</remarks>
@@ -59,18 +52,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         [DllImport("__Internal", ExactSpelling = true)]
         private static extern int WUHBrowserStorageDeleteKey(string key);
-#elif UNITY_EDITOR_WIN
-        [DllImport("advapi32.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
-        private static extern int RegOpenKeyExW(
-            IntPtr key,
-            string subKey,
-            int options,
-            int desiredAccess,
-            out IntPtr openedKey
-        );
-
-        [DllImport("advapi32.dll", ExactSpelling = true)]
-        private static extern int RegCloseKey(IntPtr key);
 #endif
 
         private static bool IsSupportedText(string value)
@@ -99,31 +80,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return true;
         }
 
-#if UNITY_EDITOR_WIN
-        private static bool CanQueryEditorPreferences()
-        {
-            // PlayerPrefs reports a denied registry query as a missing key.
-            string path = string.Concat(
-                @"Software\Unity\UnityEditor\",
-                Application.companyName,
-                @"\",
-                Application.productName
-            );
-            int status = RegOpenKeyExW(
-                new IntPtr(CurrentUserRegistryHive),
-                path,
-                0,
-                RegistryQueryValue,
-                out IntPtr key
-            );
-            if (status == RegistrySuccess)
-            {
-                return RegCloseKey(key) == RegistrySuccess;
-            }
-            return status == RegistryFileNotFound || status == RegistryPathNotFound;
-        }
-#endif
-
         /// <summary>Checks key existence and reports detected backend failures separately from absence.</summary>
         /// <remarks>
         /// Returns false with exists=false for invalid keys, an invalid scope, or detected backend failure.
@@ -149,7 +105,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 #else
                 bool present = PlayerPrefs.HasKey(storageKey);
 #if UNITY_EDITOR_WIN
-                if (!present && !CanQueryEditorPreferences())
+                // PlayerPrefs reports a denied registry query as a missing key.
+                if (!present && !WindowsEditorPlayerPrefs.CanQuery())
                 {
                     exists = false;
                     return false;
