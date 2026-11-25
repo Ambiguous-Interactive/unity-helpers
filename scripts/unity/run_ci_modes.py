@@ -20,11 +20,14 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, BinaryIO, cast
 
+from desktop_worker import create_worker_job
 from editmode_shards import merge_results, partition_assemblies
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator
     from types import FrameType
+
+    from desktop_worker import ModeProcess, WorkerJob
 
 ROOT = Path(__file__).resolve().parents[2]
 MODES = ("editmode", "playmode", "standalone")
@@ -71,7 +74,7 @@ class Mode:
 @dataclass
 class Worker:
     mode: Mode
-    process: subprocess.Popen[bytes]
+    process: ModeProcess
     started: float
     ended: float | None = None
     forced: bool = False
@@ -272,6 +275,7 @@ def launch(
     shell: str,
     environment: dict[str, str],
     stream: BinaryIO,
+    job: WorkerJob | None,
 ) -> Worker:
     config = directory / f"{mode.key}.json"
     config.write_text(json.dumps(mode.parameters), encoding="utf-8")
@@ -286,6 +290,10 @@ def launch(
         )
     if mode.name != "standalone":
         child_environment.pop("UH_NATIVE_ALLOCATOR_DIAGNOSTICS", None)
+    encoded = base64.b64encode(WORKER.encode("utf-16-le")).decode("ascii")
+    started = time.monotonic()
+    if job is not None:
+        return Worker(mode, job.launch(shell, encoded, child_environment, stream), started)
     command = [
         shell,
         "-NoProfile",
@@ -293,24 +301,14 @@ def launch(
         "-OutputFormat",
         "Text",
         "-EncodedCommand",
-        base64.b64encode(WORKER.encode("utf-16-le")).decode("ascii"),
+        encoded,
     ]
-    if sys.platform == "win32":
-        command = [
-            sys.executable,
-            str(Path(__file__).with_name("desktop_worker.py")),
-            "--shell",
-            shell,
-            "--encoded-worker",
-            base64.b64encode(WORKER.encode("utf-16-le")).decode("ascii"),
-        ]
-    started = time.monotonic()
-    process = subprocess.Popen(  # noqa: S603 - fixed PowerShell program; options travel as JSON data.
+    process = subprocess.Popen(  # noqa: S603 - fixed PowerShell program and typed options.
         command,
         env=child_environment,
         stdout=stream,
         stderr=subprocess.STDOUT,
-        start_new_session=os.name != "nt",
+        start_new_session=True,
     )
     return Worker(mode, process, started)
 
@@ -392,10 +390,17 @@ def run(
     initializers: list[Worker] = []
     worker_logs: dict[str, BinaryIO] = {}
     completed = False
+    cleanup_failed = False
+    windows_job = None
     try:
+        # Editors can connect to a licensing client started by a different
+        # mode. Keep the shared process tree until all modes have finished.
+        windows_job = create_worker_job()
         with contextlib.ExitStack() as streams:
             preparation_log = streams.enter_context((private / "activation.log").open("wb"))
-            preparation_worker = launch(preparation, private, shell, environment, preparation_log)
+            preparation_worker = launch(
+                preparation, private, shell, environment, preparation_log, windows_job
+            )
             wait([preparation_worker], started + min(timeout, 600))
             if preparation_worker.process.returncode != 0:
                 raise RuntimeError(
@@ -416,7 +421,7 @@ def run(
                     (private / f"{initialization.name}.log").open("wb")
                 )
                 initializer = launch(
-                    initialization, private, shell, environment, initialization_log
+                    initialization, private, shell, environment, initialization_log, windows_job
                 )
                 initializers.append(initializer)
                 wait([initializer], started + timeout)
@@ -448,9 +453,16 @@ def run(
                     folder.mkdir(parents=True, exist_ok=True)
                     stream = streams.enter_context((folder / "mode-controller.log").open("wb"))
                     worker_logs[mode.key] = stream
-                    workers.append(launch(mode, private, shell, environment, stream))
+                    workers.append(launch(mode, private, shell, environment, stream, windows_job))
 
             wait(workers, started + timeout, fill_available_slots)
+            if windows_job is not None:
+                job, windows_job = windows_job, None
+                try:
+                    job.close()
+                except OSError:
+                    cleanup_failed = True
+                    raise
             for worker in workers:
                 if worker.mode.name == "editmode_isolated" and worker.process.returncode == 0:
                     folder = Path(str(worker.mode.parameters["ArtifactsPath"]))
@@ -505,7 +517,6 @@ def run(
                     )
             completed = True
     finally:
-        cleanup_failed = False
         for worker in (
             initializers
             + ([preparation_worker] if preparation_worker is not None else [])
@@ -517,6 +528,12 @@ def run(
                 cleanup_failed = True
             if worker.ended is None:
                 worker.ended = time.monotonic()
+        if windows_job is not None:
+            try:
+                windows_job.close()
+            except OSError as error:
+                cleanup_failed = True
+                print(f"Could not reap the Unity controller job: {error}", file=sys.stderr)
         outcomes = dict.fromkeys((mode.outcome_key for mode in modes), "failure")
         if completed and not cleanup_failed:
             for name in outcomes:

@@ -9,6 +9,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 import uuid
 from pathlib import Path
 from typing import cast
@@ -23,11 +24,13 @@ from project_workspace import workspace
 from run_ci_modes import (
     ROOT,
     Mode,
+    Worker,
     build_modes,
     git,
     isolate_sources,
     read_selection,
     run,
+    stop,
 )
 
 PROFILES = {name: f"Subject.{name}" for name in ("editmode", "playmode", "standalone")}
@@ -574,6 +577,18 @@ def test_failed_initialization_retains_diagnostics_without_launching_workers(
 def test_timeout_kills_and_reaps_owned_workers(tmp_path: Path) -> None:
     modes, preparation, environment, shell = make_control(tmp_path)
     environment["CONTROL_HANG"] = "playmode"
+    project = tmp_path / "owned-generated-project"
+    project.mkdir()
+    (project / "retained.bin").write_bytes(b"workspace-timeout-control")
+    holder_ready = tmp_path / "holder-ready"
+    sleeper = Path(environment["CONTROL_SLEEPER"])
+    sleeper.write_text(
+        "import os, time\nfrom pathlib import Path\n"
+        f"os.chdir({str(project)!r})\n"
+        f"Path({str(holder_ready)!r}).touch()\n"
+        "time.sleep(60)\n",
+        encoding="utf-8",
+    )
     with pytest.raises(TimeoutError):
         run(
             modes,
@@ -594,6 +609,9 @@ def test_timeout_kills_and_reaps_owned_workers(tmp_path: Path) -> None:
     assert hung["ExitCode"] != 0
     assert set(receipt["Outcomes"].values()) == {"failure"}
     assert len(list((tmp_path / "events").glob("*.completed"))) == 2
+    assert holder_ready.exists()
+    retained = project.rename(tmp_path / "retained-generated-project")
+    assert (retained / "retained.bin").read_bytes() == b"workspace-timeout-control"
     child_id = int((tmp_path / "events/playmode.child").read_text(encoding="utf-8"))
     if os.name == "nt":
         status = subprocess.run(
@@ -613,6 +631,149 @@ def test_timeout_kills_and_reaps_owned_workers(tmp_path: Path) -> None:
         assert not status_path.exists() or status_path.read_text().rsplit(")", 1)[
             1
         ].strip().startswith("Z")
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows worker job lifetime")
+def test_windows_controller_keeps_shared_service_and_releases_owned_directory(
+    tmp_path: Path,
+) -> None:
+    modes, preparation, environment, shell = make_control(tmp_path)
+    project = tmp_path / "projects" / "generated"
+    evidence = {
+        "Assets/Editor/UhCiTestConfigurator.cs": b"public static class UhCiTestConfigurator {}",
+        "Assets/OdinLiveAddress-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/source.txt": b"source control",
+        "Library/WallstopOdinMigrationApply/active.txt": b"active migration",
+        "Library/WallstopOdinMigrationBackups/backup/state.json": b"backup control",
+        "Library/cache.bin": b"cache control",
+    }
+    for relative, data in evidence.items():
+        path = project / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+    stop_service = tmp_path / "stop-service"
+    service = tmp_path / "service.py"
+    service.write_text(
+        """
+import os
+import socket
+import sys
+import time
+from pathlib import Path
+
+port_path = Path(os.environ["UH_PROBE_DIRECTORY"]) / "port"
+response = b"workspace-service"
+if sys.argv[1] == "listen":
+    stop = port_path.with_name("stop-service")
+    deadline = time.monotonic() + 90
+    with socket.socket() as listener:
+        listener.bind(("127.0.0.1", 0))
+        listener.listen()
+        listener.settimeout(0.2)
+        pending = port_path.with_suffix(".tmp")
+        pending.write_text(str(listener.getsockname()[1]), encoding="ascii")
+        pending.replace(port_path)
+        while not stop.exists() and time.monotonic() < deadline:
+            try:
+                connection, _ = listener.accept()
+            except TimeoutError:
+                continue
+            with connection:
+                connection.settimeout(2)
+                connection.sendall(response)
+else:
+    port = int(port_path.read_text(encoding="ascii"))
+    with socket.create_connection(("127.0.0.1", port), timeout=2) as connection:
+        with connection.makefile("rb") as reader:
+            if reader.read(len(response) + 1) != response:
+                sys.exit(2)
+""",
+        encoding="utf-8",
+    )
+    source = Path(environment["UH_MODE_RUNNER"])
+    suffix = "        if ($env:CONTROL_HANG -eq $TestMode) {"
+    control = r"""
+        if ($TestMode -eq 'editmode') {
+            [IO.File]::WriteAllText((Join-Path $env:UH_PROBE_DIRECTORY 'owner-id'), [string]$PID)
+            $arguments = @(('"' + $env:UH_PROBE_SERVICE + '"'), 'listen')
+            $server = Start-Process -PassThru -FilePath $env:UH_PROBE_PYTHON -ArgumentList $arguments -WorkingDirectory (Join-Path $env:UH_PROBE_DIRECTORY 'projects/generated')
+            $until = [datetime]::UtcNow.AddSeconds(15)
+            while (-not (Test-Path -LiteralPath (Join-Path $env:UH_PROBE_DIRECTORY 'first-request'))) {
+                if ($server.HasExited -or [datetime]::UtcNow -gt $until) { throw 'Service did not receive first request.' }
+                Start-Sleep -Milliseconds 25
+            }
+        }
+        if ($TestMode -eq 'playmode') {
+            $until = [datetime]::UtcNow.AddSeconds(15)
+            while (-not (Test-Path -LiteralPath (Join-Path $env:UH_PROBE_DIRECTORY port))) {
+                if ([datetime]::UtcNow -gt $until) { throw 'Service did not start.' }
+                Start-Sleep -Milliseconds 25
+            }
+            & $env:UH_PROBE_PYTHON $env:UH_PROBE_SERVICE connect
+            if ($LASTEXITCODE -ne 0) { throw 'Initial service use failed.' }
+            [IO.File]::WriteAllText((Join-Path $env:UH_PROBE_DIRECTORY 'first-request'), 'ok')
+            $ownerId = [int][IO.File]::ReadAllText((Join-Path $env:UH_PROBE_DIRECTORY 'owner-id'))
+            $owner = Get-Process -Id $ownerId -ErrorAction SilentlyContinue
+            if ($null -ne $owner -and -not $owner.WaitForExit(15000)) { throw 'Owner did not finish.' }
+            & $env:UH_PROBE_PYTHON $env:UH_PROBE_SERVICE connect
+            if ($LASTEXITCODE -ne 0) { throw 'Shared service was interrupted.' }
+            [IO.File]::WriteAllText((Join-Path $env:UH_PROBE_DIRECTORY 'second-request'), 'ok')
+        }
+"""
+    worker_script = source.read_text(encoding="utf-8")
+    assert worker_script.count(suffix) == 1
+    source.write_text(worker_script.replace(suffix, control + suffix), encoding="utf-8")
+    environment.update(
+        UH_PROBE_SERVICE=str(service),
+        UH_PROBE_DIRECTORY=str(tmp_path),
+        UH_PROBE_PYTHON=sys.executable,
+    )
+    retain = tmp_path / "retain.ps1"
+    retain.write_text(
+        "param([string]$Helper, [string]$Project)\n"
+        "$ErrorActionPreference = 'Stop'\n"
+        ". $Helper\n"
+        "(Move-UnityProjectWithMigrationResidue -Project $Project).RetainedPath\n",
+        encoding="utf-8",
+    )
+    command = [
+        shell,
+        "-NoProfile",
+        "-File",
+        str(retain),
+        str(ROOT / "scripts/unity/lib/project-workspace.ps1"),
+        str(project),
+    ]
+    try:
+        success = run(
+            modes,
+            preparation,
+            private=tmp_path,
+            shell=shell,
+            environment=environment,
+            timeout=45,
+            receipt=tmp_path / "receipt.json",
+            output=None,
+        )
+        assert success, (tmp_path / "playmode/mode-controller.log").read_text(encoding="utf-8")
+        assert (tmp_path / "second-request").read_text(encoding="utf-8") == "ok"
+
+        conflict = tmp_path / "retained-projects"
+        conflict.write_bytes(b"existing conflict")
+        refused = subprocess.run(command, capture_output=True, text=True, timeout=30, check=False)
+        assert refused.returncode != 0
+        assert conflict.read_bytes() == b"existing conflict"
+        for relative, data in evidence.items():
+            assert (project / relative).read_bytes() == data
+        conflict.unlink()
+
+        moved = subprocess.run(command, capture_output=True, text=True, timeout=30, check=True)
+        retained = Path(moved.stdout.strip())
+        assert retained.parent == conflict
+        assert not project.exists()
+        for relative, data in evidence.items():
+            assert (retained / relative).read_bytes() == data
+    finally:
+        stop_service.touch()
 
 
 @pytest.mark.parametrize(
@@ -1041,6 +1202,105 @@ def test_private_desktop_cli_reports_launch_failure(tmp_path: Path) -> None:
     )
     assert result.returncode == 1
     assert "Cannot launch private Unity worker" in result.stderr
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows job and directory semantics")
+@pytest.mark.parametrize("outcome", ["success", "failure", "cancelled"])
+def test_windows_worker_releases_owned_project_and_preserves_foreign_process(
+    tmp_path: Path, outcome: str
+) -> None:
+    shell = shutil.which("pwsh")
+    assert shell is not None
+    holder = tmp_path / "hold-directory.py"
+    holder.write_text(
+        "import sys, time\n"
+        "from pathlib import Path\n"
+        "ready, release = (Path(value) for value in sys.argv[1:])\n"
+        "ready.touch()\n"
+        "for _ in range(600):\n"
+        "    if release.exists():\n"
+        "        break\n"
+        "    time.sleep(0.05)\n",
+        encoding="utf-8",
+    )
+    project = tmp_path / "project"
+    sibling = tmp_path / "sibling"
+    for directory in (project, sibling):
+        directory.mkdir()
+        (directory / "data").write_bytes(b"workspace bytes")
+    worker_ready = tmp_path / "worker-ready"
+    worker_release = tmp_path / "worker-release"
+    foreign_ready = tmp_path / "foreign-ready"
+    foreign_release = tmp_path / "foreign-release"
+    payload = """
+$ErrorActionPreference = 'Stop'
+$arguments = @('"' + $env:UH_TEST_HOLDER + '"', '"' + $env:UH_TEST_READY + '"',
+               '"' + $env:UH_TEST_RELEASE + '"')
+$child = Start-Process -PassThru -FilePath $env:UH_TEST_PYTHON -ArgumentList $arguments `
+    -WorkingDirectory $env:UH_TEST_PROJECT
+try {
+    $deadline = [Diagnostics.Stopwatch]::StartNew()
+    while (-not (Test-Path -LiteralPath $env:UH_TEST_READY)) {
+        if ($child.HasExited -or $deadline.Elapsed.TotalSeconds -ge 10) {
+            throw 'Directory holder did not start.'
+        }
+        Start-Sleep -Milliseconds 25
+    }
+    if ($env:UH_TEST_OUTCOME -eq 'cancelled') {
+        Start-Sleep -Seconds 30
+        throw 'Expected controller cancellation.'
+    }
+    if ($env:UH_TEST_OUTCOME -eq 'failure') { exit 37 }
+    exit 0
+} finally { $child.Dispose() }
+"""
+    encoded = base64.b64encode(payload.encode("utf-16-le")).decode("ascii")
+    environment = dict(
+        os.environ,
+        UH_TEST_HOLDER=str(holder),
+        UH_TEST_PROJECT=str(project),
+        UH_TEST_READY=str(worker_ready),
+        UH_TEST_RELEASE=str(worker_release),
+        UH_TEST_PYTHON=sys.executable,
+        UH_TEST_OUTCOME=outcome,
+    )
+    with subprocess.Popen(
+        [sys.executable, str(holder), str(foreign_ready), str(foreign_release)],
+        cwd=sibling,
+    ) as foreign:
+        try:
+            with subprocess.Popen(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/unity/desktop_worker.py"),
+                    "--shell",
+                    shell,
+                    "--encoded-worker",
+                    encoded,
+                ],
+                env=environment,
+            ) as launcher:
+                try:
+                    deadline = time.monotonic() + 15
+                    while not (worker_ready.exists() and foreign_ready.exists()):
+                        assert time.monotonic() < deadline, "Directory holders did not start"
+                        time.sleep(0.025)
+                    if outcome == "cancelled":
+                        worker = Worker(Mode("editmode", {}), launcher, time.monotonic())
+                        stop(worker)
+                        assert worker.forced
+                    else:
+                        assert launcher.wait(timeout=15) == (37 if outcome == "failure" else 0)
+                    retained = project.rename(tmp_path / "retained")
+                    assert (retained / "data").read_bytes() == b"workspace bytes"
+                    assert foreign.poll() is None
+                    assert (sibling / "data").read_bytes() == b"workspace bytes"
+                finally:
+                    worker_release.touch()
+                    if launcher.poll() is None:
+                        launcher.kill()
+        finally:
+            foreign_release.touch()
 
 
 def desktop_names() -> set[str]:
