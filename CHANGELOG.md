@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix Sentinel's first save overwriting a suppression file created by another tool while the save was in progress ([#863](https://github.com/Ambiguous-Interactive/unity-helpers/issues/863)).
 - Fix `BrowserStorage.TryHasKey` reporting denied Windows Editor storage as a missing key ([#1134](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1134)).
 - Fix package imports in Unity projects without Test Framework ([#1345](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1345)).
 - Fix texture scaling and layered sprite compositing on Web players and in `SINGLE_THREADED` builds ([#1277](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1277)).
