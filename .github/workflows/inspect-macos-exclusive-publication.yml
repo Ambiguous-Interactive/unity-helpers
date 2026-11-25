@@ -1,0 +1,56 @@
+name: Observe macOS exclusive file publication
+on:
+  push:
+    branches: [diagnostics/durable-publication-863-20261125]
+    paths: [.github/workflows/inspect-macos-exclusive-publication.yml]
+permissions:
+  contents: read
+jobs:
+  mac-primitive:
+    runs-on: [self-hosted, macOS, ARM64, RAM-16GB]
+    timeout-minutes: 5
+    steps:
+      - name: Exercise native exclusive rename and hard-link fallback primitives
+        shell: bash
+        run: |
+          set -euo pipefail
+          uname -sm
+          sw_vers -productVersion
+          python3 - <<'PY'
+          import ctypes
+          import errno
+          import os
+          import tempfile
+          from pathlib import Path
+
+          library = ctypes.CDLL("libSystem.B.dylib", use_errno=True)
+          library.renamex_np.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint]
+          library.renamex_np.restype = ctypes.c_int
+          library.link.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
+          library.link.restype = ctypes.c_int
+          with tempfile.TemporaryDirectory(prefix="uh-863-exclusive-") as scratch:
+              root = Path(scratch)
+              stage = root / "stage"
+              target = root / "suppression"
+              stage.write_bytes(b"pending")
+              target.write_bytes(b"other writer")
+              assert library.renamex_np(os.fsencode(stage), os.fsencode(target), 4) == -1
+              assert ctypes.get_errno() == errno.EEXIST
+              assert target.read_bytes() == b"other writer" and stage.read_bytes() == b"pending"
+              print("exclusive rename refuses the intervening destination and preserves both files")
+              target.unlink()
+              assert library.renamex_np(os.fsencode(stage), os.fsencode(target), 4) == 0
+              assert not stage.exists() and target.read_bytes() == b"pending"
+              print("exclusive rename publishes a complete file and consumes its stage")
+              stage.write_bytes(b"fallback data")
+              assert library.link(os.fsencode(stage), os.fsencode(target)) == -1
+              assert ctypes.get_errno() == errno.EEXIST and target.read_bytes() == b"pending"
+              target.unlink()
+              assert library.link(os.fsencode(stage), os.fsencode(target)) == 0
+              assert stage.read_bytes() == target.read_bytes() == b"fallback data"
+              stage.unlink()
+              assert target.read_bytes() == b"fallback data"
+              print("exclusive hard link refuses collision and survives removal of its staged name")
+          assert not root.exists()
+          print("scratch cleanup verified")
+          PY
