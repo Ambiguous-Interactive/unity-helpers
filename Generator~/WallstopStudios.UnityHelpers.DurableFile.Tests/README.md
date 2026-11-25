@@ -30,6 +30,13 @@ check that a failed replacement leaves the old file in place, restores the backu
 backup when a competing destination blocks restoration. They also check that another write
 leaves the retained backup intact.
 
+The conditional text tests create a competing file immediately after the real absence read.
+They check that late creation reports a conflict and preserves the competing bytes, and that
+publication succeeds with a clean staging directory when the destination stays absent. They cover
+the host publication path, including exclusive rename on supporting Unix filesystems, and the
+Windows branch through the platform selector. The success controls also cover destination names
+that fit on disk but would overflow the filename limit if used as a staging-name prefix.
+
 `FileHelperInitializationTests` starts the same assembly as an isolated executable on 64-bit Linux.
 Its child lowers its own `RLIMIT_FSIZE` and ignores `SIGXFSZ` before calling the actual source-linked
 initializer. Both buffered 128-byte writes and direct 65,536-byte writes exceed limits of zero, one,

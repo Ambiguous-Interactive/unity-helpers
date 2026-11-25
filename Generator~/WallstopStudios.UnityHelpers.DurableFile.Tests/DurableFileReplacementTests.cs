@@ -6,12 +6,14 @@ namespace WallstopStudios.UnityHelpers.DurableFile.Tests
     using System;
     using System.Collections.Generic;
     using System.IO;
+    using System.Runtime.InteropServices;
     using System.Text;
     using System.Threading.Tasks;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Tests.Helper;
     using RealFile = System.IO.File;
+    using RuntimeInformation = WallstopStudios.UnityHelpers.Core.Helper.RuntimeInformation;
     using SimulatedFile = WallstopStudios.UnityHelpers.Core.Helper.File;
 
     /// <summary>Checks source-linked publication with explicitly simulated capability failures.</summary>
@@ -195,8 +197,93 @@ namespace WallstopStudios.UnityHelpers.DurableFile.Tests
         public void TearDown()
         {
             SimulatedFile.Reset();
-            RuntimeInformation.SimulateWindows = false;
+            RuntimeInformation.SimulatedPlatform = null;
             Directory.Delete(_directory, recursive: true);
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void CompareMissingTextPreservesFileCreatedAfterRead(bool simulateWindows)
+        {
+            if (simulateWindows)
+            {
+                RuntimeInformation.SimulatedPlatform = OSPlatform.Windows;
+            }
+
+            const string intervening = "suppression created by another writer";
+            SimulatedFile.AfterMissingTextRead = path => RealFile.WriteAllText(path, intervening);
+
+            bool completed = DurableFile.TryCompareThenReplaceAllText(
+                _destination,
+                expectedExists: false,
+                expectedContents: string.Empty,
+                replacementContents: ReplacementText,
+                out bool exchanged,
+                out Exception error
+            );
+
+            Assert.IsTrue(completed, error?.ToString());
+            Assert.AreEqual(intervening, RealFile.ReadAllText(_destination));
+            Assert.IsFalse(exchanged);
+            Assert.AreEqual(0, SimulatedFile.ReplacementCalls);
+            CollectionAssert.AreEquivalent(
+                new[] { _source, _destination },
+                Directory.GetFiles(_directory)
+            );
+        }
+
+        [TestCase(false, 12)]
+        [TestCase(true, 12)]
+        [TestCase(false, 220)]
+        [TestCase(true, 220)]
+        public void CompareMissingTextPublishesWhenDestinationStaysAbsent(
+            bool simulateWindows,
+            int basenameLength
+        )
+        {
+            if (simulateWindows)
+            {
+                RuntimeInformation.SimulatedPlatform = OSPlatform.Windows;
+            }
+
+            _destination = Path.Combine(_directory, new string('s', basenameLength));
+
+            bool completed = DurableFile.TryCompareThenReplaceAllText(
+                _destination,
+                expectedExists: false,
+                expectedContents: string.Empty,
+                replacementContents: ReplacementText,
+                out bool exchanged,
+                out Exception error
+            );
+
+            Assert.IsTrue(completed, error?.ToString());
+            Assert.IsTrue(exchanged);
+            Assert.AreEqual(ReplacementText, RealFile.ReadAllText(_destination));
+            CollectionAssert.AreEquivalent(
+                new[] { _source, _destination },
+                Directory.GetFiles(_directory)
+            );
+        }
+
+        [Test]
+        public void CompareMissingTextReportsUnsupportedPlatformAsPublicationFailure()
+        {
+            RuntimeInformation.SimulatedPlatform = OSPlatform.Create("Unsupported");
+
+            bool completed = DurableFile.TryCompareThenReplaceAllText(
+                _destination,
+                expectedExists: false,
+                expectedContents: string.Empty,
+                replacementContents: ReplacementText,
+                out bool exchanged,
+                out Exception error
+            );
+
+            Assert.IsFalse(completed);
+            Assert.IsFalse(exchanged);
+            Assert.That(error, Is.TypeOf<PlatformNotSupportedException>());
+            CollectionAssert.AreEquivalent(new[] { _source }, Directory.GetFiles(_directory));
         }
 
         [Test]
@@ -492,7 +579,7 @@ namespace WallstopStudios.UnityHelpers.DurableFile.Tests
             bool conflictingDestination
         )
         {
-            RuntimeInformation.SimulateWindows = true;
+            RuntimeInformation.SimulatedPlatform = OSPlatform.Windows;
             RealFile.WriteAllBytes(_destination, OriginalBytes);
             IOException failure = new IOException("Simulated Windows rename refusal.", errorCode);
             SimulatedFile.ReplacementFailure = failure;

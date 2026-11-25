@@ -59,7 +59,17 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         private const int MaximumInitializationStageNameLength = 32;
         private const int MaximumInitializationStageAttempts = 64;
+        private const int UnixOperationNotPermitted = 1;
         private const int UnixNameAlreadyExists = 17;
+        private const int UnixInvalidArgument = 22;
+        private const int LinuxCurrentDirectory = -100;
+        private const int LinuxOperationUnavailable = 38;
+        private const int LinuxOperationUnsupported = 95;
+        private const int MacOperationUnsupported = 45;
+        private const int MacOperationUnavailable = 78;
+        private const int MacOperationNotSupportedOnSocket = 102;
+        private const uint LinuxRenameNoReplace = 1;
+        private const uint MacRenameExclusive = 4;
         private const int DefaultBufferSize = 4096;
 
         // FileMode.Append does not provide atomic append; bounded per-path gates prevent writer overlap.
@@ -828,8 +838,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             using (EnterGate(path))
             {
-                string temporaryPath =
-                    path + ".create." + Guid.NewGuid().ToString("N") + TemporarySuffix;
+                string temporaryPath = null;
                 FileStream ownership = null;
                 bool ownsTemporary = false;
                 bool moved = false;
@@ -840,14 +849,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     {
                         return false;
                     }
+                    temporaryPath = UniqueCreationStagingPath(path);
                     using (
-                        FileStream staging = new(
+                        FileStream staging = OpenStagingStream(
                             temporaryPath,
-                            FileMode.CreateNew,
-                            FileAccess.Write,
-                            FileShare.None,
-                            DefaultBufferSize,
-                            useAsync: false
+                            useAsync: false,
+                            createNew: true
                         )
                     )
                     {
@@ -903,14 +910,16 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// Publishes a staged file only if the destination has no directory entry.
         /// </summary>
         /// <remarks>
-        /// A successful Unix hard link leaves the staged name behind for the caller to remove.
-        /// Windows moves the staged name. On collision the staged name remains on every platform.
+        /// A successful hard link leaves the staged name behind for the caller to remove.
+        /// A successful rename consumes the staged name. A collision keeps it on every platform.
         /// </remarks>
         /// <returns>True if published, false if the destination was already occupied.</returns>
+        /// <exception cref="PlatformNotSupportedException">The platform has no supported publication operation.</exception>
         internal static bool TryPublishStagedFileWithoutOverwrite(
             string stagedPath,
             string destinationPath,
-            out bool leavesStaged
+            out bool leavesStaged,
+            bool preferExclusiveRename = false
         )
         {
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -928,20 +937,35 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
             }
 
+            bool isMac = RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
+            if (!isMac && !RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+                throw new PlatformNotSupportedException(
+                    "Exclusive file publication is unavailable on this platform."
+                );
+            }
+            if (
+                preferExclusiveRename
+                && TryRenameUnixWithoutOverwrite(
+                    stagedPath,
+                    destinationPath,
+                    isMac,
+                    out bool renamed
+                )
+            )
+            {
+                leavesStaged = !renamed;
+                return renamed;
+            }
+
             int result;
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            if (isMac)
             {
                 result = CreateHardLinkMac(stagedPath, destinationPath);
             }
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-            {
-                result = CreateHardLinkLinux(stagedPath, destinationPath);
-            }
             else
             {
-                throw new PlatformNotSupportedException(
-                    "Exclusive file publication needs hard links."
-                );
+                result = CreateHardLinkLinux(stagedPath, destinationPath);
             }
 
             if (result == 0)
@@ -1075,9 +1099,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         /// <summary>Compares current text, then stages and replaces the file.</summary>
         /// <remarks>
-        /// The staging-file ownership spans the read, staging write, and replacement, so cooperating
-        /// staged-replacement DurableFile writers cannot change the destination during this operation.
-        /// A writer that does not acquire that ownership can change it after the read and before replacement.
+        /// DurableFile writers in this process share the destination gate from comparison through
+        /// publication. An external writer can change an existing file between those steps.
+        /// When the comparison expects absence, publication refuses to overwrite any intervening creation.
         /// </remarks>
         internal static bool TryCompareThenReplaceAllText(
             string path,
@@ -1096,6 +1120,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
 
             string temporaryPath = path + TemporarySuffix;
+            string stagedPath = temporaryPath;
             using (EnterGate(path))
             {
                 FileStream ownership = null;
@@ -1132,7 +1157,16 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         return true;
                     }
 
-                    staging = OpenStagingStream(temporaryPath, useAsync: false);
+                    if (!expectedExists)
+                    {
+                        // A surviving hard-link stage must never be reopened for truncation.
+                        stagedPath = UniqueCreationStagingPath(path);
+                    }
+                    staging = OpenStagingStream(
+                        stagedPath,
+                        useAsync: false,
+                        createNew: !expectedExists
+                    );
                     ownsStaging = true;
                     byte[] bytes = Utf8NoByteOrderMark.GetBytes(
                         replacementContents ?? string.Empty
@@ -1141,10 +1175,25 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     staging.Flush(flushToDisk: true);
                     staging.Dispose();
                     staging = null;
-                    Swap(temporaryPath, path);
-                    ownsStaging = false;
+                    bool published;
+                    if (expectedExists)
+                    {
+                        Swap(stagedPath, path);
+                        ownsStaging = false;
+                        published = true;
+                    }
+                    else
+                    {
+                        published = TryPublishStagedFileWithoutOverwrite(
+                            stagedPath,
+                            path,
+                            out bool leavesStaged,
+                            preferExclusiveRename: true
+                        );
+                        ownsStaging = leavesStaged;
+                    }
                     error = null;
-                    exchanged = true;
+                    exchanged = published;
                     return true;
                 }
                 catch (Exception failure)
@@ -1157,7 +1206,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 {
                     ReleaseFileStream(staging);
                     if (ownsStaging)
-                        DiscardStagedFile(temporaryPath);
+                        DiscardStagedFile(stagedPath);
                     ReleaseStagingOwnership(ownership);
                 }
             }
@@ -1273,11 +1322,21 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         // Only a successful exclusive staging open establishes cleanup ownership; failed opens may name another writer.
         /// <summary>Opens the staging file exclusively for writing.</summary>
-        internal static FileStream OpenStagingStream(string temporaryPath, bool useAsync)
+        internal static FileStream OpenStagingStream(
+            string temporaryPath,
+            bool useAsync,
+            bool createNew = false
+        )
         {
+            FileMode mode = FileMode.Create;
+            if (createNew)
+            {
+                mode = FileMode.CreateNew;
+            }
+
             return new FileStream(
                 temporaryPath,
-                FileMode.Create,
+                mode,
                 FileAccess.Write,
                 FileShare.None,
                 DefaultBufferSize,
@@ -1362,8 +1421,92 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 
+        private static string UniqueCreationStagingPath(string path)
+        {
+            return Path.Combine(
+                Path.GetDirectoryName(Path.GetFullPath(path)),
+                ".create." + Guid.NewGuid().ToString("N") + TemporarySuffix
+            );
+        }
+
+        // A hard link is also exclusive and covers volumes that reject the rename flag.
+        private static bool TryRenameUnixWithoutOverwrite(
+            string stagedPath,
+            string destinationPath,
+            bool isMac,
+            out bool renamed
+        )
+        {
+            int result;
+            try
+            {
+                if (isMac)
+                {
+                    result = RenameExclusiveMac(stagedPath, destinationPath, MacRenameExclusive);
+                }
+                else
+                {
+                    result = RenameExclusiveLinux(
+                        LinuxCurrentDirectory,
+                        stagedPath,
+                        LinuxCurrentDirectory,
+                        destinationPath,
+                        LinuxRenameNoReplace
+                    );
+                }
+            }
+            catch (EntryPointNotFoundException)
+            {
+                renamed = false;
+                return false;
+            }
+            if (result == 0)
+            {
+                renamed = true;
+                return true;
+            }
+
+            int error = Marshal.GetLastWin32Error();
+            if (error == UnixNameAlreadyExists)
+            {
+                renamed = false;
+                return true;
+            }
+            bool unavailable;
+            if (isMac)
+            {
+                unavailable =
+                    error
+                        is MacOperationUnsupported
+                            or MacOperationUnavailable
+                            or MacOperationNotSupportedOnSocket;
+            }
+            else
+            {
+                unavailable = error is LinuxOperationUnavailable or LinuxOperationUnsupported;
+            }
+
+            if (unavailable || error is UnixOperationNotPermitted or UnixInvalidArgument)
+            {
+                renamed = false;
+                return false;
+            }
+            throw new IOException(
+                $"Could not publish '{destinationPath}' with an exclusive rename (OS error {error})."
+            );
+        }
+
         [DllImport("libc", EntryPoint = "link", ExactSpelling = true, SetLastError = true)]
         private static extern int CreateHardLinkLinux(string stagedPath, string destinationPath);
+
+        [DllImport("libc", EntryPoint = "renameat2", ExactSpelling = true, SetLastError = true)]
+        private static extern int RenameExclusiveLinux(
+            int sourceDirectory,
+            string stagedPath,
+            int destinationDirectory,
+            string destinationPath,
+            uint flags
+        );
 
         [DllImport(
             "libSystem.B.dylib",
@@ -1372,6 +1515,18 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             SetLastError = true
         )]
         private static extern int CreateHardLinkMac(string stagedPath, string destinationPath);
+
+        [DllImport(
+            "libSystem.B.dylib",
+            EntryPoint = "renamex_np",
+            ExactSpelling = true,
+            SetLastError = true
+        )]
+        private static extern int RenameExclusiveMac(
+            string stagedPath,
+            string destinationPath,
+            uint flags
+        );
 
         private static async ValueTask<Exception> WriteStagedAsync(
             string path,
