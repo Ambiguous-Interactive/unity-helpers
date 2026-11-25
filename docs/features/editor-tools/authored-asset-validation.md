@@ -227,9 +227,10 @@ re-importing. Refusals are printed, and each one says which of the five things h
 could not be read, the rewrite lost objects, the rewrite threw, the undo itself failed, or nothing
 changed. The original bytes are staged before replacement, so a staging failure does not truncate
 the asset. If the file differs from the rewrite snapshot when rollback checks, rollback refuses to
-replace it and reports that manual recovery is needed. The comparison and replacement share a lock
-with cooperating staged-replacement `DurableFile` writers; edits by other tools can still race with
-that lock, and an edit made before the snapshot cannot be distinguished from the rewrite. On
+replace it and reports that manual recovery is needed. The comparison and replacement share
+[the destination writer lock](../utilities/helper-utilities.md#durable-writes-for-player-data).
+Rollback refuses while a cooperating writer holds the lock. Direct edits can still race with
+replacement, and the snapshot can include an edit made during the rewrite. On
 platforms without `File.Replace`, rollback reports failure and preserves the current asset. Commit
 or stash first.
 

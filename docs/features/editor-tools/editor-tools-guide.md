@@ -452,10 +452,10 @@ public static class SpriteProfilePersistenceExample
 The path must be a `.asset` file in an existing folder under `Assets`. Saving refuses an occupied
 path unless `overwriteExisting` is `true`, and never replaces an asset of another type. Saved and
 loaded profiles are separate copies. A new save stages its asset and refuses a destination that
-becomes occupied before the move. Overwrite refuses a file whose bytes changed before replacement.
-Noncooperating external writers can still race with replacement or staging cleanup (tracked in #863). Asset
-file writes and reimports cannot be fully reversed by Unity Undo; use version control to recover an
-earlier saved asset. A failed save leaves its staged asset in place because another writer may have
+becomes occupied before the move. Overwrite refuses a destination whose bytes changed before
+comparison. Cleanup keeps the staging asset when its Unity GUID or file bytes differ from the
+snapshot taken when the stage was created. External writers can still make changes after the check. Unity asset deletion and
+reimport have limited Undo support. Use version control to recover an earlier saved asset. A failed save leaves its staged asset in place because another writer may have
 changed it; check the reported path before retrying or removing it. If restoring an absent file
 fails, the error also identifies the staged restore bytes for inspection.
 

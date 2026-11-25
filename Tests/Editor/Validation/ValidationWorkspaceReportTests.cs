@@ -12,6 +12,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     using System.Xml;
     using NUnit.Framework;
     using UnityEngine;
+    using UnityEngine.UIElements;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Validation.Continuous;
     using WallstopStudios.UnityHelpers.Tests.Core;
@@ -212,13 +213,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         {
             string original = "# reviewed by team\nunknown|other|field\n";
             ValidationFinding finding = Finding(ValidationSeverity.Error);
-            string changed = ValidationWindow.WithSuppression(original, finding, true);
+            string changed = ValidationSuppressionFile.WithSuppression(original, finding, true);
             StringAssert.Contains(original, changed);
             ValidationSuppressions parsed = ValidationSuppressions.Parse(changed);
             Assert.AreEqual(2, parsed.Count);
             Assert.IsTrue(parsed.IsSuppressed(in finding));
-            Assert.AreEqual(changed, ValidationWindow.WithSuppression(changed, finding, true));
-            string restored = ValidationWindow.WithSuppression(changed, finding, false);
+            Assert.AreEqual(
+                changed,
+                ValidationSuppressionFile.WithSuppression(changed, finding, true)
+            );
+            string restored = ValidationSuppressionFile.WithSuppression(changed, finding, false);
             CollectionAssert.AreEqual(
                 new[] { "unknown|other|field" },
                 ValidationSuppressions.Parse(restored).Ids
@@ -257,7 +261,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                         path,
                         false,
                         snapshot,
-                        ValidationWindow.WithSuppression(snapshot, first, true),
+                        ValidationSuppressionFile.WithSuppression(snapshot, first, true),
                         out bool exchanged,
                         out Exception error
                     );
@@ -265,7 +269,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 });
                 Assert.IsTrue(firstRead.Wait(TimeSpan.FromSeconds(10)));
                 string secondSnapshot = string.Empty;
-                string secondText = ValidationWindow.WithSuppression(secondSnapshot, second, true);
+                string secondText = ValidationSuppressionFile.WithSuppression(
+                    secondSnapshot,
+                    second,
+                    true
+                );
                 Assert.IsTrue(
                     DurableFile.TryCompareThenReplaceAllText(
                         path,
@@ -286,7 +294,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 Assert.AreEqual(secondText, File.ReadAllText(path));
 
                 string latest = File.ReadAllText(path);
-                string combined = ValidationWindow.WithSuppression(latest, first, true);
+                string combined = ValidationSuppressionFile.WithSuppression(latest, first, true);
                 Assert.IsTrue(
                     DurableFile.TryCompareThenReplaceAllText(
                         path,
@@ -323,6 +331,146 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             {
                 secondSaved.Set();
                 File.Delete(path);
+            }
+        }
+
+        [Test]
+        public void SuppressionSaveAndUndoPreserveContentChangedByOtherWriters()
+        {
+            string directory = Path.Combine(
+                Application.temporaryCachePath,
+                Guid.NewGuid().ToString("N")
+            );
+            Directory.CreateDirectory(directory);
+            string path = Path.Combine(directory, "ValidationSuppressions.txt");
+            string temporaryPath = path + DurableFile.TemporarySuffix;
+            ValidationFinding finding = Finding(ValidationSeverity.Error);
+            const string original = "unknown|other|field";
+            try
+            {
+                File.WriteAllText(path, original);
+                Assert.IsTrue(
+                    DurableFile.TryOpenStagingOwnership(
+                        temporaryPath,
+                        out FileStream writer,
+                        out Exception error
+                    ),
+                    error?.ToString()
+                );
+                using (writer)
+                {
+                    Assert.IsFalse(
+                        ValidationSuppressionFile.TryChange(
+                            path,
+                            finding.Id,
+                            finding,
+                            true,
+                            out Func<string> refusedUndo,
+                            out string failure
+                        )
+                    );
+                    Assert.IsTrue(refusedUndo == null);
+                    StringAssert.Contains("Could not save suppression", failure);
+                    Assert.AreEqual(original, File.ReadAllText(path));
+                }
+
+                Assert.IsTrue(
+                    ValidationSuppressionFile.TryChange(
+                        path,
+                        finding.Id,
+                        finding,
+                        true,
+                        out Func<string> undo,
+                        out string applyError
+                    ),
+                    applyError
+                );
+                Assert.IsTrue(undo != null);
+                string published = File.ReadAllText(path);
+                ValidationSuppressions parsed = ValidationSuppressions.Parse(published);
+                Assert.IsTrue(parsed.IsSuppressed(in finding));
+
+                const string externalEdit = "another|rule|path";
+                File.WriteAllText(path, externalEdit);
+                StringAssert.Contains("The suppression file changed", undo());
+                Assert.AreEqual(externalEdit, File.ReadAllText(path));
+
+                File.WriteAllText(path, published);
+                Assert.IsTrue(
+                    DurableFile.TryOpenStagingOwnership(temporaryPath, out writer, out error),
+                    error?.ToString()
+                );
+                using (writer)
+                {
+                    StringAssert.Contains("Could not undo suppression", undo());
+                    Assert.AreEqual(published, File.ReadAllText(path));
+                }
+
+                Assert.IsTrue(undo() == null);
+                Assert.AreEqual(original, File.ReadAllText(path));
+            }
+            finally
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+
+        [Test]
+        public void SuppressionWindowRetainsUndoAfterWriterContention()
+        {
+            string directory = Path.Combine(
+                Application.temporaryCachePath,
+                Guid.NewGuid().ToString("N")
+            );
+            Directory.CreateDirectory(directory);
+            string path = Path.Combine(directory, "ValidationSuppressions.txt");
+            string temporaryPath = path + DurableFile.TemporarySuffix;
+            const string original = "unknown|another|field";
+            ValidationFinding finding = Finding(ValidationSeverity.Error);
+            ValidationWindow window = Track(ScriptableObject.CreateInstance<ValidationWindow>());
+            try
+            {
+                File.WriteAllText(path, original);
+                Assert.IsTrue(
+                    ValidationSuppressionFile.TryChange(
+                        path,
+                        finding.Id,
+                        finding,
+                        true,
+                        out Func<string> undo,
+                        out string applyError
+                    ),
+                    applyError
+                );
+                window.ShowSuppressionUndo("Issue suppressed.", undo);
+                VisualElement toast = window.rootVisualElement.Q(className: "sentinel-toast");
+                Assert.IsTrue(toast != null);
+                Assert.AreEqual("Undo", toast.Q<Button>().text);
+                string published = File.ReadAllText(path);
+                Assert.IsTrue(
+                    DurableFile.TryOpenStagingOwnership(
+                        temporaryPath,
+                        out FileStream writer,
+                        out Exception error
+                    ),
+                    error?.ToString()
+                );
+                using (writer)
+                {
+                    window.UndoLastChange();
+                    StringAssert.Contains("Could not undo suppression", window._status);
+                    Assert.AreEqual("Undo", toast.Q<Button>().text);
+                    Assert.AreEqual(published, File.ReadAllText(path));
+                }
+
+                window.UndoLastChange();
+                Assert.AreEqual("Suppression change undone.", window._status);
+                Assert.AreNotEqual("Undo", toast.Q<Button>().text);
+                Assert.AreEqual(original, File.ReadAllText(path));
+            }
+            finally
+            {
+                Directory.Delete(directory, recursive: true);
             }
         }
 

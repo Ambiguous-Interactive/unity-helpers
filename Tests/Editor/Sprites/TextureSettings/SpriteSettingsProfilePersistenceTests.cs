@@ -521,8 +521,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             Assert.IsFalse(SpriteSettingsApplierAPI.ProfilesMatchExpected(null, 1, expectedJson));
         }
 
-        [Test]
-        public void SuccessfulStagingCleanupRemovesOnlyTheStagedAsset()
+        [TestCase(false, false)]
+        [TestCase(true, false)]
+        [TestCase(false, true)]
+        public void StagingCleanupRemovesOnlyTheUnchangedStagedAsset(
+            bool editContents,
+            bool changeIdentity
+        )
         {
             Assert.IsTrue(
                 SpriteSettingsApplierAPI.TrySaveProfiles(
@@ -538,12 +543,111 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 ScriptableObject.CreateInstance<SpriteSettingsProfileCollection>()
             );
             AssetDatabase.CreateAsset(staged, stagedPath);
+            string guid = AssetDatabase.AssetPathToGUID(stagedPath);
+            byte[] contents = File.ReadAllBytes(stagedPath);
+            if (editContents)
+            {
+                File.AppendAllText(stagedPath, "\n# later staged edit\n");
+            }
+            if (changeIdentity)
+            {
+                string replacementPath = Root + "/replacement.asset";
+                Assert.IsTrue(AssetDatabase.CopyAsset(stagedPath, replacementPath));
+                Assert.IsTrue(AssetDatabase.DeleteAsset(stagedPath));
+                Assert.AreEqual(string.Empty, AssetDatabase.MoveAsset(replacementPath, stagedPath));
+                Assert.AreNotEqual(guid, AssetDatabase.AssetPathToGUID(stagedPath));
+            }
+
+            byte[] beforeCleanup = File.ReadAllBytes(stagedPath);
+            bool removed = SpriteSettingsApplierAPI.TryDeleteProfileAsset(
+                stagedPath,
+                guid,
+                contents,
+                out error
+            );
+
+            if (editContents || changeIdentity)
+            {
+                Assert.IsFalse(removed);
+                StringAssert.Contains("changed before cleanup", error);
+                CollectionAssert.AreEqual(beforeCleanup, File.ReadAllBytes(stagedPath));
+                Assert.IsTrue(AssetDatabase.LoadMainAssetAtPath(stagedPath) != null);
+            }
+            else
+            {
+                Assert.IsTrue(removed, error);
+                Assert.IsFalse(File.Exists(stagedPath));
+                Assert.IsTrue(AssetDatabase.LoadMainAssetAtPath(stagedPath) == null);
+            }
+            Assert.IsTrue(AssetDatabase.LoadMainAssetAtPath(ProfilePath) != null);
+        }
+
+        [Test]
+        public void OverwritePreservesStagingChangedDuringAssetSave()
+        {
             Assert.IsTrue(
-                SpriteSettingsApplierAPI.TryDeleteProfileAsset(stagedPath, out error),
+                SpriteSettingsApplierAPI.TrySaveProfiles(
+                    ProfilePath,
+                    new List<SpriteSettings> { new() { name = "Original" } },
+                    false,
+                    out string error
+                ),
                 error
             );
-            Assert.IsTrue(AssetDatabase.LoadMainAssetAtPath(stagedPath) == null);
-            Assert.IsTrue(AssetDatabase.LoadMainAssetAtPath(ProfilePath) != null);
+            byte[] original = File.ReadAllBytes(ProfilePath);
+            string triggerPath = Root + "/SaveTrigger.asset";
+            SpriteSettingsProfileCollection trigger = Track(
+                ScriptableObject.CreateInstance<SpriteSettingsProfileCollection>()
+            );
+            AssetDatabase.CreateAsset(trigger, triggerPath);
+            trigger.profiles = new() { new() { name = "Dirty save trigger" } };
+            EditorUtility.SetDirty(trigger);
+
+            string editedStage = null;
+            byte[] editedContents = null;
+            SpriteProfileStagingEditProcessor.BeforeSave = paths =>
+            {
+                if (
+                    editedStage != null
+                    || !Array.Exists(paths, path =>
+                        string.Equals(path, triggerPath, StringComparison.Ordinal)
+                    )
+                )
+                {
+                    return;
+                }
+
+                string[] stages = StagedAssetFiles();
+                if (stages.Length != 1)
+                {
+                    return;
+                }
+                editedStage = stages[0];
+                File.AppendAllText(editedStage, "\n# staged edit during save\n");
+                editedContents = File.ReadAllBytes(editedStage);
+            };
+            try
+            {
+                bool saved = SpriteSettingsApplierAPI.TrySaveProfiles(
+                    ProfilePath,
+                    new List<SpriteSettings> { new() { name = "Replacement" } },
+                    true,
+                    out error
+                );
+
+                Assert.IsTrue(
+                    editedStage != null,
+                    "Unity did not run the staged edit during SaveAssets."
+                );
+                Assert.IsFalse(saved);
+                StringAssert.Contains("changed before cleanup", error);
+                CollectionAssert.AreEqual(original, File.ReadAllBytes(ProfilePath));
+                CollectionAssert.AreEqual(editedContents, File.ReadAllBytes(editedStage));
+            }
+            finally
+            {
+                SpriteProfileStagingEditProcessor.BeforeSave = null;
+            }
         }
 
         [Test]

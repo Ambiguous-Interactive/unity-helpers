@@ -16,6 +16,10 @@
     />
     <Compile Include="../../Runtime/Core/Helper/DurableFile.cs" Link="DurableFile.cs" />
     <Compile
+      Include="../../Runtime/Core/Helper/DurableFileOwnershipStream.cs"
+      Link="DurableFileOwnershipStream.cs"
+    />
+    <Compile
       Include="../../Tests/Runtime/Helper/DurableFileSidecarMoveTests.cs"
       Link="DurableFileSidecarMoveTests.cs"
     />

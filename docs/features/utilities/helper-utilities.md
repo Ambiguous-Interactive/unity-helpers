@@ -1346,20 +1346,26 @@ cancelled append may have written part of its new record.
 - The data is forced out of the page cache before the swap makes it live.
 - Concurrent writes to the same path from your game are serialized.
 - Windows sharing violations and replacement error 1175 receive up to three replacement attempts with 10 ms and 20 ms waits. The staged bytes and ownership remain held through these attempts. Persistent contention reports failure and preserves the previous save.
-- A second process using the public `DurableFile` write, append, or delete APIs cannot change the same
-  destination while the first operation owns it. Its competing operation reports failure.
+- On local Windows, macOS, and Linux filesystems that support the required locks, cooperating
+  `DurableFile` write, copy, append, and delete operations share one destination lock across
+  processes. A competing writer reports failure and can retry after the owner finishes. All
+  processes need to use the same lock protocol. On other targets, rely on the in-process gate.
 
 **What it does not promise:**
 
 - Power loss can roll back a directory update even after the file data has been flushed.
 - The ownership applies to one destination at a time. It is not a transaction across several files.
 - Tools that do not use `DurableFile` do not share this ownership and can still edit a destination.
-- An internal compare-then-replace operation checks a file before staging its replacement, but
-  unrelated writers can edit the destination between that check and the swap. It does not provide
-  atomic content compare-and-swap against external tools. See [#863](https://github.com/Ambiguous-Interactive/unity-helpers/issues/863)
-  for the stronger contract under investigation. Tests reproduce a direct edit after comparison for both text
-  and byte replacement: the complete staged replacement wins, so the external edit is lost. Use a
-  shared writer protocol or a transactional store when that loss is unacceptable.
+- An existing-file comparison runs under ownership through staging and replacement. It refuses stale
+  bytes that it reads. A tool that writes the file directly can change the bytes after that comparison,
+  and a complete replacement can overwrite those edits.
+- The same destination path and lock name must resolve to the same files for all writers. Keep the
+  parent directory and lock file in place while writers run. Network filesystems and tools that write
+  through separate paths or replace the lock file are outside the cross-process contract.
+
+The shared lock keeps the existing save formats and Unity asset paths. A transactional store can
+enforce an expected version when every writer uses the store. It would require moving the authoritative
+data to that store and updating every writer, including tools that currently edit the file directly.
 
 <!-- cspell:ignore shm -->
 
@@ -1391,8 +1397,10 @@ place, the call treats that step as failed. Calls through this helper coordinate
 within one process. Close the database and coordinate with other processes before
 moving the group. A process interruption can leave some files at their new names.
 
-An interrupted write can leave a `.tmp` sibling (`DurableFile.TemporarySuffix`). You can discard that
-staged file once the writer has stopped. A Windows recovery backup has a separate name. If
+An interrupted write can leave a `.tmp` sibling (`DurableFile.TemporarySuffix`) and a `.tmp.lock`
+file. The operating system releases the interrupted process's lock. A later writer can use the
+same lock file and remove it on release. Discard a retained stage only after its writer has stopped.
+A Windows recovery backup has a separate name. If
 `DurableFile` reports a restore failure, keep the named backup until you recover the previous
 contents.
 `DurableFile.TryDelete` succeeds when a file is absent and reports failure for a directory or a file it cannot delete.

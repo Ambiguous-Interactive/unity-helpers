@@ -6,13 +6,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 #if UNITY_EDITOR
     using WallstopStudios.UnityHelpers.Core.Extension;
     using System;
-    using System.IO;
     using System.Collections.Generic;
-    using System.Text;
+    using System.IO;
     using UnityEditor;
     using UnityEngine.UIElements;
-    using WallstopStudios.UnityHelpers.Core.Helper;
-    using WallstopStudios.UnityHelpers.Utils;
 
     public sealed partial class ValidationWindow
     {
@@ -51,34 +48,46 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             }
         }
 
-        internal static string WithSuppression(
-            string original,
-            ValidationFinding finding,
-            bool suppress
-        )
+        internal void UndoLastChange()
         {
-            string text = original ?? string.Empty;
-            ValidationSuppressions existing = ValidationSuppressions.Parse(text);
-            if (suppress)
-            {
-                return existing.IsSuppressed(in finding)
-                    ? text
-                    : text
-                        + (text.EndsWith("\n", StringComparison.Ordinal) ? string.Empty : "\n")
-                        + ValidationSuppressions.Render(new[] { finding });
-            }
-            return WithoutSuppression(text, finding.Id);
+            _undoAction?.Invoke();
         }
 
-        private static string WithoutSuppression(string text, string id)
+        internal void ShowSuppressionUndo(string message, Func<string> undo)
         {
-            using PooledResource<StringBuilder> remainingLease = Buffers.StringBuilder.Get(
-                out StringBuilder remaining
-            );
-            foreach (string line in text.Replace("\r\n", "\n").Split('\n'))
-                if (!string.Equals(line.Trim(), id, StringComparison.Ordinal))
-                    remaining.Append(line).Append('\n');
-            return remaining.ToString();
+            Say(message, AttemptUndo);
+
+            void AttemptUndo()
+            {
+                string failure;
+                try
+                {
+                    failure = undo();
+                }
+                catch (Exception thrown)
+                {
+                    failure = "Could not undo suppression: " + thrown.Message;
+                }
+                if (failure != null)
+                {
+                    Say(failure, AttemptUndo);
+                    return;
+                }
+
+                try
+                {
+                    ReloadSuppressions();
+                    RefreshSettings();
+                    Say("Suppression change undone.");
+                }
+                catch (Exception thrown)
+                {
+                    Say(
+                        "Suppression change undone. Could not refresh the workspace: "
+                            + thrown.Message
+                    );
+                }
+            }
         }
 
         private void WorkspaceChanged()
@@ -98,7 +107,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             _toast.Clear();
             AddLabel(_toast, message, "dx-grow");
             if (undo != null)
-                _toast.Add(new Button(() => _undoAction?.Invoke()) { text = "Undo" });
+                _toast.Add(new Button(UndoLastChange) { text = "Undo" });
             _toast.Add(new Button(() => _toast.Clear()) { text = "×", tooltip = "Dismiss" });
         }
 
@@ -111,85 +120,35 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         {
             try
             {
-                bool previousExists;
-                string previous;
-                try
-                {
-                    previous = File.ReadAllText(DefaultSuppressionsPath);
-                    previousExists = true;
-                }
-                catch (FileNotFoundException)
-                {
-                    previous = string.Empty;
-                    previousExists = false;
-                }
-                string updated = finding.HasValue
-                    ? WithSuppression(previous, finding.Value, suppress)
-                    : WithoutSuppression(previous, id);
-                if (string.Equals(previous, updated, StringComparison.Ordinal))
-                {
-                    ReloadSuppressions();
-                    RefreshSettings();
-                    Say("Suppression is already up to date.");
-                    return;
-                }
                 if (
-                    !DurableFile.TryCompareThenReplaceAllText(
+                    !ValidationSuppressionFile.TryChange(
                         DefaultSuppressionsPath,
-                        previousExists,
-                        previous,
-                        updated,
-                        out bool exchanged,
-                        out Exception writeError
+                        id,
+                        finding,
+                        suppress,
+                        out Func<string> undo,
+                        out string failure
                     )
                 )
                 {
-                    Say("Could not save suppression: " + writeError.Message);
+                    Say(failure);
                     return;
                 }
-                if (!exchanged)
-                {
-                    Say(
-                        "The suppression file changed since this action. Reload it before editing again."
-                    );
-                    return;
-                }
+
                 ReloadSuppressions();
                 RefreshSettings();
-                Say(suppress ? "Issue suppressed." : "Suppression restored.", () =>
+                if (undo == null)
                 {
-                    try
-                    {
-                        if (
-                            !DurableFile.TryCompareThenReplaceAllText(
-                                DefaultSuppressionsPath,
-                                true,
-                                updated,
-                                previous,
-                                out bool undone,
-                                out Exception undoError
-                            )
-                        )
-                        {
-                            Say("Could not undo suppression: " + undoError.Message);
-                            return;
-                        }
-                        if (!undone)
-                        {
-                            Say(
-                                "The suppression file changed since this action. Reload it before editing again."
-                            );
-                            return;
-                        }
-                        ReloadSuppressions();
-                        RefreshSettings();
-                        Say("Suppression change undone.");
-                    }
-                    catch (Exception thrown)
-                    {
-                        Say("Could not undo suppression: " + thrown.Message);
-                    }
-                });
+                    Say("Suppression is already up to date.");
+                    return;
+                }
+
+                string message = "Suppression restored.";
+                if (suppress)
+                {
+                    message = "Issue suppressed.";
+                }
+                ShowSuppressionUndo(message, undo);
             }
             catch (Exception thrown)
             {

@@ -136,9 +136,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         /// <param name="error">The failure reason, or null on success.</param>
         /// <returns>Whether the profiles were saved.</returns>
         /// <remarks>
-        /// Asset file writes and reimports cannot be fully reversed by Unity Undo. An overwrite
-        /// refuses a file changed before comparison; noncooperating external writers can still
-        /// race with the replacement itself.
+        /// Asset file writes and reimports have limited Unity Undo support. An overwrite refuses a
+        /// destination changed before comparison and preserves a staging asset changed before cleanup
+        /// checks it. External writers can race with replacement or asset deletion.
         /// </remarks>
         public static bool TrySaveProfiles(
             string assetPath,
@@ -716,10 +716,44 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             return DurableFile.TryCreateAllBytes(fullPath, bytes, out error);
         }
 
-        internal static bool TryDeleteProfileAsset(string assetPath, out string error)
+        internal static bool TryDeleteProfileAsset(
+            string assetPath,
+            string expectedGuid,
+            byte[] expectedContents,
+            out string error
+        )
         {
-            bool deleted = AssetDatabase.DeleteAsset(assetPath);
             string fullPath = ProfileFullPath(assetPath);
+            string currentGuid = AssetDatabase.AssetPathToGUID(assetPath);
+            if (
+                string.IsNullOrWhiteSpace(expectedGuid)
+                || !string.Equals(expectedGuid, currentGuid, StringComparison.Ordinal)
+                || expectedContents == null
+            )
+            {
+                error = $"Staged profiles asset at {assetPath} changed before cleanup.";
+                return false;
+            }
+
+            byte[] currentContents;
+            try
+            {
+                currentContents = File.ReadAllBytes(fullPath);
+            }
+            catch (IOException exception)
+                when (exception is FileNotFoundException or DirectoryNotFoundException)
+            {
+                error = $"Staged profiles asset at {assetPath} changed before cleanup.";
+                return false;
+            }
+            if (!currentContents.AsSpan().SequenceEqual(expectedContents))
+            {
+                error = $"Staged profiles asset at {assetPath} changed before cleanup.";
+                return false;
+            }
+
+            // Unity deletes by path. The checks above preserve changes observed before this call.
+            bool deleted = AssetDatabase.DeleteAsset(assetPath);
             if (
                 !deleted
                 || File.Exists(fullPath)
@@ -827,6 +861,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 {
                     throw new IOException($"Could not identify profiles asset at {writePath}.");
                 }
+                if (existing != null)
+                {
+                    string stageFile = ProfileFullPath(writePath);
+                    stagedBytes = File.ReadAllBytes(stageFile);
+                }
                 AssetDatabase.SaveAssets();
                 if (
                     AssetDatabase.LoadAssetAtPath<SpriteSettingsProfileCollection>(writePath)
@@ -878,8 +917,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
                 else
                 {
-                    stagedBytes = File.ReadAllBytes(ProfileFullPath(writePath));
-                    if (!TryDeleteProfileAsset(writePath, out string cleanupError))
+                    if (
+                        !TryDeleteProfileAsset(
+                            writePath,
+                            ownedGuid,
+                            stagedBytes,
+                            out string cleanupError
+                        )
+                    )
                     {
                         throw new IOException(cleanupError);
                     }

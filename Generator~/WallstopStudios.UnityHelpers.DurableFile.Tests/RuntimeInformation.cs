@@ -8,6 +8,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
     internal static class RuntimeInformation
     {
+        internal static Architecture ProcessArchitecture =>
+            HostRuntimeInformation.ProcessArchitecture;
+
         internal static OSPlatform? SimulatedPlatform { get; set; }
 
         internal static bool IsOSPlatform(OSPlatform platform)
