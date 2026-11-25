@@ -182,7 +182,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 )
             )
             {
-                return true;
+                return false;
             }
 
             if (
