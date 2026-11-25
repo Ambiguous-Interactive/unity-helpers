@@ -425,8 +425,10 @@ a targeted toast **Undo**. Importer fixes check asset identity and the setting t
 undo compares the file's current bytes with its saved snapshot before restoring it. A byte-identical
 replacement at the same prefab path cannot be distinguished by that check. Prefab undo stages the
 previous bytes before replacement, so a staging failure leaves the current prefab intact. The byte
-comparison and replacement share a lock with cooperating staged-replacement `DurableFile` writers.
-Other tools can still edit the prefab after the check and before replacement. On platforms without
+comparison and replacement share
+[the same lock as cooperating DurableFile writes](../utilities/helper-utilities.md#durable-writes-for-player-data).
+If another writer holds it, the prefab stays as it was before Undo. Direct filesystem edits can
+still reach the prefab after the check and before replacement. On platforms without
 `File.Replace`, restoration reports failure and preserves the current prefab. Importer and prefab restoration perform
 a new import; they do not reverse unrelated side effects caused by other import processors. A mixed
 batch's toast excludes scene removals and says to use Edit > Undo for those changes.
@@ -443,8 +445,8 @@ removes one identity; Settings also lists entries whose finding is absent from t
 The Suppressed navigation item and Show suppressed toggle let you inspect those decisions.
 Saving or undoing a suppression stages the complete file before replacement. A failure while
 staging leaves the previous decisions intact. Competing Sentinel actions compare the file while
-holding the staged-replacement writer lock, so a stale action reports a conflict and keeps the newer
-decisions. Undo also refuses to replace a newer Sentinel edit it observes. Reload the workspace and
+holding [the destination writer lock](../utilities/helper-utilities.md#durable-writes-for-player-data),
+so a stale action reports a conflict and keeps the newer decisions. Undo also refuses to replace a newer Sentinel edit it observes. Reload the workspace and
 repeat the action against the current decisions. A simultaneous action can report write contention
 and can be retried.
 The first save publishes only while the file is absent. If another tool creates the file after

@@ -14,6 +14,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     using UnityEditor;
     using UnityEngine;
     using UnityEngine.TestTools;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Validation;
     using WallstopStudios.UnityHelpers.Tests.Core.TestTypes;
     using WallstopStudios.UnityHelpers.Tests.Editor.Validation.TestTypes;
@@ -410,6 +411,31 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             {
                 DamageInPlace(_lostSubObjects);
                 byte[] rewritten = File.ReadAllBytes(filePath);
+                string temporaryPath = filePath + DurableFile.TemporarySuffix;
+                Assert.IsTrue(
+                    DurableFile.TryOpenStagingOwnership(
+                        temporaryPath,
+                        out FileStream owner,
+                        out Exception error
+                    ),
+                    error?.ToString()
+                );
+                using (owner)
+                {
+                    LogAssert.Expect(
+                        LogType.Error,
+                        new Regex(Regex.Escape($"Could not undo the rewrite of {_lostSubObjects}"))
+                    );
+                    Assert.IsFalse(
+                        StaleSerializedKeyRepair.Restore(
+                            _lostSubObjects,
+                            filePath,
+                            original,
+                            rewritten
+                        )
+                    );
+                    CollectionAssert.AreEqual(rewritten, File.ReadAllBytes(filePath));
+                }
                 File.AppendAllText(filePath, "\n# concurrent edit\n");
                 edited = File.ReadAllBytes(filePath);
                 Assert.IsFalse(

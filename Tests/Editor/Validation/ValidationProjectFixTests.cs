@@ -202,6 +202,36 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         }
 
         [Test]
+        public void PrefabUndoCanBeRetriedAfterAWriterReleasesOwnership()
+        {
+            string path = Prefab();
+            byte[] original = File.ReadAllBytes(path);
+            ValidationWorkspaceSettings.RuleDefinition rule = Rule();
+            Action undo = ValidationProjectFix.Apply(rule, Scan(path, rule)[0]);
+            byte[] fixedContents = File.ReadAllBytes(path);
+            string temporaryPath = path + DurableFile.TemporarySuffix;
+            Assert.IsTrue(
+                DurableFile.TryOpenStagingOwnership(
+                    temporaryPath,
+                    out FileStream owner,
+                    out Exception error
+                ),
+                error?.ToString()
+            );
+            using (owner)
+            {
+                InvalidOperationException refused = Assert.Throws<InvalidOperationException>(() =>
+                    undo()
+                );
+                Assert.That(refused.InnerException, Is.InstanceOf<IOException>());
+                CollectionAssert.AreEqual(fixedContents, File.ReadAllBytes(path));
+            }
+
+            undo();
+            CollectionAssert.AreEqual(original, File.ReadAllBytes(path));
+        }
+
+        [Test]
         public void BulkFixCanRemoveTwoAudioSourcesOnTheSameObject()
         {
             GameObject root = Track(new GameObject("Audio"));
