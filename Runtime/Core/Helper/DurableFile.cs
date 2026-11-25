@@ -828,8 +828,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             using (EnterGate(path))
             {
-                string temporaryPath =
-                    path + ".create." + Guid.NewGuid().ToString("N") + TemporarySuffix;
+                string temporaryPath = UniqueCreationStagingPath(path);
                 FileStream ownership = null;
                 bool ownsTemporary = false;
                 bool moved = false;
@@ -841,13 +840,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         return false;
                     }
                     using (
-                        FileStream staging = new(
+                        FileStream staging = OpenStagingStream(
                             temporaryPath,
-                            FileMode.CreateNew,
-                            FileAccess.Write,
-                            FileShare.None,
-                            DefaultBufferSize,
-                            useAsync: false
+                            useAsync: false,
+                            createNew: true
                         )
                     )
                     {
@@ -1075,9 +1071,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         /// <summary>Compares current text, then stages and replaces the file.</summary>
         /// <remarks>
-        /// The staging-file ownership spans the read, staging write, and replacement, so cooperating
-        /// staged-replacement DurableFile writers cannot change the destination during this operation.
-        /// A writer that does not acquire that ownership can change it after the read and before replacement.
+        /// DurableFile writers in this process share the destination gate from comparison through
+        /// publication. An external writer can change an existing file between those steps.
+        /// When the comparison expects absence, publication refuses to overwrite any intervening creation.
         /// </remarks>
         internal static bool TryCompareThenReplaceAllText(
             string path,
@@ -1096,6 +1092,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
 
             string temporaryPath = path + TemporarySuffix;
+            string stagedPath = temporaryPath;
             using (EnterGate(path))
             {
                 FileStream ownership = null;
@@ -1132,7 +1129,17 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         return true;
                     }
 
-                    staging = OpenStagingStream(temporaryPath, useAsync: false);
+                    if (!expectedExists)
+                    {
+                        // Unix publication can leave a hard link if cleanup fails. A unique
+                        // name prevents a later staged write from truncating the published file.
+                        stagedPath = UniqueCreationStagingPath(path);
+                    }
+                    staging = OpenStagingStream(
+                        stagedPath,
+                        useAsync: false,
+                        createNew: !expectedExists
+                    );
                     ownsStaging = true;
                     byte[] bytes = Utf8NoByteOrderMark.GetBytes(
                         replacementContents ?? string.Empty
@@ -1141,10 +1148,22 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     staging.Flush(flushToDisk: true);
                     staging.Dispose();
                     staging = null;
-                    Swap(temporaryPath, path);
-                    ownsStaging = false;
+                    if (expectedExists)
+                    {
+                        Swap(stagedPath, path);
+                        ownsStaging = false;
+                        exchanged = true;
+                    }
+                    else
+                    {
+                        exchanged = TryPublishStagedFileWithoutOverwrite(
+                            stagedPath,
+                            path,
+                            out bool leavesStaged
+                        );
+                        ownsStaging = leavesStaged;
+                    }
                     error = null;
-                    exchanged = true;
                     return true;
                 }
                 catch (Exception failure)
@@ -1157,7 +1176,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 {
                     ReleaseFileStream(staging);
                     if (ownsStaging)
-                        DiscardStagedFile(temporaryPath);
+                        DiscardStagedFile(stagedPath);
                     ReleaseStagingOwnership(ownership);
                 }
             }
@@ -1271,13 +1290,22 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 
+        private static string UniqueCreationStagingPath(string path)
+        {
+            return path + ".create." + Guid.NewGuid().ToString("N") + TemporarySuffix;
+        }
+
         // Only a successful exclusive staging open establishes cleanup ownership; failed opens may name another writer.
         /// <summary>Opens the staging file exclusively for writing.</summary>
-        internal static FileStream OpenStagingStream(string temporaryPath, bool useAsync)
+        internal static FileStream OpenStagingStream(
+            string temporaryPath,
+            bool useAsync,
+            bool createNew = false
+        )
         {
             return new FileStream(
                 temporaryPath,
-                FileMode.Create,
+                createNew ? FileMode.CreateNew : FileMode.Create,
                 FileAccess.Write,
                 FileShare.None,
                 DefaultBufferSize,

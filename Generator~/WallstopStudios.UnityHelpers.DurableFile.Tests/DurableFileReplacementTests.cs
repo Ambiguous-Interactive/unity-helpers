@@ -199,6 +199,57 @@ namespace WallstopStudios.UnityHelpers.DurableFile.Tests
             Directory.Delete(_directory, recursive: true);
         }
 
+        [TestCase(false)]
+        [TestCase(true)]
+        public void CompareMissingTextPreservesFileCreatedAfterRead(bool simulateWindows)
+        {
+            RuntimeInformation.SimulateWindows = simulateWindows;
+            const string intervening = "suppression created by another writer";
+            SimulatedFile.AfterMissingTextRead = path => RealFile.WriteAllText(path, intervening);
+
+            bool completed = DurableFile.TryCompareThenReplaceAllText(
+                _destination,
+                expectedExists: false,
+                expectedContents: string.Empty,
+                replacementContents: ReplacementText,
+                out bool exchanged,
+                out Exception error
+            );
+
+            Assert.IsTrue(completed, error?.ToString());
+            Assert.AreEqual(intervening, RealFile.ReadAllText(_destination));
+            Assert.IsFalse(exchanged);
+            Assert.AreEqual(0, SimulatedFile.ReplacementCalls);
+            CollectionAssert.AreEquivalent(
+                new[] { _source, _destination },
+                Directory.GetFiles(_directory)
+            );
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void CompareMissingTextPublishesWhenDestinationStaysAbsent(bool simulateWindows)
+        {
+            RuntimeInformation.SimulateWindows = simulateWindows;
+
+            bool completed = DurableFile.TryCompareThenReplaceAllText(
+                _destination,
+                expectedExists: false,
+                expectedContents: string.Empty,
+                replacementContents: ReplacementText,
+                out bool exchanged,
+                out Exception error
+            );
+
+            Assert.IsTrue(completed, error?.ToString());
+            Assert.IsTrue(exchanged);
+            Assert.AreEqual(ReplacementText, RealFile.ReadAllText(_destination));
+            CollectionAssert.AreEquivalent(
+                new[] { _source, _destination },
+                Directory.GetFiles(_directory)
+            );
+        }
+
         [Test]
         public void SidecarMoveReportsAllRestoreFailuresInReverseOrder()
         {

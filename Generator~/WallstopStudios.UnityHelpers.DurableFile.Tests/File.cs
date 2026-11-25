@@ -14,6 +14,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         internal static Action<string, string> BeforeFailedReplacement { get; set; }
         internal static Action<string, string> BeforeMove { get; set; }
         internal static Action<string, string> AfterMove { get; set; }
+        internal static Action<string> AfterMissingTextRead { get; set; }
         internal static string ObservedDestination { get; set; }
         internal static int ReplacementCalls { get; private set; }
         internal static int MoveCalls { get; private set; }
@@ -27,6 +28,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             BeforeFailedReplacement = null;
             BeforeMove = null;
             AfterMove = null;
+            AfterMissingTextRead = null;
             ObservedDestination = null;
             ReplacementCalls = 0;
             MoveCalls = 0;
@@ -50,7 +52,15 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         internal static string ReadAllText(string path)
         {
-            return System.IO.File.ReadAllText(path);
+            try
+            {
+                return System.IO.File.ReadAllText(path);
+            }
+            catch (FileNotFoundException)
+            {
+                AfterMissingTextRead?.Invoke(path);
+                throw;
+            }
         }
 
         internal static void Delete(string path)
