@@ -1,6 +1,10 @@
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
+#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN || !UNITY_5_3_OR_NEWER
+#define DURABLE_FILE_WINDOWS_BACKUP_CLEANUP
+#endif
+
 namespace WallstopStudios.UnityHelpers.Core.Helper
 {
     using System;
@@ -13,6 +17,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     using System.Threading.Tasks;
     using WallstopStudios.UnityHelpers.Core.Threading;
     using WallstopStudios.UnityHelpers.Utils;
+#if DURABLE_FILE_WINDOWS_BACKUP_CLEANUP
+    using Microsoft.Win32.SafeHandles;
+#endif
 
     /// <summary>
     /// Stages complete writes for player-owned data such as saves, settings and ledgers.
@@ -30,6 +37,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     /// On Windows, a replacement uses a temporary backup of the previous file. If Windows
     /// moves the previous file aside and then refuses publication, this helper tries to restore it.
     /// If restoration fails, the returned error identifies the backup path.
+    /// If cleanup is blocked after a successful replacement, the write still succeeds.
+    /// The next publication to the same path retries cleanup of backups still tracked by this process.
     /// Windows sharing violations and inability to remove the replaced file receive up to three
     /// replacement attempts with 10 ms and 20 ms waits while retaining staged contents and ownership.
     /// Cooperating writes, appends, and deletes serialize per destination in this process.
@@ -1400,6 +1409,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <summary>Publishes a staging file over an absent or existing destination.</summary>
         internal static void Swap(string temporaryPath, string path)
         {
+#if DURABLE_FILE_WINDOWS_BACKUP_CLEANUP
+            DurableFileWindowsBackup.RetryPending(path);
+#endif
             if (File.Exists(path))
             {
                 Replace(temporaryPath, path);
@@ -2056,58 +2068,82 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
                 // ReplaceFileW can remove the destination on error 1176 when no backup is requested.
+                path = Path.GetFullPath(path);
                 string directory = Path.GetDirectoryName(path) ?? string.Empty;
                 string backupName = $".{Guid.NewGuid():N}.bak";
                 backupPath = Path.Combine(directory, backupName);
             }
 
-            for (int attempt = 1; ; ++attempt)
+#if DURABLE_FILE_WINDOWS_BACKUP_CLEANUP
+            SafeFileHandle previous = null;
+            try
             {
-                try
+#endif
+                for (int attempt = 1; ; ++attempt)
                 {
-                    File.Replace(temporaryPath, path, backupPath);
-                    if (backupPath != null)
-                    {
-                        DiscardStagedFile(backupPath);
-                    }
-                    return;
-                }
-                catch (IOException failure)
-                    when (attempt < ReplacementAttemptLimit
-                        && (
-                            failure.HResult == SharingViolationHResult
-                            || failure.HResult == UnableToRemoveReplacedHResult
-                        )
-                    )
-                {
-                    // These Windows errors retain both names, so the same staged bytes can be retried.
-                    Thread.Sleep(ReplacementRetryDelayMilliseconds * attempt);
-                }
-                catch (IOException failure)
-                    when (backupPath != null
-                        && failure.HResult == UnableToMoveReplacementAfterBackupHResult
-                    )
-                {
+#if DURABLE_FILE_WINDOWS_BACKUP_CLEANUP
+                    previous?.Dispose();
+                    previous =
+                        backupPath == null ? null : DurableFileWindowsBackup.OpenPrevious(path);
+#endif
                     try
                     {
-                        File.Move(backupPath, path);
+                        File.Replace(temporaryPath, path, backupPath);
+                        break;
                     }
-                    catch (Exception restoreFailure)
+                    catch (IOException failure)
+                        when (attempt < ReplacementAttemptLimit
+                            && (
+                                failure.HResult == SharingViolationHResult
+                                || failure.HResult == UnableToRemoveReplacedHResult
+                            )
+                        )
                     {
-                        AggregateException details = new(failure, restoreFailure);
-                        throw new IOException(
-                            $"Could not restore the previous file from '{backupPath}'.",
-                            details
-                        );
+                        // These Windows errors retain both names, so the same staged bytes can be retried.
+                        Thread.Sleep(ReplacementRetryDelayMilliseconds * attempt);
                     }
-                    throw;
+                    catch (IOException failure)
+                        when (backupPath != null
+                            && failure.HResult == UnableToMoveReplacementAfterBackupHResult
+                        )
+                    {
+                        try
+                        {
+                            File.Move(backupPath, path);
+                        }
+                        catch (Exception restoreFailure)
+                        {
+                            AggregateException details = new(failure, restoreFailure);
+                            throw new IOException(
+                                $"Could not restore the previous file from '{backupPath}'.",
+                                details
+                            );
+                        }
+                        throw;
+                    }
+                    catch (FileNotFoundException)
+                    {
+                        File.Move(temporaryPath, path);
+                        return;
+                    }
                 }
-                catch (FileNotFoundException)
+
+#if DURABLE_FILE_WINDOWS_BACKUP_CLEANUP
+                if (DurableFileWindowsBackup.DiscardOrDefer(path, backupPath, previous))
                 {
-                    File.Move(temporaryPath, path);
-                    return;
+                    previous = null;
                 }
             }
+            finally
+            {
+                previous?.Dispose();
+            }
+#else
+                if (backupPath != null)
+                {
+                    DiscardStagedFile(backupPath);
+                }
+#endif
         }
     }
 }

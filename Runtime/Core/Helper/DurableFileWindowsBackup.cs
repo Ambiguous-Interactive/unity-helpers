@@ -1,0 +1,285 @@
+// MIT License - Copyright (c) 2026 wallstop
+// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+
+namespace WallstopStudios.UnityHelpers.Core.Helper
+{
+#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN || !UNITY_5_3_OR_NEWER
+    using System;
+    using System.Collections.Generic;
+    using System.IO;
+    using System.Runtime.InteropServices;
+    using Microsoft.Win32.SafeHandles;
+    using HostRuntimeInformation = System.Runtime.InteropServices.RuntimeInformation;
+
+    internal sealed class DurableFileWindowsBackup
+    {
+        private const int MaximumPendingBackups = 32;
+        private const int FileNotFound = 2;
+        private const int PathNotFound = 3;
+        private const int FileDispositionInfo = 4;
+        private const int FileIdInfo = 18;
+        private const uint ReadAttributes = 0x80;
+        private const uint DeleteAccess = 0x10000;
+        private const uint OpenReparsePoint = 0x00200000;
+        private const uint SupportsOpenByFileId = 0x01000000;
+
+        private static readonly List<DurableFileWindowsBackup> Pending = new();
+        private static readonly object PendingLock = new();
+
+        private readonly string _destination;
+        private readonly string _backup;
+        private readonly SafeFileHandle _previous;
+
+        private DurableFileWindowsBackup(string destination, string backup, SafeFileHandle previous)
+        {
+            _destination = destination;
+            _backup = backup;
+            _previous = previous;
+        }
+
+        internal static SafeFileHandle OpenPrevious(string path)
+        {
+            if (!HostRuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                return null;
+            }
+
+            return Open(path, ReadAttributes, FileShare.ReadWrite | FileShare.Delete);
+        }
+
+        internal static bool DiscardOrDefer(
+            string destination,
+            string backup,
+            SafeFileHandle previous
+        )
+        {
+            if (backup == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                File.Delete(backup);
+                return false;
+            }
+            catch (Exception)
+            {
+                if (
+                    previous == null
+                    || previous.IsInvalid
+                    || !GetVolumeInformationByHandle(
+                        previous,
+                        IntPtr.Zero,
+                        0,
+                        IntPtr.Zero,
+                        IntPtr.Zero,
+                        out uint flags,
+                        IntPtr.Zero,
+                        0
+                    )
+                    || (flags & SupportsOpenByFileId) == 0
+                )
+                {
+                    return false;
+                }
+
+                Remember(new DurableFileWindowsBackup(destination, backup, previous));
+                return true;
+            }
+        }
+
+        internal static void RetryPending(string path)
+        {
+            List<DurableFileWindowsBackup> matches = null;
+            lock (PendingLock)
+            {
+                if (Pending.Count == 0)
+                {
+                    return;
+                }
+
+                string destination = Path.GetFullPath(path);
+                for (int index = Pending.Count - 1; index >= 0; --index)
+                {
+                    DurableFileWindowsBackup item = Pending[index];
+                    if (
+                        string.Equals(
+                            item._destination,
+                            destination,
+                            StringComparison.OrdinalIgnoreCase
+                        )
+                    )
+                    {
+                        matches ??= new List<DurableFileWindowsBackup>();
+                        matches.Add(item);
+                        Pending.RemoveAt(index);
+                    }
+                }
+            }
+
+            if (matches == null)
+            {
+                return;
+            }
+
+            for (int index = matches.Count - 1; index >= 0; --index)
+            {
+                DurableFileWindowsBackup item = matches[index];
+                if (TryReclaim(item._backup, item._previous))
+                {
+                    item._previous.Dispose();
+                }
+                else
+                {
+                    Remember(item);
+                }
+            }
+        }
+
+        private static void Remember(DurableFileWindowsBackup pending)
+        {
+            DurableFileWindowsBackup evicted = null;
+            lock (PendingLock)
+            {
+                if (Pending.Count == MaximumPendingBackups)
+                {
+                    evicted = Pending[0];
+                    Pending.RemoveAt(0);
+                }
+                Pending.Add(pending);
+            }
+            evicted?._previous.Dispose();
+        }
+
+        private static bool TryReclaim(string backupPath, SafeFileHandle previous)
+        {
+            // The old handle prevents ID reuse. The delete handle prevents a rename during the identity check.
+            using SafeFileHandle backup = Open(
+                backupPath,
+                ReadAttributes | DeleteAccess,
+                FileShare.ReadWrite
+            );
+            if (backup.IsInvalid)
+            {
+                int error = Marshal.GetLastWin32Error();
+                return error is FileNotFound or PathNotFound;
+            }
+
+            uint identitySize = (uint)Marshal.SizeOf<FileIdentity>();
+            if (
+                !GetFileInformationByHandleEx(
+                    previous,
+                    FileIdInfo,
+                    out FileIdentity expected,
+                    identitySize
+                )
+                || !GetFileInformationByHandleEx(
+                    backup,
+                    FileIdInfo,
+                    out FileIdentity actual,
+                    identitySize
+                )
+            )
+            {
+                return true;
+            }
+
+            if (
+                (expected.IdLow == 0 && expected.IdHigh == 0)
+                || expected.Volume != actual.Volume
+                || expected.IdLow != actual.IdLow
+                || expected.IdHigh != actual.IdHigh
+            )
+            {
+                return true;
+            }
+
+            byte delete = 1;
+            return SetFileInformationByHandle(
+                backup,
+                FileDispositionInfo,
+                ref delete,
+                sizeof(byte)
+            );
+        }
+
+        private static SafeFileHandle Open(string fullPath, uint access, FileShare share)
+        {
+            if (260 <= fullPath.Length && !fullPath.StartsWith(@"\\?\", StringComparison.Ordinal))
+            {
+                fullPath = fullPath.StartsWith(@"\\", StringComparison.Ordinal)
+                    ? @"\\?\UNC\" + fullPath.Substring(2)
+                    : @"\\?\" + fullPath;
+            }
+
+            return CreateFile(
+                fullPath,
+                access,
+                share,
+                IntPtr.Zero,
+                FileMode.Open,
+                OpenReparsePoint,
+                IntPtr.Zero
+            );
+        }
+
+        [DllImport(
+            "kernel32.dll",
+            EntryPoint = "CreateFileW",
+            CharSet = CharSet.Unicode,
+            ExactSpelling = true,
+            SetLastError = true
+        )]
+        private static extern SafeFileHandle CreateFile(
+            string path,
+            uint access,
+            FileShare share,
+            IntPtr security,
+            FileMode disposition,
+            uint flags,
+            IntPtr template
+        );
+
+        [DllImport(
+            "kernel32.dll",
+            EntryPoint = "GetVolumeInformationByHandleW",
+            ExactSpelling = true
+        )]
+        private static extern bool GetVolumeInformationByHandle(
+            SafeFileHandle file,
+            IntPtr volumeName,
+            uint volumeNameLength,
+            IntPtr volumeSerialNumber,
+            IntPtr maximumComponentLength,
+            out uint flags,
+            IntPtr fileSystemName,
+            uint fileSystemNameLength
+        );
+
+        [DllImport("kernel32.dll", ExactSpelling = true, SetLastError = true)]
+        private static extern bool GetFileInformationByHandleEx(
+            SafeFileHandle file,
+            int informationClass,
+            out FileIdentity identity,
+            uint size
+        );
+
+        [DllImport("kernel32.dll", ExactSpelling = true, SetLastError = true)]
+        private static extern bool SetFileInformationByHandle(
+            SafeFileHandle file,
+            int informationClass,
+            ref byte information,
+            uint size
+        );
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct FileIdentity
+        {
+            public ulong Volume;
+            public ulong IdLow;
+            public ulong IdHigh;
+        }
+    }
+#endif
+}

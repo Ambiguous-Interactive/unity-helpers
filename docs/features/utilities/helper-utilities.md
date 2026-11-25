@@ -1367,7 +1367,7 @@ The shared lock keeps the existing save formats and Unity asset paths. A transac
 enforce an expected version when every writer uses the store. It would require moving the authoritative
 data to that store and updating every writer, including tools that currently edit the file directly.
 
-<!-- cspell:ignore shm -->
+<!-- cspell:ignore bak shm -->
 
 Use `DurableFile.TryMoveWithSidecars` to move a closed database and its journal files
 together. Supply the suffixes in move order and use a destination in an existing
@@ -1403,6 +1403,15 @@ same lock file and remove it on release. Discard a retained stage only after its
 A Windows recovery backup has a separate name. If
 `DurableFile` reports a restore failure, keep the named backup until you recover the previous
 contents.
+
+On Windows desktop, `DurableFile` reports a successful write once it publishes the
+new file, even if Windows refuses to remove the temporary `.bak` file. A later
+write to the same path in the same process retries removal while the helper still
+tracks that backup.
+The helper tracks up to 32 pending backups on volumes that support stable file IDs.
+It checks file identity before a retry removes a backup. A backup can remain if
+ownership cannot be verified, the write is the last one to that path, or the process stops.
+
 `DurableFile.TryDelete` succeeds when a file is absent and reports failure for a directory or a file it cannot delete.
 
 ### Coalesce Repeated Saves
