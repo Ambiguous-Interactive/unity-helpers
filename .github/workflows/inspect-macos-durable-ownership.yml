@@ -1,0 +1,86 @@
+name: Observe macOS durable writer ownership
+on:
+  push:
+    branches: [diagnostics/durable-ownership-863-20261125]
+    paths: [.github/workflows/inspect-macos-durable-ownership.yml]
+permissions:
+  contents: read
+jobs:
+  writer-lock:
+    runs-on: [self-hosted, macOS, ARM64]
+    timeout-minutes: 5
+    steps:
+      - name: Verify native locking and file identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          scratch="$(mktemp -d)"
+          trap 'rm -rf "$scratch"' EXIT
+          cd "$scratch"
+          uname -sm
+          sw_vers -productVersion
+          cat > probe.c <<'C'
+          #include <assert.h>
+          #include <dlfcn.h>
+          #include <errno.h>
+          #include <fcntl.h>
+          #include <stddef.h>
+          #include <stdio.h>
+          #include <sys/file.h>
+          #include <sys/stat.h>
+          #include <unistd.h>
+
+          #if defined(__x86_64__)
+          #define STAT_SYMBOL "stat$INODE64"
+          #define FSTAT_SYMBOL "fstat$INODE64"
+          #else
+          #define STAT_SYMBOL "stat"
+          #define FSTAT_SYMBOL "fstat"
+          #endif
+
+          int main(void) {
+              void *library = dlopen("libSystem.B.dylib", RTLD_NOW | RTLD_LOCAL);
+              assert(library);
+              int (*stat_path)(const char *, struct stat *) = dlsym(library, STAT_SYMBOL);
+              int (*stat_handle)(int, struct stat *) = dlsym(library, FSTAT_SYMBOL);
+              assert(stat_path && stat_handle);
+              assert(LOCK_EX == 2 && LOCK_NB == 4);
+              assert(sizeof(struct stat) == 144);
+              assert(offsetof(struct stat, st_dev) == 0 && offsetof(struct stat, st_ino) == 8);
+              printf("%s and %s resolve. stat=%zu dev=%zu inode=%zu.\n",
+                     STAT_SYMBOL, FSTAT_SYMBOL, sizeof(struct stat),
+                     offsetof(struct stat, st_dev), offsetof(struct stat, st_ino));
+
+              const char *name = "owned.tmp.lock";
+              int owner = open(name, O_CREAT | O_EXCL | O_RDWR, 0600);
+              int delayed = open(name, O_RDWR);
+              assert(owner >= 0 && delayed >= 0);
+              assert(flock(owner, LOCK_EX | LOCK_NB) == 0);
+              assert(flock(delayed, LOCK_EX | LOCK_NB) == -1 && errno == EWOULDBLOCK);
+
+              struct stat named, opened;
+              assert(stat_path(name, &named) == 0 && stat_handle(owner, &opened) == 0);
+              assert(named.st_ino == opened.st_ino && named.st_dev == opened.st_dev);
+              assert(unlink(name) == 0);
+              assert(close(owner) == 0);
+
+              int replacement = open(name, O_CREAT | O_EXCL | O_RDWR, 0600);
+              assert(replacement >= 0 && flock(replacement, LOCK_EX | LOCK_NB) == 0);
+              assert(flock(delayed, LOCK_EX | LOCK_NB) == 0);
+              assert(stat_path(name, &named) == 0 && stat_handle(delayed, &opened) == 0);
+              assert(named.st_ino != opened.st_ino || named.st_dev != opened.st_dev);
+              assert(close(delayed) == 0);
+              assert(unlink(name) == 0 && close(replacement) == 0);
+              assert(access(name, F_OK) == -1 && errno == ENOENT);
+              puts("Native lock rejects a live contender and file identity rejects a stale descriptor.");
+              return 0;
+          }
+          C
+          cc -Wall -Wextra -Werror -arch arm64 probe.c -o probe-arm64
+          ./probe-arm64
+          cc -Wall -Wextra -Werror -arch x86_64 probe.c -o probe-x86_64
+          if arch -x86_64 /usr/bin/true; then
+              arch -x86_64 ./probe-x86_64
+          else
+              echo 'Rosetta unavailable. Intel variant compiled without execution.'
+          fi
