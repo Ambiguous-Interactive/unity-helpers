@@ -5,12 +5,35 @@ from __future__ import annotations
 import argparse
 import base64
 import ctypes
+import os
 import re
 import subprocess
 import sys
 import time
 import uuid
 from ctypes import wintypes
+from pathlib import Path
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:
+    from typing import BinaryIO
+
+
+class ModeProcess(Protocol):
+    pid: int
+    returncode: int | None
+
+    def poll(self) -> int | None: ...
+
+    def wait(self, timeout: float | None = None) -> int: ...
+
+
+class WorkerJob(Protocol):
+    def launch(
+        self, shell: str, encoded: str, environment: dict[str, str], stream: BinaryIO
+    ) -> ModeProcess: ...
+
+    def close(self) -> None: ...
 
 
 class StartupInfo(ctypes.Structure):
@@ -62,6 +85,8 @@ def validate_payload(encoded: str) -> None:
 
 
 if sys.platform == "win32":
+    import math
+    import msvcrt
 
     class BasicJobLimits(ctypes.Structure):
         _fields_ = (
@@ -98,6 +123,13 @@ if sys.platform == "win32":
             ("total_terminated_processes", wintypes.DWORD),
         )
 
+    class JobProcessIds(ctypes.Structure):
+        _fields_ = (
+            ("assigned", wintypes.DWORD),
+            ("listed", wintypes.DWORD),
+            ("pids", ctypes.c_size_t * 16),
+        )
+
     def worker_job(kernel: ctypes.WinDLL) -> int:
         kernel.CreateJobObjectW.argtypes = (ctypes.c_void_p, wintypes.LPCWSTR)
         kernel.CreateJobObjectW.restype = wintypes.HANDLE
@@ -128,7 +160,7 @@ if sys.platform == "win32":
         kernel.QueryInformationJobObject.argtypes = (
             wintypes.HANDLE,
             ctypes.c_int,
-            ctypes.POINTER(BasicJobAccounting),
+            ctypes.c_void_p,
             wintypes.DWORD,
             ctypes.c_void_p,
         )
@@ -153,41 +185,165 @@ if sys.platform == "win32":
                     raise ctypes.WinError(ctypes.get_last_error())
                 terminating = True
             if time.monotonic() >= deadline:
+                snapshot = JobProcessIds()
+                process_id_list = 3
+                listed = kernel.QueryInformationJobObject(
+                    job, process_id_list, ctypes.byref(snapshot), ctypes.sizeof(snapshot), None
+                )
+                if listed or (ctypes.get_last_error() == 234 and snapshot.listed):
+                    pids = ", ".join(str(pid) for pid in snapshot.pids[: snapshot.listed])
+                    remaining = f"remaining job PIDs: {pids}"
+                    if snapshot.assigned > snapshot.listed:
+                        remaining += f" (first {snapshot.listed} of {snapshot.assigned})"
+                else:
+                    remaining = f"job PIDs unavailable (WinError {ctypes.get_last_error()})"
                 raise TimeoutError(
                     f"Private Unity worker job still has {accounting.active_processes} active "
-                    "processes after termination"
+                    f"processes after termination, {remaining}"
                 )
             time.sleep(0.05)
         raise ctypes.WinError(ctypes.get_last_error())
 
+    class WindowsWorkerProcess:
+        def __init__(
+            self, kernel: ctypes.WinDLL, user: ctypes.WinDLL, desktop: int, process: ProcessInfo
+        ) -> None:
+            self._kernel = kernel
+            self._user = user
+            self._desktop = desktop
+            self._process = process
+            self.pid = process.process_id
+            self.returncode: int | None = None
+            kernel.CloseHandle(process.thread)
+
+        def poll(self) -> int | None:
+            try:
+                return self.wait(0)
+            except subprocess.TimeoutExpired:
+                return None
+
+        def wait(self, timeout: float | None = None) -> int:
+            if self.returncode is not None:
+                return self.returncode
+            duration = (
+                0xFFFFFFFF
+                if timeout is None
+                else min(0xFFFFFFFE, max(0, math.ceil(timeout * 1000)))
+            )
+            status = self._kernel.WaitForSingleObject(self._process.process, duration)
+            if status == 258 and timeout is not None:
+                raise subprocess.TimeoutExpired("private Unity worker", timeout)
+            if status != 0:
+                raise ctypes.WinError(ctypes.get_last_error())
+            try:
+                code = wintypes.DWORD()
+                if not self._kernel.GetExitCodeProcess(self._process.process, ctypes.byref(code)):
+                    raise ctypes.WinError(ctypes.get_last_error())
+                self.returncode = ctypes.c_int32(code.value).value
+                return self.returncode
+            finally:
+                self._kernel.CloseHandle(self._process.process)
+                close_desktop(self._user, self._desktop)
+
     class WindowsWorkerJob:
-        """Own the shared worker job until the mode controller finishes."""
+        """Run PowerShell workers with a private desktop and one shared job."""
 
         def __init__(self) -> None:
             self._kernel = ctypes.WinDLL("kernel32", use_last_error=True)
-            configure_close_handle(self._kernel)
-            self.handle = worker_job(self._kernel)
+            self._user = ctypes.WinDLL("user32", use_last_error=True)
+            configure_native_process(self._kernel, self._user)
+            self._handle = worker_job(self._kernel)
+
+        def launch(
+            self, shell: str, encoded: str, environment: dict[str, str], stream: BinaryIO
+        ) -> ModeProcess:
+            # The CI worker is noninteractive. Child processes inherit only the
+            # input and combined log handles selected for this worker.
+            kernel = self._kernel
+            with Path(os.devnull).open("rb") as stdin:
+                input_handle = inheritable_stream_handle(kernel, stdin)
+                try:
+                    output_handle = inheritable_stream_handle(kernel, stream)
+                    try:
+                        return self._start(
+                            shell,
+                            encoded,
+                            (input_handle, output_handle, output_handle),
+                            environment=environment,
+                            handles=(input_handle, output_handle),
+                        )
+                    finally:
+                        kernel.CloseHandle(output_handle)
+                finally:
+                    kernel.CloseHandle(input_handle)
+
+        def launch_console(self, shell: str, encoded: str) -> ModeProcess:
+            kernel = self._kernel
+            handles = (kernel.GetStdHandle(-10), kernel.GetStdHandle(-11), kernel.GetStdHandle(-12))
+            return self._start(shell, encoded, handles)
+
+        def _start(
+            self,
+            shell: str,
+            encoded: str,
+            stdio: tuple[int, int, int],
+            *,
+            environment: dict[str, str] | None = None,
+            handles: tuple[int, ...] = (),
+        ) -> WindowsWorkerProcess:
+            validate_payload(encoded)
+            name = "uh-mode-" + uuid.uuid4().hex
+            desktop: int | None = self._user.CreateDesktopW(name, None, None, 0, 0x01FF, None)
+            if not desktop:
+                raise ctypes.WinError(ctypes.get_last_error())
+            try:
+                startup = StartupInfoEx()
+                startup.startup.size = ctypes.sizeof(startup)
+                startup.startup.desktop = name
+                startup.startup.flags = 0x0100  # STARTF_USESTDHANDLES
+                startup.startup.stdin, startup.startup.stdout, startup.startup.stderr = stdio
+                process = start_worker(
+                    self._kernel, startup, self._handle, shell, encoded, environment, handles
+                )
+                return WindowsWorkerProcess(self._kernel, self._user, desktop, process)
+            except BaseException:
+                close_desktop(self._user, desktop)
+                raise
 
         def close(self) -> None:
             try:
-                reap_job(self._kernel, self.handle)
+                reap_job(self._kernel, self._handle)
             finally:
-                self._kernel.CloseHandle(self.handle)
+                self._kernel.CloseHandle(self._handle)
 
-    def configure_close_handle(kernel: ctypes.WinDLL) -> None:
-        kernel.CloseHandle.argtypes = (wintypes.HANDLE,)
-        kernel.CloseHandle.restype = wintypes.BOOL
+    def inheritable_stream_handle(kernel: ctypes.WinDLL, stream: BinaryIO) -> int:
+        owner = kernel.GetCurrentProcess()
+        handle = wintypes.HANDLE()
+        duplicate_same_access = 2
+        if not kernel.DuplicateHandle(
+            owner,
+            msvcrt.get_osfhandle(stream.fileno()),
+            owner,
+            ctypes.byref(handle),
+            0,
+            True,
+            duplicate_same_access,
+        ):
+            raise ctypes.WinError(ctypes.get_last_error())
+        if handle.value is None:
+            raise OSError("Windows did not duplicate the worker stream handle")
+        return handle.value
 
-    def assign_launcher_to_job(kernel: ctypes.WinDLL, job: int) -> None:
-        kernel.GetCurrentProcess.argtypes = ()
-        kernel.GetCurrentProcess.restype = wintypes.HANDLE
-        kernel.AssignProcessToJobObject.argtypes = (wintypes.HANDLE, wintypes.HANDLE)
-        kernel.AssignProcessToJobObject.restype = wintypes.BOOL
-        if not kernel.AssignProcessToJobObject(job, kernel.GetCurrentProcess()):
+    def close_desktop(user: ctypes.WinDLL, desktop: int) -> None:
+        if not user.CloseDesktop(desktop):
             raise ctypes.WinError(ctypes.get_last_error())
 
     def create_worker_process(
-        kernel: ctypes.WinDLL, startup: StartupInfo, shell: str, encoded: str, *, extended: bool
+        kernel: ctypes.WinDLL,
+        startup: StartupInfo,
+        shell: str,
+        encoded: str,
+        environment: dict[str, str] | None,
     ) -> ProcessInfo:
         command = ctypes.create_unicode_buffer(
             subprocess.list2cmdline(
@@ -202,10 +358,15 @@ if sys.platform == "win32":
                 ]
             )
         )
+        environment_buffer = None
+        if environment is not None:
+            entries = sorted(environment, key=str.upper)
+            environment_buffer = ctypes.create_unicode_buffer(
+                "\0".join(f"{name}={environment[name]}" for name in entries) + "\0"
+            )
         process = ProcessInfo()
-        flags = 0x08000000  # CREATE_NO_WINDOW
-        if extended:
-            flags |= 0x00080000  # EXTENDED_STARTUPINFO_PRESENT
+        # CREATE_NO_WINDOW, EXTENDED_STARTUPINFO_PRESENT, CREATE_UNICODE_ENVIRONMENT
+        flags = 0x08080400
         if not kernel.CreateProcessW(
             shell,
             command,
@@ -213,7 +374,7 @@ if sys.platform == "win32":
             None,
             True,
             flags,
-            None,
+            environment_buffer,
             None,
             ctypes.byref(startup),
             ctypes.byref(process),
@@ -221,8 +382,14 @@ if sys.platform == "win32":
             raise ctypes.WinError(ctypes.get_last_error())
         return process
 
-    def start_independent_worker(
-        kernel: ctypes.WinDLL, startup: StartupInfoEx, job: int, shell: str, encoded: str
+    def start_worker(
+        kernel: ctypes.WinDLL,
+        startup: StartupInfoEx,
+        job: int,
+        shell: str,
+        encoded: str,
+        environment: dict[str, str] | None,
+        handles: tuple[int, ...],
     ) -> ProcessInfo:
         kernel.InitializeProcThreadAttributeList.argtypes = (
             ctypes.c_void_p,
@@ -244,13 +411,14 @@ if sys.platform == "win32":
         kernel.DeleteProcThreadAttributeList.argtypes = (ctypes.c_void_p,)
         kernel.DeleteProcThreadAttributeList.restype = None
         size = ctypes.c_size_t()
-        kernel.InitializeProcThreadAttributeList(None, 1, 0, ctypes.byref(size))
+        count = 2 if handles else 1
+        kernel.InitializeProcThreadAttributeList(None, count, 0, ctypes.byref(size))
         if not size.value:
             raise ctypes.WinError(ctypes.get_last_error())
         attributes = ctypes.create_string_buffer(size.value)
         startup.attributes = ctypes.cast(attributes, ctypes.c_void_p)
         if not kernel.InitializeProcThreadAttributeList(
-            startup.attributes, 1, 0, ctypes.byref(size)
+            startup.attributes, count, 0, ctypes.byref(size)
         ):
             raise ctypes.WinError(ctypes.get_last_error())
         try:
@@ -267,15 +435,23 @@ if sys.platform == "win32":
                 None,
             ):
                 raise ctypes.WinError(ctypes.get_last_error())
-            startup.startup.size = ctypes.sizeof(startup)
-            return create_worker_process(kernel, startup.startup, shell, encoded, extended=True)
+            inherited = (wintypes.HANDLE * len(handles))(*handles)
+            handle_list_attribute = 0x00020002  # PROC_THREAD_ATTRIBUTE_HANDLE_LIST
+            if handles and not kernel.UpdateProcThreadAttribute(
+                startup.attributes,
+                0,
+                handle_list_attribute,
+                ctypes.byref(inherited),
+                ctypes.sizeof(inherited),
+                None,
+                None,
+            ):
+                raise ctypes.WinError(ctypes.get_last_error())
+            return create_worker_process(kernel, startup.startup, shell, encoded, environment)
         finally:
             kernel.DeleteProcThreadAttributeList(startup.attributes)
 
-    def run(shell: str, encoded: str, inherited_job: int | None = None) -> int:
-        validate_payload(encoded)
-        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
-        user = ctypes.WinDLL("user32", use_last_error=True)
+    def configure_native_process(kernel: ctypes.WinDLL, user: ctypes.WinDLL) -> None:
         user.CreateDesktopW.argtypes = (
             wintypes.LPCWSTR,
             ctypes.c_void_p,
@@ -300,7 +476,20 @@ if sys.platform == "win32":
             ctypes.POINTER(ProcessInfo),
         )
         kernel.CreateProcessW.restype = wintypes.BOOL
-        configure_close_handle(kernel)
+        kernel.CloseHandle.argtypes = (wintypes.HANDLE,)
+        kernel.CloseHandle.restype = wintypes.BOOL
+        kernel.GetCurrentProcess.argtypes = ()
+        kernel.GetCurrentProcess.restype = wintypes.HANDLE
+        kernel.DuplicateHandle.argtypes = (
+            wintypes.HANDLE,
+            wintypes.HANDLE,
+            wintypes.HANDLE,
+            ctypes.POINTER(wintypes.HANDLE),
+            wintypes.DWORD,
+            wintypes.BOOL,
+            wintypes.DWORD,
+        )
+        kernel.DuplicateHandle.restype = wintypes.BOOL
         kernel.GetStdHandle.argtypes = (wintypes.DWORD,)
         kernel.GetStdHandle.restype = wintypes.HANDLE
         kernel.WaitForSingleObject.argtypes = (wintypes.HANDLE, wintypes.DWORD)
@@ -310,69 +499,34 @@ if sys.platform == "win32":
             ctypes.POINTER(wintypes.DWORD),
         )
         kernel.GetExitCodeProcess.restype = wintypes.BOOL
-        name = "uh-mode-" + uuid.uuid4().hex
-        desktop: int | None = user.CreateDesktopW(name, None, None, 0, 0x01FF, None)
-        if not desktop:
-            raise ctypes.WinError(ctypes.get_last_error())
+
+    def run(shell: str, encoded: str) -> int:
+        validate_payload(encoded)
+        job = WindowsWorkerJob()
         try:
-            startup = StartupInfoEx()
-            startup.startup.size = ctypes.sizeof(StartupInfo)
-            startup.startup.desktop = name
-            startup.startup.flags = 0x0100
-            startup.startup.stdin = kernel.GetStdHandle(-10)
-            startup.startup.stdout = kernel.GetStdHandle(-11)
-            startup.startup.stderr = kernel.GetStdHandle(-12)
-            job = None
-            if inherited_job is not None:
-                try:
-                    # Include the launcher and its log handles. PowerShell
-                    # inherits the job from the launcher when it starts.
-                    assign_launcher_to_job(kernel, inherited_job)
-                finally:
-                    kernel.CloseHandle(inherited_job)
-            else:
-                job = worker_job(kernel)
-            try:
-                process = (
-                    start_independent_worker(kernel, startup, job, shell, encoded)
-                    if job is not None
-                    else create_worker_process(
-                        kernel, startup.startup, shell, encoded, extended=False
-                    )
-                )
-                try:
-                    if kernel.WaitForSingleObject(process.process, 0xFFFFFFFF) != 0:
-                        raise ctypes.WinError(ctypes.get_last_error())
-                    code = wintypes.DWORD()
-                    if not kernel.GetExitCodeProcess(process.process, ctypes.byref(code)):
-                        raise ctypes.WinError(ctypes.get_last_error())
-                    return ctypes.c_int32(code.value).value
-                finally:
-                    kernel.CloseHandle(process.thread)
-                    kernel.CloseHandle(process.process)
-                    if job is not None:
-                        reap_job(kernel, job)
-            finally:
-                if job is not None:
-                    kernel.CloseHandle(job)
+            return job.launch_console(shell, encoded).wait()
         finally:
-            if not user.CloseDesktop(desktop):
-                raise ctypes.WinError(ctypes.get_last_error())
+            job.close()
+
+    def create_worker_job() -> WorkerJob | None:
+        return WindowsWorkerJob()
 
 else:
 
-    def run(_shell: str, _encoded: str, _inherited_job: int | None = None) -> int:
+    def run(_shell: str, _encoded: str) -> int:
         raise OSError("Private Unity worker desktops require Windows")
+
+    def create_worker_job() -> WorkerJob | None:
+        return None
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--shell", required=True)
     parser.add_argument("--encoded-worker", required=True)
-    parser.add_argument("--inherited-job", type=int)
     arguments = parser.parse_args()
     try:
-        return run(arguments.shell, arguments.encoded_worker, arguments.inherited_job)
+        return run(arguments.shell, arguments.encoded_worker)
     except (OSError, ValueError) as error:
         print(f"Cannot launch private Unity worker: {error}", file=sys.stderr)
         return 1

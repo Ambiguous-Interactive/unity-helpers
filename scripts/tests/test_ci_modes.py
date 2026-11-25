@@ -638,33 +638,54 @@ def test_windows_controller_keeps_shared_service_and_releases_owned_directory(
     tmp_path: Path,
 ) -> None:
     modes, preparation, environment, shell = make_control(tmp_path)
-    project = tmp_path / "project"
-    project.mkdir()
-    (project / "retained.txt").write_text("migration control", encoding="utf-8")
+    project = tmp_path / "projects" / "generated"
+    evidence = {
+        "Assets/Editor/UhCiTestConfigurator.cs": b"public static class UhCiTestConfigurator {}",
+        "Assets/OdinLiveAddress-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/source.txt": b"source control",
+        "Library/WallstopOdinMigrationApply/active.txt": b"active migration",
+        "Library/WallstopOdinMigrationBackups/backup/state.json": b"backup control",
+        "Library/cache.bin": b"cache control",
+    }
+    for relative, data in evidence.items():
+        path = project / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+    stop_service = tmp_path / "stop-service"
     service = tmp_path / "service.py"
     service.write_text(
         """
 import os
 import socket
 import sys
+import time
 from pathlib import Path
 
 port_path = Path(os.environ["UH_PROBE_DIRECTORY"]) / "port"
+response = b"workspace-service"
 if sys.argv[1] == "listen":
+    stop = port_path.with_name("stop-service")
+    deadline = time.monotonic() + 90
     with socket.socket() as listener:
         listener.bind(("127.0.0.1", 0))
         listener.listen()
+        listener.settimeout(0.2)
         pending = port_path.with_suffix(".tmp")
         pending.write_text(str(listener.getsockname()[1]), encoding="ascii")
         pending.replace(port_path)
-        while True:
-            with listener.accept()[0] as connection:
-                connection.sendall(b"workspace-service")
+        while not stop.exists() and time.monotonic() < deadline:
+            try:
+                connection, _ = listener.accept()
+            except TimeoutError:
+                continue
+            with connection:
+                connection.settimeout(2)
+                connection.sendall(response)
 else:
     port = int(port_path.read_text(encoding="ascii"))
     with socket.create_connection(("127.0.0.1", port), timeout=2) as connection:
-        if connection.recv(100) != b"workspace-service":
-            sys.exit(2)
+        with connection.makefile("rb") as reader:
+            if reader.read(len(response) + 1) != response:
+                sys.exit(2)
 """,
         encoding="utf-8",
     )
@@ -672,10 +693,9 @@ else:
     suffix = "        if ($env:CONTROL_HANG -eq $TestMode) {"
     control = r"""
         if ($TestMode -eq 'editmode') {
-            $ownerId = [int](Get-CimInstance Win32_Process -Filter "ProcessId=$PID").ParentProcessId
-            [IO.File]::WriteAllText((Join-Path $env:UH_PROBE_DIRECTORY 'owner-id'), [string]$ownerId)
+            [IO.File]::WriteAllText((Join-Path $env:UH_PROBE_DIRECTORY 'owner-id'), [string]$PID)
             $arguments = @(('"' + $env:UH_PROBE_SERVICE + '"'), 'listen')
-            $server = Start-Process -PassThru -FilePath $env:UH_PROBE_PYTHON -ArgumentList $arguments -WorkingDirectory (Join-Path $env:UH_PROBE_DIRECTORY project)
+            $server = Start-Process -PassThru -FilePath $env:UH_PROBE_PYTHON -ArgumentList $arguments -WorkingDirectory (Join-Path $env:UH_PROBE_DIRECTORY 'projects/generated')
             $until = [datetime]::UtcNow.AddSeconds(15)
             while (-not (Test-Path -LiteralPath (Join-Path $env:UH_PROBE_DIRECTORY 'first-request'))) {
                 if ($server.HasExited -or [datetime]::UtcNow -gt $until) { throw 'Service did not receive first request.' }
@@ -707,20 +727,53 @@ else:
         UH_PROBE_DIRECTORY=str(tmp_path),
         UH_PROBE_PYTHON=sys.executable,
     )
-    success = run(
-        modes,
-        preparation,
-        private=tmp_path,
-        shell=shell,
-        environment=environment,
-        timeout=45,
-        receipt=tmp_path / "receipt.json",
-        output=None,
+    retain = tmp_path / "retain.ps1"
+    retain.write_text(
+        "param([string]$Helper, [string]$Project)\n"
+        "$ErrorActionPreference = 'Stop'\n"
+        ". $Helper\n"
+        "(Move-UnityProjectWithMigrationResidue -Project $Project).RetainedPath\n",
+        encoding="utf-8",
     )
-    assert success, (tmp_path / "playmode/mode-controller.log").read_text(encoding="utf-8")
-    assert (tmp_path / "second-request").read_text(encoding="utf-8") == "ok"
-    retained = project.rename(tmp_path / "retained")
-    assert (retained / "retained.txt").read_text(encoding="utf-8") == "migration control"
+    command = [
+        shell,
+        "-NoProfile",
+        "-File",
+        str(retain),
+        str(ROOT / "scripts/unity/lib/project-workspace.ps1"),
+        str(project),
+    ]
+    try:
+        success = run(
+            modes,
+            preparation,
+            private=tmp_path,
+            shell=shell,
+            environment=environment,
+            timeout=45,
+            receipt=tmp_path / "receipt.json",
+            output=None,
+        )
+        assert success, (tmp_path / "playmode/mode-controller.log").read_text(encoding="utf-8")
+        assert (tmp_path / "second-request").read_text(encoding="utf-8") == "ok"
+
+        conflict = tmp_path / "retained-projects"
+        conflict.write_bytes(b"existing conflict")
+        refused = subprocess.run(command, capture_output=True, text=True, timeout=30, check=False)
+        assert refused.returncode != 0
+        assert conflict.read_bytes() == b"existing conflict"
+        for relative, data in evidence.items():
+            assert (project / relative).read_bytes() == data
+        conflict.unlink()
+
+        moved = subprocess.run(command, capture_output=True, text=True, timeout=30, check=True)
+        retained = Path(moved.stdout.strip())
+        assert retained.parent == conflict
+        assert not project.exists()
+        for relative, data in evidence.items():
+            assert (retained / relative).read_bytes() == data
+    finally:
+        stop_service.touch()
 
 
 @pytest.mark.parametrize(

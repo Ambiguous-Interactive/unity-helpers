@@ -20,14 +20,14 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, BinaryIO, cast
 
+from desktop_worker import create_worker_job
 from editmode_shards import merge_results, partition_assemblies
-
-if sys.platform == "win32":
-    from desktop_worker import WindowsWorkerJob
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator
     from types import FrameType
+
+    from desktop_worker import ModeProcess, WorkerJob
 
 ROOT = Path(__file__).resolve().parents[2]
 MODES = ("editmode", "playmode", "standalone")
@@ -74,7 +74,7 @@ class Mode:
 @dataclass
 class Worker:
     mode: Mode
-    process: subprocess.Popen[bytes]
+    process: ModeProcess
     started: float
     ended: float | None = None
     forced: bool = False
@@ -275,7 +275,7 @@ def launch(
     shell: str,
     environment: dict[str, str],
     stream: BinaryIO,
-    job_handle: int | None,
+    job: WorkerJob | None,
 ) -> Worker:
     config = directory / f"{mode.key}.json"
     config.write_text(json.dumps(mode.parameters), encoding="utf-8")
@@ -290,6 +290,10 @@ def launch(
         )
     if mode.name != "standalone":
         child_environment.pop("UH_NATIVE_ALLOCATOR_DIAGNOSTICS", None)
+    encoded = base64.b64encode(WORKER.encode("utf-16-le")).decode("ascii")
+    started = time.monotonic()
+    if job is not None:
+        return Worker(mode, job.launch(shell, encoded, child_environment, stream), started)
     command = [
         shell,
         "-NoProfile",
@@ -297,36 +301,15 @@ def launch(
         "-OutputFormat",
         "Text",
         "-EncodedCommand",
-        base64.b64encode(WORKER.encode("utf-16-le")).decode("ascii"),
+        encoded,
     ]
-    startup = None
-    if sys.platform == "win32":
-        command = [
-            sys.executable,
-            str(Path(__file__).with_name("desktop_worker.py")),
-            "--shell",
-            shell,
-            "--encoded-worker",
-            base64.b64encode(WORKER.encode("utf-16-le")).decode("ascii"),
-        ]
-        if job_handle is not None:
-            command.extend(("--inherited-job", str(job_handle)))
-            startup = subprocess.STARTUPINFO(lpAttributeList={"handle_list": [job_handle]})
-    started = time.monotonic()
-    if sys.platform == "win32" and job_handle is not None:
-        os.set_handle_inheritable(job_handle, True)
-    try:
-        process = subprocess.Popen(  # noqa: S603 - fixed PowerShell program and typed options.
-            command,
-            env=child_environment,
-            stdout=stream,
-            stderr=subprocess.STDOUT,
-            startupinfo=startup,
-            start_new_session=os.name != "nt",
-        )
-    finally:
-        if sys.platform == "win32" and job_handle is not None:
-            os.set_handle_inheritable(job_handle, False)
+    process = subprocess.Popen(  # noqa: S603 - fixed PowerShell program and typed options.
+        command,
+        env=child_environment,
+        stdout=stream,
+        stderr=subprocess.STDOUT,
+        start_new_session=True,
+    )
     return Worker(mode, process, started)
 
 
@@ -412,13 +395,11 @@ def run(
     try:
         # Editors can connect to a licensing client started by a different
         # mode. Keep the shared process tree until all modes have finished.
-        if sys.platform == "win32":
-            windows_job = WindowsWorkerJob()
-        job_handle = windows_job.handle if windows_job is not None else None
+        windows_job = create_worker_job()
         with contextlib.ExitStack() as streams:
             preparation_log = streams.enter_context((private / "activation.log").open("wb"))
             preparation_worker = launch(
-                preparation, private, shell, environment, preparation_log, job_handle
+                preparation, private, shell, environment, preparation_log, windows_job
             )
             wait([preparation_worker], started + min(timeout, 600))
             if preparation_worker.process.returncode != 0:
@@ -440,7 +421,7 @@ def run(
                     (private / f"{initialization.name}.log").open("wb")
                 )
                 initializer = launch(
-                    initialization, private, shell, environment, initialization_log, job_handle
+                    initialization, private, shell, environment, initialization_log, windows_job
                 )
                 initializers.append(initializer)
                 wait([initializer], started + timeout)
@@ -472,10 +453,10 @@ def run(
                     folder.mkdir(parents=True, exist_ok=True)
                     stream = streams.enter_context((folder / "mode-controller.log").open("wb"))
                     worker_logs[mode.key] = stream
-                    workers.append(launch(mode, private, shell, environment, stream, job_handle))
+                    workers.append(launch(mode, private, shell, environment, stream, windows_job))
 
             wait(workers, started + timeout, fill_available_slots)
-            if sys.platform == "win32" and windows_job is not None:
+            if windows_job is not None:
                 job, windows_job = windows_job, None
                 try:
                     job.close()
@@ -547,7 +528,7 @@ def run(
                 cleanup_failed = True
             if worker.ended is None:
                 worker.ended = time.monotonic()
-        if sys.platform == "win32" and windows_job is not None:
+        if windows_job is not None:
             try:
                 windows_job.close()
             except OSError as error:

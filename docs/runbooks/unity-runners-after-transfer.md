@@ -278,8 +278,9 @@ A failed move also stops the run without clearing the original project.
 
 On Windows, the mode controller owns the preparation and test processes in one job
 object. Concurrent modes can use the same Unity licensing client until their work
-finishes. The controller reaps the job before it collects mode artifacts or reports
-success. A cleanup failure is recorded in the mode receipt.
+finishes. After modes finish, the controller reaps the job before it moves their
+artifacts or reports success. An initializer can write its failure log before
+the job is reaped. Check the mode receipt for the cleanup outcome.
 
 If retention still fails, preserve the reported source and destination and wait for
 license return and lock release. Check the mode receipt and the CI job that owns the
