@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.DurableFile.Tests
 {
     using System;
     using System.Collections.Generic;
+    using System.Diagnostics;
     using System.IO;
     using System.Runtime.InteropServices;
     using System.Text;
@@ -284,6 +285,62 @@ namespace WallstopStudios.UnityHelpers.DurableFile.Tests
             Assert.IsFalse(exchanged);
             Assert.That(error, Is.TypeOf<PlatformNotSupportedException>());
             CollectionAssert.AreEquivalent(new[] { _source }, Directory.GetFiles(_directory));
+        }
+
+        [TestCase(Program.CompareText)]
+        [TestCase(Program.CompareBytes)]
+        public void CompareThenReplaceRefusesAnotherProcessUntilOwnershipIsReleased(string command)
+        {
+            RealFile.WriteAllText(_destination, Program.PreviousFileContents);
+            string stagePath = _destination + DurableFile.TemporarySuffix;
+            string lockPath = stagePath + DurableFile.OwnershipSuffix;
+            Assert.IsTrue(
+                DurableFile.TryOpenStagingOwnership(
+                    stagePath,
+                    out FileStream ownership,
+                    out Exception error
+                ),
+                error?.ToString()
+            );
+            using (ownership)
+            {
+                (int refused, string message) = RunContender();
+                Assert.AreEqual(Program.OwnershipRefused, refused, message);
+                Assert.AreEqual(Program.PreviousFileContents, RealFile.ReadAllText(_destination));
+                Assert.IsTrue(RealFile.Exists(lockPath));
+                Assert.IsFalse(RealFile.Exists(stagePath));
+            }
+
+            Assert.IsFalse(RealFile.Exists(lockPath));
+            (int accepted, string failure) = RunContender();
+            Assert.AreEqual(0, accepted, failure);
+            Assert.AreEqual(Program.ReplacementFileContents, RealFile.ReadAllText(_destination));
+            Assert.IsFalse(RealFile.Exists(lockPath));
+            Assert.IsFalse(RealFile.Exists(stagePath));
+
+            (int, string) RunContender()
+            {
+                ProcessStartInfo start = new()
+                {
+                    FileName = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet",
+                    UseShellExecute = false,
+                    RedirectStandardError = true,
+                };
+                start.ArgumentList.Add(typeof(Program).Assembly.Location);
+                start.ArgumentList.Add(command);
+                start.ArgumentList.Add(_destination);
+                using Process child = Process.Start(start);
+                Assert.IsNotNull(child);
+                bool exited = child.WaitForExit(10_000);
+                if (!exited)
+                {
+                    child.Kill(entireProcessTree: true);
+                    Assert.IsTrue(child.WaitForExit(5_000));
+                }
+
+                Assert.IsTrue(exited, "The contender did not exit.");
+                return (child.ExitCode, child.StandardError.ReadToEnd());
+            }
         }
 
         [Test]

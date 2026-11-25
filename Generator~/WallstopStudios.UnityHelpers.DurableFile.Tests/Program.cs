@@ -6,15 +6,27 @@ namespace WallstopStudios.UnityHelpers.DurableFile.Tests
     using System;
     using System.Globalization;
     using System.Runtime.InteropServices;
+    using System.Text;
     using WallstopStudios.UnityHelpers.Core.Helper;
 
     internal static class Program
     {
+        internal const string CompareText = "--compare-text";
+        internal const string CompareBytes = "--compare-bytes";
+        internal const int OwnershipRefused = 23;
+        internal const string PreviousFileContents = "retained contents";
+        internal const string ReplacementFileContents = "contender contents";
+
         private const int FileSizeResource = 1;
         private const int FileSizeExceededSignal = 25;
 
         internal static int Main(string[] arguments)
         {
+            if (arguments.Length == 2 && (arguments[0] is CompareText or CompareBytes))
+            {
+                return CompareThenReplace(arguments[0], arguments[1]);
+            }
+
             if (
                 arguments.Length != 4
                 || !string.Equals(arguments[0], "--initialize-limit", StringComparison.Ordinal)
@@ -48,6 +60,46 @@ namespace WallstopStudios.UnityHelpers.DurableFile.Tests
                 contents[index] = (byte)(index % 251);
             }
             return contents;
+        }
+
+        private static int CompareThenReplace(string command, string path)
+        {
+            bool replaced;
+            Exception error;
+            if (string.Equals(command, CompareText, StringComparison.Ordinal))
+            {
+                bool completed = DurableFile.TryCompareThenReplaceAllText(
+                    path,
+                    expectedExists: true,
+                    PreviousFileContents,
+                    ReplacementFileContents,
+                    out bool exchanged,
+                    out error
+                );
+                replaced = completed && exchanged;
+            }
+            else
+            {
+                byte[] previous = Encoding.UTF8.GetBytes(PreviousFileContents);
+                byte[] replacement = Encoding.UTF8.GetBytes(ReplacementFileContents);
+                replaced = DurableFile.TryCompareThenReplaceBytes(
+                    path,
+                    previous,
+                    replacement,
+                    out error
+                );
+            }
+
+            if (replaced)
+            {
+                return 0;
+            }
+            Console.Error.WriteLine(error);
+            if (error is System.IO.IOException)
+            {
+                return OwnershipRefused;
+            }
+            return 3;
         }
 
         [DllImport("libc", EntryPoint = "getrlimit", SetLastError = true)]

@@ -32,8 +32,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     /// If restoration fails, the returned error identifies the backup path.
     /// Windows sharing violations and inability to remove the replaced file receive up to three
     /// replacement attempts with 10 ms and 20 ms waits while retaining staged contents and ownership.
-    /// Creating an absent destination remains supported. Cooperating writes, appends, and deletes
-    /// serialize per destination in this process and refuse concurrent ownership across processes.
+    /// Cooperating writes, appends, and deletes serialize per destination in this process.
+    /// On supported local Windows, macOS, and Linux filesystems, processes using the same ownership
+    /// protocol refuse concurrent ownership. A stopped process releases its lock even if the
+    /// sibling lock file remains.
     /// </para>
     /// <para>
     /// Where the format allows a log of records, <see cref="TryAppendAllText"/> is strictly stronger
@@ -1023,9 +1025,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         /// <summary>Compares current bytes, then stages and replaces the file.</summary>
         /// <remarks>
-        /// The staging-file ownership spans the read, staging write, and replacement, so cooperating
-        /// staged-replacement DurableFile writers cannot change the destination during this operation.
-        /// A writer that does not acquire that ownership can change it after the read and before replacement.
+        /// Cooperating DurableFile writers share destination ownership through the read, staging,
+        /// and replacement. An external writer can change the destination after the read.
         /// </remarks>
         internal static bool TryCompareThenReplaceBytes(
             string path,
@@ -1099,7 +1100,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         /// <summary>Compares current text, then stages and replaces the file.</summary>
         /// <remarks>
-        /// DurableFile writers in this process share the destination gate from comparison through
+        /// Cooperating DurableFile writers share destination ownership from comparison through
         /// publication. An external writer can change an existing file between those steps.
         /// When the comparison expects absence, publication refuses to overwrite any intervening creation.
         /// </remarks>
@@ -1355,14 +1356,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         {
             try
             {
-                ownership = new FileStream(
-                    temporaryPath + OwnershipSuffix,
-                    FileMode.OpenOrCreate,
-                    FileAccess.ReadWrite,
-                    FileShare.Read,
-                    bufferSize: 1,
-                    FileOptions.DeleteOnClose
-                );
+                string ownershipPath = temporaryPath + OwnershipSuffix;
+                ownership = DurableFileOwnershipStream.Acquire(ownershipPath);
                 error = null;
                 return true;
             }
