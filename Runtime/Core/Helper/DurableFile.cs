@@ -977,58 +977,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             );
         }
 
-        // A hard link is also exclusive and covers volumes that reject the rename flag.
-        private static bool TryRenameUnixWithoutOverwrite(
-            string stagedPath,
-            string destinationPath,
-            bool isMac,
-            out bool renamed
-        )
-        {
-            int result;
-            try
-            {
-                result = isMac
-                    ? RenameExclusiveMac(stagedPath, destinationPath, MacRenameExclusive)
-                    : RenameExclusiveLinux(
-                        LinuxCurrentDirectory,
-                        stagedPath,
-                        LinuxCurrentDirectory,
-                        destinationPath,
-                        LinuxRenameNoReplace
-                    );
-            }
-            catch (EntryPointNotFoundException)
-            {
-                renamed = false;
-                return false;
-            }
-            renamed = result == 0;
-            if (renamed)
-            {
-                return true;
-            }
-
-            int error = Marshal.GetLastWin32Error();
-            if (error == UnixNameAlreadyExists)
-            {
-                return true;
-            }
-            bool unavailable = isMac
-                ? error
-                    is MacOperationUnsupported
-                        or MacOperationUnavailable
-                        or MacOperationNotSupportedOnSocket
-                : error is LinuxOperationUnavailable or LinuxOperationUnsupported;
-            if (unavailable || error is UnixOperationNotPermitted or UnixInvalidArgument)
-            {
-                return false;
-            }
-            throw new IOException(
-                $"Could not publish '{destinationPath}' with an exclusive rename (OS error {error})."
-            );
-        }
-
         /// <summary>Publishes an editor stage while owning the destination.</summary>
         internal static bool TryPublishOwnedStagedFileWithoutOverwrite(
             string stagedPath,
@@ -1218,15 +1166,16 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     staging.Flush(flushToDisk: true);
                     staging.Dispose();
                     staging = null;
+                    bool published;
                     if (expectedExists)
                     {
                         Swap(stagedPath, path);
                         ownsStaging = false;
-                        exchanged = true;
+                        published = true;
                     }
                     else
                     {
-                        exchanged = TryPublishStagedFileWithoutOverwrite(
+                        published = TryPublishStagedFileWithoutOverwrite(
                             stagedPath,
                             path,
                             out bool leavesStaged,
@@ -1235,6 +1184,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         ownsStaging = leavesStaged;
                     }
                     error = null;
+                    exchanged = published;
                     return true;
                 }
                 catch (Exception failure)
@@ -1361,11 +1311,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 
-        private static string UniqueCreationStagingPath(string path)
-        {
-            return path + ".create." + Guid.NewGuid().ToString("N") + TemporarySuffix;
-        }
-
         // Only a successful exclusive staging open establishes cleanup ownership; failed opens may name another writer.
         /// <summary>Opens the staging file exclusively for writing.</summary>
         internal static FileStream OpenStagingStream(
@@ -1459,6 +1404,65 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             {
                 Replace(temporaryPath, path);
             }
+        }
+
+        private static string UniqueCreationStagingPath(string path)
+        {
+            return path + ".create." + Guid.NewGuid().ToString("N") + TemporarySuffix;
+        }
+
+        // A hard link is also exclusive and covers volumes that reject the rename flag.
+        private static bool TryRenameUnixWithoutOverwrite(
+            string stagedPath,
+            string destinationPath,
+            bool isMac,
+            out bool renamed
+        )
+        {
+            int result;
+            try
+            {
+                result = isMac
+                    ? RenameExclusiveMac(stagedPath, destinationPath, MacRenameExclusive)
+                    : RenameExclusiveLinux(
+                        LinuxCurrentDirectory,
+                        stagedPath,
+                        LinuxCurrentDirectory,
+                        destinationPath,
+                        LinuxRenameNoReplace
+                    );
+            }
+            catch (EntryPointNotFoundException)
+            {
+                renamed = false;
+                return false;
+            }
+            if (result == 0)
+            {
+                renamed = true;
+                return true;
+            }
+
+            int error = Marshal.GetLastWin32Error();
+            if (error == UnixNameAlreadyExists)
+            {
+                renamed = false;
+                return true;
+            }
+            bool unavailable = isMac
+                ? error
+                    is MacOperationUnsupported
+                        or MacOperationUnavailable
+                        or MacOperationNotSupportedOnSocket
+                : error is LinuxOperationUnavailable or LinuxOperationUnsupported;
+            if (unavailable || error is UnixOperationNotPermitted or UnixInvalidArgument)
+            {
+                renamed = false;
+                return false;
+            }
+            throw new IOException(
+                $"Could not publish '{destinationPath}' with an exclusive rename (OS error {error})."
+            );
         }
 
         [DllImport("libc", EntryPoint = "link", ExactSpelling = true, SetLastError = true)]
