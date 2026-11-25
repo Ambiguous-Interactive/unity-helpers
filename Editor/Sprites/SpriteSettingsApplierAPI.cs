@@ -851,6 +851,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 {
                     throw new IOException($"Could not identify profiles asset at {writePath}.");
                 }
+                if (existing != null)
+                {
+                    string stageFile = ProfileFullPath(writePath);
+                    stagedBytes = File.ReadAllBytes(stageFile);
+                }
                 AssetDatabase.SaveAssets();
                 if (
                     AssetDatabase.LoadAssetAtPath<SpriteSettingsProfileCollection>(writePath)
@@ -902,7 +907,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
                 else
                 {
-                    stagedBytes = File.ReadAllBytes(ProfileFullPath(writePath));
                     if (
                         !TryDeleteProfileAsset(
                             writePath,

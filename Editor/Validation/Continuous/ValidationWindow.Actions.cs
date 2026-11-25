@@ -48,6 +48,48 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             }
         }
 
+        internal void UndoLastChange()
+        {
+            _undoAction?.Invoke();
+        }
+
+        internal void ShowSuppressionUndo(string message, Func<string> undo)
+        {
+            Say(message, AttemptUndo);
+
+            void AttemptUndo()
+            {
+                string failure;
+                try
+                {
+                    failure = undo();
+                }
+                catch (Exception thrown)
+                {
+                    failure = "Could not undo suppression: " + thrown.Message;
+                }
+                if (failure != null)
+                {
+                    Say(failure, AttemptUndo);
+                    return;
+                }
+
+                try
+                {
+                    ReloadSuppressions();
+                    RefreshSettings();
+                    Say("Suppression change undone.");
+                }
+                catch (Exception thrown)
+                {
+                    Say(
+                        "Suppression change undone. Could not refresh the workspace: "
+                            + thrown.Message
+                    );
+                }
+            }
+        }
+
         private void WorkspaceChanged()
         {
             _lastCompletedRun = null;
@@ -65,7 +107,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             _toast.Clear();
             AddLabel(_toast, message, "dx-grow");
             if (undo != null)
-                _toast.Add(new Button(() => _undoAction?.Invoke()) { text = "Undo" });
+                _toast.Add(new Button(UndoLastChange) { text = "Undo" });
             _toast.Add(new Button(() => _toast.Clear()) { text = "×", tooltip = "Dismiss" });
         }
 
@@ -101,25 +143,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                     return;
                 }
 
-                Say(suppress ? "Issue suppressed." : "Suppression restored.", () =>
+                string message = "Suppression restored.";
+                if (suppress)
                 {
-                    try
-                    {
-                        string undoFailure = undo();
-                        if (undoFailure != null)
-                        {
-                            Say(undoFailure);
-                            return;
-                        }
-                        ReloadSuppressions();
-                        RefreshSettings();
-                        Say("Suppression change undone.");
-                    }
-                    catch (Exception thrown)
-                    {
-                        Say("Could not undo suppression: " + thrown.Message);
-                    }
-                });
+                    message = "Issue suppressed.";
+                }
+                ShowSuppressionUndo(message, undo);
             }
             catch (Exception thrown)
             {

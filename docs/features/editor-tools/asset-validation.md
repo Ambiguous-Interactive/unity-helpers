@@ -447,8 +447,8 @@ Saving or undoing a suppression stages the complete file before replacement. A f
 staging leaves the previous decisions intact. Competing Sentinel actions compare the file while
 holding [the destination writer lock](../utilities/helper-utilities.md#durable-writes-for-player-data),
 so a stale action reports a conflict and keeps the newer decisions. Undo also refuses to replace a newer Sentinel edit it observes. Reload the workspace and
-repeat the action against the current decisions. A simultaneous action can report write contention
-and can be retried.
+repeat the action against the current decisions. If another writer holds ownership, you can retry
+the same Undo after that writer finishes.
 The first save publishes only while the file is absent. If another tool creates the file after
 Sentinel reads it, the save reports a conflict and preserves the other tool's decisions.
 On macOS and Linux, first saves require a project filesystem that supports exclusive rename or

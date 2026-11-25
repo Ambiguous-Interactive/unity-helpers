@@ -583,6 +583,74 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         }
 
         [Test]
+        public void OverwritePreservesStagingChangedDuringAssetSave()
+        {
+            Assert.IsTrue(
+                SpriteSettingsApplierAPI.TrySaveProfiles(
+                    ProfilePath,
+                    new List<SpriteSettings> { new() { name = "Original" } },
+                    false,
+                    out string error
+                ),
+                error
+            );
+            byte[] original = File.ReadAllBytes(ProfilePath);
+            string triggerPath = Root + "/SaveTrigger.asset";
+            SpriteSettingsProfileCollection trigger = Track(
+                ScriptableObject.CreateInstance<SpriteSettingsProfileCollection>()
+            );
+            AssetDatabase.CreateAsset(trigger, triggerPath);
+            trigger.profiles = new() { new() { name = "Dirty save trigger" } };
+            EditorUtility.SetDirty(trigger);
+
+            string editedStage = null;
+            byte[] editedContents = null;
+            SpriteProfileStagingEditProcessor.BeforeSave = paths =>
+            {
+                if (
+                    editedStage != null
+                    || !Array.Exists(paths, path =>
+                        string.Equals(path, triggerPath, StringComparison.Ordinal)
+                    )
+                )
+                {
+                    return;
+                }
+
+                string[] stages = StagedAssetFiles();
+                if (stages.Length != 1)
+                {
+                    return;
+                }
+                editedStage = stages[0];
+                File.AppendAllText(editedStage, "\n# staged edit during save\n");
+                editedContents = File.ReadAllBytes(editedStage);
+            };
+            try
+            {
+                bool saved = SpriteSettingsApplierAPI.TrySaveProfiles(
+                    ProfilePath,
+                    new List<SpriteSettings> { new() { name = "Replacement" } },
+                    true,
+                    out error
+                );
+
+                Assert.IsTrue(
+                    editedStage != null,
+                    "Unity did not run the staged edit during SaveAssets."
+                );
+                Assert.IsFalse(saved);
+                StringAssert.Contains("changed before cleanup", error);
+                CollectionAssert.AreEqual(original, File.ReadAllBytes(ProfilePath));
+                CollectionAssert.AreEqual(editedContents, File.ReadAllBytes(editedStage));
+            }
+            finally
+            {
+                SpriteProfileStagingEditProcessor.BeforeSave = null;
+            }
+        }
+
+        [Test]
         public void InvalidInputsLeaveAssetAndCallerProfilesUntouched()
         {
             List<SpriteSettings> input = new() { new SpriteSettings { name = "Safe" } };

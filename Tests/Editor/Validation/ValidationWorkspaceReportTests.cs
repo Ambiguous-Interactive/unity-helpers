@@ -12,6 +12,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     using System.Xml;
     using NUnit.Framework;
     using UnityEngine;
+    using UnityEngine.UIElements;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Validation.Continuous;
     using WallstopStudios.UnityHelpers.Tests.Core;
@@ -406,6 +407,65 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 }
 
                 Assert.IsTrue(undo() == null);
+                Assert.AreEqual(original, File.ReadAllText(path));
+            }
+            finally
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+
+        [Test]
+        public void SuppressionWindowRetainsUndoAfterWriterContention()
+        {
+            string directory = Path.Combine(
+                Application.temporaryCachePath,
+                Guid.NewGuid().ToString("N")
+            );
+            Directory.CreateDirectory(directory);
+            string path = Path.Combine(directory, "ValidationSuppressions.txt");
+            string temporaryPath = path + DurableFile.TemporarySuffix;
+            const string original = "unknown|another|field";
+            ValidationFinding finding = Finding(ValidationSeverity.Error);
+            ValidationWindow window = Track(ScriptableObject.CreateInstance<ValidationWindow>());
+            try
+            {
+                File.WriteAllText(path, original);
+                Assert.IsTrue(
+                    ValidationSuppressionFile.TryChange(
+                        path,
+                        finding.Id,
+                        finding,
+                        true,
+                        out Func<string> undo,
+                        out string applyError
+                    ),
+                    applyError
+                );
+                window.ShowSuppressionUndo("Issue suppressed.", undo);
+                VisualElement toast = window.rootVisualElement.Q(className: "sentinel-toast");
+                Assert.IsTrue(toast != null);
+                Assert.AreEqual("Undo", toast.Q<Button>().text);
+                string published = File.ReadAllText(path);
+                Assert.IsTrue(
+                    DurableFile.TryOpenStagingOwnership(
+                        temporaryPath,
+                        out FileStream writer,
+                        out Exception error
+                    ),
+                    error?.ToString()
+                );
+                using (writer)
+                {
+                    window.UndoLastChange();
+                    StringAssert.Contains("Could not undo suppression", window._status);
+                    Assert.AreEqual("Undo", toast.Q<Button>().text);
+                    Assert.AreEqual(published, File.ReadAllText(path));
+                }
+
+                window.UndoLastChange();
+                Assert.AreEqual("Suppression change undone.", window._status);
+                Assert.AreNotEqual("Undo", toast.Q<Button>().text);
                 Assert.AreEqual(original, File.ReadAllText(path));
             }
             finally
