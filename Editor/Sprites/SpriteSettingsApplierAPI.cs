@@ -729,20 +729,30 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 string.IsNullOrWhiteSpace(expectedGuid)
                 || !string.Equals(expectedGuid, currentGuid, StringComparison.Ordinal)
                 || expectedContents == null
-                || !File.Exists(fullPath)
             )
             {
                 error = $"Staged profiles asset at {assetPath} changed before cleanup.";
                 return false;
             }
 
-            byte[] currentContents = File.ReadAllBytes(fullPath);
+            byte[] currentContents;
+            try
+            {
+                currentContents = File.ReadAllBytes(fullPath);
+            }
+            catch (IOException exception)
+                when (exception is FileNotFoundException or DirectoryNotFoundException)
+            {
+                error = $"Staged profiles asset at {assetPath} changed before cleanup.";
+                return false;
+            }
             if (!currentContents.AsSpan().SequenceEqual(expectedContents))
             {
                 error = $"Staged profiles asset at {assetPath} changed before cleanup.";
                 return false;
             }
 
+            // Unity deletes by path. The checks above preserve changes observed before this call.
             bool deleted = AssetDatabase.DeleteAsset(assetPath);
             if (
                 !deleted

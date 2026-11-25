@@ -1,6 +1,10 @@
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
+#if UNITY_EDITOR || UNITY_STANDALONE_LINUX || UNITY_STANDALONE_OSX || !UNITY_5_3_OR_NEWER
+#define DURABLE_FILE_DESKTOP_OWNERSHIP
+#endif
+
 namespace WallstopStudios.UnityHelpers.Core.Helper
 {
     using System;
@@ -9,7 +13,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
     internal sealed class DurableFileOwnershipStream : FileStream
     {
-#if UNITY_EDITOR || UNITY_STANDALONE_LINUX || UNITY_STANDALONE_OSX || !UNITY_5_3_OR_NEWER
+#if DURABLE_FILE_DESKTOP_OWNERSHIP
         private const int LockExclusive = 2;
         private const int LockNonBlocking = 4;
         private const int LinuxCurrentDirectory = -100;
@@ -33,7 +37,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         internal static FileStream Acquire(string lockPath)
         {
-#if UNITY_EDITOR || UNITY_STANDALONE_LINUX || UNITY_STANDALONE_OSX || !UNITY_5_3_OR_NEWER
+#if DURABLE_FILE_DESKTOP_OWNERSHIP
             bool isMac = RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
             if (isMac || RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
@@ -50,7 +54,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             );
         }
 
-#if UNITY_EDITOR || UNITY_STANDALONE_LINUX || UNITY_STANDALONE_OSX || !UNITY_5_3_OR_NEWER
+#if DURABLE_FILE_DESKTOP_OWNERSHIP
         private static FileStream AcquireUnix(string lockPath, bool isMac)
         {
             DurableFileOwnershipStream stream = new(lockPath);
@@ -156,18 +160,23 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         private static bool MatchesLegacyLinuxIdentity(int descriptor, string lockPath)
         {
-            if (
-                StatLegacyLinuxDescriptor(
-                    LinuxX64StatVersion,
-                    descriptor,
-                    out LegacyLinuxFileIdentity opened
-                ) != 0
-                || StatLegacyLinuxPath(
-                    LinuxX64StatVersion,
-                    lockPath,
-                    out LegacyLinuxFileIdentity named
-                ) != 0
-            )
+            int descriptorResult = StatLegacyLinuxDescriptor(
+                LinuxX64StatVersion,
+                descriptor,
+                out LegacyLinuxFileIdentity opened
+            );
+            if (descriptorResult != 0)
+            {
+                int nativeError = Marshal.GetLastWin32Error();
+                throw OwnershipIdentityError(lockPath, nativeError);
+            }
+
+            int pathResult = StatLegacyLinuxPath(
+                LinuxX64StatVersion,
+                lockPath,
+                out LegacyLinuxFileIdentity named
+            );
+            if (pathResult != 0)
             {
                 int nativeError = Marshal.GetLastWin32Error();
                 throw OwnershipIdentityError(lockPath, nativeError);

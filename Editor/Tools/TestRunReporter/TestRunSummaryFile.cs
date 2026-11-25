@@ -328,26 +328,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
             string directory = Path.GetDirectoryName(summaryPath) ?? string.Empty;
             string claimPath = Path.Combine(directory, "unity-helpers-test-run.claim");
-            return new FileStream(
-                claimPath,
-                FileMode.OpenOrCreate,
-                FileAccess.ReadWrite,
-                FileShare.Read,
-                bufferSize: 1,
-                FileOptions.DeleteOnClose
-            );
+            return DurableFileOwnershipStream.Acquire(claimPath);
         }
 
         private static FileStream OpenClaim(string summaryPath)
         {
-            return new FileStream(
-                summaryPath + ClaimSuffix,
-                FileMode.OpenOrCreate,
-                FileAccess.ReadWrite,
-                FileShare.Read,
-                bufferSize: 1,
-                FileOptions.DeleteOnClose
-            );
+            return DurableFileOwnershipStream.Acquire(summaryPath + ClaimSuffix);
         }
     }
 #endif

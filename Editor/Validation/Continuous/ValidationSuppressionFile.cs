@@ -112,8 +112,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 out StringBuilder remaining
             );
             foreach (string line in text.Replace("\r\n", "\n").Split('\n'))
+            {
                 if (!string.Equals(line.Trim(), id, StringComparison.Ordinal))
+                {
                     remaining.Append(line).Append('\n');
+                }
+            }
             return remaining.ToString();
         }
 
