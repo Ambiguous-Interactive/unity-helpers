@@ -12,6 +12,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         internal static int ReplacementFailuresRemaining { get; set; } = -1;
         internal static bool RejectMove { get; set; }
         internal static Action<string, string> BeforeFailedReplacement { get; set; }
+        internal static Action<string> AfterSuccessfulReplacement { get; set; }
         internal static Action<string> BeforeExists { get; set; }
         internal static Action<string> AfterMissingTextRead { get; set; }
         internal static string ObservedDestination { get; set; }
@@ -25,6 +26,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             ReplacementFailuresRemaining = -1;
             RejectMove = false;
             BeforeFailedReplacement = null;
+            AfterSuccessfulReplacement = null;
             BeforeExists = null;
             AfterMissingTextRead = null;
             ObservedDestination = null;
@@ -91,6 +93,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
 
             System.IO.File.Replace(source, destination, destinationBackupFileName);
+            AfterSuccessfulReplacement?.Invoke(destinationBackupFileName);
         }
     }
 }

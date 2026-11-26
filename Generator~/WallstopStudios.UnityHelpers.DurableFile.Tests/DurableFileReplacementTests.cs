@@ -310,6 +310,37 @@ namespace WallstopStudios.UnityHelpers.DurableFile.Tests
             CollectionAssert.AreEquivalent(new[] { _source }, Directory.GetFiles(_directory));
         }
 
+        [Test]
+        public void ImmediateCleanupPreservesAReplacementAtTheBackupPath()
+        {
+            if (!OperatingSystem.IsWindows())
+            {
+                Assert.Ignore("Native Windows file replacement and identity are required.");
+            }
+
+            RealFile.WriteAllBytes(_destination, OriginalBytes);
+            string movedBackup = Path.Combine(_directory, "previous.bin");
+            string reusedPath = null;
+            SimulatedFile.AfterSuccessfulReplacement = backup =>
+            {
+                Assert.IsNotNull(backup);
+                reusedPath = backup;
+                RealFile.Move(backup, movedBackup);
+                RealFile.WriteAllText(backup, "unrelated file");
+            };
+
+            bool published = DurableFile.TryWriteAllBytes(
+                _destination,
+                ReplacementBytes,
+                out Exception error
+            );
+            Assert.IsTrue(published, error?.ToString());
+            CollectionAssert.AreEqual(ReplacementBytes, RealFile.ReadAllBytes(_destination));
+            CollectionAssert.AreEqual(OriginalBytes, RealFile.ReadAllBytes(movedBackup));
+            Assert.IsTrue(RealFile.Exists(reusedPath));
+            Assert.AreEqual("unrelated file", RealFile.ReadAllText(reusedPath));
+        }
+
         [TestCase(nameof(DurableFile.TryCopy))]
         [TestCase(nameof(DurableFile.CopyAsync))]
         public async Task CopiesRefuseAnExclusivelyOpenSource(string operation)

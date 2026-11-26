@@ -43,16 +43,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             try
             {
                 File.Replace(staged, destination, backup);
-                try
+                if (CanTrackBackup(previous) && !TryReclaim(backup, previous))
                 {
-                    File.Delete(backup);
-                }
-                catch (Exception)
-                {
-                    if (DeferCleanup(destination, backup, previous))
-                    {
-                        previous = null;
-                    }
+                    Remember(new DurableFileWindowsBackup(destination, backup, previous));
+                    previous = null;
                 }
             }
             finally
@@ -141,7 +135,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 
-        private static bool DeferCleanup(string destination, string backup, SafeFileHandle previous)
+        private static bool CanTrackBackup(SafeFileHandle previous)
         {
             if (previous == null || previous.IsInvalid)
             {
@@ -150,8 +144,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             try
             {
-                if (
-                    !GetVolumeInformationByHandle(
+                return GetVolumeInformationByHandle(
                         previous,
                         IntPtr.Zero,
                         0,
@@ -161,14 +154,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         IntPtr.Zero,
                         0
                     )
-                    || (flags & SupportsOpenByFileId) == 0
-                )
-                {
-                    return false;
-                }
-
-                Remember(new DurableFileWindowsBackup(destination, backup, previous));
-                return true;
+                    && (flags & SupportsOpenByFileId) != 0;
             }
             catch (Exception failure) when (NativeApiUnavailable(failure))
             {
@@ -201,54 +187,61 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         private static bool TryReclaim(string backupPath, SafeFileHandle previous)
         {
-            // The old handle prevents ID reuse. The delete handle prevents a rename during the identity check.
-            using SafeFileHandle backup = Open(
-                backupPath,
-                ReadAttributes | DeleteAccess,
-                FileShare.ReadWrite
-            );
-            if (backup.IsInvalid)
+            try
             {
-                int error = Marshal.GetLastWin32Error();
-                return error is FileNotFound or PathNotFound;
-            }
+                // The old handle prevents ID reuse. The delete handle prevents a rename during the identity check.
+                using SafeFileHandle backup = Open(
+                    backupPath,
+                    ReadAttributes | DeleteAccess,
+                    FileShare.ReadWrite
+                );
+                if (backup.IsInvalid)
+                {
+                    int error = Marshal.GetLastWin32Error();
+                    return error is FileNotFound or PathNotFound;
+                }
 
-            uint identitySize = (uint)Marshal.SizeOf<FileIdentity>();
-            if (
-                !GetFileInformationByHandleEx(
-                    previous,
-                    FileIdInfo,
-                    out FileIdentity expected,
-                    identitySize
+                uint identitySize = (uint)Marshal.SizeOf<FileIdentity>();
+                if (
+                    !GetFileInformationByHandleEx(
+                        previous,
+                        FileIdInfo,
+                        out FileIdentity expected,
+                        identitySize
+                    )
+                    || !GetFileInformationByHandleEx(
+                        backup,
+                        FileIdInfo,
+                        out FileIdentity actual,
+                        identitySize
+                    )
                 )
-                || !GetFileInformationByHandleEx(
+                {
+                    return false;
+                }
+
+                if (
+                    (expected.IdLow == 0 && expected.IdHigh == 0)
+                    || expected.Volume != actual.Volume
+                    || expected.IdLow != actual.IdLow
+                    || expected.IdHigh != actual.IdHigh
+                )
+                {
+                    return true;
+                }
+
+                byte delete = 1;
+                return SetFileInformationByHandle(
                     backup,
-                    FileIdInfo,
-                    out FileIdentity actual,
-                    identitySize
-                )
-            )
+                    FileDispositionInfo,
+                    ref delete,
+                    sizeof(byte)
+                );
+            }
+            catch (Exception failure) when (NativeApiUnavailable(failure))
             {
                 return false;
             }
-
-            if (
-                (expected.IdLow == 0 && expected.IdHigh == 0)
-                || expected.Volume != actual.Volume
-                || expected.IdLow != actual.IdLow
-                || expected.IdHigh != actual.IdHigh
-            )
-            {
-                return true;
-            }
-
-            byte delete = 1;
-            return SetFileInformationByHandle(
-                backup,
-                FileDispositionInfo,
-                ref delete,
-                sizeof(byte)
-            );
         }
 
         private static SafeFileHandle Open(string fullPath, uint access, FileShare share)
