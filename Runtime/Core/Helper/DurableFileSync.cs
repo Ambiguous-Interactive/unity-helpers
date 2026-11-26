@@ -363,12 +363,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 
-        internal void Delete(string path)
+        internal Exception Delete(string path)
         {
             if (_windowsHandle == null)
             {
                 File.Delete(path);
-                return;
+                return null;
             }
 
             using SafeFileHandle file = OpenWindowsEntry(
@@ -382,7 +382,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             );
             if (file.IsInvalid)
             {
-                throw new IOException(
+                return new IOException(
                     $"Could not open '{path}' for deletion (OS error {Marshal.GetLastWin32Error()})."
                 );
             }
@@ -394,10 +394,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             uint flags = DeleteWithPosixSemantics;
             if (!SetFileInformationByHandle(file, FileDispositionInfoEx, ref flags, sizeof(uint)))
             {
-                throw new IOException(
+                return new IOException(
                     $"Could not unlink '{path}' (OS error {Marshal.GetLastWin32Error()})."
                 );
             }
+
+            return null;
         }
 #else
         internal static DurableFileSync Open(string path)
@@ -417,9 +419,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             throw DirectorySyncUnavailable();
         }
 
-        internal void Delete(string path)
+        internal Exception Delete(string path)
         {
-            throw DirectorySyncUnavailable();
+            return DirectorySyncUnavailable();
         }
 #endif
 

@@ -1920,7 +1920,13 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         }
                         else
                         {
-                            directory.Delete(path);
+                            Exception deleteFailure = directory.Delete(path);
+                            if (deleteFailure != null)
+                            {
+                                exchanged = false;
+                                error = deleteFailure;
+                                return false;
+                            }
                         }
 
                         published = true;
