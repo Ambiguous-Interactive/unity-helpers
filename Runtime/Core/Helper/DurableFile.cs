@@ -112,6 +112,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return false;
             }
 
+            if (!TryNormalizePath(path, out path, out error))
+            {
+                return false;
+            }
+
             string temporaryPath = path + TemporarySuffix;
             using (EnterGate(path))
             {
@@ -244,6 +249,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return false;
             }
 
+            if (!TryNormalizePath(path, out path, out error))
+            {
+                return false;
+            }
+
             string temporaryPath = path + TemporarySuffix;
             using (EnterGate(path))
             {
@@ -344,6 +354,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             PooledArray<byte> rental = default;
             try
             {
+                path = NormalizePath(path);
                 using (EnterGate(path))
                 {
                     using FileStream stream = OpenSourceStream(path, useAsync: false);
@@ -467,6 +478,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return true;
             }
 
+            if (!TryNormalizePath(path, out path, out error))
+            {
+                return false;
+            }
+
             using (EnterGate(path))
             {
                 FileStream ownership = null;
@@ -525,6 +541,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             SemaphoreLease gate;
             try
             {
+                path = NormalizePath(path);
                 gate = await EnterGateAsync(path, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception e)
@@ -575,7 +592,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <remarks>
         /// Failed moves restore completed moves in reverse order. Every group path holds
         /// cooperating writer ownership before the first move. Moves use exclusive native rename
-        /// and require both paths on one filesystem. Use directory paths with symbolic
+        /// on supported local filesystems on Linux, macOS, and Windows Editor or standalone builds.
+        /// Both paths must be on one filesystem. Use directory paths with symbolic
         /// links or other reparse points resolved. A process interruption can leave a partly moved
         /// group, and clients that do not use DurableFile need caller coordination.
         /// </remarks>
@@ -604,7 +622,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             out Exception error
         )
         {
-            Exception validation = ValidateCopyPaths(sourcePath, destinationPath);
+            Exception validation = NormalizeCopyPaths(ref sourcePath, ref destinationPath);
             if (validation != null)
             {
                 error = validation;
@@ -657,7 +675,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <returns>True when the destination holds the source's contents.</returns>
         public static bool TryCopy(string sourcePath, string destinationPath, out Exception error)
         {
-            Exception validation = ValidateCopyPaths(sourcePath, destinationPath);
+            Exception validation = NormalizeCopyPaths(ref sourcePath, ref destinationPath);
             if (validation != null)
             {
                 error = validation;
@@ -689,8 +707,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         ReleaseFileStream(source);
                         return false;
                     }
-                    stagedPath = UniqueStagingPath(destinationPath);
-                    staging = OpenStagingStream(stagedPath, useAsync: false);
+                    staging = OpenUniqueStagingStream(destinationPath, false, out stagedPath);
                 }
                 catch (Exception e)
                 {
@@ -760,6 +777,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return false;
             }
 
+            if (!TryNormalizePath(path, out path, out _))
+            {
+                return false;
+            }
+
             using (EnterGate(path))
             {
                 FileStream ownership = null;
@@ -803,6 +825,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         internal static bool TryInitializeAllBytes(string path, byte[] contents)
         {
             if (string.IsNullOrWhiteSpace(path))
+            {
+                return false;
+            }
+
+            if (!TryNormalizePath(path, out path, out _))
             {
                 return false;
             }
@@ -956,6 +983,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return false;
             }
 
+            if (!TryNormalizePath(path, out path, out error))
+            {
+                return false;
+            }
+
             using (EnterGate(path))
             {
                 string temporaryPath = null;
@@ -969,8 +1001,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     {
                         return false;
                     }
-                    temporaryPath = UniqueStagingPath(path);
-                    using (FileStream staging = OpenStagingStream(temporaryPath, useAsync: false))
+                    using (
+                        FileStream staging = OpenUniqueStagingStream(path, false, out temporaryPath)
+                    )
                     {
                         ownsTemporary = true;
                         staging.Write(contents, 0, contents.Length);
@@ -1107,6 +1140,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             out bool leavesStaged
         )
         {
+            Exception invalid = NormalizeCopyPaths(ref stagedPath, ref destinationPath);
+            if (invalid != null)
+            {
+                throw invalid;
+            }
+
             using (EnterGate(destinationPath))
             {
                 if (
@@ -1207,6 +1246,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return false;
             }
 
+            if (!TryNormalizePath(path, out path, out error))
+            {
+                exchanged = false;
+                return false;
+            }
+
             string temporaryPath = path + TemporarySuffix;
             string stagedPath = null;
             using (EnterGate(path))
@@ -1226,7 +1271,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     string current;
                     try
                     {
-                        current = File.ReadAllText(path);
+                        File.GetAttributes(path);
+                        using FileStream source = OpenSourceStream(path, useAsync: false);
+                        using StreamReader reader = new(source);
+                        current = reader.ReadToEnd();
                         exists = true;
                     }
                     catch (FileNotFoundException)
@@ -1245,8 +1293,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         return true;
                     }
 
-                    stagedPath = UniqueStagingPath(path);
-                    staging = OpenStagingStream(stagedPath, useAsync: false);
+                    staging = OpenUniqueStagingStream(path, false, out stagedPath);
                     ownsStaging = true;
                     byte[] bytes = Utf8NoByteOrderMark.GetBytes(
                         replacementContents ?? string.Empty
@@ -1304,7 +1351,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return new ArgumentOutOfRangeException(nameof(bufferSize));
             }
 
-            Exception invalid = ValidateCopyPaths(sourcePath, destinationPath);
+            Exception invalid = NormalizeCopyPaths(ref sourcePath, ref destinationPath);
             if (invalid != null)
             {
                 return invalid;
@@ -1351,8 +1398,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         ReleaseFileStream(source);
                         return ownershipError;
                     }
-                    stagedPath = UniqueStagingPath(destinationPath);
-                    staging = OpenStagingStream(stagedPath, useAsync: true);
+                    staging = OpenUniqueStagingStream(destinationPath, true, out stagedPath);
                 }
                 catch (Exception e)
                 {
@@ -1394,7 +1440,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <summary>Verifies a newly published document before its staged name is removed.</summary>
         internal static void VerifyCreatedContents(string path, byte[] contents)
         {
-            if (!File.ReadAllBytes(path).AsSpan().SequenceEqual(contents))
+            if (!MatchesFileBytes(path, contents ?? Array.Empty<byte>(), requireExisting: true))
             {
                 throw new IOException(
                     $"Created file at {path}, but its contents differ; inspect it before retrying."
@@ -1513,12 +1559,38 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return DurableFileSync.Open(parent);
         }
 
-        private static string UniqueStagingPath(string path)
+        private static FileStream OpenUniqueStagingStream(
+            string path,
+            bool useAsync,
+            out string stagedPath
+        )
         {
-            return Path.Combine(
-                Path.GetDirectoryName(Path.GetFullPath(path)),
-                ".create." + Guid.NewGuid().ToString("N") + TemporarySuffix
-            );
+            string directory = Path.GetDirectoryName(path);
+            string filename = Path.GetFileName(path);
+            int shortLength = Math.Max(1, filename.Length);
+            bool shorten = false;
+            for (int attempt = 0; attempt < MaximumInitializationStageAttempts; ++attempt)
+            {
+                string identifier = Guid.NewGuid().ToString("N");
+                string name = shorten
+                    ? identifier.Substring(0, Math.Min(shortLength, identifier.Length))
+                        + TemporarySuffix
+                    : ".create." + identifier + TemporarySuffix;
+                string candidate = Path.Combine(directory, name);
+                try
+                {
+                    FileStream stream = OpenStagingStream(candidate, useAsync);
+                    stagedPath = candidate;
+                    return stream;
+                }
+                catch (PathTooLongException) when (!shorten && shortLength < 40)
+                {
+                    shorten = true;
+                }
+                catch (IOException) when (File.Exists(candidate) || Directory.Exists(candidate)) { }
+            }
+
+            throw new IOException($"Could not reserve exclusive staging for '{path}'.");
         }
 
         // A hard link is also exclusive and covers volumes that reject the rename flag.
@@ -1632,10 +1704,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return new ArgumentException("A destination path is required.", nameof(path));
             }
 
-            string temporaryPath = path + TemporarySuffix;
             SemaphoreLease gate;
             try
             {
+                path = NormalizePath(path);
                 gate = await EnterGateAsync(path, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception e)
@@ -1643,6 +1715,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return e;
             }
 
+            string temporaryPath = path + TemporarySuffix;
             using (gate)
             {
                 FileStream ownership = null;
@@ -1668,8 +1741,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     {
                         return ownershipError;
                     }
-                    stagedPath = UniqueStagingPath(path);
-                    staging = OpenStagingStream(stagedPath, useAsync: true);
+                    staging = OpenUniqueStagingStream(path, true, out stagedPath);
                 }
                 catch (Exception e)
                 {
@@ -1722,8 +1794,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 {
                     return false;
                 }
-                stagedPath = UniqueStagingPath(path);
-                staging = OpenStagingStream(stagedPath, useAsync: false);
+                staging = OpenUniqueStagingStream(path, false, out stagedPath);
             }
             catch (Exception e)
             {
@@ -1774,14 +1845,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return false;
             }
 
-            try
-            {
-                path = Path.GetFullPath(path);
-            }
-            catch (Exception failure)
+            if (!TryNormalizePath(path, out path, out error))
             {
                 exchanged = false;
-                error = failure;
                 return false;
             }
 
@@ -1857,8 +1923,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     }
 
                     bool create = expected == null;
-                    stagedPath = UniqueStagingPath(path);
-                    using (FileStream stage = OpenStagingStream(stagedPath, false))
+                    using (FileStream stage = OpenUniqueStagingStream(path, false, out stagedPath))
                     {
                         ownsStaging = true;
                         stage.Write(replacement, 0, replacement.Length);
@@ -2336,7 +2401,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 );
         }
 
-        private static Exception ValidateCopyPaths(string sourcePath, string destinationPath)
+        private static Exception NormalizeCopyPaths(
+            ref string sourcePath,
+            ref string destinationPath
+        )
         {
             if (string.IsNullOrWhiteSpace(sourcePath))
             {
@@ -2351,7 +2419,67 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 );
             }
 
-            return null;
+            try
+            {
+                if (
+                    Path.IsPathFullyQualified(sourcePath)
+                    && Path.IsPathFullyQualified(destinationPath)
+                )
+                {
+                    sourcePath = NormalizePath(sourcePath);
+                    destinationPath = NormalizePath(destinationPath);
+                }
+                else
+                {
+                    string basePath = Environment.CurrentDirectory;
+                    sourcePath = NormalizePath(Path.GetFullPath(sourcePath, basePath));
+                    destinationPath = NormalizePath(Path.GetFullPath(destinationPath, basePath));
+                }
+
+                return null;
+            }
+            catch (Exception failure)
+            {
+                return failure;
+            }
+        }
+
+        private static bool TryNormalizePath(
+            string path,
+            out string normalized,
+            out Exception error
+        )
+        {
+            try
+            {
+                normalized = NormalizePath(path);
+                error = null;
+                return true;
+            }
+            catch (Exception failure)
+            {
+                normalized = null;
+                error = failure;
+                return false;
+            }
+        }
+
+        private static string NormalizePath(string path)
+        {
+            string normalized = Path.GetFullPath(path);
+            if (Path.DirectorySeparatorChar == '\\')
+            {
+                string filename = Path.GetFileName(normalized);
+                if (
+                    filename.EndsWith(".", StringComparison.Ordinal)
+                    || filename.EndsWith(" ", StringComparison.Ordinal)
+                )
+                {
+                    throw new ArgumentException("Use an unambiguous filename.", nameof(path));
+                }
+            }
+
+            return normalized;
         }
 
         private static SemaphoreSlim[] CreateGates()
@@ -2386,17 +2514,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         private static int GateIndexFor(string path)
         {
-            string key = path;
-            try
-            {
-                key = Path.GetFullPath(path);
-            }
-            catch (Exception)
-            {
-                // Unnormalizable paths still serialize operations, but aliases cannot share that gate.
-            }
-
-            int hash = StringComparer.OrdinalIgnoreCase.GetHashCode(key);
+            int hash = StringComparer.OrdinalIgnoreCase.GetHashCode(path);
             return hash.PositiveMod(GateCount);
         }
 
@@ -2421,11 +2539,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         private static FileStream OpenSourceStream(string sourcePath, bool useAsync)
         {
-            return new FileStream(
+            return DurableFileOwnershipStream.OpenRegularSource(
                 sourcePath,
-                FileMode.Open,
-                FileAccess.Read,
-                FileShare.Read,
                 DefaultBufferSize,
                 useAsync
             );

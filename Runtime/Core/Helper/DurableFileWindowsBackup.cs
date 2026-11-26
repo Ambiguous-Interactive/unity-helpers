@@ -118,7 +118,20 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             try
             {
-                return Open(path, ReadAttributes, FileShare.ReadWrite | FileShare.Delete);
+                SafeFileHandle previous = Open(
+                    path,
+                    ReadAttributes,
+                    FileShare.ReadWrite | FileShare.Delete
+                );
+                if (!previous.IsInvalid)
+                {
+                    return previous;
+                }
+
+                // CreateFile reports ordinary denials through an invalid handle. Publication
+                // still runs through ReplaceFile when we cannot pin the previous identity.
+                previous.Dispose();
+                return null;
             }
             catch (Exception failure) when (NativeApiUnavailable(failure))
             {

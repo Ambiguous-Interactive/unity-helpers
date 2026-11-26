@@ -452,6 +452,17 @@ namespace WallstopStudios.UnityHelpers.DurableFile.Tests
                 Assert.Ignore("A separate writable filesystem at /dev/shm is required.");
             }
 
+            string sourceMount = FindMount(_source);
+            string destinationMount = FindMount(sharedMemory);
+            if (
+                sourceMount == null
+                || destinationMount == null
+                || string.Equals(sourceMount, destinationMount, StringComparison.Ordinal)
+            )
+            {
+                Assert.Ignore("The source and destination must use separate mounts.");
+            }
+
             string parent = Path.Combine(sharedMemory, Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(parent);
             try
@@ -473,6 +484,125 @@ namespace WallstopStudios.UnityHelpers.DurableFile.Tests
             {
                 Directory.Delete(parent, recursive: true);
             }
+        }
+
+        private static string FindMount(string path)
+        {
+            string best = null;
+            foreach (DriveInfo drive in DriveInfo.GetDrives())
+            {
+                string mount = drive.Name;
+                if (
+                    (best == null || best.Length < mount.Length)
+                    && (
+                        string.Equals(path, mount, StringComparison.Ordinal)
+                        || path.StartsWith(
+                            Path.EndsInDirectorySeparator(mount) ? mount : mount + "/",
+                            StringComparison.Ordinal
+                        )
+                    )
+                )
+                {
+                    best = mount;
+                }
+            }
+            return best;
+        }
+
+        [Test]
+        public async Task RelativeCopyKeepsItsOriginalDestinationIfWorkingDirectoryChanges()
+        {
+            string original = Environment.CurrentDirectory;
+            string other = Path.Combine(_directory, "other");
+            Directory.CreateDirectory(other);
+            string source = Path.GetFileName(_source);
+            string destination = Path.GetFileName(_destination);
+            try
+            {
+                Environment.CurrentDirectory = _directory;
+                SimulatedFile.BeforeExists = path =>
+                {
+                    if (
+                        string.Equals(Path.GetFileName(path), destination, StringComparison.Ordinal)
+                    )
+                    {
+                        Environment.CurrentDirectory = other;
+                    }
+                };
+                Exception failure = await DurableFile.CopyAsync(source, destination);
+                Assert.IsTrue(failure == null, failure?.ToString());
+                Assert.AreEqual(other, Environment.CurrentDirectory);
+                CollectionAssert.AreEqual(ReplacementBytes, RealFile.ReadAllBytes(_destination));
+                Assert.IsEmpty(Directory.GetFiles(other));
+            }
+            finally
+            {
+                Environment.CurrentDirectory = original;
+            }
+        }
+
+        [Test]
+        [Platform("Linux")]
+        public void LongParentStillAllowsAnExclusiveStageWhenTheLockFits()
+        {
+            string parent = _directory;
+            while (parent.Length + 1 < 4_070)
+            {
+                int next = Math.Min(200, 4_070 - parent.Length - 1);
+                parent = Path.Combine(parent, new string('d', next));
+            }
+            Directory.CreateDirectory(parent);
+            string path = Path.Combine(parent, "save");
+            byte[] original = { 1 };
+            byte[] replacement = { 2 };
+            RealFile.WriteAllBytes(path, original);
+            Assert.IsTrue(
+                DurableFile.TryWriteAllBytes(path, replacement, out Exception failure),
+                failure?.ToString()
+            );
+            CollectionAssert.AreEqual(replacement, RealFile.ReadAllBytes(path));
+            CollectionAssert.AreEqual(new[] { path }, Directory.GetFiles(parent));
+        }
+
+        [Test]
+        [Platform("Linux")]
+        public void RejectsANamedPipeWithoutWaitingForAWriter()
+        {
+            string pipe = Path.Combine(_directory, "named-pipe");
+            using Process create = Process.Start(
+                new ProcessStartInfo("mkfifo", pipe) { UseShellExecute = false }
+            );
+            Assert.IsTrue(create.WaitForExit(5_000));
+            Assert.AreEqual(0, create.ExitCode);
+            ProcessStartInfo start = new()
+            {
+                FileName = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet",
+                UseShellExecute = false,
+            };
+            start.ArgumentList.Add(typeof(Program).Assembly.Location);
+            start.ArgumentList.Add(Program.RefuseNamedPipe);
+            start.ArgumentList.Add(pipe);
+            using Process child = Process.Start(start);
+            bool exited = child.WaitForExit(5_000);
+            if (!exited)
+            {
+                child.Kill(entireProcessTree: true);
+                Assert.IsTrue(child.WaitForExit(5_000));
+            }
+
+            Assert.IsTrue(exited, "The operation waited for a writer on the named pipe.");
+            Assert.AreEqual(0, child.ExitCode);
+        }
+
+        [Test]
+        [Platform("Linux")]
+        public void ReleasingDirectorySynchronizationTwiceKeepsItClosed()
+        {
+            using DurableFileSync directory = DurableFileSync.Open(_directory);
+            directory.Flush();
+            directory.Dispose();
+            directory.Dispose();
+            Assert.Throws<ObjectDisposedException>(directory.Flush);
         }
 
         [Platform("Linux")]

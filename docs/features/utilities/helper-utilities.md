@@ -1403,7 +1403,8 @@ together. Supply the suffixes in move order and use a destination in an existing
 directory. Use directory paths with symbolic links and other reparse points resolved.
 The call locks both names for the database and for every sidecar, then checks for collisions
 before moving any file. It moves the database first, then each present sidecar. Both paths
-must be on the same filesystem, and the filesystem must support exclusive rename.
+must be on the same filesystem. The operation requires exclusive rename on Linux, macOS, or
+Windows Editor and standalone builds.
 
 <!-- doc-sample: compiles -->
 

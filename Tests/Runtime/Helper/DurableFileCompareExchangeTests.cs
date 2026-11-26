@@ -125,6 +125,38 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 
         [Test]
+        public void WindowsTrailingDotCannotBypassTheWriterLock()
+        {
+            if (!NativePlatform.IsOSPlatform(OSPlatform.Windows))
+            {
+                Assert.Ignore("Tests a Windows filename alias.");
+            }
+
+            byte[] original = { 1 };
+            File.WriteAllBytes(_path, original);
+            Assert.IsTrue(
+                DurableFile.TryOpenStagingOwnership(
+                    _path + DurableFile.TemporarySuffix,
+                    out FileStream writer,
+                    out Exception lockError
+                ),
+                lockError?.ToString()
+            );
+            using (writer)
+            {
+                string alias = _path + ".";
+                Assert.IsFalse(DurableFile.TryWriteAllBytes(alias, new byte[] { 2 }, out _));
+                Assert.IsFalse(DurableFile.TryDelete(alias));
+                Assert.IsFalse(
+                    DurableFile.TryCompareExchangeBytes(alias, original, null, out _, out _)
+                );
+            }
+
+            CollectionAssert.AreEqual(original, File.ReadAllBytes(_path));
+            CollectionAssert.AreEqual(new[] { _path }, Directory.GetFiles(_directory));
+        }
+
+        [Test]
         public void SynchronizesCreationReplacementAndDeletion()
         {
             if (

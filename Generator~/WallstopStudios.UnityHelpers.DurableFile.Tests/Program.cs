@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.DurableFile.Tests
 
     internal static class Program
     {
+        internal const string RefuseNamedPipe = "--refuse-named-pipe";
         internal const string CompareText = "--compare-text";
         internal const string CompareBytes = "--compare-bytes";
         internal const int OwnershipRefused = 23;
@@ -25,6 +26,21 @@ namespace WallstopStudios.UnityHelpers.DurableFile.Tests
             if (arguments.Length == 2 && (arguments[0] is CompareText or CompareBytes))
             {
                 return CompareThenReplace(arguments[0], arguments[1]);
+            }
+
+            if (
+                arguments.Length == 2
+                && string.Equals(arguments[0], RefuseNamedPipe, StringComparison.Ordinal)
+            )
+            {
+                bool completed = DurableFile.TryCompareExchangeBytes(
+                    arguments[1],
+                    Array.Empty<byte>(),
+                    null,
+                    out bool exchanged,
+                    out Exception failure
+                );
+                return !completed && !exchanged && failure is System.IO.IOException ? 0 : 6;
             }
 
             if (

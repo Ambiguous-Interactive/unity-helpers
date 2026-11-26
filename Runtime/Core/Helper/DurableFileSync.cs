@@ -28,7 +28,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         private const uint BackupSemantics = 0x02000000;
 
         private readonly SafeFileHandle _windowsHandle;
-        private readonly IntPtr _linuxDirectory;
+        private readonly LinuxDirectoryHandle _linuxDirectory;
         private readonly int _linuxDescriptor;
         private readonly string _path;
 
@@ -38,7 +38,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             _windowsHandle = handle;
         }
 
-        private DurableFileSync(string path, IntPtr directory, int descriptor)
+        private DurableFileSync(string path, LinuxDirectoryHandle directory, int descriptor)
         {
             _path = path;
             _linuxDirectory = directory;
@@ -61,21 +61,28 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         private static DurableFileSync OpenLinux(string path)
         {
-            IntPtr directory = OpenDirectory(path);
-            if (directory == IntPtr.Zero)
+            IntPtr opened = OpenDirectory(path);
+            if (opened == IntPtr.Zero)
             {
                 throw NativeFailure("open", path, Marshal.GetLastWin32Error());
             }
 
-            int descriptor = GetDirectoryDescriptor(directory);
-            if (descriptor < 0)
+            LinuxDirectoryHandle directory = new(opened);
+            try
             {
-                int error = Marshal.GetLastWin32Error();
-                CloseDirectory(directory);
-                throw NativeFailure("open", path, error);
-            }
+                int descriptor = GetDirectoryDescriptor(opened);
+                if (descriptor < 0)
+                {
+                    throw NativeFailure("open", path, Marshal.GetLastWin32Error());
+                }
 
-            return new DurableFileSync(path, directory, descriptor);
+                return new DurableFileSync(path, directory, descriptor);
+            }
+            catch
+            {
+                directory.Dispose();
+                throw;
+            }
         }
 
         internal static void FlushFileData(FileStream stream)
@@ -111,18 +118,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return;
             }
             stream.Flush(flushToDisk: true);
-        }
-
-        internal void Flush()
-        {
-            if (_windowsHandle != null)
-            {
-                FlushWindowsHandle(_windowsHandle, _path);
-            }
-            else
-            {
-                FlushUnixDescriptor(_linuxDescriptor, _path, mac: false);
-            }
         }
 
         private static void FlushWindowsHandle(SafeFileHandle handle, string path)
@@ -176,53 +171,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 {
                     throw NativeFailure("synchronize", path, error);
                 }
-            }
-        }
-
-        internal void Delete(string path)
-        {
-            if (_windowsHandle == null)
-            {
-                File.Delete(path);
-                return;
-            }
-
-            using SafeFileHandle file = OpenWindowsEntry(
-                DurableFile.GetWindowsNativePath(path),
-                DeleteAccess,
-                FileShare.ReadWrite | FileShare.Delete,
-                IntPtr.Zero,
-                FileMode.Open,
-                OpenReparsePoint,
-                IntPtr.Zero
-            );
-            if (file.IsInvalid)
-            {
-                throw new IOException(
-                    $"Could not open '{path}' for deletion (OS error {Marshal.GetLastWin32Error()})."
-                );
-            }
-
-            // Remove the name when this handle closes, even if delete-sharing readers remain.
-            // The subsequent parent flush must see the unlink rather than a deferred deletion.
-            uint flags = DeleteWithPosixSemantics;
-            if (!SetFileInformationByHandle(file, FileDispositionInfoEx, ref flags, sizeof(uint)))
-            {
-                throw new IOException(
-                    $"Could not unlink '{path}' (OS error {Marshal.GetLastWin32Error()})."
-                );
-            }
-        }
-
-        public void Dispose()
-        {
-            if (_windowsHandle != null)
-            {
-                _windowsHandle.Dispose();
-            }
-            else
-            {
-                CloseDirectory(_linuxDirectory);
             }
         }
 
@@ -384,6 +332,85 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         [DllImport("kernel32.dll", ExactSpelling = true, SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool FlushFileBuffers(SafeFileHandle handle);
+
+        public void Dispose()
+        {
+            _windowsHandle?.Dispose();
+            _linuxDirectory?.Dispose();
+        }
+
+        internal void Flush()
+        {
+            if (_windowsHandle != null)
+            {
+                FlushWindowsHandle(_windowsHandle, _path);
+            }
+            else
+            {
+                bool acquired = false;
+                try
+                {
+                    _linuxDirectory.DangerousAddRef(ref acquired);
+                    FlushUnixDescriptor(_linuxDescriptor, _path, mac: false);
+                }
+                finally
+                {
+                    if (acquired)
+                    {
+                        _linuxDirectory.DangerousRelease();
+                    }
+                }
+            }
+        }
+
+        internal void Delete(string path)
+        {
+            if (_windowsHandle == null)
+            {
+                File.Delete(path);
+                return;
+            }
+
+            using SafeFileHandle file = OpenWindowsEntry(
+                DurableFile.GetWindowsNativePath(path),
+                DeleteAccess,
+                FileShare.ReadWrite | FileShare.Delete,
+                IntPtr.Zero,
+                FileMode.Open,
+                OpenReparsePoint,
+                IntPtr.Zero
+            );
+            if (file.IsInvalid)
+            {
+                throw new IOException(
+                    $"Could not open '{path}' for deletion (OS error {Marshal.GetLastWin32Error()})."
+                );
+            }
+
+            // Remove the name when this handle closes, even if delete-sharing readers remain.
+            // The subsequent parent flush must see the unlink rather than a deferred deletion.
+            uint flags = DeleteWithPosixSemantics;
+            if (!SetFileInformationByHandle(file, FileDispositionInfoEx, ref flags, sizeof(uint)))
+            {
+                throw new IOException(
+                    $"Could not unlink '{path}' (OS error {Marshal.GetLastWin32Error()})."
+                );
+            }
+        }
+
+        private sealed class LinuxDirectoryHandle : SafeHandleZeroOrMinusOneIsInvalid
+        {
+            internal LinuxDirectoryHandle(IntPtr directory)
+                : base(ownsHandle: true)
+            {
+                SetHandle(directory);
+            }
+
+            protected override bool ReleaseHandle()
+            {
+                return CloseDirectory(handle) == 0;
+            }
+        }
 #else
         internal static DurableFileSync Open(string path)
         {
@@ -395,6 +422,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             stream.Flush(flushToDisk: true);
         }
 
+        public void Dispose() { }
+
         internal void Flush()
         {
             throw DirectorySyncUnavailable();
@@ -404,8 +433,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         {
             throw DirectorySyncUnavailable();
         }
-
-        public void Dispose() { }
 #endif
 
         private static PlatformNotSupportedException DirectorySyncUnavailable()

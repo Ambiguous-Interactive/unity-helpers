@@ -106,7 +106,10 @@ failure. Windows rename and `ReplaceFileW` have different sharing and metadata b
 Keep publication retries separate from cleanup after publication. For deferred cleanup,
 delete through a verified handle and keep retryable lookup refusals pending.
 
-For durable writes, create a unique sibling with an exclusive open. Treat deterministic
+For durable writes, resolve relative paths before acquiring ownership and keep the same resolved
+path through publication. Create a unique sibling with an exclusive open, and exercise near-limit
+paths where that name can be longer than the destination. On Unix, open a source nonblocking
+and check its file type on the opened descriptor before reading it. Treat deterministic
 lock names as reserved and preserve unexpected data in those slots. Hold the same OS-backed
 ownership from comparison through publication and acquire every affected name before moving a
 group. Use native no-clobber rename for ordered group moves and restoration. Record separately

@@ -10,13 +10,21 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     using System;
     using System.IO;
     using System.Runtime.InteropServices;
+    using Microsoft.Win32.SafeHandles;
 
     internal sealed class DurableFileOwnershipStream : FileStream
     {
 #if DURABLE_FILE_DESKTOP_OWNERSHIP
         private const int LockExclusive = 2;
         private const int LockNonBlocking = 4;
+        private const int FileNotFound = 2;
+        private const int NotDirectory = 20;
         private const int LinuxCurrentDirectory = -100;
+        private const int LinuxNonblockingCloseOnExec = 0x80800;
+        private const int MacNonblockingCloseOnExec = 0x1000004;
+        private const int FileTypeMask = 0xf000;
+        private const int RegularFile = 0x8000;
+        private const uint LinuxStatType = 1;
         private const int LinuxEmptyPath = 0x1000;
         private const int LinuxSymlinkNoFollow = 0x100;
         private const uint LinuxStatInode = 0x100;
@@ -81,6 +89,25 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 
+        internal static FileStream OpenRegularSource(string path, int bufferSize, bool useAsync)
+        {
+#if DURABLE_FILE_DESKTOP_OWNERSHIP
+            bool mac = RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
+            if (mac || RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+                return OpenUnixRegularSource(path, bufferSize, mac);
+            }
+#endif
+            return new FileStream(
+                path,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                bufferSize,
+                useAsync
+            );
+        }
+
         private static void RejectLockReparsePoint(string lockPath)
         {
             FileAttributes attributes;
@@ -110,6 +137,114 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
 #if DURABLE_FILE_DESKTOP_OWNERSHIP
+        private static FileStream OpenUnixRegularSource(string path, int bufferSize, bool mac)
+        {
+            int descriptor = mac
+                ? OpenSourceMac(path, MacNonblockingCloseOnExec)
+                : OpenSourceLinux(path, LinuxNonblockingCloseOnExec);
+            if (descriptor < 0)
+            {
+                int error = Marshal.GetLastWin32Error();
+                if (error == FileNotFound)
+                {
+                    throw new FileNotFoundException("The source file does not exist.", path);
+                }
+                if (error == NotDirectory)
+                {
+                    throw new DirectoryNotFoundException(
+                        $"A parent of '{path}' is not a directory."
+                    );
+                }
+                throw new IOException($"Could not open '{path}' (OS error {error}).");
+            }
+
+            SafeFileHandle handle = new(new IntPtr(descriptor), ownsHandle: true);
+            try
+            {
+                if (RegularFile != (UnixFileType(descriptor, path, mac) & FileTypeMask))
+                {
+                    throw new IOException($"The source must be a regular file: '{path}'.");
+                }
+
+                // A wrapped Unix descriptor is synchronous. ReadAsync still uses the
+                // stream's asynchronous read path without requiring a Windows overlapped handle.
+                return new FileStream(handle, FileAccess.Read, bufferSize, isAsync: false);
+            }
+            catch
+            {
+                handle.Dispose();
+                throw;
+            }
+        }
+
+        private static int UnixFileType(int descriptor, string path, bool mac)
+        {
+            if (mac)
+            {
+                MacFileIdentity identity;
+                int result =
+                    RuntimeInformation.ProcessArchitecture == Architecture.X64
+                        ? StatIntelMacDescriptor(descriptor, out identity)
+                        : StatMacDescriptor(descriptor, out identity);
+                if (result == 0)
+                {
+                    return identity.Mode;
+                }
+                throw MetadataError(path, Marshal.GetLastWin32Error());
+            }
+
+            bool x64 = RuntimeInformation.ProcessArchitecture == Architecture.X64;
+            try
+            {
+                if (
+                    StatLinux(
+                        descriptor,
+                        string.Empty,
+                        LinuxEmptyPath,
+                        LinuxStatType,
+                        out LinuxFileIdentity identity
+                    ) == 0
+                )
+                {
+                    return (identity.Mask & LinuxStatType) != 0 ? identity.Mode : 0;
+                }
+
+                int error = Marshal.GetLastWin32Error();
+                if (
+                    !x64
+                    || (error is not LinuxOperationUnavailable and not LinuxOperationNotPermitted)
+                )
+                {
+                    throw MetadataError(path, error);
+                }
+            }
+            catch (EntryPointNotFoundException) when (x64) { }
+
+            if (
+                StatLegacyLinuxDescriptor(
+                    LinuxX64StatVersion,
+                    descriptor,
+                    out LegacyLinuxFileIdentity legacy
+                ) != 0
+            )
+            {
+                throw MetadataError(path, Marshal.GetLastWin32Error());
+            }
+
+            return (int)legacy.Mode;
+        }
+
+        [DllImport("libc", EntryPoint = "open", ExactSpelling = true, SetLastError = true)]
+        private static extern int OpenSourceLinux(string path, int flags);
+
+        [DllImport(
+            "libSystem.B.dylib",
+            EntryPoint = "open",
+            ExactSpelling = true,
+            SetLastError = true
+        )]
+        private static extern int OpenSourceMac(string path, int flags);
+
         private static FileStream AcquireUnix(string lockPath, bool isMac)
         {
             DurableFileOwnershipStream stream;
@@ -200,7 +335,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     {
                         return MatchesLegacyLinuxIdentity(descriptor, lockPath);
                     }
-                    throw OwnershipIdentityError(lockPath, nativeError);
+                    throw MetadataError(lockPath, nativeError);
                 }
             }
             catch (EntryPointNotFoundException)
@@ -220,7 +355,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             )
             {
                 int nativeError = Marshal.GetLastWin32Error();
-                throw OwnershipIdentityError(lockPath, nativeError);
+                throw MetadataError(lockPath, nativeError);
             }
 
             return (opened.Mask & LinuxStatInode) != 0
@@ -240,7 +375,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             if (descriptorResult != 0)
             {
                 int nativeError = Marshal.GetLastWin32Error();
-                throw OwnershipIdentityError(lockPath, nativeError);
+                throw MetadataError(lockPath, nativeError);
             }
 
             int pathResult = StatLegacyLinuxPath(
@@ -251,7 +386,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             if (pathResult != 0)
             {
                 int nativeError = Marshal.GetLastWin32Error();
-                throw OwnershipIdentityError(lockPath, nativeError);
+                throw MetadataError(lockPath, nativeError);
             }
             return opened.Device == named.Device && opened.Inode == named.Inode;
         }
@@ -268,7 +403,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 )
                 {
                     int nativeError = Marshal.GetLastWin32Error();
-                    throw OwnershipIdentityError(lockPath, nativeError);
+                    throw MetadataError(lockPath, nativeError);
                 }
             }
             else if (
@@ -277,16 +412,16 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             )
             {
                 int nativeError = Marshal.GetLastWin32Error();
-                throw OwnershipIdentityError(lockPath, nativeError);
+                throw MetadataError(lockPath, nativeError);
             }
 
             return opened.Device == named.Device && opened.Inode == named.Inode;
         }
 
-        private static IOException OwnershipIdentityError(string lockPath, int nativeError)
+        private static IOException MetadataError(string path, int nativeError)
         {
             return new IOException(
-                $"Could not verify writer ownership at '{lockPath}' (OS error {nativeError})."
+                $"Could not inspect filesystem metadata for '{path}' (OS error {nativeError})."
             );
         }
 
@@ -377,6 +512,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             [FieldOffset(0)]
             internal uint Mask;
 
+            [FieldOffset(28)]
+            internal ushort Mode;
+
             [FieldOffset(32)]
             internal ulong Inode;
 
@@ -395,6 +533,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             [FieldOffset(8)]
             internal ulong Inode;
+
+            [FieldOffset(24)]
+            internal uint Mode;
         }
 
         [StructLayout(LayoutKind.Explicit, Size = 144)]
@@ -402,6 +543,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         {
             [FieldOffset(0)]
             internal int Device;
+
+            [FieldOffset(4)]
+            internal ushort Mode;
 
             [FieldOffset(8)]
             internal ulong Inode;
