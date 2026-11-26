@@ -1442,7 +1442,17 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <summary>Verifies a newly published document before its staged name is removed.</summary>
         internal static void VerifyCreatedContents(string path, byte[] contents)
         {
-            if (!MatchesFileBytes(path, contents ?? Array.Empty<byte>(), requireExisting: true))
+            (bool matches, IOException failure) = CompareFileBytes(
+                path,
+                contents ?? Array.Empty<byte>(),
+                requireExisting: true
+            );
+            if (failure != null)
+            {
+                throw failure;
+            }
+
+            if (!matches)
             {
                 throw new IOException(
                     $"Created file at {path}, but its contents differ; inspect it before retrying."
@@ -1895,7 +1905,19 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         return false;
                     }
 
-                    if (!MatchesFileBytes(path, expected, requireExisting))
+                    (bool matches, IOException comparisonFailure) = CompareFileBytes(
+                        path,
+                        expected,
+                        requireExisting
+                    );
+                    if (comparisonFailure != null)
+                    {
+                        exchanged = false;
+                        error = comparisonFailure;
+                        return false;
+                    }
+
+                    if (!matches)
                     {
                         exchanged = false;
                         error = null;
@@ -1993,7 +2015,13 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 
-        private static bool MatchesFileBytes(string path, byte[] expected, bool requireExisting)
+        // Isolate expected file-open failures from IL2CPP callers.
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static (bool Matches, IOException Failure) CompareFileBytes(
+            string path,
+            byte[] expected,
+            bool requireExisting
+        )
         {
             FileStream stream;
             try
@@ -2001,33 +2029,41 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 FileAttributes attributes = File.GetAttributes(path);
                 if (expected == null)
                 {
-                    return false;
+                    return (false, null);
                 }
                 if ((attributes & FileAttributes.ReparsePoint) != 0)
                 {
-                    throw new IOException($"Use the resolved file path in place of '{path}'.");
+                    return (
+                        false,
+                        new IOException($"Use the resolved file path in place of '{path}'.")
+                    );
                 }
 
                 stream = OpenSourceStream(path, useAsync: false);
             }
             catch (IOException failure)
-                when (!requireExisting
+            {
+                if (
+                    !requireExisting
                     && failure is FileNotFoundException or DirectoryNotFoundException
                 )
-            {
-                return expected == null;
+                {
+                    return (expected == null, null);
+                }
+
+                return (false, failure);
             }
 
             using (stream)
             {
                 if (stream.Length != expected.Length)
                 {
-                    return false;
+                    return (false, null);
                 }
 
                 if (expected.Length == 0)
                 {
-                    return stream.ReadByte() < 0;
+                    return (stream.ReadByte() < 0, null);
                 }
 
                 using PooledArray<byte> lease = SystemArrayPool<byte>.Get(
@@ -2047,13 +2083,13 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         || !buffer.AsSpan(0, read).SequenceEqual(expected.AsSpan(offset, read))
                     )
                     {
-                        return false;
+                        return (false, null);
                     }
 
                     offset += read;
                 }
 
-                return stream.ReadByte() < 0;
+                return (stream.ReadByte() < 0, null);
             }
         }
 
