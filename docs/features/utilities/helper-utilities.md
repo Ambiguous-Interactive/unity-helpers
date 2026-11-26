@@ -1438,8 +1438,8 @@ contents.
 
 On Windows desktop, `DurableFile` reports a successful write once it publishes the
 new file, even if Windows refuses to remove the temporary `.bak` file. A later
-write to the same path in the same process retries removal while the helper still
-tracks that backup.
+whole-file write or copy through its regular swap retries removal for the same path
+while the process still tracks that backup. In-place appends skip this cleanup.
 The helper tracks up to 32 pending backups on volumes that support stable file IDs.
 It checks file identity before a retry removes a backup. A backup can remain if
 ownership cannot be verified, the write is the last one to that path, or the process stops.

@@ -35,7 +35,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     /// moves the previous file aside and then refuses publication, this helper tries to restore it.
     /// If restoration fails, the returned error identifies the backup path.
     /// If cleanup is blocked after a successful replacement, the write still succeeds.
-    /// The next publication to the same path retries cleanup of backups still tracked by this process.
+    /// A later whole-file write or copy through the regular swap retries tracked backups for that path.
     /// Windows sharing violations and inability to remove the replaced file receive up to three
     /// replacement attempts with 10 ms and 20 ms waits while retaining staged contents and ownership.
     /// Cooperating writes, appends, and deletes serialize per destination in this process.
@@ -614,58 +614,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             );
         }
 
-        internal static bool TryMoveWithSidecars(
-            string sourcePath,
-            string destinationPath,
-            ReadOnlySpan<string> sidecarSuffixes,
-            Action<string, string> moveFile,
-            out Exception error
-        )
-        {
-            Exception validation = NormalizeCopyPaths(ref sourcePath, ref destinationPath);
-            if (validation != null)
-            {
-                error = validation;
-                return false;
-            }
-
-            try
-            {
-                int count = checked(sidecarSuffixes.Length + 1);
-                using PooledArray<(
-                    string Source,
-                    string Destination,
-                    bool Present,
-                    bool Moved
-                )> entries = SystemArrayPool<(
-                    string Source,
-                    string Destination,
-                    bool Present,
-                    bool Moved
-                )>.Get(
-                    count,
-                    out (string Source, string Destination, bool Present, bool Moved)[] moves
-                );
-                Span<(string Source, string Destination, bool Present, bool Moved)> plan =
-                    moves.AsSpan(0, count);
-                uint gates = PlanSidecarMove(sourcePath, destinationPath, sidecarSuffixes, plan);
-                Exception failure = MoveSidecarGroup(plan, gates, moveFile);
-                if (failure != null)
-                {
-                    error = failure;
-                    return false;
-                }
-
-                error = null;
-                return true;
-            }
-            catch (Exception failure)
-            {
-                error = failure;
-                return false;
-            }
-        }
-
         /// <summary>
         /// Replaces a file with another file's contents, staging and flushing before the swap.
         /// </summary>
@@ -821,6 +769,58 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 
+        internal static bool TryMoveWithSidecars(
+            string sourcePath,
+            string destinationPath,
+            ReadOnlySpan<string> sidecarSuffixes,
+            Action<string, string> moveFile,
+            out Exception error
+        )
+        {
+            Exception validation = NormalizeCopyPaths(ref sourcePath, ref destinationPath);
+            if (validation != null)
+            {
+                error = validation;
+                return false;
+            }
+
+            try
+            {
+                int count = checked(sidecarSuffixes.Length + 1);
+                using PooledArray<(
+                    string Source,
+                    string Destination,
+                    bool Present,
+                    bool Moved
+                )> entries = SystemArrayPool<(
+                    string Source,
+                    string Destination,
+                    bool Present,
+                    bool Moved
+                )>.Get(
+                    count,
+                    out (string Source, string Destination, bool Present, bool Moved)[] moves
+                );
+                Span<(string Source, string Destination, bool Present, bool Moved)> plan =
+                    moves.AsSpan(0, count);
+                uint gates = PlanSidecarMove(sourcePath, destinationPath, sidecarSuffixes, plan);
+                Exception failure = MoveSidecarGroup(plan, gates, moveFile);
+                if (failure != null)
+                {
+                    error = failure;
+                    return false;
+                }
+
+                error = null;
+                return true;
+            }
+            catch (Exception failure)
+            {
+                error = failure;
+                return false;
+            }
+        }
+
         /// <summary>Initializes absent data without leaving a partial destination after failure.</summary>
         internal static bool TryInitializeAllBytes(string path, byte[] contents)
         {
@@ -853,8 +853,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     {
                         return false;
                     }
-                    // A legal maximum-length destination can leave no room for a lock suffix.
-                    // Exclusive name publication still prevents those initializers from overwriting.
+                    /*
+                        A legal maximum-length destination can leave no room for a lock suffix.
+                        Exclusive name publication still prevents those initializers from overwriting.
+                    */
                     if (
                         !TryOpenStagingOwnership(
                             destinationPath + TemporarySuffix,

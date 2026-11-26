@@ -118,7 +118,9 @@ flush failure before publication and a directory flush failure after publication
 bytes and reported state in both cases. Request the access rights the native documentation
 requires, even when a narrower handle happens to work on one system. File data and directory entries have separate
 synchronization requirements, and a sequence of renames needs a recovery protocol to survive
-interruption as a group.
+interruption as a group. Run the registered comment-block-form and nested-type-placement
+checks when altering interop types or reorganizing file operations. They verify member order
+and comment syntax beyond changed-file preflight.
 
 ### Code Samples
 

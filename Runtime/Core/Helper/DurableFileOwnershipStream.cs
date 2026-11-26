@@ -67,8 +67,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             catch (IOException) when (File.Exists(lockPath))
             {
                 RejectLockReparsePoint(lockPath);
-                // An existing entry can hold an older writer, a stale lock, or unrelated data.
-                // A handle that did not create the entry must never delete it on close.
+                /*
+                    An existing entry can hold an older writer, a stale lock, or unrelated data.
+                    A handle that did not create the entry must never delete it on close.
+                */
                 FileStream existing = new(
                     lockPath,
                     FileMode.Open,
@@ -166,8 +168,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     throw new IOException($"The source must be a regular file: '{path}'.");
                 }
 
-                // A wrapped Unix descriptor is synchronous. ReadAsync still uses the
-                // stream's asynchronous read path without requiring a Windows overlapped handle.
+                /*
+                    A wrapped Unix descriptor is synchronous. ReadAsync still uses the
+                    stream's asynchronous read path without requiring a Windows overlapped handle.
+                */
                 return new FileStream(handle, FileAccess.Read, bufferSize, isAsync: false);
             }
             catch

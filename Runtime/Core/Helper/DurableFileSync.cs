@@ -59,32 +59,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             throw DirectorySyncUnavailable();
         }
 
-        private static DurableFileSync OpenLinux(string path)
-        {
-            IntPtr opened = OpenDirectory(path);
-            if (opened == IntPtr.Zero)
-            {
-                throw NativeFailure("open", path, Marshal.GetLastWin32Error());
-            }
-
-            LinuxDirectoryHandle directory = new(opened);
-            try
-            {
-                int descriptor = GetDirectoryDescriptor(opened);
-                if (descriptor < 0)
-                {
-                    throw NativeFailure("open", path, Marshal.GetLastWin32Error());
-                }
-
-                return new DurableFileSync(path, directory, descriptor);
-            }
-            catch
-            {
-                directory.Dispose();
-                throw;
-            }
-        }
-
         internal static void FlushFileData(FileStream stream)
         {
             bool linux = HostRuntimeInformation.IsOSPlatform(OSPlatform.Linux);
@@ -118,6 +92,32 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return;
             }
             stream.Flush(flushToDisk: true);
+        }
+
+        private static DurableFileSync OpenLinux(string path)
+        {
+            IntPtr opened = OpenDirectory(path);
+            if (opened == IntPtr.Zero)
+            {
+                throw NativeFailure("open", path, Marshal.GetLastWin32Error());
+            }
+
+            LinuxDirectoryHandle directory = new(opened);
+            try
+            {
+                int descriptor = GetDirectoryDescriptor(opened);
+                if (descriptor < 0)
+                {
+                    throw NativeFailure("open", path, Marshal.GetLastWin32Error());
+                }
+
+                return new DurableFileSync(path, directory, descriptor);
+            }
+            catch
+            {
+                directory.Dispose();
+                throw;
+            }
         }
 
         private static void FlushWindowsHandle(SafeFileHandle handle, string path)
@@ -387,28 +387,16 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 );
             }
 
-            // Remove the name when this handle closes, even if delete-sharing readers remain.
-            // The subsequent parent flush must see the unlink rather than a deferred deletion.
+            /*
+                Remove the name when this handle closes, even if delete-sharing readers remain.
+                The subsequent parent flush must see the unlink rather than a deferred deletion.
+            */
             uint flags = DeleteWithPosixSemantics;
             if (!SetFileInformationByHandle(file, FileDispositionInfoEx, ref flags, sizeof(uint)))
             {
                 throw new IOException(
                     $"Could not unlink '{path}' (OS error {Marshal.GetLastWin32Error()})."
                 );
-            }
-        }
-
-        private sealed class LinuxDirectoryHandle : SafeHandleZeroOrMinusOneIsInvalid
-        {
-            internal LinuxDirectoryHandle(IntPtr directory)
-                : base(ownsHandle: true)
-            {
-                SetHandle(directory);
-            }
-
-            protected override bool ReleaseHandle()
-            {
-                return CloseDirectory(handle) == 0;
             }
         }
 #else
@@ -441,5 +429,21 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 "Parent directory synchronization is supported on Linux and local Windows NTFS."
             );
         }
+
+#if UNITY_EDITOR || UNITY_STANDALONE || !UNITY_5_3_OR_NEWER
+        private sealed class LinuxDirectoryHandle : SafeHandleZeroOrMinusOneIsInvalid
+        {
+            internal LinuxDirectoryHandle(IntPtr directory)
+                : base(ownsHandle: true)
+            {
+                SetHandle(directory);
+            }
+
+            protected override bool ReleaseHandle()
+            {
+                return CloseDirectory(handle) == 0;
+            }
+        }
+#endif
     }
 }

@@ -176,6 +176,29 @@ namespace WallstopStudios.UnityHelpers.DurableFile.Tests
                 : ReplacementBytes;
         }
 
+        private static string FindMount(string path)
+        {
+            string best = null;
+            foreach (DriveInfo drive in DriveInfo.GetDrives())
+            {
+                string mount = drive.Name;
+                if (
+                    (best == null || best.Length < mount.Length)
+                    && (
+                        string.Equals(path, mount, StringComparison.Ordinal)
+                        || path.StartsWith(
+                            Path.EndsInDirectorySeparator(mount) ? mount : mount + "/",
+                            StringComparison.Ordinal
+                        )
+                    )
+                )
+                {
+                    best = mount;
+                }
+            }
+            return best;
+        }
+
         [SetUp]
         public void SetUp()
         {
@@ -484,29 +507,6 @@ namespace WallstopStudios.UnityHelpers.DurableFile.Tests
             {
                 Directory.Delete(parent, recursive: true);
             }
-        }
-
-        private static string FindMount(string path)
-        {
-            string best = null;
-            foreach (DriveInfo drive in DriveInfo.GetDrives())
-            {
-                string mount = drive.Name;
-                if (
-                    (best == null || best.Length < mount.Length)
-                    && (
-                        string.Equals(path, mount, StringComparison.Ordinal)
-                        || path.StartsWith(
-                            Path.EndsInDirectorySeparator(mount) ? mount : mount + "/",
-                            StringComparison.Ordinal
-                        )
-                    )
-                )
-                {
-                    best = mount;
-                }
-            }
-            return best;
         }
 
         [Test]

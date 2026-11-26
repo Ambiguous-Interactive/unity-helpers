@@ -128,8 +128,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     return previous;
                 }
 
-                // CreateFile reports ordinary denials through an invalid handle. Publication
-                // still runs through ReplaceFile when we cannot pin the previous identity.
+                /*
+                    CreateFile reports ordinary denials through an invalid handle. Publication
+                    still runs through ReplaceFile when we cannot pin the previous identity.
+                */
                 previous.Dispose();
                 return null;
             }
