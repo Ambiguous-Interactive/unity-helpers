@@ -21,6 +21,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <remarks>
         /// Failed staging leaves the destination absent so initialization can be retried. Platforms or
         /// filesystems without atomic publication that preserves competing creators return false.
+        /// Initialization shares writer ownership when the filesystem permits the lock name.
+        /// A maximum-length filename can rely on exclusive publication alone.
         /// Owned temporary files are removed on a best-effort basis; process interruption may leave one.
         /// </remarks>
         /// <param name="path">Absolute or relative file path; blank paths are refused.</param>

@@ -18,6 +18,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         private const int LockNonBlocking = 4;
         private const int LinuxCurrentDirectory = -100;
         private const int LinuxEmptyPath = 0x1000;
+        private const int LinuxSymlinkNoFollow = 0x100;
         private const uint LinuxStatInode = 0x100;
         private const int LinuxOperationNotPermitted = 1;
         private const int LinuxOperationUnavailable = 38;
@@ -44,19 +45,74 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return AcquireUnix(lockPath, isMac);
             }
 #endif
-            return new FileStream(
-                lockPath,
-                FileMode.OpenOrCreate,
-                FileAccess.ReadWrite,
-                FileShare.Read,
-                bufferSize: 1,
-                FileOptions.DeleteOnClose
-            );
+            try
+            {
+                return new FileStream(
+                    lockPath,
+                    FileMode.CreateNew,
+                    FileAccess.ReadWrite,
+                    FileShare.Read,
+                    bufferSize: 1,
+                    FileOptions.DeleteOnClose
+                );
+            }
+            catch (IOException) when (File.Exists(lockPath))
+            {
+                RejectLockReparsePoint(lockPath);
+                // An existing entry can hold an older writer, a stale lock, or unrelated data.
+                // A handle that did not create the entry must never delete it on close.
+                FileStream existing = new(
+                    lockPath,
+                    FileMode.Open,
+                    FileAccess.ReadWrite,
+                    FileShare.Read,
+                    bufferSize: 1
+                );
+                try
+                {
+                    RequireEmptyLock(existing, lockPath);
+                    return existing;
+                }
+                catch
+                {
+                    existing.Dispose();
+                    throw;
+                }
+            }
+        }
+
+        private static void RejectLockReparsePoint(string lockPath)
+        {
+            FileAttributes attributes;
+            try
+            {
+                attributes = File.GetAttributes(lockPath);
+            }
+            catch (FileNotFoundException)
+            {
+                return;
+            }
+
+            if ((attributes & FileAttributes.ReparsePoint) != 0)
+            {
+                throw new IOException(
+                    $"The writer lock path is a symbolic link or reparse point: '{lockPath}'."
+                );
+            }
+        }
+
+        private static void RequireEmptyLock(FileStream stream, string lockPath)
+        {
+            if (stream.Length != 0)
+            {
+                throw new IOException($"The writer lock path contains data: '{lockPath}'.");
+            }
         }
 
 #if DURABLE_FILE_DESKTOP_OWNERSHIP
         private static FileStream AcquireUnix(string lockPath, bool isMac)
         {
+            RejectLockReparsePoint(lockPath);
             DurableFileOwnershipStream stream = new(lockPath);
             try
             {
@@ -96,6 +152,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         $"Writer ownership changed at '{lockPath}'. Retry the operation."
                     );
                 }
+                RequireEmptyLock(stream, lockPath);
                 stream._ownsName = true;
                 return stream;
             }
@@ -141,7 +198,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 StatLinux(
                     LinuxCurrentDirectory,
                     lockPath,
-                    0,
+                    LinuxSymlinkNoFollow,
                     LinuxStatInode,
                     out LinuxFileIdentity named
                 ) != 0
@@ -245,7 +302,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             out LegacyLinuxFileIdentity identity
         );
 
-        [DllImport("libc", EntryPoint = "__xstat", ExactSpelling = true, SetLastError = true)]
+        [DllImport("libc", EntryPoint = "__lxstat", ExactSpelling = true, SetLastError = true)]
         private static extern int StatLegacyLinuxPath(
             int version,
             string path,
@@ -265,7 +322,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         [DllImport(
             "libSystem.B.dylib",
-            EntryPoint = "stat$INODE64",
+            EntryPoint = "lstat$INODE64",
             ExactSpelling = true,
             SetLastError = true
         )]
@@ -281,7 +338,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         [DllImport(
             "libSystem.B.dylib",
-            EntryPoint = "stat",
+            EntryPoint = "lstat",
             ExactSpelling = true,
             SetLastError = true
         )]

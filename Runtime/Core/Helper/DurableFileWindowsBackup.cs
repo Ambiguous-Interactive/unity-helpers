@@ -238,15 +238,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         private static SafeFileHandle Open(string fullPath, uint access, FileShare share)
         {
-            if (260 <= fullPath.Length && !fullPath.StartsWith(@"\\?\", StringComparison.Ordinal))
-            {
-                fullPath = fullPath.StartsWith(@"\\", StringComparison.Ordinal)
-                    ? @"\\?\UNC\" + fullPath.Substring(2)
-                    : @"\\?\" + fullPath;
-            }
-
             return CreateFile(
-                fullPath,
+                DurableFile.GetWindowsNativePath(fullPath),
                 access,
                 share,
                 IntPtr.Zero,

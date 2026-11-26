@@ -106,6 +106,16 @@ failure. Windows rename and `ReplaceFileW` have different sharing and metadata b
 Keep publication retries separate from cleanup after publication. For deferred cleanup,
 delete through a verified handle and keep retryable lookup refusals pending.
 
+For durable writes, create a unique sibling with an exclusive open. Treat deterministic
+lock names as reserved and preserve unexpected data in those slots. Hold the same OS-backed
+ownership from comparison through publication and acquire every affected name before moving a
+group. Use native no-clobber rename for ordered group moves and restoration. Record separately
+whether a namespace change happened and whether its synchronization succeeded. Inject a file
+flush failure before publication and a directory flush failure after publication. Verify live
+bytes and reported state in both cases. File data and directory entries have separate
+synchronization requirements, and a sequence of renames needs a recovery protocol to survive
+interruption as a group.
+
 ### Code Samples
 
 Dispose owned `SerializedObject` and `SerializedProperty` instances before destroying their target.

@@ -357,7 +357,7 @@ namespace WallstopStudios.UnityHelpers.DurableFile.Tests
             RealFile.WriteAllText(journalSource, "original journal");
             IOException firstFailure = new IOException("The final move was denied.");
             List<(string Source, string Destination)> attempts = new();
-            SimulatedFile.BeforeMove = (source, destination) =>
+            void MoveFile(string source, string destination)
             {
                 attempts.Add((source, destination));
                 if (string.Equals(source, journalSource, StringComparison.Ordinal))
@@ -366,13 +366,16 @@ namespace WallstopStudios.UnityHelpers.DurableFile.Tests
                     RealFile.WriteAllText(sharedMemorySource, "replacement shared memory");
                     throw firstFailure;
                 }
-            };
+
+                RealFile.Move(source, destination);
+            }
 
             Assert.IsFalse(
                 DurableFile.TryMoveWithSidecars(
                     _source,
                     _destination,
                     new[] { "-wal", "-shm", "-journal" },
+                    MoveFile,
                     out Exception error
                 )
             );
@@ -410,36 +413,36 @@ namespace WallstopStudios.UnityHelpers.DurableFile.Tests
         }
 
         [Test]
-        public void SidecarMoveRefusesCopyWithoutSourceRemoval()
+        [Platform("Linux")]
+        public void SidecarMoveRefusesCrossFilesystemCopyDelete()
         {
-            string sourceJournal = _source + "-wal";
-            string destinationJournal = _destination + "-wal";
-            RealFile.WriteAllText(sourceJournal, "write-ahead");
-            SimulatedFile.AfterMove = (source, destination) =>
+            const string sharedMemory = "/dev/shm";
+            if (!Directory.Exists(sharedMemory))
             {
-                if (string.Equals(source, sourceJournal, StringComparison.Ordinal))
-                {
-                    RealFile.Copy(destination, source);
-                }
-            };
+                Assert.Ignore("A separate writable filesystem at /dev/shm is required.");
+            }
 
-            Assert.IsFalse(
-                DurableFile.TryMoveWithSidecars(
-                    _source,
-                    _destination,
-                    new[] { "-wal" },
-                    out Exception error
-                )
-            );
-            Assert.IsInstanceOf<AggregateException>(error);
-            AggregateException aggregate = (AggregateException)error;
-            Assert.AreEqual(2, aggregate.InnerExceptions.Count);
-            StringAssert.Contains("left the source in place", aggregate.InnerExceptions[0].Message);
-            StringAssert.Contains(destinationJournal, aggregate.InnerExceptions[1].Message);
-            CollectionAssert.AreEqual(ReplacementBytes, RealFile.ReadAllBytes(_source));
-            Assert.IsFalse(RealFile.Exists(_destination));
-            Assert.AreEqual("write-ahead", RealFile.ReadAllText(sourceJournal));
-            Assert.AreEqual("write-ahead", RealFile.ReadAllText(destinationJournal));
+            string parent = Path.Combine(sharedMemory, Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(parent);
+            try
+            {
+                string destination = Path.Combine(parent, "player.save");
+                Assert.IsFalse(
+                    DurableFile.TryMoveWithSidecars(
+                        _source,
+                        destination,
+                        Array.Empty<string>(),
+                        out Exception error
+                    )
+                );
+                StringAssert.Contains("OS error 18", error.Message);
+                CollectionAssert.AreEqual(ReplacementBytes, RealFile.ReadAllBytes(_source));
+                Assert.IsEmpty(Directory.GetFiles(parent));
+            }
+            finally
+            {
+                Directory.Delete(parent, recursive: true);
+            }
         }
 
         [Platform("Linux")]
