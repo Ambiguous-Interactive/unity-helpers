@@ -15,6 +15,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
     using UnityEditor.Compilation;
     using UnityEngine;
     using UnityEngine.TestTools;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer;
     using Object = UnityEngine.Object;
 
@@ -89,7 +90,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             UnityMethodAnalyzerWindow window = CreateWindow();
             string path = Path.Combine(_tempDir, "report.json");
             File.WriteAllText(path, "Previous report");
-            Directory.CreateDirectory(path + ".tmp");
+            Directory.CreateDirectory(
+                path + DurableFile.TemporarySuffix + DurableFile.OwnershipSuffix
+            );
 
             LogAssert.Expect(LogType.Error, new Regex("Export failed"));
             window.ExportReportToPath(path, true);

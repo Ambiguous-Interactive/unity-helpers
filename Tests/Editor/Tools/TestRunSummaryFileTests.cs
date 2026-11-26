@@ -382,7 +382,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         {
             string owner = BeginRun(TestMode.EditMode, StartedUtc);
             string marker = File.ReadAllText(_summaryPath);
-            Directory.CreateDirectory(_summaryPath + DurableFile.TemporarySuffix);
+            Directory.CreateDirectory(
+                _summaryPath + DurableFile.TemporarySuffix + DurableFile.OwnershipSuffix
+            );
 
             Assert.IsFalse(
                 TestRunSummaryFile.TryFinishRun(

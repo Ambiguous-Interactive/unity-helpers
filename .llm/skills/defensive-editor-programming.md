@@ -120,7 +120,9 @@ requires, even when a narrower handle happens to work on one system. File data a
 synchronization requirements, and a sequence of renames needs a recovery protocol to survive
 interruption as a group. Run the registered comment-block-form and nested-type-placement
 checks when altering interop types or reorganizing file operations. They verify member order
-and comment syntax beyond changed-file preflight.
+and comment syntax beyond changed-file preflight. Sweep all callers' failure fixtures when
+staging names change. To make a write fail before staging, block its writer lock or use the
+existing fault injection seam. A directory at the old predictable stage no longer forces failure.
 
 ### Code Samples
 

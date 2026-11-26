@@ -146,7 +146,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             Assert.That(issueError, Is.Not.Empty);
             Assert.That(File.ReadAllText(path), Is.EqualTo(original));
 
-            Directory.CreateDirectory(path + DurableFile.TemporarySuffix);
+            Directory.CreateDirectory(
+                path + DurableFile.TemporarySuffix + DurableFile.OwnershipSuffix
+            );
             Assert.That(
                 UnityMethodAnalyzerReportExportAPI.TryExportMarkdown(
                     path,

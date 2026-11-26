@@ -138,8 +138,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
 
             string fullPath = RelToFull(src);
             byte[] originalBytes = File.ReadAllBytes(fullPath);
-            string stagingPath = fullPath + DurableFile.TemporarySuffix;
-            Directory.CreateDirectory(stagingPath);
+            string ownershipPath =
+                fullPath + DurableFile.TemporarySuffix + DurableFile.OwnershipSuffix;
+            Directory.CreateDirectory(ownershipPath);
             try
             {
                 SpriteCropperAPI.CropResult failedResult = SpriteCropperAPI.Crop(
@@ -154,7 +155,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             }
             finally
             {
-                Directory.Delete(stagingPath, recursive: true);
+                Directory.Delete(ownershipPath, recursive: true);
             }
 
             SpriteCropperAPI.CropResult result = SpriteCropperAPI.Crop(
