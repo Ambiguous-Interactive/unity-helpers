@@ -99,6 +99,13 @@ Reuse `DurableFile` for byte writes; a restore to an absent path needs its no-cl
 operation. `File.Move(source, destination)` can replace an occupied destination on Unix; use the
 shared exclusive publisher for cross-platform no-clobber publication.
 
+Qualify any replacement primitive against an existing file, an absent destination,
+delete-share and deny-delete readers, a mapped image, and metadata such as ACLs,
+creation time, and alternate streams. Record both names and their contents after each
+failure. Windows rename and `ReplaceFileW` have different sharing and metadata behavior.
+Keep publication retries separate from cleanup after publication. For deferred cleanup,
+delete through a verified handle and keep retryable lookup refusals pending.
+
 ### Code Samples
 
 Dispose owned `SerializedObject` and `SerializedProperty` instances before destroying their target.

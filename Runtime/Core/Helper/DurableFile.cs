@@ -17,9 +17,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     using System.Threading.Tasks;
     using WallstopStudios.UnityHelpers.Core.Threading;
     using WallstopStudios.UnityHelpers.Utils;
-#if DURABLE_FILE_WINDOWS_BACKUP_CLEANUP
-    using Microsoft.Win32.SafeHandles;
-#endif
 
     /// <summary>
     /// Stages complete writes for player-owned data such as saves, settings and ledgers.
@@ -2074,76 +2071,60 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 backupPath = Path.Combine(directory, backupName);
             }
 
-#if DURABLE_FILE_WINDOWS_BACKUP_CLEANUP
-            SafeFileHandle previous = null;
-            try
+            for (int attempt = 1; ; ++attempt)
             {
-#endif
-                for (int attempt = 1; ; ++attempt)
+                try
                 {
 #if DURABLE_FILE_WINDOWS_BACKUP_CLEANUP
-                    previous?.Dispose();
-                    previous =
-                        backupPath == null ? null : DurableFileWindowsBackup.OpenPrevious(path);
-#endif
-                    try
+                    if (backupPath != null)
                     {
-                        File.Replace(temporaryPath, path, backupPath);
-                        break;
-                    }
-                    catch (IOException failure)
-                        when (attempt < ReplacementAttemptLimit
-                            && (
-                                failure.HResult == SharingViolationHResult
-                                || failure.HResult == UnableToRemoveReplacedHResult
-                            )
-                        )
-                    {
-                        // These Windows errors retain both names, so the same staged bytes can be retried.
-                        Thread.Sleep(ReplacementRetryDelayMilliseconds * attempt);
-                    }
-                    catch (IOException failure)
-                        when (backupPath != null
-                            && failure.HResult == UnableToMoveReplacementAfterBackupHResult
-                        )
-                    {
-                        try
-                        {
-                            File.Move(backupPath, path);
-                        }
-                        catch (Exception restoreFailure)
-                        {
-                            AggregateException details = new(failure, restoreFailure);
-                            throw new IOException(
-                                $"Could not restore the previous file from '{backupPath}'.",
-                                details
-                            );
-                        }
-                        throw;
-                    }
-                    catch (FileNotFoundException)
-                    {
-                        File.Move(temporaryPath, path);
+                        DurableFileWindowsBackup.ReplaceOnce(temporaryPath, path, backupPath);
                         return;
                     }
-                }
-
-#if DURABLE_FILE_WINDOWS_BACKUP_CLEANUP
-                if (DurableFileWindowsBackup.DiscardOrDefer(path, backupPath, previous))
-                {
-                    previous = null;
-                }
-            }
-            finally
-            {
-                previous?.Dispose();
-            }
-#else
-                if (backupPath != null)
-                {
-                    DiscardStagedFile(backupPath);
-                }
 #endif
+                    File.Replace(temporaryPath, path, backupPath);
+                    if (backupPath != null)
+                    {
+                        DiscardStagedFile(backupPath);
+                    }
+                    return;
+                }
+                catch (IOException failure)
+                    when (attempt < ReplacementAttemptLimit
+                        && (
+                            failure.HResult == SharingViolationHResult
+                            || failure.HResult == UnableToRemoveReplacedHResult
+                        )
+                    )
+                {
+                    // These errors retain both names, so the same staged bytes can be retried.
+                    Thread.Sleep(ReplacementRetryDelayMilliseconds * attempt);
+                }
+                catch (IOException failure)
+                    when (backupPath != null
+                        && failure.HResult == UnableToMoveReplacementAfterBackupHResult
+                    )
+                {
+                    try
+                    {
+                        File.Move(backupPath, path);
+                    }
+                    catch (Exception restoreFailure)
+                    {
+                        AggregateException details = new(failure, restoreFailure);
+                        throw new IOException(
+                            $"Could not restore the previous file from '{backupPath}'.",
+                            details
+                        );
+                    }
+                    throw;
+                }
+                catch (FileNotFoundException)
+                {
+                    File.Move(temporaryPath, path);
+                    return;
+                }
+            }
         }
     }
 }

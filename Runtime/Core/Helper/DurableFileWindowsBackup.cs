@@ -37,55 +37,27 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             _previous = previous;
         }
 
-        internal static SafeFileHandle OpenPrevious(string path)
+        internal static void ReplaceOnce(string staged, string destination, string backup)
         {
-            if (!HostRuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                return null;
-            }
-
-            return Open(path, ReadAttributes, FileShare.ReadWrite | FileShare.Delete);
-        }
-
-        internal static bool DiscardOrDefer(
-            string destination,
-            string backup,
-            SafeFileHandle previous
-        )
-        {
-            if (backup == null)
-            {
-                return false;
-            }
-
+            SafeFileHandle previous = OpenPrevious(destination);
             try
             {
-                File.Delete(backup);
-                return false;
-            }
-            catch (Exception)
-            {
-                if (
-                    previous == null
-                    || previous.IsInvalid
-                    || !GetVolumeInformationByHandle(
-                        previous,
-                        IntPtr.Zero,
-                        0,
-                        IntPtr.Zero,
-                        IntPtr.Zero,
-                        out uint flags,
-                        IntPtr.Zero,
-                        0
-                    )
-                    || (flags & SupportsOpenByFileId) == 0
-                )
+                File.Replace(staged, destination, backup);
+                try
                 {
-                    return false;
+                    File.Delete(backup);
                 }
-
-                Remember(new DurableFileWindowsBackup(destination, backup, previous));
-                return true;
+                catch (Exception)
+                {
+                    if (DeferCleanup(destination, backup, previous))
+                    {
+                        previous = null;
+                    }
+                }
+            }
+            finally
+            {
+                previous?.Dispose();
             }
         }
 
@@ -135,6 +107,66 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     Remember(item);
                 }
             }
+        }
+
+        private static SafeFileHandle OpenPrevious(string path)
+        {
+            if (!HostRuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                return null;
+            }
+
+            try
+            {
+                return Open(path, ReadAttributes, FileShare.ReadWrite | FileShare.Delete);
+            }
+            catch (Exception failure) when (NativeApiUnavailable(failure))
+            {
+                return null;
+            }
+        }
+
+        private static bool DeferCleanup(string destination, string backup, SafeFileHandle previous)
+        {
+            if (previous == null || previous.IsInvalid)
+            {
+                return false;
+            }
+
+            try
+            {
+                if (
+                    !GetVolumeInformationByHandle(
+                        previous,
+                        IntPtr.Zero,
+                        0,
+                        IntPtr.Zero,
+                        IntPtr.Zero,
+                        out uint flags,
+                        IntPtr.Zero,
+                        0
+                    )
+                    || (flags & SupportsOpenByFileId) == 0
+                )
+                {
+                    return false;
+                }
+
+                Remember(new DurableFileWindowsBackup(destination, backup, previous));
+                return true;
+            }
+            catch (Exception failure) when (NativeApiUnavailable(failure))
+            {
+                return false;
+            }
+        }
+
+        private static bool NativeApiUnavailable(Exception failure)
+        {
+            return failure
+                is DllNotFoundException
+                    or EntryPointNotFoundException
+                    or PlatformNotSupportedException;
         }
 
         private static void Remember(DurableFileWindowsBackup pending)
