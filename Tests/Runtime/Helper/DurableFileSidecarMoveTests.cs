@@ -61,6 +61,83 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Directory.Delete(_directory, recursive: true);
         }
 
+        [TestCase(false, false)]
+        [TestCase(false, true)]
+        [TestCase(true, false)]
+        [TestCase(true, true)]
+        public void RefusesGroupWhileAnyMemberHasAnActiveWriter(bool lockSource, bool lockSidecar)
+        {
+            string sourceSidecar = _source + Suffixes[0];
+            string destinationSidecar = _destination + Suffixes[0];
+            File.WriteAllText(_source, "database");
+            File.WriteAllText(sourceSidecar, "journal");
+            string lockedPath = lockSource ? _source : _destination;
+            if (lockSidecar)
+            {
+                lockedPath += Suffixes[0];
+            }
+
+            Assert.IsTrue(
+                DurableFile.TryOpenStagingOwnership(
+                    lockedPath + DurableFile.TemporarySuffix,
+                    out FileStream writer,
+                    out Exception lockError
+                ),
+                lockError?.ToString()
+            );
+            using (writer)
+            {
+                Assert.IsFalse(
+                    DurableFile.TryMoveWithSidecars(
+                        _source,
+                        _destination,
+                        Suffixes,
+                        out Exception error
+                    )
+                );
+                Assert.IsInstanceOf<IOException>(error);
+                Assert.AreEqual("database", File.ReadAllText(_source));
+                Assert.AreEqual("journal", File.ReadAllText(sourceSidecar));
+                Assert.IsFalse(File.Exists(_destination));
+                Assert.IsFalse(File.Exists(destinationSidecar));
+            }
+
+            Assert.IsTrue(
+                DurableFile.TryMoveWithSidecars(
+                    _source,
+                    _destination,
+                    Suffixes,
+                    out Exception retryError
+                ),
+                retryError?.ToString()
+            );
+            Assert.AreEqual("database", File.ReadAllText(_destination));
+            Assert.AreEqual("journal", File.ReadAllText(destinationSidecar));
+            CollectionAssert.AreEquivalent(
+                new[] { _destination, destinationSidecar },
+                Directory.GetFiles(_directory)
+            );
+        }
+
+        [Test]
+        public void RefusesToMoveAFileIntoItsOwnWriterLock()
+        {
+            File.WriteAllText(_source, "database");
+            string lockPath = _source + DurableFile.TemporarySuffix + DurableFile.OwnershipSuffix;
+
+            Assert.IsFalse(
+                DurableFile.TryMoveWithSidecars(
+                    _source,
+                    lockPath,
+                    Array.Empty<string>(),
+                    out Exception error
+                )
+            );
+            Assert.IsInstanceOf<ArgumentException>(error);
+            Assert.AreEqual("database", File.ReadAllText(_source));
+            Assert.IsFalse(File.Exists(lockPath));
+        }
+
         [Test]
         public void MovesDatabaseAndPresentSidecars()
         {

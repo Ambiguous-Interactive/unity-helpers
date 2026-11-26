@@ -1,6 +1,10 @@
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
+#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN || !UNITY_5_3_OR_NEWER
+#define DURABLE_FILE_WINDOWS_BACKUP_CLEANUP
+#endif
+
 namespace WallstopStudios.UnityHelpers.Core.Helper
 {
     using System;
@@ -20,8 +24,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     /// <remarks>
     /// <para>
     /// <see cref="File.WriteAllText(string, string)"/> truncates the destination before writing a
-    /// single byte, so an interrupted write replaces a valid document with a partial one. Every
-    /// write here stages the new contents in a sibling file, forces them out of the page cache, and
+    /// single byte, so an interrupted write replaces a valid document with a partial one. A
+    /// whole-file write here stages the new contents in a sibling file, forces them out of the page cache, and
     /// only then swaps the staged file over the destination.
     /// </para>
     /// <para>
@@ -30,6 +34,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     /// On Windows, a replacement uses a temporary backup of the previous file. If Windows
     /// moves the previous file aside and then refuses publication, this helper tries to restore it.
     /// If restoration fails, the returned error identifies the backup path.
+    /// If cleanup is blocked after a successful replacement, the write still succeeds.
+    /// A later whole-file write or copy through the regular swap retries tracked backups for that path.
     /// Windows sharing violations and inability to remove the replaced file receive up to three
     /// replacement attempts with 10 ms and 20 ms waits while retaining staged contents and ownership.
     /// Cooperating writes, appends, and deletes serialize per destination in this process.
@@ -38,8 +44,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     /// sibling lock file remains.
     /// </para>
     /// <para>
-    /// Where the format allows a log of records, <see cref="TryAppendAllText"/> is strictly stronger
-    /// than a whole-document rewrite: an append never rewrites bytes that are already on disk.
+    /// <see cref="TryAppendAllText"/> leaves previous bytes in place. An interrupted append can
+    /// leave an incomplete final record.
     /// </para>
     /// <para>
     /// Contains no <c>UnityEngine</c> dependency and is safe to call from any thread.
@@ -48,7 +54,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     public static class DurableFile
     {
         /// <summary>
-        /// Suffix of the sibling file a write is staged into before the swap.
+        /// Suffix used by sibling staging files.
         /// </summary>
         /// <remarks>
         /// Public so consumers can recognize and ignore a leftover staged file, which is what an
@@ -83,6 +89,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         private const int ReplacementRetryDelayMilliseconds = 10;
 
         private static readonly SemaphoreSlim[] Gates = CreateGates();
+        private static readonly Action<string, string> ExclusiveMove = MoveFileExclusively;
 
         private static readonly char[] InvalidSidecarCharacters = Path.GetInvalidFileNameChars();
 
@@ -102,6 +109,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             if (string.IsNullOrWhiteSpace(path))
             {
                 error = new ArgumentException("A destination path is required.", nameof(path));
+                return false;
+            }
+
+            if (!TryNormalizePath(path, out path, out error))
+            {
                 return false;
             }
 
@@ -237,11 +249,81 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return false;
             }
 
+            if (!TryNormalizePath(path, out path, out error))
+            {
+                return false;
+            }
+
             string temporaryPath = path + TemporarySuffix;
             using (EnterGate(path))
             {
                 return TryWriteStagedBytes(path, temporaryPath, bytes, offset, count, out error);
             }
+        }
+
+        /// <summary>Applies a single-file change only when the current bytes match.</summary>
+        /// <remarks>
+        /// Cooperating DurableFile writers share OS-backed ownership on supported local filesystems.
+        /// A missing file and an empty file are distinct. Matching is by value, so a file that
+        /// returns to its original bytes can match again. External writes that bypass the owner
+        /// can race the operation. An absent-file creation still uses exclusive OS publication.
+        /// </remarks>
+        /// <param name="path">The file to change.</param>
+        /// <param name="expected">The expected bytes, or null to expect absence.</param>
+        /// <param name="replacement">The bytes to publish, or null to delete a matching file.</param>
+        /// <param name="exchanged">True when the change was applied or the expected absence was confirmed.</param>
+        /// <param name="error">The failure on an I/O error.</param>
+        /// <returns>True when evaluated, including a mismatch. False on failure.</returns>
+        public static bool TryCompareExchangeBytes(
+            string path,
+            byte[] expected,
+            byte[] replacement,
+            out bool exchanged,
+            out Exception error
+        )
+        {
+            return TryCompareExchangeBytes(
+                path,
+                expected,
+                replacement,
+                syncParentDirectory: false,
+                out exchanged,
+                out error
+            );
+        }
+
+        /// <summary>Applies a byte comparison and can synchronize publication to disk.</summary>
+        /// <remarks>
+        /// Directory synchronization requires an existing parent on a supported local filesystem.
+        /// Use the resolved directory path. An error after publication still sets
+        /// <paramref name="exchanged"/> to true, so callers can reconcile against the live file.
+        /// Keep both arrays unchanged for the duration of the call.
+        /// </remarks>
+        /// <param name="path">The file to change.</param>
+        /// <param name="expected">The expected bytes, or null to expect absence.</param>
+        /// <param name="replacement">The bytes to publish, or null to delete a matching file.</param>
+        /// <param name="syncParentDirectory">True to wait for the directory update to reach storage.</param>
+        /// <param name="exchanged">True when published or when the expected absence was confirmed.</param>
+        /// <param name="error">The failure, including a requested synchronization failure after publication.</param>
+        /// <returns>True when comparison and any requested publication and synchronization succeeded.</returns>
+        public static bool TryCompareExchangeBytes(
+            string path,
+            byte[] expected,
+            byte[] replacement,
+            bool syncParentDirectory,
+            out bool exchanged,
+            out Exception error
+        )
+        {
+            return TryCompareExchangeBytesCore(
+                path,
+                expected,
+                replacement,
+                requireExisting: false,
+                syncParentDirectory,
+                out exchanged,
+                out error
+            );
         }
 
         /// <summary>Reads a file into a disposable pooled byte buffer.</summary>
@@ -272,6 +354,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             PooledArray<byte> rental = default;
             try
             {
+                path = NormalizePath(path);
                 using (EnterGate(path))
                 {
                     using FileStream stream = OpenSourceStream(path, useAsync: false);
@@ -395,6 +478,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return true;
             }
 
+            if (!TryNormalizePath(path, out path, out error))
+            {
+                return false;
+            }
+
             using (EnterGate(path))
             {
                 FileStream ownership = null;
@@ -408,7 +496,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     byte[] bytes = Utf8NoByteOrderMark.GetBytes(contents);
                     using FileStream stream = OpenAppendStream(path, useAsync: false);
                     stream.Write(bytes, 0, bytes.Length);
-                    stream.Flush(flushToDisk: true);
+                    DurableFileSync.FlushFileData(stream);
                     error = null;
                     return true;
                 }
@@ -453,6 +541,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             SemaphoreLease gate;
             try
             {
+                path = NormalizePath(path);
                 gate = await EnterGateAsync(path, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception e)
@@ -481,7 +570,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     await stream
                         .WriteAsync(bytes, 0, bytes.Length, cancellationToken)
                         .ConfigureAwait(false);
-                    stream.Flush(flushToDisk: true);
+                    DurableFileSync.FlushFileData(stream);
                     return null;
                 }
                 catch (Exception e)
@@ -501,10 +590,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <param name="sidecarSuffixes">Unique filename suffixes appended to both paths in order.</param>
         /// <param name="error">The move failure, or an aggregate with that failure followed by restoration failures.</param>
         /// <remarks>
-        /// Failed moves restore completed moves in reverse order. Cooperating calls in this process
-        /// serialize on every group path. Use directory paths with any symbolic links or other
-        /// reparse points resolved. Other processes need caller coordination, and a process
-        /// interruption can leave a partly moved group.
+        /// Failed moves restore completed moves in reverse order. Every group path holds
+        /// cooperating writer ownership before the first move. Moves use exclusive native rename
+        /// on supported local filesystems on Linux, macOS, and Windows Editor or standalone builds.
+        /// Both paths must be on one filesystem. Use directory paths with symbolic
+        /// links or other reparse points resolved. A process interruption can leave a partly moved
+        /// group, and clients that do not use DurableFile need caller coordination.
         /// </remarks>
         /// <returns>True when the file and all present sidecars moved, or false on failure.</returns>
         public static bool TryMoveWithSidecars(
@@ -514,38 +605,13 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             out Exception error
         )
         {
-            Exception validation = ValidateCopyPaths(sourcePath, destinationPath);
-            if (validation != null)
-            {
-                error = validation;
-                return false;
-            }
-
-            try
-            {
-                int count = checked(sidecarSuffixes.Length + 1);
-                using PooledArray<(string Source, string Destination, bool Moved)> entries =
-                    SystemArrayPool<(string Source, string Destination, bool Moved)>.Get(
-                        count,
-                        out (string Source, string Destination, bool Moved)[] moves
-                    );
-                Span<(string Source, string Destination, bool Moved)> plan = moves.AsSpan(0, count);
-                uint gates = PlanSidecarMove(sourcePath, destinationPath, sidecarSuffixes, plan);
-                Exception failure = MoveSidecarGroup(plan, gates);
-                if (failure != null)
-                {
-                    error = failure;
-                    return false;
-                }
-
-                error = null;
-                return true;
-            }
-            catch (Exception failure)
-            {
-                error = failure;
-                return false;
-            }
+            return TryMoveWithSidecars(
+                sourcePath,
+                destinationPath,
+                sidecarSuffixes,
+                ExclusiveMove,
+                out error
+            );
         }
 
         /// <summary>
@@ -557,7 +623,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <returns>True when the destination holds the source's contents.</returns>
         public static bool TryCopy(string sourcePath, string destinationPath, out Exception error)
         {
-            Exception validation = ValidateCopyPaths(sourcePath, destinationPath);
+            Exception validation = NormalizeCopyPaths(ref sourcePath, ref destinationPath);
             if (validation != null)
             {
                 error = validation;
@@ -570,6 +636,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 FileStream source;
                 FileStream ownership = null;
                 FileStream staging;
+                string stagedPath;
                 try
                 {
                     // Open the source before creating destination directories so failed reads leave no new folders.
@@ -588,7 +655,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         ReleaseFileStream(source);
                         return false;
                     }
-                    staging = OpenStagingStream(temporaryPath, useAsync: false);
+                    staging = OpenUniqueStagingStream(destinationPath, false, out stagedPath);
                 }
                 catch (Exception e)
                 {
@@ -605,10 +672,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         using (staging)
                         {
                             source.CopyTo(staging, DefaultBufferSize);
-                            staging.Flush(flushToDisk: true);
+                            DurableFileSync.FlushFileData(staging);
                         }
 
-                        Swap(temporaryPath, destinationPath);
+                        Swap(stagedPath, destinationPath);
                     }
 
                     error = null;
@@ -616,7 +683,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
                 catch (Exception e)
                 {
-                    DiscardStagedFile(temporaryPath);
+                    DiscardStagedFile(stagedPath);
                     error = e;
                     return false;
                 }
@@ -654,6 +721,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         public static bool TryDelete(string path)
         {
             if (string.IsNullOrWhiteSpace(path))
+            {
+                return false;
+            }
+
+            if (!TryNormalizePath(path, out path, out _))
             {
                 return false;
             }
@@ -697,6 +769,58 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 
+        internal static bool TryMoveWithSidecars(
+            string sourcePath,
+            string destinationPath,
+            ReadOnlySpan<string> sidecarSuffixes,
+            Action<string, string> moveFile,
+            out Exception error
+        )
+        {
+            Exception validation = NormalizeCopyPaths(ref sourcePath, ref destinationPath);
+            if (validation != null)
+            {
+                error = validation;
+                return false;
+            }
+
+            try
+            {
+                int count = checked(sidecarSuffixes.Length + 1);
+                using PooledArray<(
+                    string Source,
+                    string Destination,
+                    bool Present,
+                    bool Moved
+                )> entries = SystemArrayPool<(
+                    string Source,
+                    string Destination,
+                    bool Present,
+                    bool Moved
+                )>.Get(
+                    count,
+                    out (string Source, string Destination, bool Present, bool Moved)[] moves
+                );
+                Span<(string Source, string Destination, bool Present, bool Moved)> plan =
+                    moves.AsSpan(0, count);
+                uint gates = PlanSidecarMove(sourcePath, destinationPath, sidecarSuffixes, plan);
+                Exception failure = MoveSidecarGroup(plan, gates, moveFile);
+                if (failure != null)
+                {
+                    error = failure;
+                    return false;
+                }
+
+                error = null;
+                return true;
+            }
+            catch (Exception failure)
+            {
+                error = failure;
+                return false;
+            }
+        }
+
         /// <summary>Initializes absent data without leaving a partial destination after failure.</summary>
         internal static bool TryInitializeAllBytes(string path, byte[] contents)
         {
@@ -705,9 +829,15 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return false;
             }
 
+            if (!TryNormalizePath(path, out path, out _))
+            {
+                return false;
+            }
+
             using (EnterGate(path))
             {
                 string temporaryPath = null;
+                FileStream ownership = null;
                 bool ownsTemporary = false;
                 try
                 {
@@ -723,6 +853,21 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     {
                         return false;
                     }
+                    /*
+                        A legal maximum-length destination can leave no room for a lock suffix.
+                        Exclusive name publication still prevents those initializers from overwriting.
+                    */
+                    if (
+                        !TryOpenStagingOwnership(
+                            destinationPath + TemporarySuffix,
+                            out ownership,
+                            out Exception lockError
+                        ) && lockError is not PathTooLongException
+                    )
+                    {
+                        return false;
+                    }
+
                     int temporaryNameLength = MaximumInitializationStageNameLength;
                     FileStream staging = null;
                     for (int attempt = 0; attempt < MaximumInitializationStageAttempts; ++attempt)
@@ -779,13 +924,14 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     {
                         contents ??= Array.Empty<byte>();
                         staging.Write(contents, 0, contents.Length);
-                        staging.Flush(flushToDisk: true);
+                        DurableFileSync.FlushFileData(staging);
                     }
                     if (
                         !TryPublishStagedFileWithoutOverwrite(
                             temporaryPath,
                             destinationPath,
-                            out bool leavesStaged
+                            out bool leavesStaged,
+                            preferExclusiveRename: true
                         )
                     )
                     {
@@ -804,6 +950,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     {
                         DiscardStagedFile(temporaryPath);
                     }
+                    ReleaseStagingOwnership(ownership);
                 }
             }
         }
@@ -838,6 +985,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return false;
             }
 
+            if (!TryNormalizePath(path, out path, out error))
+            {
+                return false;
+            }
+
             using (EnterGate(path))
             {
                 string temporaryPath = null;
@@ -851,18 +1003,13 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     {
                         return false;
                     }
-                    temporaryPath = UniqueCreationStagingPath(path);
                     using (
-                        FileStream staging = OpenStagingStream(
-                            temporaryPath,
-                            useAsync: false,
-                            createNew: true
-                        )
+                        FileStream staging = OpenUniqueStagingStream(path, false, out temporaryPath)
                     )
                     {
                         ownsTemporary = true;
                         staging.Write(contents, 0, contents.Length);
-                        staging.Flush(flushToDisk: true);
+                        DurableFileSync.FlushFileData(staging);
                     }
 
                     if (
@@ -995,6 +1142,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             out bool leavesStaged
         )
         {
+            Exception invalid = NormalizeCopyPaths(ref stagedPath, ref destinationPath);
+            if (invalid != null)
+            {
+                throw invalid;
+            }
+
             using (EnterGate(destinationPath))
             {
                 if (
@@ -1049,53 +1202,28 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return false;
             }
 
-            using (EnterGate(path))
+            if (
+                !TryCompareExchangeBytesCore(
+                    path,
+                    expected,
+                    replacement,
+                    requireExisting: true,
+                    syncParentDirectory: false,
+                    out bool exchanged,
+                    out error
+                )
+            )
             {
-                string temporaryPath = path + TemporarySuffix;
-                FileStream ownership = null;
-                FileStream staging = null;
-                bool ownsStaging = false;
-                try
-                {
-                    if (!TryOpenStagingOwnership(temporaryPath, out ownership, out error))
-                    {
-                        return false;
-                    }
-                    byte[] current = File.ReadAllBytes(path);
-                    if (!BytesEqual(current, expected))
-                    {
-                        error = new InvalidOperationException(
-                            "The file changed since it was read."
-                        );
-                        return false;
-                    }
-
-                    staging = OpenStagingStream(temporaryPath, useAsync: false);
-                    ownsStaging = true;
-                    staging.Write(replacement, 0, replacement.Length);
-                    staging.Flush(flushToDisk: true);
-                    staging.Dispose();
-                    staging = null;
-                    Swap(temporaryPath, path);
-                    ownsStaging = false;
-                    error = null;
-                    return true;
-                }
-                catch (Exception e)
-                {
-                    error = e;
-                    return false;
-                }
-                finally
-                {
-                    ReleaseFileStream(staging);
-                    if (ownsStaging)
-                    {
-                        DiscardStagedFile(temporaryPath);
-                    }
-                    ReleaseStagingOwnership(ownership);
-                }
+                return false;
             }
+
+            if (!exchanged)
+            {
+                error = new InvalidOperationException("The file changed since it was read.");
+                return false;
+            }
+
+            return true;
         }
 
         /// <summary>Compares current text, then stages and replaces the file.</summary>
@@ -1120,8 +1248,14 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return false;
             }
 
+            if (!TryNormalizePath(path, out path, out error))
+            {
+                exchanged = false;
+                return false;
+            }
+
             string temporaryPath = path + TemporarySuffix;
-            string stagedPath = temporaryPath;
+            string stagedPath = null;
             using (EnterGate(path))
             {
                 FileStream ownership = null;
@@ -1139,7 +1273,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     string current;
                     try
                     {
-                        current = File.ReadAllText(path);
+                        File.GetAttributes(path);
+                        using FileStream source = OpenSourceStream(path, useAsync: false);
+                        using StreamReader reader = new(source);
+                        current = reader.ReadToEnd();
                         exists = true;
                     }
                     catch (FileNotFoundException)
@@ -1158,22 +1295,13 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         return true;
                     }
 
-                    if (!expectedExists)
-                    {
-                        // A surviving hard-link stage must never be reopened for truncation.
-                        stagedPath = UniqueCreationStagingPath(path);
-                    }
-                    staging = OpenStagingStream(
-                        stagedPath,
-                        useAsync: false,
-                        createNew: !expectedExists
-                    );
+                    staging = OpenUniqueStagingStream(path, false, out stagedPath);
                     ownsStaging = true;
                     byte[] bytes = Utf8NoByteOrderMark.GetBytes(
                         replacementContents ?? string.Empty
                     );
                     staging.Write(bytes, 0, bytes.Length);
-                    staging.Flush(flushToDisk: true);
+                    DurableFileSync.FlushFileData(staging);
                     staging.Dispose();
                     staging = null;
                     bool published;
@@ -1225,7 +1353,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return new ArgumentOutOfRangeException(nameof(bufferSize));
             }
 
-            Exception invalid = ValidateCopyPaths(sourcePath, destinationPath);
+            Exception invalid = NormalizeCopyPaths(ref sourcePath, ref destinationPath);
             if (invalid != null)
             {
                 return invalid;
@@ -1248,6 +1376,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 FileStream source;
                 FileStream ownership = null;
                 FileStream staging;
+                string stagedPath;
                 try
                 {
                     // Source first, for the reason recorded in TryCopy.
@@ -1271,7 +1400,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         ReleaseFileStream(source);
                         return ownershipError;
                     }
-                    staging = OpenStagingStream(temporaryPath, useAsync: true);
+                    staging = OpenUniqueStagingStream(destinationPath, true, out stagedPath);
                 }
                 catch (Exception e)
                 {
@@ -1290,17 +1419,17 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                                 .CopyToAsync(staging, bufferSize, cancellationToken)
                                 .ConfigureAwait(false);
 
-                            staging.Flush(flushToDisk: true);
+                            DurableFileSync.FlushFileData(staging);
                         }
 
-                        PublishStagedFile(temporaryPath, destinationPath, cancellationToken);
+                        PublishStagedFile(stagedPath, destinationPath, cancellationToken);
                     }
 
                     return null;
                 }
                 catch (Exception e)
                 {
-                    DiscardStagedFile(temporaryPath);
+                    DiscardStagedFile(stagedPath);
                     return e;
                 }
                 finally
@@ -1313,7 +1442,17 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <summary>Verifies a newly published document before its staged name is removed.</summary>
         internal static void VerifyCreatedContents(string path, byte[] contents)
         {
-            if (!File.ReadAllBytes(path).AsSpan().SequenceEqual(contents))
+            (bool matches, IOException failure) = CompareFileBytes(
+                path,
+                contents ?? Array.Empty<byte>(),
+                requireExisting: true
+            );
+            if (failure != null)
+            {
+                throw failure;
+            }
+
+            if (!matches)
             {
                 throw new IOException(
                     $"Created file at {path}, but its contents differ; inspect it before retrying."
@@ -1322,22 +1461,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
         // Only a successful exclusive staging open establishes cleanup ownership; failed opens may name another writer.
-        /// <summary>Opens the staging file exclusively for writing.</summary>
-        internal static FileStream OpenStagingStream(
-            string temporaryPath,
-            bool useAsync,
-            bool createNew = false
-        )
+        /// <summary>Creates a new staging file exclusively for writing.</summary>
+        internal static FileStream OpenStagingStream(string temporaryPath, bool useAsync)
         {
-            FileMode mode = FileMode.Create;
-            if (createNew)
-            {
-                mode = FileMode.CreateNew;
-            }
-
             return new FileStream(
                 temporaryPath,
-                mode,
+                FileMode.CreateNew,
                 FileAccess.Write,
                 FileShare.None,
                 DefaultBufferSize,
@@ -1400,6 +1529,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <summary>Publishes a staging file over an absent or existing destination.</summary>
         internal static void Swap(string temporaryPath, string path)
         {
+#if DURABLE_FILE_WINDOWS_BACKUP_CLEANUP
+            DurableFileWindowsBackup.RetryPending(path);
+#endif
             if (File.Exists(path))
             {
                 Replace(temporaryPath, path);
@@ -1416,12 +1548,65 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 
-        private static string UniqueCreationStagingPath(string path)
+        internal static string GetWindowsNativePath(string fullPath)
         {
-            return Path.Combine(
-                Path.GetDirectoryName(Path.GetFullPath(path)),
-                ".create." + Guid.NewGuid().ToString("N") + TemporarySuffix
-            );
+            if (
+                fullPath.Length < 260
+                || fullPath.StartsWith(@"\\?\", StringComparison.Ordinal)
+                || fullPath.StartsWith(@"\\.\", StringComparison.Ordinal)
+            )
+            {
+                return fullPath;
+            }
+
+            return fullPath.StartsWith(@"\\", StringComparison.Ordinal)
+                ? @"\\?\UNC\" + fullPath.Substring(2)
+                : @"\\?\" + fullPath;
+        }
+
+        private static DurableFileSync OpenDirectoryForSync(string path)
+        {
+            string parent = Path.GetDirectoryName(Path.GetFullPath(path));
+            RequireUnaliasedDirectory(parent);
+            return DurableFileSync.Open(parent);
+        }
+
+        private static FileStream OpenUniqueStagingStream(
+            string path,
+            bool useAsync,
+            out string stagedPath
+        )
+        {
+            string directory = Path.GetDirectoryName(path);
+            string filename = Path.GetFileName(path);
+            // Every caller already holds the sibling writer lock. Keep the stage within that length.
+            int maximumStemLength = filename.Length + OwnershipSuffix.Length;
+            const string prefix = ".create.";
+            for (int attempt = 0; attempt < MaximumInitializationStageAttempts; ++attempt)
+            {
+                string identifier = Guid.NewGuid().ToString("N");
+                int identifierLength = identifier.Length;
+                string stem =
+                    maximumStemLength < prefix.Length + identifierLength
+                        ? identifier.Substring(0, Math.Min(maximumStemLength, identifierLength))
+                        : prefix + identifier;
+                string name = stem + TemporarySuffix;
+                if (string.Equals(name, filename, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                string candidate = Path.Combine(directory, name);
+                try
+                {
+                    FileStream stream = OpenStagingStream(candidate, useAsync);
+                    stagedPath = candidate;
+                    return stream;
+                }
+                catch (IOException) when (File.Exists(candidate) || Directory.Exists(candidate)) { }
+            }
+
+            throw new IOException($"Could not reserve exclusive staging for '{path}'.");
         }
 
         // A hard link is also exclusive and covers volumes that reject the rename flag.
@@ -1535,10 +1720,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return new ArgumentException("A destination path is required.", nameof(path));
             }
 
-            string temporaryPath = path + TemporarySuffix;
             SemaphoreLease gate;
             try
             {
+                path = NormalizePath(path);
                 gate = await EnterGateAsync(path, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception e)
@@ -1546,10 +1731,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return e;
             }
 
+            string temporaryPath = path + TemporarySuffix;
             using (gate)
             {
                 FileStream ownership = null;
                 FileStream staging;
+                string stagedPath;
                 byte[] bytes;
                 try
                 {
@@ -1570,7 +1757,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     {
                         return ownershipError;
                     }
-                    staging = OpenStagingStream(temporaryPath, useAsync: true);
+                    staging = OpenUniqueStagingStream(path, true, out stagedPath);
                 }
                 catch (Exception e)
                 {
@@ -1585,16 +1772,16 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         await staging
                             .WriteAsync(bytes, 0, bytes.Length, cancellationToken)
                             .ConfigureAwait(false);
-                        staging.Flush(flushToDisk: true);
+                        DurableFileSync.FlushFileData(staging);
                     }
 
-                    PublishStagedFile(temporaryPath, path, cancellationToken);
+                    PublishStagedFile(stagedPath, path, cancellationToken);
 
                     return null;
                 }
                 catch (Exception e)
                 {
-                    DiscardStagedFile(temporaryPath);
+                    DiscardStagedFile(stagedPath);
                     return e;
                 }
                 finally
@@ -1615,6 +1802,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         {
             FileStream ownership = null;
             FileStream staging;
+            string stagedPath;
             try
             {
                 EnsureDirectory(path);
@@ -1622,7 +1810,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 {
                     return false;
                 }
-                staging = OpenStagingStream(temporaryPath, useAsync: false);
+                staging = OpenUniqueStagingStream(path, false, out stagedPath);
             }
             catch (Exception e)
             {
@@ -1636,17 +1824,17 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 using (staging)
                 {
                     staging.Write(contents, offset, count);
-                    staging.Flush(flushToDisk: true);
+                    DurableFileSync.FlushFileData(staging);
                 }
 
-                Swap(temporaryPath, path);
+                Swap(stagedPath, path);
 
                 error = null;
                 return true;
             }
             catch (Exception e)
             {
-                DiscardStagedFile(temporaryPath);
+                DiscardStagedFile(stagedPath);
                 error = e;
                 return false;
             }
@@ -1656,24 +1844,273 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 
+        private static bool TryCompareExchangeBytesCore(
+            string path,
+            byte[] expected,
+            byte[] replacement,
+            bool requireExisting,
+            bool syncParentDirectory,
+            out bool exchanged,
+            out Exception error
+        )
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                exchanged = false;
+                error = new ArgumentException("A destination path is required.", nameof(path));
+                return false;
+            }
+
+            if (!TryNormalizePath(path, out path, out error))
+            {
+                exchanged = false;
+                return false;
+            }
+
+            using (EnterGate(path))
+            {
+                string temporaryPath = path + TemporarySuffix;
+                string stagedPath = null;
+                FileStream ownership = null;
+                bool ownsStaging = false;
+                bool published = false;
+                try
+                {
+                    if (expected == null && replacement != null && !syncParentDirectory)
+                    {
+                        EnsureDirectory(path);
+                    }
+
+                    if (
+                        !TryOpenStagingOwnership(
+                            temporaryPath,
+                            out ownership,
+                            out Exception lockError
+                        )
+                    )
+                    {
+                        if (
+                            !requireExisting
+                            && lockError is DirectoryNotFoundException
+                            && (expected != null || replacement == null)
+                        )
+                        {
+                            exchanged = expected == null;
+                            error = null;
+                            return true;
+                        }
+
+                        exchanged = false;
+                        error = lockError;
+                        return false;
+                    }
+
+                    (bool matches, IOException comparisonFailure) = CompareFileBytes(
+                        path,
+                        expected,
+                        requireExisting
+                    );
+                    if (comparisonFailure != null)
+                    {
+                        exchanged = false;
+                        error = comparisonFailure;
+                        return false;
+                    }
+
+                    if (!matches)
+                    {
+                        exchanged = false;
+                        error = null;
+                        return true;
+                    }
+
+                    if (expected == null && replacement == null)
+                    {
+                        exchanged = true;
+                        error = null;
+                        return true;
+                    }
+
+                    using DurableFileSync directory = syncParentDirectory
+                        ? OpenDirectoryForSync(path)
+                        : null;
+                    if (replacement == null)
+                    {
+                        if (directory == null)
+                        {
+                            File.Delete(path);
+                        }
+                        else
+                        {
+                            Exception deleteFailure = directory.Delete(path);
+                            if (deleteFailure != null)
+                            {
+                                exchanged = false;
+                                error = deleteFailure;
+                                return false;
+                            }
+                        }
+
+                        published = true;
+                        directory?.Flush();
+                        exchanged = true;
+                        error = null;
+                        return true;
+                    }
+
+                    bool create = expected == null;
+                    using (FileStream stage = OpenUniqueStagingStream(path, false, out stagedPath))
+                    {
+                        ownsStaging = true;
+                        stage.Write(replacement, 0, replacement.Length);
+                        DurableFileSync.FlushFileData(stage);
+                    }
+
+                    if (create)
+                    {
+                        published = TryPublishStagedFileWithoutOverwrite(
+                            stagedPath,
+                            path,
+                            out bool leavesStaged,
+                            preferExclusiveRename: true
+                        );
+                        ownsStaging = leavesStaged;
+                    }
+                    else
+                    {
+                        Swap(stagedPath, path);
+                        ownsStaging = false;
+                        published = true;
+                    }
+
+                    if (published && directory != null)
+                    {
+                        if (ownsStaging)
+                        {
+                            DiscardStagedFile(stagedPath);
+                            ownsStaging = false;
+                        }
+
+                        directory.Flush();
+                    }
+
+                    exchanged = published;
+                    error = null;
+                    return true;
+                }
+                catch (Exception failure)
+                {
+                    exchanged = published;
+                    error = failure;
+                    return false;
+                }
+                finally
+                {
+                    if (ownsStaging)
+                    {
+                        DiscardStagedFile(stagedPath);
+                    }
+                    ReleaseStagingOwnership(ownership);
+                }
+            }
+        }
+
+        // Isolate expected file-open failures from IL2CPP callers.
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static (bool Matches, IOException Failure) CompareFileBytes(
+            string path,
+            byte[] expected,
+            bool requireExisting
+        )
+        {
+            FileStream stream;
+            try
+            {
+                FileAttributes attributes = File.GetAttributes(path);
+                if (expected == null)
+                {
+                    return (false, null);
+                }
+                if ((attributes & FileAttributes.ReparsePoint) != 0)
+                {
+                    return (
+                        false,
+                        new IOException($"Use the resolved file path in place of '{path}'.")
+                    );
+                }
+
+                stream = OpenSourceStream(path, useAsync: false);
+            }
+            catch (IOException failure)
+            {
+                if (
+                    !requireExisting
+                    && failure is FileNotFoundException or DirectoryNotFoundException
+                )
+                {
+                    return (expected == null, null);
+                }
+
+                return (false, failure);
+            }
+
+            using (stream)
+            {
+                if (stream.Length != expected.Length)
+                {
+                    return (false, null);
+                }
+
+                if (expected.Length == 0)
+                {
+                    return (stream.ReadByte() < 0, null);
+                }
+
+                using PooledArray<byte> lease = SystemArrayPool<byte>.Get(
+                    Math.Min(expected.Length, DefaultBufferSize),
+                    out byte[] buffer
+                );
+                int offset = 0;
+                while (offset < expected.Length)
+                {
+                    int read = stream.Read(
+                        buffer,
+                        0,
+                        Math.Min(expected.Length - offset, DefaultBufferSize)
+                    );
+                    if (
+                        read == 0
+                        || !buffer.AsSpan(0, read).SequenceEqual(expected.AsSpan(offset, read))
+                    )
+                    {
+                        return (false, null);
+                    }
+
+                    offset += read;
+                }
+
+                return (stream.ReadByte() < 0, null);
+            }
+        }
+
         private static uint PlanSidecarMove(
             string sourcePath,
             string destinationPath,
             ReadOnlySpan<string> sidecarSuffixes,
-            Span<(string Source, string Destination, bool Moved)> moves
+            Span<(string Source, string Destination, bool Present, bool Moved)> moves
         )
         {
             string source = NormalizeMovePath(sourcePath, nameof(sourcePath));
             string destination = NormalizeMovePath(destinationPath, nameof(destinationPath));
             string sourceParent = Path.GetDirectoryName(source);
             string destinationParent = Path.GetDirectoryName(destination);
-            RequireUnaliasedMoveDirectory(sourceParent);
+            RequireUnaliasedDirectory(sourceParent);
             if (!string.Equals(sourceParent, destinationParent, StringComparison.Ordinal))
             {
-                RequireUnaliasedMoveDirectory(destinationParent);
+                RequireUnaliasedDirectory(destinationParent);
             }
 
-            moves[0] = (source, destination, false);
+            moves[0] = (source, destination, false, false);
             int next = 1;
             foreach (string suffix in sidecarSuffixes)
             {
@@ -1693,6 +2130,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 moves[next] = (
                     NormalizeMovePath(source + suffix, nameof(sidecarSuffixes)),
                     NormalizeMovePath(destination + suffix, nameof(sidecarSuffixes)),
+                    false,
                     false
                 );
                 ++next;
@@ -1705,7 +2143,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             );
             next = 0;
             uint gateMask = 0;
-            foreach ((string from, string to, bool _) in moves)
+            foreach ((string from, string to, bool _, bool _) in moves)
             {
                 paths[next++] = from;
                 paths[next++] = to;
@@ -1725,6 +2163,26 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 {
                     throw new ArgumentException(
                         "A file or sidecar appears more than once in the move."
+                    );
+                }
+            }
+
+            for (int index = 0; index < pathCount; ++index)
+            {
+                string ownershipPath = paths[index] + TemporarySuffix + OwnershipSuffix;
+                if (
+                    0
+                    <= Array.BinarySearch(
+                        paths,
+                        0,
+                        pathCount,
+                        ownershipPath,
+                        StringComparer.OrdinalIgnoreCase
+                    )
+                )
+                {
+                    throw new ArgumentException(
+                        "A group member conflicts with a writer lock path."
                     );
                 }
             }
@@ -1756,7 +2214,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return fullPath;
         }
 
-        private static void RequireUnaliasedMoveDirectory(string parent)
+        private static void RequireUnaliasedDirectory(string parent)
         {
             for (string directory = parent; !string.IsNullOrEmpty(directory); )
             {
@@ -1778,14 +2236,20 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
         private static Exception MoveSidecarGroup(
-            Span<(string Source, string Destination, bool Moved)> moves,
-            uint gateMask
+            Span<(string Source, string Destination, bool Present, bool Moved)> moves,
+            uint gateMask,
+            Action<string, string> moveFile
         )
         {
             using PooledArray<SemaphoreLease> gateLease = SystemArrayPool<SemaphoreLease>.Get(
                 GateCount,
                 out SemaphoreLease[] heldGates
             );
+            using PooledArray<FileStream> ownershipLease = SystemArrayPool<FileStream>.Get(
+                checked(moves.Length * 2),
+                out FileStream[] heldOwnership
+            );
+            int ownershipCount = 0;
             int heldCount = 0;
             try
             {
@@ -1799,46 +2263,42 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     }
                 }
 
-                int count = moves.Length;
-                for (int index = 0; index < count; ++index)
+                foreach ((string source, string destination, bool _, bool _) in moves)
                 {
-                    ref (string Source, string Destination, bool Moved) move = ref moves[index];
-                    FileAttributes? sourceAttributes = ReadMoveAttributes(move.Source);
-                    if (!sourceAttributes.HasValue && 0 < index)
+                    heldOwnership[ownershipCount] = DurableFileOwnershipStream.Acquire(
+                        source + TemporarySuffix + OwnershipSuffix
+                    );
+                    ++ownershipCount;
+                    heldOwnership[ownershipCount] = DurableFileOwnershipStream.Acquire(
+                        destination + TemporarySuffix + OwnershipSuffix
+                    );
+                    ++ownershipCount;
+                }
+
+                ValidateSidecarMoveEntries(moves);
+                foreach (
+                    ref (string Source, string Destination, bool Present, bool Moved) move in moves
+                )
+                {
+                    if (move.Present)
                     {
-                        if (ReadMoveAttributes(move.Destination).HasValue)
-                        {
-                            throw new IOException(
-                                $"The destination already has a sidecar at '{move.Destination}'."
-                            );
-                        }
-
-                        continue;
+                        moveFile(move.Source, move.Destination);
+                        move.Moved = true;
                     }
-
-                    if (
-                        sourceAttributes.HasValue
-                        && (sourceAttributes.Value & FileAttributes.Directory) != 0
-                    )
-                    {
-                        throw new IOException(
-                            $"Cannot move a directory as a file: '{move.Source}'."
-                        );
-                    }
-
-                    File.Move(move.Source, move.Destination);
-                    move.Moved = true;
-                    RequireMoveSourceRemoved(move.Source, move.Destination);
                 }
 
                 return null;
             }
             catch (Exception failure)
             {
-                return RestoreSidecarMoves(moves, failure);
+                return RestoreSidecarMoves(moves, moveFile, failure);
             }
             finally
             {
+                for (int index = ownershipCount - 1; 0 <= index; --index)
+                {
+                    ReleaseStagingOwnership(heldOwnership[index]);
+                }
                 for (int index = heldCount - 1; 0 <= index; --index)
                 {
                     heldGates[index].Dispose();
@@ -1846,15 +2306,95 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 
-        private static void RequireMoveSourceRemoved(string source, string destination)
+        private static void ValidateSidecarMoveEntries(
+            Span<(string Source, string Destination, bool Present, bool Moved)> moves
+        )
         {
-            if (ReadMoveAttributes(source).HasValue)
+            int count = moves.Length;
+            for (int index = 0; index < count; ++index)
             {
-                throw new IOException(
-                    $"The move from '{source}' to '{destination}' left the source in place."
-                );
+                ref (string Source, string Destination, bool Present, bool Moved) move = ref moves[
+                    index
+                ];
+                FileAttributes? source = ReadMoveAttributes(move.Source);
+                if (!source.HasValue && index == 0)
+                {
+                    throw new FileNotFoundException(
+                        "The file to move does not exist.",
+                        move.Source
+                    );
+                }
+
+                if (source.HasValue && (source.Value & FileAttributes.Directory) != 0)
+                {
+                    throw new IOException($"Cannot move a directory as a file: '{move.Source}'.");
+                }
+
+                if (ReadMoveAttributes(move.Destination).HasValue)
+                {
+                    throw new IOException(
+                        $"The destination already exists at '{move.Destination}'."
+                    );
+                }
+
+                move.Present = source.HasValue;
             }
         }
+
+        private static void MoveFileExclusively(string source, string destination)
+        {
+#if DURABLE_FILE_WINDOWS_BACKUP_CLEANUP
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                // Zero flags forbid both replacement and the cross-volume copy/delete fallback.
+                if (
+                    MoveFileExWindows(
+                        GetWindowsNativePath(source),
+                        GetWindowsNativePath(destination),
+                        0
+                    )
+                )
+                {
+                    return;
+                }
+
+                int error = Marshal.GetLastWin32Error();
+                throw new IOException(
+                    $"Could not rename '{source}' to '{destination}' (OS error {error})."
+                );
+            }
+
+#endif
+            bool isMac = RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
+            if (
+                (isMac || RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                && TryRenameUnixWithoutOverwrite(source, destination, isMac, out bool renamed)
+            )
+            {
+                if (renamed)
+                {
+                    return;
+                }
+
+                throw new IOException($"The destination already exists at '{destination}'.");
+            }
+
+            throw new PlatformNotSupportedException(
+                $"The filesystem cannot exclusively rename '{source}' to '{destination}'."
+            );
+        }
+
+#if DURABLE_FILE_WINDOWS_BACKUP_CLEANUP
+        [DllImport(
+            "kernel32.dll",
+            EntryPoint = "MoveFileExW",
+            CharSet = CharSet.Unicode,
+            ExactSpelling = true,
+            SetLastError = true
+        )]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool MoveFileExWindows(string source, string destination, uint flags);
+#endif
 
         private static FileAttributes? ReadMoveAttributes(string path)
         {
@@ -1873,14 +2413,15 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
         private static Exception RestoreSidecarMoves(
-            ReadOnlySpan<(string Source, string Destination, bool Moved)> moves,
+            ReadOnlySpan<(string Source, string Destination, bool Present, bool Moved)> moves,
+            Action<string, string> moveFile,
             Exception failure
         )
         {
             List<Exception> failures = null;
             for (int index = moves.Length - 1; 0 <= index; --index)
             {
-                (string source, string destination, bool moved) = moves[index];
+                (string source, string destination, bool _, bool moved) = moves[index];
                 if (!moved)
                 {
                     continue;
@@ -1888,8 +2429,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
                 try
                 {
-                    File.Move(destination, source);
-                    RequireMoveSourceRemoved(destination, source);
+                    moveFile(destination, source);
                 }
                 catch (Exception restoreFailure)
                 {
@@ -1911,7 +2451,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 );
         }
 
-        private static Exception ValidateCopyPaths(string sourcePath, string destinationPath)
+        private static Exception NormalizeCopyPaths(
+            ref string sourcePath,
+            ref string destinationPath
+        )
         {
             if (string.IsNullOrWhiteSpace(sourcePath))
             {
@@ -1926,12 +2469,67 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 );
             }
 
-            return null;
+            try
+            {
+                if (
+                    Path.IsPathFullyQualified(sourcePath)
+                    && Path.IsPathFullyQualified(destinationPath)
+                )
+                {
+                    sourcePath = NormalizePath(sourcePath);
+                    destinationPath = NormalizePath(destinationPath);
+                }
+                else
+                {
+                    string basePath = Environment.CurrentDirectory;
+                    sourcePath = NormalizePath(Path.GetFullPath(sourcePath, basePath));
+                    destinationPath = NormalizePath(Path.GetFullPath(destinationPath, basePath));
+                }
+
+                return null;
+            }
+            catch (Exception failure)
+            {
+                return failure;
+            }
         }
 
-        private static bool BytesEqual(byte[] first, byte[] second)
+        private static bool TryNormalizePath(
+            string path,
+            out string normalized,
+            out Exception error
+        )
         {
-            return first.AsSpan().SequenceEqual(second);
+            try
+            {
+                normalized = NormalizePath(path);
+                error = null;
+                return true;
+            }
+            catch (Exception failure)
+            {
+                normalized = null;
+                error = failure;
+                return false;
+            }
+        }
+
+        private static string NormalizePath(string path)
+        {
+            string normalized = Path.GetFullPath(path);
+            if (Path.DirectorySeparatorChar == '\\')
+            {
+                string filename = Path.GetFileName(normalized);
+                if (
+                    filename.EndsWith(".", StringComparison.Ordinal)
+                    || filename.EndsWith(" ", StringComparison.Ordinal)
+                )
+                {
+                    throw new ArgumentException("Use an unambiguous filename.", nameof(path));
+                }
+            }
+
+            return normalized;
         }
 
         private static SemaphoreSlim[] CreateGates()
@@ -1966,17 +2564,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         private static int GateIndexFor(string path)
         {
-            string key = path;
-            try
-            {
-                key = Path.GetFullPath(path);
-            }
-            catch (Exception)
-            {
-                // Unnormalizable paths still serialize operations, but aliases cannot share that gate.
-            }
-
-            int hash = StringComparer.OrdinalIgnoreCase.GetHashCode(key);
+            int hash = StringComparer.OrdinalIgnoreCase.GetHashCode(path);
             return hash.PositiveMod(GateCount);
         }
 
@@ -2001,11 +2589,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         private static FileStream OpenSourceStream(string sourcePath, bool useAsync)
         {
-            return new FileStream(
+            return DurableFileOwnershipStream.OpenRegularSource(
                 sourcePath,
-                FileMode.Open,
-                FileAccess.Read,
-                FileShare.Read,
                 DefaultBufferSize,
                 useAsync
             );
@@ -2056,6 +2641,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
                 // ReplaceFileW can remove the destination on error 1176 when no backup is requested.
+                path = Path.GetFullPath(path);
                 string directory = Path.GetDirectoryName(path) ?? string.Empty;
                 string backupName = $".{Guid.NewGuid():N}.bak";
                 backupPath = Path.Combine(directory, backupName);
@@ -2065,6 +2651,13 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             {
                 try
                 {
+#if DURABLE_FILE_WINDOWS_BACKUP_CLEANUP
+                    if (backupPath != null)
+                    {
+                        DurableFileWindowsBackup.ReplaceOnce(temporaryPath, path, backupPath);
+                        return;
+                    }
+#endif
                     File.Replace(temporaryPath, path, backupPath);
                     if (backupPath != null)
                     {
@@ -2080,7 +2673,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         )
                     )
                 {
-                    // These Windows errors retain both names, so the same staged bytes can be retried.
+                    // These errors retain both names, so the same staged bytes can be retried.
                     Thread.Sleep(ReplacementRetryDelayMilliseconds * attempt);
                 }
                 catch (IOException failure)

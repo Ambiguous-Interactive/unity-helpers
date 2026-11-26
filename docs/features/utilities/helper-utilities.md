@@ -1221,10 +1221,10 @@ same directory and are removed on a best-effort basis. An interrupted process ca
 **Async file copy:**
 
 A zero or negative copy buffer returns `false` before opening files. The destination keeps its
-previous contents if reading or staging fails, or if the copy is cancelled. A successful copy replaces it after the full source has been staged. On platforms that
-do not support file replacement, the final swap deletes the old destination before moving the
-staged file; a failed move can leave the destination absent. A temporary sibling file may remain
-after an interrupted process.
+previous contents if reading or staging fails, or if the copy is cancelled before publication.
+A successful copy replaces the destination after the full source has been staged and flushed.
+Unsupported replacement reports failure and leaves the existing file in place. An interrupted process
+can leave a temporary sibling file.
 
 <!-- doc-sample: compiles -->
 
@@ -1318,7 +1318,7 @@ success):
 Exception error = await DurableFile.WriteAllTextAsync(savePath, json, cancellationToken);
 Exception binaryError = await DurableFile.WriteAllBytesAsync(savePath, serializedBytes, cancellationToken);
 
-// Append is stronger still: it never rewrites bytes that are already on disk.
+// Append keeps existing bytes in place and may leave part of a new record on failure.
 DurableFile.TryAppendAllText(ledgerPath, $"{score}\n", out Exception appendError);
 
 // Replace one file with another under the same staging discipline.
@@ -1343,37 +1343,68 @@ cancelled append may have written part of its new record.
   destination created by another writer in place.
 - Unsupported `File.Replace` reports failure and preserves the existing destination. Creating an absent
   destination still uses a move; subsequent replacements require platform support.
-- The data is forced out of the page cache before the swap makes it live.
+- Whole-file writes and copies create unique sibling stages exclusively. On desktop platforms,
+  the helper checks the native file synchronization result before publication.
 - Concurrent writes to the same path from your game are serialized.
 - Windows sharing violations and replacement error 1175 receive up to three replacement attempts with 10 ms and 20 ms waits. The staged bytes and ownership remain held through these attempts. Persistent contention reports failure and preserves the previous save.
 - On local Windows, macOS, and Linux filesystems that support the required locks, cooperating
-  `DurableFile` write, copy, append, and delete operations share one destination lock across
-  processes. A competing writer reports failure and can retry after the owner finishes. All
-  processes need to use the same lock protocol. On other targets, rely on the in-process gate.
+  `DurableFile` write, copy, append, delete, and compare-and-exchange operations share one
+  destination lock across processes. A competing writer reports failure and can retry after the
+  owner finishes. All processes need to use the same lock protocol. On other targets, rely on the
+  in-process gate.
 
 **What it does not promise:**
 
-- Power loss can roll back a directory update even after the file data has been flushed.
-- The ownership applies to one destination at a time. It is not a transaction across several files.
-- Tools that do not use `DurableFile` do not share this ownership and can still edit a destination.
-- An existing-file comparison runs under ownership through staging and replacement. It refuses stale
-  bytes that it reads. A tool that writes the file directly can change the bytes after that comparison,
-  and a complete replacement can overwrite those edits.
+- The default write, copy, append, and delete APIs can lose a directory update after power loss.
+- Tools that write directly can bypass the lock protocol. A copy reads one source handle, including
+  any in-place changes that become visible through that handle.
 - The same destination path and lock name must resolve to the same files for all writers. Keep the
   parent directory and lock file in place while writers run. Network filesystems and tools that write
   through separate paths or replace the lock file are outside the cross-process contract.
 
-The shared lock keeps the existing save formats and Unity asset paths. A transactional store can
-enforce an expected version when every writer uses the store. It would require moving the authoritative
-data to that store and updating every writer, including tools that currently edit the file directly.
+### Compare and Exchange Saved Bytes
 
-<!-- cspell:ignore shm -->
+Use `DurableFile.TryCompareExchangeBytes` to replace or delete a file only when its bytes match
+the expected value. A null expected value means the path must be absent. A null replacement
+means delete. Use `Array.Empty<byte>()` for a file with zero bytes. For a memento, retain the original
+bytes before publication and use the published bytes as the expected value during restoration.
+A later change causes a mismatch and keeps the current file in place. Matching is by value, so
+an intervening write that restores the same bytes can match again.
+
+```csharp
+bool completed = DurableFile.TryCompareExchangeBytes(
+    savePath, publishedBytes, snapshotBytes, out bool restored, out Exception restoreError
+);
+```
+
+The method holds writer ownership through comparison and publication. On creation it also uses
+an exclusive operating-system operation to refuse an intervening creation. Existing-file comparison
+and publication can race a writer that bypasses the lock. Pass resolved paths to regular files.
+
+Pass `syncParentDirectory: true` on a supported Linux filesystem or local Windows NTFS drive to
+wait for both the file data and its directory update. The parent must already exist, and the
+filesystem and storage device must honor their synchronization requests. Windows also requires
+write access to the parent directory. In this mode, Windows deletion removes the name before synchronization even when delete-sharing readers keep the old
+file open. A deny-delete reader prevents deletion. Ordinary writes on macOS request a hardware
+file flush where the volume supports it.
+
+- `completed == true` and `restored == false` means the expected value did not match.
+- `completed == true` and `restored == true` means the change completed, or expected absence
+  was confirmed without a change.
+- `completed == false` and `restored == true` means publication happened and a later directory
+  synchronization failed. Read the current state before deciding whether to retry or restore.
+- `completed == false` and `restored == false` means the operation failed before publication was
+  confirmed. On Windows, a failed restoration identifies any retained backup in the error.
+
+<!-- cspell:ignore bak shm -->
 
 Use `DurableFile.TryMoveWithSidecars` to move a closed database and its journal files
 together. Supply the suffixes in move order and use a destination in an existing
 directory. Use directory paths with symbolic links and other reparse points resolved.
-The call moves the database first, then each present sidecar. A collision,
-including a destination sidecar with no matching source file, makes the call fail.
+The call locks both names for the database and for every sidecar, then checks for collisions
+before moving any file. It moves the database first, then each present sidecar. Both paths
+must be on the same filesystem. The operation requires exclusive rename on Linux, macOS, or
+Windows Editor and standalone builds.
 
 <!-- doc-sample: compiles -->
 
@@ -1392,17 +1423,27 @@ bool moved = DurableFile.TryMoveWithSidecars(
 
 The call restores completed moves in reverse order after a failure. If a restoration
 fails, the returned aggregate contains the first failure and each restoration error.
-Each restoration error names both paths. If a filesystem move leaves the source in
-place, the call treats that step as failed. Calls through this helper coordinate
-within one process. Close the database and coordinate with other processes before
-moving the group. A process interruption can leave some files at their new names.
+Each restoration error names both paths. Close the database and coordinate with clients that
+access these files directly. Other processes can observe intermediate names during a group move.
+A process interruption can leave the group partly moved. For crash-atomic publication of related
+data, put it in one file or use a transactional store.
 
-An interrupted write can leave a `.tmp` sibling (`DurableFile.TemporarySuffix`) and a `.tmp.lock`
-file. The operating system releases the interrupted process's lock. A later writer can use the
-same lock file and remove it on release. Discard a retained stage only after its writer has stopped.
+An interrupted write can leave a unique sibling ending in `.tmp` (`DurableFile.TemporarySuffix`)
+and a `.tmp.lock` file. Reserve the lock name for `DurableFile`. The operating system releases
+ownership when the process stops. A later writer can reuse a leftover empty lock. Discard a
+retained stage only after its writer has stopped.
 A Windows recovery backup has a separate name. If
 `DurableFile` reports a restore failure, keep the named backup until you recover the previous
 contents.
+
+On Windows desktop, `DurableFile` reports a successful write once it publishes the
+new file, even if Windows refuses to remove the temporary `.bak` file. A later
+whole-file write or copy through its regular swap retries removal for the same path
+while the process still tracks that backup. In-place appends skip this cleanup.
+The helper tracks up to 32 pending backups on volumes that support stable file IDs.
+It checks file identity before removing a backup, including on the first attempt. A backup
+can remain if ownership cannot be verified, no later write runs, or the process stops.
+
 `DurableFile.TryDelete` succeeds when a file is absent and reports failure for a directory or a file it cannot delete.
 
 ### Coalesce Repeated Saves

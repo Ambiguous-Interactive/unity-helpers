@@ -600,7 +600,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             {
                                 stagedOwned = true;
                                 stream.Write(bytes, 0, bytes.Length);
-                                stream.Flush(flushToDisk: true);
+                                DurableFileSync.FlushFileData(stream);
                             }
 
                             if (

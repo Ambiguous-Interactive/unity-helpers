@@ -28,10 +28,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
         private string _testDirectory;
 
-        // A directory at the staging path forces the interrupted-write branch without killing the process.
+        // A directory at the writer lock path prevents staging without touching the destination.
         private static void BlockStaging(string path)
         {
-            Directory.CreateDirectory(path + DurableFile.TemporarySuffix);
+            Directory.CreateDirectory(
+                path + DurableFile.TemporarySuffix + DurableFile.OwnershipSuffix
+            );
         }
 
 #if UNITY_EDITOR
@@ -213,14 +215,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void CreateAllBytesPublishesCompleteContentsWithoutAStagedFile()
         {
-            string path = Path.Combine(_testDirectory, "nested", "created.bin");
+            string directory = Path.Combine(_testDirectory, "nested");
+            string path = Path.Combine(directory, "created.bin");
             byte[] contents = { 0, 255, 17, 42 };
 
             Assert.IsTrue(DurableFile.TryCreateAllBytes(path, contents, out Exception error));
 
             Assert.IsTrue(error == null);
             CollectionAssert.AreEqual(contents, File.ReadAllBytes(path));
-            Assert.IsEmpty(Directory.GetFiles(Path.GetDirectoryName(path), "*.create.*.tmp"));
+            CollectionAssert.AreEqual(new[] { path }, Directory.GetFiles(directory));
         }
 
         [Test]
@@ -408,7 +411,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsTrue(error != null);
             CollectionAssert.AreEqual(actual, File.ReadAllBytes(path));
 
-            Directory.Delete(path + DurableFile.TemporarySuffix);
+            Directory.Delete(path + DurableFile.TemporarySuffix + DurableFile.OwnershipSuffix);
             Assert.IsTrue(DurableFile.TryWriteAllText(path, null, encoding, out error));
             Assert.IsTrue(error == null);
             CollectionAssert.AreEqual(expectedPreamble, File.ReadAllBytes(path));
@@ -591,7 +594,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
             Assert.IsTrue(error != null);
             Assert.AreEqual("previous", File.ReadAllText(path));
-            Assert.IsTrue(Directory.Exists(path + DurableFile.TemporarySuffix));
+            Assert.IsTrue(
+                Directory.Exists(path + DurableFile.TemporarySuffix + DurableFile.OwnershipSuffix)
+            );
         }
 
         [Test]

@@ -99,6 +99,31 @@ Reuse `DurableFile` for byte writes; a restore to an absent path needs its no-cl
 operation. `File.Move(source, destination)` can replace an occupied destination on Unix; use the
 shared exclusive publisher for cross-platform no-clobber publication.
 
+Qualify any replacement primitive against an existing file, an absent destination,
+delete-share and deny-delete readers, a mapped image, and metadata such as ACLs,
+creation time, and alternate streams. Record both names and their contents after each
+failure. Windows rename and `ReplaceFileW` have different sharing and metadata behavior.
+Keep publication retries separate from cleanup after publication. For deferred cleanup,
+delete through a verified handle and keep retryable lookup refusals pending.
+
+For durable writes, resolve relative paths before acquiring ownership and keep the same resolved
+path through publication. Create a unique sibling with an exclusive open, and exercise near-limit
+paths where that name can be longer than the destination. On Unix, open a source nonblocking
+and check its file type on the opened descriptor before reading it. Treat deterministic
+lock names as reserved and preserve unexpected data in those slots. Hold the same OS-backed
+ownership from comparison through publication and acquire every affected name before moving a
+group. Use native no-clobber rename for ordered group moves and restoration. Record separately
+whether a namespace change happened and whether its synchronization succeeded. Inject a file
+flush failure before publication and a directory flush failure after publication. Verify live
+bytes and reported state in both cases. Request the access rights the native documentation
+requires, even when a narrower handle happens to work on one system. File data and directory entries have separate
+synchronization requirements, and a sequence of renames needs a recovery protocol to survive
+interruption as a group. Run the registered comment-block-form and nested-type-placement
+checks when altering interop types or reorganizing file operations. They verify member order
+and comment syntax beyond changed-file preflight. Sweep all callers' failure fixtures when
+staging names change. To make a write fail before staging, block its writer lock or use the
+existing fault injection seam. A directory at the old predictable stage no longer forces failure.
+
 ### Code Samples
 
 Dispose owned `SerializedObject` and `SerializedProperty` instances before destroying their target.

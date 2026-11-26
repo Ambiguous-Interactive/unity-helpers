@@ -109,6 +109,37 @@ namespace WallstopStudios.UnityHelpers.DurableFile.Tests
         }
 
         [Test]
+        public void RefusesInitializationWhileAnActiveWriterOwnsThePath()
+        {
+            Assert.IsTrue(
+                DurableFile.TryOpenStagingOwnership(
+                    _destination + DurableFile.TemporarySuffix,
+                    out FileStream owner,
+                    out Exception error
+                ),
+                error?.ToString()
+            );
+            using (owner)
+            {
+                Assert.IsFalse(FileHelper.InitializePath(_destination, new byte[] { 1 }));
+                Assert.IsFalse(RealFile.Exists(_destination));
+            }
+
+            Assert.IsTrue(FileHelper.InitializePath(_destination, new byte[] { 2 }));
+            CollectionAssert.AreEqual(new byte[] { 2 }, RealFile.ReadAllBytes(_destination));
+        }
+
+        [Test]
+        [Platform("Linux")]
+        public void InitializesMaximumLengthBasenameWithoutExtendingItsName()
+        {
+            _destination = Path.Combine(_directory, new string('s', 255));
+            Assert.IsTrue(FileHelper.InitializePath(_destination, new byte[] { 1 }));
+            CollectionAssert.AreEqual(new byte[] { 1 }, RealFile.ReadAllBytes(_destination));
+            CollectionAssert.AreEqual(new[] { _destination }, Directory.GetFiles(_directory));
+        }
+
+        [Test]
         public void DirectoryCollisionPreservesDirectoryAndAllowsRetryAfterItIsRemoved()
         {
             Directory.CreateDirectory(_destination);

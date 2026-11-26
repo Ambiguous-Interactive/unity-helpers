@@ -47,6 +47,11 @@ Inspect reviews and comments through GitHub MCP first. Then run the repository c
 below after every push and before completion; it verifies all four surfaces even when the current
 MCP toolset does not expose one of them.
 
+A reviewer may receive an incomplete diff. Verify any claim that a companion file
+is missing against GitHub's changed-file list or the integration tree. For Unity
+`.meta` files, use the deterministic importer check to verify the metadata itself.
+Record the tree and check result before resolving the finding.
+
 **`GET /issues/{n}/comments` does not return inline review threads.** A session that
 polls only that one sees an empty list and reports "no reviewer feedback" while a
 human is waiting on a comment pinned to a line. Nothing in this skill said where to

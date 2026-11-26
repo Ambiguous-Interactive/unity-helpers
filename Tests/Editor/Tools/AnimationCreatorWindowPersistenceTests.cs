@@ -12,6 +12,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
     using UnityEditor;
     using UnityEngine;
     using UnityEngine.TestTools;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Animation;
     using WallstopStudios.UnityHelpers.Editor.Sprites;
     using WallstopStudios.UnityHelpers.Tests.Core;
@@ -230,7 +231,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             Assert.IsTrue(File.Exists(fullPath));
 
             byte[] original = File.ReadAllBytes(fullPath);
-            Directory.CreateDirectory(fullPath + ".tmp");
+            Directory.CreateDirectory(
+                fullPath + DurableFile.TemporarySuffix + DurableFile.OwnershipSuffix
+            );
             _window.spriteNameRegex = "^Replacement_.*$";
             LogAssert.Expect(LogType.Error, new Regex("Failed to save config"));
             Assert.IsFalse(_window.SaveConfig(_tempFolder));

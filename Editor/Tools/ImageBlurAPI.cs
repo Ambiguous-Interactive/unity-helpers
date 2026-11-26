@@ -147,7 +147,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                                 {
                                     stagedOwned = true;
                                     stream.Write(bytes, 0, bytes.Length);
-                                    stream.Flush(flushToDisk: true);
+                                    DurableFileSync.FlushFileData(stream);
                                 }
 
                                 for (int counter = 0; ; ++counter)

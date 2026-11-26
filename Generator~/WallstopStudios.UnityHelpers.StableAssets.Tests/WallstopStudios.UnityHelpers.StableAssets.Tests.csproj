@@ -32,9 +32,14 @@
       Link="SceneCanonicalizer.Scalars.cs"
     />
     <Compile Include="../../Runtime/Core/Helper/DurableFile.cs" Link="DurableFile.cs" />
+    <Compile Include="../../Runtime/Core/Helper/DurableFileSync.cs" Link="DurableFileSync.cs" />
     <Compile
       Include="../../Runtime/Core/Helper/DurableFileOwnershipStream.cs"
       Link="DurableFileOwnershipStream.cs"
+    />
+    <Compile
+      Include="../../Runtime/Core/Helper/DurableFileWindowsBackup.cs"
+      Link="DurableFileWindowsBackup.cs"
     />
     <Compile Include="../../Runtime/Core/Helper/FileHelper.cs" Link="FileHelper.cs" />
     <Compile Include="../../Runtime/Core/Threading/SemaphoreLease.cs" Link="SemaphoreLease.cs" />

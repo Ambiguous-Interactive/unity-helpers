@@ -30,6 +30,11 @@ check that a failed replacement leaves the old file in place, restores the backu
 backup when a competing destination blocks restoration. They also check that another write
 leaves the retained backup intact.
 
+On Windows, the linked backup fixture holds an image mapping on a disposable PE file.
+It checks that subsequent writes preserve the new bytes, honor delete-sharing restrictions,
+and reclaim the verified backup after the handle closes. It also checks that a different
+file placed at the same backup path survives.
+
 The conditional text tests create a competing file immediately after the real absence read.
 They check that late creation reports a conflict and preserves the competing bytes, and that
 publication succeeds with a clean staging directory when the destination stays absent. They cover

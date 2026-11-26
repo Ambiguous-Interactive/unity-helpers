@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
     using NUnit.Framework;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Extension;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Serialization;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
     using WallstopStudios.UnityHelpers.Editor.Tools;
@@ -82,7 +83,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             );
 
             byte[] original = File.ReadAllBytes(_outputPath);
-            Directory.CreateDirectory(_outputPath + ".tmp");
+            Directory.CreateDirectory(
+                _outputPath + DurableFile.TemporarySuffix + DurableFile.OwnershipSuffix
+            );
             ProtoSchemaExporter.ExportResult blocked = ProtoSchemaExporter.Export(
                 new[] { typeof(ProtoSchemaExporterSecondSampleContract) },
                 _outputPath,
