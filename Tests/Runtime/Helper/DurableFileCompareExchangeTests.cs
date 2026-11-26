@@ -185,19 +185,44 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             string missingParent = Path.Combine(_directory, "missing");
             _path = Path.Combine(missingParent, "save.dat");
 
-            Assert.IsFalse(
-                DurableFile.TryCompareExchangeBytes(
-                    _path,
-                    null,
-                    new byte[] { 1 },
-                    syncParentDirectory: true,
-                    out bool exchanged,
-                    out Exception error
-                )
+            UnityEngine.Debug.Log("UH CAS missing parent before lock probe");
+            bool acquired = DurableFile.TryOpenStagingOwnership(
+                _path + DurableFile.TemporarySuffix,
+                out FileStream ownership,
+                out Exception lockError
             );
+            using (ownership)
+            {
+                UnityEngine.Debug.Log(
+                    "UH CAS missing parent lock returned "
+                        + acquired
+                        + " "
+                        + (lockError == null ? "null" : lockError.GetType().FullName)
+                );
+            }
+
+            UnityEngine.Debug.Log("UH CAS missing parent before call");
+            bool completed = DurableFile.TryCompareExchangeBytes(
+                _path,
+                null,
+                new byte[] { 1 },
+                syncParentDirectory: true,
+                out bool exchanged,
+                out Exception error
+            );
+            UnityEngine.Debug.Log(
+                "UH CAS missing parent returned "
+                    + completed
+                    + " "
+                    + exchanged
+                    + " "
+                    + (error == null ? "null" : error.GetType().FullName)
+            );
+            Assert.IsFalse(completed);
             Assert.IsFalse(exchanged);
             Assert.IsInstanceOf<DirectoryNotFoundException>(error);
             Assert.IsFalse(Directory.Exists(missingParent));
+            UnityEngine.Debug.Log("UH CAS missing parent after assertions");
         }
 
         [TestCase(false)]
