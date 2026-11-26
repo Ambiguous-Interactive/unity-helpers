@@ -222,6 +222,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             return result;
         }
 
+        private static int ReferenceLog2(ulong value)
+        {
+            int result = 0;
+            while (1 < value)
+            {
+                value >>= 1;
+                ++result;
+            }
+
+            return result;
+        }
+
         [TestCaseSource(nameof(PopCountUlongCases))]
         public void PopCountUlongReturnsExpectedCount(ulong value, int expected)
         {
@@ -331,6 +343,68 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             {
                 int value = Rng.Next(int.MinValue, int.MaxValue);
                 Assert.AreEqual(ReferenceLog2((uint)value), BitOps.Log2(value), $"value={value}");
+            }
+        }
+
+        [Test]
+        public void Log2UintMatchesReferenceAtEveryBitBoundary()
+        {
+            Assert.AreEqual(0, BitOps.Log2(0U));
+            Assert.AreEqual(31, BitOps.Log2(uint.MaxValue));
+            for (int bit = 0; bit < 32; ++bit)
+            {
+                uint power = 1U << bit;
+                Assert.AreEqual(bit, BitOps.Log2(power), $"power=2^{bit}");
+                if (1U < power)
+                {
+                    Assert.AreEqual(bit - 1, BitOps.Log2(power - 1U), $"value=2^{bit}-1");
+                }
+
+                if (0 < bit && bit < 31)
+                {
+                    Assert.AreEqual(bit, BitOps.Log2(power + 1U), $"value=2^{bit}+1");
+                }
+            }
+        }
+
+        [Test]
+        public void Log2UlongMatchesReferenceAtEveryBitBoundary()
+        {
+            Assert.AreEqual(0, BitOps.Log2(0UL));
+            Assert.AreEqual(UlongLog2Max, BitOps.Log2(ulong.MaxValue));
+            for (int bit = 0; bit < UlongBits; ++bit)
+            {
+                ulong power = 1UL << bit;
+                Assert.AreEqual(bit, BitOps.Log2(power), $"power=2^{bit}");
+                if (1UL < power)
+                {
+                    Assert.AreEqual(bit - 1, BitOps.Log2(power - 1UL), $"value=2^{bit}-1");
+                }
+
+                if (0 < bit && bit < UlongLog2Max)
+                {
+                    Assert.AreEqual(bit, BitOps.Log2(power + 1UL), $"value=2^{bit}+1");
+                }
+            }
+        }
+
+        [Test]
+        public void Log2UintMatchesReferenceAcrossDeterministicSamples()
+        {
+            for (int iteration = 0; iteration < 4_096; ++iteration)
+            {
+                uint value = unchecked((uint)Rng.Next());
+                Assert.AreEqual(ReferenceLog2(value), BitOps.Log2(value), $"value={value}");
+            }
+        }
+
+        [Test]
+        public void Log2UlongMatchesReferenceAcrossDeterministicSamples()
+        {
+            for (int iteration = 0; iteration < 4_096; ++iteration)
+            {
+                ulong value = unchecked(((ulong)(uint)Rng.Next() << 32) | (uint)Rng.Next());
+                Assert.AreEqual(ReferenceLog2(value), BitOps.Log2(value), $"value={value}");
             }
         }
 

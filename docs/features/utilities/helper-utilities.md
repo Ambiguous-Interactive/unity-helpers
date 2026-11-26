@@ -2171,13 +2171,13 @@ int[] restored = ArrayConverter.ByteArrayToIntArrayBlockCopy(bytes);
 power-of-two detection and power-of-two ceiling. Its signed overloads use the two's-complement
 bit pattern.
 
-When compiled for .NET Core 3.0 or later, population count and trailing zero count use
-`System.Numerics.BitOperations`. The runtime can use hardware instructions where available.
+When compiled for .NET Core 3.0 or later, population count, trailing zero count and floor log2
+use `System.Numerics.BitOperations`. The runtime can use hardware instructions where available.
 Unity uses the portable implementations for the same results. Trailing zero count on zero
 returns the width of the input, either 32 or 64.
 
-The unsigned `Log2` forms use bit smearing and portable de Bruijn indexing instead of a
-chain of input comparisons.
+On Unity, the unsigned `Log2` forms use bit smearing and portable de Bruijn indexing instead of
+a chain of input comparisons.
 `Log2(0)` and `Log2(1)` return zero. Logarithm and trailing-zero lookup data use constant
 read-only spans. Mono uses fixed array caches initialized once because its span construction
 is slower on this path; warm calls create no lookup arrays. See the

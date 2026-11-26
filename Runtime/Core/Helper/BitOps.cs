@@ -15,8 +15,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     /// <remarks>
     /// Signed overloads interpret their argument as the two's-complement bit pattern, matching
     /// unsigned overloads. Builds targeting .NET Core 3.0 or later use
-    /// <c>System.Numerics.BitOperations</c> for population count and trailing zero count.
-    /// Unity uses portable implementations for both.
+    /// <c>System.Numerics.BitOperations</c> for population count, trailing zero count and floor
+    /// log2. Unity uses portable implementations for all three.
     /// </remarks>
     public static class BitOps
     {
@@ -361,10 +361,13 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// </summary>
         /// <param name="value">The value to inspect.</param>
         /// <returns>The floor of log2(<paramref name="value"/>); 0 when <paramref name="value"/> is 0 or 1.</returns>
-        /// <remarks>Uses bit smearing and portable de Bruijn indexing.</remarks>
+        /// <remarks>Uses the hardware intrinsic on .NET Core 3.0 or later, and portable de Bruijn indexing elsewhere.</remarks>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int Log2(uint value)
         {
+#if NETCOREAPP3_0_OR_GREATER
+            return BitOperations.Log2(value);
+#else
             value |= value >> 1;
             value |= value >> 2;
             value |= value >> 4;
@@ -375,6 +378,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return MonoLog2UintIndices[index];
 #else
             return Log2UintIndices[index];
+#endif
 #endif
         }
 
@@ -396,10 +400,13 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// </summary>
         /// <param name="value">The value to inspect.</param>
         /// <returns>The floor of log2(<paramref name="value"/>); 0 when <paramref name="value"/> is 0 or 1.</returns>
-        /// <remarks>Uses bit smearing and portable de Bruijn indexing.</remarks>
+        /// <remarks>Uses the hardware intrinsic on .NET Core 3.0 or later, and portable de Bruijn indexing elsewhere.</remarks>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int Log2(ulong value)
         {
+#if NETCOREAPP3_0_OR_GREATER
+            return BitOperations.Log2(value);
+#else
             value |= value >> 1;
             value |= value >> 2;
             value |= value >> 4;
@@ -411,6 +418,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return MonoLog2UlongIndices[index];
 #else
             return Log2UlongIndices[index];
+#endif
 #endif
         }
 

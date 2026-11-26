@@ -41,7 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Use hardware bit counts in `BitOps` on supported .NET targets ([#1285](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1285)).
+- Use hardware bit counts and floor log2 in `BitOps` on supported .NET targets ([#1285](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1285), [#1303](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1303)).
 
 ## [3.7.2] - 2026-11-19
 
