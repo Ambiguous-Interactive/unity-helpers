@@ -2114,10 +2114,23 @@ internal sealed class UhCiStandaloneTestCallback : ITestRunCallback
 
     public void TestStarted(ITest test)
     {
+        if (TraceHelperTest(test))
+        {
+            Debug.LogFormat(LogType.Log, LogOption.NoStacktrace, null, "[uh-test-stream] TEST-STARTED {0}", test.FullName);
+        }
     }
 
     public void TestFinished(ITestResult result)
     {
+        if (TraceHelperTest(result.Test))
+        {
+            Debug.LogFormat(LogType.Log, LogOption.NoStacktrace, null, "[uh-test-stream] TEST-FINISHED {0} {1}", result.Test.FullName, result.ResultState);
+        }
+    }
+
+    private static bool TraceHelperTest(ITest test)
+    {
+        return !test.IsSuite && test.FullName.StartsWith("WallstopStudios.UnityHelpers.Tests.Helper.", StringComparison.Ordinal);
     }
 
     public void RunFinished(ITestResult result)
