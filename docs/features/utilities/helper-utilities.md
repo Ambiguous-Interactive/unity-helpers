@@ -1383,8 +1383,8 @@ and publication can race a writer that bypasses the lock. Pass resolved paths to
 
 Pass `syncParentDirectory: true` on a supported Linux filesystem or local Windows NTFS drive to
 wait for both the file data and its directory update. The parent must already exist, and the
-filesystem and storage device must honor their synchronization requests. In this mode, Windows
-deletion removes the name before synchronization even when delete-sharing readers keep the old
+filesystem and storage device must honor their synchronization requests. Windows also requires
+write access to the parent directory. In this mode, Windows deletion removes the name before synchronization even when delete-sharing readers keep the old
 file open. A deny-delete reader prevents deletion. Ordinary writes on macOS request a hardware
 file flush where the volume supports it.
 

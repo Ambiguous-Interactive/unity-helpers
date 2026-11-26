@@ -24,8 +24,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     /// <remarks>
     /// <para>
     /// <see cref="File.WriteAllText(string, string)"/> truncates the destination before writing a
-    /// single byte, so an interrupted write replaces a valid document with a partial one. Every
-    /// write here stages the new contents in a sibling file, forces them out of the page cache, and
+    /// single byte, so an interrupted write replaces a valid document with a partial one. A
+    /// whole-file write here stages the new contents in a sibling file, forces them out of the page cache, and
     /// only then swaps the staged file over the destination.
     /// </para>
     /// <para>
@@ -44,8 +44,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     /// sibling lock file remains.
     /// </para>
     /// <para>
-    /// Where the format allows a log of records, <see cref="TryAppendAllText"/> is strictly stronger
-    /// than a whole-document rewrite: an append never rewrites bytes that are already on disk.
+    /// <see cref="TryAppendAllText"/> leaves previous bytes in place. An interrupted append can
+    /// leave an incomplete final record.
     /// </para>
     /// <para>
     /// Contains no <c>UnityEngine</c> dependency and is safe to call from any thread.

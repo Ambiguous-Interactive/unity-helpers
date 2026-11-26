@@ -20,7 +20,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         private const int MacFullSync = 51;
         private const int MacOperationNotSupportedOnSocket = 102;
         private const uint FixedDrive = 3;
-        private const uint DirectoryAccess = 0x00120083;
+        private const uint GenericWrite = 0x40000000;
         private const uint DeleteAccess = 0x00010000;
         private const uint OpenReparsePoint = 0x00200000;
         private const int FileDispositionInfoEx = 21;
@@ -237,7 +237,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             SafeFileHandle handle = OpenWindowsEntry(
                 DurableFile.GetWindowsNativePath(path),
-                DirectoryAccess,
+                GenericWrite,
                 FileShare.Read | FileShare.Write | FileShare.Delete,
                 IntPtr.Zero,
                 FileMode.Open,

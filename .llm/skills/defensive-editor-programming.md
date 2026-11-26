@@ -112,7 +112,8 @@ ownership from comparison through publication and acquire every affected name be
 group. Use native no-clobber rename for ordered group moves and restoration. Record separately
 whether a namespace change happened and whether its synchronization succeeded. Inject a file
 flush failure before publication and a directory flush failure after publication. Verify live
-bytes and reported state in both cases. File data and directory entries have separate
+bytes and reported state in both cases. Request the access rights the native documentation
+requires, even when a narrower handle happens to work on one system. File data and directory entries have separate
 synchronization requirements, and a sequence of renames needs a recovery protocol to survive
 interruption as a group.
 

@@ -27,10 +27,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         private bool _ownsName;
 #endif
 
-        private DurableFileOwnershipStream(string lockPath)
+        private DurableFileOwnershipStream(string lockPath, FileMode mode)
             : base(
                 lockPath,
-                FileMode.OpenOrCreate,
+                mode,
                 FileAccess.ReadWrite,
                 FileShare.ReadWrite | FileShare.Delete,
                 bufferSize: 1
@@ -112,8 +112,20 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 #if DURABLE_FILE_DESKTOP_OWNERSHIP
         private static FileStream AcquireUnix(string lockPath, bool isMac)
         {
-            RejectLockReparsePoint(lockPath);
-            DurableFileOwnershipStream stream = new(lockPath);
+            DurableFileOwnershipStream stream;
+            bool created;
+            try
+            {
+                stream = new DurableFileOwnershipStream(lockPath, FileMode.CreateNew);
+                created = true;
+            }
+            catch (IOException) when (File.Exists(lockPath))
+            {
+                RejectLockReparsePoint(lockPath);
+                stream = new DurableFileOwnershipStream(lockPath, FileMode.Open);
+                created = false;
+            }
+
             try
             {
                 int descriptor = stream.SafeFileHandle.DangerousGetHandle().ToInt32();
@@ -152,7 +164,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         $"Writer ownership changed at '{lockPath}'. Retry the operation."
                     );
                 }
-                RequireEmptyLock(stream, lockPath);
+                if (!created)
+                {
+                    RequireEmptyLock(stream, lockPath);
+                }
                 stream._ownsName = true;
                 return stream;
             }

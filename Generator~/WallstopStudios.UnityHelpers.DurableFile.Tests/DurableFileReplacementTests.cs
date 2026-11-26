@@ -412,6 +412,36 @@ namespace WallstopStudios.UnityHelpers.DurableFile.Tests
             Assert.IsFalse(RealFile.Exists(journalDestination));
         }
 
+        [Platform("Linux")]
+        [TestCase(false)]
+        [TestCase(true)]
+        public void RefusesSymbolicWriterLockWithoutTouchingItsTarget(bool targetExists)
+        {
+            string linkedPath = Path.Combine(_directory, "unrelated");
+            if (targetExists)
+            {
+                RealFile.WriteAllText(linkedPath, "leave this alone");
+            }
+
+            string lockPath =
+                _destination + DurableFile.TemporarySuffix + DurableFile.OwnershipSuffix;
+            RealFile.CreateSymbolicLink(lockPath, linkedPath);
+            Assert.IsFalse(
+                DurableFile.TryWriteAllText(_destination, "replacement", out Exception error)
+            );
+            Assert.IsInstanceOf<IOException>(error);
+            Assert.IsFalse(RealFile.Exists(_destination));
+            Assert.AreEqual(linkedPath, new FileInfo(lockPath).LinkTarget);
+            if (targetExists)
+            {
+                Assert.AreEqual("leave this alone", RealFile.ReadAllText(linkedPath));
+            }
+            else
+            {
+                Assert.IsFalse(RealFile.Exists(linkedPath));
+            }
+        }
+
         [Test]
         [Platform("Linux")]
         public void SidecarMoveRefusesCrossFilesystemCopyDelete()
