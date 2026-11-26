@@ -310,6 +310,29 @@ namespace WallstopStudios.UnityHelpers.DurableFile.Tests
             CollectionAssert.AreEquivalent(new[] { _source }, Directory.GetFiles(_directory));
         }
 
+        [TestCase(nameof(DurableFile.TryCopy))]
+        [TestCase(nameof(DurableFile.CopyAsync))]
+        public async Task CopiesRefuseAnExclusivelyOpenSource(string operation)
+        {
+            RealFile.WriteAllBytes(_destination, OriginalBytes);
+            using (
+                FileStream writer = new(_source, FileMode.Open, FileAccess.Write, FileShare.None)
+            )
+            {
+                Assert.Throws<IOException>(() =>
+                {
+                    using FileStream reader = RealFile.OpenRead(_source);
+                });
+                Exception error = await Execute(operation);
+                Assert.That(error, Is.InstanceOf<IOException>());
+                CollectionAssert.AreEqual(OriginalBytes, RealFile.ReadAllBytes(_destination));
+            }
+
+            Assert.IsNull(await Execute(operation));
+            CollectionAssert.AreEqual(ReplacementBytes, RealFile.ReadAllBytes(_destination));
+            AssertPublicationCleanup();
+        }
+
         [TestCase(Program.CompareText)]
         [TestCase(Program.CompareBytes)]
         public void CompareThenReplaceRefusesAnotherProcessUntilOwnershipIsReleased(string command)

@@ -8,9 +8,9 @@
 namespace WallstopStudios.UnityHelpers.Core.Helper
 {
     using System;
+    using System.Globalization;
     using System.IO;
     using System.Runtime.InteropServices;
-    using Microsoft.Win32.SafeHandles;
 
     internal sealed class DurableFileOwnershipStream : FileStream
     {
@@ -97,7 +97,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             bool mac = RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
             if (mac || RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
-                return OpenUnixRegularSource(path, bufferSize, mac);
+                return OpenUnixRegularSource(path, bufferSize, useAsync, mac);
             }
 #endif
             return new FileStream(
@@ -139,7 +139,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
 #if DURABLE_FILE_DESKTOP_OWNERSHIP
-        private static FileStream OpenUnixRegularSource(string path, int bufferSize, bool mac)
+        private static FileStream OpenUnixRegularSource(
+            string path,
+            int bufferSize,
+            bool useAsync,
+            bool mac
+        )
         {
             int descriptor = mac
                 ? OpenSourceMac(path, MacNonblockingCloseOnExec)
@@ -160,7 +165,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 throw new IOException($"Could not open '{path}' (OS error {error}).");
             }
 
-            SafeFileHandle handle = new(new IntPtr(descriptor), ownsHandle: true);
             try
             {
                 if (RegularFile != (UnixFileType(descriptor, path, mac) & FileTypeMask))
@@ -169,15 +173,31 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
 
                 /*
-                    A wrapped Unix descriptor is synchronous. ReadAsync still uses the
-                    stream's asynchronous read path without requiring a Windows overlapped handle.
+                    Mono only registers handles it opens itself. Reopen the pinned file to keep
+                    managed sharing checks without reopening a pathname that could now be a pipe.
                 */
-                return new FileStream(handle, FileAccess.Read, bufferSize, isAsync: false);
+                string descriptorRoot = mac ? "/dev/fd/" : "/proc/self/fd/";
+                string pinnedPath =
+                    descriptorRoot + descriptor.ToString(CultureInfo.InvariantCulture);
+                return new FileStream(
+                    pinnedPath,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.Read,
+                    bufferSize,
+                    useAsync
+                );
             }
-            catch
+            finally
             {
-                handle.Dispose();
-                throw;
+                if (mac)
+                {
+                    CloseSourceMac(descriptor);
+                }
+                else
+                {
+                    CloseSourceLinux(descriptor);
+                }
             }
         }
 
@@ -248,6 +268,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             SetLastError = true
         )]
         private static extern int OpenSourceMac(string path, int flags);
+
+        [DllImport("libc", EntryPoint = "close", ExactSpelling = true)]
+        private static extern int CloseSourceLinux(int descriptor);
+
+        [DllImport("libSystem.B.dylib", EntryPoint = "close", ExactSpelling = true)]
+        private static extern int CloseSourceMac(int descriptor);
 
         private static FileStream AcquireUnix(string lockPath, bool isMac)
         {

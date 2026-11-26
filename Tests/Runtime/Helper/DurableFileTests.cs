@@ -215,14 +215,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void CreateAllBytesPublishesCompleteContentsWithoutAStagedFile()
         {
-            string path = Path.Combine(_testDirectory, "nested", "created.bin");
+            string directory = Path.Combine(_testDirectory, "nested");
+            string path = Path.Combine(directory, "created.bin");
             byte[] contents = { 0, 255, 17, 42 };
 
             Assert.IsTrue(DurableFile.TryCreateAllBytes(path, contents, out Exception error));
 
             Assert.IsTrue(error == null);
             CollectionAssert.AreEqual(contents, File.ReadAllBytes(path));
-            Assert.IsEmpty(Directory.GetFiles(Path.GetDirectoryName(path), "*.create.*.tmp"));
+            CollectionAssert.AreEqual(new[] { path }, Directory.GetFiles(directory));
         }
 
         [Test]

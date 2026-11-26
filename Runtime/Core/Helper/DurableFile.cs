@@ -1569,25 +1569,29 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         {
             string directory = Path.GetDirectoryName(path);
             string filename = Path.GetFileName(path);
-            int shortLength = Math.Max(1, filename.Length);
-            bool shorten = false;
+            // Every caller already holds the sibling writer lock. Keep the stage within that length.
+            int maximumStemLength = filename.Length + OwnershipSuffix.Length;
+            const string prefix = ".create.";
             for (int attempt = 0; attempt < MaximumInitializationStageAttempts; ++attempt)
             {
                 string identifier = Guid.NewGuid().ToString("N");
-                string name = shorten
-                    ? identifier.Substring(0, Math.Min(shortLength, identifier.Length))
-                        + TemporarySuffix
-                    : ".create." + identifier + TemporarySuffix;
+                int identifierLength = identifier.Length;
+                string stem =
+                    maximumStemLength < prefix.Length + identifierLength
+                        ? identifier.Substring(0, Math.Min(maximumStemLength, identifierLength))
+                        : prefix + identifier;
+                string name = stem + TemporarySuffix;
+                if (string.Equals(name, filename, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
                 string candidate = Path.Combine(directory, name);
                 try
                 {
                     FileStream stream = OpenStagingStream(candidate, useAsync);
                     stagedPath = candidate;
                     return stream;
-                }
-                catch (PathTooLongException) when (!shorten && shortLength < 40)
-                {
-                    shorten = true;
                 }
                 catch (IOException) when (File.Exists(candidate) || Directory.Exists(candidate)) { }
             }
@@ -1886,7 +1890,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                             return true;
                         }
 
-                        throw lockError;
+                        exchanged = false;
+                        error = lockError;
+                        return false;
                     }
 
                     if (!MatchesFileBytes(path, expected, requireExisting))
