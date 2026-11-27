@@ -112,6 +112,18 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             CollectionAssert.AreEquivalent(keys, set);
         }
 
+        [Test]
+        public void HighBitKeysSpreadAcrossHomeSlots()
+        {
+            HashSet<int> homes = new();
+            for (int index = 0; index < 1024; ++index)
+            {
+                homes.Add((int)(IntSet.Mix(index << 16) & 0xFFFF));
+            }
+
+            Assert.Greater(homes.Count, 900);
+        }
+
         [TestCase(11)]
         [TestCase(731)]
         public void SeededOperationsMatchIndependentSetAfterEveryStep(int seed)
@@ -137,7 +149,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                     Assert.AreEqual(expected.Add(key), actual.TryAdd(key));
                 }
                 Assert.AreEqual(expected.Count, actual.Count);
-                Assert.IsTrue(expected.SetEquals(actual));
+                CollectionAssert.AreEquivalent(expected, actual);
                 Assert.AreEqual(expected.Contains(key), actual.Contains(key));
             }
         }

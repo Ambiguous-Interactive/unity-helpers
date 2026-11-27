@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     using System.Collections;
     using System.Collections.Generic;
     using System.Runtime.CompilerServices;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     /// <summary>Stores all 32-bit signed keys using mixed open addressing.</summary>
     /// <remarks>Uses packed keys and hash-slot indices without value storage. Not thread-safe; iteration is unordered and detects mutation.</remarks>
@@ -59,7 +60,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         {
             unchecked
             {
-                return (uint)key * 0x9E37_79B9u;
+                uint value = (uint)key;
+                value ^= value >> 16;
+                value *= 0x7FEB352Du;
+                value ^= value >> 15;
+                value *= 0x846CA68Bu;
+                value ^= value >> 16;
+                return value;
             }
         }
 
@@ -126,12 +133,22 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             {
                 return;
             }
+            int probeBudget = _slots.Length;
             for (int entry = 0; entry < count; ++entry)
             {
                 int slot = (int)(Mix(_keys[entry]) & (uint)_mask);
+                int probes = 0;
                 while (_slots[slot] != entry + 1)
                 {
                     slot = (slot + 1) & _mask;
+                    if (probeBudget < ++probes)
+                    {
+                        Array.Clear(_slots, 0, _slots.Length);
+                        Array.Clear(_keys, 0, count);
+                        _count = 0;
+                        _version = unchecked(_version + 1);
+                        return;
+                    }
                 }
                 _slots[slot] = 0;
                 _keys[entry] = 0;
@@ -267,7 +284,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             /// <summary>Hashes the traversal state.</summary>
             public override int GetHashCode()
             {
-                return HashCode.Combine(_owner, _version, _index);
+                return Objects.HashCode(_owner, _version, _index);
             }
 
             private void ValidateVersion()

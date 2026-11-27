@@ -94,9 +94,9 @@ workload on the target backend.
 
 ## Signed 32-Bit Set
 
-`IntSet` accepts every `int` key, including `int.MinValue`, zero and `int.MaxValue`. It mixes the
-full 32-bit key with one multiply before selecting a slot, so keys sharing their low bits do not
-all start at the same slot. It stores packed keys and hash-slot indices in two arrays, with no
+`IntSet` accepts every `int` key, including `int.MinValue`, zero and `int.MaxValue`. It avalanches
+the full 32-bit key before selecting a slot, so keys sharing their low bits do not all start at the
+same slot. It stores packed keys and hash-slot indices in two arrays, with no
 value storage. It is not thread-safe.
 
 `IntSet` provides `TryAdd`, `Contains`, `Remove`, `Clear`, `Count`, `IsEmpty`, `Capacity`, and
