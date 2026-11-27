@@ -2193,7 +2193,7 @@ int liveEnemies = BitOps.PopCount(0b1011UL); // 3
 int bucket = BitOps.Log2(77) + 1; // floor log2 + 1
 int lowestFlag = BitOps.TrailingZeroCount(0b1010_0000); // lowest set bit, 32 when none
 int highestFlag = BitOps.LeadingZeroCount(0b1010_0000); // zero bits before the highest set bit
-uint rotated = BitOps.RotateLeft(0b1000_0001U, 1); // 0b0000_0011
+uint rotated = BitOps.RotateLeft(0b1000_0001U, 1); // 0b1_0000_0010 (258)
 uint poolSize = BitOps.NextPowerOfTwo(37U); // smallest power of two >= 37
 bool isFlag = BitOps.IsPowerOfTwo(1UL << 7); // exactly one bit set
 ```

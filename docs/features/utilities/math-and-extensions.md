@@ -817,7 +817,8 @@ Color overCard = color.BlendOver(card, 0.6f); // blend toward card, keep color's
 
 `BlendOver` lerps linear values and converts back to gamma when the project uses the Linear color
 space. At `0` it returns the backdrop's RGB, and at `1` it returns the foreground's RGB. The
-foreground's alpha is preserved in every case.
+foreground's alpha is preserved in every case. It reads `QualitySettings.activeColorSpace`, so call
+it on the main thread.
 
 Dominant color example (bucket-based):
 

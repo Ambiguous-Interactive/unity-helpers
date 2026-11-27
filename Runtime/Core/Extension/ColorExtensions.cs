@@ -41,7 +41,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     /// Provides extension methods for Unity's Color type, including color averaging, hex conversion, and complementary color generation.
     /// </summary>
     /// <remarks>
-    /// Thread Safety: All methods are thread-safe as they operate on value types and use no shared state.
+    /// Thread Safety: Methods that do not read Unity project settings are thread-safe because they
+    /// operate on value types and use no shared state. BlendOver reads the active color space, so
+    /// call it on the main thread.
     /// Reference: https://sharpsnippets.wordpress.com/2014/03/11/c-extension-complementary-color/
     /// </remarks>
     public static class ColorExtensions
@@ -112,6 +114,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <returns>The blended RGB and the source color's alpha.</returns>
         /// <remarks>
         /// A Linear color space project blends linear values and converts the result back to gamma.
+        /// Reads <see cref="QualitySettings.activeColorSpace"/>, so call it on the main thread.
         /// </remarks>
         public static Color BlendOver(this in Color color, in Color backdrop, float opacity)
         {
