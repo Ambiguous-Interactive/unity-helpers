@@ -94,6 +94,7 @@ distribution is unknown. The span overload fills a precomputed schedule once.
 <!-- doc-sample: compiles -->
 
 ```csharp
+using System;
 using WallstopStudios.UnityHelpers.Core.Helper;
 
 long second = Sequences.Luby(2); // 1
