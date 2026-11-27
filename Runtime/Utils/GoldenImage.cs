@@ -57,7 +57,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 actual,
                 tolerance,
                 width,
-                width <= 0 ? 1 : (expectedLength + width - 1) / width,
+                width <= 0 ? 1 : (expectedLength == 0 ? 0 : 1 + (expectedLength - 1) / width),
                 edgePeakFraction
             );
         }
