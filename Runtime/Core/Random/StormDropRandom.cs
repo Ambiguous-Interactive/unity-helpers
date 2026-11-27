@@ -168,18 +168,16 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             }
         }
 
+        /// <inheritdoc />
         public override ulong NextUlong()
         {
-            uint upper = NextUint();
-            uint lower = NextUint();
-            return ((ulong)upper << 32) | lower;
+            return ComposeUlong(NextUint(), NextUint());
         }
 
+        /// <inheritdoc />
         public override double NextDouble()
         {
-            const double scale = 1.0 / 9007199254740992.0;
-            ulong combined = NextUlong() >> 11;
-            return combined * scale;
+            return ComposeDouble(NextUlong());
         }
 
         public override IRandom Copy()

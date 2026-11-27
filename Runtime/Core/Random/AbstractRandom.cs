@@ -1534,6 +1534,19 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             };
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static ulong ComposeUlong(uint upper, uint lower)
+        {
+            return ((ulong)upper << 32) | lower;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static double ComposeDouble(ulong sample)
+        {
+            const double scale = 1.0 / 9007199254740992.0;
+            return (sample >> 11) * scale;
+        }
+
         internal RandomState BuildStateFromSpan(
             ulong state1,
             ulong state2,
