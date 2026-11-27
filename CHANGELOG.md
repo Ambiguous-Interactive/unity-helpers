@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `IntSet` for every 32-bit signed key, with packed iteration, mutation checks and no value storage ([#1257](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1257)).
 - Add `DepthScratchArray<T>` for one grow-only scratch array per recursion depth, avoiding a pooled rent and return at every node ([#1306](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1306)).
 - Add `BitOps.LeadingZeroCount`, `RotateLeft` and `RotateRight` for 32-bit and 64-bit values ([#1303](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1303)).
 - Add `Color.WithAlpha`, `Color.ScaleAlpha` and `Color.BlendOver` for opacity and backdrop blending ([#1295](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1295)).
