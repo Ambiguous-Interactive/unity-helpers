@@ -448,7 +448,7 @@
     },
     {
       "name": "update-documentation",
-      "sha256": "1955dc19fc94c9632cc462de07a2c04d0e6154f0dd2b029358295f504842c257",
+      "sha256": "481b90f963b744789782511009d104b2859ee396f936195b654bac2c88aea092",
       "parts": [
         "update-documentation-part-1.md",
         "update-documentation-part-2.md",

@@ -161,10 +161,12 @@ section unchanged and add no `Fixed` entry; the defect still never shipped. When
 a change has no entry, cite the existing line.
 
 **Decide with git, never memory** — the defect shipped only if the defective behavior existed at the
-last release tag. A file or symbol check is not enough; the file can predate the defect.
+last release tag. A file or symbol check is not enough; the file can predate the defect. Read the
+tagged implementation and trace the affected path, or run a minimal reproduction against the tagged
+code. A search for today's code shape can miss a renamed helper or a different branch.
 
 ```bash
 git tag --sort=-v:refname | head -1                          # last release tag
 git ls-tree -r --name-only <tag> -- <path>                   # did the file exist?
-git show <tag>:<path> | rg -n '<the defective code shape>'   # did the defect exist?
+git show <tag>:<path>                                        # read the tagged implementation
 ```
