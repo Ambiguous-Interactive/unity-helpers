@@ -12,7 +12,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     /// Provides extension methods for Circle data structure operations, particularly grid enumeration.
     /// </summary>
     /// <remarks>
-    /// Thread Safety: All methods are thread-safe as they operate on value types without shared state.
+    /// Thread Safety: Methods that only read the circle and yield points are thread-safe. The
+    /// buffer overload requires exclusive access to the caller's list.
     /// Performance: EnumerateArea methods use bounding box optimization and avoid allocations where possible.
     /// </remarks>
     public static class CircleExtensions

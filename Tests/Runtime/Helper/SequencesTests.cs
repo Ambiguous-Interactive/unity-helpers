@@ -71,11 +71,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 
         [Test]
-        public void LubyRejectsNonPositiveIndexes()
+        public void LubyReturnsZeroForNonPositiveIndexes()
         {
-            Assert.Throws<ArgumentOutOfRangeException>(() => Sequences.Luby(0));
-            Assert.Throws<ArgumentOutOfRangeException>(() => Sequences.Luby(-1));
-            Assert.Throws<ArgumentOutOfRangeException>(() => Sequences.Luby(int.MinValue));
+            Assert.AreEqual(0L, Sequences.Luby(0));
+            Assert.AreEqual(0L, Sequences.Luby(-1));
+            Assert.AreEqual(0L, Sequences.Luby(int.MinValue));
         }
 
         [Test]

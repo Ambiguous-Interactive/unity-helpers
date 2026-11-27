@@ -14,17 +14,15 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// Returns the 1-based Luby restart multiplier at an index.
         /// </summary>
         /// <param name="index">The 1-based position in the sequence.</param>
-        /// <returns>The multiplier, a power of two. The sequence is 1, 1, 2, 1, 1, 2, 4, 1, ...</returns>
-        /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="index"/> is not positive.</exception>
+        /// <returns>
+        /// The multiplier, a power of two, or 0 when <paramref name="index"/> is not positive.
+        /// The sequence is 1, 1, 2, 1, 1, 2, 4, 1, ...
+        /// </returns>
         public static long Luby(int index)
         {
             if (index <= 0)
             {
-                throw new ArgumentOutOfRangeException(
-                    nameof(index),
-                    index,
-                    "The Luby sequence is 1-based, so the index must be positive."
-                );
+                return 0;
             }
 
             long remaining = index;
@@ -54,14 +52,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <returns>True when <paramref name="index"/> is positive; otherwise, false.</returns>
         public static bool TryLuby(int index, out long value)
         {
-            if (index <= 0)
-            {
-                value = 0;
-                return false;
-            }
-
             value = Luby(index);
-            return true;
+            return 0 < value;
         }
 
         /// <summary>
