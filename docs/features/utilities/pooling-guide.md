@@ -760,6 +760,28 @@ Size storage from trusted application bounds. Do not pass unchecked sizes from a
 payload. Use exact-size storage when passing arrays to APIs such as `Texture2D.SetPixels32`, which
 require the array length to match the texture dimensions.
 
+### Per-depth scratch for recursion
+
+`DepthScratch<T>` keeps one grow-only array per recursion depth. `Get(depth, length)` returns a span
+over that depth's array and grows it only when the request is longer. One frame per depth is live at
+a time, so a depth-first search can stop renting and returning a pooled array at every node.
+
+A zero length returns an empty span. Growth preserves existing contents; a shorter request exposes
+the stale prefix, so write every slot before reading it. The arrays belong to the instance and are
+not pooled. One instance belongs to one search or thread. Negative depths and lengths are rejected.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using System;
+using WallstopStudios.UnityHelpers.Utils;
+
+int start = 0;
+DepthScratch<int> scratch = new();
+Span<int> path = scratch.Get(depth: 3, length: 8);
+path[0] = start;
+```
+
 ## Borrowing a Buffer for One Operation
 
 `SystemArrayPool<T>.TryWithBuffer` owns the rental while a synchronous callback receives a
