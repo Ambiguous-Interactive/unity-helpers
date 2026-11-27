@@ -2167,14 +2167,15 @@ int[] restored = ArrayConverter.ByteArrayToIntArrayBlockCopy(bytes);
 
 ### Bit Manipulation (`BitOps`)
 
-`BitOps` provides population count, trailing zero count, floor log2, highest-bit isolation,
-power-of-two detection and power-of-two ceiling. Its signed overloads use the two's-complement
-bit pattern.
+`BitOps` provides population count, trailing zero count, leading zero count, floor log2,
+bit rotation, highest-bit isolation, power-of-two detection and power-of-two ceiling. Its signed
+overloads use the two's-complement bit pattern.
 
-When compiled for .NET Core 3.0 or later, population count, trailing zero count and floor log2
-use `System.Numerics.BitOperations`. The runtime can use hardware instructions where available.
-Unity uses the portable implementations for the same results. Trailing zero count on zero
-returns the width of the input, either 32 or 64.
+When compiled for .NET Core 3.0 or later, population count, trailing and leading zero count,
+floor log2 and rotation use `System.Numerics.BitOperations`. The runtime can use hardware
+instructions where available. Unity uses the portable implementations for the same results.
+Trailing and leading zero count on zero return the width of the input, either 32 or 64.
+Rotation offsets are reduced modulo the width, and negative offsets rotate the other way.
 
 On Unity, the unsigned `Log2` forms use bit smearing and portable de Bruijn indexing instead of
 a chain of input comparisons.
@@ -2191,6 +2192,8 @@ using WallstopStudios.UnityHelpers.Core.Helper;
 int liveEnemies = BitOps.PopCount(0b1011UL); // 3
 int bucket = BitOps.Log2(77) + 1; // floor log2 + 1
 int lowestFlag = BitOps.TrailingZeroCount(0b1010_0000); // lowest set bit, 32 when none
+int highestFlag = BitOps.LeadingZeroCount(0b1010_0000); // zero bits before the highest set bit
+uint rotated = BitOps.RotateLeft(0b1000_0001U, 1); // 0b0000_0011
 uint poolSize = BitOps.NextPowerOfTwo(37U); // smallest power of two >= 37
 bool isFlag = BitOps.IsPowerOfTwo(1UL << 7); // exactly one bit set
 ```

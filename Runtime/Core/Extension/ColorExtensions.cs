@@ -78,6 +78,52 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         /// <summary>
+        /// Replaces the alpha channel of a color and keeps its RGB channels.
+        /// </summary>
+        /// <param name="color">The source color.</param>
+        /// <param name="alpha">The new alpha value.</param>
+        /// <returns>The source color with <paramref name="alpha"/>.</returns>
+        public static Color WithAlpha(this in Color color, float alpha)
+        {
+            Color result = color;
+            result.a = alpha;
+            return result;
+        }
+
+        /// <summary>
+        /// Multiplies the alpha channel of a color and keeps its RGB channels.
+        /// </summary>
+        /// <param name="color">The source color.</param>
+        /// <param name="factor">The factor applied to the current alpha.</param>
+        /// <returns>The source color with scaled alpha.</returns>
+        public static Color ScaleAlpha(this in Color color, float factor)
+        {
+            Color result = color;
+            result.a *= factor;
+            return result;
+        }
+
+        /// <summary>
+        /// Blends a color toward a backdrop by opacity and keeps the source alpha.
+        /// </summary>
+        /// <param name="color">The foreground color.</param>
+        /// <param name="backdrop">The color behind the foreground.</param>
+        /// <param name="opacity">The foreground share, from 0 for the backdrop to 1 for the color.</param>
+        /// <returns>The blended RGB and the source color's alpha.</returns>
+        /// <remarks>
+        /// A Linear color space project blends linear values and converts the result back to gamma.
+        /// </remarks>
+        public static Color BlendOver(this in Color color, in Color backdrop, float opacity)
+        {
+            Color blended =
+                QualitySettings.activeColorSpace == ColorSpace.Linear
+                    ? Color.Lerp(backdrop.linear, color.linear, opacity).gamma
+                    : Color.Lerp(backdrop, color, opacity);
+            blended.a = color.a;
+            return blended;
+        }
+
+        /// <summary>
         /// Calculates the average color of a sprite's texture pixels using the specified averaging method.
         /// </summary>
         /// <param name="sprite">The sprite whose average color to calculate.</param>

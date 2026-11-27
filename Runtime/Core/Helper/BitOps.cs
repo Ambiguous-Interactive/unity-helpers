@@ -435,6 +435,58 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
         /// <summary>
+        /// Counts the leading (most significant) zero bits of a <see cref="uint"/> value.
+        /// </summary>
+        /// <param name="value">The value to inspect.</param>
+        /// <returns>The number of zero bits before the most significant set bit, or 32 when <paramref name="value"/> is zero.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int LeadingZeroCount(uint value)
+        {
+#if NETCOREAPP3_0_OR_GREATER
+            return BitOperations.LeadingZeroCount(value);
+#else
+            return value == 0U ? 32 : 31 - Log2(value);
+#endif
+        }
+
+        /// <summary>
+        /// Counts the leading (most significant) zero bits of an <see cref="int"/> value.
+        /// </summary>
+        /// <param name="value">The value to inspect; the bit pattern is interpreted as unsigned.</param>
+        /// <returns>The number of zero bits before the most significant set bit, or 32 when the bit pattern is zero.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int LeadingZeroCount(int value)
+        {
+            return LeadingZeroCount((uint)value);
+        }
+
+        /// <summary>
+        /// Counts the leading (most significant) zero bits of a <see cref="ulong"/> value.
+        /// </summary>
+        /// <param name="value">The value to inspect.</param>
+        /// <returns>The number of zero bits before the most significant set bit, or 64 when <paramref name="value"/> is zero.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int LeadingZeroCount(ulong value)
+        {
+#if NETCOREAPP3_0_OR_GREATER
+            return BitOperations.LeadingZeroCount(value);
+#else
+            return value == 0UL ? 64 : 63 - Log2(value);
+#endif
+        }
+
+        /// <summary>
+        /// Counts the leading (most significant) zero bits of a <see cref="long"/> value.
+        /// </summary>
+        /// <param name="value">The value to inspect; the bit pattern is interpreted as unsigned.</param>
+        /// <returns>The number of zero bits before the most significant set bit, or 64 when the bit pattern is zero.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int LeadingZeroCount(long value)
+        {
+            return LeadingZeroCount((ulong)value);
+        }
+
+        /// <summary>
         /// Isolates the most significant set bit of a <see cref="ulong"/> value.
         /// </summary>
         /// <param name="value">The value to inspect.</param>
@@ -520,6 +572,122 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         public static bool IsPowerOfTwo(int value)
         {
             return IsPowerOfTwo((uint)value);
+        }
+
+        /// <summary>
+        /// Rotates the bits of a <see cref="uint"/> value left by an offset.
+        /// </summary>
+        /// <param name="value">The value whose bits are rotated.</param>
+        /// <param name="offset">The number of positions to rotate; positive and negative offsets and multiples of 32 are accepted.</param>
+        /// <returns><paramref name="value"/> rotated left by <paramref name="offset"/> modulo 32 positions.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static uint RotateLeft(uint value, int offset)
+        {
+#if NETCOREAPP3_0_OR_GREATER
+            return BitOperations.RotateLeft(value, offset);
+#else
+            int shift = offset & 31;
+            return (value << shift) | (value >> ((32 - shift) & 31));
+#endif
+        }
+
+        /// <summary>
+        /// Rotates the bits of an <see cref="int"/> value left by an offset.
+        /// </summary>
+        /// <param name="value">The value whose bits are rotated; the bit pattern is interpreted as unsigned.</param>
+        /// <param name="offset">The number of positions to rotate.</param>
+        /// <returns>The rotated bit pattern.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int RotateLeft(int value, int offset)
+        {
+            return unchecked((int)RotateLeft((uint)value, offset));
+        }
+
+        /// <summary>
+        /// Rotates the bits of a <see cref="ulong"/> value left by an offset.
+        /// </summary>
+        /// <param name="value">The value whose bits are rotated.</param>
+        /// <param name="offset">The number of positions to rotate; positive and negative offsets and multiples of 64 are accepted.</param>
+        /// <returns><paramref name="value"/> rotated left by <paramref name="offset"/> modulo 64 positions.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static ulong RotateLeft(ulong value, int offset)
+        {
+#if NETCOREAPP3_0_OR_GREATER
+            return BitOperations.RotateLeft(value, offset);
+#else
+            int shift = offset & 63;
+            return (value << shift) | (value >> ((64 - shift) & 63));
+#endif
+        }
+
+        /// <summary>
+        /// Rotates the bits of a <see cref="long"/> value left by an offset.
+        /// </summary>
+        /// <param name="value">The value whose bits are rotated; the bit pattern is interpreted as unsigned.</param>
+        /// <param name="offset">The number of positions to rotate.</param>
+        /// <returns>The rotated bit pattern.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static long RotateLeft(long value, int offset)
+        {
+            return unchecked((long)RotateLeft((ulong)value, offset));
+        }
+
+        /// <summary>
+        /// Rotates the bits of a <see cref="uint"/> value right by an offset.
+        /// </summary>
+        /// <param name="value">The value whose bits are rotated.</param>
+        /// <param name="offset">The number of positions to rotate; positive and negative offsets and multiples of 32 are accepted.</param>
+        /// <returns><paramref name="value"/> rotated right by <paramref name="offset"/> modulo 32 positions.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static uint RotateRight(uint value, int offset)
+        {
+#if NETCOREAPP3_0_OR_GREATER
+            return BitOperations.RotateRight(value, offset);
+#else
+            int shift = offset & 31;
+            return (value >> shift) | (value << ((32 - shift) & 31));
+#endif
+        }
+
+        /// <summary>
+        /// Rotates the bits of an <see cref="int"/> value right by an offset.
+        /// </summary>
+        /// <param name="value">The value whose bits are rotated; the bit pattern is interpreted as unsigned.</param>
+        /// <param name="offset">The number of positions to rotate.</param>
+        /// <returns>The rotated bit pattern.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int RotateRight(int value, int offset)
+        {
+            return unchecked((int)RotateRight((uint)value, offset));
+        }
+
+        /// <summary>
+        /// Rotates the bits of a <see cref="ulong"/> value right by an offset.
+        /// </summary>
+        /// <param name="value">The value whose bits are rotated.</param>
+        /// <param name="offset">The number of positions to rotate; positive and negative offsets and multiples of 64 are accepted.</param>
+        /// <returns><paramref name="value"/> rotated right by <paramref name="offset"/> modulo 64 positions.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static ulong RotateRight(ulong value, int offset)
+        {
+#if NETCOREAPP3_0_OR_GREATER
+            return BitOperations.RotateRight(value, offset);
+#else
+            int shift = offset & 63;
+            return (value >> shift) | (value << ((64 - shift) & 63));
+#endif
+        }
+
+        /// <summary>
+        /// Rotates the bits of a <see cref="long"/> value right by an offset.
+        /// </summary>
+        /// <param name="value">The value whose bits are rotated; the bit pattern is interpreted as unsigned.</param>
+        /// <param name="offset">The number of positions to rotate.</param>
+        /// <returns>The rotated bit pattern.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static long RotateRight(long value, int offset)
+        {
+            return unchecked((long)RotateRight((ulong)value, offset));
         }
 
         /// <summary>
