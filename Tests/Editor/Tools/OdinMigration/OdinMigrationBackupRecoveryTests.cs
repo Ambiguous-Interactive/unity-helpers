@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
     using System.Security.Cryptography;
     using System.Text;
     using NUnit.Framework;
+    using UnityEditor;
     using UnityEngine;
     using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration;
@@ -78,9 +79,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
         [TearDown]
         public void DeleteRecoveryFiles()
         {
-            if (Directory.Exists(_fullFolder))
+            if (AssetDatabase.IsValidFolder(_assetFolder))
+            {
+                AssetDatabase.DeleteAsset(_assetFolder);
+            }
+            else if (Directory.Exists(_fullFolder))
             {
                 Directory.Delete(_fullFolder, true);
+            }
+
+            string meta = _fullFolder + ".meta";
+            if (File.Exists(meta))
+            {
+                File.Delete(meta);
             }
             if (Directory.Exists(_backup))
             {
