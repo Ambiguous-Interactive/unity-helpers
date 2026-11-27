@@ -1713,6 +1713,32 @@ itself, and most globals worth borrowing (Unity's among them) are main-thread on
 
 ---
 
+### GoldenImage
+
+`GoldenImage` compares rendered pixels with a per-channel tolerance. The edge-tolerant overload
+forgives a mismatched local peak when its error stays within a fraction of that peak's contrast,
+which covers renderer differences at high-contrast edges without hiding flat-region drift.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using UnityEngine;
+using WallstopStudios.UnityHelpers.Utils;
+
+Color32[] expected = { new Color32(0, 0, 0, 255) };
+Color32[] actual = { new Color32(1, 0, 0, 255) };
+int mismatches = GoldenImage.CountMismatches(expected, actual, tolerance: 2);
+int edgeMismatches = GoldenImage.CountEdgeTolerantMismatches(
+    expected,
+    actual,
+    tolerance: 2,
+    width: 1,
+    edgePeakFraction: 0.25f
+);
+```
+
+A length difference counts as a mismatch. A width below one falls back to the exact comparison.
+
 ### Unity-Aware Null Checks
 
 **The problem:** Unity's `==` operator overload can be slow, and destroyed UnityEngine.Objects return `true` for `== null` but `false` for `is null`.

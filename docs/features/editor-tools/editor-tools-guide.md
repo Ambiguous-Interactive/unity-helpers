@@ -1923,6 +1923,31 @@ For attributes that _reject_ a bad value rather than just displaying it, see
 
 ## Automation & Utilities
 
+### Scripting Backend Scope
+
+`ScriptingBackendScope` applies a `NamedBuildTarget`'s scripting backend and restores the previous
+value when the scope is disposed, so a build script cannot leak an IL2CPP switch into later work.
+
+```csharp
+using UnityEditor;
+using UnityEditor.Build;
+using WallstopStudios.UnityHelpers.Editor.Utils;
+
+public static class ExampleBuildBackend
+{
+    public static void UseIl2Cpp()
+    {
+        using (new ScriptingBackendScope(NamedBuildTarget.Standalone, ScriptingImplementation.IL2CPP))
+        {
+        }
+    }
+}
+```
+
+Nested scopes for the same target restore in order, and copies share one restoration claim. A
+getter or setter failure is logged and does not throw from disposal. The scope changes
+`PlayerSettings`; it does not start a build or undo a domain reload.
+
 <a id="scriptableobject-singleton-creator"></a>
 
 ### ScriptableObject Singleton Creator

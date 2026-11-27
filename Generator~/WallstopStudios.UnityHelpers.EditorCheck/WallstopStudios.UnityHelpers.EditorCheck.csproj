@@ -181,7 +181,9 @@
     <WallstopTestFramework Condition="'$(WallstopTestFramework)' == ''">true</WallstopTestFramework>
     <DefineConstants Condition="'$(WallstopTestFramework)' == 'true'"
       >$(DefineConstants);WALLSTOP_UNITY_HELPERS_TEST_FRAMEWORK</DefineConstants>
-    <DefineConstants>$(DefineConstants);UNITY_EDITOR;$(UnityVersionDefines)</DefineConstants>
+    <!-- The 2021.1 reference SDK lacks NamedBuildTarget and its PlayerSettings overloads.
+         Editor/Utils/ScriptingBackendScope.cs and its test are excluded from the harness by this marker. -->
+    <DefineConstants>$(DefineConstants);UNITY_EDITOR;$(UnityVersionDefines);WALLSTOP_EDITOR_CHECK</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <!-- Analyzer only: it ships to nobody and contributes no runtime assets. -->
