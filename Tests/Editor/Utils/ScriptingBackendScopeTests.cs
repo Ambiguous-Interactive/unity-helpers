@@ -3,7 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
 {
-#if !WALLSTOP_EDITOR_CHECK
+#if UNITY_2021_2_OR_NEWER && !WALLSTOP_EDITOR_CHECK
     using NUnit.Framework;
     using UnityEditor;
     using UnityEditor.Build;
@@ -65,6 +65,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
             }
 
             Assert.AreEqual(_original, PlayerSettings.GetScriptingBackend(Target));
+        }
+
+        [Test]
+        public void DefaultTargetIsIgnored()
+        {
+            using (new ScriptingBackendScope(default, Other(_original)))
+            {
+                Assert.AreEqual(_original, PlayerSettings.GetScriptingBackend(Target));
+            }
         }
 
         [Test]

@@ -3,7 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Editor.Utils
 {
-#if UNITY_EDITOR && !WALLSTOP_EDITOR_CHECK
+#if UNITY_EDITOR && UNITY_2021_2_OR_NEWER && !WALLSTOP_EDITOR_CHECK
     using System;
     using System.Collections.Generic;
     using UnityEditor;
@@ -30,6 +30,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         /// <param name="backend">The backend to apply.</param>
         public ScriptingBackendScope(NamedBuildTarget target, ScriptingImplementation backend)
         {
+            if (string.IsNullOrWhiteSpace(target.TargetName))
+            {
+                _scope = default;
+                return;
+            }
+
             _scope = Owner(target).Borrow(backend);
         }
 
@@ -75,7 +81,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         /// <inheritdoc />
         public override int GetHashCode()
         {
-            return Objects.HashCode(_scope);
+            return _scope.GetHashCode();
         }
     }
 #endif

@@ -138,6 +138,38 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         }
 
         [Test]
+        public void PartialFinalRowDoesNotThrow()
+        {
+            Color32[] expected = Pixels(
+                new Color32(0, 0, 0, 255),
+                new Color32(255, 255, 255, 255),
+                new Color32(0, 0, 0, 255)
+            );
+            Color32[] actual = Pixels(
+                new Color32(10, 0, 0, 255),
+                new Color32(255, 255, 255, 255),
+                new Color32(0, 0, 0, 255)
+            );
+
+            Assert.DoesNotThrow(() =>
+            {
+                GoldenImage.CountEdgeTolerantMismatches(expected, actual, 0, 2, 2, 0.25f);
+            });
+        }
+
+        [Test]
+        public void ExplicitDimensionsLargerThanArrayDoNotThrow()
+        {
+            Color32[] expected = Pixels(new Color32(0, 0, 0, 255), new Color32(255, 255, 255, 255));
+            Color32[] actual = Pixels(new Color32(10, 0, 0, 255), new Color32(255, 255, 255, 255));
+
+            Assert.DoesNotThrow(() =>
+            {
+                GoldenImage.CountEdgeTolerantMismatches(expected, actual, 0, 3, 3, 0.25f);
+            });
+        }
+
+        [Test]
         public void NullImagesAreHandled()
         {
             Assert.AreEqual(0, GoldenImage.CountMismatches(null, null, 0));

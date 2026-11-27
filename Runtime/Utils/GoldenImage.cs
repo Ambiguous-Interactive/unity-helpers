@@ -100,8 +100,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
                 if (TryGetEdgeAllowance(expected, index, width, height, out int allowance))
                 {
-                    int permitted = (int)Math.Round(fraction * allowance);
-                    if (difference <= permitted)
+                    if (difference <= fraction * allowance)
                     {
                         continue;
                     }
@@ -157,8 +156,14 @@ namespace WallstopStudios.UnityHelpers.Utils
                         continue;
                     }
 
+                    long neighborIndex = (long)neighborY * width + neighborX;
+                    if (neighborIndex < 0 || image.Length <= neighborIndex)
+                    {
+                        continue;
+                    }
+
                     hasNeighbor = true;
-                    int neighborLuma = Luma(image[neighborY * width + neighborX]);
+                    int neighborLuma = Luma(image[(int)neighborIndex]);
                     int difference = Math.Abs(centerLuma - neighborLuma);
                     if (foundContrast < difference)
                     {
