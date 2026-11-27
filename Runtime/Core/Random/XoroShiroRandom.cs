@@ -151,6 +151,18 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             }
         }
 
+        /// <inheritdoc />
+        public override ulong NextUlong()
+        {
+            return ComposeUlong(NextUint(), NextUint());
+        }
+
+        /// <inheritdoc />
+        public override double NextDouble()
+        {
+            return ComposeDouble(NextUlong());
+        }
+
         public override IRandom Copy()
         {
             return new XoroShiroRandom(InternalState);

@@ -224,6 +224,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             return (x << k) | (x >> (64 - k));
         }
 
+        /// <inheritdoc />
         public override ulong NextUlong()
         {
             return NextWord();
@@ -235,6 +236,12 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             {
                 return (uint)(NextWord() >> 32);
             }
+        }
+
+        /// <inheritdoc />
+        public override double NextDouble()
+        {
+            return ComposeDouble(NextUlong());
         }
 
         public override IRandom Copy()

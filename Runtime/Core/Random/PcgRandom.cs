@@ -189,6 +189,18 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             }
         }
 
+        /// <inheritdoc />
+        public override ulong NextUlong()
+        {
+            return ComposeUlong(NextUint(), NextUint());
+        }
+
+        /// <inheritdoc />
+        public override double NextDouble()
+        {
+            return ComposeDouble(NextUlong());
+        }
+
         public bool Equals(PcgRandom other)
         {
             if (ReferenceEquals(other, null))
