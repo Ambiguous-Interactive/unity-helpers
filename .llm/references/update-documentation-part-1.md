@@ -154,6 +154,11 @@ correct, so fold whatever the fix guarantees a user (a limit, an API to call, a 
 feature's `Added` entry, and drop the bug narration. The same test applies to a `Changed`,
 `Improved` or `Security` entry whose "before" is behavior no release ever had.
 
+A post-merge review correction follows the same rule. Update the feature's existing `[Unreleased]`
+entry in the follow-up PR, including any final contract such as a sentinel or `TryXxx` sibling.
+When a reviewer asks why a change has no entry, cite the existing line; do not add a `Fixed` entry
+for behavior no release ever had.
+
 **Decide with git, never memory** — the subject shipped only if it existed at the last release tag:
 
 ```bash

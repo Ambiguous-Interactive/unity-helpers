@@ -123,6 +123,10 @@ If the changes include user-facing modifications:
 2. Verify entry matches the actual change (not outdated from an earlier iteration)
 3. Verify format follows [update-documentation](./update-documentation.md) rules
 
+When a reviewer asks why a change has no entry, quote the existing `[Unreleased]` line. For a
+review-only correction to unreleased code, update that entry in the follow-up PR; do not add a
+`Fixed` entry for behavior no release ever had.
+
 ---
 
 ## Related Skills
