@@ -79,6 +79,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 
         [Test]
+        public void TryLubyRejectsNonPositiveIndexesWithoutThrowing()
+        {
+            Assert.IsFalse(Sequences.TryLuby(0, out long zeroValue));
+            Assert.AreEqual(0L, zeroValue);
+            Assert.IsFalse(Sequences.TryLuby(-1, out long negativeValue));
+            Assert.AreEqual(0L, negativeValue);
+            Assert.IsFalse(Sequences.TryLuby(int.MinValue, out long minimumValue));
+            Assert.AreEqual(0L, minimumValue);
+        }
+
+        [Test]
+        public void TryLubyMatchesLubyForPositiveIndexes()
+        {
+            for (int index = 1; index <= FirstFifteenLubyValues.Length; ++index)
+            {
+                Assert.IsTrue(Sequences.TryLuby(index, out long value), $"index={index}");
+                Assert.AreEqual(Sequences.Luby(index), value, $"index={index}");
+            }
+        }
+
+        [Test]
         public void LubySpanMatchesScalarValues()
         {
             long[] values = new long[FirstFifteenLubyValues.Length];

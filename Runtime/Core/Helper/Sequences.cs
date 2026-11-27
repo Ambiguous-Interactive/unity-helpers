@@ -47,6 +47,24 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
         /// <summary>
+        /// Tries to read the 1-based Luby restart multiplier at an index.
+        /// </summary>
+        /// <param name="index">The 1-based position in the sequence.</param>
+        /// <param name="value">The multiplier, or 0 when <paramref name="index"/> is not positive.</param>
+        /// <returns>True when <paramref name="index"/> is positive; otherwise, false.</returns>
+        public static bool TryLuby(int index, out long value)
+        {
+            if (index <= 0)
+            {
+                value = 0;
+                return false;
+            }
+
+            value = Luby(index);
+            return true;
+        }
+
+        /// <summary>
         /// Fills a span with the 1-based Luby restart multipliers.
         /// </summary>
         /// <param name="destination">The span to fill, starting at index 1 of the sequence.</param>

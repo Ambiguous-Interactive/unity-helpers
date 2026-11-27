@@ -102,7 +102,8 @@ Span<long> schedule = stackalloc long[8];
 Sequences.Luby(schedule); // 1, 1, 2, 1, 1, 2, 4, 1
 ```
 
-`Luby` throws `ArgumentOutOfRangeException` for an index below one.
+`Luby` throws `ArgumentOutOfRangeException` for an index below one. `Sequences.TryLuby` returns
+`false` and a zero value instead, for callers that cannot prove the index is positive.
 
 ## Geometry
 

@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add `BitOps.LeadingZeroCount`, `RotateLeft` and `RotateRight` for 32-bit and 64-bit values ([#1303](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1303)).
 - Add `Color.WithAlpha`, `Color.ScaleAlpha` and `Color.BlendOver` for opacity and backdrop blending ([#1295](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1295)).
-- Add `Sequences.Luby` for scalar and span-filled Luby restart schedules ([#1293](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1293)).
+- Add `Sequences.Luby` and `Sequences.TryLuby` for scalar and span-filled Luby restart schedules ([#1293](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1293)).
 - Expose `AuthoredAssetYaml.TryGetOnlyDirectEntry` for finding a unique root field before reading its YAML block ([#1127](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1127)).
 - Add `NonDrawingGraphic` for rectangular or circular uGUI hit targets without drawing content ([#1291](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1291)).
 - Add grouped moves for saves and their sidecars, with reverse-order rollback on failure ([#1227](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1227)).
