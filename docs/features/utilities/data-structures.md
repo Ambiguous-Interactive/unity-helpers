@@ -92,6 +92,32 @@ foreach (ulong state in visited)
 These APIs do not promise a timing ratio over `Dictionary` or `HashSet`; measure the complete
 workload on the target backend.
 
+## Signed 32-Bit Set
+
+`IntSet` accepts every `int` key, including `int.MinValue`, zero and `int.MaxValue`. It avalanches
+the full 32-bit key before selecting a slot, so keys sharing their low bits do not all start at the
+same slot. It stores packed keys and hash-slot indices in two arrays, with no
+value storage. It is not thread-safe.
+
+`IntSet` provides `TryAdd`, `Contains`, `Remove`, `Clear`, `Count`, `IsEmpty`, `Capacity`, and
+value-type enumeration. Iteration is O(Count), unordered, and invalidated by a successful
+mutation. Capacity reserves two hash slots per live key and grows geometrically.
+`MaximumCapacity` is the largest live-key count; `TryAdd` returns false at the limit. The
+constructor rejects negative hints and hints above `MaximumCapacity`.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using WallstopStudios.UnityHelpers.Core.DataStructure;
+
+IntSet visited = new(128);
+bool firstVisit = visited.TryAdd(int.MinValue);
+foreach (int state in visited)
+{
+    UnityEngine.Debug.Log(state);
+}
+```
+
 ## Cyclic Buffer (Ring Buffer)
 
 - What it is: Fixed-capacity circular array with head/tail indices that wrap.
