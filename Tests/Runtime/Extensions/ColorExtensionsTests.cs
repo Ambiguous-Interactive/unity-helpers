@@ -560,6 +560,64 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         }
 
         [Test]
+        public void WithAlphaReplacesOnlyTheAlphaChannel()
+        {
+            Color source = new(0.2f, 0.4f, 0.6f, 0.8f);
+            Color result = source.WithAlpha(0.25f);
+            Assert.AreEqual(0.2f, result.r);
+            Assert.AreEqual(0.4f, result.g);
+            Assert.AreEqual(0.6f, result.b);
+            Assert.AreEqual(0.25f, result.a);
+            Assert.AreEqual(0.8f, source.a, "The source color must not change.");
+        }
+
+        [Test]
+        public void ScaleAlphaMultipliesOnlyTheAlphaChannel()
+        {
+            Color source = new(0.2f, 0.4f, 0.6f, 0.5f);
+            Color result = source.ScaleAlpha(0.4f);
+            Assert.AreEqual(0.2f, result.r);
+            Assert.AreEqual(0.4f, result.g);
+            Assert.AreEqual(0.6f, result.b);
+            Assert.AreEqual(0.2f, result.a, 1e-6f);
+            Assert.AreEqual(0.5f, source.a, "The source color must not change.");
+        }
+
+        [Test]
+        public void BlendOverEndpointsSelectColorOrBackdropAndKeepSourceAlpha()
+        {
+            Color foreground = new(0.9f, 0.1f, 0.2f, 0.3f);
+            Color backdrop = new(0.1f, 0.2f, 0.8f, 1f);
+            Color atBackdrop = foreground.BlendOver(backdrop, 0f);
+            Assert.AreEqual(backdrop.r, atBackdrop.r, 1e-6f);
+            Assert.AreEqual(backdrop.g, atBackdrop.g, 1e-6f);
+            Assert.AreEqual(backdrop.b, atBackdrop.b, 1e-6f);
+            Assert.AreEqual(foreground.a, atBackdrop.a);
+            Color atForeground = foreground.BlendOver(backdrop, 1f);
+            Assert.AreEqual(foreground.r, atForeground.r, 1e-6f);
+            Assert.AreEqual(foreground.g, atForeground.g, 1e-6f);
+            Assert.AreEqual(foreground.b, atForeground.b, 1e-6f);
+            Assert.AreEqual(foreground.a, atForeground.a);
+        }
+
+        [Test]
+        public void BlendOverMatchesTheActiveColorSpace()
+        {
+            Color foreground = new(0.9f, 0.1f, 0.2f, 0.3f);
+            Color backdrop = new(0.1f, 0.2f, 0.8f, 1f);
+            Color expected =
+                QualitySettings.activeColorSpace == ColorSpace.Linear
+                    ? Color.Lerp(backdrop.linear, foreground.linear, 0.35f).gamma
+                    : Color.Lerp(backdrop, foreground, 0.35f);
+            expected.a = foreground.a;
+            Color actual = foreground.BlendOver(backdrop, 0.35f);
+            Assert.AreEqual(expected.r, actual.r, 1e-5f);
+            Assert.AreEqual(expected.g, actual.g, 1e-5f);
+            Assert.AreEqual(expected.b, actual.b, 1e-5f);
+            Assert.AreEqual(expected.a, actual.a);
+        }
+
+        [Test]
         public void GetAverageColorLargeSpriteMatchesExpectedMean()
         {
             const int size = 64;

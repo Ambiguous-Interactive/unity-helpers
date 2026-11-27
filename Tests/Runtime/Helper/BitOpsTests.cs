@@ -99,6 +99,28 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             }
         }
 
+        private static IEnumerable<TestCaseData> LeadingZeroCountUlongCases()
+        {
+            yield return new TestCaseData(0UL, UlongBits).SetName(
+                "LeadingZeroCount(ulong).Zero.ReturnsSixtyFour"
+            );
+            yield return new TestCaseData(1UL, UlongLog2Max).SetName(
+                "LeadingZeroCount(ulong).One.ReturnsSixtyThree"
+            );
+            yield return new TestCaseData(ulong.MaxValue, 0).SetName(
+                "LeadingZeroCount(ulong).AllBitsSet.ReturnsZero"
+            );
+            yield return new TestCaseData(UlongHighestBit, 0).SetName(
+                "LeadingZeroCount(ulong).HighestBit.ReturnsZero"
+            );
+            for (int bit = 0; bit < UlongBits; ++bit)
+            {
+                yield return new TestCaseData(1UL << bit, UlongLog2Max - bit).SetName(
+                    $"LeadingZeroCount(ulong).Bit{bit}"
+                );
+            }
+        }
+
         private static IEnumerable<TestCaseData> HighestSetBitUlongCases()
         {
             yield return new TestCaseData(0UL, 0UL).SetName(
@@ -232,6 +254,50 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             }
 
             return result;
+        }
+
+        private static uint ReferenceRotateLeft(uint value, int offset)
+        {
+            int shift = ((offset % 32) + 32) % 32;
+            for (int step = 0; step < shift; ++step)
+            {
+                value = (value << 1) | (value >> 31);
+            }
+
+            return value;
+        }
+
+        private static uint ReferenceRotateRight(uint value, int offset)
+        {
+            int shift = ((offset % 32) + 32) % 32;
+            for (int step = 0; step < shift; ++step)
+            {
+                value = (value >> 1) | (value << 31);
+            }
+
+            return value;
+        }
+
+        private static ulong ReferenceRotateLeft(ulong value, int offset)
+        {
+            int shift = ((offset % 64) + 64) % 64;
+            for (int step = 0; step < shift; ++step)
+            {
+                value = (value << 1) | (value >> 63);
+            }
+
+            return value;
+        }
+
+        private static ulong ReferenceRotateRight(ulong value, int offset)
+        {
+            int shift = ((offset % 64) + 64) % 64;
+            for (int step = 0; step < shift; ++step)
+            {
+                value = (value >> 1) | (value << 63);
+            }
+
+            return value;
         }
 
         [TestCaseSource(nameof(PopCountUlongCases))]
@@ -405,6 +471,203 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             {
                 ulong value = unchecked(((ulong)(uint)Rng.Next() << 32) | (uint)Rng.Next());
                 Assert.AreEqual(ReferenceLog2(value), BitOps.Log2(value), $"value={value}");
+            }
+        }
+
+        [TestCaseSource(nameof(LeadingZeroCountUlongCases))]
+        public void LeadingZeroCountUlongReturnsExpectedCount(ulong value, int expected)
+        {
+            Assert.AreEqual(expected, BitOps.LeadingZeroCount(value));
+        }
+
+        [Test]
+        public void LeadingZeroCountUintMatchesEveryBitBoundary()
+        {
+            Assert.AreEqual(32, BitOps.LeadingZeroCount(0U));
+            Assert.AreEqual(31, BitOps.LeadingZeroCount(1U));
+            Assert.AreEqual(0, BitOps.LeadingZeroCount(uint.MaxValue));
+            for (int bit = 0; bit < 32; ++bit)
+            {
+                Assert.AreEqual(31 - bit, BitOps.LeadingZeroCount(1U << bit), $"bit={bit}");
+            }
+        }
+
+        [Test]
+        public void LeadingZeroCountSignedOverloadsUseTheUnsignedPattern()
+        {
+            Assert.AreEqual(32, BitOps.LeadingZeroCount(0));
+            Assert.AreEqual(0, BitOps.LeadingZeroCount(-1));
+            Assert.AreEqual(0, BitOps.LeadingZeroCount(int.MinValue));
+            Assert.AreEqual(1, BitOps.LeadingZeroCount(0x4000_0000));
+            Assert.AreEqual(64, BitOps.LeadingZeroCount(0L));
+            Assert.AreEqual(0, BitOps.LeadingZeroCount(-1L));
+            Assert.AreEqual(0, BitOps.LeadingZeroCount(long.MinValue));
+            Assert.AreEqual(1, BitOps.LeadingZeroCount(0x4000_0000_0000_0000L));
+            for (int iteration = 0; iteration < 1_000; ++iteration)
+            {
+                int signed = Rng.Next(int.MinValue, int.MaxValue);
+                Assert.AreEqual(
+                    BitOps.LeadingZeroCount((uint)signed),
+                    BitOps.LeadingZeroCount(signed),
+                    $"value={signed}"
+                );
+                long wide = unchecked((long)RandomUlong());
+                Assert.AreEqual(
+                    BitOps.LeadingZeroCount((ulong)wide),
+                    BitOps.LeadingZeroCount(wide),
+                    $"value={wide}"
+                );
+            }
+        }
+
+        [Test]
+        public void RotateLeftUintMatchesBitwiseReference()
+        {
+            uint[] values = { 0U, 1U, 0x8000_0000U, 0xDEAD_BEEFU, uint.MaxValue };
+            int[] offsets =
+            {
+                0,
+                1,
+                7,
+                31,
+                32,
+                33,
+                63,
+                64,
+                65,
+                -1,
+                -7,
+                -31,
+                -32,
+                -33,
+                int.MinValue,
+                int.MaxValue,
+            };
+            foreach (uint value in values)
+            {
+                foreach (int offset in offsets)
+                {
+                    Assert.AreEqual(
+                        ReferenceRotateLeft(value, offset),
+                        BitOps.RotateLeft(value, offset),
+                        $"value={value:X8}, offset={offset}"
+                    );
+                    Assert.AreEqual(
+                        ReferenceRotateRight(value, offset),
+                        BitOps.RotateRight(value, offset),
+                        $"value={value:X8}, offset={offset}"
+                    );
+                }
+            }
+
+            for (int iteration = 0; iteration < 256; ++iteration)
+            {
+                uint value = unchecked((uint)Rng.Next());
+                int offset = Rng.Next(-128, 128);
+                Assert.AreEqual(
+                    ReferenceRotateLeft(value, offset),
+                    BitOps.RotateLeft(value, offset),
+                    $"value={value:X8}, offset={offset}"
+                );
+            }
+        }
+
+        [Test]
+        public void RotateLeftUlongMatchesBitwiseReference()
+        {
+            ulong[] values = { 0UL, 1UL, UlongHighestBit, 0xDEAD_BEEF_0123_4567UL, ulong.MaxValue };
+            int[] offsets =
+            {
+                0,
+                1,
+                7,
+                63,
+                64,
+                65,
+                127,
+                128,
+                129,
+                -1,
+                -7,
+                -63,
+                -64,
+                -65,
+                int.MinValue,
+                int.MaxValue,
+            };
+            foreach (ulong value in values)
+            {
+                foreach (int offset in offsets)
+                {
+                    Assert.AreEqual(
+                        ReferenceRotateLeft(value, offset),
+                        BitOps.RotateLeft(value, offset),
+                        $"value={value:X16}, offset={offset}"
+                    );
+                    Assert.AreEqual(
+                        ReferenceRotateRight(value, offset),
+                        BitOps.RotateRight(value, offset),
+                        $"value={value:X16}, offset={offset}"
+                    );
+                }
+            }
+
+            for (int iteration = 0; iteration < 256; ++iteration)
+            {
+                ulong value = RandomUlong();
+                int offset = Rng.Next(-128, 128);
+                Assert.AreEqual(
+                    ReferenceRotateLeft(value, offset),
+                    BitOps.RotateLeft(value, offset),
+                    $"value={value:X16}, offset={offset}"
+                );
+            }
+        }
+
+        [Test]
+        public void RotationSignedOverloadsUseTheUnsignedPattern()
+        {
+            const int intPattern = unchecked((int)0xDEAD_BEEFU);
+            const long longPattern = unchecked((long)0xDEAD_BEEF_0123_4567UL);
+            Assert.AreEqual(
+                BitOps.RotateLeft(unchecked((uint)intPattern), 5),
+                unchecked((uint)BitOps.RotateLeft(intPattern, 5))
+            );
+            Assert.AreEqual(
+                BitOps.RotateRight(unchecked((uint)intPattern), 5),
+                unchecked((uint)BitOps.RotateRight(intPattern, 5))
+            );
+            Assert.AreEqual(
+                BitOps.RotateLeft(unchecked((ulong)longPattern), 9),
+                unchecked((ulong)BitOps.RotateLeft(longPattern, 9))
+            );
+            Assert.AreEqual(
+                BitOps.RotateRight(unchecked((ulong)longPattern), 9),
+                unchecked((ulong)BitOps.RotateRight(longPattern, 9))
+            );
+            Assert.AreEqual(intPattern, BitOps.RotateLeft(intPattern, 32));
+            Assert.AreEqual(intPattern, BitOps.RotateRight(intPattern, -32));
+            Assert.AreEqual(longPattern, BitOps.RotateLeft(longPattern, 64));
+            Assert.AreEqual(longPattern, BitOps.RotateRight(longPattern, -64));
+        }
+
+        [Test]
+        public void RotateRightReversesRotateLeft()
+        {
+            for (int iteration = 0; iteration < 256; ++iteration)
+            {
+                uint narrow = unchecked((uint)Rng.Next());
+                int narrowOffset = Rng.Next(-128, 128);
+                Assert.AreEqual(
+                    narrow,
+                    BitOps.RotateRight(BitOps.RotateLeft(narrow, narrowOffset), narrowOffset)
+                );
+                ulong wide = RandomUlong();
+                int wideOffset = Rng.Next(-128, 128);
+                Assert.AreEqual(
+                    wide,
+                    BitOps.RotateRight(BitOps.RotateLeft(wide, wideOffset), wideOffset)
+                );
             }
         }
 

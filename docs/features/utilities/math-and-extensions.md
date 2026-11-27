@@ -85,6 +85,27 @@ bool close = 0.1f.Approximately(0.10001f, 0.0001f); // true
 
 <a id="geometry"></a>
 
+### Restart Schedules (`Sequences`)
+
+`Sequences.Luby` returns the 1-based Luby restart multiplier, a power of two:
+1, 1, 2, 1, 1, 2, 4, 1, and so on. It suits search restarts and retry schedules whose run-time
+distribution is unknown. The span overload fills a precomputed schedule once.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using System;
+using WallstopStudios.UnityHelpers.Core.Helper;
+
+long second = Sequences.Luby(2); // 1
+long seventh = Sequences.Luby(7); // 4
+Span<long> schedule = stackalloc long[8];
+Sequences.Luby(schedule); // 1, 1, 2, 1, 1, 2, 4, 1
+```
+
+`Luby` throws `ArgumentOutOfRangeException` for an index below one. `Sequences.TryLuby` returns
+`false` and a zero value instead, for callers that cannot prove the index is positive.
+
 ## Geometry
 
 ### Line2D: 2D line segment operations
@@ -786,6 +807,19 @@ using WallstopStudios.UnityHelpers.Core.Extension;
 Color avg = sprite.GetAverageColor(ColorAveragingMethod.LAB);
 string html = avg.ToHex();
 ```
+
+Alpha and backdrop helpers keep the RGB channels independent from opacity:
+
+```csharp
+Color faded = color.ScaleAlpha(0.5f);        // half the existing alpha
+Color opaque = color.WithAlpha(1f);          // replace the alpha
+Color overCard = color.BlendOver(card, 0.6f); // blend toward card, keep color's alpha
+```
+
+`BlendOver` lerps linear values and converts back to gamma when the project uses the Linear color
+space. At `0` it returns the backdrop's RGB, and at `1` it returns the foreground's RGB. The
+foreground's alpha is preserved in every case. It reads `QualitySettings.activeColorSpace`, so call
+it on the main thread.
 
 Dominant color example (bucket-based):
 
