@@ -148,6 +148,19 @@ public bool TryParse(string json, out MyData result, out string error)
 }
 ```
 
+A new public helper that takes a position, index or offset is a failable operation even when the
+originating issue asks for a throwing API. Return a documented sentinel (`0`, `false` or
+`default`) and provide a `TryXxx` sibling. Do not add a new throwing overload; existing throwing
+APIs are grandfathered.
+
+### Class-level thread-safety remarks
+
+A class-level "All methods are thread-safe" remark is only true when every method is pure value
+work. If a method reads a Unity object or project setting, enumerates a caller-owned collection,
+fills a caller-owned buffer, or uses a supplied `IRandom`, name that dependency in the class remark
+or point to the method's own thread-safety remarks. Never let a blanket class claim contradict a
+method remark.
+
 ### 3. Safe Indexing
 
 ```csharp

@@ -30,6 +30,8 @@
 
 ### [2. TryXxx Pattern for Failable Operations](../references/defensive-programming-part-1.md#2-tryxxx-pattern-for-failable-operations)
 
+### [Class-level thread-safety remarks](../references/defensive-programming-part-1.md#class-level-thread-safety-remarks)
+
 ### [3. Safe Indexing](../references/defensive-programming-part-1.md#3-safe-indexing)
 
 ### [4. Null-Safe Unity Object Handling](../references/defensive-programming-part-2.md#4-null-safe-unity-object-handling)
