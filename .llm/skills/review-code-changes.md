@@ -95,8 +95,8 @@ When review feedback is part of the task, fetch current issue comments, reviews,
 
 Give each current actionable comment a disposition backed by the implementation, a regression test, or a specific explanation. Read full comment bodies and nested replies. After a push, inspect new feedback against the pushed commit and repeat before merge. Record any remaining requests in the issue or handoff with their current identifiers.
 
-Before acting on a missing-file or out-of-scope finding, verify it against the committed tree
-(`git ls-tree -r <base> -- <path>`) and the issue's full comment history, not only the issue body
+Before acting on a missing-file or out-of-scope finding, verify it against the reviewed commit's tree
+(`git ls-tree -r <reviewed-commit> -- <path>`) and the issue's full comment history, not only the issue body
 or the diff viewer. Reply with the blob or comment link, then resolve the finding when it is stale.
 
 ---

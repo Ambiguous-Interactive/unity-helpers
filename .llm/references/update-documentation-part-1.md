@@ -155,14 +155,16 @@ feature's `Added` entry, and drop the bug narration. The same test applies to a 
 `Improved` or `Security` entry whose "before" is behavior no release ever had.
 
 A post-merge review correction follows the same rule. Update the feature's existing `[Unreleased]`
-entry in the follow-up PR, including any final contract such as a sentinel or `TryXxx` sibling.
-When a reviewer asks why a change has no entry, cite the existing line; do not add a `Fixed` entry
-for behavior no release ever had.
+`Added` entry in the follow-up PR, including any final contract such as a sentinel or `TryXxx`
+sibling. If that feature's `Added` entry is already in a released section, leave the released
+section unchanged and add no `Fixed` entry; the defect still never shipped. When a reviewer asks why
+a change has no entry, cite the existing line.
 
-**Decide with git, never memory** — the subject shipped only if it existed at the last release tag:
+**Decide with git, never memory** — the defect shipped only if the defective behavior existed at the
+last release tag. A file or symbol check is not enough; the file can predate the defect.
 
 ```bash
-git tag --sort=-v:refname | head -1                       # last release tag
-git ls-tree -r --name-only <tag> -- <path>                # did the file exist?
-git show <tag>:<path> | rg <symbol>                       # did the symbol exist?
+git tag --sort=-v:refname | head -1                          # last release tag
+git ls-tree -r --name-only <tag> -- <path>                   # did the file exist?
+git show <tag>:<path> | rg -n '<the defective code shape>'   # did the defect exist?
 ```
