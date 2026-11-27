@@ -199,6 +199,13 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             }
         }
 
+        /// <inheritdoc />
+        public override double NextDouble()
+        {
+            return ComposeDouble(NextUlong());
+        }
+
+        /// <inheritdoc />
         public override ulong NextUlong()
         {
             return NextWord();

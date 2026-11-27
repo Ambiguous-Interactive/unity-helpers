@@ -140,6 +140,18 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             return NextUintInternal(ref _position);
         }
 
+        /// <inheritdoc />
+        public override ulong NextUlong()
+        {
+            return ComposeUlong(NextUint(), NextUint());
+        }
+
+        /// <inheritdoc />
+        public override double NextDouble()
+        {
+            return ComposeDouble(NextUlong());
+        }
+
         public float NextNoise(int x, int y)
         {
             return NextNoise(x, y, _position);
