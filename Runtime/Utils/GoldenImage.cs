@@ -121,9 +121,9 @@ namespace WallstopStudios.UnityHelpers.Utils
             out int contrast
         )
         {
-            contrast = 0;
             if (image == null || index < 0 || image.Length <= index)
             {
+                contrast = 0;
                 return false;
             }
 
@@ -131,6 +131,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             int y = index / width;
             if (height <= y)
             {
+                contrast = 0;
                 return false;
             }
 
@@ -139,6 +140,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             bool brighterThanEveryNeighbor = true;
             bool darkerThanEveryNeighbor = true;
             bool hasNeighbor = false;
+            int foundContrast = 0;
             for (int offsetY = -1; offsetY <= 1; ++offsetY)
             {
                 int neighborY = y + offsetY;
@@ -158,9 +160,9 @@ namespace WallstopStudios.UnityHelpers.Utils
                     hasNeighbor = true;
                     int neighborLuma = Luma(image[neighborY * width + neighborX]);
                     int difference = Math.Abs(centerLuma - neighborLuma);
-                    if (contrast < difference)
+                    if (foundContrast < difference)
                     {
-                        contrast = difference;
+                        foundContrast = difference;
                     }
 
                     if (centerLuma <= neighborLuma)
@@ -175,6 +177,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
             }
 
+            contrast = foundContrast;
             return hasNeighbor && (brighterThanEveryNeighbor || darkerThanEveryNeighbor);
         }
 
