@@ -9,12 +9,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
     [TestFixture]
     [Category("Fast")]
-    public sealed class DepthScratchTests
+    public sealed class DepthScratchArrayTests
     {
         [Test]
         public void ReusesStorageForTheSameDepth()
         {
-            DepthScratch<int> scratch = new();
+            DepthScratchArray<int> scratch = new();
             Span<int> first = scratch.Get(2, 4);
             first[0] = 17;
 
@@ -26,7 +26,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [Test]
         public void GrowsStorageAndPreservesExistingValues()
         {
-            DepthScratch<int> scratch = new();
+            DepthScratchArray<int> scratch = new();
             Span<int> first = scratch.Get(0, 2);
             first[0] = 1;
             first[1] = 2;
@@ -41,7 +41,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [Test]
         public void SeparateDepthsKeepSeparateArrays()
         {
-            DepthScratch<int> scratch = new();
+            DepthScratchArray<int> scratch = new();
             Span<int> first = scratch.Get(0, 3);
             first[0] = 9;
 
@@ -54,7 +54,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public void DeepDepthsGrowTheDepthTable()
         {
             const int DepthCount = 64;
-            DepthScratch<int> scratch = new();
+            DepthScratchArray<int> scratch = new();
             for (int depth = 0; depth < DepthCount; ++depth)
             {
                 Span<int> span = scratch.Get(depth, 2);
@@ -68,33 +68,54 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         }
 
         [Test]
+        public void MaximumDepthIsAccepted()
+        {
+            DepthScratchArray<int> scratch = new();
+
+            Span<int> span = scratch.Get(DepthScratchArray<int>.MaximumDepth, 1);
+            span[0] = 7;
+
+            Assert.AreEqual(7, span[0]);
+        }
+
+        [Test]
         public void ZeroLengthReturnsAnEmptySpan()
         {
-            DepthScratch<int> scratch = new();
+            DepthScratchArray<int> scratch = new();
 
             Assert.IsTrue(scratch.Get(5, 0).IsEmpty);
         }
 
         [Test]
-        public void NegativeDepthIsRejected()
+        public void NegativeDepthReturnsAnEmptySpan()
         {
-            DepthScratch<int> scratch = new();
+            DepthScratchArray<int> scratch = new();
 
-            Assert.Throws<ArgumentOutOfRangeException>(() =>
-            {
-                scratch.Get(-1, 1);
-            });
+            Assert.IsTrue(scratch.Get(-1, 1).IsEmpty);
         }
 
         [Test]
-        public void NegativeLengthIsRejected()
+        public void NegativeLengthReturnsAnEmptySpan()
         {
-            DepthScratch<int> scratch = new();
+            DepthScratchArray<int> scratch = new();
 
-            Assert.Throws<ArgumentOutOfRangeException>(() =>
-            {
-                scratch.Get(0, -1);
-            });
+            Assert.IsTrue(scratch.Get(0, -1).IsEmpty);
+        }
+
+        [Test]
+        public void DepthAboveMaximumReturnsAnEmptySpan()
+        {
+            DepthScratchArray<int> scratch = new();
+
+            Assert.IsTrue(scratch.Get(DepthScratchArray<int>.MaximumDepth + 1, 1).IsEmpty);
+        }
+
+        [Test]
+        public void MaximumIntegerDepthDoesNotOverflow()
+        {
+            DepthScratchArray<int> scratch = new();
+
+            Assert.IsTrue(scratch.Get(int.MaxValue, 1).IsEmpty);
         }
     }
 }

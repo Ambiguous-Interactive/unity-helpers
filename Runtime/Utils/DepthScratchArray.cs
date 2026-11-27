@@ -8,38 +8,24 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// <summary>Keeps one grow-only scratch array per recursion depth.</summary>
     /// <remarks>
     /// One instance belongs to one search or thread. Growth preserves existing contents, and a
-    /// smaller request exposes the stale prefix, so write every slot before reading it.
+    /// smaller request exposes the stale prefix, so write every slot before reading it. Negative
+    /// requests and depths above <see cref="MaximumDepth"/> return an empty span.
     /// </remarks>
-    public sealed class DepthScratch<T>
+    public sealed class DepthScratchArray<T>
     {
+        /// <summary>Largest depth this instance will store.</summary>
+        public const int MaximumDepth = 65536;
+
         private const int InitialDepth = 4;
         private T[][] _buffers = Array.Empty<T[]>();
 
         /// <summary>Returns the scratch span kept for a recursion depth.</summary>
-        /// <param name="depth">Nonnegative recursion depth.</param>
+        /// <param name="depth">Recursion depth, from zero through <see cref="MaximumDepth"/>.</param>
         /// <param name="length">Requested logical length; zero returns an empty span.</param>
-        /// <exception cref="ArgumentOutOfRangeException">Thrown when depth or length is negative.</exception>
+        /// <returns>An empty span for a negative depth, a depth above the maximum, or a nonpositive length.</returns>
         public Span<T> Get(int depth, int length)
         {
-            if (depth < 0)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(depth),
-                    depth,
-                    "Must be non-negative."
-                );
-            }
-
-            if (length < 0)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(length),
-                    length,
-                    "Must be non-negative."
-                );
-            }
-
-            if (length == 0)
+            if (depth < 0 || MaximumDepth < depth || length <= 0)
             {
                 return Span<T>.Empty;
             }
