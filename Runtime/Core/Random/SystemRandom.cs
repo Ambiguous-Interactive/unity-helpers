@@ -175,6 +175,13 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             return unchecked((uint)Next());
         }
 
+        public override ulong NextUlong()
+        {
+            uint upper = NextUint();
+            uint lower = NextUint();
+            return ((ulong)upper << 32) | lower;
+        }
+
         public override bool NextBool()
         {
             return Next() < HalfwayInt;

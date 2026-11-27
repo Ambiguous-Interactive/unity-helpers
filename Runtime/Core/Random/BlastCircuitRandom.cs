@@ -199,6 +199,13 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             }
         }
 
+        public override double NextDouble()
+        {
+            const double scale = 1.0 / 9007199254740992.0;
+            ulong combined = NextUlong() >> 11;
+            return combined * scale;
+        }
+
         public override ulong NextUlong()
         {
             return NextWord();

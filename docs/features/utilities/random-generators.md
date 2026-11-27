@@ -182,6 +182,11 @@ against 3.28 ns.
 `XoroShiroRandom` deliberately does not: xoroshiro128+ is a `+` scrambler with no strong 64-bit word
 to hand back, so it keeps composing a 64-bit draw out of two strong halves.
 
+Every sealed generator also overrides `NextUlong()` and `NextDouble()` with the same formula as the
+base class. A caller that holds the generator as `IRandom` therefore lands in the concrete type,
+where the two 32-bit draws can be inlined instead of crossing the base class's virtual calls. The
+returned stream is unchanged.
+
 A generator that answers 64-bit draws in one advance produces a **different sequence** for the same
 seed than 3.5.1 did. See [Seeded streams that moved](#seeded-streams-that-moved).
 

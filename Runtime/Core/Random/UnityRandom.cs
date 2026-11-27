@@ -185,6 +185,20 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             return unchecked((uint)UnityEngine.Random.Range(int.MinValue, int.MaxValue));
         }
 
+        public override ulong NextUlong()
+        {
+            uint upper = NextUint();
+            uint lower = NextUint();
+            return ((ulong)upper << 32) | lower;
+        }
+
+        public override double NextDouble()
+        {
+            const double scale = 1.0 / 9007199254740992.0;
+            ulong combined = NextUlong() >> 11;
+            return combined * scale;
+        }
+
         public override IRandom Copy()
         {
             // Clone the complete state without advancing the shared engine stream.
