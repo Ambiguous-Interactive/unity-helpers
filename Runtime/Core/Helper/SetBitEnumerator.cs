@@ -53,7 +53,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <summary>Hashes the traversal state.</summary>
         public override int GetHashCode()
         {
-            return HashCode.Combine(_remaining, Current);
+            return Objects.HashCode(_remaining, Current);
         }
     }
 }

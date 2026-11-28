@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     using System;
     using System.Collections;
     using System.Collections.Generic;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     /// <summary>Stores all unsigned 64-bit keys using mixed open addressing.</summary>
     /// <remarks>Uses packed keys and hash-slot indices without value storage. Not thread-safe; iteration is unordered and detects mutation.</remarks>
@@ -257,7 +258,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             /// <summary>Hashes the traversal state.</summary>
             public override int GetHashCode()
             {
-                return HashCode.Combine(_owner, _version, _index);
+                return Objects.HashCode(_owner, _version, _index);
             }
 
             private void ValidateVersion()

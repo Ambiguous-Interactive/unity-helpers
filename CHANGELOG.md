@@ -49,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Use deterministic `Objects.HashCode` composition for runtime and editor value hashes instead of `System.HashCode` ([#1364](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1364)).
 - Sort spans in place without a full-length pooled copy. A comparer exception now propagates and leaves the contents unspecified, so the hot path carries no recovery work ([#1157](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1157)).
 - Use hardware bit counts and floor log2 in `BitOps` on supported .NET targets ([#1285](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1285), [#1303](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1303)).
 - Let every sealed random generator answer `NextUlong` and `NextDouble` directly, so an `IRandom` receiver avoids extra virtual dispatch without changing any stream ([#1298](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1298)).

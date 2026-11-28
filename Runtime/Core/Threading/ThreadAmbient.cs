@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
 {
     using System;
     using System.Threading;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     /// <summary>Holds one scoped value per thread and closed generic type.</summary>
     /// <typeparam name="T">The ambient context value type.</typeparam>
@@ -124,7 +125,7 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
             /// <inheritdoc />
             public override int GetHashCode()
             {
-                return HashCode.Combine(_thread, _identity);
+                return Objects.HashCode(_thread, _identity);
             }
         }
     }

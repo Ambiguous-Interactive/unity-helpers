@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Editor.Validation
 {
+    using WallstopStudios.UnityHelpers.Core.Helper;
 #if UNITY_EDITOR
     using System;
     using System.Collections.Generic;
@@ -91,7 +92,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         /// <inheritdoc />
         public override int GetHashCode()
         {
-            return HashCode.Combine(Kind, DeclaringType, Name);
+            return Objects.HashCode(Kind, DeclaringType, Name);
         }
     }
 #endif

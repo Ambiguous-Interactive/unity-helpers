@@ -148,6 +148,12 @@
     "inputs": ["@csharp", "@tooling"]
   },
   {
+    "id": "hashcode-policy",
+    "name": "Deterministic hash composition",
+    "run": "uv run --quiet --project scripts/python~ --locked pytest scripts/tests/test_hashcode_policy.py -q",
+    "inputs": ["@csharp", "@tooling"]
+  },
+  {
     "id": "license-headers",
     "name": "MIT license headers",
     "run": "npm run lint:license-headers",

@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     using System;
     using System.Collections.Generic;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     /// <summary>Counts independent holds and reports transitions between held and released.</summary>
     /// <remarks>
@@ -182,7 +183,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             /// <inheritdoc />
             public override int GetHashCode()
             {
-                return HashCode.Combine(_set, _identity);
+                return Objects.HashCode(_set, _identity);
             }
         }
     }
