@@ -120,7 +120,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         public void FractionalEnumInputsAreRejected()
         {
             Assert.IsFalse(ValueCoercion.TryCoerce(typeof(Sample), 1.5d, out object fractional));
-            Assert.IsNull(fractional);
+            Assert.IsTrue(fractional == null);
             Assert.IsTrue(ValueCoercion.TryCoerce(typeof(Sample), 2d, out object integral));
             Assert.AreEqual(Sample.Second, integral);
         }
@@ -130,9 +130,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         {
             ThrowingConvertible input = new();
             Assert.IsFalse(ValueCoercion.TryCoerce(typeof(Sample), input, out object enumValue));
-            Assert.IsNull(enumValue);
+            Assert.IsTrue(enumValue == null);
             Assert.IsFalse(ValueCoercion.TryCoerce(typeof(string), input, out object text));
-            Assert.IsNull(text);
+            Assert.IsTrue(text == null);
         }
 
         [Test]
