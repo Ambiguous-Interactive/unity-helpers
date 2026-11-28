@@ -108,9 +108,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             Assert.IsTrue(mask.Pixels == null);
             Assert.That(readError, Does.Contain("separate alpha"));
             Assert.IsFalse(
+                SpriteMaskReader.TryRead(
+                    sprite,
+                    out _,
+                    out string importedError,
+                    source: SpriteMaskReadSource.ImportedTexture
+                )
+            );
+            Assert.That(importedError, Does.Contain("separate alpha"));
+            Assert.IsFalse(
                 SpriteArtBounds.TryGetLocalArtBounds(sprite, out Bounds bounds, out string error)
             );
             Assert.AreEqual(default(Bounds), bounds);
+            Assert.That(error, Does.Contain("separate alpha"));
+            Assert.IsFalse(
+                SpriteArtBounds.TryGetLocalArtBounds(
+                    sprite,
+                    out _,
+                    out error,
+                    source: SpriteMaskReadSource.ImportedTexture
+                )
+            );
             Assert.That(error, Does.Contain("separate alpha"));
         }
 
@@ -203,11 +221,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             importer.spriteImportMode = SpriteImportMode.Single;
             importer.textureCompression = TextureImporterCompression.Uncompressed;
             importer.isReadable = true;
+            importer.maxTextureSize = 32;
             importer.spritePixelsPerUnit = 16;
             importer.SaveAndReimport();
             Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(path);
             Assert.IsTrue(sprite != null);
             Assert.IsTrue(sprite.texture.isReadable);
+            Assert.AreEqual(32, sprite.texture.width);
 
             Assert.IsTrue(
                 SpriteMaskReader.TryRead(
@@ -227,9 +247,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 ),
                 error
             );
-            CollectionAssert.AreEqual(sourceMask.Pixels, importedMask.Pixels);
-            Assert.AreEqual(sourceMask.Pivot, importedMask.Pivot);
-            Assert.AreEqual(sourceMask.UnitsPerPixel, importedMask.UnitsPerPixel);
+            Assert.AreEqual(64, sourceMask.Width);
+            Assert.AreEqual(32, importedMask.Width);
 
             Assert.IsTrue(
                 SpriteArtBounds.TryGetLocalArtBounds(sprite, out Bounds sourceBounds, out error),
@@ -244,7 +263,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 ),
                 error
             );
-            Assert.AreEqual(sourceBounds, importedBounds);
+            Assert.That(importedBounds.center.x, Is.EqualTo(sourceBounds.center.x).Within(0.0001f));
+            Assert.That(importedBounds.center.y, Is.EqualTo(sourceBounds.center.y).Within(0.0001f));
+            Assert.That(importedBounds.size.x, Is.EqualTo(sourceBounds.size.x).Within(0.0001f));
+            Assert.That(importedBounds.size.y, Is.EqualTo(sourceBounds.size.y).Within(0.0001f));
 
             Assert.IsTrue(
                 SpriteArtBounds.TryGetCentreOfLargestDarkestInkRegion(
@@ -265,7 +287,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 ),
                 error
             );
-            Assert.AreEqual(sourceInk, importedInk);
+            Assert.That(importedInk.x, Is.EqualTo(sourceInk.x).Within(0.0001f));
+            Assert.That(importedInk.y, Is.EqualTo(sourceInk.y).Within(0.0001f));
         }
 
         [Test]
