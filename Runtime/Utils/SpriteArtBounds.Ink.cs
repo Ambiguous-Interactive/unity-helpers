@@ -11,6 +11,24 @@ namespace WallstopStudios.UnityHelpers.Utils
     public static partial class SpriteArtBounds
     {
         /// <summary>Finds the local centroid of the largest connected region of an eligible dark colour.</summary>
+        /// <remarks>Uses <see cref="SpriteMaskReadSource.SourcePng"/> in the Editor.</remarks>
+        public static bool TryGetCentreOfLargestDarkestInkRegion(
+            Sprite sprite,
+            float minimumShare,
+            out Vector2 centre,
+            out string error
+        )
+        {
+            return TryGetCentreOfLargestDarkestInkRegion(
+                sprite,
+                minimumShare,
+                out centre,
+                out error,
+                SpriteMaskReadSource.SourcePng
+            );
+        }
+
+        /// <summary>Finds the local centroid of the largest connected region of an eligible dark colour.</summary>
         /// <param name="sprite">The sprite to read without changing import settings.</param>
         /// <param name="minimumShare">The minimum fraction of fully opaque pixels belonging to the colour, from zero through one.</param>
         /// <param name="centre">The region's pixel-centre average in local units, or zero on failure.</param>
@@ -33,7 +51,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             float minimumShare,
             out Vector2 centre,
             out string error,
-            SpriteMaskReadSource source = SpriteMaskReadSource.SourcePng
+            SpriteMaskReadSource source
         )
         {
             if (!WallMath.IsFinite(minimumShare) || minimumShare < 0 || 1 < minimumShare)

@@ -21,11 +21,6 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// <param name="mask">New mask pixels and their local coordinate mapping, or default on failure.</param>
         /// <param name="error">The reason reading failed, or null on success.</param>
         /// <param name="alphaThreshold">The minimum nonzero alpha byte considered opaque.</param>
-        /// <param name="source">
-        /// Which texture the Editor reads. <see cref="SpriteMaskReadSource.SourcePng"/> keeps the
-        /// original source pixels; <see cref="SpriteMaskReadSource.ImportedTexture"/> reads the
-        /// imported, readable texture that the player draws. Players always read their readable texture.
-        /// </param>
         /// <returns>Whether the sprite's exact pixel mask could be read.</returns>
         /// <remarks>
         /// Alpha zero is always transparent; other pixels are opaque at or above the threshold.
@@ -38,8 +33,35 @@ namespace WallstopStudios.UnityHelpers.Utils
             Sprite sprite,
             out SpriteAlphaMask mask,
             out string error,
-            byte alphaThreshold = 1,
-            SpriteMaskReadSource source = SpriteMaskReadSource.SourcePng
+            byte alphaThreshold = 1
+        )
+        {
+            return TryRead(
+                sprite,
+                out mask,
+                out error,
+                alphaThreshold,
+                SpriteMaskReadSource.SourcePng
+            );
+        }
+
+        /// <summary>Reads the selected Editor texture source into a mask.</summary>
+        /// <param name="sprite">The sprite to read on Unity's main thread.</param>
+        /// <param name="mask">New mask pixels and their local coordinate mapping, or default on failure.</param>
+        /// <param name="error">The reason reading failed, or null on success.</param>
+        /// <param name="alphaThreshold">The minimum nonzero alpha byte considered opaque.</param>
+        /// <param name="source">
+        /// Which texture the Editor reads. <see cref="SpriteMaskReadSource.SourcePng"/> keeps the
+        /// original source pixels; <see cref="SpriteMaskReadSource.ImportedTexture"/> reads the
+        /// imported, readable texture that the player draws. Players always read their readable texture.
+        /// </param>
+        /// <returns>Whether the sprite's exact pixel mask could be read.</returns>
+        public static bool TryRead(
+            Sprite sprite,
+            out SpriteAlphaMask mask,
+            out string error,
+            byte alphaThreshold,
+            SpriteMaskReadSource source
         )
         {
             try

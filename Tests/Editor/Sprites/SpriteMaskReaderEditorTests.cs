@@ -112,6 +112,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                     sprite,
                     out _,
                     out string importedError,
+                    alphaThreshold: 1,
                     source: SpriteMaskReadSource.ImportedTexture
                 )
             );
@@ -126,6 +127,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                     sprite,
                     out _,
                     out error,
+                    alphaThreshold: 1,
                     source: SpriteMaskReadSource.ImportedTexture
                 )
             );
@@ -234,6 +236,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                     sprite,
                     out SpriteAlphaMask sourceMask,
                     out string error,
+                    alphaThreshold: 1,
                     source: SpriteMaskReadSource.SourcePng
                 ),
                 error
@@ -243,6 +246,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                     sprite,
                     out SpriteAlphaMask importedMask,
                     out error,
+                    alphaThreshold: 1,
                     source: SpriteMaskReadSource.ImportedTexture
                 ),
                 error
@@ -259,14 +263,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                     sprite,
                     out Bounds importedBounds,
                     out error,
+                    alphaThreshold: 1,
                     source: SpriteMaskReadSource.ImportedTexture
                 ),
                 error
             );
-            Assert.That(importedBounds.center.x, Is.EqualTo(sourceBounds.center.x).Within(0.0001f));
-            Assert.That(importedBounds.center.y, Is.EqualTo(sourceBounds.center.y).Within(0.0001f));
-            Assert.That(importedBounds.size.x, Is.EqualTo(sourceBounds.size.x).Within(0.0001f));
-            Assert.That(importedBounds.size.y, Is.EqualTo(sourceBounds.size.y).Within(0.0001f));
+            AssertBounds(sourceBounds, ExpectedBounds(sourceMask));
+            AssertBounds(importedBounds, ExpectedBounds(importedMask));
 
             Assert.IsTrue(
                 SpriteArtBounds.TryGetCentreOfLargestDarkestInkRegion(
@@ -287,8 +290,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 ),
                 error
             );
-            Assert.That(importedInk.x, Is.EqualTo(sourceInk.x).Within(0.0001f));
-            Assert.That(importedInk.y, Is.EqualTo(sourceInk.y).Within(0.0001f));
+            AssertVector(sourceInk, ExpectedCentroid(sourceMask));
+            AssertVector(importedInk, ExpectedCentroid(importedMask));
         }
 
         [Test]
@@ -316,6 +319,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                     sprite,
                     out SpriteAlphaMask mask,
                     out string error,
+                    alphaThreshold: 1,
                     source: SpriteMaskReadSource.ImportedTexture
                 )
             );
@@ -323,7 +327,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             Assert.That(error, Does.Contain("imported texture requires a readable"));
 
             Assert.IsFalse(
-                SpriteMaskReader.TryRead(sprite, out _, out error, source: (SpriteMaskReadSource)99)
+                SpriteMaskReader.TryRead(
+                    sprite,
+                    out _,
+                    out error,
+                    alphaThreshold: 1,
+                    source: (SpriteMaskReadSource)99
+                )
             );
             Assert.That(error, Does.Contain("read source is unknown"));
         }
@@ -643,6 +653,76 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             Assert.AreEqual(before, EditorJsonUtility.ToJson(importer));
             Assert.IsFalse(importer.isReadable);
             yield break;
+        }
+
+        private static void AssertBounds(Bounds actual, Bounds expected)
+        {
+            Assert.That(actual.center.x, Is.EqualTo(expected.center.x).Within(0.0001f));
+            Assert.That(actual.center.y, Is.EqualTo(expected.center.y).Within(0.0001f));
+            Assert.That(actual.size.x, Is.EqualTo(expected.size.x).Within(0.0001f));
+            Assert.That(actual.size.y, Is.EqualTo(expected.size.y).Within(0.0001f));
+        }
+
+        private static void AssertVector(Vector2 actual, Vector2 expected)
+        {
+            Assert.That(actual.x, Is.EqualTo(expected.x).Within(0.0001f));
+            Assert.That(actual.y, Is.EqualTo(expected.y).Within(0.0001f));
+        }
+
+        private static Bounds ExpectedBounds(SpriteAlphaMask mask)
+        {
+            int left = mask.Width;
+            int bottom = mask.Height;
+            int right = -1;
+            int top = -1;
+            for (int y = 0; y < mask.Height; ++y)
+            {
+                for (int x = 0; x < mask.Width; ++x)
+                {
+                    if (!mask.Pixels[y * mask.Width + x])
+                    {
+                        continue;
+                    }
+                    left = Math.Min(left, x);
+                    bottom = Math.Min(bottom, y);
+                    right = Math.Max(right, x);
+                    top = Math.Max(top, y);
+                }
+            }
+            Assert.That(right, Is.GreaterThanOrEqualTo(left), "The mask has no opaque pixels.");
+            float minX = (left - mask.Pivot.x) * mask.UnitsPerPixel.x;
+            float minY = (bottom - mask.Pivot.y) * mask.UnitsPerPixel.y;
+            float maxX = (right + 1 - mask.Pivot.x) * mask.UnitsPerPixel.x;
+            float maxY = (top + 1 - mask.Pivot.y) * mask.UnitsPerPixel.y;
+            return new Bounds(
+                new Vector3((minX + maxX) * 0.5f, (minY + maxY) * 0.5f, 0f),
+                new Vector3(maxX - minX, maxY - minY, 0f)
+            );
+        }
+
+        private static Vector2 ExpectedCentroid(SpriteAlphaMask mask)
+        {
+            double sumX = 0;
+            double sumY = 0;
+            int count = 0;
+            for (int y = 0; y < mask.Height; ++y)
+            {
+                for (int x = 0; x < mask.Width; ++x)
+                {
+                    if (!mask.Pixels[y * mask.Width + x])
+                    {
+                        continue;
+                    }
+                    sumX += x + 0.5;
+                    sumY += y + 0.5;
+                    ++count;
+                }
+            }
+            Assert.That(count, Is.GreaterThan(0), "The mask has no opaque pixels.");
+            return new Vector2(
+                (float)((sumX / count - mask.Pivot.x) * mask.UnitsPerPixel.x),
+                (float)((sumY / count - mask.Pivot.y) * mask.UnitsPerPixel.y)
+            );
         }
 
         private string CreatePng()

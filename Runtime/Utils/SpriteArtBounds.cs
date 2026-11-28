@@ -10,6 +10,24 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// <summary>Measures the bounds of drawn sprite pixels and their transformed corners.</summary>
     public static partial class SpriteArtBounds
     {
+        /// <summary>Reads local art bounds from source PNG pixels in the Editor or readable texture pixels in a player.</summary>
+        /// <remarks>Uses <see cref="SpriteMaskReadSource.SourcePng"/> in the Editor.</remarks>
+        public static bool TryGetLocalArtBounds(
+            Sprite sprite,
+            out Bounds bounds,
+            out string error,
+            byte alphaThreshold = 1
+        )
+        {
+            return TryGetLocalArtBounds(
+                sprite,
+                out bounds,
+                out error,
+                alphaThreshold,
+                SpriteMaskReadSource.SourcePng
+            );
+        }
+
         /// <summary>Reads the local bounds of nontransparent sprite pixels without changing import settings.</summary>
         /// <param name="sprite">The sprite to measure.</param>
         /// <param name="bounds">The local art bounds, or default on failure.</param>
@@ -33,8 +51,8 @@ namespace WallstopStudios.UnityHelpers.Utils
             Sprite sprite,
             out Bounds bounds,
             out string error,
-            byte alphaThreshold = 1,
-            SpriteMaskReadSource source = SpriteMaskReadSource.SourcePng
+            byte alphaThreshold,
+            SpriteMaskReadSource source
         )
         {
             if (
