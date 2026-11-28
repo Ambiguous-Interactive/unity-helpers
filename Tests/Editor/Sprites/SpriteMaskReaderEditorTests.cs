@@ -108,9 +108,29 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             Assert.IsTrue(mask.Pixels == null);
             Assert.That(readError, Does.Contain("separate alpha"));
             Assert.IsFalse(
+                SpriteMaskReader.TryRead(
+                    sprite,
+                    out _,
+                    out string importedError,
+                    alphaThreshold: 1,
+                    source: SpriteMaskReadSource.ImportedTexture
+                )
+            );
+            Assert.That(importedError, Does.Contain("separate alpha"));
+            Assert.IsFalse(
                 SpriteArtBounds.TryGetLocalArtBounds(sprite, out Bounds bounds, out string error)
             );
             Assert.AreEqual(default(Bounds), bounds);
+            Assert.That(error, Does.Contain("separate alpha"));
+            Assert.IsFalse(
+                SpriteArtBounds.TryGetLocalArtBounds(
+                    sprite,
+                    out _,
+                    out error,
+                    alphaThreshold: 1,
+                    source: SpriteMaskReadSource.ImportedTexture
+                )
+            );
             Assert.That(error, Does.Contain("separate alpha"));
         }
 
@@ -191,6 +211,131 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             );
             Assert.AreEqual(before, EditorJsonUtility.ToJson(importer));
             Assert.AreEqual(readable, importer.isReadable);
+        }
+
+        [Test]
+        public void ReadsImportedTextureWhenRequested()
+        {
+            string path = CreatePng();
+            TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
+            Assert.IsTrue(importer != null);
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            importer.textureCompression = TextureImporterCompression.Uncompressed;
+            importer.isReadable = true;
+            importer.maxTextureSize = 32;
+            importer.spritePixelsPerUnit = 16;
+            importer.SaveAndReimport();
+            Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+            Assert.IsTrue(sprite != null);
+            Assert.IsTrue(sprite.texture.isReadable);
+            Assert.AreEqual(32, sprite.texture.width);
+
+            Assert.IsTrue(
+                SpriteMaskReader.TryRead(
+                    sprite,
+                    out SpriteAlphaMask sourceMask,
+                    out string error,
+                    alphaThreshold: 1,
+                    source: SpriteMaskReadSource.SourcePng
+                ),
+                error
+            );
+            Assert.IsTrue(
+                SpriteMaskReader.TryRead(
+                    sprite,
+                    out SpriteAlphaMask importedMask,
+                    out error,
+                    alphaThreshold: 1,
+                    source: SpriteMaskReadSource.ImportedTexture
+                ),
+                error
+            );
+            Assert.AreEqual(64, sourceMask.Width);
+            Assert.AreEqual(32, importedMask.Width);
+
+            Assert.IsTrue(
+                SpriteArtBounds.TryGetLocalArtBounds(sprite, out Bounds sourceBounds, out error),
+                error
+            );
+            Assert.IsTrue(
+                SpriteArtBounds.TryGetLocalArtBounds(
+                    sprite,
+                    out Bounds importedBounds,
+                    out error,
+                    alphaThreshold: 1,
+                    source: SpriteMaskReadSource.ImportedTexture
+                ),
+                error
+            );
+            AssertBounds(sourceBounds, ExpectedBounds(sourceMask));
+            AssertBounds(importedBounds, ExpectedBounds(importedMask));
+
+            Assert.IsTrue(
+                SpriteArtBounds.TryGetCentreOfLargestDarkestInkRegion(
+                    sprite,
+                    1f,
+                    out Vector2 sourceInk,
+                    out error
+                ),
+                error
+            );
+            Assert.IsTrue(
+                SpriteArtBounds.TryGetCentreOfLargestDarkestInkRegion(
+                    sprite,
+                    1f,
+                    out Vector2 importedInk,
+                    out error,
+                    source: SpriteMaskReadSource.ImportedTexture
+                ),
+                error
+            );
+            AssertVector(sourceInk, ExpectedCentroid(sourceMask));
+            AssertVector(importedInk, ExpectedCentroid(importedMask));
+        }
+
+        [Test]
+        public void ImportedTextureModeRefusesUnreadableTextureAndUnknownSource()
+        {
+            string path = CreatePng();
+            TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
+            Assert.IsTrue(importer != null);
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            importer.textureCompression = TextureImporterCompression.Uncompressed;
+            importer.isReadable = false;
+            importer.spritePixelsPerUnit = 16;
+            importer.SaveAndReimport();
+            Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+            Assert.IsTrue(sprite != null);
+            Assert.IsFalse(sprite.texture.isReadable);
+
+            Assert.IsTrue(
+                SpriteMaskReader.TryRead(sprite, out _, out string sourceError),
+                sourceError
+            );
+            Assert.IsFalse(
+                SpriteMaskReader.TryRead(
+                    sprite,
+                    out SpriteAlphaMask mask,
+                    out string error,
+                    alphaThreshold: 1,
+                    source: SpriteMaskReadSource.ImportedTexture
+                )
+            );
+            Assert.IsTrue(mask.Pixels == null);
+            Assert.That(error, Does.Contain("imported texture requires a readable"));
+
+            Assert.IsFalse(
+                SpriteMaskReader.TryRead(
+                    sprite,
+                    out _,
+                    out error,
+                    alphaThreshold: 1,
+                    source: (SpriteMaskReadSource)99
+                )
+            );
+            Assert.That(error, Does.Contain("read source is unknown"));
         }
 
         [Test]
@@ -508,6 +653,76 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             Assert.AreEqual(before, EditorJsonUtility.ToJson(importer));
             Assert.IsFalse(importer.isReadable);
             yield break;
+        }
+
+        private void AssertBounds(Bounds actual, Bounds expected)
+        {
+            Assert.That(actual.center.x, Is.EqualTo(expected.center.x).Within(0.0001f));
+            Assert.That(actual.center.y, Is.EqualTo(expected.center.y).Within(0.0001f));
+            Assert.That(actual.size.x, Is.EqualTo(expected.size.x).Within(0.0001f));
+            Assert.That(actual.size.y, Is.EqualTo(expected.size.y).Within(0.0001f));
+        }
+
+        private void AssertVector(Vector2 actual, Vector2 expected)
+        {
+            Assert.That(actual.x, Is.EqualTo(expected.x).Within(0.0001f));
+            Assert.That(actual.y, Is.EqualTo(expected.y).Within(0.0001f));
+        }
+
+        private Bounds ExpectedBounds(SpriteAlphaMask mask)
+        {
+            int left = mask.Width;
+            int bottom = mask.Height;
+            int right = -1;
+            int top = -1;
+            for (int y = 0; y < mask.Height; ++y)
+            {
+                for (int x = 0; x < mask.Width; ++x)
+                {
+                    if (!mask.Pixels[y * mask.Width + x])
+                    {
+                        continue;
+                    }
+                    left = Math.Min(left, x);
+                    bottom = Math.Min(bottom, y);
+                    right = Math.Max(right, x);
+                    top = Math.Max(top, y);
+                }
+            }
+            Assert.That(right, Is.GreaterThanOrEqualTo(left), "The mask has no opaque pixels.");
+            float minX = (left - mask.Pivot.x) * mask.UnitsPerPixel.x;
+            float minY = (bottom - mask.Pivot.y) * mask.UnitsPerPixel.y;
+            float maxX = (right + 1 - mask.Pivot.x) * mask.UnitsPerPixel.x;
+            float maxY = (top + 1 - mask.Pivot.y) * mask.UnitsPerPixel.y;
+            return new Bounds(
+                new Vector3((minX + maxX) * 0.5f, (minY + maxY) * 0.5f, 0f),
+                new Vector3(maxX - minX, maxY - minY, 0f)
+            );
+        }
+
+        private Vector2 ExpectedCentroid(SpriteAlphaMask mask)
+        {
+            double sumX = 0;
+            double sumY = 0;
+            int count = 0;
+            for (int y = 0; y < mask.Height; ++y)
+            {
+                for (int x = 0; x < mask.Width; ++x)
+                {
+                    if (!mask.Pixels[y * mask.Width + x])
+                    {
+                        continue;
+                    }
+                    sumX += x + 0.5;
+                    sumY += y + 0.5;
+                    ++count;
+                }
+            }
+            Assert.That(count, Is.GreaterThan(0), "The mask has no opaque pixels.");
+            return new Vector2(
+                (float)((sumX / count - mask.Pivot.x) * mask.UnitsPerPixel.x),
+                (float)((sumY / count - mask.Pivot.y) * mask.UnitsPerPixel.y)
+            );
         }
 
         private string CreatePng()

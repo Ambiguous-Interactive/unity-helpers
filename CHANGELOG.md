@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `SpriteMaskReadSource.ImportedTexture` to read the imported sprite texture in mask, bounds and ink-region queries ([#1124](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1124)).
 - Add runtime-`Type` enum parsing and integer conversion, plus invariant `ValueCoercion.TryCoerce` for configuration values ([#1290](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1290)).
 - Add `GoldenImage` tolerant golden-image comparison with optional edge-peak forgiveness ([#1292](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1292)).
 - Add `ScriptingBackendScope` to apply and restore a build target's scripting backend ([#1292](https://github.com/Ambiguous-Interactive/unity-helpers/issues/1292)).

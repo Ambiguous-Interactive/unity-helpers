@@ -24,7 +24,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// <returns>Whether the sprite's exact pixel mask could be read.</returns>
         /// <remarks>
         /// Alpha zero is always transparent; other pixels are opaque at or above the threshold.
-        /// Editor PNG masks honor the texture importer's alpha source.
+        /// Source PNG masks honor the texture importer's alpha source.
         /// Separate alpha textures require original PNG pixels in the Editor.
         /// Readable RGBA32, RGB24, ARGB32, BGRA32, Alpha8, RGB565 and RGBA4444 textures are scanned directly.
         /// The returned mask owns its Boolean array; source PNGs and other formats may need temporary pixels.
@@ -36,6 +36,34 @@ namespace WallstopStudios.UnityHelpers.Utils
             byte alphaThreshold = 1
         )
         {
+            return TryRead(
+                sprite,
+                out mask,
+                out error,
+                alphaThreshold,
+                SpriteMaskReadSource.SourcePng
+            );
+        }
+
+        /// <summary>Reads the selected Editor texture source into a mask.</summary>
+        /// <param name="sprite">The sprite to read on Unity's main thread.</param>
+        /// <param name="mask">New mask pixels and their local coordinate mapping, or default on failure.</param>
+        /// <param name="error">The reason reading failed, or null on success.</param>
+        /// <param name="alphaThreshold">The minimum nonzero alpha byte considered opaque.</param>
+        /// <param name="source">
+        /// Which texture the Editor reads. <see cref="SpriteMaskReadSource.SourcePng"/> keeps the
+        /// original source pixels; <see cref="SpriteMaskReadSource.ImportedTexture"/> reads the
+        /// imported, readable texture that the player draws. Players always read their readable texture.
+        /// </param>
+        /// <returns>Whether the sprite's exact pixel mask could be read.</returns>
+        public static bool TryRead(
+            Sprite sprite,
+            out SpriteAlphaMask mask,
+            out string error,
+            byte alphaThreshold,
+            SpriteMaskReadSource source
+        )
+        {
             try
             {
                 if (
@@ -43,7 +71,8 @@ namespace WallstopStudios.UnityHelpers.Utils
                         sprite,
                         out SpritePixelRegion region,
                         out string failure,
-                        borrowReadableTexture: true
+                        borrowReadableTexture: true,
+                        source: source
                     )
                 )
                 {
@@ -88,7 +117,8 @@ namespace WallstopStudios.UnityHelpers.Utils
             Sprite sprite,
             out SpritePixelRegion region,
             out string error,
-            bool borrowReadableTexture = false
+            bool borrowReadableTexture = false,
+            SpriteMaskReadSource source = SpriteMaskReadSource.SourcePng
         )
         {
             if (sprite == null)
@@ -97,6 +127,17 @@ namespace WallstopStudios.UnityHelpers.Utils
                 region = default;
                 return false;
             }
+
+            if (
+                source != SpriteMaskReadSource.SourcePng
+                && source != SpriteMaskReadSource.ImportedTexture
+            )
+            {
+                error = "The sprite read source is unknown.";
+                region = default;
+                return false;
+            }
+
             try
             {
                 float pixelsPerUnit = sprite.pixelsPerUnit;
@@ -114,7 +155,8 @@ namespace WallstopStudios.UnityHelpers.Utils
 #if UNITY_EDITOR
                 string assetPath = AssetDatabase.GetAssetPath(sprite);
                 if (
-                    !string.IsNullOrWhiteSpace(assetPath)
+                    source == SpriteMaskReadSource.SourcePng
+                    && !string.IsNullOrWhiteSpace(assetPath)
                     && string.Equals(
                         Path.GetExtension(assetPath),
                         ".png",
@@ -182,7 +224,9 @@ namespace WallstopStudios.UnityHelpers.Utils
                 if (texture == null || !texture.isReadable || sprite.packed)
                 {
                     error =
-                        "Exact sprite art needs a source PNG in the Editor or a readable, unpacked texture at runtime. Bake the collider in the Editor and disable this component for unreadable player textures.";
+                        source == SpriteMaskReadSource.ImportedTexture
+                            ? "Reading the imported texture requires a readable, unpacked texture."
+                            : "Exact sprite art needs a source PNG in the Editor or a readable, unpacked texture at runtime. Bake the collider in the Editor and disable this component for unreadable player textures.";
                     region = default;
                     return false;
                 }

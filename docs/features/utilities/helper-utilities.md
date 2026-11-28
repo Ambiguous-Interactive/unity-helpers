@@ -1990,15 +1990,22 @@ Read bounds when the sprite or its source changes. If you already hold a `Sprite
 the mask overload to avoid reading the texture again. The mask overload checks dimensions and
 coordinates, borrows the pixel array, and allocates no result storage.
 
-Mask bounds subtract the stored float pivot from pixel corners in double precision,
-then multiply by the stored float `UnitsPerPixel`. Bounds centres and sizes round to float
-at the end. This can differ by a bit from float subtraction followed by division by
-pixels per unit. Plan one deliberate re-bake when migrating a byte-compared scene bake.
-`AsDrawn` preserves `center.z`; `LowestCornerY` transforms corners in that same local Z plane.
+Mask bounds compute each edge as a double pixel offset from the stored float pivot, multiplied by
+the stored float `UnitsPerPixel`. The resulting centre and size round to float, and
+`Bounds.min` and `Bounds.max` round again from that centre and size. This can differ by a bit
+from float subtraction followed by division by pixels per unit. Plan one deliberate re-bake when
+migrating a byte-compared scene bake. `AsDrawn` preserves `center.z`; `LowestCornerY` transforms
+corners in that same local Z plane.
+
+Pass `SpriteMaskReadSource.ImportedTexture` to read the imported, readable texture that the player
+draws instead of the source PNG. The imported texture must be readable and the sprite unpacked;
+otherwise the call returns false with a reason and does not change import settings. This mode lets
+a consumer compare against the pixels a player samples before choosing to re-bake.
 
 `SpriteArtBounds.TryGetCentreOfLargestDarkestInkRegion(sprite, minimumShare, out Vector2 centre,
-out string error)` finds a colour region's centroid for sprite analysis. It reads source PNG
-pixels in the Editor, including unreadable imports, or readable unpacked textures at runtime.
+out string error, source)` finds a colour region's centroid for sprite analysis. It reads source PNG
+pixels in the Editor by default, including unreadable imports, or readable unpacked textures at
+runtime. Pass `SpriteMaskReadSource.ImportedTexture` to read the imported texture instead.
 Atlas-only pixels and separate alpha textures without a source PNG are refused.
 It does not change import settings.
 

@@ -11,10 +11,33 @@ namespace WallstopStudios.UnityHelpers.Utils
     public static partial class SpriteArtBounds
     {
         /// <summary>Finds the local centroid of the largest connected region of an eligible dark colour.</summary>
+        /// <remarks>Uses <see cref="SpriteMaskReadSource.SourcePng"/> in the Editor.</remarks>
+        public static bool TryGetCentreOfLargestDarkestInkRegion(
+            Sprite sprite,
+            float minimumShare,
+            out Vector2 centre,
+            out string error
+        )
+        {
+            return TryGetCentreOfLargestDarkestInkRegion(
+                sprite,
+                minimumShare,
+                out centre,
+                out error,
+                SpriteMaskReadSource.SourcePng
+            );
+        }
+
+        /// <summary>Finds the local centroid of the largest connected region of an eligible dark colour.</summary>
         /// <param name="sprite">The sprite to read without changing import settings.</param>
         /// <param name="minimumShare">The minimum fraction of fully opaque pixels belonging to the colour, from zero through one.</param>
         /// <param name="centre">The region's pixel-centre average in local units, or zero on failure.</param>
         /// <param name="error">The refusal reason, or null on success.</param>
+        /// <param name="source">
+        /// Which Editor texture to read. <see cref="SpriteMaskReadSource.SourcePng"/> uses original
+        /// PNG pixels; <see cref="SpriteMaskReadSource.ImportedTexture"/> uses the imported,
+        /// readable texture that the player draws.
+        /// </param>
         /// <remarks>
         /// Uses source PNG pixels in the Editor or a readable unpacked texture.
         /// Only fully opaque pixels contribute. Colours use integer Rec. 601 weights 299, 587 and 114;
@@ -27,7 +50,8 @@ namespace WallstopStudios.UnityHelpers.Utils
             Sprite sprite,
             float minimumShare,
             out Vector2 centre,
-            out string error
+            out string error,
+            SpriteMaskReadSource source
         )
         {
             if (!WallMath.IsFinite(minimumShare) || minimumShare < 0 || 1 < minimumShare)
@@ -42,7 +66,8 @@ namespace WallstopStudios.UnityHelpers.Utils
                     !SpriteMaskReader.TryReadPixels(
                         sprite,
                         out SpritePixelRegion pixels,
-                        out string failure
+                        out string failure,
+                        source: source
                     )
                 )
                 {

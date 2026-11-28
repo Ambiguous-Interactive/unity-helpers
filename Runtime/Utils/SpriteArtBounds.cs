@@ -10,14 +10,8 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// <summary>Measures the bounds of drawn sprite pixels and their transformed corners.</summary>
     public static partial class SpriteArtBounds
     {
-        /// <summary>Reads the local bounds of nontransparent sprite pixels without changing import settings.</summary>
-        /// <remarks>
-        /// Uses original PNG pixels in the Editor or readable texture pixels. Packed atlas fallbacks
-        /// require rectangular, unrotated packing; tight and rotated atlas data are refused.
-        /// Separate alpha textures require source PNG pixels or the mask overload.
-        /// Scans effective alpha directly, without allocating an intermediate mask.
-        /// Bounds multiply double pixel offsets by stored float units per pixel before rounding to float.
-        /// </remarks>
+        /// <summary>Reads local art bounds from source PNG pixels in the Editor or readable texture pixels in a player.</summary>
+        /// <remarks>Uses <see cref="SpriteMaskReadSource.SourcePng"/> in the Editor.</remarks>
         public static bool TryGetLocalArtBounds(
             Sprite sprite,
             out Bounds bounds,
@@ -25,12 +19,49 @@ namespace WallstopStudios.UnityHelpers.Utils
             byte alphaThreshold = 1
         )
         {
+            return TryGetLocalArtBounds(
+                sprite,
+                out bounds,
+                out error,
+                alphaThreshold,
+                SpriteMaskReadSource.SourcePng
+            );
+        }
+
+        /// <summary>Reads the local bounds of nontransparent sprite pixels without changing import settings.</summary>
+        /// <param name="sprite">The sprite to measure.</param>
+        /// <param name="bounds">The local art bounds, or default on failure.</param>
+        /// <param name="error">The reason measurement failed, or null on success.</param>
+        /// <param name="alphaThreshold">The minimum nonzero alpha byte considered opaque.</param>
+        /// <param name="source">
+        /// Which Editor texture to read. <see cref="SpriteMaskReadSource.SourcePng"/> uses original
+        /// PNG pixels; <see cref="SpriteMaskReadSource.ImportedTexture"/> uses the imported,
+        /// readable texture that the player draws.
+        /// </param>
+        /// <remarks>
+        /// Uses original PNG pixels in the Editor or readable texture pixels. Packed atlas fallbacks
+        /// require rectangular, unrotated packing; tight and rotated atlas data are refused.
+        /// Separate alpha textures require source PNG pixels or the mask overload.
+        /// Scans effective alpha directly, without allocating an intermediate mask.
+        /// Each edge is a double pixel offset from the pivot multiplied by the stored float units
+        /// per pixel. The resulting center and size are cast once to float, and
+        /// <see cref="Bounds.min"/> and <see cref="Bounds.max"/> round again from that center and size.
+        /// </remarks>
+        public static bool TryGetLocalArtBounds(
+            Sprite sprite,
+            out Bounds bounds,
+            out string error,
+            byte alphaThreshold,
+            SpriteMaskReadSource source
+        )
+        {
             if (
                 !SpriteMaskReader.TryReadPixels(
                     sprite,
                     out SpritePixelRegion region,
                     out error,
-                    borrowReadableTexture: true
+                    borrowReadableTexture: true,
+                    source: source
                 )
             )
             {
