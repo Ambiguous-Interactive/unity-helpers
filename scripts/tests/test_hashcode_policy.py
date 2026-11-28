@@ -27,21 +27,35 @@ def scan(text: str) -> list[str]:
     return found
 
 
-def findings() -> list[str]:
+def findings(
+    repository: Path = ROOT, roots: tuple[str, ...] = ("Runtime", "Editor")
+) -> list[str]:
     found: list[str] = []
-    for path in source_files(ROOT, ("Runtime", "Editor")):
+    for path in source_files(repository, roots):
         masked = mask_noise(path.read_text(encoding="utf-8"))
         for match in FORBIDDEN.finditer(masked):
             if masked[: match.start()].rstrip().endswith("."):
                 continue
             line = masked.count("\n", 0, match.start()) + 1
-            found.append(f"{path.relative_to(ROOT).as_posix()}:{line}: {match.group(0)}")
+            found.append(f"{path.relative_to(repository).as_posix()}:{line}: {match.group(0)}")
     return found
 
 
 def test_production_sources_use_objects_hashcode() -> None:
     found = findings()
     assert found == [], "Use Objects.HashCode instead:\n" + "\n".join(found)
+
+
+def test_production_scan_reports_a_forbidden_source(tmp_path: Path) -> None:
+    runtime = tmp_path / "Runtime"
+    runtime.mkdir()
+    (runtime / "Bad.cs").write_text(
+        "internal static class Bad { internal static int Value(int a, int b) "
+        "{ return System.HashCode.Combine(a, b); } }",
+        encoding="utf-8",
+    )
+    found = findings(tmp_path, ("Runtime",))
+    assert any("Bad.cs" in item and "HashCode" in item for item in found), found
 
 
 def test_detector_rejects_each_forbidden_shape() -> None:
