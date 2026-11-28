@@ -166,6 +166,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 
         [Test]
+        public void NullIsRejectedForVoidPointerAndByRefTargets()
+        {
+            Assert.IsFalse(ValueCoercion.TryCoerce(typeof(void), null, out object voidValue));
+            Assert.IsTrue(voidValue == null);
+            Assert.IsFalse(
+                ValueCoercion.TryCoerce(
+                    typeof(int).MakePointerType(),
+                    null,
+                    out object pointerValue
+                )
+            );
+            Assert.IsTrue(pointerValue == null);
+            Assert.IsFalse(
+                ValueCoercion.TryCoerce(typeof(int).MakeByRefType(), null, out object byRefValue)
+            );
+            Assert.IsTrue(byRefValue == null);
+        }
+
+        [Test]
         public void NullTargetReturnsFalse()
         {
             Assert.IsFalse(ValueCoercion.TryCoerce(null, 1, out object value));

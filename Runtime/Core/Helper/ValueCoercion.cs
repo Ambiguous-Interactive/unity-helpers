@@ -32,7 +32,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             if (input == null)
             {
                 value = null;
-                return !target.IsValueType || nullable != null;
+                return nullable != null
+                    || (
+                        (target.IsClass || target.IsInterface)
+                        && !target.IsPointer
+                        && !target.IsByRef
+                    );
             }
 
             if (effective.IsInstanceOfType(input))
