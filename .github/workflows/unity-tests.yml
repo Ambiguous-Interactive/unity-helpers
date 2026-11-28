@@ -728,7 +728,7 @@ jobs:
           $variant = @()
           if ($env:UH_COMBINE_LATEST -eq 'true') { $variant += '--with-single-threaded' }
           uv run --project scripts/python~ --locked --no-dev python scripts/unity/run_ci_modes.py --version '${{ matrix.unity-version }}' `
-            --editmode-shards 2 --max-workers 5 --timeout-seconds 1980 @variant
+            --editmode-shards 2 --max-workers 5 --timeout-seconds 1860 @variant
           if ($LASTEXITCODE -ne 0) { throw 'One or more concurrent Unity modes failed.' }
           ./scripts/unity/assert-no-active-unity-editor.ps1
 
@@ -1878,7 +1878,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           ./scripts/unity/assert-no-active-unity-editor.ps1
           uv run --project scripts/python~ --locked --no-dev python scripts/unity/run_ci_modes.py --version '${{ matrix.unity-version }}' `
-            --editmode-shards 2 --max-workers 5 --timeout-seconds 1980 --single-threaded
+            --editmode-shards 2 --max-workers 5 --timeout-seconds 1860 --single-threaded
           if ($LASTEXITCODE -ne 0) { throw 'One or more concurrent Unity modes failed.' }
           ./scripts/unity/assert-no-active-unity-editor.ps1
 

@@ -81,7 +81,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
         {
             if (AssetDatabase.IsValidFolder(_assetFolder))
             {
-                AssetDatabase.DeleteAsset(_assetFolder);
+                if (!AssetDatabase.DeleteAsset(_assetFolder) && Directory.Exists(_fullFolder))
+                {
+                    Directory.Delete(_fullFolder, true);
+                }
             }
             else if (Directory.Exists(_fullFolder))
             {
@@ -89,7 +92,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             }
 
             string meta = _fullFolder + ".meta";
-            if (File.Exists(meta))
+            if (!Directory.Exists(_fullFolder) && File.Exists(meta))
             {
                 File.Delete(meta);
             }
