@@ -10,11 +10,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from csharp_sources import mask_noise, source_files
 
 ROOT = Path(__file__).resolve().parents[2]
+QUALIFIER = r"(?:global\s*::\s*)?(?:System\s*\.\s*)?"
 FORBIDDEN = re.compile(
-    r"\bHashCode\s*\.\s*(?:Combine|Add)\b"
-    r"|\bnew\s+(?:System\s*\.\s*)?HashCode\s*\("
-    r"|\b(?:System\s*\.\s*)?HashCode\s+[A-Za-z_]\w*\s*[=;]"
-    r"|\bdefault\s*\(\s*(?:System\s*\.\s*)?HashCode\s*\)"
+    rf"\b{QUALIFIER}HashCode\s*\.\s*(?:Combine|Add)\b"
+    rf"|\bnew\s+{QUALIFIER}HashCode\s*\("
+    rf"|\b{QUALIFIER}HashCode\s+[A-Za-z_]\w*\s*[=;]"
+    rf"|\bdefault\s*\(\s*{QUALIFIER}HashCode\s*\)"
 )
 
 
@@ -44,6 +45,8 @@ def test_detector_rejects_each_forbidden_shape() -> None:
     assert FORBIDDEN.search("private HashCode _hash;") is not None
     assert FORBIDDEN.search("var hash = default(System.HashCode);") is not None
     assert FORBIDDEN.search("var hash = default(HashCode);") is not None
+    assert FORBIDDEN.search("var hash = new global::System.HashCode();") is not None
+    assert FORBIDDEN.search("global::System.HashCode hash = default;") is not None
     assert FORBIDDEN.search("return Objects.HashCode(first, second);") is None
     assert FORBIDDEN.search("return value.GetHashCode();") is None
 
