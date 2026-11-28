@@ -100,6 +100,42 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 
         [Test]
+        public void UnsignedEnumValuesAboveLongMaximumAreCoerced()
+        {
+            Assert.IsTrue(
+                ValueCoercion.TryCoerce(typeof(ULongSample), ulong.MaxValue, out object value)
+            );
+            Assert.AreEqual(ULongSample.Max, value);
+            Assert.IsTrue(
+                ValueCoercion.TryCoerce(
+                    typeof(ULongSample),
+                    "18446744073709551615",
+                    out object parsed
+                )
+            );
+            Assert.AreEqual(ULongSample.Max, parsed);
+        }
+
+        [Test]
+        public void FractionalEnumInputsAreRejected()
+        {
+            Assert.IsFalse(ValueCoercion.TryCoerce(typeof(Sample), 1.5d, out object fractional));
+            Assert.IsNull(fractional);
+            Assert.IsTrue(ValueCoercion.TryCoerce(typeof(Sample), 2d, out object integral));
+            Assert.AreEqual(Sample.Second, integral);
+        }
+
+        [Test]
+        public void ThrowingConvertibleReturnsFalse()
+        {
+            ThrowingConvertible input = new();
+            Assert.IsFalse(ValueCoercion.TryCoerce(typeof(Sample), input, out object enumValue));
+            Assert.IsNull(enumValue);
+            Assert.IsFalse(ValueCoercion.TryCoerce(typeof(string), input, out object text));
+            Assert.IsNull(text);
+        }
+
+        [Test]
         public void NullTargetReturnsFalse()
         {
             Assert.IsFalse(ValueCoercion.TryCoerce(null, 1, out object value));
@@ -117,6 +153,100 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         {
             Zero = 0,
             Max = 255,
+        }
+
+        private enum ULongSample : ulong
+        {
+            Zero = 0,
+            Max = ulong.MaxValue,
+        }
+
+        private sealed class ThrowingConvertible : IConvertible
+        {
+            public TypeCode GetTypeCode()
+            {
+                return TypeCode.Object;
+            }
+
+            public bool ToBoolean(IFormatProvider provider)
+            {
+                throw new NotSupportedException();
+            }
+
+            public byte ToByte(IFormatProvider provider)
+            {
+                throw new NotSupportedException();
+            }
+
+            public char ToChar(IFormatProvider provider)
+            {
+                throw new NotSupportedException();
+            }
+
+            public DateTime ToDateTime(IFormatProvider provider)
+            {
+                throw new NotSupportedException();
+            }
+
+            public decimal ToDecimal(IFormatProvider provider)
+            {
+                throw new NotSupportedException();
+            }
+
+            public double ToDouble(IFormatProvider provider)
+            {
+                throw new NotSupportedException();
+            }
+
+            public short ToInt16(IFormatProvider provider)
+            {
+                throw new NotSupportedException();
+            }
+
+            public int ToInt32(IFormatProvider provider)
+            {
+                throw new NotSupportedException();
+            }
+
+            public long ToInt64(IFormatProvider provider)
+            {
+                throw new NotSupportedException();
+            }
+
+            public sbyte ToSByte(IFormatProvider provider)
+            {
+                throw new NotSupportedException();
+            }
+
+            public float ToSingle(IFormatProvider provider)
+            {
+                throw new NotSupportedException();
+            }
+
+            public string ToString(IFormatProvider provider)
+            {
+                throw new InvalidCastException();
+            }
+
+            public object ToType(Type conversionType, IFormatProvider provider)
+            {
+                throw new NotSupportedException();
+            }
+
+            public ushort ToUInt16(IFormatProvider provider)
+            {
+                throw new NotSupportedException();
+            }
+
+            public uint ToUInt32(IFormatProvider provider)
+            {
+                throw new NotSupportedException();
+            }
+
+            public ulong ToUInt64(IFormatProvider provider)
+            {
+                throw new NotSupportedException();
+            }
         }
     }
 }

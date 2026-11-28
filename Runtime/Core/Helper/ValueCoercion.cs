@@ -43,11 +43,30 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             if (effective.IsEnum)
             {
+                Type underlying = Enum.GetUnderlyingType(effective);
                 if (input is string name)
                 {
                     if (EnumValues.TryParse(effective, name.AsSpan(), false, out value))
                     {
                         return true;
+                    }
+
+                    if (underlying == typeof(ulong))
+                    {
+                        if (
+                            ulong.TryParse(
+                                name,
+                                NumberStyles.Integer,
+                                CultureInfo.InvariantCulture,
+                                out ulong unsignedParsed
+                            )
+                        )
+                        {
+                            return TryCreateEnum(effective, unsignedParsed, out value);
+                        }
+
+                        value = null;
+                        return false;
                     }
 
                     if (
@@ -62,6 +81,25 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         return EnumValues.TryFromInteger(effective, parsed, out value);
                     }
 
+                    value = null;
+                    return false;
+                }
+
+                if (input is ulong unsignedInput && underlying == typeof(ulong))
+                {
+                    return TryCreateEnum(effective, unsignedInput, out value);
+                }
+
+                if (
+                    (input is double doubleValue && doubleValue != Math.Truncate(doubleValue))
+                    || (input is float floatValue && floatValue != Math.Truncate(floatValue))
+                    || (
+                        input is decimal decimalValue
+                        && decimalValue != decimal.Truncate(decimalValue)
+                    )
+                )
+                {
+                    value = null;
                     return false;
                 }
 
@@ -76,6 +114,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         when (exception is FormatException
                             || exception is InvalidCastException
                             || exception is OverflowException
+                            || exception is NotSupportedException
+                            || exception is ArgumentException
                         )
                     {
                         value = null;
@@ -89,8 +129,17 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             if (effective == typeof(string))
             {
-                value = Convert.ToString(input, CultureInfo.InvariantCulture);
-                return value != null;
+                try
+                {
+                    value = Convert.ToString(input, CultureInfo.InvariantCulture);
+                    return value != null;
+                }
+                catch (Exception exception)
+                    when (exception is InvalidCastException || exception is FormatException)
+                {
+                    value = null;
+                    return false;
+                }
             }
 
             if (effective == typeof(bool) && input is string text)
@@ -126,6 +175,20 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             value = null;
             return false;
+        }
+
+        private static bool TryCreateEnum(Type enumType, ulong value, out object result)
+        {
+            try
+            {
+                result = Enum.ToObject(enumType, value);
+                return true;
+            }
+            catch (ArgumentException)
+            {
+                result = null;
+                return false;
+            }
         }
     }
 }
