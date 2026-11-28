@@ -101,19 +101,27 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 int dest = leftStart;
                 int leftLimit = leftLength;
 
-                while (leftIndex < leftLimit && rightIndex <= rightEnd)
+                try
                 {
-                    if (0 < comparer.Compare(buffer[leftIndex], array[rightIndex]))
+                    while (leftIndex < leftLimit && rightIndex <= rightEnd)
                     {
-                        array[dest] = array[rightIndex];
-                        ++rightIndex;
+                        if (0 < comparer.Compare(buffer[leftIndex], array[rightIndex]))
+                        {
+                            array[dest] = array[rightIndex];
+                            ++rightIndex;
+                        }
+                        else
+                        {
+                            array[dest] = buffer[leftIndex];
+                            ++leftIndex;
+                        }
+                        ++dest;
                     }
-                    else
-                    {
-                        array[dest] = buffer[leftIndex];
-                        ++leftIndex;
-                    }
-                    ++dest;
+                }
+                catch
+                {
+                    buffer.Slice(0, leftLength).CopyTo(array.Slice(leftStart, leftLength));
+                    throw;
                 }
 
                 while (leftIndex < leftLimit)
@@ -134,19 +142,27 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 int rightIndex = rightLength - 1;
                 int dest = rightEnd;
 
-                while (leftStart <= leftIndex && 0 <= rightIndex)
+                try
                 {
-                    if (0 < comparer.Compare(array[leftIndex], buffer[rightIndex]))
+                    while (leftStart <= leftIndex && 0 <= rightIndex)
                     {
-                        array[dest] = array[leftIndex];
-                        leftIndex--;
+                        if (0 < comparer.Compare(array[leftIndex], buffer[rightIndex]))
+                        {
+                            array[dest] = array[leftIndex];
+                            leftIndex--;
+                        }
+                        else
+                        {
+                            array[dest] = buffer[rightIndex];
+                            rightIndex--;
+                        }
+                        dest--;
                     }
-                    else
-                    {
-                        array[dest] = buffer[rightIndex];
-                        rightIndex--;
-                    }
-                    dest--;
+                }
+                catch
+                {
+                    buffer.Slice(0, rightLength).CopyTo(array.Slice(rightStart, rightLength));
+                    throw;
                 }
 
                 while (0 <= rightIndex)
@@ -297,11 +313,20 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             {
                 T key = array[i];
                 int j = i - 1;
-                while (left <= j && 0 < comparer.Compare(array[j], key))
+                try
                 {
-                    array[j + 1] = array[j];
-                    j--;
+                    while (left <= j && 0 < comparer.Compare(array[j], key))
+                    {
+                        array[j + 1] = array[j];
+                        j--;
+                    }
                 }
+                catch
+                {
+                    array[j + 1] = key;
+                    throw;
+                }
+
                 array[j + 1] = key;
             }
         }

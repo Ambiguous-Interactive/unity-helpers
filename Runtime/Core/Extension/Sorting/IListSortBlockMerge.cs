@@ -88,16 +88,24 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             int rightIndex = mid + 1;
             int dest = left;
 
-            while (leftIndex <= mid && rightIndex <= right)
+            try
             {
-                if (comparer.Compare(buffer[leftIndex], buffer[rightIndex]) <= 0)
+                while (leftIndex <= mid && rightIndex <= right)
                 {
-                    array[dest++] = buffer[leftIndex++];
+                    if (comparer.Compare(buffer[leftIndex], buffer[rightIndex]) <= 0)
+                    {
+                        array[dest++] = buffer[leftIndex++];
+                    }
+                    else
+                    {
+                        array[dest++] = buffer[rightIndex++];
+                    }
                 }
-                else
-                {
-                    array[dest++] = buffer[rightIndex++];
-                }
+            }
+            catch
+            {
+                buffer.Slice(left, right - left + 1).CopyTo(array.Slice(left, right - left + 1));
+                throw;
             }
 
             while (leftIndex <= mid)

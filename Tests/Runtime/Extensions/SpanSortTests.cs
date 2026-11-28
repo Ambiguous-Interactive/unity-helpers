@@ -198,6 +198,43 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             CollectionAssert.AreEqual(new[] { 2, 4, 6, 8 }, values);
         }
 
+        [TestCaseSource(nameof(Algorithms))]
+        public void SortWithComparerThrowingAfterMovesKeepsAPermutation(SortAlgorithm algorithm)
+        {
+            int[] original = { 9, 3, 7, 1, 8, 2, 6, 4, 5, 0 };
+            int[] sortedOriginal = (int[])original.Clone();
+            Array.Sort(sortedOriginal);
+            for (int throwAt = 1; throwAt <= 64; ++throwAt)
+            {
+                int[] values = (int[])original.Clone();
+                int calls = 0;
+                IComparer<int> comparer = Comparer<int>.Create(
+                    (left, right) =>
+                    {
+                        if (++calls == throwAt)
+                        {
+                            throw new InvalidOperationException();
+                        }
+
+                        return left.CompareTo(right);
+                    }
+                );
+                try
+                {
+                    values.AsSpan().Sort(comparer, algorithm);
+                }
+                catch (InvalidOperationException) { }
+
+                int[] sortedValues = (int[])values.Clone();
+                Array.Sort(sortedValues);
+                CollectionAssert.AreEqual(
+                    sortedOriginal,
+                    sortedValues,
+                    $"{algorithm} throwAt {throwAt}: [{string.Join(",", values)}]"
+                );
+            }
+        }
+
         [Test]
         public void InsertionSortOnAnArraySpanDoesNotRentAFullCopy()
         {

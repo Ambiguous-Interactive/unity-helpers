@@ -75,10 +75,18 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 {
                     T element = array[i];
                     j = i;
-                    while (gap <= j && 0 < comparer.Compare(array[j - gap], element))
+                    try
                     {
-                        array[j] = array[j - gap];
-                        j -= gap;
+                        while (gap <= j && 0 < comparer.Compare(array[j - gap], element))
+                        {
+                            array[j] = array[j - gap];
+                            j -= gap;
+                        }
+                    }
+                    catch
+                    {
+                        array[j] = element;
+                        throw;
                     }
 
                     array[j] = element;
@@ -94,11 +102,19 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 T element = array[i];
                 j = i;
 
-                while (0 < j && 0 < comparer.Compare(array[gap], element))
+                try
                 {
-                    array[j] = array[gap];
-                    j = gap;
-                    gap--;
+                    while (0 < j && 0 < comparer.Compare(array[gap], element))
+                    {
+                        array[j] = array[gap];
+                        j = gap;
+                        gap--;
+                    }
+                }
+                catch
+                {
+                    array[j] = element;
+                    throw;
                 }
 
                 array[j] = element;
