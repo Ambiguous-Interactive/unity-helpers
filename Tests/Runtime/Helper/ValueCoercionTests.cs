@@ -138,6 +138,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 
         [Test]
+        public void FractionalUnsignedEnumInputsAreRejected()
+        {
+            Assert.IsFalse(ValueCoercion.TryCoerce(typeof(ULongSample), 1.5m, out object value));
+            Assert.IsTrue(value == null);
+        }
+
+        [Test]
         public void FractionalEnumInputsAreRejected()
         {
             Assert.IsFalse(ValueCoercion.TryCoerce(typeof(Sample), 1.5d, out object fractional));
@@ -248,7 +255,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
             public string ToString(IFormatProvider provider)
             {
-                throw new NotSupportedException();
+                throw new InvalidOperationException();
             }
 
             public object ToType(Type conversionType, IFormatProvider provider)

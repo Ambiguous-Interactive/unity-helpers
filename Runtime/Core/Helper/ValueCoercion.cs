@@ -85,26 +85,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     return false;
                 }
 
-                if (underlying == typeof(ulong))
-                {
-                    try
-                    {
-                        ulong unsignedInput = Convert.ToUInt64(input, CultureInfo.InvariantCulture);
-                        return TryCreateEnum(effective, unsignedInput, out value);
-                    }
-                    catch (Exception exception)
-                        when (exception is FormatException
-                            || exception is InvalidCastException
-                            || exception is OverflowException
-                            || exception is NotSupportedException
-                            || exception is ArgumentException
-                        )
-                    {
-                        value = null;
-                        return false;
-                    }
-                }
-
                 if (
                     (input is double doubleValue && doubleValue != Math.Truncate(doubleValue))
                     || (input is float floatValue && floatValue != Math.Truncate(floatValue))
@@ -118,6 +98,20 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     return false;
                 }
 
+                if (underlying == typeof(ulong))
+                {
+                    try
+                    {
+                        ulong unsignedInput = Convert.ToUInt64(input, CultureInfo.InvariantCulture);
+                        return TryCreateEnum(effective, unsignedInput, out value);
+                    }
+                    catch (Exception)
+                    {
+                        value = null;
+                        return false;
+                    }
+                }
+
                 if (input is IConvertible)
                 {
                     try
@@ -125,13 +119,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         long numeric = Convert.ToInt64(input, CultureInfo.InvariantCulture);
                         return EnumValues.TryFromInteger(effective, numeric, out value);
                     }
-                    catch (Exception exception)
-                        when (exception is FormatException
-                            || exception is InvalidCastException
-                            || exception is OverflowException
-                            || exception is NotSupportedException
-                            || exception is ArgumentException
-                        )
+                    catch (Exception)
                     {
                         value = null;
                         return false;
@@ -149,11 +137,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     value = Convert.ToString(input, CultureInfo.InvariantCulture);
                     return value != null;
                 }
-                catch (Exception exception)
-                    when (exception is InvalidCastException
-                        || exception is FormatException
-                        || exception is NotSupportedException
-                    )
+                catch (Exception)
                 {
                     value = null;
                     return false;
@@ -179,13 +163,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     value = Convert.ChangeType(input, effective, CultureInfo.InvariantCulture);
                     return true;
                 }
-                catch (Exception exception)
-                    when (exception is FormatException
-                        || exception is InvalidCastException
-                        || exception is OverflowException
-                        || exception is NotSupportedException
-                        || exception is ArgumentException
-                    )
+                catch (Exception)
                 {
                     value = null;
                     return false;
