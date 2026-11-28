@@ -15,7 +15,7 @@ FORBIDDEN = re.compile(
     rf"\b{QUALIFIER}HashCode\s*\.\s*(?:Combine|Add)\b"
     r"|\bnew\s+(?:global\s*::\s*)?(?:System\s*\.\s*)?HashCode\s*[({]"
     rf"|\busing\s+[A-Za-z_]\w*\s*=\s*{QUALIFIER}HashCode\s*;"
-    rf"|\b{QUALIFIER}HashCode\s+[A-Za-z_]\w*\s*[=;]"
+    rf"|\b{QUALIFIER}HashCode\s*\??\s+[A-Za-z_]\w*\s*[=;]"
     rf"|\bdefault\s*\(\s*{QUALIFIER}HashCode\s*\)"
 )
 
@@ -50,6 +50,7 @@ def test_detector_rejects_each_forbidden_shape() -> None:
     assert FORBIDDEN.search("global::System.HashCode hash = default;") is not None
     assert FORBIDDEN.search("var hash = new System.HashCode { };") is not None
     assert FORBIDDEN.search("using HC = System.HashCode;") is not None
+    assert FORBIDDEN.search("System.HashCode? hash = new System.HashCode();") is not None
     assert FORBIDDEN.search("return Objects.HashCode(first, second);") is None
     assert FORBIDDEN.search("return value.GetHashCode();") is None
 
