@@ -44,17 +44,21 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             if (list is T[] array)
             {
-                GhostSortCore(array, count, comparer);
+                GhostSortCore(array.AsSpan(0, count), count, comparer);
                 return;
             }
 
             using PooledArray<T> scratchLease = SystemArrayPool<T>.Get(count, out T[] scratch);
             list.CopyTo(scratch, 0);
-            GhostSortCore(scratch, count, comparer);
+            GhostSortCore(scratch.AsSpan(0, count), count, comparer);
             WriteBack(list, scratch, count);
         }
 
-        private static void GhostSortCore<T, TComparer>(T[] array, int count, TComparer comparer)
+        private static void GhostSortCore<T, TComparer>(
+            Span<T> array,
+            int count,
+            TComparer comparer
+        )
             where TComparer : IComparer<T>
         {
             int length = count;

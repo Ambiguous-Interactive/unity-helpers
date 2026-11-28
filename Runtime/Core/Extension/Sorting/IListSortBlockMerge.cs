@@ -32,18 +32,18 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             if (list is T[] array)
             {
-                BlockMergeSortCore(array, count, comparer);
+                BlockMergeSortCore(array.AsSpan(0, count), count, comparer);
                 return;
             }
 
             using PooledArray<T> scratchLease = SystemArrayPool<T>.Get(count, out T[] scratch);
             list.CopyTo(scratch, 0);
-            BlockMergeSortCore(scratch, count, comparer);
+            BlockMergeSortCore(scratch.AsSpan(0, count), count, comparer);
             WriteBack(list, scratch, count);
         }
 
         private static void BlockMergeSortCore<T, TComparer>(
-            T[] array,
+            Span<T> array,
             int count,
             TComparer comparer
         )
@@ -65,8 +65,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void BlockMerge<T, TComparer>(
-            T[] array,
-            T[] buffer,
+            Span<T> array,
+            Span<T> buffer,
             int left,
             int mid,
             int right,

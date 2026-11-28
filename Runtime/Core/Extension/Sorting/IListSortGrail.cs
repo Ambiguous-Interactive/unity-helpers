@@ -43,17 +43,21 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             if (list is T[] array)
             {
-                GrailSortCore(array, count, comparer);
+                GrailSortCore(array.AsSpan(0, count), count, comparer);
                 return;
             }
 
             using PooledArray<T> scratchLease = SystemArrayPool<T>.Get(count, out T[] scratch);
             list.CopyTo(scratch, 0);
-            GrailSortCore(scratch, count, comparer);
+            GrailSortCore(scratch.AsSpan(0, count), count, comparer);
             WriteBack(list, scratch, count);
         }
 
-        private static void GrailSortCore<T, TComparer>(T[] array, int count, TComparer comparer)
+        private static void GrailSortCore<T, TComparer>(
+            Span<T> array,
+            int count,
+            TComparer comparer
+        )
             where TComparer : IComparer<T>
         {
             int bufferLength = count / 2 + 1;
@@ -62,8 +66,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void GrailSortRange<T, TComparer>(
-            T[] array,
-            T[] buffer,
+            Span<T> array,
+            Span<T> buffer,
             int left,
             int right,
             TComparer comparer

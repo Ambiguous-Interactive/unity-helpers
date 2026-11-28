@@ -44,17 +44,21 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             if (list is T[] array)
             {
-                MeteorSortCore(array, count, comparer);
+                MeteorSortCore(array.AsSpan(0, count), count, comparer);
                 return;
             }
 
             using PooledArray<T> scratchLease = SystemArrayPool<T>.Get(count, out T[] scratch);
             list.CopyTo(scratch, 0);
-            MeteorSortCore(scratch, count, comparer);
+            MeteorSortCore(scratch.AsSpan(0, count), count, comparer);
             WriteBack(list, scratch, count);
         }
 
-        private static void MeteorSortCore<T, TComparer>(T[] array, int count, TComparer comparer)
+        private static void MeteorSortCore<T, TComparer>(
+            Span<T> array,
+            int count,
+            TComparer comparer
+        )
             where TComparer : IComparer<T>
         {
             int length = count;

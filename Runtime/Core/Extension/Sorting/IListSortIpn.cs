@@ -9,6 +9,7 @@
 // ReSharper disable once CheckNamespace
 namespace WallstopStudios.UnityHelpers.Core.Extension
 {
+    using System;
     using System.Collections.Generic;
     using Utils;
     using WallstopStudios.UnityHelpers.Core.Helper;
@@ -32,24 +33,24 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             if (list is T[] array)
             {
-                IpnSortCore(array, count, comparer);
+                IpnSortCore(array.AsSpan(0, count), count, comparer);
                 return;
             }
 
             using PooledArray<T> scratchLease = SystemArrayPool<T>.Get(count, out T[] scratch);
             list.CopyTo(scratch, 0);
-            IpnSortCore(scratch, count, comparer);
+            IpnSortCore(scratch.AsSpan(0, count), count, comparer);
             WriteBack(list, scratch, count);
         }
 
-        private static void IpnSortCore<T, TComparer>(T[] array, int count, TComparer comparer)
+        private static void IpnSortCore<T, TComparer>(Span<T> array, int count, TComparer comparer)
             where TComparer : IComparer<T>
         {
             IpnSortRange(array, 0, count - 1, comparer, 2 * BitOps.Log2(count));
         }
 
         private static void IpnSortRange<T, TComparer>(
-            T[] array,
+            Span<T> array,
             int left,
             int right,
             TComparer comparer,
@@ -103,7 +104,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static int IpnSelectPivotIndex<T, TComparer>(
-            T[] array,
+            Span<T> array,
             int left,
             int right,
             TComparer comparer

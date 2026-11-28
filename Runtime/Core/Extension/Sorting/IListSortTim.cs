@@ -33,17 +33,17 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             if (list is T[] array)
             {
-                TimSortCore(array, count, comparer);
+                TimSortCore(array.AsSpan(0, count), count, comparer);
                 return;
             }
 
             using PooledArray<T> scratchLease = SystemArrayPool<T>.Get(count, out T[] scratch);
             list.CopyTo(scratch, 0);
-            TimSortCore(scratch, count, comparer);
+            TimSortCore(scratch.AsSpan(0, count), count, comparer);
             WriteBack(list, scratch, count);
         }
 
-        private static void TimSortCore<T, TComparer>(T[] array, int count, TComparer comparer)
+        private static void TimSortCore<T, TComparer>(Span<T> array, int count, TComparer comparer)
             where TComparer : IComparer<T>
         {
             int minRun = ComputeTimSortMinRun(count);
@@ -89,9 +89,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void TimSortMergeCollapse<T, TComparer>(
-            T[] array,
+            Span<T> array,
             TComparer comparer,
-            T[] buffer,
+            Span<T> buffer,
             List<(int start, int length)> runStack
         )
             where TComparer : IComparer<T>
@@ -131,9 +131,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void TimSortMergeForce<T, TComparer>(
-            T[] array,
+            Span<T> array,
             TComparer comparer,
-            T[] buffer,
+            Span<T> buffer,
             List<(int start, int length)> runStack
         )
             where TComparer : IComparer<T>
@@ -152,9 +152,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void TimSortMergeAt<T, TComparer>(
-            T[] array,
+            Span<T> array,
             TComparer comparer,
-            T[] buffer,
+            Span<T> buffer,
             List<(int start, int length)> runStack,
             int index
         )

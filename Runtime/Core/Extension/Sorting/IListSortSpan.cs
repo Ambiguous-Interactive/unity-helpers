@@ -12,13 +12,12 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     {
         /// <summary>Sorts a span using the selected list sorting algorithm and comparer.</summary>
         /// <remarks>
-        /// Copies through one pooled buffer of the span's length, preserving the algorithm's
-        /// ordering and stability guarantees. Only the supplied span is written back, after sorting
-        /// succeeds. Comparer exceptions propagate and leave the span unchanged. The buffer is
-        /// returned on failure as well as success, clearing managed references on return.
-        /// The algorithm may rent additional scratch storage; cold pools can allocate.
-        /// Empty and single-element spans require no buffer and do not invoke the comparer.
-        /// The algorithm argument is required to distinguish this from framework span sorting.
+        /// Sorts the span in place, preserving the algorithm's ordering and stability guarantees.
+        /// No full-length copy is made. The algorithm may rent its usual scratch storage; cold
+        /// pools can allocate. Comparer exceptions propagate and leave the span holding a
+        /// permutation of the original values; no element is lost or duplicated. Empty and
+        /// single-element spans do not invoke the comparer. The algorithm argument is required to
+        /// distinguish this from framework span sorting.
         /// </remarks>
         /// <exception cref="InvalidEnumArgumentException">The selected algorithm is undefined.</exception>
         public static void Sort<T, TComparer>(
@@ -41,14 +40,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             {
                 return;
             }
-            using PooledArray<T> scratchLease = SystemArrayPool<T>.Get(count, out T[] scratch);
-            span.CopyTo(scratch);
-            SortArrayRange(scratch, count, comparer, sortAlgorithm);
-            scratch.AsSpan(0, count).CopyTo(span);
+            SortArrayRange(span, count, comparer, sortAlgorithm);
         }
 
         /// <summary>Sorts a span using GhostSort and the supplied comparer.</summary>
-        /// <remarks>Uses the pooled-copy and failure guarantees of <see cref="Sort{T, TComparer}(Span{T}, TComparer, SortAlgorithm)"/>.</remarks>
+        /// <remarks>Uses the in-place and failure guarantees of <see cref="Sort{T, TComparer}(Span{T}, TComparer, SortAlgorithm)"/>.</remarks>
         public static void GhostSort<T, TComparer>(this Span<T> span, TComparer comparer)
             where TComparer : IComparer<T>
         {
@@ -56,7 +52,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         /// <summary>Sorts a span using InsertionSort and the supplied comparer.</summary>
-        /// <remarks>Uses the pooled-copy and failure guarantees of <see cref="Sort{T, TComparer}(Span{T}, TComparer, SortAlgorithm)"/>.</remarks>
+        /// <remarks>Uses the in-place and failure guarantees of <see cref="Sort{T, TComparer}(Span{T}, TComparer, SortAlgorithm)"/>.</remarks>
         public static void InsertionSort<T, TComparer>(this Span<T> span, TComparer comparer)
             where TComparer : IComparer<T>
         {
@@ -91,7 +87,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         /// <summary>Sorts a span using MeteorSort and the supplied comparer.</summary>
-        /// <remarks>Uses the pooled-copy and failure guarantees of <see cref="Sort{T, TComparer}(Span{T}, TComparer, SortAlgorithm)"/>.</remarks>
+        /// <remarks>Uses the in-place and failure guarantees of <see cref="Sort{T, TComparer}(Span{T}, TComparer, SortAlgorithm)"/>.</remarks>
         public static void MeteorSort<T, TComparer>(this Span<T> span, TComparer comparer)
             where TComparer : IComparer<T>
         {
@@ -99,7 +95,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         /// <summary>Sorts a span using PatternDefeatingQuickSort and the supplied comparer.</summary>
-        /// <remarks>Uses the pooled-copy and failure guarantees of <see cref="Sort{T, TComparer}(Span{T}, TComparer, SortAlgorithm)"/>.</remarks>
+        /// <remarks>Uses the in-place and failure guarantees of <see cref="Sort{T, TComparer}(Span{T}, TComparer, SortAlgorithm)"/>.</remarks>
         public static void PatternDefeatingQuickSort<T, TComparer>(
             this Span<T> span,
             TComparer comparer
@@ -110,7 +106,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         /// <summary>Sorts a span using GrailSort and the supplied comparer.</summary>
-        /// <remarks>Uses the pooled-copy and failure guarantees of <see cref="Sort{T, TComparer}(Span{T}, TComparer, SortAlgorithm)"/>.</remarks>
+        /// <remarks>Uses the in-place and failure guarantees of <see cref="Sort{T, TComparer}(Span{T}, TComparer, SortAlgorithm)"/>.</remarks>
         public static void GrailSort<T, TComparer>(this Span<T> span, TComparer comparer)
             where TComparer : IComparer<T>
         {
@@ -118,7 +114,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         /// <summary>Sorts a span using PowerSort and the supplied comparer.</summary>
-        /// <remarks>Uses the pooled-copy and failure guarantees of <see cref="Sort{T, TComparer}(Span{T}, TComparer, SortAlgorithm)"/>.</remarks>
+        /// <remarks>Uses the in-place and failure guarantees of <see cref="Sort{T, TComparer}(Span{T}, TComparer, SortAlgorithm)"/>.</remarks>
         public static void PowerSort<T, TComparer>(this Span<T> span, TComparer comparer)
             where TComparer : IComparer<T>
         {
@@ -126,7 +122,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         /// <summary>Sorts a span using TimSort and the supplied comparer.</summary>
-        /// <remarks>Uses the pooled-copy and failure guarantees of <see cref="Sort{T, TComparer}(Span{T}, TComparer, SortAlgorithm)"/>.</remarks>
+        /// <remarks>Uses the in-place and failure guarantees of <see cref="Sort{T, TComparer}(Span{T}, TComparer, SortAlgorithm)"/>.</remarks>
         public static void TimSort<T, TComparer>(this Span<T> span, TComparer comparer)
             where TComparer : IComparer<T>
         {
@@ -134,7 +130,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         /// <summary>Sorts a span using JesseSort and the supplied comparer.</summary>
-        /// <remarks>Uses the pooled-copy and failure guarantees of <see cref="Sort{T, TComparer}(Span{T}, TComparer, SortAlgorithm)"/>.</remarks>
+        /// <remarks>Uses the in-place and failure guarantees of <see cref="Sort{T, TComparer}(Span{T}, TComparer, SortAlgorithm)"/>.</remarks>
         public static void JesseSort<T, TComparer>(this Span<T> span, TComparer comparer)
             where TComparer : IComparer<T>
         {
@@ -142,7 +138,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         /// <summary>Sorts a span using GreenSort and the supplied comparer.</summary>
-        /// <remarks>Uses the pooled-copy and failure guarantees of <see cref="Sort{T, TComparer}(Span{T}, TComparer, SortAlgorithm)"/>.</remarks>
+        /// <remarks>Uses the in-place and failure guarantees of <see cref="Sort{T, TComparer}(Span{T}, TComparer, SortAlgorithm)"/>.</remarks>
         public static void GreenSort<T, TComparer>(this Span<T> span, TComparer comparer)
             where TComparer : IComparer<T>
         {
@@ -150,7 +146,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         /// <summary>Sorts a span using SkaSort and the supplied comparer.</summary>
-        /// <remarks>Uses the pooled-copy and failure guarantees of <see cref="Sort{T, TComparer}(Span{T}, TComparer, SortAlgorithm)"/>.</remarks>
+        /// <remarks>Uses the in-place and failure guarantees of <see cref="Sort{T, TComparer}(Span{T}, TComparer, SortAlgorithm)"/>.</remarks>
         public static void SkaSort<T, TComparer>(this Span<T> span, TComparer comparer)
             where TComparer : IComparer<T>
         {
@@ -158,7 +154,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         /// <summary>Sorts a span using IpnSort and the supplied comparer.</summary>
-        /// <remarks>Uses the pooled-copy and failure guarantees of <see cref="Sort{T, TComparer}(Span{T}, TComparer, SortAlgorithm)"/>.</remarks>
+        /// <remarks>Uses the in-place and failure guarantees of <see cref="Sort{T, TComparer}(Span{T}, TComparer, SortAlgorithm)"/>.</remarks>
         public static void IpnSort<T, TComparer>(this Span<T> span, TComparer comparer)
             where TComparer : IComparer<T>
         {
@@ -166,7 +162,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         /// <summary>Sorts a span using SmoothSort and the supplied comparer.</summary>
-        /// <remarks>Uses the pooled-copy and failure guarantees of <see cref="Sort{T, TComparer}(Span{T}, TComparer, SortAlgorithm)"/>.</remarks>
+        /// <remarks>Uses the in-place and failure guarantees of <see cref="Sort{T, TComparer}(Span{T}, TComparer, SortAlgorithm)"/>.</remarks>
         public static void SmoothSort<T, TComparer>(this Span<T> span, TComparer comparer)
             where TComparer : IComparer<T>
         {
@@ -174,7 +170,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         /// <summary>Sorts a span using BlockMergeSort and the supplied comparer.</summary>
-        /// <remarks>Uses the pooled-copy and failure guarantees of <see cref="Sort{T, TComparer}(Span{T}, TComparer, SortAlgorithm)"/>.</remarks>
+        /// <remarks>Uses the in-place and failure guarantees of <see cref="Sort{T, TComparer}(Span{T}, TComparer, SortAlgorithm)"/>.</remarks>
         public static void BlockMergeSort<T, TComparer>(this Span<T> span, TComparer comparer)
             where TComparer : IComparer<T>
         {
@@ -182,7 +178,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         /// <summary>Sorts a span using Ips4oSort and the supplied comparer.</summary>
-        /// <remarks>Uses the pooled-copy and failure guarantees of <see cref="Sort{T, TComparer}(Span{T}, TComparer, SortAlgorithm)"/>.</remarks>
+        /// <remarks>Uses the in-place and failure guarantees of <see cref="Sort{T, TComparer}(Span{T}, TComparer, SortAlgorithm)"/>.</remarks>
         public static void Ips4oSort<T, TComparer>(this Span<T> span, TComparer comparer)
             where TComparer : IComparer<T>
         {
@@ -190,7 +186,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         /// <summary>Sorts a span using PowerSortPlus and the supplied comparer.</summary>
-        /// <remarks>Uses the pooled-copy and failure guarantees of <see cref="Sort{T, TComparer}(Span{T}, TComparer, SortAlgorithm)"/>.</remarks>
+        /// <remarks>Uses the in-place and failure guarantees of <see cref="Sort{T, TComparer}(Span{T}, TComparer, SortAlgorithm)"/>.</remarks>
         public static void PowerSortPlus<T, TComparer>(this Span<T> span, TComparer comparer)
             where TComparer : IComparer<T>
         {
@@ -198,7 +194,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         /// <summary>Sorts a span using GlideSort and the supplied comparer.</summary>
-        /// <remarks>Uses the pooled-copy and failure guarantees of <see cref="Sort{T, TComparer}(Span{T}, TComparer, SortAlgorithm)"/>.</remarks>
+        /// <remarks>Uses the in-place and failure guarantees of <see cref="Sort{T, TComparer}(Span{T}, TComparer, SortAlgorithm)"/>.</remarks>
         public static void GlideSort<T, TComparer>(this Span<T> span, TComparer comparer)
             where TComparer : IComparer<T>
         {
@@ -206,7 +202,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         /// <summary>Sorts a span using FluxSort and the supplied comparer.</summary>
-        /// <remarks>Uses the pooled-copy and failure guarantees of <see cref="Sort{T, TComparer}(Span{T}, TComparer, SortAlgorithm)"/>.</remarks>
+        /// <remarks>Uses the in-place and failure guarantees of <see cref="Sort{T, TComparer}(Span{T}, TComparer, SortAlgorithm)"/>.</remarks>
         public static void FluxSort<T, TComparer>(this Span<T> span, TComparer comparer)
             where TComparer : IComparer<T>
         {
@@ -214,7 +210,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         /// <summary>Sorts a span using YamSort and the supplied comparer.</summary>
-        /// <remarks>Uses the pooled-copy and failure guarantees of <see cref="Sort{T, TComparer}(Span{T}, TComparer, SortAlgorithm)"/>.</remarks>
+        /// <remarks>Uses the in-place and failure guarantees of <see cref="Sort{T, TComparer}(Span{T}, TComparer, SortAlgorithm)"/>.</remarks>
         public static void YamSort<T, TComparer>(this Span<T> span, TComparer comparer)
             where TComparer : IComparer<T>
         {
@@ -222,7 +218,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void SortArrayRange<T, TComparer>(
-            T[] array,
+            Span<T> array,
             int count,
             TComparer comparer,
             SortAlgorithm sortAlgorithm

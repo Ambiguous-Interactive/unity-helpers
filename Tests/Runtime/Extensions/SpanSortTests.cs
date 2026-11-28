@@ -8,6 +8,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     using System.ComponentModel;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Extension;
+    using WallstopStudios.UnityHelpers.Tests.TestUtils;
+    using ThreadAllocationCounter = WallstopStudios.UnityHelpers.Tests.Core.ThreadAllocationCounter;
 
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
@@ -179,18 +181,41 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         }
 
         [TestCaseSource(nameof(Algorithms))]
-        public void SortWithThrowingComparerLeavesCallerStorageIntact(SortAlgorithm algorithm)
+        public void SortWithThrowingComparerKeepsEveryOriginalValue(SortAlgorithm algorithm)
         {
             int[] values = { 8, 6, 4, 2 };
+            int[] original = (int[])values.Clone();
             IComparer<int> comparer = Comparer<int>.Create(
                 static (left, right) => throw new InvalidOperationException()
             );
             Assert.Throws<InvalidOperationException>(() =>
                 values.AsSpan().Sort(comparer, algorithm)
             );
-            CollectionAssert.AreEqual(new[] { 8, 6, 4, 2 }, values);
+            Array.Sort(original);
+            Array.Sort(values);
+            CollectionAssert.AreEqual(original, values);
             values.AsSpan().Sort(Comparer<int>.Default, algorithm);
             CollectionAssert.AreEqual(new[] { 2, 4, 6, 8 }, values);
+        }
+
+        [Test]
+        public void InsertionSortOnAnArraySpanDoesNotRentAFullCopy()
+        {
+            GCAssert.IgnoreIfAllocationMeasurementUnavailable();
+            int[] values = new int[1024];
+            for (int index = 0; index < values.Length; ++index)
+            {
+                values[index] = (index * 37) % 1024;
+            }
+
+            int[] expected = (int[])values.Clone();
+            Array.Sort(expected);
+            _ = values.AsSpan().ToArray();
+            long before = ThreadAllocationCounter.Read();
+            values.AsSpan().Sort(Comparer<int>.Default, SortAlgorithm.Insertion);
+            long allocated = ThreadAllocationCounter.Read() - before;
+            Assert.AreEqual(0, allocated);
+            CollectionAssert.AreEqual(expected, values);
         }
 
         [TestCase(SortAlgorithm.Insertion)]

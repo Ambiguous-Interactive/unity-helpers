@@ -32,17 +32,21 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             if (list is T[] array)
             {
-                GreenSortCore(array, count, comparer);
+                GreenSortCore(array.AsSpan(0, count), count, comparer);
                 return;
             }
 
             using PooledArray<T> scratchLease = SystemArrayPool<T>.Get(count, out T[] scratch);
             list.CopyTo(scratch, 0);
-            GreenSortCore(scratch, count, comparer);
+            GreenSortCore(scratch.AsSpan(0, count), count, comparer);
             WriteBack(list, scratch, count);
         }
 
-        private static void GreenSortCore<T, TComparer>(T[] array, int count, TComparer comparer)
+        private static void GreenSortCore<T, TComparer>(
+            Span<T> array,
+            int count,
+            TComparer comparer
+        )
             where TComparer : IComparer<T>
         {
             using PooledArray<T> bufferLease = SystemArrayPool<T>.Get(
@@ -53,8 +57,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void GreenSortRange<T, TComparer>(
-            T[] array,
-            T[] buffer,
+            Span<T> array,
+            Span<T> buffer,
             int left,
             int right,
             TComparer comparer
@@ -80,8 +84,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void GreenSymmetricMerge<T, TComparer>(
-            T[] array,
-            T[] buffer,
+            Span<T> array,
+            Span<T> buffer,
             int left,
             int mid,
             int right,

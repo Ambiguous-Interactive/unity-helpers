@@ -1250,15 +1250,16 @@ values.InsertionSort(Comparer<int>.Default);
 ```
 
 These overloads use the same algorithm kernels and comparer as the list methods, preserving
-ordering and stability guarantees. They copy through one pooled buffer of the span's length;
-the selected algorithm may also rent its usual scratch buffers. Cold pools can allocate. Only
-the supplied slice is written back, so elements outside it remain untouched. Empty and
-single-element spans do not rent a buffer or call the comparer.
+ordering and stability guarantees. They sort the span in place without a full-length copy;
+the selected algorithm may rent its usual scratch buffers. Cold pools can allocate. Only the
+supplied slice is written, so elements outside it remain untouched. Empty and single-element
+spans do not rent a buffer or call the comparer.
 
 An invalid algorithm throws `InvalidEnumArgumentException`, including for an empty span.
-Comparer exceptions propagate; the caller's span stays unchanged, and pooled buffers are
-returned and cleared when they contain managed references. The explicit algorithm argument
-keeps `Sort(comparer)` available to the framework without an ambiguous extension call.
+Comparer exceptions propagate; an in-place sort may have already moved elements, so the span
+then holds a permutation of the original values and no element is lost or duplicated. The
+explicit algorithm argument keeps `Sort(comparer)` available to the framework without an
+ambiguous extension call.
 
 For small or nearly sorted spans, use `values.InsertionSortInPlace(comparer)` to avoid the
 copy and buffer rent. It keeps equal elements in their original order. If the comparer throws,
