@@ -33,20 +33,20 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return;
             }
 
-            if (list is T[] array)
+            if (TryGetExactArray(list, out T[] array))
             {
-                InsertionSortCore(array, count, comparer);
+                InsertionSortCore(array.AsSpan(0, count), count, comparer);
                 return;
             }
 
             using PooledArray<T> scratchLease = SystemArrayPool<T>.Get(count, out T[] scratch);
             list.CopyTo(scratch, 0);
-            InsertionSortCore(scratch, count, comparer);
+            InsertionSortCore(scratch.AsSpan(0, count), count, comparer);
             WriteBack(list, scratch, count);
         }
 
         private static void InsertionSortCore<T, TComparer>(
-            T[] array,
+            Span<T> array,
             int count,
             TComparer comparer
         )

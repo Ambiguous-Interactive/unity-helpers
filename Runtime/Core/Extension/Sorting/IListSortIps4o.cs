@@ -39,26 +39,30 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return;
             }
 
-            if (list is T[] array)
+            if (TryGetExactArray(list, out T[] array))
             {
-                Ips4oSortCore(array, count, comparer);
+                Ips4oSortCore(array.AsSpan(0, count), count, comparer);
                 return;
             }
 
             using PooledArray<T> scratchLease = SystemArrayPool<T>.Get(count, out T[] scratch);
             list.CopyTo(scratch, 0);
-            Ips4oSortCore(scratch, count, comparer);
+            Ips4oSortCore(scratch.AsSpan(0, count), count, comparer);
             WriteBack(list, scratch, count);
         }
 
-        private static void Ips4oSortCore<T, TComparer>(T[] array, int count, TComparer comparer)
+        private static void Ips4oSortCore<T, TComparer>(
+            Span<T> array,
+            int count,
+            TComparer comparer
+        )
             where TComparer : IComparer<T>
         {
             Ips4oSortRange(array, 0, count - 1, comparer);
         }
 
         private static void Ips4oSortRange<T, TComparer>(
-            T[] array,
+            Span<T> array,
             int left,
             int right,
             TComparer comparer
@@ -89,11 +93,16 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             int sampleSize = Math.Min(length, bucketCount * 2 - 1);
 
             using PooledArray<T> sampleLease = SystemArrayPool<T>.Get(sampleSize, out T[] sample);
-            Ips4oBuildSample(array, left, right, sample, sampleSize);
+            Ips4oBuildSample(array, left, right, sample.AsSpan(0, sampleSize), sampleSize);
             Array.Sort(sample, 0, sampleSize, comparer);
 
             using PooledArray<T> pivotLease = SystemArrayPool<T>.Get(pivotCount, out T[] pivots);
-            Ips4oSelectPivots(sample, sampleSize, pivots, bucketCount);
+            Ips4oSelectPivots(
+                sample.AsSpan(0, sampleSize),
+                sampleSize,
+                pivots.AsSpan(0, pivotCount),
+                bucketCount
+            );
 
             // Oversized rents are safe because every access uses initialized bucket counts, not array length.
             using PooledArray<int> countLease = SystemArrayPool<int>.Get(
@@ -126,7 +135,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 running += bucketCounts[i];
             }
 
-            Array.Copy(bucketOffsets, bucketPositions, bucketCount);
+            CopyRange(bucketOffsets.AsSpan(), 0, bucketPositions.AsSpan(), 0, bucketCount);
 
             using PooledArray<T> bufferLease = SystemArrayPool<T>.Get(length, out T[] buffer);
             for (int i = left; i <= right; ++i)
@@ -194,10 +203,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void Ips4oBuildSample<T>(
-            T[] array,
+            Span<T> array,
             int left,
             int right,
-            T[] sample,
+            Span<T> sample,
             int sampleSize
         )
         {
@@ -219,9 +228,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void Ips4oSelectPivots<T>(
-            T[] sample,
+            Span<T> sample,
             int sampleSize,
-            T[] pivots,
+            Span<T> pivots,
             int bucketCount
         )
         {
@@ -243,7 +252,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
         private static int Ips4oLocateBucket<T, TComparer>(
             T value,
-            T[] pivots,
+            Span<T> pivots,
             int pivotCount,
             TComparer comparer
         )

@@ -30,20 +30,20 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return;
             }
 
-            if (list is T[] array)
+            if (TryGetExactArray(list, out T[] array))
             {
-                PowerSortPlusCore(array, count, comparer);
+                PowerSortPlusCore(array.AsSpan(0, count), count, comparer);
                 return;
             }
 
             using PooledArray<T> scratchLease = SystemArrayPool<T>.Get(count, out T[] scratch);
             list.CopyTo(scratch, 0);
-            PowerSortPlusCore(scratch, count, comparer);
+            PowerSortPlusCore(scratch.AsSpan(0, count), count, comparer);
             WriteBack(list, scratch, count);
         }
 
         private static void PowerSortPlusCore<T, TComparer>(
-            T[] array,
+            Span<T> array,
             int count,
             TComparer comparer
         )
@@ -162,8 +162,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static int PowerSortPlusMergeNodes<T, TComparer>(
-            T[] array,
-            T[] buffer,
+            Span<T> array,
+            Span<T> buffer,
             TComparer comparer,
             int headIndex,
             List<PowerSortPlusCandidate> heap,

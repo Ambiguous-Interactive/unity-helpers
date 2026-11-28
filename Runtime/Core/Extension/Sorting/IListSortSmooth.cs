@@ -9,6 +9,7 @@
 // ReSharper disable once CheckNamespace
 namespace WallstopStudios.UnityHelpers.Core.Extension
 {
+    using System;
     using System.Collections.Generic;
     using Utils;
     using WallstopStudios.UnityHelpers.Core.Helper;
@@ -79,19 +80,23 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return;
             }
 
-            if (list is T[] array)
+            if (TryGetExactArray(list, out T[] array))
             {
-                SmoothSortCore(array, count, comparer);
+                SmoothSortCore(array.AsSpan(0, count), count, comparer);
                 return;
             }
 
             using PooledArray<T> scratchLease = SystemArrayPool<T>.Get(count, out T[] scratch);
             list.CopyTo(scratch, 0);
-            SmoothSortCore(scratch, count, comparer);
+            SmoothSortCore(scratch.AsSpan(0, count), count, comparer);
             WriteBack(list, scratch, count);
         }
 
-        private static void SmoothSortCore<T, TComparer>(T[] array, int count, TComparer comparer)
+        private static void SmoothSortCore<T, TComparer>(
+            Span<T> array,
+            int count,
+            TComparer comparer
+        )
             where TComparer : IComparer<T>
         {
             int head = 0;
@@ -166,7 +171,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void SmoothSortSift<T, TComparer>(
-            T[] array,
+            Span<T> array,
             int head,
             int pshift,
             TComparer comparer
@@ -206,7 +211,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void SmoothSortTrinkle<T, TComparer>(
-            T[] array,
+            Span<T> array,
             int head,
             int p,
             int pshift,

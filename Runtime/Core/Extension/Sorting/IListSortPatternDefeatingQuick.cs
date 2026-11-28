@@ -46,20 +46,20 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return;
             }
 
-            if (list is T[] array)
+            if (TryGetExactArray(list, out T[] array))
             {
-                PatternDefeatingQuickSortCore(array, count, comparer);
+                PatternDefeatingQuickSortCore(array.AsSpan(0, count), count, comparer);
                 return;
             }
 
             using PooledArray<T> scratchLease = SystemArrayPool<T>.Get(count, out T[] scratch);
             list.CopyTo(scratch, 0);
-            PatternDefeatingQuickSortCore(scratch, count, comparer);
+            PatternDefeatingQuickSortCore(scratch.AsSpan(0, count), count, comparer);
             WriteBack(list, scratch, count);
         }
 
         private static void PatternDefeatingQuickSortCore<T, TComparer>(
-            T[] array,
+            Span<T> array,
             int count,
             TComparer comparer
         )
@@ -70,7 +70,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void PatternDefeatingQuickSortRange<T, TComparer>(
-            T[] array,
+            Span<T> array,
             int left,
             int right,
             TComparer comparer,
@@ -140,7 +140,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static (int pivotStart, int pivotEnd, bool swapped) PartitionRange<T, TComparer>(
-            T[] array,
+            Span<T> array,
             int left,
             int right,
             int pivotIndex,

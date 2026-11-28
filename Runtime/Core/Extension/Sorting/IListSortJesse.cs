@@ -35,18 +35,22 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             {
                 return;
             }
-            if (list is T[] array)
+            if (TryGetExactArray(list, out T[] array))
             {
-                JesseSortCore(array, count, comparer);
+                JesseSortCore(array.AsSpan(0, count), count, comparer);
                 return;
             }
             using PooledArray<T> scratchLease = SystemArrayPool<T>.Get(count, out T[] scratch);
             list.CopyTo(scratch, 0);
-            JesseSortCore(scratch, count, comparer);
+            JesseSortCore(scratch.AsSpan(0, count), count, comparer);
             WriteBack(list, scratch, count);
         }
 
-        private static void JesseSortCore<T, TComparer>(T[] array, int count, TComparer comparer)
+        private static void JesseSortCore<T, TComparer>(
+            Span<T> array,
+            int count,
+            TComparer comparer
+        )
             where TComparer : IComparer<T>
         {
             if (count < 2)
@@ -73,7 +77,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             {
                 if (direction < 0)
                 {
-                    Array.Reverse(array, 0, count);
+                    ReverseRange(array, 0, count);
                 }
                 return;
             }
@@ -81,7 +85,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void JesseSortUnorderedCore<T, TComparer>(
-            T[] array,
+            Span<T> array,
             int count,
             int orderedEnd,
             int direction,
@@ -115,7 +119,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             {
                 if (direction < 0)
                 {
-                    Array.Reverse(array, 0, orderedEnd);
+                    ReverseRange(array, 0, orderedEnd);
                 }
                 position = orderedEnd;
                 runs.Add(new JesseRun { Start = 0, End = position });
@@ -139,7 +143,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                         actualEnd = runEnd;
                         if (route == JesseDescendingRoute)
                         {
-                            Array.Reverse(array, position, actualEnd - position);
+                            ReverseRange(array, position, actualEnd - position);
                         }
                     }
                     else
@@ -204,7 +208,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static int ClassifyJesseChunk<T, TComparer>(
-            T[] array,
+            Span<T> array,
             int start,
             int end,
             TComparer comparer
@@ -283,7 +287,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static int ExtendJesseRun<T, TComparer>(
-            T[] array,
+            Span<T> array,
             int begin,
             int end,
             bool descending,
@@ -305,7 +309,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void SortJesseDirectRegion<T, TComparer>(
-            T[] array,
+            Span<T> array,
             int start,
             int end,
             TComparer comparer
@@ -319,7 +323,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void SortJessePatienceRegion<T, TComparer>(
-            T[] array,
+            Span<T> array,
             int start,
             int end,
             TComparer comparer
@@ -460,7 +464,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
                 else
                 {
-                    Array.Copy(array, start + offset, storage, cursor, length);
+                    CopyRange(array, start + offset, storage, cursor, length);
                     cursor += length;
                 }
                 cursors[runIndex] = cursor;
@@ -469,14 +473,14 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             if (prefixCount < count)
             {
                 SortJesseDirectRegion(array, start + prefixCount, end, comparer);
-                Array.Copy(array, start + prefixCount, storage, prefixCount, count - prefixCount);
+                CopyRange(array, start + prefixCount, storage, prefixCount, count - prefixCount);
                 runs.Add(new JesseRun { Start = prefixCount, End = count });
             }
             MergeJesseBuffers(storage, 0, array, start, count, runs, comparer, true, false);
         }
 
         private static int FindJessePile<T, TComparer>(
-            T[] array,
+            Span<T> array,
             int index,
             List<JessePile> piles,
             int hint,
@@ -530,7 +534,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void MergeJesseInitialRuns<T, TComparer>(
-            T[] array,
+            Span<T> array,
             int count,
             List<JesseRun> runs,
             TComparer comparer,
@@ -547,9 +551,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
                 if (comparer.Compare(array[count - 1], array[0]) <= 0)
                 {
-                    Array.Reverse(array, 0, middle);
-                    Array.Reverse(array, middle, count - middle);
-                    Array.Reverse(array, 0, count);
+                    ReverseRange(array, 0, middle);
+                    ReverseRange(array, middle, count - middle);
+                    ReverseRange(array, 0, count);
                     return;
                 }
             }
@@ -561,7 +565,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 JesseRun left = runs[index];
                 if (index + 1 == runCount)
                 {
-                    Array.Copy(array, left.Start, scratch, left.Start, left.End - left.Start);
+                    CopyRange(array, left.Start, scratch, left.Start, left.End - left.Start);
                     runs[merged++] = left;
                 }
                 else
@@ -587,7 +591,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void MergeJessePreparedRuns<T, TComparer>(
-            T[] array,
+            Span<T> array,
             int start,
             int count,
             List<JesseRun> runs,
@@ -603,13 +607,13 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
             using PooledArray<T> scratchLease = SystemArrayPool<T>.Get(count, out T[] scratch);
             MergeJesseBuffers(array, start, scratch, 0, count, runs, comparer, inner, outer);
-            Array.Copy(scratch, 0, array, start, count);
+            CopyRange(scratch, 0, array, start, count);
         }
 
         private static void MergeJesseBuffers<T, TComparer>(
-            T[] initialSource,
+            Span<T> initialSource,
             int sourceOffset,
-            T[] initialTarget,
+            Span<T> initialTarget,
             int targetOffset,
             int count,
             List<JesseRun> runs,
@@ -619,8 +623,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         )
             where TComparer : IComparer<T>
         {
-            T[] source = initialSource;
-            T[] target = initialTarget;
+            Span<T> source = initialSource;
+            Span<T> target = initialTarget;
+            int sourceBuffer = 0;
             int sourceStart = sourceOffset;
             int targetStart = targetOffset;
             int runCount = runs.Count;
@@ -678,7 +683,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     JesseRun left = runs[index];
                     if (index + 1 == runCount)
                     {
-                        Array.Copy(
+                        CopyRange(
                             source,
                             sourceStart + left.Start,
                             target,
@@ -707,20 +712,23 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     runs[merged++] = new JesseRun { Start = left.Start, End = right.End };
                 }
                 runCount = merged;
-                (source, target) = (target, source);
+                Span<T> swap = source;
+                source = target;
+                target = swap;
+                sourceBuffer = 1 - sourceBuffer;
                 (sourceStart, targetStart) = (targetStart, sourceStart);
                 ++tier;
             }
-            if (!ReferenceEquals(source, initialTarget) || sourceStart != targetOffset)
+            if (sourceBuffer != 1 || sourceStart != targetOffset)
             {
-                Array.Copy(source, sourceStart, initialTarget, targetOffset, count);
+                CopyRange(source, sourceStart, initialTarget, targetOffset, count);
             }
         }
 
         private static void MergeJessePair<T, TComparer>(
-            T[] source,
+            Span<T> source,
             int sourceOffset,
-            T[] target,
+            Span<T> target,
             int targetOffset,
             int begin,
             int middle,
@@ -739,7 +747,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 ) <= 0
             )
             {
-                Array.Copy(source, sourceOffset + begin, target, targetOffset + begin, end - begin);
+                CopyRange(source, sourceOffset + begin, target, targetOffset + begin, end - begin);
                 return;
             }
             if (
@@ -748,14 +756,14 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     <= 0
             )
             {
-                Array.Copy(
+                CopyRange(
                     source,
                     sourceOffset + middle,
                     target,
                     targetOffset + begin,
                     end - middle
                 );
-                Array.Copy(
+                CopyRange(
                     source,
                     sourceOffset + begin,
                     target,
@@ -800,7 +808,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                             comparer,
                             false
                         );
-                        Array.Copy(
+                        CopyRange(
                             source,
                             sourceOffset + right,
                             target,
@@ -828,7 +836,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                             comparer,
                             true
                         );
-                        Array.Copy(
+                        CopyRange(
                             source,
                             sourceOffset + left,
                             target,
@@ -843,7 +851,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
             if (left < middle)
             {
-                Array.Copy(
+                CopyRange(
                     source,
                     sourceOffset + left,
                     target,
@@ -853,18 +861,12 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
             else if (right < end)
             {
-                Array.Copy(
-                    source,
-                    sourceOffset + right,
-                    target,
-                    targetOffset + output,
-                    end - right
-                );
+                CopyRange(source, sourceOffset + right, target, targetOffset + output, end - right);
             }
         }
 
         private static int FindJesseGallopEnd<T, TComparer>(
-            T[] source,
+            Span<T> source,
             int offset,
             int begin,
             int end,
@@ -908,7 +910,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static bool ShouldGallopJesseOuter<T, TComparer>(
-            T[] source,
+            Span<T> source,
             int offset,
             int begin,
             int middle,
@@ -963,7 +965,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static bool IsSparseJesseMiddleDensity<T, TComparer>(
-            T[] array,
+            Span<T> array,
             int count,
             TComparer comparer
         )
@@ -1006,7 +1008,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static bool TryGlobalJesseRuns<T, TComparer>(
-            T[] array,
+            Span<T> array,
             int count,
             TComparer comparer,
             List<JesseRun> runs
@@ -1113,14 +1115,14 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             {
                 if (run.Descending)
                 {
-                    Array.Reverse(array, run.Start, run.End - run.Start);
+                    ReverseRange(array, run.Start, run.End - run.Start);
                 }
             }
             return true;
         }
 
         private static bool JesseRunsOverlap<T, TComparer>(
-            T[] array,
+            Span<T> array,
             JesseRun left,
             JesseRun right,
             TComparer comparer
@@ -1136,7 +1138,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void PrecompactJesseRuns<T, TComparer>(
-            T[] array,
+            Span<T> array,
             List<JesseRun> runs,
             TComparer comparer
         )
@@ -1177,7 +1179,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                                 comparer,
                                 int.MaxValue
                             );
-                            Array.Copy(
+                            CopyRange(
                                 scratch,
                                 first.Start,
                                 array,
@@ -1200,7 +1202,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                                 comparer,
                                 int.MaxValue
                             );
-                            Array.Copy(
+                            CopyRange(
                                 scratch,
                                 second.Start,
                                 array,

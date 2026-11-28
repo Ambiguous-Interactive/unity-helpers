@@ -37,6 +37,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// algorithm's own method documents what it rents.
         /// </para>
         /// <para>
+        /// Failure: the sort does not catch comparer exceptions. They propagate, and the list
+        /// contents are then unspecified.
+        /// </para>
+        /// <para>
         /// Edge cases: Empty or single element lists require no sorting. Every
         /// <see cref="SortAlgorithm"/> member states whether it is stable:
         /// <see cref="SortAlgorithm.Insertion"/>, <see cref="SortAlgorithm.Grail"/>,

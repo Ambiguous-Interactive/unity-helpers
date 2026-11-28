@@ -35,19 +35,23 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return;
             }
 
-            if (list is T[] array)
+            if (TryGetExactArray(list, out T[] array))
             {
-                GlideSortCore(array, count, comparer);
+                GlideSortCore(array.AsSpan(0, count), count, comparer);
                 return;
             }
 
             using PooledArray<T> scratchLease = SystemArrayPool<T>.Get(count, out T[] scratch);
             list.CopyTo(scratch, 0);
-            GlideSortCore(scratch, count, comparer);
+            GlideSortCore(scratch.AsSpan(0, count), count, comparer);
             WriteBack(list, scratch, count);
         }
 
-        private static void GlideSortCore<T, TComparer>(T[] array, int count, TComparer comparer)
+        private static void GlideSortCore<T, TComparer>(
+            Span<T> array,
+            int count,
+            TComparer comparer
+        )
             where TComparer : IComparer<T>
         {
             using PooledArray<T> bufferLease = SystemArrayPool<T>.Get(count, out T[] buffer);
@@ -114,8 +118,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void GlideMergeRuns<T, TComparer>(
-            T[] array,
-            T[] buffer,
+            Span<T> array,
+            Span<T> buffer,
             int leftStart,
             int leftLength,
             int rightStart,
@@ -147,7 +151,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             int rightRemaining = rightLength;
             int leftWins = 0;
             int rightWins = 0;
-            T[] leftBuffer = buffer;
+            Span<T> leftBuffer = buffer;
 
             while (0 < leftRemaining && 0 < rightRemaining)
             {
@@ -218,7 +222,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static int GlideGallopLeft<T, TComparer>(
-            T[] list,
+            Span<T> list,
             int start,
             int length,
             T key,
@@ -245,7 +249,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static int GlideGallopRight<T, TComparer>(
-            T[] list,
+            Span<T> list,
             int start,
             int length,
             T key,

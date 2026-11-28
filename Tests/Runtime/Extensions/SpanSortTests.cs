@@ -8,6 +8,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     using System.ComponentModel;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Extension;
+    using WallstopStudios.UnityHelpers.Tests.TestUtils;
+    using ThreadAllocationCounter = WallstopStudios.UnityHelpers.Tests.Core.ThreadAllocationCounter;
 
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
@@ -66,6 +68,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.That(values[length + 1], Is.EqualTo(int.MinValue));
         }
 
+        [TestCaseSource(nameof(Algorithms))]
+        public void ListSortHandlesCovariantArrayStorage(SortAlgorithm algorithm)
+        {
+            string[] backing = { "b", "a", "c" };
+            IList<object> values = backing;
+            values.Sort(Comparer<object>.Default, algorithm);
+            CollectionAssert.AreEqual(new object[] { "a", "b", "c" }, backing);
+        }
+
         [TestCase(0)]
         [TestCase(1)]
         [TestCase(2)]
@@ -116,7 +127,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         }
 
         [Test]
-        public void InPlaceInsertionSortKeepsEveryValueAfterAComparerThrows()
+        public void InPlaceInsertionSortPropagatesComparerException()
         {
             int[] values = { 4, 3, 1, 2 };
             int comparisons = 0;
@@ -135,7 +146,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 values.AsSpan().InsertionSortInPlace(comparer)
             );
             Assert.AreEqual(3, comparisons);
-            CollectionAssert.AreEqual(new[] { 3, 4, 1, 2 }, values);
+            values.AsSpan().InsertionSortInPlace(Comparer<int>.Default);
+            CollectionAssert.IsOrdered(values);
         }
 
         [TestCaseSource(nameof(Algorithms))]
@@ -179,7 +191,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         }
 
         [TestCaseSource(nameof(Algorithms))]
-        public void SortWithThrowingComparerLeavesCallerStorageIntact(SortAlgorithm algorithm)
+        public void SortPropagatesComparerException(SortAlgorithm algorithm)
         {
             int[] values = { 8, 6, 4, 2 };
             IComparer<int> comparer = Comparer<int>.Create(
@@ -188,9 +200,29 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.Throws<InvalidOperationException>(() =>
                 values.AsSpan().Sort(comparer, algorithm)
             );
-            CollectionAssert.AreEqual(new[] { 8, 6, 4, 2 }, values);
             values.AsSpan().Sort(Comparer<int>.Default, algorithm);
             CollectionAssert.AreEqual(new[] { 2, 4, 6, 8 }, values);
+        }
+
+        [Test]
+        public void InsertionSortOnAnArraySpanDoesNotRentAFullCopy()
+        {
+            GCAssert.IgnoreIfAllocationMeasurementUnavailable();
+            int[] values = new int[1024];
+            for (int index = 0; index < values.Length; ++index)
+            {
+                values[index] = (index * 37) % 1024;
+            }
+
+            int[] expected = (int[])values.Clone();
+            Array.Sort(expected);
+            int[] warmup = (int[])values.Clone();
+            warmup.AsSpan().Sort(Comparer<int>.Default, SortAlgorithm.Insertion);
+            long before = ThreadAllocationCounter.Read();
+            values.AsSpan().Sort(Comparer<int>.Default, SortAlgorithm.Insertion);
+            long allocated = ThreadAllocationCounter.Read() - before;
+            Assert.AreEqual(0, allocated);
+            CollectionAssert.AreEqual(expected, values);
         }
 
         [TestCase(SortAlgorithm.Insertion)]

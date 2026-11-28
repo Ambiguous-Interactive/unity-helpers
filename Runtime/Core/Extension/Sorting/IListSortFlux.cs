@@ -9,6 +9,7 @@
 // ReSharper disable once CheckNamespace
 namespace WallstopStudios.UnityHelpers.Core.Extension
 {
+    using System;
     using System.Collections.Generic;
     using Utils;
     using WallstopStudios.UnityHelpers.Core.Helper;
@@ -30,19 +31,19 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return;
             }
 
-            if (list is T[] array)
+            if (TryGetExactArray(list, out T[] array))
             {
-                FluxSortCore(array, count, comparer);
+                FluxSortCore(array.AsSpan(0, count), count, comparer);
                 return;
             }
 
             using PooledArray<T> scratchLease = SystemArrayPool<T>.Get(count, out T[] scratch);
             list.CopyTo(scratch, 0);
-            FluxSortCore(scratch, count, comparer);
+            FluxSortCore(scratch.AsSpan(0, count), count, comparer);
             WriteBack(list, scratch, count);
         }
 
-        private static void FluxSortCore<T, TComparer>(T[] array, int count, TComparer comparer)
+        private static void FluxSortCore<T, TComparer>(Span<T> array, int count, TComparer comparer)
             where TComparer : IComparer<T>
         {
             DualPivotQuickSort(array, 0, count - 1, comparer, 2 * BitOps.Log2(count));
@@ -56,7 +57,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Written against <c>T[]</c> with an insertion sort threshold to avoid excess recursion.
         /// </remarks>
         private static void DualPivotQuickSort<T, TComparer>(
-            T[] array,
+            Span<T> array,
             int left,
             int right,
             TComparer comparer,

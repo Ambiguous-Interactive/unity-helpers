@@ -4,18 +4,48 @@
 // ReSharper disable once CheckNamespace
 namespace WallstopStudios.UnityHelpers.Core.Extension
 {
+    using System;
     using System.Collections.Generic;
     using WallstopStudios.UnityHelpers.Core.Helper;
 
     public static partial class IListExtensions
     {
+        // A covariant array passed as IList<T> is not a T[] at runtime; AsSpan would throw.
+        private static bool TryGetExactArray<T>(IList<T> list, out T[] array)
+        {
+            if (list is T[] candidate && candidate.GetType() == typeof(T[]))
+            {
+                array = candidate;
+                return true;
+            }
+
+            array = null;
+            return false;
+        }
+
+        private static void CopyRange<T>(
+            Span<T> source,
+            int sourceIndex,
+            Span<T> destination,
+            int destinationIndex,
+            int length
+        )
+        {
+            source.Slice(sourceIndex, length).CopyTo(destination.Slice(destinationIndex, length));
+        }
+
+        private static void ReverseRange<T>(Span<T> span, int start, int count)
+        {
+            span.Slice(start, count).Reverse();
+        }
+
         // Copying to a pooled array costs less than interface dispatch at every sort comparison.
-        private static void SortSwap<T>(T[] array, int left, int right)
+        private static void SortSwap<T>(Span<T> array, int left, int right)
         {
             (array[left], array[right]) = (array[right], array[left]);
         }
 
-        private static void SortReverse<T>(T[] array, int start, int end)
+        private static void SortReverse<T>(Span<T> array, int start, int end)
         {
             while (start < end)
             {
@@ -26,7 +56,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static int SelectPivotIndex<T, TComparer>(
-            T[] array,
+            Span<T> array,
             int left,
             int right,
             TComparer comparer
@@ -50,8 +80,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void MergeRuns<T, TComparer>(
-            T[] array,
-            T[] buffer,
+            Span<T> array,
+            Span<T> buffer,
             int leftStart,
             int leftLength,
             int rightStart,
@@ -142,7 +172,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void CollectNaturalRuns<T, TComparer>(
-            T[] array,
+            Span<T> array,
             int count,
             TComparer comparer,
             List<(int start, int length)> runs
@@ -198,7 +228,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static int MakeAscendingRun<T, TComparer>(
-            T[] array,
+            Span<T> array,
             int start,
             int count,
             TComparer comparer
@@ -235,7 +265,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static int MedianOfFiveIndices<T, TComparer>(
-            T[] array,
+            Span<T> array,
             int first,
             int second,
             int third,
@@ -264,7 +294,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void InsertionSortRange<T, TComparer>(
-            T[] array,
+            Span<T> array,
             int left,
             int right,
             TComparer comparer
@@ -290,7 +320,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void HeapSortRange<T, TComparer>(
-            T[] array,
+            Span<T> array,
             int start,
             int end,
             TComparer comparer
@@ -316,7 +346,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static void SiftDown<T, TComparer>(
-            T[] array,
+            Span<T> array,
             int start,
             int length,
             int root,
@@ -352,7 +382,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         private static bool IsRangeSorted<T, TComparer>(
-            T[] array,
+            Span<T> array,
             int left,
             int right,
             TComparer comparer
