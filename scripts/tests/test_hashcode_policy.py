@@ -11,7 +11,9 @@ from csharp_sources import mask_noise, source_files
 
 ROOT = Path(__file__).resolve().parents[2]
 FORBIDDEN = re.compile(
-    r"\bHashCode\s*\.\s*(?:Combine|Add)\b|\bnew\s+(?:System\s*\.\s*)?HashCode\s*\("
+    r"\bHashCode\s*\.\s*(?:Combine|Add)\b"
+    r"|\bnew\s+(?:System\s*\.\s*)?HashCode\s*\("
+    r"|\b(?:System\s*\.\s*)?HashCode\s+[A-Za-z_]\w*\s*[=;]"
 )
 
 
@@ -35,6 +37,10 @@ def test_detector_rejects_each_forbidden_shape() -> None:
     assert FORBIDDEN.search("return System.HashCode.Combine(first);") is not None
     assert FORBIDDEN.search("HashCode hash = new HashCode();") is not None
     assert FORBIDDEN.search("HashCode hash = new System.HashCode();") is not None
+    assert FORBIDDEN.search("HashCode hash = default;") is not None
+    assert FORBIDDEN.search("System.HashCode hash = default(System.HashCode);") is not None
+    assert FORBIDDEN.search("HashCode hash = new();") is not None
+    assert FORBIDDEN.search("private HashCode _hash;") is not None
     assert FORBIDDEN.search("return Objects.HashCode(first, second);") is None
     assert FORBIDDEN.search("return value.GetHashCode();") is None
 
