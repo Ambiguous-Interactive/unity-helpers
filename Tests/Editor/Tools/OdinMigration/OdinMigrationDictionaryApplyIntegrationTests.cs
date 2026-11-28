@@ -70,6 +70,46 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             );
         }
 
+        [OneTimeSetUp]
+        public void RemoveStaleRecoveryFolders()
+        {
+            string assets = FullPath("Assets");
+            if (!Directory.Exists(assets))
+            {
+                return;
+            }
+
+            foreach (
+                string directory in Directory.GetDirectories(
+                    assets,
+                    ".OdinMigrationRecovery-*",
+                    SearchOption.TopDirectoryOnly
+                )
+            )
+            {
+                string assetPath = "Assets/" + Path.GetFileName(directory);
+                if (AssetDatabase.IsValidFolder(assetPath))
+                {
+                    if (!AssetDatabase.DeleteAsset(assetPath) && Directory.Exists(directory))
+                    {
+                        Directory.Delete(directory, true);
+                    }
+                }
+                else
+                {
+                    Directory.Delete(directory, true);
+                }
+
+                string meta = directory + ".meta";
+                if (!Directory.Exists(directory) && File.Exists(meta))
+                {
+                    File.Delete(meta);
+                }
+            }
+
+            AssetDatabase.Refresh();
+        }
+
         [UnitySetUp]
         public IEnumerator CreateOriginalConsumerSource()
         {

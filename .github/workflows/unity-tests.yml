@@ -719,7 +719,7 @@ jobs:
           GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
           UH_PARALLEL_ASSEMBLY_PROFILES: ${{ needs.matrix-config.outputs.integration-assembly-profiles }}
           UH_PARALLEL_SELECTED_MODES: ${{ needs.matrix-config.outputs.test-modes }}
-          UH_COMBINE_LATEST: ${{ needs.matrix-config.outputs.combine-variants == 'true' && matrix.unity-version == '6000.6.0f1' }}
+          UH_COMBINE_LATEST: ${{ github.event_name != 'pull_request' && needs.matrix-config.outputs.combine-variants == 'true' && matrix.unity-version == '6000.6.0f1' }}
           UH_PARALLEL_SINGLE_THREADED_SELECTED_MODES: ${{ github.event_name == 'pull_request' && needs.matrix-config.outputs.test-modes || '["editmode","playmode","standalone"]' }}
           UH_PARALLEL_SINGLE_THREADED_ASSEMBLY_PROFILES: ${{ needs.matrix-config.outputs.core-assembly-profiles }}
         run: |
@@ -727,7 +727,8 @@ jobs:
           ./scripts/unity/assert-no-active-unity-editor.ps1
           $variant = @()
           if ($env:UH_COMBINE_LATEST -eq 'true') { $variant += '--with-single-threaded' }
-          uv run --project scripts/python~ --locked --no-dev python scripts/unity/run_ci_modes.py --version '${{ matrix.unity-version }}' --editmode-shards 2 --max-workers 5 @variant
+          uv run --project scripts/python~ --locked --no-dev python scripts/unity/run_ci_modes.py --version '${{ matrix.unity-version }}' `
+            --editmode-shards 2 --max-workers 5 --timeout-seconds 1860 @variant
           if ($LASTEXITCODE -ne 0) { throw 'One or more concurrent Unity modes failed.' }
           ./scripts/unity/assert-no-active-unity-editor.ps1
 
@@ -1678,7 +1679,7 @@ jobs:
       - name: Require every SINGLE_THREADED Unity mode
         id: require_st_modes
         if: >-
-          ${{ needs.matrix-config.outputs.combine-variants == 'true' && matrix.unity-version == '6000.6.0f1' &&
+          ${{ github.event_name != 'pull_request' && needs.matrix-config.outputs.combine-variants == 'true' && matrix.unity-version == '6000.6.0f1' &&
             always() && !cancelled() }}
         shell: pwsh
         env:
@@ -1745,7 +1746,7 @@ jobs:
       - runner-preflight
     if: >-
       ${{ !cancelled() &&
-        github.event_name == 'workflow_dispatch' &&
+        (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref_protected)) &&
         !(github.event_name == 'workflow_dispatch' && inputs.native-readback-run-id != '') &&
         (github.event_name != 'pull_request' ||
           github.event.pull_request.head.repo.full_name == github.repository) &&
@@ -1876,7 +1877,8 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           ./scripts/unity/assert-no-active-unity-editor.ps1
-          uv run --project scripts/python~ --locked --no-dev python scripts/unity/run_ci_modes.py --version '${{ matrix.unity-version }}' --editmode-shards 2 --max-workers 5 --single-threaded
+          uv run --project scripts/python~ --locked --no-dev python scripts/unity/run_ci_modes.py --version '${{ matrix.unity-version }}' `
+            --editmode-shards 2 --max-workers 5 --timeout-seconds 1860 --single-threaded
           if ($LASTEXITCODE -ne 0) { throw 'One or more concurrent Unity modes failed.' }
           ./scripts/unity/assert-no-active-unity-editor.ps1
 
