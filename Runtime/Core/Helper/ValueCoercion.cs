@@ -85,9 +85,24 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     return false;
                 }
 
-                if (input is ulong unsignedInput && underlying == typeof(ulong))
+                if (underlying == typeof(ulong))
                 {
-                    return TryCreateEnum(effective, unsignedInput, out value);
+                    try
+                    {
+                        ulong unsignedInput = Convert.ToUInt64(input, CultureInfo.InvariantCulture);
+                        return TryCreateEnum(effective, unsignedInput, out value);
+                    }
+                    catch (Exception exception)
+                        when (exception is FormatException
+                            || exception is InvalidCastException
+                            || exception is OverflowException
+                            || exception is NotSupportedException
+                            || exception is ArgumentException
+                        )
+                    {
+                        value = null;
+                        return false;
+                    }
                 }
 
                 if (
@@ -135,7 +150,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     return value != null;
                 }
                 catch (Exception exception)
-                    when (exception is InvalidCastException || exception is FormatException)
+                    when (exception is InvalidCastException
+                        || exception is FormatException
+                        || exception is NotSupportedException
+                    )
                 {
                     value = null;
                     return false;
@@ -165,6 +183,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     when (exception is FormatException
                         || exception is InvalidCastException
                         || exception is OverflowException
+                        || exception is NotSupportedException
                         || exception is ArgumentException
                     )
                 {

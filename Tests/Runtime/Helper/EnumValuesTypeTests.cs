@@ -75,6 +75,30 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 
         [Test]
+        public void MutatingThePublicValuesArrayDoesNotChangeParsing()
+        {
+            Array values = EnumValues.Of(typeof(Sample));
+            object original = values.GetValue(0);
+            values.SetValue((Sample)99, 0);
+            try
+            {
+                Assert.IsTrue(
+                    EnumValues.TryParse(
+                        typeof(Sample),
+                        "Unknown".AsSpan(),
+                        false,
+                        out object parsed
+                    )
+                );
+                Assert.AreEqual(Sample.Unknown, parsed);
+            }
+            finally
+            {
+                values.SetValue(original, 0);
+            }
+        }
+
+        [Test]
         public void TryFromIntegerAcceptsRepresentableValues()
         {
             Assert.IsTrue(EnumValues.TryFromInteger(typeof(Sample), 2, out object second));

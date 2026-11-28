@@ -14,6 +14,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         private static readonly Func<Type, Array> CreateValues = Enum.GetValues;
         private static readonly ConcurrentDictionary<Type, string[]> Names = new();
         private static readonly Func<Type, string[]> CreateNames = Enum.GetNames;
+        private static readonly ConcurrentDictionary<Type, object[]> ParseValues = new();
+        private static readonly Func<Type, object[]> CreateParseValues = ReadParseValues;
 
         /// <summary>Gets the shared values in unsigned numeric order, retaining aliases.</summary>
         /// <param name="enumType">The enum type to read.</param>
@@ -82,10 +84,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return false;
             }
 
-            Array values;
+            object[] values;
             try
             {
-                values = Of(enumType);
+                values = ParseValues.GetOrAdd(enumType, CreateParseValues);
             }
             catch (Exception exception)
                 when (exception is ArgumentException
@@ -111,7 +113,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     continue;
                 }
 
-                object current = values.GetValue(index);
+                object current = values[index];
                 if (found && !Equals(candidate, current))
                 {
                     value = null;
@@ -157,6 +159,18 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 result = null;
                 return false;
             }
+        }
+
+        private static object[] ReadParseValues(Type enumType)
+        {
+            Array values = Enum.GetValues(enumType);
+            int count = values.Length;
+            object[] copy = new object[count];
+            for (int index = 0; index < count; ++index)
+            {
+                copy[index] = values.GetValue(index);
+            }
+            return copy;
         }
 
         private static bool IsInRange(Type underlying, long value)

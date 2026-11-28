@@ -117,6 +117,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 
         [Test]
+        public void UnsignedEnumInputsAboveLongMaximumAreCoerced()
+        {
+            Assert.IsTrue(
+                ValueCoercion.TryCoerce(
+                    typeof(ULongSample),
+                    9223372036854775808m,
+                    out object decimalValue
+                )
+            );
+            Assert.AreEqual((ULongSample)9223372036854775808UL, decimalValue);
+            Assert.IsTrue(
+                ValueCoercion.TryCoerce(
+                    typeof(ULongSample),
+                    9223372036854775808d,
+                    out object doubleValue
+                )
+            );
+            Assert.AreEqual((ULongSample)9223372036854775808UL, doubleValue);
+        }
+
+        [Test]
         public void FractionalEnumInputsAreRejected()
         {
             Assert.IsFalse(ValueCoercion.TryCoerce(typeof(Sample), 1.5d, out object fractional));
@@ -133,6 +154,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsTrue(enumValue == null);
             Assert.IsFalse(ValueCoercion.TryCoerce(typeof(string), input, out object text));
             Assert.IsTrue(text == null);
+            Assert.IsFalse(ValueCoercion.TryCoerce(typeof(int), input, out object number));
+            Assert.IsTrue(number == null);
         }
 
         [Test]
@@ -225,7 +248,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
             public string ToString(IFormatProvider provider)
             {
-                throw new InvalidCastException();
+                throw new NotSupportedException();
             }
 
             public object ToType(Type conversionType, IFormatProvider provider)
