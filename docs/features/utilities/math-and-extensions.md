@@ -1662,6 +1662,33 @@ may allocate discarded candidate arrays before one value is published.
 reading metadata or values. Other exceptions propagate. Failed reads do not publish
 a cache entry. Prefer `EnumValues<T>.Values` when `T` is known at compile time.
 
+#### Runtime-Type Parsing and Coercion
+
+`EnumValues.TryParse(Type enumType, ReadOnlySpan<char> name, bool ignoreCase, out object value)`
+matches declared names on a type known only at runtime. Aliases with one value are accepted;
+names that differ only by case and identify distinct values are ambiguous and fail.
+`EnumValues.TryFromInteger(Type enumType, long value, out object result)` creates any value the
+underlying type can hold, declared or not; out-of-range values fail. Both return false and null
+for null or non-enum types.
+
+`ValueCoercion.TryCoerce(Type target, object input, out object value)` handles loosely typed
+configuration values: same-type values pass through, strings parse with the invariant culture,
+enums accept a declared name or a numeric string, `bool` accepts `true`/`false`, and other
+`IConvertible` inputs use `Convert.ChangeType`. Null is accepted for reference and nullable
+targets. Unsupported conversions return false and never throw.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using System;
+using WallstopStudios.UnityHelpers.Core.Helper;
+
+bool found = EnumValues.TryParse(
+    typeof(DayOfWeek), "Monday".AsSpan(), false, out object parsed);
+bool created = EnumValues.TryFromInteger(typeof(DayOfWeek), 1, out object numeric);
+bool converted = ValueCoercion.TryCoerce(typeof(float), "1.5", out object coerced);
+```
+
 ### Fast Enum-to-String Conversion
 
 **The problem:** `enum.ToString()` is slow (reflection) and allocates every call.
