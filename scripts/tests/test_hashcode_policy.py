@@ -10,14 +10,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from csharp_sources import mask_noise, source_files
 
 ROOT = Path(__file__).resolve().parents[2]
-QUALIFIER = r"(?:global\s*::\s*)?(?:System\s*\.\s*)?"
 FORBIDDEN = re.compile(
-    rf"\b{QUALIFIER}HashCode\s*\.\s*(?:Combine|Add)\b"
-    r"|\bnew\s+(?:global\s*::\s*)?(?:System\s*\.\s*)?HashCode\s*[({]"
-    rf"|\busing\s+static\s+{QUALIFIER}HashCode\s*;"
-    rf"|\busing\s+[A-Za-z_]\w*\s*=\s*{QUALIFIER}HashCode\s*;"
-    rf"|\b{QUALIFIER}HashCode\s*\??\s+[A-Za-z_]\w*\s*[=;]"
-    rf"|\bdefault\s*\(\s*{QUALIFIER}HashCode\s*\)"
+    r"\bSystem\s*\.\s*HashCode\b"
+    r"|(?<!\.)\bHashCode\b(?!\s*<)"
 )
 
 
@@ -53,6 +48,7 @@ def test_detector_rejects_each_forbidden_shape() -> None:
     assert FORBIDDEN.search("using HC = System.HashCode;") is not None
     assert FORBIDDEN.search("System.HashCode? hash = new System.HashCode();") is not None
     assert FORBIDDEN.search("using static System.HashCode;") is not None
+    assert FORBIDDEN.search("private HashCode first, second;") is not None
     assert FORBIDDEN.search("return Objects.HashCode(first, second);") is None
     assert FORBIDDEN.search("return value.GetHashCode();") is None
 
