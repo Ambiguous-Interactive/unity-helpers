@@ -10,6 +10,19 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
     public static partial class IListExtensions
     {
+        // A covariant array passed as IList<T> is not a T[] at runtime; AsSpan would throw.
+        private static bool TryGetExactArray<T>(IList<T> list, out T[] array)
+        {
+            if (list is T[] candidate && candidate.GetType() == typeof(T[]))
+            {
+                array = candidate;
+                return true;
+            }
+
+            array = null;
+            return false;
+        }
+
         private static void CopyRange<T>(
             Span<T> source,
             int sourceIndex,

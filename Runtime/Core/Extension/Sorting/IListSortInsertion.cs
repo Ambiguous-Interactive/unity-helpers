@@ -33,7 +33,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return;
             }
 
-            if (list is T[] array)
+            if (TryGetExactArray(list, out T[] array))
             {
                 InsertionSortCore(array.AsSpan(0, count), count, comparer);
                 return;

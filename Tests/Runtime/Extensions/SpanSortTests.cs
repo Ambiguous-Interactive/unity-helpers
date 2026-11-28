@@ -68,6 +68,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.That(values[length + 1], Is.EqualTo(int.MinValue));
         }
 
+        [TestCaseSource(nameof(Algorithms))]
+        public void ListSortHandlesCovariantArrayStorage(SortAlgorithm algorithm)
+        {
+            string[] backing = { "b", "a", "c" };
+            IList<object> values = backing;
+            values.Sort(Comparer<object>.Default, algorithm);
+            CollectionAssert.AreEqual(new object[] { "a", "b", "c" }, backing);
+        }
+
         [TestCase(0)]
         [TestCase(1)]
         [TestCase(2)]
@@ -207,7 +216,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
             int[] expected = (int[])values.Clone();
             Array.Sort(expected);
-            _ = values.AsSpan().ToArray();
+            int[] warmup = (int[])values.Clone();
+            warmup.AsSpan().Sort(Comparer<int>.Default, SortAlgorithm.Insertion);
             long before = ThreadAllocationCounter.Read();
             values.AsSpan().Sort(Comparer<int>.Default, SortAlgorithm.Insertion);
             long allocated = ThreadAllocationCounter.Read() - before;
