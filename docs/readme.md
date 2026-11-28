@@ -984,6 +984,8 @@ Additional high-performance data structures:
 | **SparseSet**        | Fast add/remove with iteration |
 | **TimedCache<T>**    | Auto-expiring cache            |
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 // Cyclic buffer for damage history
 CyclicBuffer<float> damageHistory = new(capacity: 10);
@@ -992,19 +994,17 @@ damageHistory.Add(30f);
 float avgDamage = damageHistory.Average();
 
 // Priority queue for event scheduling (priority determined by comparer)
-PriorityQueue<GameEvent> eventQueue = new(
-    Comparer<GameEvent>.Create((a, b) => b.Priority.CompareTo(a.Priority)) // Higher first
+PriorityQueue<int> eventQueue = new(
+    Comparer<int>.Create((a, b) => b.CompareTo(a)) // Higher first
 );
-eventQueue.Enqueue(spawnEvent);
-eventQueue.Enqueue(bossEvent);
-if (eventQueue.TryDequeue(out GameEvent next)) { /* process event */ }
+eventQueue.Enqueue(1);
+eventQueue.Enqueue(10);
+if (eventQueue.TryDequeue(out int next)) { /* process event */ }
 
 // Trie for autocomplete
-Trie commandTrie = new();
-commandTrie.Insert("teleport");
-commandTrie.Insert("tell");
-commandTrie.Insert("terrain");
-List<string> matches = commandTrie.GetWordsWithPrefix("tel");
+Trie commandTrie = new(new[] { "teleport", "tell", "terrain" });
+List<string> matches = new();
+commandTrie.GetWordsWithPrefix("tel", matches);
 // Returns: ["teleport", "tell"]
 ```
 
