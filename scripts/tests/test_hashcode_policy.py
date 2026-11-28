@@ -27,9 +27,7 @@ def scan(text: str) -> list[str]:
     return found
 
 
-def findings(
-    repository: Path = ROOT, roots: tuple[str, ...] = ("Runtime", "Editor")
-) -> list[str]:
+def findings(repository: Path = ROOT, roots: tuple[str, ...] = ("Runtime", "Editor")) -> list[str]:
     found: list[str] = []
     for path in source_files(repository, roots):
         masked = mask_noise(path.read_text(encoding="utf-8"))
