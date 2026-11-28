@@ -76,9 +76,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             out object value
         )
         {
-            value = null;
             if (enumType == null || !enumType.IsEnum)
             {
+                value = null;
                 return false;
             }
 
@@ -93,6 +93,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     || exception is NotSupportedException
                 )
             {
+                value = null;
                 return false;
             }
 
@@ -121,7 +122,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 found = true;
             }
 
-            value = candidate;
+            value = found ? candidate : null;
             return found;
         }
 
@@ -133,15 +134,16 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <remarks>The value need not be declared. Values outside the underlying type's range fail.</remarks>
         public static bool TryFromInteger(Type enumType, long value, out object result)
         {
-            result = null;
             if (enumType == null || !enumType.IsEnum)
             {
+                result = null;
                 return false;
             }
 
             Type underlying = Enum.GetUnderlyingType(enumType);
             if (!IsInRange(underlying, value))
             {
+                result = null;
                 return false;
             }
 
@@ -152,6 +154,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
             catch (ArgumentException)
             {
+                result = null;
                 return false;
             }
         }

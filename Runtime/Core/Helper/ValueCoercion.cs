@@ -21,9 +21,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <returns>Whether the input was converted.</returns>
         public static bool TryCoerce(Type target, object input, out object value)
         {
-            value = null;
             if (target == null)
             {
+                value = null;
                 return false;
             }
 
@@ -31,6 +31,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             Type effective = nullable ?? target;
             if (input == null)
             {
+                value = null;
                 return !target.IsValueType || nullable != null;
             }
 
@@ -77,10 +78,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                             || exception is OverflowException
                         )
                     {
+                        value = null;
                         return false;
                     }
                 }
 
+                value = null;
                 return false;
             }
 
@@ -98,6 +101,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     return true;
                 }
 
+                value = null;
                 return false;
             }
 
@@ -120,6 +124,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
             }
 
+            value = null;
             return false;
         }
     }
