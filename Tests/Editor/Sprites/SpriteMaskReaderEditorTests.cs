@@ -655,7 +655,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             yield break;
         }
 
-        private static void AssertBounds(Bounds actual, Bounds expected)
+        private void AssertBounds(Bounds actual, Bounds expected)
         {
             Assert.That(actual.center.x, Is.EqualTo(expected.center.x).Within(0.0001f));
             Assert.That(actual.center.y, Is.EqualTo(expected.center.y).Within(0.0001f));
@@ -663,13 +663,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             Assert.That(actual.size.y, Is.EqualTo(expected.size.y).Within(0.0001f));
         }
 
-        private static void AssertVector(Vector2 actual, Vector2 expected)
+        private void AssertVector(Vector2 actual, Vector2 expected)
         {
             Assert.That(actual.x, Is.EqualTo(expected.x).Within(0.0001f));
             Assert.That(actual.y, Is.EqualTo(expected.y).Within(0.0001f));
         }
 
-        private static Bounds ExpectedBounds(SpriteAlphaMask mask)
+        private Bounds ExpectedBounds(SpriteAlphaMask mask)
         {
             int left = mask.Width;
             int bottom = mask.Height;
@@ -700,7 +700,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             );
         }
 
-        private static Vector2 ExpectedCentroid(SpriteAlphaMask mask)
+        private Vector2 ExpectedCentroid(SpriteAlphaMask mask)
         {
             double sumX = 0;
             double sumY = 0;
