@@ -14,10 +14,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <remarks>
         /// Sorts the span in place, preserving the algorithm's ordering and stability guarantees.
         /// No full-length copy is made. The algorithm may rent its usual scratch storage; cold
-        /// pools can allocate. Comparer exceptions propagate and leave the span holding a
-        /// permutation of the original values; no element is lost or duplicated. Empty and
-        /// single-element spans do not invoke the comparer. The algorithm argument is required to
-        /// distinguish this from framework span sorting.
+        /// pools can allocate. The sort does not catch comparer exceptions: they propagate, and
+        /// the span contents are then unspecified. Empty and single-element spans do not invoke
+        /// the comparer. The algorithm argument is required to distinguish this from framework
+        /// span sorting.
         /// </remarks>
         /// <exception cref="InvalidEnumArgumentException">The selected algorithm is undefined.</exception>
         public static void Sort<T, TComparer>(
@@ -61,8 +61,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
         /// <summary>Stably sorts a span in place without renting a buffer.</summary>
         /// <remarks>
-        /// Intended for short or nearly sorted spans. If the comparer throws, earlier insertions
-        /// remain applied and every original element remains in the span.
+        /// Intended for short or nearly sorted spans. The sort does not catch comparer
+        /// exceptions: they propagate, and the span contents are then unspecified.
         /// </remarks>
         public static void InsertionSortInPlace<T, TComparer>(this Span<T> span, TComparer comparer)
             where TComparer : IComparer<T>

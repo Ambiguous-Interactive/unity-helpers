@@ -180,39 +180,31 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         {
             T value = array[head];
 
-            try
+            while (1 < pshift)
             {
-                while (1 < pshift)
+                int right = head - 1;
+                int left = head - 1 - SmoothSortLeonardoNumbers[pshift - 2];
+
+                if (
+                    0 <= comparer.Compare(value, array[left])
+                    && 0 <= comparer.Compare(value, array[right])
+                )
                 {
-                    int right = head - 1;
-                    int left = head - 1 - SmoothSortLeonardoNumbers[pshift - 2];
-
-                    if (
-                        0 <= comparer.Compare(value, array[left])
-                        && 0 <= comparer.Compare(value, array[right])
-                    )
-                    {
-                        break;
-                    }
-
-                    if (0 <= comparer.Compare(array[left], array[right]))
-                    {
-                        array[head] = array[left];
-                        head = left;
-                        pshift--;
-                    }
-                    else
-                    {
-                        array[head] = array[right];
-                        head = right;
-                        pshift -= 2;
-                    }
+                    break;
                 }
-            }
-            catch
-            {
-                array[head] = value;
-                throw;
+
+                if (0 <= comparer.Compare(array[left], array[right]))
+                {
+                    array[head] = array[left];
+                    head = left;
+                    pshift--;
+                }
+                else
+                {
+                    array[head] = array[right];
+                    head = right;
+                    pshift -= 2;
+                }
             }
 
             array[head] = value;
@@ -230,41 +222,33 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         {
             T value = array[head];
 
-            try
+            while (p != 1)
             {
-                while (p != 1)
+                int stepson = head - SmoothSortLeonardoNumbers[pshift];
+                if (comparer.Compare(array[stepson], value) <= 0)
                 {
-                    int stepson = head - SmoothSortLeonardoNumbers[pshift];
-                    if (comparer.Compare(array[stepson], value) <= 0)
+                    break;
+                }
+
+                if (!isTrusty && 1 < pshift)
+                {
+                    int right = head - 1;
+                    int left = head - 1 - SmoothSortLeonardoNumbers[pshift - 2];
+                    if (
+                        0 <= comparer.Compare(array[right], array[stepson])
+                        || 0 <= comparer.Compare(array[left], array[stepson])
+                    )
                     {
                         break;
                     }
-
-                    if (!isTrusty && 1 < pshift)
-                    {
-                        int right = head - 1;
-                        int left = head - 1 - SmoothSortLeonardoNumbers[pshift - 2];
-                        if (
-                            0 <= comparer.Compare(array[right], array[stepson])
-                            || 0 <= comparer.Compare(array[left], array[stepson])
-                        )
-                        {
-                            break;
-                        }
-                    }
-
-                    array[head] = array[stepson];
-                    head = stepson;
-                    int trailing = BitOps.TrailingZeroCount(p & ~1);
-                    p >>= trailing;
-                    pshift += trailing;
-                    isTrusty = false;
                 }
-            }
-            catch
-            {
-                array[head] = value;
-                throw;
+
+                array[head] = array[stepson];
+                head = stepson;
+                int trailing = BitOps.TrailingZeroCount(p & ~1);
+                p >>= trailing;
+                pshift += trailing;
+                isTrusty = false;
             }
 
             if (!isTrusty)
