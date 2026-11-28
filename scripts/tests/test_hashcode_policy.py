@@ -12,8 +12,19 @@ from csharp_sources import mask_noise, source_files
 ROOT = Path(__file__).resolve().parents[2]
 FORBIDDEN = re.compile(
     r"\bSystem\s*\.\s*HashCode\b"
+    r"|\busing\s+[A-Za-z_]\w*\s*=\s*System\s*;"
     r"|(?<!\.)\bHashCode\b(?!\s*<)"
 )
+
+
+def scan(text: str) -> list[str]:
+    masked = mask_noise(text)
+    found: list[str] = []
+    for match in FORBIDDEN.finditer(masked):
+        if masked[: match.start()].rstrip().endswith("."):
+            continue
+        found.append(match.group(0))
+    return found
 
 
 def findings() -> list[str]:
@@ -21,6 +32,8 @@ def findings() -> list[str]:
     for path in source_files(ROOT, ("Runtime", "Editor")):
         masked = mask_noise(path.read_text(encoding="utf-8"))
         for match in FORBIDDEN.finditer(masked):
+            if masked[: match.start()].rstrip().endswith("."):
+                continue
             line = masked.count("\n", 0, match.start()) + 1
             found.append(f"{path.relative_to(ROOT).as_posix()}:{line}: {match.group(0)}")
     return found
@@ -49,6 +62,9 @@ def test_detector_rejects_each_forbidden_shape() -> None:
     assert FORBIDDEN.search("System.HashCode? hash = new System.HashCode();") is not None
     assert FORBIDDEN.search("using static System.HashCode;") is not None
     assert FORBIDDEN.search("private HashCode first, second;") is not None
+    assert FORBIDDEN.search("using Sys = System;") is not None
+    assert scan("int hash = Objects. HashCode(first, second);") == []
+    assert scan("using Sys = System; int hash = Sys.HashCode.Combine(first, second);") != []
     assert FORBIDDEN.search("return Objects.HashCode(first, second);") is None
     assert FORBIDDEN.search("return value.GetHashCode();") is None
 
