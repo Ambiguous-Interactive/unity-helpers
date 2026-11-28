@@ -11,18 +11,30 @@ namespace WallstopStudios.UnityHelpers.Utils
     public static partial class SpriteArtBounds
     {
         /// <summary>Reads the local bounds of nontransparent sprite pixels without changing import settings.</summary>
+        /// <param name="sprite">The sprite to measure.</param>
+        /// <param name="bounds">The local art bounds, or default on failure.</param>
+        /// <param name="error">The reason measurement failed, or null on success.</param>
+        /// <param name="alphaThreshold">The minimum nonzero alpha byte considered opaque.</param>
+        /// <param name="source">
+        /// Which Editor texture to read. <see cref="SpriteMaskReadSource.SourcePng"/> uses original
+        /// PNG pixels; <see cref="SpriteMaskReadSource.ImportedTexture"/> uses the imported,
+        /// readable texture that the player draws.
+        /// </param>
         /// <remarks>
         /// Uses original PNG pixels in the Editor or readable texture pixels. Packed atlas fallbacks
         /// require rectangular, unrotated packing; tight and rotated atlas data are refused.
         /// Separate alpha textures require source PNG pixels or the mask overload.
         /// Scans effective alpha directly, without allocating an intermediate mask.
-        /// Bounds multiply double pixel offsets by stored float units per pixel before rounding to float.
+        /// Each edge is a double pixel offset from the pivot multiplied by the stored float units
+        /// per pixel. The resulting center and size are cast once to float, and
+        /// <see cref="Bounds.min"/> and <see cref="Bounds.max"/> round again from that center and size.
         /// </remarks>
         public static bool TryGetLocalArtBounds(
             Sprite sprite,
             out Bounds bounds,
             out string error,
-            byte alphaThreshold = 1
+            byte alphaThreshold = 1,
+            SpriteMaskReadSource source = SpriteMaskReadSource.SourcePng
         )
         {
             if (
@@ -30,7 +42,8 @@ namespace WallstopStudios.UnityHelpers.Utils
                     sprite,
                     out SpritePixelRegion region,
                     out error,
-                    borrowReadableTexture: true
+                    borrowReadableTexture: true,
+                    source: source
                 )
             )
             {

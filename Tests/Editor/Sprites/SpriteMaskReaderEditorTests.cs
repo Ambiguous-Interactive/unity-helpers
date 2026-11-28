@@ -194,6 +194,118 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         }
 
         [Test]
+        public void ReadsImportedTextureWhenRequested()
+        {
+            string path = CreatePng();
+            TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
+            Assert.IsTrue(importer != null);
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            importer.textureCompression = TextureImporterCompression.Uncompressed;
+            importer.isReadable = true;
+            importer.spritePixelsPerUnit = 16;
+            importer.SaveAndReimport();
+            Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+            Assert.IsTrue(sprite != null);
+            Assert.IsTrue(sprite.texture.isReadable);
+
+            Assert.IsTrue(
+                SpriteMaskReader.TryRead(
+                    sprite,
+                    out SpriteAlphaMask sourceMask,
+                    out string error,
+                    source: SpriteMaskReadSource.SourcePng
+                ),
+                error
+            );
+            Assert.IsTrue(
+                SpriteMaskReader.TryRead(
+                    sprite,
+                    out SpriteAlphaMask importedMask,
+                    out error,
+                    source: SpriteMaskReadSource.ImportedTexture
+                ),
+                error
+            );
+            CollectionAssert.AreEqual(sourceMask.Pixels, importedMask.Pixels);
+            Assert.AreEqual(sourceMask.Pivot, importedMask.Pivot);
+            Assert.AreEqual(sourceMask.UnitsPerPixel, importedMask.UnitsPerPixel);
+
+            Assert.IsTrue(
+                SpriteArtBounds.TryGetLocalArtBounds(sprite, out Bounds sourceBounds, out error),
+                error
+            );
+            Assert.IsTrue(
+                SpriteArtBounds.TryGetLocalArtBounds(
+                    sprite,
+                    out Bounds importedBounds,
+                    out error,
+                    source: SpriteMaskReadSource.ImportedTexture
+                ),
+                error
+            );
+            Assert.AreEqual(sourceBounds, importedBounds);
+
+            Assert.IsTrue(
+                SpriteArtBounds.TryGetCentreOfLargestDarkestInkRegion(
+                    sprite,
+                    1f,
+                    out Vector2 sourceInk,
+                    out error
+                ),
+                error
+            );
+            Assert.IsTrue(
+                SpriteArtBounds.TryGetCentreOfLargestDarkestInkRegion(
+                    sprite,
+                    1f,
+                    out Vector2 importedInk,
+                    out error,
+                    source: SpriteMaskReadSource.ImportedTexture
+                ),
+                error
+            );
+            Assert.AreEqual(sourceInk, importedInk);
+        }
+
+        [Test]
+        public void ImportedTextureModeRefusesUnreadableTextureAndUnknownSource()
+        {
+            string path = CreatePng();
+            TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
+            Assert.IsTrue(importer != null);
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            importer.textureCompression = TextureImporterCompression.Uncompressed;
+            importer.isReadable = false;
+            importer.spritePixelsPerUnit = 16;
+            importer.SaveAndReimport();
+            Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+            Assert.IsTrue(sprite != null);
+            Assert.IsFalse(sprite.texture.isReadable);
+
+            Assert.IsTrue(
+                SpriteMaskReader.TryRead(sprite, out _, out string sourceError),
+                sourceError
+            );
+            Assert.IsFalse(
+                SpriteMaskReader.TryRead(
+                    sprite,
+                    out SpriteAlphaMask mask,
+                    out string error,
+                    source: SpriteMaskReadSource.ImportedTexture
+                )
+            );
+            Assert.IsTrue(mask.Pixels == null);
+            Assert.That(error, Does.Contain("imported texture requires a readable"));
+
+            Assert.IsFalse(
+                SpriteMaskReader.TryRead(sprite, out _, out error, source: (SpriteMaskReadSource)99)
+            );
+            Assert.That(error, Does.Contain("read source is unknown"));
+        }
+
+        [Test]
         public void ReadsOnlySelectedSubspriteWithItsOwnPivot()
         {
             string path = CreatePng();
