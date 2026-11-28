@@ -4249,15 +4249,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 return 0;
             }
 
-            HashCode hash = new HashCode();
-            hash.Add(_serializableTypeIgnorePatterns.Count);
+            int hash = Objects.HashCode(_serializableTypeIgnorePatterns.Count);
             foreach (SerializableTypeIgnorePattern entry in _serializableTypeIgnorePatterns)
             {
                 string trimmed = entry?.Pattern?.Trim() ?? string.Empty;
-                hash.Add(trimmed);
+                hash = Objects.HashCode(hash, trimmed);
             }
 
-            return hash.ToHashCode();
+            return hash;
         }
 
         private void ApplyRuntimeConfiguration()

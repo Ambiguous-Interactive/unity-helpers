@@ -105,7 +105,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             /// <summary>Hashes the traversal state.</summary>
             public override int GetHashCode()
             {
-                return HashCode.Combine(_owner, _cursor, _finished, Current);
+                return Objects.HashCode(_owner, _cursor, _finished, Current);
             }
         }
     }
